@@ -584,7 +584,7 @@
                     "Child Entity Order": [
                         "Entity_[468033655472]",
                         "Entity_[523868230320]",
-                        "Instance_[64615564592860]/ContainerEntity"
+                        "Instance_[14079976469101]/ContainerEntity"
                     ]
                 },
                 "EditorInspectorComponent": {
@@ -603,7 +603,8 @@
                         "density": 1.225000023841858,
                         "viscosity": 0.000018000000636675395,
                         "robot_name_space": true,
-                        "导出XML": true
+                        "导出XML": true,
+                        "导出Visual": true
                     }
                 },
                 "EditorMjGrpcServerComponent": {
@@ -1877,7 +1878,7 @@
         }
     },
     "Instances": {
-        "Instance_[64615564592860]": {
+        "Instance_[14079976469101]": {
             "Source": "Prefabs/Pusher.prefab",
             "Patches": [
                 {
@@ -1888,19 +1889,22 @@
                 {
                     "op": "replace",
                     "path": "/ContainerEntity/Components/TransformComponent/Transform Data/Translate/0",
-                    "value": 1.0226516723632813
+                    "value": 1.9735087156295776
                 },
                 {
                     "op": "replace",
                     "path": "/ContainerEntity/Components/TransformComponent/Transform Data/Translate/1",
-                    "value": 2.5877954959869385
+                    "value": 1.3748140335083008
                 },
                 {
                     "op": "replace",
                     "path": "/ContainerEntity/Components/TransformComponent/Transform Data/Translate/2",
-                    "value": 0.5414056181907654
+                    "value": 0.3383204936981201
                 }
             ]
+        },
+        "Instance_[64615564592860]": {
+            "Source": "Prefabs/Pusher.prefab"
         }
     }
 }
