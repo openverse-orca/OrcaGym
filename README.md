@@ -30,8 +30,22 @@ cd OrcaGym
 
 2. **Install Dependencies:**
 
+To facilitate quick installation, we can create a new Conda environment:
+```bash
+conda create --name orca_gym_test python=3.11
+conda activate orca_gym_test
+```
+
+Then install the dependencies in the newly created environment:
 ```bash
 pip install -r requirements.txt
+```
+
+2. **Install PyTorch:**
+
+Using a combination of PyTorch and CUDA can effectively speed up reinforcement learning training. Install the corresponding CUDA package based on your GPU device. Here is an example:
+```bash
+pip install torch==2.3.1+cu121 -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
 ## Set Up OrcaStudio:
@@ -41,39 +55,10 @@ Follow the instructions provided in the OrcaStudio documentation to install and 
 ## Usage
 Using OrcaGym is straightforward. Here is an example to get you started:
 
-1. Import OrcaGym:
-
-```python
-import orcagym
-import gym
-
-# Create an OrcaGym environment
-env = gym.make('OrcaEnv-v0')
-```
-
-2. Run a Simulation:
-
-```python
-observation = env.reset()
-for _ in range(1000):
-    env.render()
-    action = env.action_space.sample()  # Random action
-    observation, reward, done, info = env.step(action)
-    if done:
-        observation = env.reset()
-env.close()
-```
-
-2. Integrate with RL Algorithms:
-OrcaGym environments are compatible with popular RL libraries such as Stable Baselines3. You can use these libraries to train agents in OrcaGym environments.
-
-```python
-from stable_baselines3 import PPO
-
-model = PPO('MlpPolicy', env, verbose=1)
-model.learn(total_timesteps=10000)
-model.save("ppo_orcagym")
-```
+* **Validate OrcaGym Environment:**
+1. Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$myWorkSpace/OrcaStudio`, then copy the files to `$myWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
+2. Run OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
+3. Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
 
 ## Important Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
