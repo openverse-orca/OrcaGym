@@ -1,0 +1,674 @@
+syntax = "proto3";
+
+package MujocoMessage;
+
+service GrpcService {
+  // 全局控制
+  rpc SetSimulationState (SetSimulationStateRequest) returns (SetSimulationStateResponse) {}
+  rpc LoadInitialFrame (LoadInitialFrameRequest) returns (LoadInitialFrameResponse) {}
+  rpc LoadKeyFrame (LoadKeyFrameRequest) returns (LoadKeyFrameResponse) {}
+
+
+  // 配置查询
+  rpc QueryModelInfo (QueryModelInfoRequest) returns (QueryModelInfoResponse) {}
+  rpc QueryOptConfig (QueryOptConfigRequest) returns (QueryOptConfigResponse) {}
+
+  // 配置设置
+  rpc SetOptTimestep (SetOptTimestepRequest) returns (SetOptTimestepResponse) {}
+  rpc SetOptConfig (SetOptConfigRequest) returns (SetOptConfigResponse) {}
+
+  // Model 查询
+  rpc QueryAllBodies (QueryAllBodiesRequest) returns (QueryAllBodiesResponse) {}
+  rpc QueryAllJoints (QueryAllJointsRequest) returns (QueryAllJointsResponse) {}
+  rpc QueryAllActuators (QueryAllActuatorsRequest) returns (QueryAllActuatorsResponse) {}
+  rpc QueryActuatorCtrlRange (QueryActuatorCtrlRangeRequest) returns (QueryActuatorCtrlRangeResponse) {}
+  rpc QueryAllMocapBodies (QueryAllMocapBodiesRequest) returns (QueryAllMocapBodiesResponse);
+  rpc QueryAllEqualityConstraints (QueryAllEqualityConstraintsRequest) returns (QueryAllEqualityConstraintsResponse);
+
+  // Data 查询
+  rpc QueryAllQposAndQvel (QueryAllQposAndQvelRequest) returns (QueryAllQposAndQvelResponse) {}
+  rpc QueryQfrcInverse (QueryQfrcInverseRequest) returns (QueryQfrcInverseResponse) {}
+  rpc QueryActuatorMoment (QueryActuatorMomentRequest) returns (QueryActuatorMomentResponse) {}
+  rpc QueryQfrcActuator (QueryQfrcActuatorRequest) returns (QueryQfrcActuatorResponse) {}  
+  rpc QueryCfrcExt (QueryCfrcExtRequest) returns (QueryCfrcExtResponse) {}
+  rpc QueryActuatorForce (QueryActuatorForceRequest) returns (QueryActuatorForceResponse) {}
+  rpc QueryBodyVelocities (QueryBodyVelocitiesRequest) returns (QueryBodyVelocitiesResponse);
+
+  // 全量数据覆盖写入
+  rpc SetQpos (SetQposRequest) returns (SetQposResponse) {}
+  rpc SetQacc (SetQaccRequest) returns (SetQaccResponse) {}
+  rpc SetCtrl (SetCtrlRequest) returns (SetCtrlResponse) {}
+  rpc SetQvel (SetQvelRequest) returns (SetQvelResponse) {}
+
+  // 元素查询
+  rpc QueryJointNames (QueryJointNamesRequest) returns (QueryJointNamesResponse) {}
+  rpc QueryJointDofadr (QueryJointDofadrRequest) returns (QueryJointDofadrResponse) {}  
+  rpc QueryChildBody (QueryChildBodyRequest) returns (QueryChildBodyResponse) {}
+  rpc QueryBodyQpos (QueryBodyQposRequest) returns (QueryBodyQposResponse) {}
+  rpc QueryBodyQvel (QueryBodyQvelRequest) returns (QueryBodyQvelResponse) {}
+  rpc QueryJointQpos (QueryJointQposRequest) returns (QueryJointQposResponse) {}
+  rpc QueryJointQvel (QueryJointQvelRequest) returns (QueryJointQvelResponse) {}
+  rpc QueryBodySubtreeMassByName (QueryBodySubtreeMassByNameRequest) returns (QueryBodySubtreeMassByNameResponse) {}
+  rpc QueryBodyCom (QueryBodyComRequest) returns (QueryBodyComResponse) {}
+  rpc QueryJointLimits (QueryJointLimitsRequest) returns (QueryJointLimitsResponse);
+  rpc QueryActuatorGainPrm (QueryActuatorGainPrmRequest) returns (QueryActuatorGainPrmResponse);
+  rpc QueryActuatorBiasPrm (QueryActuatorBiasPrmRequest) returns (QueryActuatorBiasPrmResponse);
+  rpc QuerySitePosAndMat (QuerySitePosAndMatRequest) returns (QuerySitePosAndMatResponse);
+  rpc QuerySiteJac (QuerySiteJacRequest) returns (QuerySiteJacResponse);
+
+  // 元素设置
+  rpc SetControlInput (SetControlInputRequest) returns (SetControlInputResponse) {}
+  rpc SetJointQpos (SetJointQposRequest) returns (SetJointQposResponse) {}
+  rpc SetActuatorGainPrm (SetActuatorGainPrmRequest) returns (SetActuatorGainPrmResponse);
+  rpc SetActuatorBiasPrm (SetActuatorBiasPrmRequest) returns (SetActuatorBiasPrmResponse);
+  rpc QueryMocapPosAndQuat (QueryMocapPosAndQuatRequest) returns (QueryMocapPosAndQuatResponse);
+  rpc SetMocapPosAndQuat (SetMocapPosAndQuatRequest) returns (SetMocapPosAndQuatResponse);
+  rpc UpdateEqualityConstraints (UpdateEqualityConstraintsRequest) returns (UpdateEqualityConstraintsResponse);
+
+  // 动力学计算
+  rpc MJ_Forward (MJ_ForwardRequest) returns (MJ_ForwardResponse);
+  rpc MJ_Inverse (MJ_InverseRequest) returns (MJ_InverseResponse);
+  rpc MJ_Step (MJ_StepRequest) returns (MJ_StepResponse) {}
+  rpc CalculateStateDifference (CalculateStateDifferenceRequest) returns (CalculateStateDifferenceResponse) {}
+  rpc MJ_DifferentiatePos (DifferentiatePosRequest) returns (DifferentiatePosResponse) {}
+  rpc MJD_TransitionFD (TransitionFDRequest) returns (TransitionFDResponse) {}
+  rpc MJ_JacSubtreeCom (JacSubtreeComRequest) returns (JacSubtreeComResponse) {}
+  rpc MJ_JacBodyCom (JacBodyComRequest) returns (JacBodyComResponse) {}  
+}
+
+enum SimulationState {
+  RUNNING = 0;
+  PAUSED = 1;
+}
+
+message SetSimulationStateRequest {
+  SimulationState state = 1;
+}
+
+message SetSimulationStateResponse {}
+
+message QueryModelInfoRequest {}
+
+message QueryModelInfoResponse {
+  int32 nq = 1;
+  int32 nv = 2;
+  int32 nu = 3;
+  int32 nbody = 4;
+  int32 njnt = 5;
+  int32 ngeom = 6;
+  int32 nsite = 7;
+  int32 nmesh = 8;
+  int32 ncam = 9;
+  int32 nlight = 10;
+  int32 nuser_body = 11;
+  int32 nuser_jnt = 12;
+  int32 nuser_geom = 13;
+  int32 nuser_site = 14;
+  int32 nuser_tendon = 15;
+  int32 nuser_actuator = 16;
+  int32 nuser_sensor = 17;
+}
+
+message QueryOptConfigRequest {}
+
+message QueryOptConfigResponse {
+    float timestep = 1;
+    float apirate = 2;
+    float impratio = 3;
+    float tolerance = 4;
+    float ls_tolerance = 5;
+    float noslip_tolerance = 6;
+    float mpr_tolerance = 7;
+    repeated float gravity = 8;
+    repeated float wind = 9;
+    repeated float magnetic = 10;
+    float density = 11;
+    float viscosity = 12;
+    float o_margin = 13;
+    repeated float o_solref = 14;
+    repeated float o_solimp = 15;
+    repeated float o_friction = 16;
+    int32 integrator = 17;
+    int32 cone = 18;
+    int32 jacobian = 19;
+    int32 solver = 20;
+    int32 iterations = 21;
+    int32 ls_iterations = 22;
+    int32 noslip_iterations = 23;
+    int32 mpr_iterations = 24;
+    int32 disableflags = 25;
+    int32 enableflags = 26;
+    int32 disableactuator = 27;
+    int32 sdf_initpoints = 28;
+    int32 sdf_iterations = 29;
+}
+
+message SetOptConfigRequest {
+    float timestep = 1;
+    float apirate = 2;
+    float impratio = 3;
+    float tolerance = 4;
+    float ls_tolerance = 5;
+    float noslip_tolerance = 6;
+    float mpr_tolerance = 7;
+    repeated float gravity = 8;
+    repeated float wind = 9;
+    repeated float magnetic = 10;
+    float density = 11;
+    float viscosity = 12;
+    float o_margin = 13;
+    repeated float o_solref = 14;
+    repeated float o_solimp = 15;
+    repeated float o_friction = 16;
+    int32 integrator = 17;
+    int32 cone = 18;
+    int32 jacobian = 19;
+    int32 solver = 20;
+    int32 iterations = 21;
+    int32 ls_iterations = 22;
+    int32 noslip_iterations = 23;
+    int32 mpr_iterations = 24;
+    int32 disableflags = 25;
+    int32 enableflags = 26;
+    int32 disableactuator = 27;
+    int32 sdf_initpoints = 28;
+    int32 sdf_iterations = 29;
+}
+
+message SetOptConfigResponse {}
+
+message QueryAllBodiesRequest {}
+
+message QueryAllBodiesResponse {
+  message BodyInfo {
+    string name = 1;
+    int32 id = 2;
+  }
+  repeated BodyInfo body_info = 1;
+}
+
+message QueryAllJointsRequest {}
+
+message QueryAllJointsResponse {
+  message JointInfo {
+    string name = 1;
+    int32 id = 2;
+    int32 body_id = 3;
+    int32 type = 4;
+  }
+  repeated JointInfo joint_info = 1;
+}
+
+message QueryJointNamesRequest {}
+message QueryJointNamesResponse {
+  repeated string JointNames = 1;
+}
+
+message QueryJointDofadrRequest {
+  repeated string JointNames = 1;
+}
+message QueryJointDofadrResponse {
+  repeated int32 JointDofadrs = 1;
+}
+
+message QueryChildBodyRequest {
+  string ParentBodyName = 1;
+}
+
+message QueryChildBodyResponse {
+  repeated string ChildrenBodyName = 1;
+}
+
+message QueryBodyQposRequest {
+  repeated string BodyNameList = 1;
+}
+
+message JointQpos {
+  string JointName = 1;
+  repeated float Qpos = 2;
+}
+
+message BodyQpos {
+  string BodyName = 1;
+  repeated JointQpos Joints = 2;
+}
+
+message QueryBodyQposResponse {
+  repeated BodyQpos BodyQposList = 1;
+}
+
+message QueryBodyQvelRequest {
+  repeated string BodyNameList = 1;
+}
+
+message JointQvel {
+  string JointName = 1;
+  repeated float Qvel = 2;
+}
+
+message BodyQvel {
+  string BodyName = 1;
+  repeated JointQvel Joints = 2;
+}
+
+message QueryBodyQvelResponse {
+  repeated BodyQvel BodyQvelList = 1;
+}
+
+message SetControlInputRequest {
+  message ActuatorControl {
+    string ActuatorName = 1;
+    float ControlInput = 2;
+  }
+  repeated ActuatorControl Controls = 1;
+}
+
+message SetControlInputResponse {
+  message ActuatorResult {
+    string ActuatorName = 1;
+    bool Success = 2;
+  }
+  repeated ActuatorResult Results = 1;
+}
+
+message LoadInitialFrameRequest {}
+
+message LoadInitialFrameResponse {}
+
+message LoadKeyFrameRequest {
+  string KeyFrameName = 1;
+}
+
+message LoadKeyFrameResponse {
+  bool success = 1;
+}
+
+message QueryAllActuatorsRequest {}
+
+message ActuatorData {
+  string ActuatorName = 1;
+  string JointName = 2;
+  float GearRatio = 3;
+}
+
+message QueryAllActuatorsResponse {
+  repeated ActuatorData ActuatorDataList = 1;
+}
+
+message QueryJointQposRequest {
+  repeated string JointNameList = 1;
+}
+
+message QueryJointQposResponse {
+  repeated JointQpos JointQposList = 1;
+}
+
+message QueryJointQvelRequest {
+  repeated string JointNameList = 1;
+}
+
+message QueryJointQvelResponse {
+  repeated JointQvel JointQvelList = 1;
+}
+
+message CalculateStateDifferenceRequest {
+  repeated string JointNames = 1;
+  repeated float InitialQpos = 2;
+}
+
+message StateDifference {
+  string JointName = 1;
+  repeated float Dq = 2;
+  repeated float Qvel = 3;
+}
+
+message CalculateStateDifferenceResponse {
+  repeated StateDifference StateDiffList = 1;
+}
+
+message DifferentiatePosRequest {
+  repeated float InitialQpos = 1;
+  repeated float Qpos = 2;
+}
+
+message DifferentiatePosResponse {
+  repeated float Dq = 1;
+}
+
+message TransitionFDRequest {
+  double Epsilon = 1;
+  bool FlgCentered = 2;
+}
+
+message TransitionFDResponse {
+  int32 nv = 1;
+  int32 nu = 2;
+  repeated float A = 3;
+  repeated float B = 4;
+}
+
+message JacSubtreeComRequest {
+  string BodyName = 1;
+}
+
+message JacSubtreeComResponse {
+  repeated float JacCom = 1;
+}
+
+message JacBodyComRequest {
+  string BodyName = 1;
+}
+
+message JacBodyComResponse {
+  repeated float JacP = 1;
+  repeated float JacR = 2;
+}
+
+message QueryAllQposAndQvelRequest {}
+
+message QueryAllQposAndQvelResponse {
+  repeated float Qpos = 1;
+  repeated float Qvel = 2;
+}
+
+message QueryQfrcInverseRequest {}
+
+message QueryQfrcInverseResponse {
+  repeated float qfrc_inverse = 1;
+}
+
+message QueryActuatorMomentRequest {}
+
+message QueryActuatorMomentResponse {
+  repeated float actuator_moment = 1;
+  int32 nv = 2;
+  int32 nu = 3;
+}
+
+message QueryQfrcActuatorRequest {}
+
+message QueryQfrcActuatorResponse {
+  repeated float qfrc_actuator = 1;
+}
+
+message SetQposRequest {
+    repeated float qpos = 1;
+}
+
+message SetQposResponse {}
+
+message SetQaccRequest {
+    repeated float qacc = 1;
+}
+
+message SetQaccResponse {}
+
+message QueryBodySubtreeMassByNameRequest {
+  string body_name = 1;
+}
+
+message QueryBodySubtreeMassByNameResponse {
+  float body_subtreemass = 1;
+}
+
+message SetOptTimestepRequest {
+    float timestep = 1;
+}
+
+message SetOptTimestepResponse {}
+
+message SetCtrlRequest {
+    repeated float ctrl = 1;
+}
+
+message SetCtrlResponse {}
+
+message MJ_ForwardRequest {}
+
+message MJ_ForwardResponse {}
+
+message MJ_InverseRequest {}
+
+message MJ_InverseResponse {}
+
+message MJ_StepRequest {
+    int32 nstep = 1;  // 需要模拟的步数
+}
+
+message MJ_StepResponse {}
+
+message SetQvelRequest {
+    repeated float qvel = 1;  // 关节速度数组
+}
+
+message SetQvelResponse {}
+
+message QueryBodyComRequest {
+    repeated string body_names = 1;  // 要查询的身体部件的名字列表
+}
+
+message QueryBodyComResponse {
+    repeated BodyCom body_coms = 1;  // 质心位置数组
+    bool success = 2;                // 操作是否成功
+}
+
+message BodyCom {
+    string body_name = 1;  // 身体部件名字
+    repeated float com = 2;  // 质心位置数组，长度为3
+}
+
+message QueryCfrcExtRequest {
+    repeated string body_names = 1;  // 要查询的身体部件的名字列表
+}
+
+message QueryCfrcExtResponse {
+    repeated BodyCfrcExt body_cfrc_exts = 1;  // 每个身体部件的外部接触力矩
+    bool success = 2;                         // 操作是否成功
+}
+
+message BodyCfrcExt {
+    string body_name = 1;  // 身体部件名字
+    repeated float cfrc_ext = 2;  // 外部接触力矩，长度为6
+}
+
+message QueryActuatorCtrlRangeRequest {
+    // 无需额外字段
+}
+
+message QueryActuatorCtrlRangeResponse {
+    repeated ActuatorCtrlRange actuator_ctrl_ranges = 1;  // 激励器控制范围
+    bool success = 2;  // 操作是否成功
+}
+
+message ActuatorCtrlRange {
+    float min = 1;
+    float max = 2;
+}
+
+message SetJointQposRequest {
+  repeated JointQpos joint_qpos_list = 1;
+}
+
+message SetJointQposResponse {
+  bool success = 1;
+}
+
+message QueryActuatorForceRequest {}
+
+message QueryActuatorForceResponse {
+  repeated float actuator_force = 1;
+}
+
+message QueryJointLimitsRequest {
+    repeated string joint_names = 1; // 需要查询的关节名字列表
+}
+
+message JointLimit {
+    string joint_name = 1; // 关节名字
+    bool has_limit = 2;    // 是否有位置限制
+    float range_min = 3;  // 位置限制最小值
+    float range_max = 4;  // 位置限制最大值
+}
+
+message QueryJointLimitsResponse {
+    repeated JointLimit joint_limits = 1; // 关节限制列表
+}
+
+// 添加查询 body 线速度和角速度的接口
+message QueryBodyVelocitiesRequest {
+    repeated string body_names = 1;
+}
+
+message QueryBodyVelocitiesResponse {
+    message BodyVelocity {
+        string body_name = 1;
+        repeated double linear_velocity = 2;
+        repeated double angular_velocity = 3;
+    }
+    repeated BodyVelocity body_velocities = 1;
+}
+
+// QueryActuatorGainPrm
+message QueryActuatorGainPrmRequest {
+    repeated string actuator_names = 1; // 要查询的actuator名称列表
+}
+
+message ActuatorGainPrm {
+    string actuator_name = 1;
+    repeated float gain_prm = 2;
+}
+
+message QueryActuatorGainPrmResponse {
+    repeated ActuatorGainPrm gain_prm_list = 1;
+}
+
+// SetActuatorGainPrm
+message SetActuatorGainPrmRequest {
+    message ActuatorGainPrmSet {
+        string actuator_name = 1;
+        repeated float gain_prm = 2;
+    }
+    repeated ActuatorGainPrmSet gain_prm_set_list = 1;
+}
+
+message SetActuatorGainPrmResponse {
+    bool success = 1;
+}
+
+// QueryActuatorBiasPrm
+message QueryActuatorBiasPrmRequest {
+    repeated string actuator_names = 1; // 要查询的actuator名称列表
+}
+
+message ActuatorBiasPrm {
+    string actuator_name = 1;
+    repeated float bias_prm = 2;
+}
+
+message QueryActuatorBiasPrmResponse {
+    repeated ActuatorBiasPrm bias_prm_list = 1;
+}
+
+// SetActuatorBiasPrm
+message SetActuatorBiasPrmRequest {
+    message ActuatorBiasPrmSet {
+        string actuator_name = 1;
+        repeated float bias_prm = 2;
+    }
+    repeated ActuatorBiasPrmSet bias_prm_set_list = 1;
+}
+
+message SetActuatorBiasPrmResponse {
+    bool success = 1;
+}
+
+// 查询所有 mocap body 
+message QueryAllMocapBodiesRequest {}
+message QueryAllMocapBodiesResponse {
+    message MocapBodyInfo {
+        string mocap_body_name = 1;
+        int32 mocap_body_id = 2;
+    }
+    repeated  MocapBodyInfo mocap_bodies = 1;
+}
+
+// 查询 mocap body 的位置和方向
+message QueryMocapPosAndQuatRequest {
+    repeated string mocap_body_names = 1;
+}
+message QueryMocapPosAndQuatResponse {
+    message MocapBodyInfo {
+        string mocap_body_name = 1;
+        repeated float pos = 2;
+        repeated float quat = 3;
+    }
+    repeated MocapBodyInfo mocap_body_info = 1;
+}
+
+// 设置 mocap body 的位置和方向
+message SetMocapPosAndQuatRequest {
+    message MocapBodyInfo {
+        string mocap_body_name = 1;
+        repeated float pos = 2;
+        repeated float quat = 3;
+    }
+    repeated MocapBodyInfo mocap_body_info = 1;
+}
+message SetMocapPosAndQuatResponse {
+    repeated bool success = 1;
+} 
+
+// 查询所有 equality 约束信息
+message QueryAllEqualityConstraintsRequest {}
+message QueryAllEqualityConstraintsResponse {
+    message EqualityConstraintInfo {
+        int32 eq_type = 1;
+        int32 obj1_id = 2;
+        int32 obj2_id = 3;
+        bool active = 4;
+        repeated float solref = 5;
+        repeated float solimp = 6;
+        repeated float data = 7;
+    }
+    repeated EqualityConstraintInfo equality_constraints = 1;
+}
+
+message QuerySitePosAndMatRequest {
+    repeated string site_names = 1;
+}
+
+message QuerySitePosAndMatResponse {
+    message SitePosAndMat {
+        string site_name = 1;
+        repeated float xpos = 2;
+        repeated float xmat = 3;
+    }  
+    repeated SitePosAndMat site_pos_and_mat = 1;
+}
+
+// 查询多个 site 的 jacobian
+message QuerySiteJacRequest {
+    repeated string site_names = 1;
+}
+
+message QuerySiteJacResponse {
+    message SiteJac {
+        string site_name = 1;
+        repeated float jacp = 2;
+        repeated float jacr = 3;
+    }
+    repeated SiteJac site_jacs = 1;
+}
+
+message UpdateEqualityConstraintsRequest {
+    message EqualityConstraintsInfo {
+        int32 obj1_id = 1;
+        int32 obj2_id = 2;
+        repeated float data = 3;
+    }
+    repeated EqualityConstraintsInfo equality_constraints = 1;
+}
+
+message UpdateEqualityConstraintsResponse {
+    bool success = 1;
+}

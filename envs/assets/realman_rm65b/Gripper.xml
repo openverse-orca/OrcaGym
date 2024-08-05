@@ -1,0 +1,33 @@
+ttle<mujoco model="Gripper">
+  <compiler angle="radian"/>
+  <asset>
+    <mesh name="Gripper_base_link" file="Gripper_base_link.STL"/>
+    <mesh name="Gripper_Link1" file="Gripper_Link1.STL"/>
+    <mesh name="Gripper_Link11" file="Gripper_Link11.STL"/>
+    <mesh name="Gripper_Link2" file="Gripper_Link2.STL"/>
+    <mesh name="Gripper_Link22" file="Gripper_Link22.STL"/>
+  </asset>
+  <worldbody>
+    <geom type="mesh" rgba="0.894118 0.913725 0.929412 1" mesh="Gripper_base_link"/>
+    <body name="Gripper_Link1" pos="0.036 -0.04 -0.019" quat="0.988227 0 0 -0.152992">
+      <inertial pos="0.016415 9.75755e-09 0.00898194" quat="0.500415 0.499584 0.499584 0.500415" mass="0.00647716" diaginertia="1.6998e-06 1.45017e-06 2.95066e-07"/>
+      <joint name="Gripper_Link1" pos="0 0 0" axis="0 0 1" limited="true" range="0 1"/>
+      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1" mesh="Gripper_Link1"/>
+      <body name="Gripper_Link11" pos="0.042 0 0.003" quat="0.988227 0 0 0.152992">
+        <inertial pos="0.0113666 0.0118643 0.00600001" quat="0.427363 0.427363 0.563348 0.563348" mass="0.0127543" diaginertia="1.52644e-06 1.50565e-06 4.93551e-07"/>
+        <joint name="Gripper_Link11" pos="0 0 0" axis="0 0 1" limited="true" range="-1 0"/>
+        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1" mesh="Gripper_Link11"/>
+      </body>
+    </body>
+    <body name="Gripper_Link2" pos="0.036 0.04 -0.019" quat="0.988227 0 0 0.152992">
+      <inertial pos="0.016415 9.75755e-09 0.00898194" quat="0.500415 0.499584 0.499584 0.500415" mass="0.00647716" diaginertia="1.6998e-06 1.45017e-06 2.95066e-07"/>
+      <joint name="Gripper_Link2" pos="0 0 0" axis="0 0 1" limited="true" range="-1 0"/>
+      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1" mesh="Gripper_Link2"/>
+      <body name="Gripper_Link22" pos="0.042 0 0.015" quat="0.152993 0 0 0.988227">
+        <inertial pos="-0.0113666 0.0118643 -0.00600001" quat="0.563348 0.563348 0.427363 0.427363" mass="0.0127543" diaginertia="1.52644e-06 1.50565e-06 4.93551e-07"/>
+        <joint name="Gripper_Link22" pos="0 0 0" axis="0 0 1" limited="true" range="0 1"/>
+        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1" mesh="Gripper_Link22"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>
