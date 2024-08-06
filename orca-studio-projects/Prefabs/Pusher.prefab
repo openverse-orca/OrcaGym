@@ -732,7 +732,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -864,7 +865,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{8AC61DD9-14AC-5B09-A0DA-7D0C4DEF5637}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/metal007_2k-png/metal007.azmaterial"
                                         }
                                     }
                                 }
@@ -1012,9 +1014,8 @@
                     "Config": {
                         "name": "_geom_3",
                         "type": 3,
-                        "density": 0.009999999776482582,
+                        "density": 100.0,
                         "condim": 1,
-                        "conaffinity": 0,
                         "size": [
                             0.05000000074505806,
                             0.05000000074505806,
@@ -1293,7 +1294,25 @@
                 },
                 "EditorMaterialComponent": {
                     "$type": "EditorMaterialComponent",
-                    "Id": 13132817053405871056
+                    "Id": 13132817053405871056,
+                    "Controller": {
+                        "Configuration": {
+                            "materials": [
+                                {
+                                    "Key": {
+                                        "materialSlotStableId": 1206712
+                                    },
+                                    "Value": {
+                                        "MaterialAsset": {
+                                            "assetId": {
+                                                "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 },
                 "EditorMjGeomComponent": {
                     "$type": "EditorMjGeomComponent",
@@ -1994,7 +2013,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{8AC61DD9-14AC-5B09-A0DA-7D0C4DEF5637}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/metal007_2k-png/metal007.azmaterial"
                                         }
                                     }
                                 }
@@ -2305,7 +2325,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{C8A9BD76-51B1-5836-88B8-EC4885295EAB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/wood_table_worn_2k/wood_table_worn.azmaterial"
                                         }
                                     }
                                 }
@@ -2795,7 +2816,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -3121,7 +3143,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{8AC61DD9-14AC-5B09-A0DA-7D0C4DEF5637}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/metal007_2k-png/metal007.azmaterial"
                                         }
                                     }
                                 }
@@ -3685,7 +3708,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -4733,7 +4757,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -4867,7 +4892,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -4999,7 +5025,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{C8A9BD76-51B1-5836-88B8-EC4885295EAB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/wood_table_worn_2k/wood_table_worn.azmaterial"
                                         }
                                     }
                                 }
@@ -5132,7 +5159,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -5576,7 +5604,8 @@
                                         "MaterialAsset": {
                                             "assetId": {
                                                 "guid": "{58CBEFC9-FD09-5E4E-8DBB-5AD9DC0C76EB}"
-                                            }
+                                            },
+                                            "assetHint": "objects/mujocodefaultlevel/materials/oak_veneer_01_2k/oak_veneer.azmaterial"
                                         }
                                     }
                                 }
@@ -5592,8 +5621,6 @@
                         "type": 0,
                         "density": 300.0,
                         "condim": 1,
-                        "contype": 0,
-                        "conaffinity": 0,
                         "pos": [
                             0.14550000429153442,
                             0.0,

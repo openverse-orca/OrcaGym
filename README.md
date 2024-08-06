@@ -50,15 +50,20 @@ pip install torch==2.3.1+cu121 -f https://download.pytorch.org/whl/torch_stable.
 
 ## Set Up OrcaStudio:
 
-Follow the instructions provided in the OrcaStudio documentation to install and configure OrcaStudio on your system.
+Follow the instructions provided in the [OrcaStudio documentation](URL:http://orca3d.cn/) to install and configure OrcaStudio on your system.
 
 ## Usage
-Using OrcaGym is straightforward. Here is an example to get you started:
+Using OrcaGym is straightforward. Here are the examples to get you started:
 
-* **Validate OrcaGym Environment:**
-1. Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$myWorkSpace/OrcaStudio`, then copy the files to `$myWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
-2. Run OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
-3. Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
+1 **Validate OrcaGym Environment:**
+* **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
+* **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
+* **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
+
+
+2 **OrcaGym's Mujoco Interface**
+* **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LRQ` level.
+* **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LRQ.ipynb` to learn how to port the LRQ example included in the Mujoco project into OrcaGym.
 
 ## Important Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
