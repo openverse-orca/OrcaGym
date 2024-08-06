@@ -30,7 +30,7 @@ cd OrcaGym
 
 2. **Install Dependencies:**
 
-To facilitate quick installation, we can create a new Conda environment:
+To facilitate quick installation, we can create a new Conda environment: (If you do not have anaconda installed, please go to the [official website](https://www.anaconda.com/) to install it)
 ```bash
 conda create --name orca_gym_test python=3.11
 conda activate orca_gym_test
