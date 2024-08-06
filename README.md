@@ -62,8 +62,8 @@ Using OrcaGym is straightforward. Here are the examples to get you started:
 
 
 2 **OrcaGym's Mujoco Interface**
-* **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LRQ` level.
-* **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LRQ.ipynb` to learn how to port the LRQ example included in the Mujoco project into OrcaGym.
+* **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level.
+* **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
 
 ## Important Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
