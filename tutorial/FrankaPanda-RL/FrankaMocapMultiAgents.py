@@ -4,7 +4,7 @@ import argparse
 import time
 
 current_file_path = os.path.abspath('')
-project_root = os.path.dirname(current_file_path)
+project_root = os.path.dirname(os.path.dirname(current_file_path))
 
 # 将项目根目录添加到 PYTHONPATH
 if project_root not in sys.path:
@@ -14,7 +14,6 @@ if project_root not in sys.path:
 import gymnasium as gym
 from stable_baselines3 import PPO, SAC, DDPG
 from gymnasium.envs.registration import register
-from envs.mujoco.franka_emika_panda import FrankaEnv
 from datetime import datetime
 import torch
 import torch.nn as nn

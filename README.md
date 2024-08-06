@@ -58,16 +58,21 @@ Using OrcaGym is straightforward. Here are the examples to get you started:
 * **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
 
 * **Validate OrcaGym Environment:**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`. Click the "Start" button (Ctrl-G) to enter Game Play mode.
     * **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
 
 * **OrcaGym's Mujoco Interface**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level.
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
     * **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
 
 * **Control the Franka Panda Robot Arm with an Xbox Controller**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level.
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
     * **Follow the Guide**: Follow the instructions in `tutorial/Xbox-Joystick-Control.ipynb` to learn how to control the Franka Panda robot arm using the controller, and implement operation recording and replay.
+
+* **Reinforcement Learning Training Example**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `FrankaPanda_RL` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
+    * **Follow the Guide**: Follow the instructions in `tutorial/FrankaPanda-RL/FrankaPanda-RL.ipynb` to learn how to use multi-agent reinforcement learning training.
+
 
 ## Important Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
