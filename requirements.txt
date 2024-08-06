@@ -6,3 +6,4 @@ grpcio-tools
 gymnasium>=0.29.1
 stable-baselines3>=2.3.2
 pygame>=2.6.0
+h5py
