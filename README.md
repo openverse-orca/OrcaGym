@@ -55,15 +55,19 @@ Follow the instructions provided in the [OrcaStudio documentation](URL:http://or
 ## Usage
 Using OrcaGym is straightforward. Here are the examples to get you started:
 
-1 **Validate OrcaGym Environment:**
 * **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
-* **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
-* **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
 
+* **Validate OrcaGym Environment:**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`.
+    * **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
 
-2 **OrcaGym's Mujoco Interface**
-* **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level.
-* **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
+* **OrcaGym's Mujoco Interface**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level.
+    * **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
+
+* **Control the Franka Panda Robot Arm with an Xbox Controller**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level.
+    * **Follow the Guide**: Follow the instructions in `tutorial/Xbox-Joystick-Control.ipynb` to learn how to control the Franka Panda robot arm using the controller, and implement operation recording and replay.
 
 ## Important Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
