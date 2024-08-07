@@ -1902,47 +1902,52 @@
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10547399840926]"
+                    "path": "/Entities/Entity_[56072987734673]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10560284742814]"
+                    "path": "/Entities/Entity_[56081577669265]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10581759579294]"
+                    "path": "/Entities/Entity_[56253376361105]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10624709252254]"
+                    "path": "/Entities/Entity_[56300621001361]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10629004219550]"
+                    "path": "/Entities/Entity_[56313505903249]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10817982780574]"
+                    "path": "/Entities/Entity_[56334980739729]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10925356962974]"
+                    "path": "/Entities/Entity_[56347865641617]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10968306635934]"
+                    "path": "/Entities/Entity_[56399405249169]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10998371407006]"
+                    "path": "/Entities/Entity_[56532549235345]"
+                },
+                {
+                    "op": "replace",
+                    "path": "/Entities/Entity_[56386520347281]/Components/EditorEntitySortComponent/Child Entity Order/0",
+                    "value": "Entity_[56352160608913]"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10586054546590]/Components/EditorEntitySortComponent/Child Entity Order/1"
+                    "path": "/Entities/Entity_[56386520347281]/Components/EditorEntitySortComponent/Child Entity Order/1"
                 },
                 {
                     "op": "remove",
-                    "path": "/Entities/Entity_[10586054546590]/Components/EditorMjEqualityComponent"
+                    "path": "/Entities/Entity_[56386520347281]/Components/EditorMjEqualityComponent"
                 }
             ]
         }
