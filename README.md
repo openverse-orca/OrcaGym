@@ -55,7 +55,7 @@ Follow the instructions provided in the [OrcaStudio documentation](URL:http://or
 ## Usage
 Using OrcaGym is straightforward. Here are the examples to get you started:
 
-* **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
+* **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects/{your-orca-studio-version}` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
 
 * **Validate OrcaGym Environment:**
     * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`. Click the "Start" button (Ctrl-G) to enter Game Play mode.
