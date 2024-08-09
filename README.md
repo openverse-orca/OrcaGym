@@ -71,7 +71,7 @@ Using OrcaGym is straightforward. Here are the examples to get you started:
 
 * **Reinforcement Learning Training Example**
     * **Launch OrcaStudio**: Launch OrcaStudio and load the `FrankaPanda_RL` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/FrankaPanda-RL/FrankaPanda-RL.ipynb` to learn how to use multi-agent reinforcement learning training.
+    * **Follow the Guide**: Follow the instructions in `tutorial/FrankaPanda-RL/FrankaPanda-RL.md` to learn how to use multi-agent reinforcement learning training.
 
 
 ## Important Considerations
