@@ -2932,7 +2932,14 @@
                 "TransformComponent": {
                     "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
                     "Id": 14206988904166768007,
-                    "Parent Entity": "ContainerEntity"
+                    "Parent Entity": "ContainerEntity",
+                    "Transform Data": {
+                        "Translate": [
+                            0.0,
+                            0.0,
+                            -0.0010000000474974513
+                        ]
+                    }
                 }
             }
         },
@@ -5866,7 +5873,8 @@
                         "geom1": "",
                         "geom2": "",
                         "body1": "Entity_[12730786350189]",
-                        "body2": "Entity_[12443023541357]"
+                        "body2": "Entity_[12443023541357]",
+                        "condim": 670215472
                     }
                 },
                 "EditorNonUniformScaleComponent": {
