@@ -20,6 +20,11 @@
     <mesh name="link4_coll" file="link4_coll.stl"/>
     <mesh name="link5_coll" file="link5_coll.stl"/>
     <mesh name="link6_coll" file="link6_coll.stl"/>
+    <mesh name="Gripper_base_link_coll" file="Gripper_base_link_coll.stl"/>
+    <mesh name="Gripper_Link1_coll" file="Gripper_Link1_coll.stl"/>
+    <mesh name="Gripper_Link11_coll" file="Gripper_Link11_coll.stl"/>
+    <mesh name="Gripper_Link2_coll" file="Gripper_Link2_coll.stl"/>
+    <mesh name="Gripper_Link22_coll" file="Gripper_Link22_coll.stl"/>   
   </asset>
 
   <default>
@@ -32,14 +37,7 @@
   </default>
 
   <worldbody>
-    <body mocap="true" name="ee_mocap" pos="0.6000 0 0.4000">
-        <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.7" size="0.005 0.005 0.005" type="box"></geom>
-        <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.5 0.005 0.005" type="box"></geom>
-        <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.5 0.001" type="box"></geom>
-        <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.005 0.5" type="box"></geom>
-    </body>
-
-    <body mocap="true" name="hand_mocap" pos="0.6000 0 0.6000">
+    <body mocap="true" name="ee_mocap" pos="-0.6000 0 0.4000">
         <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.7" size="0.005 0.005 0.005" type="box"></geom>
         <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.5 0.005 0.005" type="box"></geom>
         <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.5 0.001" type="box"></geom>
@@ -81,35 +79,32 @@
                   <geom type="mesh" rgba="1 1 1 1"  mesh="link6_coll" class="collision"/>
                   <body name="Gripper_base_link" pos="-0.009652004 -0.000000060 0.042412579" quat="0.707105 0 -0.707108 0">
                     <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_base_link" class="visual"/>
-                    <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_base_link" class="collision"/>
+                    <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_base_link_coll" class="collision"/>
                     <body pos="0.1000 0.000000000 -0.011360586" name="ee_center_body">
                         <site size="0.010000000 0.005000000 0.005000000" rgba="0.500000000 0.500000000 0.500000000 1.000000000" pos="0.000000000 0.000000000 0.000000000" quat="1.000000000 0.000000000 0.000000000 0.000000000" group="0" type="sphere" name="ee_center_site"/>
-                    </body>         
-                    <body pos="-0.1000 0.000000000 -0.011360586" name="hand_center_body">
-                        <site size="0.010000000 0.005000000 0.005000000" rgba="0.500000000 0.500000000 0.500000000 1.000000000" pos="0.000000000 0.000000000 0.000000000" quat="1.000000000 0.000000000 0.000000000 0.000000000" group="0" type="sphere" name="hand_center_site"/>
-                    </body>       
+                    </body>            
                     <body name="Gripper_Link1" pos="0.036 -0.04 -0.019" quat="0.988227 0 0 -0.152992">
                       <inertial pos="0.016415 9.75755e-09 0.00898194" quat="0.500415 0.499584 0.499584 0.500415" mass="0.00647716" diaginertia="1.6998e-06 1.45017e-06 2.95066e-07"/>
                       <joint name="Gripper_Link1" pos="0 0 0" axis="0 0 1" limited="true" range="0 1"  damping="0.2" stiffness="0"/>
                       <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link1" class="visual"/>
-                      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link1" class="collision"/>
+                      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link1_coll" class="collision"/>
                       <body name="Gripper_Link11" pos="0.042 0 0.003" quat="0.988227 0 0 0.152992">
                         <inertial pos="0.0113666 0.0118643 0.00600001" quat="0.427363 0.427363 0.563348 0.563348" mass="0.0127543" diaginertia="1.52644e-06 1.50565e-06 4.93551e-07"/>
                         <joint name="Gripper_Link11" pos="0 0 0" axis="0 0 1" limited="true" range="-1 0"  damping="0.2" stiffness="1"/>
                         <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link11" class="visual"/>
-                        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link11" class="collision"/>
+                        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link11_coll" class="collision"/>
                       </body>
                     </body>
                     <body name="Gripper_Link2" pos="0.036 0.04 -0.019" quat="0.988227 0 0 0.152992">
                       <inertial pos="0.016415 9.75755e-09 0.00898194" quat="0.500415 0.499584 0.499584 0.500415" mass="0.00647716" diaginertia="1.6998e-06 1.45017e-06 2.95066e-07"/>
                       <joint name="Gripper_Link2" pos="0 0 0" axis="0 0 1" limited="true" range="-1 0"  damping="0.2" stiffness="0"/>
                       <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link2" class="visual"/>
-                      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link2" class="collision"/>
+                      <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link2_coll" class="collision"/>
                       <body name="Gripper_Link22" pos="0.042 0 0.015" quat="0.152993 0 0 0.988227">
                         <inertial pos="-0.0113666 0.0118643 -0.00600001" quat="0.563348 0.563348 0.427363 0.427363" mass="0.0127543" diaginertia="1.52644e-06 1.50565e-06 4.93551e-07"/>
                         <joint name="Gripper_Link22" pos="0 0 0" axis="0 0 1" limited="true" range="0 1"  damping="0.2" stiffness="1"/>
                         <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link22" class="visual"/>
-                        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link22" class="collision"/>
+                        <geom type="mesh" rgba="0.894118 0.913725 0.929412 1"  mesh="Gripper_Link22_coll" class="collision"/>
                       </body>
                     </body>
                   </body>
@@ -124,18 +119,18 @@
 
   <equality>
     <weld body1="ee_mocap" body2="ee_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
-    <weld body1="hand_mocap" body2="hand_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
   </equality>
 
-
   <actuator>
-    <general name="actuator1" joint="joint1" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-100 100"/>
-    <general name="actuator2" joint="joint2" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-2.268 2.268" forcerange="-100 100"/>
-    <general name="actuator3" joint="joint3" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-2.355 2.355" forcerange="-75 75"/>
-    <general name="actuator4" joint="joint4" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-75 75"/>
-    <general name="actuator5" joint="joint5" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-2.233 2.233" forcerange="-50 50"/>
-    <general name="actuator6" joint="joint6" gainprm="500" biasprm="0 -500 -50"  biastype="affine" dyntype="none" ctrlrange="-6.28 6.28" forcerange="-50 50"/>
-    <general name="actuator_gripper1" joint="Gripper_Link1" ctrlrange="-1 1" forcerange="-15 15" />
-    <general name="actuator_gripper2" joint="Gripper_Link2" ctrlrange="-1 1" forcerange="-15 15" />
+    <general name="actuator1" joint="joint1" gainprm="2000" biasprm="0 -2000 -200"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-100 100"/>
+    <general name="actuator2" joint="joint2" gainprm="2000" biasprm="0 -2000 -200"  biastype="affine" dyntype="none" ctrlrange="-2.268 2.268" forcerange="-100 100"/>
+    <general name="actuator3" joint="joint3" gainprm="1500" biasprm="0 -1500 -150"  biastype="affine" dyntype="none" ctrlrange="-2.355 2.355" forcerange="-75 75"/>
+    <general name="actuator4" joint="joint4" gainprm="1500" biasprm="0 -1500 -150"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-75 75"/>
+    <general name="actuator5" joint="joint5" gainprm="1000" biasprm="0 -1000 -100"  biastype="affine" dyntype="none" ctrlrange="-2.233 2.233" forcerange="-50 50"/>
+    <general name="actuator6" joint="joint6" gainprm="1000" biasprm="0 -1000 -100"  biastype="affine" dyntype="none" ctrlrange="-6.28 6.28" forcerange="-50 50"/>
+    <general name="actuator_gripper1" joint="Gripper_Link1" ctrlrange="0 1" forcerange="-15 15" />
+    <general name="actuator_gripper2" joint="Gripper_Link2" ctrlrange="-1 0" forcerange="-15 15" />
+    <general name="actuator_gripper11" joint="Gripper_Link11" ctrlrange="-1 0" forcerange="-15 15" />
+    <general name="actuator_gripper22" joint="Gripper_Link22" ctrlrange="0 1" forcerange="-15 15" />
   </actuator>  
 </mujoco>

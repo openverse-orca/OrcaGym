@@ -6,6 +6,7 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick
 import h5py
+from scipy.spatial.transform import Rotation as R
 
 class RecordState:
     RECORD = "record"
@@ -46,7 +47,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             **kwargs,
         )
 
-        self.neutral_joint_values = np.array([0.00, -0.8, -1, 0, -1.3, 0, 0.00, 0.00])
+        self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0.00, 0.00, 0, 0])
 
         print("Opt Config before setting: ", self.gym.opt_config)
         # self.gym.opt_config["o_solref"] = [0.005, 0.9]
@@ -111,14 +112,14 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         return obs, reward, terminated, truncated, info
 
     def _capture_joystick_pos_ctrl(self, joystick_state) -> np.ndarray:
-        move_left_right = joystick_state["axes"]["LeftStickX"]
-        move_up_down = joystick_state["axes"]["LeftStickY"]
+        move_left_right = -joystick_state["axes"]["LeftStickX"]
+        move_up_down = -joystick_state["axes"]["LeftStickY"]
         move_forward_backward = (1 + joystick_state["axes"]["RT"]) * 0.5 - (1 + joystick_state["axes"]["LT"]) * 0.5
         pos_ctrl = np.array([move_forward_backward, move_left_right, move_up_down])
         return pos_ctrl
     
     def _capture_joystick_rot_ctrl(self, joystick_state) -> np.ndarray:
-        yaw = joystick_state["axes"]["RightStickX"]
+        yaw = -joystick_state["axes"]["RightStickX"]
         pitch = joystick_state["axes"]["RightStickY"]
         roll = joystick_state["buttons"]["RB"] * 0.5 - joystick_state["buttons"]["LB"] * 0.5
         rot_ctrl = np.array([yaw, pitch, roll])
@@ -130,6 +131,45 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         self.ctrl[5] += rot_ctrl[2] * 0.1   # roll
         pass
 
+    def _calculate_delta_quat(self, ee_xquat, mocap_xquat):
+        # 将四元数转换为Rotation对象
+        ee_rotation = R.from_quat(ee_xquat)
+        mocap_rotation = R.from_quat(mocap_xquat)
+        
+        # 计算相对旋转四元数
+        delta_rotation = mocap_rotation * ee_rotation.inv()
+        delta_xquat = delta_rotation.as_quat()  # 转换为四元数表示
+        return delta_xquat
+
+    def _quat_to_rot_matrix(self, delta_xquat):
+        delta_rotation = R.from_quat(delta_xquat)
+        rot_matrix = delta_rotation.as_matrix()  # 转换为旋转矩阵
+        return rot_matrix
+
+    def _extract_yaw_pitch_roll(self, rot_matrix):
+        pitch = np.arcsin(-rot_matrix[2, 0])
+
+        if np.cos(pitch) != 0:
+            roll = np.arctan2(rot_matrix[2, 1], rot_matrix[2, 2])
+            yaw = np.arctan2(rot_matrix[1, 0], rot_matrix[0, 0])
+        else:
+            # Gimbal lock: pitch is +/- 90 degrees
+            roll = 0  # Roll can be set to any value
+            yaw = np.arctan2(-rot_matrix[0, 1], rot_matrix[1, 1])
+
+        return yaw, pitch, roll
+
+    def _calculate_yaw_pitch_roll(self, ee_xquat, mocap_xquat):
+        # Step 1: Calculate the relative quaternion
+        delta_xquat = self._calculate_delta_quat(ee_xquat, mocap_xquat)
+        
+        # Step 2: Convert the quaternion to a rotation matrix
+        rot_matrix = self._quat_to_rot_matrix(delta_xquat)
+        
+        # Step 3: Extract yaw, pitch, roll from the rotation matrix
+        yaw, pitch, roll = self._extract_yaw_pitch_roll(rot_matrix)
+        
+        return np.array([yaw, pitch, roll])
     
     def _calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
         R_yaw = np.array([
@@ -156,10 +196,14 @@ class RM65BJoystickEnv(MujocoRobotEnv):
     def _set_gripper_ctrl(self, joystick_state) -> None:
         if (joystick_state["buttons"]["A"]):
             self.ctrl[6] += 0.002
+            self.ctrl[8] -= 0.002
             self.ctrl[7] -= 0.002
+            self.ctrl[9] += 0.002
         elif (joystick_state["buttons"]["B"]):
             self.ctrl[6] -= 0.002
+            self.ctrl[8] += 0.002
             self.ctrl[7] += 0.002
+            self.ctrl[9] -= 0.002
 
         self.ctrl[6] = np.clip(self.ctrl[6], self.ctrl_range[6][0], self.ctrl_range[6][1])
         self.ctrl[7] = np.clip(self.ctrl[7], self.ctrl_range[7][0], self.ctrl_range[7][1])
@@ -239,16 +283,19 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             return
 
         ee_xpos, ee_xmat = self.get_ee_xform()
+        ee_xquat = rotations.mat2quat(ee_xmat)
 
         # 平移控制
-        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * 0.02
+        move_ctrl_rate = 0.02
+        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * move_ctrl_rate
         mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
 
         # 旋转控制，如果输入量小，需要记录当前姿态并在下一帧还原（保持姿态）
+        rot_ctrl_rate = 0.02
         if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
             mocap_xquat = self.save_xquat
         else:
-            rot_offset = rot_ctrl * 0.02
+            rot_offset = rot_ctrl * rot_ctrl_rate
             new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
             mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
             self.save_xquat = mocap_xquat
@@ -260,11 +307,18 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         self.ctrl[:6] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
 
         # 补偿旋转控制
+        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
+        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
+        #     print("Rot_ctrl: ", rot_ctrl)
+
         self._joint_rot_ctrl_compensation(rot_ctrl)
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:
             self._save_record()
+
+
 
 
     def _save_record(self) -> None:
@@ -325,7 +379,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
 
     def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("ee_mocap"): {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
@@ -342,7 +396,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
         # assign value to finger joints
         gripper_joint_qpos_list = {}
-        for name, value in zip(self.gripper_joint_names, self.neutral_joint_values[7:9]):
+        for name, value in zip(self.gripper_joint_names, self.neutral_joint_values[7:11]):
             gripper_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos_list)
 
