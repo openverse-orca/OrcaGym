@@ -30,7 +30,7 @@ cd OrcaGym
 
 2. **Install Dependencies:**
 
-To facilitate quick installation, we can create a new Conda environment: (If you do not have anaconda installed, please go to the [official website](https://www.anaconda.com/) to install it)
+To facilitate quick installation, we can create a new Conda environment: (If you do not have anaconda or miniconda installed, please go to the [official website](https://www.anaconda.com/) to install it)
 ```bash
 conda create --name orca_gym_test python=3.11
 conda activate orca_gym_test
@@ -51,6 +51,9 @@ pip install torch==2.3.1+cu121 -f https://download.pytorch.org/whl/torch_stable.
 ## Set Up OrcaStudio:
 
 Follow the instructions provided in the [OrcaStudio documentation](URL:http://orca3d.cn/) to install and configure OrcaStudio on your system.
+
+Please note that OrcaStudio is a program that runs on Windows and Linux. Therefore, when using WSL to run OrcaGym in conjunction with OrcaStudio run on Windows, we are actually performing cross-virtual machine communication. This requires some additional [configuration](./doc/setup-wsl-grpc-communication.md).
+
 
 ## Usage
 Using OrcaGym is straightforward. Here are the examples to get you started:
