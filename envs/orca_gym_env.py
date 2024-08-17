@@ -567,6 +567,14 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def update_equality_constraints(self, eq_list):
         self.loop.run_until_complete(self._update_equality_constraints(eq_list))
 
+    def query_all_geoms(self):
+        geom_dict = self.loop.run_until_complete(self._query_all_geoms())
+        return geom_dict
+
+    async def _query_all_geoms(self):
+        geom_dict = await self.gym.query_all_geoms()
+        return geom_dict
+
     async def _query_opt_config(self):
         opt_config = await self.gym.query_opt_config()
         return opt_config

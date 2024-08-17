@@ -47,14 +47,45 @@ class OrcaGym:
         self.model.init_body_dict(body_dict)
         joint_dict = await self.query_all_joints()
         self.model.init_joint_dict(joint_dict)
-        actuator_ctrlrange = await self.query_actuator_ctrl_range()
-        self.model.init_actuator_ctrlrange(actuator_ctrlrange)
+        geom_dict = await self.query_all_geoms()
+        self.model.init_geom_dict(geom_dict)
+
 
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
         response = await self.stub.QueryAllActuators(request)
-        actuator_dict = {actuator.ActuatorName : {"JointName": actuator.JointName, "GearRatio": actuator.GearRatio} for actuator in response.ActuatorDataList}
+        actuator_dict = {
+            actuator.ActuatorName: {
+                "JointName": actuator.JointName,
+                "GearRatio": actuator.GearRatio,
+                "ActuatorTrnid": list(actuator.actuator_trnid),
+                "ActuatorCtrllimited": actuator.actuator_ctrllimited,
+                "ActuatorForcelimited": actuator.actuator_forcelimited,
+                "ActuatorActlimited": actuator.actuator_actlimited,
+                "ActuatorCtrlrange": list(actuator.actuator_ctrlrange),
+                "ActuatorForcerange": list(actuator.actuator_forcerange),
+                "ActuatorActrange": list(actuator.actuator_actrange),
+                "ActuatorTrntype": actuator.actuator_trntype,
+                "ActuatorDyntype": actuator.actuator_dyntype,
+                "ActuatorGaintype": actuator.actuator_gaintype,
+                "ActuatorBiastype": actuator.actuator_biastype,
+                "ActuatorActadr": actuator.actuator_actadr,
+                "ActuatorActnum": actuator.actuator_actnum,
+                "ActuatorGroup": actuator.actuator_group,
+                "ActuatorDynprm": list(actuator.actuator_dynprm),
+                "ActuatorGainprm": list(actuator.actuator_gainprm),
+                "ActuatorBiasprm": list(actuator.actuator_biasprm),
+                "ActuatorActearly": actuator.actuator_actearly,
+                "ActuatorGear": list(actuator.actuator_gear),
+                "ActuatorCranklength": actuator.actuator_cranklength,
+                "ActuatorAcc0": actuator.actuator_acc0,
+                "ActuatorLength0": actuator.actuator_length0,
+                "ActuatorLengthrange": list(actuator.actuator_lengthrange),
+            }
+            for actuator in response.ActuatorDataList
+        }
         return actuator_dict
+
 
     async def query_joint_qpos(self, joint_names):
         request = mjc_message_pb2.QueryJointQposRequest(JointNameList=joint_names)
@@ -311,20 +342,63 @@ class OrcaGym:
     async def query_all_joints(self):
         request = mjc_message_pb2.QueryAllJointsRequest()
         response = await self.stub.QueryAllJoints(request)
-        joint_dict = {joint.name: {"joint_id": joint.id, 
-                                   "joint_body_id": joint.body_id, 
-                                   "joint_type": joint.type,
-                                   "joint_range": list(joint.range),
-                                   "qpos_idx_start": joint.qpos_idx_start,
-                                   "qvel_idx_start": joint.qvel_idx_start} 
-                                   for joint in response.joint_info}
+        joint_dict = {
+            joint.name: {
+                "ID": joint.id,
+                "BodyID": joint.body_id,
+                "Type": joint.type,
+                "Range": list(joint.range),
+                "QposIdxStart": joint.qpos_idx_start,
+                "QvelIdxStart": joint.qvel_idx_start,
+                "Group": joint.group,
+                "Limited": joint.limited,
+                "ActfrcLimited": joint.actfrclimited,
+                "Solref": list(joint.solref),
+                "Solimp": list(joint.solimp),
+                "Pos": list(joint.pos),
+                "Axis": list(joint.axis),
+                "Stiffness": joint.stiffness,
+                "ActfrcRange": list(joint.actfrcrange),
+                "Margin": joint.margin,
+            }
+            for joint in response.joint_info
+        }
         return joint_dict
-    
+
     async def query_all_bodies(self):
         request = mjc_message_pb2.QueryAllBodiesRequest()
         response = await self.stub.QueryAllBodies(request)
-        body_dict = {body.name: body.id for body in response.body_info}
+        body_dict = {
+            body.name: {
+                "ID": body.id,
+                "ParentID": body.parent_id,
+                "RootID": body.root_id,
+                "WeldID": body.weld_id,
+                "MocapID": body.mocap_id,
+                "JntNum": body.jnt_num,
+                "JntAdr": body.jnt_adr,
+                "DofNum": body.dof_num,
+                "DofAdr": body.dof_adr,
+                "TreeID": body.tree_id,
+                "GeomNum": body.geom_num,
+                "GeomAdr": body.geom_adr,
+                "Simple": body.simple,
+                "SameFrame": body.same_frame,
+                "Pos": list(body.pos),
+                "Quat": list(body.quat),
+                "IPos": list(body.ipos),
+                "IQuat": list(body.iquat),
+                "Mass": body.mass,
+                "SubtreeMass": body.subtree_mass,
+                "Inertia": list(body.inertia),
+                "InvWeight": list(body.inv_weight),
+                "GravComp": body.grav_comp,
+                "Margin": body.margin,
+            }
+            for body in response.body_info
+        }
         return body_dict
+
     
     async def mj_forward(self):
         request = mjc_message_pb2.MJ_ForwardRequest()
@@ -361,15 +435,6 @@ class OrcaGym:
             return {body_cfrc_ext.body_name: list(body_cfrc_ext.cfrc_ext) for body_cfrc_ext in response.body_cfrc_exts}
         else:
             raise Exception("Failed to query cfrc_ext")        
-        
-    async def query_actuator_ctrl_range(self):
-        request = mjc_message_pb2.QueryActuatorCtrlRangeRequest()
-        response = await self.stub.QueryActuatorCtrlRange(request)
-        if response.success:
-            ranges = [(actuator_ctrl_range.min, actuator_ctrl_range.max) for actuator_ctrl_range in response.actuator_ctrl_ranges]
-            return np.array(ranges, dtype=np.float32)  # 将列表转换为 NumPy 数组
-        else:
-            raise Exception("Failed to query actuator control ranges")
         
     async def set_joint_qpos(self, joint_qpos_list):
         request = mjc_message_pb2.SetJointQposRequest()
@@ -513,3 +578,33 @@ class OrcaGym:
 
         response = await self.stub.UpdateEqualityConstraints(request)
         return response.success
+    
+    async def query_all_geoms(self):
+        request = mjc_message_pb2.QueryAllGeomsRequest()
+        response = await self.stub.QueryAllGeoms(request)
+        geom_dict = {
+            geom.geom_name: {
+                "BodyName": geom.body_name,
+                "GeomType": geom.geom_type,
+                "GeomContype": geom.geom_contype,
+                "GeomConaffinity": geom.geom_conaffinity,
+                "GeomCondim": geom.geom_condim,
+                "GeomSolmix": geom.geom_solmix,
+                "GeomSolref": list(geom.geom_solref),
+                "GeomSolimp": list(geom.geom_solimp),
+                "GeomSize": list(geom.geom_size),
+                "GeomFriction": list(geom.geom_friction),
+                "GeomDataID": geom.geom_dataid,
+                "GeomMatID": geom.geom_matid,
+                "GeomGroup": geom.geom_group,
+                "GeomPriority": geom.geom_priority,
+                "GeomPlugin": geom.geom_plugin,
+                "GeomSameFrame": geom.geom_sameframe,
+                "GeomPos": list(geom.geom_pos),
+                "GeomQuat": list(geom.geom_quat),
+                "GeomMargin": geom.geom_margin,
+                "GeomGap": geom.geom_gap,
+            }
+            for geom in response.geom_data_list
+        }
+        return geom_dict

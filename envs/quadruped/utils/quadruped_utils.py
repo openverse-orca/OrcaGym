@@ -219,19 +219,29 @@ def extract_mj_joint_info(env) -> OrderedDict[str, JointInfo]:
     #         qpos_idx=qpos_idx,
     #         qvel_idx=qvel_idx)
 
-    # Iterate over all actuators
+    actuator_dict = env.model.get_actuator_dict()
     current_dim = 0
-    for acutator_idx in range(model.nu):
-        name_start_index = model.name_actuatoradr[acutator_idx]
-        act_name = model.names[name_start_index:].split(b'\x00', 1)[0].decode('utf-8')
-        mj_actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
-        # Get the joint index associated with the actuator
-        joint_id = model.actuator_trnid[mj_actuator_id, 0]
-        # Get the joint name from the joint index
-        joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
-
-        # Add the actuator indx to the joint_info
-        joint_info[joint_name].actuator_id = mj_actuator_id
+    for i, actuator in enumerate(actuator_dict.values()):
+        joint_name = actuator['JointName']
+        joint_info[joint_name].actuator_id = i
         joint_info[joint_name].tau_idx = tuple(range(current_dim, current_dim + joint_info[joint_name].nv))
         current_dim += joint_info[joint_name].nv
+        
+
+    # Iterate over all actuators
+    # current_dim = 0
+    # for acutator_idx in range(model.nu):
+    #     name_start_index = model.name_actuatoradr[acutator_idx]
+    #     act_name = model.names[name_start_index:].split(b'\x00', 1)[0].decode('utf-8')
+    #     mj_actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
+    #     # Get the joint index associated with the actuator
+    #     joint_id = model.actuator_trnid[mj_actuator_id, 0]
+    #     # Get the joint name from the joint index
+    #     joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+
+    #     # Add the actuator indx to the joint_info
+    #     joint_info[joint_name].actuator_id = mj_actuator_id
+    #     joint_info[joint_name].tau_idx = tuple(range(current_dim, current_dim + joint_info[joint_name].nv))
+    #     current_dim += joint_info[joint_name].nv
+    
     return joint_info

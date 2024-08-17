@@ -21,7 +21,7 @@ service GrpcService {
   rpc QueryAllBodies (QueryAllBodiesRequest) returns (QueryAllBodiesResponse) {}
   rpc QueryAllJoints (QueryAllJointsRequest) returns (QueryAllJointsResponse) {}
   rpc QueryAllActuators (QueryAllActuatorsRequest) returns (QueryAllActuatorsResponse) {}
-  rpc QueryActuatorCtrlRange (QueryActuatorCtrlRangeRequest) returns (QueryActuatorCtrlRangeResponse) {}
+  rpc QueryAllGeoms (QueryAllGeomsRequest) returns (QueryAllGeomsResponse) {}
   rpc QueryAllMocapBodies (QueryAllMocapBodiesRequest) returns (QueryAllMocapBodiesResponse);
   rpc QueryAllEqualityConstraints (QueryAllEqualityConstraintsRequest) returns (QueryAllEqualityConstraintsResponse);
 
@@ -180,11 +180,34 @@ message SetOptConfigResponse {}
 message QueryAllBodiesRequest {}
 
 message QueryAllBodiesResponse {
-  message BodyInfo {
-    string name = 1;
-    int32 id = 2;
-  }
-  repeated BodyInfo body_info = 1;
+    message BodyInfo {
+        string name = 1;
+        int32 id = 2;
+        int32 parent_id = 3;
+        int32 root_id = 4;
+        int32 weld_id = 5;
+        int32 mocap_id = 6;
+        int32 jnt_num = 7;
+        int32 jnt_adr = 8;
+        int32 dof_num = 9;
+        int32 dof_adr = 10;
+        int32 tree_id = 11;
+        int32 geom_num = 12;
+        int32 geom_adr = 13;
+        bool simple = 14;
+        bool same_frame = 15;
+        repeated float pos = 16;
+        repeated float quat = 17;
+        repeated float ipos = 18;
+        repeated float iquat = 19;
+        float mass = 20;
+        float subtree_mass = 21;
+        repeated float inertia = 22;
+        repeated float inv_weight = 23;
+        float grav_comp = 24;
+        float margin = 25;
+    }
+    repeated BodyInfo body_info = 1;
 }
 
 message QueryAllJointsRequest {}
@@ -198,6 +221,16 @@ message QueryAllJointsResponse {
     repeated float range = 5;
     int32 qpos_idx_start = 6;
     int32 qvel_idx_start = 7;
+    int32 group = 8;
+    bool limited = 9;
+    bool actfrclimited = 10;
+    repeated float solref = 11;
+    repeated float solimp = 12;
+    repeated float pos = 13;
+    repeated float axis = 14;
+    float stiffness = 15;
+    repeated float actfrcrange = 16;
+    float margin = 17;
   }
   repeated JointInfo joint_info = 1;
 }
@@ -288,15 +321,69 @@ message LoadKeyFrameResponse {
 
 message QueryAllActuatorsRequest {}
 
-message ActuatorData {
-  string ActuatorName = 1;
-  string JointName = 2;
-  float GearRatio = 3;
+message QueryAllActuatorsResponse {
+    message ActuatorData {
+        string ActuatorName = 1;
+        string JointName = 2;
+        float GearRatio = 3;
+        repeated int32 actuator_trnid = 4;
+        bool actuator_ctrllimited = 5;
+        bool actuator_forcelimited = 6;
+        bool actuator_actlimited = 7;
+        repeated float actuator_ctrlrange = 8;
+        repeated float actuator_forcerange = 9;
+        repeated float actuator_actrange = 10;
+        int32 actuator_trntype = 11;
+        int32 actuator_dyntype = 12;
+        int32 actuator_gaintype = 13;
+        int32 actuator_biastype = 14;
+        int32 actuator_actadr = 15;
+        int32 actuator_actnum = 16;
+        int32 actuator_group = 17;
+        repeated float actuator_dynprm = 18;
+        repeated float actuator_gainprm = 19;
+        repeated float actuator_biasprm = 20;
+        bool actuator_actearly = 21;
+        repeated float actuator_gear = 22;
+        float actuator_cranklength = 23;
+        float actuator_acc0 = 24;
+        float actuator_length0 = 25;
+        repeated float actuator_lengthrange = 26;
+    }
+
+    repeated ActuatorData ActuatorDataList = 1;
 }
 
-message QueryAllActuatorsResponse {
-  repeated ActuatorData ActuatorDataList = 1;
+message QueryAllGeomsRequest {}
+
+message QueryAllGeomsResponse {
+    message GeomData {
+        string geom_name = 1;
+        string body_name = 2;
+        int32 geom_type = 3;
+        int32 geom_contype = 4;
+        int32 geom_conaffinity = 5;
+        int32 geom_condim = 6;
+        float geom_solmix = 7;
+        repeated float geom_solref = 8;
+        repeated float geom_solimp = 9;
+        repeated float geom_size = 10;
+        repeated float geom_friction = 11;
+        int32 geom_dataid = 12;
+        int32 geom_matid = 13;
+        int32 geom_group = 14;
+        int32 geom_priority = 15;
+        int32 geom_plugin = 16;
+        bool geom_sameframe = 17;
+        repeated float geom_pos = 18;
+        repeated float geom_quat = 19;
+        float geom_margin = 20;
+        float geom_gap = 21;
+    }
+
+    repeated GeomData geom_data_list = 1;
 }
+
 
 message QueryJointQposRequest {
   repeated string JointNameList = 1;
@@ -472,20 +559,6 @@ message QueryCfrcExtResponse {
 message BodyCfrcExt {
     string body_name = 1;  // 身体部件名字
     repeated float cfrc_ext = 2;  // 外部接触力矩，长度为6
-}
-
-message QueryActuatorCtrlRangeRequest {
-    // 无需额外字段
-}
-
-message QueryActuatorCtrlRangeResponse {
-    repeated ActuatorCtrlRange actuator_ctrl_ranges = 1;  // 激励器控制范围
-    bool success = 2;  // 操作是否成功
-}
-
-message ActuatorCtrlRange {
-    float min = 1;
-    float max = 2;
 }
 
 message SetJointQposRequest {

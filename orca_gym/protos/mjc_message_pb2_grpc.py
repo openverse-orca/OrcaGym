@@ -89,10 +89,10 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryAllActuatorsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryAllActuatorsResponse.FromString,
                 _registered_method=True)
-        self.QueryActuatorCtrlRange = channel.unary_unary(
-                '/MujocoMessage.GrpcService/QueryActuatorCtrlRange',
-                request_serializer=mjc__message__pb2.QueryActuatorCtrlRangeRequest.SerializeToString,
-                response_deserializer=mjc__message__pb2.QueryActuatorCtrlRangeResponse.FromString,
+        self.QueryAllGeoms = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryAllGeoms',
+                request_serializer=mjc__message__pb2.QueryAllGeomsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryAllGeomsResponse.FromString,
                 _registered_method=True)
         self.QueryAllMocapBodies = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryAllMocapBodies',
@@ -373,7 +373,7 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def QueryActuatorCtrlRange(self, request, context):
+    def QueryAllGeoms(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -689,10 +689,10 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.QueryAllActuatorsRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryAllActuatorsResponse.SerializeToString,
             ),
-            'QueryActuatorCtrlRange': grpc.unary_unary_rpc_method_handler(
-                    servicer.QueryActuatorCtrlRange,
-                    request_deserializer=mjc__message__pb2.QueryActuatorCtrlRangeRequest.FromString,
-                    response_serializer=mjc__message__pb2.QueryActuatorCtrlRangeResponse.SerializeToString,
+            'QueryAllGeoms': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryAllGeoms,
+                    request_deserializer=mjc__message__pb2.QueryAllGeomsRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryAllGeomsResponse.SerializeToString,
             ),
             'QueryAllMocapBodies': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryAllMocapBodies,
@@ -1186,7 +1186,7 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def QueryActuatorCtrlRange(request,
+    def QueryAllGeoms(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1199,9 +1199,9 @@ class GrpcService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/MujocoMessage.GrpcService/QueryActuatorCtrlRange',
-            mjc__message__pb2.QueryActuatorCtrlRangeRequest.SerializeToString,
-            mjc__message__pb2.QueryActuatorCtrlRangeResponse.FromString,
+            '/MujocoMessage.GrpcService/QueryAllGeoms',
+            mjc__message__pb2.QueryAllGeomsRequest.SerializeToString,
+            mjc__message__pb2.QueryAllGeomsResponse.FromString,
             options,
             channel_credentials,
             insecure,

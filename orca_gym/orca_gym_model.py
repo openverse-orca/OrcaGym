@@ -1,6 +1,7 @@
 import sys
 import os
 import grpc
+import numpy as np
 
 
 class OrcaGymModel:
@@ -19,7 +20,6 @@ class OrcaGymModel:
         self._eq_list = None
         self._mocap_dict = None
         self._actuator_dict = None
-        self._actuator_ctrlrange = None
         self._body_dict = None
         self._joint_dict = None
         
@@ -37,6 +37,9 @@ class OrcaGymModel:
 
         self.neq = len(eq_list)
 
+    def get_eq_list(self):
+        return self._eq_list
+    
     def init_mocap_dict(self, mocap_dict):
         self._mocap_dict = mocap_dict
         print("Mocap dict: ", mocap_dict)
@@ -44,33 +47,63 @@ class OrcaGymModel:
         self.nmocap = len(mocap_dict)
 
     def init_actuator_dict(self, actuator_dict):
-        self._actuator_dict = actuator_dict
+        for i, (actuator_name, actuator) in enumerate(actuator_dict.items()):
+            actuator["ActuatorId"] = i
+        self._actuator_dict = actuator_dict.copy()
         print("Actuator dict: ", actuator_dict)
 
-    def init_actuator_ctrlrange(self, actuator_ctrlrange):
-        self._actuator_ctrlrange = actuator_ctrlrange
-        print("Actuator control range: ", actuator_ctrlrange)
+    def get_actuator_dict(self):
+        return self._actuator_dict
+    
+    def actuator_name2id(self, actuator_name):
+        return self._actuator_dict[actuator_name]["ActuatorId"]
 
     def init_body_dict(self, body_dict):
-        self._body_dict = body_dict
+        for i, (body_name, body) in enumerate(body_dict.items()):
+            body["BodyId"] = i
+        self._body_dict = body_dict.copy()
         print("Body dict: ", body_dict)
 
+    def get_body_dict(self):
+        return self._body_dict
+    
+    def body_name2id(self, body_name):
+        return self._body_dict[body_name]["BodyId"]
+
     def init_joint_dict(self, joint_dict):
-        self._joint_dict = joint_dict
+        for i, (joint_name, joint) in enumerate(joint_dict.items()):
+            joint["JointId"] = i
+        self._joint_dict = joint_dict.copy()
         print("Joint dict: ", joint_dict)
 
     def get_joint_dict(self):
         return self._joint_dict
-
-    def get_eq_list(self):
-        return self._eq_list
     
+    def joint_name2id(self, joint_name):
+        return self._joint_dict[joint_name]["JointId"]
+
+    def init_geom_dict(self, geom_dict):
+        for i, (geom_name, geom) in enumerate(geom_dict.items()):
+            geom["GeomId"] = i
+        self._geom_dict = geom_dict.copy()
+        print("Geom dict: ", geom_dict)
+
+    def get_geom_dict(self):
+        return self._geom_dict
+    
+    def geom_name2id(self, geom_name):
+        return self._geom_dict[geom_name]["GeomId"]
 
     def get_body_names(self):
         return self._body_dict.keys()
     
     def get_actuator_ctrlrange(self):
-        return self._actuator_ctrlrange
+        actuator_ctrlrange = {}
+        for actuator_name, actuator in self._actuator_dict.items():
+            actuator_ctrlrange[actuator_name] = actuator["ActuatorCtrlrange"]
+        ctrlrange = np.array(list(actuator_ctrlrange.values()))
+        return ctrlrange
+        
 
     # def stip_agent_name(self, org_name):
     #     for agent in self.agent_names:

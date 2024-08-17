@@ -168,10 +168,19 @@ class QuadrupedEnv(OrcaGymEnv):
             self._find_feet_model_attrs(feet_geom_name)
 
         # Action space: Torque values for each joint _________________________________________________________________
-        tau_low, tau_high = self.mjModel.actuator_forcerange[:, 0], self.mjModel.actuator_forcerange[:, 1]
-        is_act_lim = [np.inf if not lim else 1.0 for lim in self.mjModel.actuator_forcelimited]
+        actuator_dict = self.model.get_actuator_dict()
+        tau_low, tau_high, is_act_lim = np.zeros(0)
+        for actuator_name, actuator in actuator_dict.items():
+            tau_low.append(actuator["ActuatorForcerange"][0])
+            tau_high.append(actuator["ActuatorForcerange"][1])
+            is_act_lim.append(np.inf if actuator["ActuatorForcelimited"] == False else 1.0)
+
+
+        # tau_low, tau_high = self.mjModel.actuator_forcerange[:, 0], self.mjModel.actuator_forcerange[:, 1]
+        # is_act_lim = [np.inf if not lim else 1.0 for lim in self.mjModel.actuator_forcelimited]
+
         self.action_space = spaces.Box(
-            shape=(self.mjModel.nu,),
+            shape=(self.model.nu,),
             low=np.asarray([tau if not lim else -np.inf for tau, lim in zip(tau_low, is_act_lim)]),
             high=np.asarray([tau if not lim else np.inf for tau, lim in zip(tau_high, is_act_lim)]),
             dtype=np.float32)
@@ -878,16 +887,16 @@ class QuadrupedEnv(OrcaGymEnv):
 
         return invalid_contact_detected, invalid_contacts  # No invalid contact detected
 
-    def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
-        """Returns the body ID and name associated with the geometry name or ID."""
-        assert geom_name is not None or geom_id is not None, "Please provide either the geometry name or ID."
-        if geom_name is not None:
-            geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+    # def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
+    #     """Returns the body ID and name associated with the geometry name or ID."""
+    #     assert geom_name is not None or geom_id is not None, "Please provide either the geometry name or ID."
+    #     if geom_name is not None:
+    #         geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
 
-        body_id = self.mjModel.geom_bodyid[geom_id]
-        body_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
+    #     body_id = self.mjModel.geom_bodyid[geom_id]
+    #     body_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
 
-        return body_id, body_name
+    #     return body_id, body_name
 
     def _update_camera_target(self, cam, target_point: np.ndarray):
         cam.lookat[:] = target_point  # Update the camera lookat point to the target point
@@ -1085,13 +1094,25 @@ class QuadrupedEnv(OrcaGymEnv):
         [self._init_args.pop(k) for k in ['self', '__class__']]  # Remove 'self' and '__class__
 
     def _find_feet_model_attrs(self, feet_geom_name):
-        _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
+        """Find the geom and body IDs of the feet based on the provided feet_geom_name."""
+        geom_dict = self.model.get_geom_dict()
         for lef_name in ["FR", "FL", "RR", "RL"]:
-            foot_geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, feet_geom_name[lef_name])
-            assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {_all_geoms}."
+            geom_name = feet_geom_name[lef_name]
+            foot_geom_id = self.model.geom_name2id(geom_name)
+            assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {geom_dict.keys()}."
+            foot_body_id = self.model.body_name2id(geom_dict[feet_geom_name[lef_name]]['BodyName'])
+            assert foot_body_id != -1, f"Foot BODY {geom_dict[feet_geom_name[lef_name]]['BodyName']} not found."
             self._feet_geom_id[lef_name] = foot_geom_id
-            foot_body_id, foot_body_name = self._get_geom_body_info(geom_id=foot_geom_id)
             self._feet_body_id[lef_name] = foot_body_id
+
+
+        # _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
+        # for lef_name in ["FR", "FL", "RR", "RL"]:
+        #     foot_geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, feet_geom_name[lef_name])
+        #     assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {_all_geoms}."
+        #     self._feet_geom_id[lef_name] = foot_geom_id
+        #     foot_body_id, foot_body_name = self._get_geom_body_info(geom_id=foot_geom_id)
+        #     self._feet_body_id[lef_name] = foot_body_id
 
     def __str__(self):
         """Returns a description of the environment task configuration."""
