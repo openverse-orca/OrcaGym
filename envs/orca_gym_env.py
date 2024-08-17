@@ -412,6 +412,9 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         cfrc_ext_dict = await self.gym.query_cfrc_ext(body_names=body_names)
         return cfrc_ext_dict
         
+    def set_time_step(self, time_step):
+        self.loop.run_until_complete(self._set_time_step(time_step))
+                                     
     async def _set_time_step(self, time_step):
         await self.gym.set_opt_timestep(time_step)
     

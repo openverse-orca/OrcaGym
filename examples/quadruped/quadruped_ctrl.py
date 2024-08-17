@@ -10,7 +10,7 @@ import os
 import sys
 
 current_file_path = os.path.abspath('')
-project_root = os.path.dirname(current_file_path)
+project_root = os.path.dirname(os.path.dirname(current_file_path))
 
 # 将项目根目录添加到 PYTHONPATH
 if project_root not in sys.path:
@@ -19,6 +19,10 @@ if project_root not in sys.path:
 # [Begin] OrcaGym 修改的代码 ______________________________________________________________
 from envs.quadruped.quadruped_env import QuadrupedEnv
 from envs.quadruped import config as cfg
+from envs.orca_gym_env import ActionSpaceType
+from gymnasium.envs.registration import register
+import gymnasium as gym
+from envs.franka_control.franka_joystick_env import RecordState
 # [End] OrcaGym 修改的代码 ______________________________________________________________
 
 # [Begin] Quadruped-PyMPC 原生的代码 ______________________________________________________
@@ -41,6 +45,42 @@ from gym_quadruped.utils.mujoco.visual import render_sphere
 # [End] Quadruped-PyMPC 原生的代码 ______________________________________________________
 
 
+
+TIME_STEP = 0.01  # 100 Hz simulation
+
+def register_env(grpc_address, record_state, record_file, 
+                 robot_name, hip_height, robot_leg_joints, 
+                 robot_feet_geom_names, scene_name, simulation_dt, state_observables_names):
+    print("register_env: ", grpc_address)
+    gym.register(
+        id=f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}",
+        entry_point="envs.quadruped.quadruped_env:QuadrupedEnv",
+        kwargs={'frame_skip': 1,   # 1 action per frame
+                'reward_type': "dense",
+                'action_space_type': ActionSpaceType.CONTINUOUS,
+                'action_step_count': 0,
+                'grpc_address': grpc_address, 
+                'agent_names': ['GO2'], 
+                'time_step': TIME_STEP,
+                'record_state': record_state,
+                'record_file': record_file,
+                'robot': robot_name,
+                'hip_height': hip_height,
+                'legs_joint_names': robot_leg_joints,  # Joint names of the legs DoF
+                'feet_geom_name': robot_feet_geom_names,  # Geom/Frame id of feet
+                'scene': scene_name,
+                'sim_dt': simulation_dt,
+                'ref_base_lin_vel': 0.0,  # pass a float for a fixed value
+                'ground_friction_coeff': 1.5,  # pass a float for a fixed value
+                'base_vel_command_type': "human",  # "forward", "random", "forward+rotate", "human"
+                'state_obs_names': state_observables_names,  # Desired quantities in the 'state' vec
+                },
+        max_episode_steps=sys.maxsize,  # never stop
+        reward_threshold=0.0,
+    )
+
+
+
 if __name__ == '__main__':
     np.set_printoptions(precision=3, suppress=True)
 
@@ -55,19 +95,29 @@ if __name__ == '__main__':
                                'qpos_js', 'qvel_js', 'tau_ctrl_setpoint',
                                'feet_pos_base', 'feet_vel_base', 'contact_state', 'contact_forces_base',)
 
+    grpc_address = "172.17.224.1:50051"
+    print("simulation running... , grpc_address: ", grpc_address)
+    env_id = f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}"
 
+    register_env(grpc_address, RecordState.NONE, 'quadruped_ctrl.h5',
+                 robot_name, hip_height, robot_leg_joints, robot_feet_geom_names, 
+                 scene_name, simulation_dt, state_observables_names)
+
+    env = gym.make(env_id)        
+    print("启动仿真环境")
+    
     # Create the quadruped robot environment -----------------------------------------------------------
-    env = QuadrupedEnv(robot=robot_name,
-                       hip_height=hip_height,
-                       legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-                       feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
-                       scene=scene_name,
-                       sim_dt=simulation_dt,
-                       ref_base_lin_vel=0.0,  # pass a float for a fixed value
-                       ground_friction_coeff=1.5,  # pass a float for a fixed value
-                       base_vel_command_type="human",  # "forward", "random", "forward+rotate", "human"
-                       state_obs_names=state_observables_names,  # Desired quantities in the 'state' vec
-                       )
+    # env = QuadrupedEnv(robot=robot_name,
+    #                    hip_height=hip_height,
+    #                    legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
+    #                    feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
+    #                    scene=scene_name,
+    #                    sim_dt=simulation_dt,
+    #                    ref_base_lin_vel=0.0,  # pass a float for a fixed value
+    #                    ground_friction_coeff=1.5,  # pass a float for a fixed value
+    #                    base_vel_command_type="human",  # "forward", "random", "forward+rotate", "human"
+    #                    state_obs_names=state_observables_names,  # Desired quantities in the 'state' vec
+    #                    )
     # env = QuadrupedEnv(robot=robot_name,
     #                    hip_height=hip_height,
     #                    legs_joint_names=LegsAttr(**robot_leg_joints),  # Joint names of the legs DoF
@@ -87,7 +137,7 @@ if __name__ == '__main__':
         env.mjModel.qpos0 = np.concatenate((env.mjModel.qpos0[:7], cfg.qpos0_js))
 
     env.reset(random=False)
-    env.render()  # Pass in the first render call any mujoco.viewer.KeyCallbackType
+    # env.render()  # Pass in the first render call any mujoco.viewer.KeyCallbackType
 
 
     # Controller initialization -------------------------------------------------------------
@@ -522,7 +572,7 @@ if __name__ == '__main__':
 
 
             # Render only at a certain frequency -----------------------------------------------------------------
-            if time.time() - last_render_time > 1.0 / RENDER_FREQ or env.step_num == 1:
+            if False: # time.time() - last_render_time > 1.0 / RENDER_FREQ or env.step_num == 1:
                 _, _, feet_GRF = env.feet_contact_state(ground_reaction_forces=True)
 
                 # Plot the swing trajectory

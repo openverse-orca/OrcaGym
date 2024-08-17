@@ -59,6 +59,8 @@ class OrcaGymModel:
         self._joint_dict = joint_dict
         print("Joint dict: ", joint_dict)
 
+    def get_joint_dict(self):
+        return self._joint_dict
 
     def get_eq_list(self):
         return self._eq_list

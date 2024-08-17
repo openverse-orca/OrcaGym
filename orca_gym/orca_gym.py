@@ -311,7 +311,13 @@ class OrcaGym:
     async def query_all_joints(self):
         request = mjc_message_pb2.QueryAllJointsRequest()
         response = await self.stub.QueryAllJoints(request)
-        joint_dict = {joint.name: {"joint_id": joint.id, "joint_body_id": joint.body_id, "joint_type": joint.type} for joint in response.joint_info}
+        joint_dict = {joint.name: {"joint_id": joint.id, 
+                                   "joint_body_id": joint.body_id, 
+                                   "joint_type": joint.type,
+                                   "joint_range": list(joint.range),
+                                   "qpos_idx_start": joint.qpos_idx_start,
+                                   "qvel_idx_start": joint.qvel_idx_start} 
+                                   for joint in response.joint_info}
         return joint_dict
     
     async def query_all_bodies(self):

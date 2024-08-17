@@ -195,6 +195,9 @@ message QueryAllJointsResponse {
     int32 id = 2;
     int32 body_id = 3;
     int32 type = 4;
+    repeated float range = 5;
+    int32 qpos_idx_start = 6;
+    int32 qvel_idx_start = 7;
   }
   repeated JointInfo joint_info = 1;
 }

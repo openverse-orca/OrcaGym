@@ -3,11 +3,7 @@ import os
 import grpc
 from enum import Enum
 
-# 定义关节类型常量
-mjJNT_FREE = 0
-mjJNT_BALL = 1
-mjJNT_SLIDE = 2
-mjJNT_HINGE = 3
+
 
 class Body:
     def __init__(self, name, id):
@@ -15,6 +11,12 @@ class Body:
         self.id = id
     
 class Joint:
+    # 定义关节类型常量
+    mjJNT_FREE = 0
+    mjJNT_BALL = 1
+    mjJNT_SLIDE = 2
+    mjJNT_HINGE = 3
+
     def __init__(self, name, id, body_id, type):
         self.name = name
         self.id = id
@@ -23,35 +25,35 @@ class Joint:
 
     # 获取 joint 的 qpos size
     def qpos_size(joint_type):
-        if joint_type == mjJNT_FREE:
+        if joint_type == Joint.mjJNT_FREE:
             return 7
-        elif joint_type == mjJNT_BALL:
+        elif joint_type == Joint.mjJNT_BALL:
             return 4
-        elif joint_type in (mjJNT_SLIDE, mjJNT_HINGE):
+        elif joint_type in (Joint.mjJNT_SLIDE, Joint.mjJNT_HINGE):
             return 1
         else:
             return 0
 
     # 获取 joint 的 qvel size
     def qvel_size(joint_type):
-        if joint_type == mjJNT_FREE:
+        if joint_type == Joint.mjJNT_FREE:
             return 6
-        elif joint_type == mjJNT_BALL:
+        elif joint_type == Joint.mjJNT_BALL:
             return 3
-        elif joint_type in (mjJNT_SLIDE, mjJNT_HINGE):
+        elif joint_type in (Joint.mjJNT_SLIDE, Joint.mjJNT_HINGE):
             return 1
         else:
             return 0
 
     # 获取 joint 的 dof size
     def dof_size(joint_type):
-        if joint_type == mjJNT_FREE:
+        if joint_type == Joint.mjJNT_FREE:
             return 6  # 一个自由关节有6个DOF
-        elif joint_type == mjJNT_BALL:
+        elif joint_type == Joint.mjJNT_BALL:
             return 3  # 一个球关节有3个DOF
-        elif joint_type == mjJNT_SLIDE:
+        elif joint_type == Joint.mjJNT_SLIDE:
             return 1  # 一个滑动关节有1个DOF
-        elif joint_type == mjJNT_HINGE:
+        elif joint_type == Joint.mjJNT_HINGE:
             return 1  # 一个铰链关节有1个DOF
         else:
             return 0  # 其他类型的关节可能没有DOF

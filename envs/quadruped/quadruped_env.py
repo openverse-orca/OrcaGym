@@ -8,17 +8,20 @@ from collections import namedtuple
 from pathlib import Path
 from typing import Any, Union
 
-import gymnasium as gym
-import mujoco
-import mujoco.viewer
+# import gymnasium as gym
+# import mujoco
+# import mujoco.viewer
 import numpy as np
 from gymnasium import spaces
-from mujoco import MjData, MjModel
+# from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
 from gym_quadruped.utils.math_utils import homogenous_transform
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
-from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
+# from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
+from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
+
+from envs.orca_gym_env import OrcaGymEnv
 
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
@@ -30,7 +33,7 @@ FEET_OBS = ['feet_pos', 'feet_pos:base', 'feet_vel', 'feet_vel:base', 'contact_s
             'contact_forces:base']
 
 
-class QuadrupedEnv(gym.Env):
+class QuadrupedEnv(OrcaGymEnv):
     """A simple quadruped environment for testing model-based controllers and imitation learning algorithms.
 
     To deal with different quadruped robots, which might have different joint naming and ordering conventions, this
@@ -45,6 +48,10 @@ class QuadrupedEnv(gym.Env):
     metadata = {'render.modes': ['human'], 'version': 0}
 
     def __init__(self,
+                 frame_skip: int,        
+                 grpc_address: str,
+                 agent_names: list,
+                 time_step: float,    
                  robot: str,
                  hip_height: float,
                  legs_joint_names: dict,
@@ -57,6 +64,7 @@ class QuadrupedEnv(gym.Env):
                  ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
                  legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
                  feet_geom_name: dict = None,
+                 **kwargs,
                  ):
         """Initialize the quadruped environment.
 
@@ -88,7 +96,15 @@ class QuadrupedEnv(gym.Env):
             feet_geom_name: (dict) Dict with keys FL, FR, RL, RR; and as values the name of the Mujoco geometry
                 (MjvGeom) associated with the feet/contact-point of each leg. Used to compute the ground contact forces.
         """
-        super(QuadrupedEnv, self).__init__()
+
+        super().__init__(
+            frame_skip = frame_skip,
+            grpc_address=grpc_address,
+            agent_names=agent_names,
+            time_step=time_step,            
+            observation_space=None,  # needs to be defined after   
+            **kwargs,
+        )
 
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
@@ -106,28 +122,30 @@ class QuadrupedEnv(gym.Env):
         # Define the model and data _______________________________________________________________
         # TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
         #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        base_path = Path(dir_path) / 'robot_model' / robot
-        model_file_path = base_path / f'scene_{scene}.xml'
-        print(model_file_path)
-        assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
+        # dir_path = os.path.dirname(os.path.realpath(__file__))
+        # base_path = Path(dir_path) / '../assets/quadruped/robot_model' / robot
+        # model_file_path = base_path / f'scene_{scene}.xml'
+        # print(model_file_path)
+        # assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
 
         # Load the robot and scene to mujoco
-        try:
-            self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(model_file_path))
-        except ValueError as e:
-            raise ValueError(f"Error loading the scene {model_file_path}:") from e
+        # try:
+        #     self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(model_file_path))
+        # except ValueError as e:
+        #     raise ValueError(f"Error loading the scene {model_file_path}:") from e
 
-        self.mjData: MjData = mujoco.MjData(self.mjModel)
+        # self.mjData: MjData = mujoco.MjData(self.mjModel)
         # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
-        self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
+        # self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
 
         # Set the simulation step size (dt)
-        self.mjModel.opt.timestep = sim_dt
+        # self.mjModel.opt.timestep = sim_dt
+        self.set_time_step(time_step)   # 注意：sim_dt 是 0.002，time_step 是 0.01
+        
 
         # Identify the legs DoF indices/address in the qpos and qvel arrays ___________________________________________
         assert legs_joint_names is not None, "Please provide the joint names associated with each of the four legs."
-        self.joint_info = extract_mj_joint_info(self.mjModel)
+        self.joint_info = extract_mj_joint_info(self)
         self.legs_qpos_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qpos vector
         self.legs_qvel_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qvel vector
         self.legs_tau_idx = LegsAttr(None, None, None, None)   # Indices of legs actuators in gen forces vector
@@ -225,6 +243,9 @@ class QuadrupedEnv(gym.Env):
         -------
             np.ndarray: The initial observation.
         """
+
+        super().reset(seed=seed)
+
         # Reset relevant variables
         self.step_num = 0
         self.mjData.time = 0.0
