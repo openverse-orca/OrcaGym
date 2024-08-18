@@ -62,8 +62,18 @@ class OrcaGym:
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
         response = await self.stub.QueryAllActuators(request)
-        actuator_dict = {
-            actuator.ActuatorName: {
+        actuator_dict = {}
+        idx = 0
+        for actuator in response.ActuatorDataList:
+            actuator_name = actuator.ActuatorName
+            if actuator_name == "":
+                actuator_name = "actuator"
+
+            if actuator_name in actuator_dict:
+                actuator_name = actuator_name + f"_{idx}"
+                idx += 1
+
+            actuator_dict[actuator_name] = {
                 "JointName": actuator.JointName,
                 "GearRatio": actuator.GearRatio,
                 "TrnId": list(actuator.actuator_trnid),
@@ -90,8 +100,6 @@ class OrcaGym:
                 "Length0": actuator.actuator_length0,
                 "LengthRange": list(actuator.actuator_lengthrange),
             }
-            for actuator in response.ActuatorDataList
-        }
         return actuator_dict
 
 
