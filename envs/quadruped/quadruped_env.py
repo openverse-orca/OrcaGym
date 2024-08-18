@@ -169,11 +169,11 @@ class QuadrupedEnv(OrcaGymEnv):
 
         # Action space: Torque values for each joint _________________________________________________________________
         actuator_dict = self.model.get_actuator_dict()
-        tau_low, tau_high, is_act_lim = np.zeros(0)
+        tau_low, tau_high, is_act_lim = [], [], []
         for actuator_name, actuator in actuator_dict.items():
-            tau_low.append(actuator["ActuatorForcerange"][0])
-            tau_high.append(actuator["ActuatorForcerange"][1])
-            is_act_lim.append(np.inf if actuator["ActuatorForcelimited"] == False else 1.0)
+            tau_low.append(actuator["ForceRange"][0])
+            tau_high.append(actuator["ForceRange"][1])
+            is_act_lim.append(np.inf if actuator["Forcelimited"] == False else 1.0)
 
 
         # tau_low, tau_high = self.mjModel.actuator_forcerange[:, 0], self.mjModel.actuator_forcerange[:, 1]
@@ -213,8 +213,11 @@ class QuadrupedEnv(OrcaGymEnv):
             dict: Additional information.
         """
         # Apply action (torque) to the robot
-        self.mjData.ctrl = action
-        mujoco.mj_step(self.mjModel, self.mjData)
+        self.ctrl = action
+        self.do_simulation(self.ctrl, self.frame_skip)
+
+        # self.mjData.ctrl = action
+        # mujoco.mj_step(self.mjModel, self.mjData)
 
         # Get observation
         obs = self._get_obs()
@@ -227,7 +230,8 @@ class QuadrupedEnv(OrcaGymEnv):
         is_terminated = invalid_contact  # and ...
         is_truncated = False
         # Info dictionary
-        info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
+        # info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
+        info = dict(time=0, step_num=self.step_num, invalid_contacts=contact_info)
 
         self.step_num += 1
         return obs, reward, is_terminated, is_truncated, info
@@ -257,22 +261,25 @@ class QuadrupedEnv(OrcaGymEnv):
 
         # Reset relevant variables
         self.step_num = 0
-        self.mjData.time = 0.0
-        self.mjData.ctrl = 0.0  # Reset control signals
-        self.mjData.qfrc_applied = 0.0
+        # self.mjData.time = 0.0
+        # self.mjData.ctrl = 0.0  # Reset control signals
+        self.ctrl = np.zeros(self.model.nu)
+        # self.mjData.qfrc_applied = 0.0
         options = {} if options is None else options
 
         if seed is not None: np.random.seed(seed)  # Set seed for reproducibility
 
         # Reset the robot state ----------------------------------------------------------------------------------------
         if qpos is None and qvel is None:  # Random initialization around xml keyframe 0
-            mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+            # mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+            self.load_keyframe("home")
+            qpos, qvel = self.query_qpos_qvel()
             # Add white noise to the joint-space position and velocity
             if random:
                 q_pos_amp = 25 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
                 q_vel_amp = 0.1
-                self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
-                self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
+                qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.model.nq - 7)
+                qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.model.nv - 6)
                 # Random orientation
                 roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
                 pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
@@ -281,38 +288,46 @@ class QuadrupedEnv(OrcaGymEnv):
                                                 np.random.uniform(-pitch_sweep, pitch_sweep),
                                                 np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
                 ori_wxyz = np.roll(ori_xyzw, 1)
-                self.mjData.qpos[3:7] = ori_wxyz
+                qpos[3:7] = ori_wxyz
                 # Random xy position withing a 2 x 2 square
-                self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
+                qpos[0:2] = np.random.uniform(-2, 2, 2)
 
                 try:
                     feet_pos = self.feet_pos(frame='world')
                     max_z = np.max([pos[2] for pos in feet_pos.to_list()])
-                    self.mjData.qpos[2] -= max_z
+                    qpos[2] -= max_z
                 except ValueError as e:
-                    self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.05 * self.hip_height,
+                    qpos[2] = self.hip_height + np.random.uniform(-0.05 * self.hip_height,
                                                                               0.05 * self.hip_height)
+                
+                self.set_qpos_qvel(qpos, qvel)
 
 
             # Perform a forward dynamics computation to update the contact information
-            mujoco.mj_step1(self.mjModel, self.mjData)
+            # mujoco.mj_step1(self.mjModel, self.mjData)
+            self.do_simulation(self.ctrl, 1)
             # Check if the robot is in contact with the ground. If true lift the robot until contact is broken.
             contact_state, contacts = self.feet_contact_state()
             while np.any(contact_state.to_list()):
                 all_contacts = list(itertools.chain(*contacts.to_list()))
                 max_penetration_distance = np.max([np.abs(contact.dist) for contact in all_contacts])
-                self.mjData.qpos[2] += max_penetration_distance * 1.1
-                mujoco.mj_step1(self.mjModel, self.mjData)
+                qpos[2] += max_penetration_distance * 1.1
+                # mujoco.mj_step1(self.mjModel, self.mjData)
+                self.set_qpos_qvel(qpos, qvel)
+                self.do_simulation(self.ctrl, 1)
                 contact_state, contacts = self.feet_contact_state()
         else:
-            self.mjData.qpos = qpos
-            self.mjData.qvel = qvel
+            # self.mjData.qpos = qpos
+            # self.mjData.qvel = qvel
+            self.set_qpos_qvel(qpos, qvel)
 
         # Reset the accelerations to zero
-        self.mjData.qacc[:] = 0
-        self.mjData.qacc_warmstart[:] = 0
+        # self.mjData.qacc[:] = 0
+        # qacc 在初始化的时候会设置
+        # self.mjData.qacc_warmstart[:] = 0
         # This ensures all registers/arrays are updated
-        mujoco.mj_step(self.mjModel, self.mjData)
+        # mujoco.mj_step(self.mjModel, self.mjData)
+        self.do_simulation(self.ctrl, self.frame_skip)
 
         # Reset the desired base velocity command
         # ----------------------------------------------------------------------
@@ -354,46 +369,47 @@ class QuadrupedEnv(OrcaGymEnv):
         Returns:
 
         """
-        if self.viewer is None:
-            self.viewer = mujoco.viewer.launch_passive(
-                self.mjModel, self.mjData, show_left_ui=False, show_right_ui=False,
-                key_callback=lambda x: self._key_callback(x)
-                )
-            if tint_robot: change_robot_appearance(self.mjModel, alpha=1.0)
+        pass
+        # if self.viewer is None:
+        #     self.viewer = mujoco.viewer.launch_passive(
+        #         self.mjModel, self.mjData, show_left_ui=False, show_right_ui=False,
+        #         key_callback=lambda x: self._key_callback(x)
+        #         )
+        #     if tint_robot: change_robot_appearance(self.mjModel, alpha=1.0)
 
-            mujoco.mjv_defaultFreeCamera(self.mjModel, self.viewer.cam)
-            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
-            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
+        #     mujoco.mjv_defaultFreeCamera(self.mjModel, self.viewer.cam)
+        #     self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+        #     self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
 
-        # Define/Update markers for visualization of desired and current base velocity _______________________________
-        X_B = self.base_configuration
-        base_pos = X_B[:3, 3]
-        base_lin_vel = self.mjData.qvel[0:3]
-        ref_base_lin_vel_B, _ = self.target_base_vel()
-        ref_vec_pos, vec_pos = base_pos + [0, 0, 0.1], base_pos + [0, 0, 0.15]
-        ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, .7]), np.array([0, 1, 1, .7])
-        ref_vec_scale, vec_scale = np.linalg.norm(ref_base_lin_vel_B) / 1.0, np.linalg.norm(base_lin_vel) / 1.0
+        # # Define/Update markers for visualization of desired and current base velocity _______________________________
+        # X_B = self.base_configuration
+        # base_pos = X_B[:3, 3]
+        # base_lin_vel = self.mjData.qvel[0:3]
+        # ref_base_lin_vel_B, _ = self.target_base_vel()
+        # ref_vec_pos, vec_pos = base_pos + [0, 0, 0.1], base_pos + [0, 0, 0.15]
+        # ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, .7]), np.array([0, 1, 1, .7])
+        # ref_vec_scale, vec_scale = np.linalg.norm(ref_base_lin_vel_B) / 1.0, np.linalg.norm(base_lin_vel) / 1.0
 
-        ref_vec_id, vec_id = self._geom_ids.get('ref_dr_B_vec', -1), self._geom_ids.get('dr_B_vec', -1)
-        self._geom_ids['ref_dr_B_vec'] = render_vector(
-            self.viewer, ref_base_lin_vel_B, pos=ref_vec_pos, scale=ref_vec_scale, color=ref_vel_vec_color,
-            geom_id=ref_vec_id
-            )
-        self._geom_ids['dr_B_vec'] = render_vector(
-            self.viewer, base_lin_vel, pos=vec_pos, scale=vec_scale, color=vel_vec_color,
-            geom_id=vec_id
-            )
+        # ref_vec_id, vec_id = self._geom_ids.get('ref_dr_B_vec', -1), self._geom_ids.get('dr_B_vec', -1)
+        # self._geom_ids['ref_dr_B_vec'] = render_vector(
+        #     self.viewer, ref_base_lin_vel_B, pos=ref_vec_pos, scale=ref_vec_scale, color=ref_vel_vec_color,
+        #     geom_id=ref_vec_id
+        #     )
+        # self._geom_ids['dr_B_vec'] = render_vector(
+        #     self.viewer, base_lin_vel, pos=vec_pos, scale=vec_scale, color=vel_vec_color,
+        #     geom_id=vec_id
+        #     )
 
-        # Ghost robot rendering _______________________________________________________________________________________
-        if ghost_qpos is not None:
-            self._render_ghost_robots(qpos=ghost_qpos, alpha=ghost_alpha)
+        # # Ghost robot rendering _______________________________________________________________________________________
+        # if ghost_qpos is not None:
+        #     self._render_ghost_robots(qpos=ghost_qpos, alpha=ghost_alpha)
 
-        # Update the camera position. _________________________________________________________________________________
-        cam_pos = max(self.hip_height * 0.1, base_pos[2])
-        self._update_camera_target(self.viewer.cam, np.concatenate((base_pos[:2], [cam_pos])))
+        # # Update the camera position. _________________________________________________________________________________
+        # cam_pos = max(self.hip_height * 0.1, base_pos[2])
+        # self._update_camera_target(self.viewer.cam, np.concatenate((base_pos[:2], [cam_pos])))
 
-        # Finally, sync the viewer with the data. # TODO: if render mode is rgb, return the frame.
-        self.viewer.sync()
+        # # Finally, sync the viewer with the data. # TODO: if render mode is rgb, return the frame.
+        # self.viewer.sync()
 
     def target_base_vel(self):
         """Returns the target base linear (3,) and angular (3,) velocity in the world reference frame."""
@@ -406,31 +422,34 @@ class QuadrupedEnv(OrcaGymEnv):
 
     def base_lin_vel(self, frame='world'):
         """Returns the base linear velocity (3,) in the specified frame."""
+        _, qvel = self.query_qpos_qvel()
         if frame == 'world':
-            return self.mjData.qvel[0:3]
+            return qvel[0:3]
         elif frame == 'base':
             R = self.base_configuration[0:3, 0:3]
-            return R.T @ self.mjData.qvel[0:3]
+            return R.T @ qvel[0:3]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
     def base_ang_vel(self, frame='world'):
         """Returns the base angular velocity (3,) in the specified frame."""
+        _, qvel = self.query_qpos_qvel()
         if frame == 'world':
-            return self.mjData.qvel[3:6]
+            return qvel[3:6]
         elif frame == 'base':
             R = self.base_configuration[0:3, 0:3]
-            return R.T @ self.mjData.qvel[3:6]
+            return R.T @ qvel[3:6]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         
     def base_lin_acc(self, frame='world'):
         """Returns the base linear acceleration (3,) [m/s^2] in the specified frame."""
+        qacc = self.query_qacc()
         if frame == 'world':
-            return self.mjData.qacc[0:3]
+            return qacc[0:3]
         elif frame == 'base':
             R = self.base_configuration[0:3, 0:3]
-            return R.T @ self.mjData.qacc[0:3]
+            return R.T @ qacc[0:3]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
@@ -447,8 +466,10 @@ class QuadrupedEnv(OrcaGymEnv):
             np.ndarray: The reflected rotational inertia matrix in the world frame.
         """
         # Initialize the full mass matrix
-        mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
-        mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
+        # mass_matrix = np.zeros((self.model.nv, self.model.nv))
+        # mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
+
+        mass_matrix = self.calc_full_mass_matrix()
 
         # Extract the 3x3 rotational inertia matrix of the base (assuming the base has 6 DoFs)
         inertia_B_at_qpos = mass_matrix[3:6, 3:6]
@@ -477,16 +498,24 @@ class QuadrupedEnv(OrcaGymEnv):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         # TODO: Name of bodies should not be hardcodd
-        FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
-        FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FR_hip')
-        RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RL_hip')
-        RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RR_hip')
+        xpos, _ = self.get_body_com_xpos_xmat(['FR_hip', 'FL_hip', 'RL_hip', 'RR_hip'])
         return LegsAttr(
-            FR=R.T @ self.mjData.body(FR_hip_id).xpos,
-            FL=R.T @ self.mjData.body(FL_hip_id).xpos,
-            RR=R.T @ self.mjData.body(RR_hip_id).xpos,
-            RL=R.T @ self.mjData.body(RL_hip_id).xpos,
+            FR=R.T @ xpos[0],
+            FL=R.T @ xpos[1],
+            RL=R.T @ xpos[2],
+            RR=R.T @ xpos[3],
             )
+
+        # FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
+        # FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FR_hip')
+        # RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RL_hip')
+        # RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RR_hip')
+        # return LegsAttr(
+        #     FR=R.T @ self.mjData.body(FR_hip_id).xpos,
+        #     FL=R.T @ self.mjData.body(FL_hip_id).xpos,
+        #     RR=R.T @ self.mjData.body(RR_hip_id).xpos,
+        #     RL=R.T @ self.mjData.body(RL_hip_id).xpos,
+        #     )
 
     def feet_pos(self, frame='world') -> LegsAttr:
         """Get the feet positions in the specified frame.
@@ -812,19 +841,20 @@ class QuadrupedEnv(OrcaGymEnv):
     def _get_obs(self):
         """Returns the state observation based on the specified state observation names."""
         obs = []
+        qpos, qvel = self.query_qpos_qvel()
         for obs_name in self.state_obs_names:
             # Generalized position, velocity, and force (torque) spaces
             if obs_name == 'qpos':
-                obs.append(self.mjData.qpos)
+                obs.append(qpos)
             elif obs_name == 'qvel':
-                obs.append(self.mjData.qvel)
+                obs.append(qvel)
             elif obs_name == 'tau_ctrl_setpoint':
                 obs.append(self.torque_ctrl_setpoint)
             # Joint-space position and velocity spaces
             elif obs_name == 'qpos_js':
-                obs.append(self.mjData.qpos[7:])
+                obs.append(qpos[7:])
             elif obs_name == 'qvel_js':
-                obs.append(self.mjData.qvel[6:])
+                obs.append(qvel[6:])
             # Base position and velocity configurations (in world frame)
             elif obs_name == 'base_pos':
                 obs.append(self.base_pos)
@@ -869,17 +899,25 @@ class QuadrupedEnv(OrcaGymEnv):
         """Env termination occurs when a contact is detected on the robot's base."""
         invalid_contacts = {}
         invalid_contact_detected = False
-        for contact in self.mjData.contact:
-            # Get body IDs from geom IDs
-            body1_id = self.mjModel.geom_bodyid[contact.geom1]
-            body2_id = self.mjModel.geom_bodyid[contact.geom2]
+        contact_list = self.get_contact_simple()
+        geom_dict = self.model.get_geom_dict()
+        for contact in contact_list:
+            body1_name = geom_dict[contact['Geom1']]['BodyName']
+            body1_id = self.model.body_name2id(body1_name)
+            body2_name = geom_dict[contact['Geom2']]['BodyName']
+            body2_id = self.model.body_name2id(body2_name)
+
+        # for contact in self.mjData.contact:
+        #     # Get body IDs from geom IDs
+        #     body1_id = self.mjModel.geom_bodyid[contact.geom1]
+        #     body2_id = self.mjModel.geom_bodyid[contact.geom2]
 
             if 0 in [body1_id, body2_id]:  # World body ID is 0
                 second_id = body2_id if body1_id == 0 else body1_id
                 if second_id not in self._feet_body_id.to_list():  # Check if contact occurs with anything but the feet
                     # Get body names from body IDs
-                    body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
-                    body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)
+                    # body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
+                    # body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)
                     invalid_contacts[f"{body1_name}:{body1_id}_{body2_name}:{body2_id}"] = contact
                     invalid_contact_detected = True
             else:  # Contact between two bodies of the robot
@@ -985,34 +1023,46 @@ class QuadrupedEnv(OrcaGymEnv):
         obs_dim, last_idx = 0, 0
 
         obs_lim_min, obs_lim_max = [], []
-        qpos_lim_min, qpos_lim_max = self.mjModel.jnt_range[:, 0], self.mjModel.jnt_range[:, 1]
-        tau_lim_min, tau_lim_max = self.mjModel.actuator_ctrlrange[:, 0], self.mjModel.actuator_ctrlrange[:, 1]
+
+        qpos_lim_min, qpos_lim_max = [], []
+        joint_dict = self.model.get_joint_dict()
+        for joint_name, joint in joint_dict.items():
+            qpos_lim_min.append(joint['Range'][0])
+            qpos_lim_max.append(joint['Range'][1])
+
+        tau_lim_min, tau_lim_max = [], []
+        for actuator_name, actuator in self.model.get_actuator_dict().items():
+            tau_lim_min.append(actuator['CtrlRange'][0])
+            tau_lim_max.append(actuator['CtrlRange'][1])
+
+        # qpos_lim_min, qpos_lim_max = self.mjModel.jnt_range[:, 0], self.mjModel.jnt_range[:, 1]
+        # tau_lim_min, tau_lim_max = self.mjModel.actuator_ctrlrange[:, 0], self.mjModel.actuator_ctrlrange[:, 1]
 
         obs_idx = {k: None for k in state_obs_names}
         for obs_name in state_obs_names:
             # Generalized position, velocity, and force (torque) spaces
 
             if obs_name == 'qpos':
-                obs_dim += self.mjModel.nq
+                obs_dim += self.model.nq
                 obs_lim_max.extend([np.inf] * 7 + qpos_lim_max[1:].tolist())  # Ignore the base position
                 obs_lim_min.extend([-np.inf] * 7 + qpos_lim_min[1:].tolist())  # Ignore the base position
             elif obs_name == 'qvel':
-                obs_dim += self.mjModel.nv
-                obs_lim_max.extend([np.inf] * self.mjModel.nv)
-                obs_lim_min.extend([-np.inf] * self.mjModel.nv)
+                obs_dim += self.model.nv
+                obs_lim_max.extend([np.inf] * self.model.nv)
+                obs_lim_min.extend([-np.inf] * self.model.nv)
             elif obs_name == 'tau_ctrl_setpoint':
-                obs_dim += self.mjModel.nu
+                obs_dim += self.model.nu
                 obs_lim_max.extend(tau_lim_max)
                 obs_lim_min.extend(tau_lim_min)
             # Joint-space position and velocity spaces
             elif obs_name == 'qpos_js':  # Joint space position configuration
-                obs_dim += self.mjModel.nq - 7
+                obs_dim += self.model.nq - 7
                 obs_lim_max.extend(qpos_lim_max[1:])
                 obs_lim_min.extend(qpos_lim_min[1:])
             elif obs_name == 'qvel_js':  # Joint space velocity configuration
-                obs_dim += self.mjModel.nv - 6
-                obs_lim_max.extend([np.inf] * (self.mjModel.nv - 6))
-                obs_lim_min.extend([-np.inf] * (self.mjModel.nv - 6))
+                obs_dim += self.model.nv - 6
+                obs_lim_max.extend([np.inf] * (self.model.nv - 6))
+                obs_lim_min.extend([-np.inf] * (self.model.nv - 6))
             # Base position and velocity configurations (in world frame)
             elif obs_name == 'base_pos':
                 if "qpos" in state_obs_names:

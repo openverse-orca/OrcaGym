@@ -100,7 +100,7 @@ class OrcaGymModel:
     def get_actuator_ctrlrange(self):
         actuator_ctrlrange = {}
         for actuator_name, actuator in self._actuator_dict.items():
-            actuator_ctrlrange[actuator_name] = actuator["ActuatorCtrlrange"]
+            actuator_ctrlrange[actuator_name] = actuator["CtrlRange"]
         ctrlrange = np.array(list(actuator_ctrlrange.values()))
         return ctrlrange
         

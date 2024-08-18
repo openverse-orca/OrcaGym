@@ -27,6 +27,8 @@ service GrpcService {
 
   // Data 查询
   rpc QueryAllQposAndQvel (QueryAllQposAndQvelRequest) returns (QueryAllQposAndQvelResponse) {}
+  rpc QueryContact (QueryContactRequest) returns (QueryContactResponse) {}
+  rpc QueryContactSimple (QueryContactSimpleRequest) returns (QueryContactSimpleResponse) {}
   rpc QueryQfrcInverse (QueryQfrcInverseRequest) returns (QueryQfrcInverseResponse) {}
   rpc QueryActuatorMoment (QueryActuatorMomentRequest) returns (QueryActuatorMomentResponse) {}
   rpc QueryQfrcActuator (QueryQfrcActuatorRequest) returns (QueryQfrcActuatorResponse) {}  
@@ -49,12 +51,14 @@ service GrpcService {
   rpc QueryJointQpos (QueryJointQposRequest) returns (QueryJointQposResponse) {}
   rpc QueryJointQvel (QueryJointQvelRequest) returns (QueryJointQvelResponse) {}
   rpc QueryBodySubtreeMassByName (QueryBodySubtreeMassByNameRequest) returns (QueryBodySubtreeMassByNameResponse) {}
-  rpc QueryBodyCom (QueryBodyComRequest) returns (QueryBodyComResponse) {}
   rpc QueryJointLimits (QueryJointLimitsRequest) returns (QueryJointLimitsResponse);
   rpc QueryActuatorGainPrm (QueryActuatorGainPrmRequest) returns (QueryActuatorGainPrmResponse);
   rpc QueryActuatorBiasPrm (QueryActuatorBiasPrmRequest) returns (QueryActuatorBiasPrmResponse);
   rpc QuerySitePosAndMat (QuerySitePosAndMatRequest) returns (QuerySitePosAndMatResponse);
   rpc QuerySiteJac (QuerySiteJacRequest) returns (QuerySiteJacResponse);
+  rpc QueryBodyComPosMat (QueryBodyComPosMatRequest) returns (QueryBodyComPosMatResponse) {}
+  rpc QueryBodyPosMatQuat (QueryBodyPosMatQuatRequest) returns (QueryBodyPosMatQuatResponse) {}
+  rpc QueryGeomPosMat (QueryGeomPosMatRequest) returns (QueryGeomPosMatResponse) {}
 
   // 元素设置
   rpc SetControlInput (SetControlInputRequest) returns (SetControlInputResponse) {}
@@ -461,6 +465,46 @@ message QueryAllQposAndQvelResponse {
   repeated float Qvel = 2;
 }
 
+message QueryContactRequest {}
+
+message QueryContactResponse {
+    message ContactData {
+        float dist = 1;
+        repeated float pos = 2;
+        repeated float frame = 3;
+        float includemargin = 4;
+        repeated float friction = 5;
+        repeated float solref = 6;
+        repeated float solreffriction = 7;
+        repeated float solimp = 8;
+        float mu = 9;
+        repeated float H = 10;
+        int32 dim = 11;
+        int32 geom1 = 12;
+        int32 geom2 = 13;
+        repeated int32 geom = 14;
+        repeated int32 flex = 15;
+        repeated int32 elem = 16;
+        repeated int32 vert = 17;
+        int32 exclude = 18;
+        int32 efc_address = 19;
+    }
+
+    repeated ContactData contacts = 1;
+}
+
+message QueryContactSimpleRequest {}
+
+message QueryContactSimpleResponse {
+    message ContactData {
+        int32 dim = 1;
+        int32 geom1 = 2;
+        int32 geom2 = 3;
+    }
+
+    repeated ContactData contacts = 1;
+}
+
 message QueryQfrcInverseRequest {}
 
 message QueryQfrcInverseResponse {
@@ -532,20 +576,6 @@ message SetQvelRequest {
 }
 
 message SetQvelResponse {}
-
-message QueryBodyComRequest {
-    repeated string body_names = 1;  // 要查询的身体部件的名字列表
-}
-
-message QueryBodyComResponse {
-    repeated BodyCom body_coms = 1;  // 质心位置数组
-    bool success = 2;                // 操作是否成功
-}
-
-message BodyCom {
-    string body_name = 1;  // 身体部件名字
-    repeated float com = 2;  // 质心位置数组，长度为3
-}
 
 message QueryCfrcExtRequest {
     repeated string body_names = 1;  // 要查询的身体部件的名字列表
@@ -747,4 +777,44 @@ message UpdateEqualityConstraintsRequest {
 
 message UpdateEqualityConstraintsResponse {
     bool success = 1;
+}
+
+message QueryBodyComPosMatRequest {
+    repeated string body_name_list = 1; // 要查询的 body 名字列表
+}
+
+message QueryBodyComPosMatResponse {
+    message BodyComPosMat {
+        string body_name = 1;
+        repeated float com_pos = 2;  // 质心位置 (3 elements)
+        repeated float com_mat = 3;  // 惯性矩阵 (9 elements)
+    }
+    repeated BodyComPosMat body_com_pos_mat_list = 1;
+}
+
+message QueryBodyPosMatQuatRequest {
+    repeated string body_name_list = 1; // 要查询的 body 名字列表
+}
+
+message QueryBodyPosMatQuatResponse {
+    message BodyPosMatQuat {
+        string body_name = 1;
+        repeated float pos = 2;      // 位置 (3 elements)
+        repeated float mat = 3;      // 旋转矩阵 (9 elements)
+        repeated float quat = 4;     // 旋转四元数 (4 elements)
+    }
+    repeated BodyPosMatQuat body_pos_mat_quat_list = 1;
+}
+
+message QueryGeomPosMatRequest {
+    repeated string geom_name_list = 1; // 要查询的 geom 名字列表
+}
+
+message QueryGeomPosMatResponse {
+    message GeomPosMat {
+        string geom_name = 1;
+        repeated float pos = 2;      // 位置 (3 elements)
+        repeated float mat = 3;      // 旋转矩阵 (9 elements)
+    }
+    repeated GeomPosMat geom_pos_mat_list = 1;
 }

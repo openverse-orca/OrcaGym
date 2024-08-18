@@ -109,6 +109,16 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryAllQposAndQvelRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryAllQposAndQvelResponse.FromString,
                 _registered_method=True)
+        self.QueryContact = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryContact',
+                request_serializer=mjc__message__pb2.QueryContactRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryContactResponse.FromString,
+                _registered_method=True)
+        self.QueryContactSimple = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryContactSimple',
+                request_serializer=mjc__message__pb2.QueryContactSimpleRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryContactSimpleResponse.FromString,
+                _registered_method=True)
         self.QueryQfrcInverse = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryQfrcInverse',
                 request_serializer=mjc__message__pb2.QueryQfrcInverseRequest.SerializeToString,
@@ -199,11 +209,6 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryBodySubtreeMassByNameRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryBodySubtreeMassByNameResponse.FromString,
                 _registered_method=True)
-        self.QueryBodyCom = channel.unary_unary(
-                '/MujocoMessage.GrpcService/QueryBodyCom',
-                request_serializer=mjc__message__pb2.QueryBodyComRequest.SerializeToString,
-                response_deserializer=mjc__message__pb2.QueryBodyComResponse.FromString,
-                _registered_method=True)
         self.QueryJointLimits = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryJointLimits',
                 request_serializer=mjc__message__pb2.QueryJointLimitsRequest.SerializeToString,
@@ -228,6 +233,21 @@ class GrpcServiceStub(object):
                 '/MujocoMessage.GrpcService/QuerySiteJac',
                 request_serializer=mjc__message__pb2.QuerySiteJacRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QuerySiteJacResponse.FromString,
+                _registered_method=True)
+        self.QueryBodyComPosMat = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryBodyComPosMat',
+                request_serializer=mjc__message__pb2.QueryBodyComPosMatRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryBodyComPosMatResponse.FromString,
+                _registered_method=True)
+        self.QueryBodyPosMatQuat = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryBodyPosMatQuat',
+                request_serializer=mjc__message__pb2.QueryBodyPosMatQuatRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryBodyPosMatQuatResponse.FromString,
+                _registered_method=True)
+        self.QueryGeomPosMat = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryGeomPosMat',
+                request_serializer=mjc__message__pb2.QueryGeomPosMatRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryGeomPosMatResponse.FromString,
                 _registered_method=True)
         self.SetControlInput = channel.unary_unary(
                 '/MujocoMessage.GrpcService/SetControlInput',
@@ -398,6 +418,18 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def QueryContact(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryContactSimple(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def QueryQfrcInverse(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -508,12 +540,6 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def QueryBodyCom(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def QueryJointLimits(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -539,6 +565,24 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def QuerySiteJac(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryBodyComPosMat(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryBodyPosMatQuat(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryGeomPosMat(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -709,6 +753,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.QueryAllQposAndQvelRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryAllQposAndQvelResponse.SerializeToString,
             ),
+            'QueryContact': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryContact,
+                    request_deserializer=mjc__message__pb2.QueryContactRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryContactResponse.SerializeToString,
+            ),
+            'QueryContactSimple': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryContactSimple,
+                    request_deserializer=mjc__message__pb2.QueryContactSimpleRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryContactSimpleResponse.SerializeToString,
+            ),
             'QueryQfrcInverse': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryQfrcInverse,
                     request_deserializer=mjc__message__pb2.QueryQfrcInverseRequest.FromString,
@@ -799,11 +853,6 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.QueryBodySubtreeMassByNameRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryBodySubtreeMassByNameResponse.SerializeToString,
             ),
-            'QueryBodyCom': grpc.unary_unary_rpc_method_handler(
-                    servicer.QueryBodyCom,
-                    request_deserializer=mjc__message__pb2.QueryBodyComRequest.FromString,
-                    response_serializer=mjc__message__pb2.QueryBodyComResponse.SerializeToString,
-            ),
             'QueryJointLimits': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryJointLimits,
                     request_deserializer=mjc__message__pb2.QueryJointLimitsRequest.FromString,
@@ -828,6 +877,21 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QuerySiteJac,
                     request_deserializer=mjc__message__pb2.QuerySiteJacRequest.FromString,
                     response_serializer=mjc__message__pb2.QuerySiteJacResponse.SerializeToString,
+            ),
+            'QueryBodyComPosMat': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryBodyComPosMat,
+                    request_deserializer=mjc__message__pb2.QueryBodyComPosMatRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryBodyComPosMatResponse.SerializeToString,
+            ),
+            'QueryBodyPosMatQuat': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryBodyPosMatQuat,
+                    request_deserializer=mjc__message__pb2.QueryBodyPosMatQuatRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryBodyPosMatQuatResponse.SerializeToString,
+            ),
+            'QueryGeomPosMat': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryGeomPosMat,
+                    request_deserializer=mjc__message__pb2.QueryGeomPosMatRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryGeomPosMatResponse.SerializeToString,
             ),
             'SetControlInput': grpc.unary_unary_rpc_method_handler(
                     servicer.SetControlInput,
@@ -1283,6 +1347,60 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QueryAllQposAndQvel',
             mjc__message__pb2.QueryAllQposAndQvelRequest.SerializeToString,
             mjc__message__pb2.QueryAllQposAndQvelResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryContact(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryContact',
+            mjc__message__pb2.QueryContactRequest.SerializeToString,
+            mjc__message__pb2.QueryContactResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryContactSimple(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryContactSimple',
+            mjc__message__pb2.QueryContactSimpleRequest.SerializeToString,
+            mjc__message__pb2.QueryContactSimpleResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1780,33 +1898,6 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def QueryBodyCom(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/MujocoMessage.GrpcService/QueryBodyCom',
-            mjc__message__pb2.QueryBodyComRequest.SerializeToString,
-            mjc__message__pb2.QueryBodyComResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
     def QueryJointLimits(request,
             target,
             options=(),
@@ -1931,6 +2022,87 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QuerySiteJac',
             mjc__message__pb2.QuerySiteJacRequest.SerializeToString,
             mjc__message__pb2.QuerySiteJacResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryBodyComPosMat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryBodyComPosMat',
+            mjc__message__pb2.QueryBodyComPosMatRequest.SerializeToString,
+            mjc__message__pb2.QueryBodyComPosMatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryBodyPosMatQuat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryBodyPosMatQuat',
+            mjc__message__pb2.QueryBodyPosMatQuatRequest.SerializeToString,
+            mjc__message__pb2.QueryBodyPosMatQuatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryGeomPosMat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryGeomPosMat',
+            mjc__message__pb2.QueryGeomPosMatRequest.SerializeToString,
+            mjc__message__pb2.QueryGeomPosMatResponse.FromString,
             options,
             channel_credentials,
             insecure,

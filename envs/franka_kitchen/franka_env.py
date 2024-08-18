@@ -133,7 +133,7 @@ class FrankaRobot(MujocoEnv):
     def reset_model(self):
         qpos = self.init_qpos
         qvel = self.init_qvel
-        self.set_state(qpos, qvel)
+        self.set_qpos_qvel(qpos, qvel)
         obs = self._get_obs()
 
         return obs

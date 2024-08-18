@@ -58,29 +58,29 @@ class OrcaGym:
             actuator.ActuatorName: {
                 "JointName": actuator.JointName,
                 "GearRatio": actuator.GearRatio,
-                "ActuatorTrnid": list(actuator.actuator_trnid),
-                "ActuatorCtrllimited": actuator.actuator_ctrllimited,
-                "ActuatorForcelimited": actuator.actuator_forcelimited,
-                "ActuatorActlimited": actuator.actuator_actlimited,
-                "ActuatorCtrlrange": list(actuator.actuator_ctrlrange),
-                "ActuatorForcerange": list(actuator.actuator_forcerange),
-                "ActuatorActrange": list(actuator.actuator_actrange),
-                "ActuatorTrntype": actuator.actuator_trntype,
-                "ActuatorDyntype": actuator.actuator_dyntype,
-                "ActuatorGaintype": actuator.actuator_gaintype,
-                "ActuatorBiastype": actuator.actuator_biastype,
-                "ActuatorActadr": actuator.actuator_actadr,
-                "ActuatorActnum": actuator.actuator_actnum,
-                "ActuatorGroup": actuator.actuator_group,
-                "ActuatorDynprm": list(actuator.actuator_dynprm),
-                "ActuatorGainprm": list(actuator.actuator_gainprm),
-                "ActuatorBiasprm": list(actuator.actuator_biasprm),
-                "ActuatorActearly": actuator.actuator_actearly,
-                "ActuatorGear": list(actuator.actuator_gear),
-                "ActuatorCranklength": actuator.actuator_cranklength,
-                "ActuatorAcc0": actuator.actuator_acc0,
-                "ActuatorLength0": actuator.actuator_length0,
-                "ActuatorLengthrange": list(actuator.actuator_lengthrange),
+                "TrnId": list(actuator.actuator_trnid),
+                "CtrlLimited": actuator.actuator_ctrllimited,
+                "ForceLimited": actuator.actuator_forcelimited,
+                "ActLimited": actuator.actuator_actlimited,
+                "CtrlRange": list(actuator.actuator_ctrlrange),
+                "ForceRange": list(actuator.actuator_forcerange),
+                "ActRange": list(actuator.actuator_actrange),
+                "TrnType": actuator.actuator_trntype,
+                "DynType": actuator.actuator_dyntype,
+                "GainType": actuator.actuator_gaintype,
+                "BiasType": actuator.actuator_biastype,
+                "ActAdr": actuator.actuator_actadr,
+                "ActNum": actuator.actuator_actnum,
+                "Group": actuator.actuator_group,
+                "DynPrm": list(actuator.actuator_dynprm),
+                "GainPrm": list(actuator.actuator_gainprm),
+                "BiasPrm": list(actuator.actuator_biasprm),
+                "ActEarly": actuator.actuator_actearly,
+                "Gear": list(actuator.actuator_gear),
+                "CrankLength": actuator.actuator_cranklength,
+                "Acc0": actuator.actuator_acc0,
+                "Length0": actuator.actuator_length0,
+                "LengthRange": list(actuator.actuator_lengthrange),
             }
             for actuator in response.ActuatorDataList
         }
@@ -419,14 +419,6 @@ class OrcaGym:
         request = mjc_message_pb2.SetQvelRequest(qvel=qvel)
         response = await self.stub.SetQvel(request)
         return response    
-    
-    async def query_body_com(self, body_names):
-        request = mjc_message_pb2.QueryBodyComRequest(body_names=body_names)
-        response = await self.stub.QueryBodyCom(request)
-        if response.success:
-            return {body_com.body_name: list(body_com.com) for body_com in response.body_coms}
-        else:
-            raise Exception("Failed to query body COM")    
         
     async def query_cfrc_ext(self, body_names):
         request = mjc_message_pb2.QueryCfrcExtRequest(body_names=body_names)
@@ -585,26 +577,109 @@ class OrcaGym:
         geom_dict = {
             geom.geom_name: {
                 "BodyName": geom.body_name,
-                "GeomType": geom.geom_type,
-                "GeomContype": geom.geom_contype,
-                "GeomConaffinity": geom.geom_conaffinity,
-                "GeomCondim": geom.geom_condim,
-                "GeomSolmix": geom.geom_solmix,
-                "GeomSolref": list(geom.geom_solref),
-                "GeomSolimp": list(geom.geom_solimp),
-                "GeomSize": list(geom.geom_size),
-                "GeomFriction": list(geom.geom_friction),
-                "GeomDataID": geom.geom_dataid,
-                "GeomMatID": geom.geom_matid,
-                "GeomGroup": geom.geom_group,
-                "GeomPriority": geom.geom_priority,
-                "GeomPlugin": geom.geom_plugin,
-                "GeomSameFrame": geom.geom_sameframe,
-                "GeomPos": list(geom.geom_pos),
-                "GeomQuat": list(geom.geom_quat),
-                "GeomMargin": geom.geom_margin,
-                "GeomGap": geom.geom_gap,
+                "Type": geom.geom_type,
+                "Contype": geom.geom_contype,
+                "Conaffinity": geom.geom_conaffinity,
+                "Condim": geom.geom_condim,
+                "Solmix": geom.geom_solmix,
+                "Solref": list(geom.geom_solref),
+                "Solimp": list(geom.geom_solimp),
+                "Size": list(geom.geom_size),
+                "Friction": list(geom.geom_friction),
+                "DataID": geom.geom_dataid,
+                "MatID": geom.geom_matid,
+                "Group": geom.geom_group,
+                "Priority": geom.geom_priority,
+                "Plugin": geom.geom_plugin,
+                "SameFrame": geom.geom_sameframe,
+                "Pos": list(geom.geom_pos),
+                "Quat": list(geom.geom_quat),
+                "Margin": geom.geom_margin,
+                "Gap": geom.geom_gap,
             }
             for geom in response.geom_data_list
         }
         return geom_dict
+
+    async def query_contact(self):
+        request = mjc_message_pb2.QueryContactRequest()
+        response = await self.stub.QueryContact(request)
+        
+        contacts = []
+        for contact in response.contacts:
+            contact_info = {
+                "Dist": contact.dist,
+                "Pos": list(contact.pos),
+                "Frame": list(contact.frame),
+                "IncludeMargin": contact.includemargin,
+                "Friction": list(contact.friction),
+                "Solref": list(contact.solref),
+                "SolrefFriction": list(contact.solreffriction),
+                "Solimp": list(contact.solimp),
+                "Mu": contact.mu,
+                "H": list(contact.h),
+                "Dim": contact.dim,
+                "Geom1": contact.geom1,
+                "Geom2": contact.geom2,
+                "Geom": list(contact.geom),
+                "Flex": list(contact.flex),
+                "Elem": list(contact.elem),
+                "Vert": list(contact.vert),
+                "Exclude": contact.exclude,
+                "EfcAddress": contact.efc_address,
+            }
+            contacts.append(contact_info)
+        
+        return contacts
+
+    async def query_contact_simple(self):
+        request = mjc_message_pb2.QueryContactSimpleRequest()
+        response = await self.stub.QueryContactSimple(request)
+        
+        contacts = []
+        for contact in response.contacts:
+            contact_info = {
+                "Dim": contact.dim,
+                "Geom1": contact.geom1,
+                "Geom2": contact.geom2,
+            }
+            contacts.append(contact_info)
+        
+        return contacts
+    
+    async def query_body_com_xpos_xmat(self, body_name_list):
+        request = mjc_message_pb2.QueryBodyComPosMatRequest(body_name_list=body_name_list)
+        response = await self.stub.QueryBodyComPosMat(request)
+        body_com_pos_mat_dict = {
+            body.body_name: {
+                "Pos": list(body.com_pos),
+                "Mat": list(body.com_mat),
+            }
+            for body in response.body_com_pos_mat_list
+        }
+        return body_com_pos_mat_dict
+
+    async def query_body_xpos_xmat_xquat(self, body_name_list):
+        request = mjc_message_pb2.QueryBodyPosMatQuatRequest(body_name_list=body_name_list)
+        response = await self.stub.QueryBodyPosMatQuat(request)
+        body_pos_mat_quat_dict = {
+            body.body_name: {
+                "Pos": list(body.pos),
+                "Mat": list(body.mat),
+                "Quat": list(body.quat),
+            }
+            for body in response.body_pos_mat_quat_list
+        }
+        return body_pos_mat_quat_dict
+
+    async def query_geom_xpos_xmat(self, geom_name_list):
+        request = mjc_message_pb2.QueryGeomPosMatRequest(geom_name_list=geom_name_list)
+        response = await self.stub.QueryGeomPosMat(request)
+        geom_pos_mat_dict = {
+            geom.geom_name: {
+                "Pos": list(geom.pos),
+                "Mat": list(geom.mat),
+            }
+            for geom in response.geom_pos_mat_list
+        }
+        return geom_pos_mat_dict

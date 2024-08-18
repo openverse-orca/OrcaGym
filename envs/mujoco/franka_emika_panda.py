@@ -284,7 +284,9 @@ class FrankaEnv(OrcaGymEnv):
     
     def query_obs_xpos(self):
         OBS_BODY_NAMES = [self.body("hand"), "Toys_Box1"]
-        xpos_dict, xpos = self.get_body_com(OBS_BODY_NAMES)
+        body_com_dict = self.get_body_com_dict(OBS_BODY_NAMES)
+        xpos_dict = {body_name: body_com_dict[body_name]['Pos'] for body_name in OBS_BODY_NAMES}
+        xpos = np.array(list(xpos_dict.values())).flat.copy()
         return xpos_dict, xpos
         
     def query_obs_velocities(self):

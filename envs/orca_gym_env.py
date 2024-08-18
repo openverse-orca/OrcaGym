@@ -205,10 +205,6 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """Close all processes like rendering contexts"""
         raise NotImplementedError
 
-    def get_body_com(self, body_name) -> NDArray[np.float64]:
-        """Return the cartesian position of a body frame"""
-        raise NotImplementedError
-
     def state_vector(self) -> NDArray[np.float64]:
         """Return the position and velocity joint states of the model"""
         qpos, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
@@ -277,7 +273,7 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         data = None # data 是远端异步数据，只支持实时查询和设置，没有本地副本
         return model, data
 
-    def set_state(self, qpos, qvel):
+    def set_qpos_qvel(self, qpos, qvel):
         """Set the joints position qpos and velocity qvel of the model.
 
         Note: `qpos` and `qvel` is not the full physics state for all mujoco models/environments https://mujoco.readthedocs.io/en/stable/APIreference/APItypes.html#mjtstate
@@ -333,11 +329,36 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         self.loop.run_until_complete(self._resume_simulation())  # 退出gym恢复仿真事件循环
         self.loop.run_until_complete(self._close_grpc())
 
-    def get_body_com(self, body_name_list):
+    def get_body_com_dict(self, body_name_list):
+        body_com_dict = self.loop.run_until_complete(self._get_body_com_xpos_xmat(body_name_list))
+        return body_com_dict
+
+    def get_body_com_xpos_xmat(self, body_name_list):
         # return self.data.body(body_name).xpos
-        xpos_dict = self.loop.run_until_complete(self._get_body_com(body_name_list))
-        xpos = np.array([xpos_dict[body_name] for body_name in body_name_list]).flat.copy()
-        return xpos_dict, xpos
+        body_com_dict = self.loop.run_until_complete(self._get_body_com_xpos_xmat(body_name_list))
+        if len(body_com_dict) != len(body_name_list):
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos = np.array([body_com_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
+        xmat = np.array([body_com_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
+        return xpos, xmat
+
+    def get_body_xpos_xmat_xquat(self, body_name_list):
+        # return self.data.body(body_name).xpos
+        body_dict = self.loop.run_until_complete(self._get_body_xpos_xmat_xquat(body_name_list))
+        if len(body_dict) != len(body_name_list):
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
+        xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
+        xquat = np.array([body_dict[body_name]['Quat'] for body_name in body_name_list]).flat.copy()
+        return xpos, xmat, xquat
+    
+    def get_geom_com_xpos_xmat(self, geom_name_list):
+        geom_dict = self.loop.run_until_complete(self._get_geom_xpos_xmat(geom_name_list))
+        if len(geom_dict) != len(geom_name_list):
+            raise ValueError("Some geom names are not found in the simulation.")
+        xpos = np.array([geom_dict[geom_name]['Pos'] for geom_name in geom_name_list]).flat.copy()
+        xmat = np.array([geom_dict[geom_name]['Mat'] for geom_name in geom_name_list]).flat.copy()
+        return xpos, xmat
 
     async def _initialize_orca_sim(self):
         await self.gym.init_simulation()
@@ -403,9 +424,17 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     async def _mj_forward(self):
         await self.gym.mj_forward()
 
-    async def _get_body_com(self, body_name_list):
-        body_com_dict = await self.gym.query_body_com(body_name_list)
+    async def _get_body_com_xpos_xmat(self, body_name_list):
+        body_com_dict = await self.gym.query_body_com_xpos_xmat(body_name_list)
         return body_com_dict
+    
+    async def _get_body_xpos_xmat_xquat(self, body_name_list):
+        body_dict = await self.gym.query_body_xpos_xmat_xquat(body_name_list)
+        return body_dict
+    
+    async def _get_geom_xpos_xmat(self, geom_name_list):
+        geom_dict = await self.gym.query_geom_xpos_xmat(geom_name_list)
+        return geom_dict
     
     async def _query_all_cfrc_ext(self):
         body_names = self.model.get_body_names()
@@ -588,3 +617,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
 
     def set_opt_config(self, opt_config):
         self.loop.run_until_complete(self._set_opt_config(opt_config))
+
+    async def _query_contact_simple(self):
+        contact_simple = await self.gym.query_contact_simple()
+        return contact_simple
+    
+    def query_contact_simple(self):
+        contact_simple = self.loop.run_until_complete(self._query_contact_simple())
+        return contact_simple
