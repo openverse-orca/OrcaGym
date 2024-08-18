@@ -15,6 +15,9 @@ from orca_gym.orca_gym import OrcaGym
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
+from orca_gym.orca_gym import OrcaGymModel
+from orca_gym.orca_gym import OrcaGymData
+
 class ActionSpaceType:
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
@@ -60,7 +63,7 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         # may use width and height
         self.model, self.data = self._initialize_simulation()
         
-        self.loop.run_until_complete(self._reset_simulation()) # 重置仿真环境
+        self.reset_simulation() # 重置仿真环境
 
         self._init_qpos_qvel()
 
@@ -136,7 +139,7 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """
         raise NotImplementedError
 
-    def _initialize_simulation(self) -> Tuple[Any, Any]:
+    def _initialize_simulation(self) -> Tuple[OrcaGymModel, OrcaGymData]:
         """
         Initialize MuJoCo simulation data structures mjModel and mjData.
         """
@@ -171,7 +174,7 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
             self.set_seed_value(seed)
 
         # mujoco.mj_resetData(self.model, self.data)
-        self.loop.run_until_complete(self._reset_simulation())
+        self.reset_simulation()
 
         ob = self.reset_model()
         info = self._get_reset_info()
@@ -200,16 +203,11 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
                 f"Action dimension mismatch. Expected {(self.model.nu,)}, found {np.array(ctrl).shape}"
             )
         self._step_orca_sim_simulation(ctrl, n_frames)
+        self.loop.run_until_complete(self.gym.update_data())
 
     def close(self):
         """Close all processes like rendering contexts"""
         raise NotImplementedError
-
-    def state_vector(self) -> NDArray[np.float64]:
-        """Return the position and velocity joint states of the model"""
-        qpos, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
-        return np.concatenate([qpos.flat, qvel.flat])
-        # return np.concatenate([self.data.qpos.flat, self.data.qvel.flat])
 
     async def _initialize_grpc(self):
         """Initialize the GRPC communication channel."""
@@ -228,6 +226,10 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         raise NotImplementedError
     
     async def _reset_simulation(self):
+        """Reset the simulation."""
+        raise NotImplementedError
+    
+    def reset_simulation(self):
         """Reset the simulation."""
         raise NotImplementedError
     
@@ -266,11 +268,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
 
     def _initialize_simulation(
         self,
-    ) -> Tuple["OrcaGym.model", "OrcaGym.data"]:
+    ) -> Tuple[OrcaGymModel, OrcaGymData]:
         print(f"Initializing simulation: Class: OrcaGymEnv")
         self.loop.run_until_complete(self._initialize_orca_sim())
         model = self.gym.model
-        data = None # data 是远端异步数据，只支持实时查询和设置，没有本地副本
+        data = self.gym.data
         return model, data
 
     def set_qpos_qvel(self, qpos, qvel):
@@ -352,7 +354,7 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         xquat = np.array([body_dict[body_name]['Quat'] for body_name in body_name_list]).flat.copy()
         return xpos, xmat, xquat
     
-    def get_geom_com_xpos_xmat(self, geom_name_list):
+    def get_geom_xpos_xmat(self, geom_name_list):
         geom_dict = self.loop.run_until_complete(self._get_geom_xpos_xmat(geom_name_list))
         if len(geom_dict) != len(geom_name_list):
             raise ValueError("Some geom names are not found in the simulation.")
@@ -372,33 +374,17 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     async def _pause_simulation(self):
         await self.gym.pause_simulation()
 
-
     async def _resume_simulation(self):
         await self.gym.resume_simulation()
 
-    def query_qpos_qvel(self):
-        qpos, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
-        return qpos, qvel
-
-    async def _query_qpos_qvel(self):
-        qpos, qvel = await self.gym.query_all_qpos_and_qvel()
-        return qpos, qvel
-
-    def query_qpos(self):
-        qpos, _ = self.loop.run_until_complete(self._query_qpos_qvel())
-        return qpos
-    
-    def query_qvel(self):
-        _, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
-        return qvel
-
     def _init_qpos_qvel(self):
-        qpos, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
-        self.init_qpos = qpos.ravel().copy()
-        self.init_qvel = qvel.ravel().copy()
+        self.loop.run_until_complete(self.gym.update_data())
+        self.init_qpos = self.gym.data.qpos.ravel().copy()
+        self.init_qvel = self.gym.data.qvel.ravel().copy()
 
     def reset_simulation(self):
         self.loop.run_until_complete(self._reset_simulation())
+        self.loop.run_until_complete(self.gym.update_data())
 
     async def _reset_simulation(self):
         await self.gym.load_initial_frame()
@@ -574,19 +560,17 @@ class OrcaGymEnv(BaseOrcaGymEnv):
             }
         return site_dict
     
-    async def _query_site_jac(self, site_names):
-        query_dict = await self.gym.query_site_jac(site_names)
+    async def _mj_jac_site(self, site_names):
+        query_dict = await self.gym.mj_jac_site(site_names)
         return query_dict
     
     def query_site_xvalp_xvalr(self, site_names):
-        query_dict = self.loop.run_until_complete(self._query_site_jac(site_names))
-        _, qvel = self.loop.run_until_complete(self._query_qpos_qvel())
-
+        query_dict = self.loop.run_until_complete(self._mj_jac_site(site_names))
         xvalp_dict = {}
         xvalr_dict = {}
         for site in query_dict:
-            xvalp_dict[site] = np.array(query_dict[site]['jacp']).reshape(3, -1) @ qvel
-            xvalr_dict[site] = np.array(query_dict[site]['jacr']).reshape(3, -1) @ qvel
+            xvalp_dict[site] = np.array(query_dict[site]['jacp']).reshape(3, -1) @ self.data.qvel
+            xvalr_dict[site] = np.array(query_dict[site]['jacr']).reshape(3, -1) @ self.data.qvel
 
         return xvalp_dict, xvalr_dict
     
@@ -625,3 +609,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def query_contact_simple(self):
         contact_simple = self.loop.run_until_complete(self._query_contact_simple())
         return contact_simple
+    
+    async def _query_contact(self):
+        contact = await self.gym.query_contact()
+        return contact
+    
+    def query_contact(self):
+        contact = self.loop.run_until_complete(self._query_contact())
+        return contact

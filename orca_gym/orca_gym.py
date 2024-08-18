@@ -14,6 +14,7 @@ import scipy.linalg
 from datetime import datetime
 
 from orca_gym.orca_gym_model import OrcaGymModel
+from orca_gym.orca_gym_data import OrcaGymData
 
 class OrcaGym:
     def __init__(self, stub):
@@ -50,6 +51,13 @@ class OrcaGym:
         geom_dict = await self.query_all_geoms()
         self.model.init_geom_dict(geom_dict)
 
+        self.data = OrcaGymData(self.model)
+        await self.update_data()
+
+
+    async def update_data(self):
+        qpos, qvel = await self.query_all_qpos_and_qvel()
+        self.data.update(qpos, qvel)
 
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
@@ -549,7 +557,7 @@ class OrcaGym:
         return site_pos_and_mat
     
     
-    async def query_site_jac(self, site_names):
+    async def mj_jac_site(self, site_names):
         request = mjc_message_pb2.QuerySiteJacRequest(site_names=site_names)
         response = await self.stub.QuerySiteJac(request)
         site_jacs_dict = {}

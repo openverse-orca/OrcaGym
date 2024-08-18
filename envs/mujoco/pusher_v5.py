@@ -271,12 +271,11 @@ class PusherEnv(OrcaGymEnv, utils.EzPickle):
         return self._get_obs()
 
     def _get_obs(self):
-        qpos, qvel = self.query_qpos_qvel()
         xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])
         return np.concatenate(
             [
-                qpos.flatten()[:7],
-                qvel.flatten()[:7],
+                self.data.qpos.flatten()[:7],
+                self.data.qvel.flatten()[:7],
                 xpos[:3],
                 xpos[3:6],
                 xpos[6:],

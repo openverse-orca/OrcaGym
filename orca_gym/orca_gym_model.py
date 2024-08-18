@@ -13,10 +13,7 @@ class OrcaGymModel:
     mjEQ_DISTANCE = 5      # unsupported, will cause an error if used
 
     def __init__(self, model_info):
-
-
         self.init_model_info(model_info)                
-
         self._eq_list = None
         self._mocap_dict = None
         self._actuator_dict = None
@@ -57,6 +54,12 @@ class OrcaGymModel:
     
     def actuator_name2id(self, actuator_name):
         return self._actuator_dict[actuator_name]["ActuatorId"]
+    
+    def actuator_id2name(self, actuator_id):
+        for actuator_name, actuator in self._actuator_dict.items():
+            if actuator["ActuatorId"] == actuator_id:
+                return actuator_name
+        return None
 
     def init_body_dict(self, body_dict):
         for i, (body_name, body) in enumerate(body_dict.items()):
@@ -69,6 +72,12 @@ class OrcaGymModel:
     
     def body_name2id(self, body_name):
         return self._body_dict[body_name]["BodyId"]
+    
+    def body_id2name(self, body_id):
+        for body_name, body in self._body_dict.items():
+            if body["BodyId"] == body_id:
+                return body_name
+        return None
 
     def init_joint_dict(self, joint_dict):
         for i, (joint_name, joint) in enumerate(joint_dict.items()):
@@ -81,6 +90,12 @@ class OrcaGymModel:
     
     def joint_name2id(self, joint_name):
         return self._joint_dict[joint_name]["JointId"]
+    
+    def joint_id2name(self, joint_id):
+        for joint_name, joint in self._joint_dict.items():
+            if joint["JointId"] == joint_id:
+                return joint_name
+        return None
 
     def init_geom_dict(self, geom_dict):
         for i, (geom_name, geom) in enumerate(geom_dict.items()):
@@ -93,9 +108,23 @@ class OrcaGymModel:
     
     def geom_name2id(self, geom_name):
         return self._geom_dict[geom_name]["GeomId"]
+    
+    def geom_id2name(self, geom_id):
+        for geom_name, geom in self._geom_dict.items():
+            if geom["GeomId"] == geom_id:
+                return geom_name
+        return None
 
     def get_body_names(self):
         return self._body_dict.keys()
+    
+    def get_geom_bodyname(self, geom_name):
+        return self._geom_dict[geom_name]["BodyName"]
+    
+    def get_geom_bodyid(self, geom_id):
+        geom_name = self.geom_id2name(geom_id)
+        body_name = self.get_geom_bodyname(geom_name)
+        return self.body_name2id(body_name)
     
     def get_actuator_ctrlrange(self):
         actuator_ctrlrange = {}

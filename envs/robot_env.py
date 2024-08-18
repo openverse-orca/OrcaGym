@@ -56,8 +56,7 @@ class BaseRobotEnv(GoalEnv):
             **kwargs 
         )
 
-        qpos, _ = self.query_qpos_qvel()
-        self.initial_qpos = qpos
+        self.initial_qpos = self.data.qpos
 
         self.goal = np.zeros(0)
         obs = self._get_obs()
@@ -238,9 +237,8 @@ class MujocoRobotEnv(BaseRobotEnv):
             action_step_count = action_step_count,
             **kwargs)
         
-        qpos, qvel = self.query_qpos_qvel()
-        self.initial_qpos = np.copy(qpos)
-        self.initial_qvel = np.copy(qvel)
+        self.initial_qpos = np.copy(self.data.qpos)
+        self.initial_qvel = np.copy(self.data.qvel)
 
     def _reset_sim(self):
         self.reset_simulation()

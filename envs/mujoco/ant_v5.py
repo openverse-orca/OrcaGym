@@ -364,7 +364,7 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
 
     @property
     def is_healthy(self):
-        state = self.state_vector()
+        state = np.concatenate([self.data.qpos, self.data.qvel])
         min_z, max_z = self._healthy_z_range
         is_healthy = np.isfinite(state).all() and min_z <= state[2] <= max_z
         return is_healthy
@@ -431,9 +431,8 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
         return reward, reward_info
 
     def _get_obs(self):
-        qpos, qvel = self.query_qpos_qvel()
-        position = qpos.flatten()
-        velocity = qvel.flatten()
+        position = self.data.qpos.flatten()
+        velocity = self.data.qvel.flatten()
         # position = self.data.qpos.flatten()
         # velocity = self.data.qvel.flatten()
 
