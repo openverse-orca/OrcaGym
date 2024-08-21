@@ -249,6 +249,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryGeomPosMatRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryGeomPosMatResponse.FromString,
                 _registered_method=True)
+        self.QueryContactForce = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryContactForce',
+                request_serializer=mjc__message__pb2.QueryContactForceRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryContactForceResponse.FromString,
+                _registered_method=True)
         self.SetControlInput = channel.unary_unary(
                 '/MujocoMessage.GrpcService/SetControlInput',
                 request_serializer=mjc__message__pb2.SetControlInputRequest.SerializeToString,
@@ -588,6 +593,12 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def QueryContactForce(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def SetControlInput(self, request, context):
         """元素设置
         """
@@ -892,6 +903,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QueryGeomPosMat,
                     request_deserializer=mjc__message__pb2.QueryGeomPosMatRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryGeomPosMatResponse.SerializeToString,
+            ),
+            'QueryContactForce': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryContactForce,
+                    request_deserializer=mjc__message__pb2.QueryContactForceRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryContactForceResponse.SerializeToString,
             ),
             'SetControlInput': grpc.unary_unary_rpc_method_handler(
                     servicer.SetControlInput,
@@ -2103,6 +2119,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QueryGeomPosMat',
             mjc__message__pb2.QueryGeomPosMatRequest.SerializeToString,
             mjc__message__pb2.QueryGeomPosMatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryContactForce(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryContactForce',
+            mjc__message__pb2.QueryContactForceRequest.SerializeToString,
+            mjc__message__pb2.QueryContactForceResponse.FromString,
             options,
             channel_credentials,
             insecure,

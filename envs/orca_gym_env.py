@@ -617,3 +617,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def query_contact(self):
         contact = self.loop.run_until_complete(self._query_contact())
         return contact
+    
+    async def _query_contact_force(self, contact_ids):
+        contact_force = await self.gym.query_contact_force(contact_ids)
+        return contact_force
+    
+    def query_contact_force(self, contact_ids):
+        contact_force = self.loop.run_until_complete(self._query_contact_force(contact_ids))
+        return contact_force

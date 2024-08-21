@@ -14,6 +14,11 @@ class RecordState:
     REPLAY_FINISHED = "replay_finished"
     NONE = "none"
 
+class GripperState:
+    OPENNING = "openning"
+    CLOSING = "closing"
+    STOPPED = "stopped"
+    
 class RM65BJoystickEnv(MujocoRobotEnv):
     """
     通过xbox手柄控制机械臂
@@ -47,7 +52,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             **kwargs,
         )
 
-        self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0.00, 0.00, 0, 0])
+        self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0.00, 0.00])
 
         print("Opt Config before setting: ", self.gym.opt_config)
         # self.gym.opt_config["o_solref"] = [0.005, 0.9]
@@ -68,10 +73,19 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
         # control range
         self.ctrl_range = self.model.get_actuator_ctrlrange()
+        actuators_dict = self.model.get_actuator_dict()
+        self.gripper_force_limit = actuators_dict[self.actuator("actuator_gripper1")]["ForceRange"][1]
+        self.gripper_state = GripperState.STOPPED
 
         # index used to distinguish arm and gripper joints
         self.arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6")]
-        self.gripper_joint_names = [self.joint("Gripper_Link1"), self.joint("Gripper_Link11"), self.joint("Gripper_Link2"), self.joint("Gripper_Link22")]
+        # self.gripper_joint_names = [self.joint("Gripper_Link1"), self.joint("Gripper_Link11"), self.joint("Gripper_Link2"), self.joint("Gripper_Link22")]
+        self.gripper_joint_names = [self.joint("Gripper_Link1"), self.joint("Gripper_Link2")]
+        self.gripper_body_names = [self.body("Gripper_Link11"), self.body("Gripper_Link22")]
+        self.gripper_geom_ids = []
+        for geom_info in self.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self.gripper_body_names:
+                self.gripper_geom_ids.append(geom_info["GeomId"])
 
         self._set_init_state()
 
@@ -119,7 +133,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         return pos_ctrl
     
     def _capture_joystick_rot_ctrl(self, joystick_state) -> np.ndarray:
-        yaw = -joystick_state["axes"]["RightStickX"]
+        yaw = joystick_state["axes"]["RightStickX"]
         pitch = joystick_state["axes"]["RightStickY"]
         roll = joystick_state["buttons"]["RB"] * 0.5 - joystick_state["buttons"]["LB"] * 0.5
         rot_ctrl = np.array([yaw, pitch, roll])
@@ -193,20 +207,56 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
         return new_xmat
     
+    def _query_gripper_contact_force(self) -> dict:
+        contact_simple_list = self.query_contact_simple()
+        contact_force_query_ids = []
+        for contact_simple in contact_simple_list:
+            if contact_simple["Geom1"] in self.gripper_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+            if contact_simple["Geom2"] in self.gripper_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+
+        print("Contact force query ids: ", contact_force_query_ids)
+        contact_force_dict = self.query_contact_force(contact_force_query_ids)
+        return contact_force_dict
+
     def _set_gripper_ctrl(self, joystick_state) -> None:
         if (joystick_state["buttons"]["A"]):
-            self.ctrl[6] += 0.002
-            self.ctrl[8] -= 0.002
-            self.ctrl[7] -= 0.002
-            self.ctrl[9] += 0.002
+            self.gripper_state = GripperState.CLOSING
         elif (joystick_state["buttons"]["B"]):
-            self.ctrl[6] -= 0.002
-            self.ctrl[8] += 0.002
-            self.ctrl[7] += 0.002
-            self.ctrl[9] -= 0.002
+            self.gripper_state = GripperState.OPENNING
 
-        self.ctrl[6] = np.clip(self.ctrl[6], self.ctrl_range[6][0], self.ctrl_range[6][1])
-        self.ctrl[7] = np.clip(self.ctrl[7], self.ctrl_range[7][0], self.ctrl_range[7][1])
+        if self.gripper_state == GripperState.CLOSING:
+            # cfrc_ext_dict, _ = self.query_cfrc_ext([self.body("Gripper_Link11"), self.body("Gripper_Link22")])
+            contact_force_dict = self._query_gripper_contact_force()
+            compose_force = 0
+            for force in contact_force_dict.values():
+                print("Gripper contact force: ", force)
+                compose_force += np.linalg.norm(force[:3])
+
+            if compose_force >= self.gripper_force_limit:
+                self.gripper_state = GripperState.STOPPED
+                print("Gripper force limit reached. Stop gripper at: ", self.ctrl[6], self.ctrl[7])
+
+        MOVE_STEP = 0.0002
+        if self.gripper_state == GripperState.CLOSING:
+            self.ctrl[6] += MOVE_STEP
+            self.ctrl[7] -= MOVE_STEP
+            if self.ctrl[6] > self.ctrl_range[6][1]:
+                self.ctrl[6] = self.ctrl_range[6][1]
+                self.gripper_state = GripperState.STOPPED
+            if self.ctrl[7] < self.ctrl_range[7][0]:
+                self.ctrl[7] = self.ctrl_range[7][0]
+                self.gripper_state = GripperState.STOPPED
+        elif self.gripper_state == GripperState.OPENNING:
+            self.ctrl[6] -= MOVE_STEP
+            self.ctrl[7] += MOVE_STEP
+            if self.ctrl[6] < self.ctrl_range[6][0]:
+                self.ctrl[6] = self.ctrl_range[6][0]
+                self.gripper_state = GripperState.STOPPED
+            if self.ctrl[7] > self.ctrl_range[7][1]:
+                self.ctrl[7] = self.ctrl_range[7][1]
+                self.gripper_state = GripperState.STOPPED
 
     def _load_record(self) -> None:
         if self.record_file is None:
@@ -379,7 +429,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
 
     def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("ee_mocap"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap"): {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
@@ -413,7 +463,9 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         return xpos, xmat
 
     def get_fingers_width(self) -> np.ndarray:
-        qpos_dict = self.query_joint_qpos([self.joint("Gripper_Link11"), self.joint("Gripper_Link22")])
-        finger1 = qpos_dict[self.joint("Gripper_Link11")]
-        finger2 = qpos_dict[self.joint("Gripper_Link22")]
+        # qpos_dict = self.query_joint_qpos([self.joint("Gripper_Link11"), self.joint("Gripper_Link22")])
+        # finger1 = qpos_dict[self.joint("Gripper_Link11")]
+        # finger2 = qpos_dict[self.joint("Gripper_Link22")]
+        finger1 = np.zeros(1)
+        finger2 = np.zeros(1)
         return finger1 + finger2

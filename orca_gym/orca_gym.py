@@ -622,8 +622,9 @@ class OrcaGym:
         response = await self.stub.QueryContact(request)
         
         contacts = []
-        for contact in response.contacts:
+        for i, contact in enumerate(response.contacts):
             contact_info = {
+                "ID": i,
                 "Dist": contact.dist,
                 "Pos": list(contact.pos),
                 "Frame": list(contact.frame),
@@ -653,8 +654,9 @@ class OrcaGym:
         response = await self.stub.QueryContactSimple(request)
         
         contacts = []
-        for contact in response.contacts:
+        for i, contact in enumerate(response.contacts):
             contact_info = {
+                "ID": i,
                 "Dim": contact.dim,
                 "Geom1": contact.geom1,
                 "Geom2": contact.geom2,
@@ -699,3 +701,11 @@ class OrcaGym:
             for geom in response.geom_pos_mat_list
         }
         return geom_pos_mat_dict
+
+    async def query_contact_force(self, contact_ids):
+        request = mjc_message_pb2.QueryContactForceRequest(contact_ids=contact_ids)
+        response = await self.stub.QueryContactForce(request)
+        forces_dict = {}
+        for contact_force in response.contact_forces:
+            forces_dict[contact_force.id] = np.array(contact_force.forces)
+        return forces_dict

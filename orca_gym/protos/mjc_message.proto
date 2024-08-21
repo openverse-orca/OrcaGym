@@ -59,6 +59,7 @@ service GrpcService {
   rpc QueryBodyComPosMat (QueryBodyComPosMatRequest) returns (QueryBodyComPosMatResponse) {}
   rpc QueryBodyPosMatQuat (QueryBodyPosMatQuatRequest) returns (QueryBodyPosMatQuatResponse) {}
   rpc QueryGeomPosMat (QueryGeomPosMatRequest) returns (QueryGeomPosMatResponse) {}
+  rpc QueryContactForce(QueryContactForceRequest) returns (QueryContactForceResponse);
 
   // 元素设置
   rpc SetControlInput (SetControlInputRequest) returns (SetControlInputResponse) {}
@@ -817,4 +818,16 @@ message QueryGeomPosMatResponse {
         repeated float mat = 3;      // 旋转矩阵 (9 elements)
     }
     repeated GeomPosMat geom_pos_mat_list = 1;
+}
+
+message QueryContactForceRequest {
+    repeated int32 contact_ids = 1; // List of contact IDs to query
+}
+
+message QueryContactForceResponse {
+    message ContactForce {
+        int32 id = 1;  // Contact ID
+        repeated float forces = 2;  // Forces array (3 for tangential forces and 3 for normal force)
+    }
+    repeated ContactForce contact_forces = 1;
 }
