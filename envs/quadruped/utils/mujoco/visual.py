@@ -5,7 +5,7 @@ import numpy as np
 from mujoco.viewer import Handle
 from scipy.spatial.transform import Rotation
 
-from ..quadruped_utils import LegsAttr
+from envs.quadruped.utils.quadruped_utils import LegsAttr
 
 
 def cross2(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # See https://github.com/microsoft/pylance-release/issues/3277

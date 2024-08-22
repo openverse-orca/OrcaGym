@@ -2,7 +2,7 @@
 and of the internal simulations that can be launch from the folder /simulation.
 """
 import numpy as np
-from quadruped_pympc.helpers.quadruped_utils import GaitType
+from envs.quadruped.helpers.quadruped_utils import GaitType
 
 # These are used both for a real experiment and a simulation -----------
 # These are the only attributes needed per quadruped, the rest can be computed automatically ----------------------

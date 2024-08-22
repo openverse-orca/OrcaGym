@@ -16,33 +16,26 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-# [Begin] OrcaGym 修改的代码 ______________________________________________________________
+
 from envs.quadruped.quadruped_env import QuadrupedEnv
 from envs.quadruped import config as cfg
 from envs.orca_gym_env import ActionSpaceType
 from gymnasium.envs.registration import register
 import gymnasium as gym
 from envs.franka_control.franka_joystick_env import RecordState
-# [End] OrcaGym 修改的代码 ______________________________________________________________
+from envs.quadruped.utils.mujoco.visual import render_vector
+from envs.quadruped.utils.quadruped_utils import LegsAttr
+from envs.quadruped.helpers.foothold_reference_generator import FootholdReferenceGenerator
+from envs.quadruped.helpers.periodic_gait_generator import PeriodicGaitGenerator
+from envs.quadruped.helpers.swing_trajectory_controller import SwingTrajectoryController
+from envs.quadruped.helpers.terrain_estimator import TerrainEstimator
+from envs.quadruped.helpers.quadruped_utils import plot_swing_mujoco
 
-# [Begin] Quadruped-PyMPC 原生的代码 ______________________________________________________
-# Gym and Simulation related imports
-# from gym_quadruped.quadruped_env import QuadrupedEnv
-from gym_quadruped.utils.mujoco.visual import render_vector
-from gym_quadruped.utils.quadruped_utils import LegsAttr
-# Control imports
-
-from quadruped_pympc.helpers.foothold_reference_generator import FootholdReferenceGenerator
-from quadruped_pympc.helpers.periodic_gait_generator import PeriodicGaitGenerator
-from quadruped_pympc.helpers.swing_trajectory_controller import SwingTrajectoryController
-from quadruped_pympc.helpers.terrain_estimator import TerrainEstimator
-from quadruped_pympc.helpers.quadruped_utils import plot_swing_mujoco
-# HeightMap import
 if(cfg.simulation_params['visual_foothold_adaptation'] != 'blind'):
-    from gym_quadruped.sensors.heightmap import HeightMap
-    from quadruped_pympc.helpers.visual_foothold_adaptation import VisualFootholdAdaptation
-from gym_quadruped.utils.mujoco.visual import render_sphere
-# [End] Quadruped-PyMPC 原生的代码 ______________________________________________________
+    from envs.quadruped.sensors.heightmap import HeightMap
+    from envs.quadruped.helpers.visual_foothold_adaptation import VisualFootholdAdaptation
+from envs.quadruped.utils.mujoco.visual import render_sphere
+
 
 
 
@@ -133,8 +126,8 @@ if __name__ == '__main__':
 
 
     # Some robots require a change in the zero joint-space configuration. If provided apply it
-    if cfg.qpos0_js is not None:
-        env.mjModel.qpos0 = np.concatenate((env.mjModel.qpos0[:7], cfg.qpos0_js))
+    # if cfg.qpos0_js is not None:
+    #     env.mjModel.qpos0 = np.concatenate((env.mjModel.qpos0[:7], cfg.qpos0_js))
 
     env.reset(random=False)
     # env.render()  # Pass in the first render call any mujoco.viewer.KeyCallbackType
