@@ -84,6 +84,14 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
+        EE_NAME_R  = self.site("ee_center_site_r")
+        site_dict_r = self.query_site_pos_and_quat([EE_NAME_R])
+        self.initial_grasp_site_xpos_r = site_dict_r[EE_NAME_R]['xpos']
+        self.initial_grasp_site_xquat_r = site_dict_r[EE_NAME_R]['xquat']
+        self.save_xquat_r = self.initial_grasp_site_xquat_r.copy()
+
+        self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
+
         self.joystick = XboxJoystick()
         
 
@@ -270,43 +278,63 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick.update()
-        joystick_state = self.joystick.get_first_state()
+        joystick_states = self.joystick.get_all_state()
+        if len(joystick_states) > 2:
+            joystick_states = joystick_states[:2]
+        # print(len(joystick_states))
 
-        pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
-        rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
-        # self._set_gripper_ctrl(joystick_state)
+        changed = False
+        for index, joystick_state in enumerate(joystick_states):
+            # print(index, joystick_state)
+            pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
+            rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
+            # self._set_gripper_ctrl(joystick_state)
 
-        # 如果控制量太小，不执行动作
-        CTRL_THRESHOLD = 0.1
-        if np.linalg.norm(pos_ctrl) < CTRL_THRESHOLD and np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+            # 如果控制量太小，不执行动作
+            CTRL_THRESHOLD = 0.1
+            if np.linalg.norm(pos_ctrl) < CTRL_THRESHOLD and np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+                continue
+
+            changed = True
+
+            ee_xpos, ee_xmat = self.get_ee_xform() if index == 0 else self.get_ee_r_xform()
+            ee_xquat = rotations.mat2quat(ee_xmat)
+
+            # 平移控制
+            move_ctrl_rate = 0.02
+            mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * move_ctrl_rate
+            mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
+
+            # 旋转控制，如果输入量小，需要记录当前姿态并在下一帧还原（保持姿态）
+            rot_ctrl_rate = 0.04
+            if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+                mocap_xquat = self.save_xquat if index == 0 else self.save_xquat_r
+            else:
+                rot_offset = rot_ctrl * rot_ctrl_rate
+                new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+                mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
+                if index == 0:
+                    self.save_xquat = mocap_xquat
+                else:
+                    self.save_xquat_r = mocap_xquat
+
+            # 直接根据新的qpos位置设置控制量，类似于牵引示教
+            # print(mocap_xpos, mocap_xquat)
+            if index == 0:
+                self.set_grasp_mocap(mocap_xpos, mocap_xquat)
+            else:
+                self.set_grasp_mocap_r(mocap_xpos, mocap_xquat)
+            # print(index, mocap_xpos, mocap_xquat)
+        
+        if not changed:
             if self.record_state == RecordState.RECORD:
                 self._save_record()
             return
 
-        ee_xpos, ee_xmat = self.get_ee_xform()
-        ee_xquat = rotations.mat2quat(ee_xmat)
-
-        # 平移控制
-        move_ctrl_rate = 0.02
-        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * move_ctrl_rate
-        mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
-
-        # 旋转控制，如果输入量小，需要记录当前姿态并在下一帧还原（保持姿态）
-        rot_ctrl_rate = 0.02
-        if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-            mocap_xquat = self.save_xquat
-        else:
-            rot_offset = rot_ctrl * rot_ctrl_rate
-            new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
-            mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
-            self.save_xquat = mocap_xquat
-
-        # 直接根据新的qpos位置设置控制量，类似于牵引示教
-        # print(mocap_xpos, mocap_xquat)
-        self.set_grasp_mocap(mocap_xpos, mocap_xquat)
         self.mj_forward()
         joint_qpos = self.query_joint_qpos(self.arm_joint_names)
         self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.left_arm_joint_names]).flat.copy()
+        self.ctrl[7:14] = np.array([joint_qpos[joint_name] for joint_name in self.right_arm_joint_names]).flat.copy()
 
         # 补偿旋转控制
         # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
@@ -358,6 +386,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
     def _reset_sim(self) -> bool:
         self._set_init_state()
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
+        self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
         self.mj_forward()
         return True
 
@@ -378,6 +407,11 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
     def set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap"): {'pos': position, 'quat': orientation}}
+        # print("Set grasp mocap: ", position, orientation)
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+
+    def set_grasp_mocap_r(self, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap_r"): {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
@@ -404,8 +438,15 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
+    def get_ee_r_xform(self) -> np.ndarray:
+        pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site_r")])
+        xpos = pos_dict[self.site("ee_center_site_r")]['xpos'].copy()
+        xmat = pos_dict[self.site("ee_center_site_r")]['xmat'].copy().reshape(3, 3)
+        return xpos, xmat
+
     def get_fingers_width(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos([self.joint("Gripper_Link11"), self.joint("Gripper_Link22")])
         finger1 = qpos_dict[self.joint("Gripper_Link11")]
         finger2 = qpos_dict[self.joint("Gripper_Link22")]
         return finger1 + finger2
+    
