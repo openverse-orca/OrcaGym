@@ -171,7 +171,7 @@ simulation_params = {
     "visual_foothold_adaptation":  'blind', #'blind', 'height', 'vfa'
 
     # this is the integration time used in the simulator
-    'dt':                          0.002,
+    'dt':                          0.01,
 
     'gait':                        'trot',  # 'trot', 'pace', 'crawl', 'bound', 'full_stance'
     'gait_params':                 {'trot': {'step_freq': 1.4, 'duty_factor': 0.65, 'type': GaitType.TROT.value},
@@ -187,7 +187,7 @@ simulation_params = {
     'ref_z':                       hip_height,
 
 
-    # the MPC will be called every 1/(mpc_frequency*dt) timesteps
+    # the MPC will be called every 1/(*dt) timesteps
     # this helps to evaluate more realistically the performance of the controller
     'mpc_frequency':               100,
 

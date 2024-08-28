@@ -21,6 +21,7 @@ from envs.quadruped.utils.mujoco.visual import change_robot_appearance, render_g
 from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
 from envs.orca_gym_env import OrcaGymEnv
+from orca_gym.devices.keyboard import KeyboardInput
 
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
@@ -107,6 +108,8 @@ class QuadrupedEnv(OrcaGymEnv):
 
         # Add for OrcaGymEnv
         self._agent_joint_names = None
+
+        self._keyboard_controller = KeyboardInput()
 
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
@@ -214,6 +217,9 @@ class QuadrupedEnv(OrcaGymEnv):
             bool: Whether the episode is truncated.
             dict: Additional information.
         """
+
+        self._key_callback()
+
         # Apply action (torque) to the robot
         self.ctrl = action
         self.do_simulation(self.ctrl, self.frame_skip)
@@ -360,7 +366,9 @@ class QuadrupedEnv(OrcaGymEnv):
 
         # Ground friction coefficient randomization if enabled.
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
-        self._set_ground_friction(tangential_coeff=tangential_friction)
+        # self._set_ground_friction(tangential_coeff=tangential_friction)
+        self._set_ground_friction()
+        # TODO: 改为不随机摩擦力
 
         return self._get_obs()
 
@@ -1044,17 +1052,27 @@ class QuadrupedEnv(OrcaGymEnv):
     #             ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
     #             )
 
-    def _key_callback(self, keycode):
+    def _key_callback(self):
         # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
-        if keycode == 262:  # arrow right
-            self._ref_base_ang_yaw_dot -= np.pi / 6
-        elif keycode == 263:  # arrow left
-            self._ref_base_ang_yaw_dot += np.pi / 6
-        elif keycode == 265:  # arrow up
-            self._ref_base_lin_vel_H[0] += 0.25 * self.hip_height  # % of (hip_height / second)
-        elif keycode == 264:  # arrow down
-            self._ref_base_lin_vel_H[0] -= 0.25 * self.hip_height  # % of (hip_height / second)
-        elif keycode == 345:  # ctrl
+
+        input_rate = 0.1
+
+        self._keyboard_controller.update()
+
+        key_state = self._keyboard_controller.get_state()
+
+        if key_state['Esc'] == 1:  # q
+            raise KeyboardInterrupt("User interrupted the simulation.")
+
+        if key_state['D'] == 1:  # arrow right
+            self._ref_base_ang_yaw_dot -= np.pi / 6 * input_rate
+        if key_state['A'] == 1:  # arrow left
+            self._ref_base_ang_yaw_dot += np.pi / 6 * input_rate
+        if key_state['W'] == 1:  # arrow up
+            self._ref_base_lin_vel_H[0] += 0.1 * self.hip_height * input_rate  # % of (hip_height / second)
+        if key_state['S'] == 1:  # arrow down
+            self._ref_base_lin_vel_H[0] -= 0.1 * self.hip_height * input_rate  # % of (hip_height / second)
+        if key_state['Space'] == 1:  # stop
             self._ref_base_lin_vel_H *= 0.0
             self._ref_base_ang_yaw_dot = 0.0
 

@@ -641,13 +641,15 @@ if __name__ == '__main__':
                 step_timestep_6 = time.time()
 
 
-                # print("Step time: ", step_timestep_6 - step_timestep_0, 
-                #         step_timestep_1 - step_timestep_0, 
-                #         step_timestep_2 - step_timestep_1,
-                #         step_timestep_3 - step_timestep_2,
-                #         step_timestep_4 - step_timestep_3,
-                #         step_timestep_5 - step_timestep_4,
-                #         step_timestep_6 - step_timestep_5)
+                print("Step time: ", step_timestep_6 - step_timestep_0)
+
+                # print("Step times: ", 
+                #         "0-1:", step_timestep_1 - step_timestep_0, 
+                #         "1-2:", step_timestep_2 - step_timestep_1,
+                #         "2-3:", step_timestep_3 - step_timestep_2,
+                #         "3-4:", step_timestep_4 - step_timestep_3,
+                #         "4-5:", step_timestep_5 - step_timestep_4,
+                #         "5-6:", step_timestep_6 - step_timestep_5)
 
             except KeyboardInterrupt:
                 print("Simulation stopped")        
