@@ -2,6 +2,7 @@ import sys
 import os
 import grpc
 import numpy as np
+import json
 
 
 class OrcaGymModel:
@@ -11,6 +12,8 @@ class OrcaGymModel:
     mjEQ_TENDON = 3        # couple the lengths of two tendons with cubic
     mjEQ_FLEX = 4          # fix all edge lengths of a flex
     mjEQ_DISTANCE = 5      # unsupported, will cause an error if used
+
+    PRINT_INIT_INFO = False
 
     def __init__(self, model_info):
         self.init_model_info(model_info)                
@@ -22,15 +25,20 @@ class OrcaGymModel:
         
     def init_model_info(self, model_info):
         self.model_info = model_info
-        print("Model info: ", model_info)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(model_info, indent=4)
+            print("Model info: ", formatted_dict)
 
         self.nq = model_info["nq"]
         self.nv = model_info["nv"]
         self.nu = model_info["nu"]
+        self.ngeom = model_info["ngeom"]
     
     def init_eq_list(self, eq_list):
         self._eq_list = eq_list
-        print("Equality constraints: ", eq_list)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(eq_list, indent=4)
+            print("Equality constraints: ", formatted_dict)
 
         self.neq = len(eq_list)
 
@@ -39,7 +47,9 @@ class OrcaGymModel:
     
     def init_mocap_dict(self, mocap_dict):
         self._mocap_dict = mocap_dict
-        print("Mocap dict: ", mocap_dict)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(mocap_dict, indent=4)
+            print("Mocap dict: ", formatted_dict)
 
         self.nmocap = len(mocap_dict)
 
@@ -47,10 +57,21 @@ class OrcaGymModel:
         for i, (actuator_name, actuator) in enumerate(actuator_dict.items()):
             actuator["ActuatorId"] = i
         self._actuator_dict = actuator_dict.copy()
-        print("Actuator dict: ", actuator_dict)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(actuator_dict, indent=4)
+            print("Actuator dict: ", formatted_dict)
 
     def get_actuator_dict(self):
         return self._actuator_dict
+    
+    def get_actuator(self, actuator_name:str):
+        return self._actuator_dict[actuator_name]
+    
+    def get_actuator(self, actuator_id:int):
+        actuator_name = self.actuator_id2name(actuator_id)
+        if actuator_name is not None:
+            return self._actuator_dict[actuator_name]
+        return None
     
     def actuator_name2id(self, actuator_name):
         return self._actuator_dict[actuator_name]["ActuatorId"]
@@ -65,10 +86,21 @@ class OrcaGymModel:
         for i, (body_name, body) in enumerate(body_dict.items()):
             body["BodyId"] = i
         self._body_dict = body_dict.copy()
-        print("Body dict: ", body_dict)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(body_dict, indent=4)
+            print("Body dict: ", formatted_dict)
 
     def get_body_dict(self):
         return self._body_dict
+    
+    def get_body(self, body_name:str):
+        return self._body_dict[body_name]
+    
+    def get_body(self, body_id:int):
+        body_name = self.body_id2name(body_id)
+        if body_name is not None:
+            return self._body_dict[body_name]
+        return None
     
     def body_name2id(self, body_name):
         return self._body_dict[body_name]["BodyId"]
@@ -83,10 +115,21 @@ class OrcaGymModel:
         for i, (joint_name, joint) in enumerate(joint_dict.items()):
             joint["JointId"] = i
         self._joint_dict = joint_dict.copy()
-        print("Joint dict: ", joint_dict)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(joint_dict, indent=4)
+            print("Joint dict: ", formatted_dict)
 
     def get_joint_dict(self):
         return self._joint_dict
+    
+    def get_joint(self, joint_name:str):
+        return self._joint_dict[joint_name]
+    
+    def get_joint(self, joint_id:int):
+        joint_name = self.joint_id2name(joint_id)
+        if joint_name is not None:
+            return self._joint_dict[joint_name]
+        return None
     
     def joint_name2id(self, joint_name):
         return self._joint_dict[joint_name]["JointId"]
@@ -101,10 +144,21 @@ class OrcaGymModel:
         for i, (geom_name, geom) in enumerate(geom_dict.items()):
             geom["GeomId"] = i
         self._geom_dict = geom_dict.copy()
-        print("Geom dict: ", geom_dict)
+        if self.PRINT_INIT_INFO:
+            formatted_dict = json.dumps(geom_dict, indent=4)
+            print("Geom dict: ", formatted_dict)
 
     def get_geom_dict(self):
         return self._geom_dict
+    
+    def get_geom(self, geom_name:str):
+        return self._geom_dict[geom_name]
+    
+    def get_geom(self, geom_id:int):
+        geom_name = self.geom_id2name(geom_id)
+        if geom_name is not None:
+            return self._geom_dict[geom_name]
+        return None
     
     def geom_name2id(self, geom_name):
         return self._geom_dict[geom_name]["GeomId"]

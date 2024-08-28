@@ -44,7 +44,7 @@ class QuadrupedEnv(OrcaGymEnv):
     _DEFAULT_OBS = ('qpos', 'qvel', 'tau_ctrl_setpoint', 'feet_pos_base', 'feet_vel_base')
     ALL_OBS = BASE_OBS + GEN_COORDS_OBS + FEET_OBS
 
-    metadata = {'render.modes': ['human'], 'version': 0}
+    metadata = {'render_modes': ['human'], 'version': 0}
 
     def __init__(self,
                  frame_skip: int,        
@@ -105,6 +105,9 @@ class QuadrupedEnv(OrcaGymEnv):
             **kwargs,
         )
 
+        # Add for OrcaGymEnv
+        self._agent_joint_names = None
+
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
 
@@ -139,7 +142,7 @@ class QuadrupedEnv(OrcaGymEnv):
 
         # Set the simulation step size (dt)
         # self.mjModel.opt.timestep = sim_dt
-        self.set_time_step(time_step)   # 注意：sim_dt 是 0.002，time_step 是 0.01
+        self.set_time_step(time_step)  
         
 
         # Identify the legs DoF indices/address in the qpos and qvel arrays ___________________________________________
@@ -172,7 +175,7 @@ class QuadrupedEnv(OrcaGymEnv):
         for actuator_name, actuator in actuator_dict.items():
             tau_low.append(actuator["ForceRange"][0])
             tau_high.append(actuator["ForceRange"][1])
-            is_act_lim.append(np.inf if actuator["Forcelimited"] == False else 1.0)
+            is_act_lim.append(np.inf if actuator["ForceLimited"] == False else 1.0)
 
 
         # tau_low, tau_high = self.mjModel.actuator_forcerange[:, 0], self.mjModel.actuator_forcerange[:, 1]
@@ -234,6 +237,10 @@ class QuadrupedEnv(OrcaGymEnv):
 
         self.step_num += 1
         return obs, reward, is_terminated, is_truncated, info
+
+    def reset_model(self):
+        # Robot_env 统一处理，这里实现空函数就可以
+        pass
 
     def reset(self,
               qpos: np.ndarray = None,
@@ -441,7 +448,7 @@ class QuadrupedEnv(OrcaGymEnv):
         
     def base_lin_acc(self, frame='world'):
         """Returns the base linear acceleration (3,) [m/s^2] in the specified frame."""
-        qacc = self.query_qacc()
+        qacc = self.data.qacc.copy()
         if frame == 'world':
             return qacc[0:3]
         elif frame == 'base':
@@ -495,12 +502,12 @@ class QuadrupedEnv(OrcaGymEnv):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         # TODO: Name of bodies should not be hardcodd
-        xpos, _ = self.get_body_com_xpos_xmat(['FR_hip', 'FL_hip', 'RL_hip', 'RR_hip'])
+        xpos_list, _ = self.get_body_com_xpos_xmat_list([self.body('FR_hip'), self.body('FL_hip'), self.body('RL_hip'), self.body('RR_hip')])
         return LegsAttr(
-            FR=R.T @ xpos[0],
-            FL=R.T @ xpos[1],
-            RL=R.T @ xpos[2],
-            RR=R.T @ xpos[3],
+            FR=R.T @ xpos_list[0],
+            FL=R.T @ xpos_list[1],
+            RL=R.T @ xpos_list[2],
+            RR=R.T @ xpos_list[3],
             )
 
         # FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
@@ -548,10 +555,10 @@ class QuadrupedEnv(OrcaGymEnv):
         geom_names = [self.model.geom_id2name(geom_id) for geom_id in geom_ids]
         geom_xpos, _ = self.get_geom_xpos_xmat(geom_names)
         return LegsAttr(
-            FR=homogenous_transform(geom_xpos[0], X),
-            FL=homogenous_transform(geom_xpos[1], X),
-            RR=homogenous_transform(geom_xpos[2], X),
-            RL=homogenous_transform(geom_xpos[3], X),
+            FR=homogenous_transform(geom_xpos[0:3], X),
+            FL=homogenous_transform(geom_xpos[3:6], X),
+            RR=homogenous_transform(geom_xpos[6:9], X),
+            RL=homogenous_transform(geom_xpos[9:12], X),
             )
 
         # return LegsAttr(
@@ -696,7 +703,7 @@ class QuadrupedEnv(OrcaGymEnv):
                             if ground_reaction_forces:  # Store the contact forces
                                 # Contact normal is R_c[:,0], that is the x-axis of the contact frame
                                 R_c = contact['Frame'].reshape(3, 3)
-                                force_c = self.mj_contactForce(contact_id)
+                                force_c = self.query_contact_force([contact_id])[contact_id]
                                 # force_c = np.zeros(6)  # 6D wrench vector
                                 # mujoco.mj_contactForce(self.mjModel, self.mjData, id=contact_id, result=force_c)
                                 # Transform the contact force to the world frame
@@ -774,11 +781,16 @@ class QuadrupedEnv(OrcaGymEnv):
         """Calculate the center of mass (CoM) of the entire robot in world frame."""
         total_mass = 0.0
         com = np.zeros(3)
+        
         body_dict = self.model.get_body_dict()
-        subtree_com = self.query_subtree_com()
-        for i, body_name in enumerate(body_dict.keys()):
+        body_name_list = body_dict.keys()
+        subtree_com_dict = self.query_subtree_com(body_name_list)
+        if len(subtree_com_dict) != len(body_name_list):
+            raise ValueError("Failed to Query the CoM of the robot.")
+        
+        for body_name in body_name_list:
             body_mass = body_dict[body_name]['Mass']
-            body_com = subtree_com[i]
+            body_com = subtree_com_dict[body_name]
             com += body_mass * body_com
             total_mass += body_mass
         com /= total_mass
@@ -787,8 +799,8 @@ class QuadrupedEnv(OrcaGymEnv):
     @property
     def base_configuration(self):
         """Robot base configuration (homogenous transformation matrix) in world reference frame."""
-        com_pos = self.mjData.qpos[0:3]  # world frame
-        quat_wxyz = self.mjData.qpos[3:7]  # world frame (wxyz) mujoco convention
+        com_pos = self.data.qpos[0:3]  # world frame
+        quat_wxyz = self.data.qpos[3:7]  # world frame (wxyz) mujoco convention
         quat_xyzw = np.roll(quat_wxyz, -1)  # SciPy convention (xyzw)
         X_B = np.eye(4)
         X_B[0:3, 0:3] = Rotation.from_quat(quat_xyzw).as_matrix()
@@ -798,17 +810,17 @@ class QuadrupedEnv(OrcaGymEnv):
     @property
     def joint_space_state(self):
         """Returns the joint-space state (qpos, qvel) of the robot."""
-        return self.mjData.qpos[7:], self.mjData.qvel[6:]
+        return self.data.qpos[7:], self.data.qvel[6:]
 
     @property
     def base_pos(self):
         """Returns the base position (3,) in the world reference frame."""
-        return self.mjData.qpos[0:3]
+        return self.data.qpos[0:3]
 
     @property
     def base_ori_euler_xyz(self):
         """Returns the base orientation in Euler XYZ angles (roll, pitch, yaw) in the world reference frame."""
-        quat_wxyz = self.mjData.qpos[3:7]
+        quat_wxyz = self.data.qpos[3:7]
         quat_xyzw = np.roll(quat_wxyz, -1)
         return Rotation.from_quat(quat_xyzw).as_euler('xyz')
 
@@ -828,27 +840,27 @@ class QuadrupedEnv(OrcaGymEnv):
 
         Differs from the generalized forces used to evolve the simulation when actuators are non-ideal models.
         """
-        return np.array(self.mjData.ctrl)
+        return np.array(self.ctrl)
 
     @property
     def simulation_dt(self):
         """Returns the simulation dt in seconds."""
-        return self.mjModel.opt.timestep
+        return self.gym.opt_config['timestep']
 
     @property
     def simulation_time(self):
         """Returns the simulation time in seconds."""
-        return self.mjData.time
+        return 0 # self.mjData.time
     
     @property
     def robot_model(self):
         """Returns the Robot model."""
-        return self.mjModel
+        return self.model
 
     @property
     def sim_data(self):
         """Returns the simulation Data."""
-        return self.mjData
+        return self.data
 
     def extract_obs_from_state(self, state_like_array: np.ndarray) -> dict[str, np.ndarray]:
         """Extracts the state observation from a state-like array.
@@ -936,12 +948,11 @@ class QuadrupedEnv(OrcaGymEnv):
         """Env termination occurs when a contact is detected on the robot's base."""
         invalid_contacts = {}
         invalid_contact_detected = False
-        contact_list = self.get_contact_simple()
-        geom_dict = self.model.get_geom_dict()
+        contact_list = self.query_contact_simple()
         for contact in contact_list:
-            body1_name = geom_dict[contact['Geom1']]['BodyName']
+            body1_name = self.model.get_geom(contact['Geom1'])['BodyName']
             body1_id = self.model.body_name2id(body1_name)
-            body2_name = geom_dict[contact['Geom2']]['BodyName']
+            body2_name = self.model.get_geom(contact['Geom2'])['BodyName']
             body2_id = self.model.body_name2id(body2_name)
 
         # for contact in self.mjData.contact:
@@ -986,46 +997,52 @@ class QuadrupedEnv(OrcaGymEnv):
                              rolling_coeff: float = 0.0  # Default MJ rolling coefficient
                              ):
         """Initialize ground friction coefficients using a specified distribution."""
-        pass
-        for geom_id in range(self.mjModel.ngeom):
-            geom_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+        geom_name_list = []
+        geom_friction_list = []
+        for geom_id in range(self.model.ngeom):
+            geom_name = self.model.geom_id2name(geom_id)
             if geom_name and geom_name.lower() in ['ground', 'floor', 'hfield', "terrain"]:
-                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
+                geom_name_list.append(geom_name)
+                geom_friction_list.append(np.array([tangential_coeff, torsional_coeff, rolling_coeff]))
                 # print(f"Setting friction for {geom_name} to: {tangential_coeff, torsional_coeff, rolling_coeff}")
             elif geom_id in self._feet_geom_id:  # Set the same friction coefficients for the feet geometries
-                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
+                geom_name_list.append(geom_name)
+                geom_friction_list.append(np.array([tangential_coeff, torsional_coeff, rolling_coeff]))
             else:
                 pass
 
-    def _render_ghost_robots(self, qpos: np.ndarray, alpha: float | np.ndarray = 0.5):
-        """ Render ghost robots with the provided qpos configurations.
+        if len(geom_name_list) > 0:
+            self.set_geom_friction(geom_name_list, geom_friction_list)
 
-        :param qpos: (n_robots, nq) or (nq,) array with the joint positions of the ghost robots.
-        :param alpha: (float) or (n_robots,) array with the transparency of the ghost robots.
-        """
-        qp = np.asarray(qpos)
-        if qp.ndim == 2:
-            assert qp.shape[1] == self.mjModel.nq, f"Invalid qpos shape: (...,{qp.shape[1]}) != {self.mjModel.nq}"
-            alpha = [alpha] * qp.shape[0] if isinstance(alpha, float) else alpha
-        else:
-            qp = qp.reshape(1, -1)
-            alpha = [alpha]
+    # def _render_ghost_robots(self, qpos: np.ndarray, alpha: float | np.ndarray = 0.5):
+    #     """ Render ghost robots with the provided qpos configurations.
 
-        for ghost_robot_idx, (q, a) in enumerate(zip(qp, alpha)):
-            # Use forward kinematics to update the geometry positions
-            if ghost_robot_idx not in self._ghost_robots_geom:
-                self._ghost_robots_geom[ghost_robot_idx] = {}
+    #     :param qpos: (n_robots, nq) or (nq,) array with the joint positions of the ghost robots.
+    #     :param alpha: (float) or (n_robots,) array with the transparency of the ghost robots.
+    #     """
+    #     qp = np.asarray(qpos)
+    #     if qp.ndim == 2:
+    #         assert qp.shape[1] == self.mjModel.nq, f"Invalid qpos shape: (...,{qp.shape[1]}) != {self.mjModel.nq}"
+    #         alpha = [alpha] * qp.shape[0] if isinstance(alpha, float) else alpha
+    #     else:
+    #         qp = qp.reshape(1, -1)
+    #         alpha = [alpha]
 
-            self._ghost_mjData.qpos = q
-            self._ghost_mjData.qvel *= 0.0
-            mujoco.mj_forward(self.mjModel, self._ghost_mjData)
-            self._ghost_robots_geom[ghost_robot_idx] |= render_ghost_robot(
-                self.viewer,
-                self.mjModel,
-                self._ghost_mjData,
-                alpha=a,
-                ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
-                )
+    #     for ghost_robot_idx, (q, a) in enumerate(zip(qp, alpha)):
+    #         # Use forward kinematics to update the geometry positions
+    #         if ghost_robot_idx not in self._ghost_robots_geom:
+    #             self._ghost_robots_geom[ghost_robot_idx] = {}
+
+    #         self._ghost_mjData.qpos = q
+    #         self._ghost_mjData.qvel *= 0.0
+    #         mujoco.mj_forward(self.mjModel, self._ghost_mjData)
+    #         self._ghost_robots_geom[ghost_robot_idx] |= render_ghost_robot(
+    #             self.viewer,
+    #             self.mjModel,
+    #             self._ghost_mjData,
+    #             alpha=a,
+    #             ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
+    #             )
 
     def _key_callback(self, keycode):
         # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
@@ -1057,6 +1074,10 @@ class QuadrupedEnv(OrcaGymEnv):
         gym.Space: The environment state observation space.
         dict: A dictionary mapping each state observation name to its indices in the observation space.
         """
+
+        # qpos = self._query_agent_qpos()
+        # print("Agetn Qpos: ", qpos)
+
         obs_dim, last_idx = 0, 0
 
         obs_lim_min, obs_lim_max = [], []
@@ -1214,54 +1235,74 @@ class QuadrupedEnv(OrcaGymEnv):
         return msg
 
 
+    # def _query_agent_qpos(self) -> np.ndarray:
+    #     """Returns the agent's joint positions from the simulation data.
+    #        Only works for single agent environments now.
+    #     """
+    #     if len(self._agent_names) > 1:
+    #         raise ValueError("Only single agent environments are supported.")
+        
+    #     if self._agent_joint_names is None:
+    #         self._agent_joint_names = []
+    #         agent_name = self._agent_names[0]
+    #         for i, name in enumerate(self.model.get_joint_dict().keys()):
+    #             if name.startswith(agent_name + '_'):
+    #                 self._agent_joint_names.append(name)
+
+    #     qpos_dict = self.query_joint_qpos(self._agent_joint_names)
+    #     qpos = np.concatenate([qpos_dict[joint_name] for joint_name in self._agent_joint_names])
+    #     return qpos.flat.copy()
+        
+
+
 # Example usage:
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    robot_name = "mini_cheetah"
-    scene_name = "flat"
-    robot_feet_geom_names = dict(FL='FL', FR='FR', RL='RL', RR='RR')
-    robot_leg_joints = dict(FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint', ],  # TODO: Make configs per robot.
-                            FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', ],
-                            RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint', ],
-                            RR=['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', ])
+#     robot_name = "mini_cheetah"
+#     scene_name = "flat"
+#     robot_feet_geom_names = dict(FL='FL', FR='FR', RL='RL', RR='RR')
+#     robot_leg_joints = dict(FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint', ],  # TODO: Make configs per robot.
+#                             FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', ],
+#                             RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint', ],
+#                             RR=['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', ])
 
-    state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
+#     state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
 
-    env = QuadrupedEnv(robot='mini_cheetah',
-                       hip_height=0.25,
-                       legs_joint_names=robot_leg_joints,        # Joint names of the legs DoF
-                       feet_geom_name=robot_feet_geom_names,     # Geom/Frame id of feet
-                       scene=scene_name,
-                       ref_base_lin_vel=(0.5, 1.0),              # pass a float for a fixed value
-                       ground_friction_coeff=(0.2, 1.5),         # pass a float for a fixed value
-                       base_vel_command_type="random",           # "forward", "random", "forward+rotate", "human"
-                       state_obs_names=state_observables_names,  # Desired quantities in the 'state'
-                       )
-    obs = env.reset()
-    env.render(tint_robot=True)
-    for _ in range(10):
-        obs = env.reset()
-        for _ in range(20000):
-            qpos, qvel = env.mjData.qpos, env.mjData.qvel
+#     env = QuadrupedEnv(robot='mini_cheetah',
+#                        hip_height=0.25,
+#                        legs_joint_names=robot_leg_joints,        # Joint names of the legs DoF
+#                        feet_geom_name=robot_feet_geom_names,     # Geom/Frame id of feet
+#                        scene=scene_name,
+#                        ref_base_lin_vel=(0.5, 1.0),              # pass a float for a fixed value
+#                        ground_friction_coeff=(0.2, 1.5),         # pass a float for a fixed value
+#                        base_vel_command_type="random",           # "forward", "random", "forward+rotate", "human"
+#                        state_obs_names=state_observables_names,  # Desired quantities in the 'state'
+#                        )
+#     obs = env.reset()
+#     env.render(tint_robot=True)
+#     for _ in range(10):
+#         obs = env.reset()
+#         for _ in range(20000):
+#             qpos, qvel = env.mjData.qpos, env.mjData.qvel
 
-            action = env.action_space.sample() * 50  # Sample random action
-            state, reward, is_terminated, is_truncated, info = env.step(action=action)
+#             action = env.action_space.sample() * 50  # Sample random action
+#             state, reward, is_terminated, is_truncated, info = env.step(action=action)
 
-            state_dict = env.extract_obs_from_state(state)
-            for state_obs_name in state_observables_names:
-                assert state_obs_name in state_dict, f"Missing state observation: {state_obs_name}"
-                assert state_dict[state_obs_name] is not None, f"Invalid state observation: {state_obs_name}"
+#             state_dict = env.extract_obs_from_state(state)
+#             for state_obs_name in state_observables_names:
+#                 assert state_obs_name in state_dict, f"Missing state observation: {state_obs_name}"
+#                 assert state_dict[state_obs_name] is not None, f"Invalid state observation: {state_obs_name}"
 
-            if is_terminated:
-                pass
-                # Handle terminal states here. Terminal states are contacts with ground with any geom but feet.
+#             if is_terminated:
+#                 pass
+#                 # Handle terminal states here. Terminal states are contacts with ground with any geom but feet.
 
-            # The environment enables also to visualize ghost robot configurations for debugging purposes.
-            # These ghost/decorative robots are not simulated, rather only displayed in the viewer.
-            # These robot's config are given by a qpos array.
-            qpos_ghost1, qpos_ghost2 = np.array(qpos), np.array(qpos)
-            qpos_ghost1[0] += 1.0
-            qpos_ghost2[0] -= 1.0
-            env.render(ghost_qpos=(qpos_ghost1, qpos_ghost2), ghost_alpha=(0.1, 0.5))
+#             # The environment enables also to visualize ghost robot configurations for debugging purposes.
+#             # These ghost/decorative robots are not simulated, rather only displayed in the viewer.
+#             # These robot's config are given by a qpos array.
+#             qpos_ghost1, qpos_ghost2 = np.array(qpos), np.array(qpos)
+#             qpos_ghost1[0] += 1.0
+#             qpos_ghost2[0] -= 1.0
+#             env.render(ghost_qpos=(qpos_ghost1, qpos_ghost2), ghost_alpha=(0.1, 0.5))
 
-    env.close()
+#     env.close()

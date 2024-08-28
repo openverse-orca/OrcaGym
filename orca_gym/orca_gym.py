@@ -33,10 +33,11 @@ class OrcaGym:
 
     async def init_simulation(self):
         self.opt_config = await self.query_opt_config()
-        print("Opt config: ", self.opt_config)
+        self.print_opt_config()
 
         model_info = await self.query_model_info()
         self.model = OrcaGymModel(model_info)      # 对应 Mujoco Model
+        self.print_model_info(model_info)
 
         eq_list = await self.query_all_equality_constraints()
         self.model.init_eq_list(eq_list)
@@ -54,10 +55,27 @@ class OrcaGym:
         self.data = OrcaGymData(self.model)
         await self.update_data()
 
+    def print_opt_config(self):
+        print("Opt config: ", f"timestep:{self.opt_config['timestep']}", 
+              f"iterations:{self.opt_config['iterations']}", 
+              f"noslip_iterations:{self.opt_config['noslip_iterations']}",
+              f"mpr_iterations:{self.opt_config['mpr_iterations']}",
+              f"sdf_iterations:{self.opt_config['sdf_iterations']}",
+              f"gravity:{self.opt_config['gravity']}",)
+        
+    def print_model_info(self, model_info):
+        print("Model info: ", f"nq:{model_info['nq']}",
+              f"nv:{model_info['nv']}",
+              f"nu:{model_info['nu']}",
+              f"nbody:{model_info['nbody']}",
+              f"njnt:{model_info['njnt']}",
+              f"ngeom:{model_info['ngeom']}",
+              f"nsite:{model_info['nsite']}",
+              )
 
     async def update_data(self):
-        qpos, qvel = await self.query_all_qpos_and_qvel()
-        self.data.update(qpos, qvel)
+        qpos, qvel, qacc = await self.query_all_qpos_qvel_qacc()
+        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
 
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
@@ -280,12 +298,13 @@ class OrcaGym:
         response = await self.stub.QueryJointDofadr(request)
         return response.JointDofadrs
 
-    async def query_all_qpos_and_qvel(self):
-        request = mjc_message_pb2.QueryAllQposAndQvelRequest()
-        response = await self.stub.QueryAllQposAndQvel(request)
-        qpos = np.array(response.Qpos)
-        qvel = np.array(response.Qvel)
-        return qpos, qvel
+    async def query_all_qpos_qvel_qacc(self):
+        request = mjc_message_pb2.QueryAllQposQvelQaccRequest()
+        response = await self.stub.QueryAllQposQvelQacc(request)
+        qpos = np.array(response.qpos)
+        qvel = np.array(response.qvel)
+        qacc = np.array(response.qacc)
+        return qpos, qvel, qacc
 
     async def load_keyframe(self, keyframe_name):
         request = mjc_message_pb2.LoadKeyFrameRequest(KeyFrameName=keyframe_name)
@@ -634,7 +653,7 @@ class OrcaGym:
                 "SolrefFriction": list(contact.solreffriction),
                 "Solimp": list(contact.solimp),
                 "Mu": contact.mu,
-                "H": list(contact.h),
+                "H": list(contact.H),
                 "Dim": contact.dim,
                 "Geom1": contact.geom1,
                 "Geom2": contact.geom2,
@@ -709,3 +728,75 @@ class OrcaGym:
         for contact_force in response.contact_forces:
             forces_dict[contact_force.id] = np.array(contact_force.forces)
         return forces_dict
+    
+    async def mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
+        # Create the request message
+        request = mjc_message_pb2.MJ_JacRequest(
+            point=point,
+            body=body,
+            compute_jacp=compute_jacp,
+            compute_jacr=compute_jacr
+        )
+
+        # Call the gRPC service and await the response
+        response = await self.stub.MJ_Jac(request)
+
+        # Convert the response into numpy arrays for ease of use
+        jacp = np.array(response.jacp).reshape((3, -1)) if compute_jacp else None
+        jacr = np.array(response.jacr).reshape((3, -1)) if compute_jacr else None
+
+        return jacp, jacr
+    
+    async def calc_full_mass_matrix(self):
+        request = mjc_message_pb2.CalcFullMassMatrixRequest()
+        response = await self.stub.CalcFullMassMatrix(request)
+
+        # 将响应转换为 numpy 数组，表示全质量矩阵
+        full_mass_matrix = np.array(response.full_mass_matrix).reshape((self.model.nv, self.model.nv))
+
+        return full_mass_matrix
+    
+    async def query_qfrc_bias(self):
+        # 构建请求消息
+        request = mjc_message_pb2.QueryQfrcBiasRequest()
+
+        # 调用 gRPC 服务并等待响应
+        response = await self.stub.QueryQfrcBias(request)
+
+        # 将响应转换为 numpy 数组，表示 qfrc_bias
+        qfrc_bias = np.array(response.qfrc_bias)
+
+        return qfrc_bias
+
+    async def query_subtree_com(self, body_name_list):
+        # 构建请求消息
+        request = mjc_message_pb2.QuerySubtreeComRequest(
+            body_name_list=body_name_list
+        )
+
+        # 调用 gRPC 服务并等待响应
+        response = await self.stub.QuerySubtreeCom(request)
+
+        # 构建结果字典，将 body_name 与对应的 subtree_com 关联
+        subtree_com_dict = {}
+        subtree_com_data = np.array(response.subtree_com).reshape((-1, 3))
+        
+        for body_name, subtree_com in zip(response.body_name_list, subtree_com_data):
+            subtree_com_dict[body_name] = subtree_com
+
+        return subtree_com_dict
+    
+    async def set_geom_friction(self, geom_name_list, friction_list):
+        # 构建请求消息
+        request = mjc_message_pb2.SetGeomFrictionRequest()
+        request.geom_name_list.extend(geom_name_list)
+
+        for friction in friction_list:
+            friction_proto = request.friction_list.add()
+            friction_proto.values.extend(friction)
+
+        # 调用gRPC服务
+        response = await self.stub.SetGeomFriction(request)
+
+        # 返回每个geom的设置成功状态
+        return response.success_list    

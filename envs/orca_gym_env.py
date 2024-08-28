@@ -62,6 +62,7 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
         # may use width and height
         self.model, self.data = self._initialize_simulation()
+        print("Agent Names: ", self._agent_names)
         
         self.reset_simulation() # 重置仿真环境
 
@@ -269,7 +270,7 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def _initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
-        print(f"Initializing simulation: Class: OrcaGymEnv")
+        print(f"Initializing simulation: Class: {self.__class__.__name__}")
         self.loop.run_until_complete(self._initialize_orca_sim())
         model = self.gym.model
         data = self.gym.data
@@ -331,11 +332,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         self.loop.run_until_complete(self._resume_simulation())  # 退出gym恢复仿真事件循环
         self.loop.run_until_complete(self._close_grpc())
 
-    def get_body_com_dict(self, body_name_list):
+    def get_body_com_dict(self, body_name_list) -> Dict[str, Dict[str, NDArray[np.float64]]]:
         body_com_dict = self.loop.run_until_complete(self._get_body_com_xpos_xmat(body_name_list))
         return body_com_dict
 
-    def get_body_com_xpos_xmat(self, body_name_list):
+    def get_body_com_xpos_xmat(self, body_name_list) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         # return self.data.body(body_name).xpos
         body_com_dict = self.loop.run_until_complete(self._get_body_com_xpos_xmat(body_name_list))
         if len(body_com_dict) != len(body_name_list):
@@ -343,6 +344,14 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         xpos = np.array([body_com_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
         xmat = np.array([body_com_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
         return xpos, xmat
+    
+    def get_body_com_xpos_xmat_list(self, body_name_list) -> Tuple[list[NDArray[np.float64]], list[NDArray[np.float64]]]:
+        body_com_dict = self.loop.run_until_complete(self._get_body_com_xpos_xmat(body_name_list))
+        if len(body_com_dict) != len(body_name_list):
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos_list = [np.array(body_com_dict[body_name]['Pos']) for body_name in body_name_list]
+        xmat_list = [np.array(body_com_dict[body_name]['Mat']) for body_name in body_name_list]
+        return xpos_list, xmat_list
 
     def get_body_xpos_xmat_xquat(self, body_name_list):
         # return self.data.body(body_name).xpos
@@ -625,3 +634,41 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.loop.run_until_complete(self._query_contact_force(contact_ids))
         return contact_force
+    
+    async def _mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
+        jacp, jacr = await self.gym.mj_jac(point, body, compute_jacp, compute_jacr)
+        return jacp, jacr
+    
+    def mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
+        jacp, jacr = self.loop.run_until_complete(self._mj_jac(point, body, compute_jacp, compute_jacr))
+        return jacp, jacr
+    
+    async def _calc_full_mass_matrix(self):
+        mass_matrix = await self.gym.calc_full_mass_matrix()
+        return mass_matrix
+    
+    def calc_full_mass_matrix(self):
+        mass_matrix = self.loop.run_until_complete(self._calc_full_mass_matrix())
+        return mass_matrix
+    
+    async def _query_qfrc_bias(self):
+        qfrc_bias = await self.gym.query_qfrc_bias()
+        return qfrc_bias
+    
+    def query_qfrc_bias(self):
+        qfrc_bias = self.loop.run_until_complete(self._query_qfrc_bias())
+        return qfrc_bias
+    
+    async def _query_subtree_com(self, body_name):
+        subtree_com_dict = await self.gym.query_subtree_com(body_name)
+        return subtree_com_dict
+    
+    def query_subtree_com(self, body_name):
+        subtree_com_dict = self.loop.run_until_complete(self._query_subtree_com(body_name))
+        return subtree_com_dict
+    
+    async def _set_geom_friction(self, geom_name_list, friction_list):
+        await self.gym.set_geom_friction(geom_name_list, friction_list)
+
+    def set_geom_friction(self, geom_name_list, friction_list):
+        self.loop.run_until_complete(self._set_geom_friction(geom_name_list, friction_list))

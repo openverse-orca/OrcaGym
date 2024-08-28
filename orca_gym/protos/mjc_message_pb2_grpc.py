@@ -104,10 +104,10 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryAllEqualityConstraintsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryAllEqualityConstraintsResponse.FromString,
                 _registered_method=True)
-        self.QueryAllQposAndQvel = channel.unary_unary(
-                '/MujocoMessage.GrpcService/QueryAllQposAndQvel',
-                request_serializer=mjc__message__pb2.QueryAllQposAndQvelRequest.SerializeToString,
-                response_deserializer=mjc__message__pb2.QueryAllQposAndQvelResponse.FromString,
+        self.QueryAllQposQvelQacc = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryAllQposQvelQacc',
+                request_serializer=mjc__message__pb2.QueryAllQposQvelQaccRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryAllQposQvelQaccResponse.FromString,
                 _registered_method=True)
         self.QueryContact = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryContact',
@@ -148,6 +148,16 @@ class GrpcServiceStub(object):
                 '/MujocoMessage.GrpcService/QueryBodyVelocities',
                 request_serializer=mjc__message__pb2.QueryBodyVelocitiesRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryBodyVelocitiesResponse.FromString,
+                _registered_method=True)
+        self.QueryQfrcBias = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryQfrcBias',
+                request_serializer=mjc__message__pb2.QueryQfrcBiasRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryQfrcBiasResponse.FromString,
+                _registered_method=True)
+        self.QuerySubtreeCom = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QuerySubtreeCom',
+                request_serializer=mjc__message__pb2.QuerySubtreeComRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QuerySubtreeComResponse.FromString,
                 _registered_method=True)
         self.SetQpos = channel.unary_unary(
                 '/MujocoMessage.GrpcService/SetQpos',
@@ -289,6 +299,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.UpdateEqualityConstraintsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.UpdateEqualityConstraintsResponse.FromString,
                 _registered_method=True)
+        self.SetGeomFriction = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetGeomFriction',
+                request_serializer=mjc__message__pb2.SetGeomFrictionRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetGeomFrictionResponse.FromString,
+                _registered_method=True)
         self.MJ_Forward = channel.unary_unary(
                 '/MujocoMessage.GrpcService/MJ_Forward',
                 request_serializer=mjc__message__pb2.MJ_ForwardRequest.SerializeToString,
@@ -328,6 +343,16 @@ class GrpcServiceStub(object):
                 '/MujocoMessage.GrpcService/MJ_JacBodyCom',
                 request_serializer=mjc__message__pb2.JacBodyComRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.JacBodyComResponse.FromString,
+                _registered_method=True)
+        self.MJ_Jac = channel.unary_unary(
+                '/MujocoMessage.GrpcService/MJ_Jac',
+                request_serializer=mjc__message__pb2.MJ_JacRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.MJ_JacResponse.FromString,
+                _registered_method=True)
+        self.CalcFullMassMatrix = channel.unary_unary(
+                '/MujocoMessage.GrpcService/CalcFullMassMatrix',
+                request_serializer=mjc__message__pb2.CalcFullMassMatrixRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.CalcFullMassMatrixResponse.FromString,
                 _registered_method=True)
 
 
@@ -416,7 +441,7 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def QueryAllQposAndQvel(self, request, context):
+    def QueryAllQposQvelQacc(self, request, context):
         """Data 查询
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -466,6 +491,18 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def QueryBodyVelocities(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryQfrcBias(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QuerySubtreeCom(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -642,6 +679,12 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetGeomFriction(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def MJ_Forward(self, request, context):
         """动力学计算
         """
@@ -687,6 +730,19 @@ class GrpcServiceServicer(object):
 
     def MJ_JacBodyCom(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def MJ_Jac(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CalcFullMassMatrix(self, request, context):
+        """计算全局的质量矩阵，不只包含机器人本体，还有其他有关节的物品
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -759,10 +815,10 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.QueryAllEqualityConstraintsRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryAllEqualityConstraintsResponse.SerializeToString,
             ),
-            'QueryAllQposAndQvel': grpc.unary_unary_rpc_method_handler(
-                    servicer.QueryAllQposAndQvel,
-                    request_deserializer=mjc__message__pb2.QueryAllQposAndQvelRequest.FromString,
-                    response_serializer=mjc__message__pb2.QueryAllQposAndQvelResponse.SerializeToString,
+            'QueryAllQposQvelQacc': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryAllQposQvelQacc,
+                    request_deserializer=mjc__message__pb2.QueryAllQposQvelQaccRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryAllQposQvelQaccResponse.SerializeToString,
             ),
             'QueryContact': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryContact,
@@ -803,6 +859,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QueryBodyVelocities,
                     request_deserializer=mjc__message__pb2.QueryBodyVelocitiesRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryBodyVelocitiesResponse.SerializeToString,
+            ),
+            'QueryQfrcBias': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryQfrcBias,
+                    request_deserializer=mjc__message__pb2.QueryQfrcBiasRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryQfrcBiasResponse.SerializeToString,
+            ),
+            'QuerySubtreeCom': grpc.unary_unary_rpc_method_handler(
+                    servicer.QuerySubtreeCom,
+                    request_deserializer=mjc__message__pb2.QuerySubtreeComRequest.FromString,
+                    response_serializer=mjc__message__pb2.QuerySubtreeComResponse.SerializeToString,
             ),
             'SetQpos': grpc.unary_unary_rpc_method_handler(
                     servicer.SetQpos,
@@ -944,6 +1010,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.UpdateEqualityConstraintsRequest.FromString,
                     response_serializer=mjc__message__pb2.UpdateEqualityConstraintsResponse.SerializeToString,
             ),
+            'SetGeomFriction': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetGeomFriction,
+                    request_deserializer=mjc__message__pb2.SetGeomFrictionRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetGeomFrictionResponse.SerializeToString,
+            ),
             'MJ_Forward': grpc.unary_unary_rpc_method_handler(
                     servicer.MJ_Forward,
                     request_deserializer=mjc__message__pb2.MJ_ForwardRequest.FromString,
@@ -983,6 +1054,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.MJ_JacBodyCom,
                     request_deserializer=mjc__message__pb2.JacBodyComRequest.FromString,
                     response_serializer=mjc__message__pb2.JacBodyComResponse.SerializeToString,
+            ),
+            'MJ_Jac': grpc.unary_unary_rpc_method_handler(
+                    servicer.MJ_Jac,
+                    request_deserializer=mjc__message__pb2.MJ_JacRequest.FromString,
+                    response_serializer=mjc__message__pb2.MJ_JacResponse.SerializeToString,
+            ),
+            'CalcFullMassMatrix': grpc.unary_unary_rpc_method_handler(
+                    servicer.CalcFullMassMatrix,
+                    request_deserializer=mjc__message__pb2.CalcFullMassMatrixRequest.FromString,
+                    response_serializer=mjc__message__pb2.CalcFullMassMatrixResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1347,7 +1428,7 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def QueryAllQposAndQvel(request,
+    def QueryAllQposQvelQacc(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1360,9 +1441,9 @@ class GrpcService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/MujocoMessage.GrpcService/QueryAllQposAndQvel',
-            mjc__message__pb2.QueryAllQposAndQvelRequest.SerializeToString,
-            mjc__message__pb2.QueryAllQposAndQvelResponse.FromString,
+            '/MujocoMessage.GrpcService/QueryAllQposQvelQacc',
+            mjc__message__pb2.QueryAllQposQvelQaccRequest.SerializeToString,
+            mjc__message__pb2.QueryAllQposQvelQaccResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1579,6 +1660,60 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QueryBodyVelocities',
             mjc__message__pb2.QueryBodyVelocitiesRequest.SerializeToString,
             mjc__message__pb2.QueryBodyVelocitiesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryQfrcBias(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryQfrcBias',
+            mjc__message__pb2.QueryQfrcBiasRequest.SerializeToString,
+            mjc__message__pb2.QueryQfrcBiasResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QuerySubtreeCom(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QuerySubtreeCom',
+            mjc__message__pb2.QuerySubtreeComRequest.SerializeToString,
+            mjc__message__pb2.QuerySubtreeComResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2346,6 +2481,33 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
+    def SetGeomFriction(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetGeomFriction',
+            mjc__message__pb2.SetGeomFrictionRequest.SerializeToString,
+            mjc__message__pb2.SetGeomFrictionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def MJ_Forward(request,
             target,
             options=(),
@@ -2551,6 +2713,60 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/MJ_JacBodyCom',
             mjc__message__pb2.JacBodyComRequest.SerializeToString,
             mjc__message__pb2.JacBodyComResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def MJ_Jac(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/MJ_Jac',
+            mjc__message__pb2.MJ_JacRequest.SerializeToString,
+            mjc__message__pb2.MJ_JacResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CalcFullMassMatrix(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/CalcFullMassMatrix',
+            mjc__message__pb2.CalcFullMassMatrixRequest.SerializeToString,
+            mjc__message__pb2.CalcFullMassMatrixResponse.FromString,
             options,
             channel_credentials,
             insecure,

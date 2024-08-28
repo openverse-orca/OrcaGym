@@ -169,17 +169,17 @@ def extract_mj_joint_info(env) -> OrderedDict[str, JointInfo]:
     joint_dict = env.model.get_joint_dict()
 
     for joint_name, joint in joint_dict.items():
-        type = joint['joint_type']
+        type = joint['Type']
         nq = Joint.qpos_size(type)
         nv = Joint.qvel_size(type)
-        qpos_idx_start = joint['qpos_idx_start']
-        qvel_idx_start = joint['qvel_idx_start']
+        qpos_idx_start = joint['QposIdxStart']
+        qvel_idx_start = joint['QvelIdxStart']
 
         joint_info[joint_name] = JointInfo(
             name=joint_name,
             type=type,
-            body_id=joint['joint_body_id'],
-            range=joint['joint_range'],
+            body_id=joint['BodyID'],
+            range=joint['Range'],
             nq=nq,
             nv=nv,
             qpos_idx=np.arange(qpos_idx_start, qpos_idx_start + nq),
