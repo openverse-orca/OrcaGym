@@ -73,6 +73,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         self.arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07"), self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07"), self.joint("J_head_yaw"), self.joint("J_head_pitch")]
         self.left_arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07")]
         self.right_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")]
+
         self._set_init_state()
 
         EE_NAME  = self.site("ee_center_site")
@@ -269,7 +270,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick.update()
-        joystick_state = self.joystick.get_state()
+        joystick_state = self.joystick.get_first_state()
 
         pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
         rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
@@ -301,7 +302,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             self.save_xquat = mocap_xquat
 
         # 直接根据新的qpos位置设置控制量，类似于牵引示教
-        print(mocap_xpos, mocap_xquat)
+        # print(mocap_xpos, mocap_xquat)
         self.set_grasp_mocap(mocap_xpos, mocap_xquat)
         self.mj_forward()
         joint_qpos = self.query_joint_qpos(self.arm_joint_names)
