@@ -226,7 +226,7 @@ class PusherEnv(OrcaGymEnv, utils.EzPickle):
         return observation, reward, False, False, info
 
     def _get_rew(self, action):
-        _, xpos = self.get_body_com([self.body("tips_arm"), self.body("object"), self.body("goal")])
+        xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])
         tips_arm_pos = xpos[:3]
         object_pos = xpos[3:6]
         goal_pos = xpos[6:]
@@ -267,16 +267,15 @@ class PusherEnv(OrcaGymEnv, utils.EzPickle):
             low=-0.005, high=0.005, size=self.model.nv
         )
         qvel[-4:] = 0
-        self.set_state(qpos, qvel)
+        self.set_qpos_qvel(qpos, qvel)
         return self._get_obs()
 
     def _get_obs(self):
-        qpos, qvel = self.query_qpos_qvel()
-        _, xpos = self.get_body_com([self.body("tips_arm"), self.body("object"), self.body("goal")])
+        xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])
         return np.concatenate(
             [
-                qpos.flatten()[:7],
-                qvel.flatten()[:7],
+                self.data.qpos.flatten()[:7],
+                self.data.qvel.flatten()[:7],
                 xpos[:3],
                 xpos[3:6],
                 xpos[6:],

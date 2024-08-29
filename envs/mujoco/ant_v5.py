@@ -364,17 +364,17 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
 
     @property
     def is_healthy(self):
-        state = self.state_vector()
+        state = np.concatenate([self.data.qpos, self.data.qvel])
         min_z, max_z = self._healthy_z_range
         is_healthy = np.isfinite(state).all() and min_z <= state[2] <= max_z
         return is_healthy
 
     def step(self, action):
 
-        _, xpos = self.get_body_com([self.body("torso")])
+        xpos, _ = self.get_body_com_xpos_xmat([self.body("torso")])
         xy_position_before = xpos[:2].copy()
         self.do_simulation(action, self.frame_skip)
-        _, xpos = self.get_body_com([self.body("torso")])
+        xpos, _ = self.get_body_com_xpos_xmat([self.body("torso")])
         xy_position_after = xpos[:2].copy()
 
         # xy_position_before = self.data.body(self._main_body).xpos[:2].copy()
@@ -431,9 +431,8 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
         return reward, reward_info
 
     def _get_obs(self):
-        qpos, qvel = self.query_qpos_qvel()
-        position = qpos.flatten()
-        velocity = qvel.flatten()
+        position = self.data.qpos.flatten()
+        velocity = self.data.qvel.flatten()
         # position = self.data.qpos.flatten()
         # velocity = self.data.qvel.flatten()
 
@@ -457,7 +456,7 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
             self.init_qvel
             + self._reset_noise_scale * self.np_random.standard_normal(self.model.nv)
         )
-        self.set_state(qpos, qvel)
+        self.set_qpos_qvel(qpos, qvel)
 
         observation = self._get_obs()
 

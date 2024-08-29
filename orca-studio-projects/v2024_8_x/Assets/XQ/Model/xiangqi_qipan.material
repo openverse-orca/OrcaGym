@@ -1,0 +1,19 @@
+{
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.textureMap": "../Tex/qipan_C.PNG",
+        "emissive.color": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+        ],
+        "normal.factor": 2.0,
+        "normal.flipY": true,
+        "normal.textureMap": "../Tex/qipan_n.PNG",
+        "opacity.factor": 1.0,
+        "roughness.factor": 0.8585786819458008,
+        "roughness.textureMap": "../Tex/qipan_r.png"
+    }
+}

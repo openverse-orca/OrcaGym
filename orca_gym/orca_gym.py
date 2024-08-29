@@ -14,6 +14,7 @@ import scipy.linalg
 from datetime import datetime
 
 from orca_gym.orca_gym_model import OrcaGymModel
+from orca_gym.orca_gym_data import OrcaGymData
 
 class OrcaGym:
     def __init__(self, stub):
@@ -32,10 +33,11 @@ class OrcaGym:
 
     async def init_simulation(self):
         self.opt_config = await self.query_opt_config()
-        print("Opt config: ", self.opt_config)
+        self.print_opt_config()
 
         model_info = await self.query_model_info()
         self.model = OrcaGymModel(model_info)      # 对应 Mujoco Model
+        self.print_model_info(model_info)
 
         eq_list = await self.query_all_equality_constraints()
         self.model.init_eq_list(eq_list)
@@ -47,14 +49,80 @@ class OrcaGym:
         self.model.init_body_dict(body_dict)
         joint_dict = await self.query_all_joints()
         self.model.init_joint_dict(joint_dict)
-        actuator_ctrlrange = await self.query_actuator_ctrl_range()
-        self.model.init_actuator_ctrlrange(actuator_ctrlrange)
+        geom_dict = await self.query_all_geoms()
+        self.model.init_geom_dict(geom_dict)
+
+        self.data = OrcaGymData(self.model)
+        await self.update_data()
+
+    def print_opt_config(self):
+        print("Opt config: ", f"timestep:{self.opt_config['timestep']}", 
+              f"iterations:{self.opt_config['iterations']}", 
+              f"noslip_iterations:{self.opt_config['noslip_iterations']}",
+              f"mpr_iterations:{self.opt_config['mpr_iterations']}",
+              f"sdf_iterations:{self.opt_config['sdf_iterations']}",
+              f"gravity:{self.opt_config['gravity']}",)
+        
+    def print_model_info(self, model_info):
+        print("Model info: ", f"nq:{model_info['nq']}",
+              f"nv:{model_info['nv']}",
+              f"nu:{model_info['nu']}",
+              f"nbody:{model_info['nbody']}",
+              f"njnt:{model_info['njnt']}",
+              f"ngeom:{model_info['ngeom']}",
+              f"nsite:{model_info['nsite']}",
+              )
+
+    async def update_data(self):
+        qpos, qvel, qacc = await self.query_all_qpos_qvel_qacc()
+        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
+        qfrc_bias = await self.query_qfrc_bias()
+        self.data.update_qfrc_bias(qfrc_bias)
+
 
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
         response = await self.stub.QueryAllActuators(request)
-        actuator_dict = {actuator.ActuatorName : {"JointName": actuator.JointName, "GearRatio": actuator.GearRatio} for actuator in response.ActuatorDataList}
+        actuator_dict = {}
+        idx = 0
+        for actuator in response.ActuatorDataList:
+            actuator_name = actuator.ActuatorName
+            if actuator_name == "":
+                actuator_name = "actuator"
+
+            if actuator_name in actuator_dict:
+                actuator_name = actuator_name + f"_{idx}"
+                idx += 1
+
+            actuator_dict[actuator_name] = {
+                "JointName": actuator.JointName,
+                "GearRatio": actuator.GearRatio,
+                "TrnId": list(actuator.actuator_trnid),
+                "CtrlLimited": actuator.actuator_ctrllimited,
+                "ForceLimited": actuator.actuator_forcelimited,
+                "ActLimited": actuator.actuator_actlimited,
+                "CtrlRange": list(actuator.actuator_ctrlrange),
+                "ForceRange": list(actuator.actuator_forcerange),
+                "ActRange": list(actuator.actuator_actrange),
+                "TrnType": actuator.actuator_trntype,
+                "DynType": actuator.actuator_dyntype,
+                "GainType": actuator.actuator_gaintype,
+                "BiasType": actuator.actuator_biastype,
+                "ActAdr": actuator.actuator_actadr,
+                "ActNum": actuator.actuator_actnum,
+                "Group": actuator.actuator_group,
+                "DynPrm": list(actuator.actuator_dynprm),
+                "GainPrm": list(actuator.actuator_gainprm),
+                "BiasPrm": list(actuator.actuator_biasprm),
+                "ActEarly": actuator.actuator_actearly,
+                "Gear": list(actuator.actuator_gear),
+                "CrankLength": actuator.actuator_cranklength,
+                "Acc0": actuator.actuator_acc0,
+                "Length0": actuator.actuator_length0,
+                "LengthRange": list(actuator.actuator_lengthrange),
+            }
         return actuator_dict
+
 
     async def query_joint_qpos(self, joint_names):
         request = mjc_message_pb2.QueryJointQposRequest(JointNameList=joint_names)
@@ -233,12 +301,13 @@ class OrcaGym:
         response = await self.stub.QueryJointDofadr(request)
         return response.JointDofadrs
 
-    async def query_all_qpos_and_qvel(self):
-        request = mjc_message_pb2.QueryAllQposAndQvelRequest()
-        response = await self.stub.QueryAllQposAndQvel(request)
-        qpos = np.array(response.Qpos)
-        qvel = np.array(response.Qvel)
-        return qpos, qvel
+    async def query_all_qpos_qvel_qacc(self):
+        request = mjc_message_pb2.QueryAllQposQvelQaccRequest()
+        response = await self.stub.QueryAllQposQvelQacc(request)
+        qpos = np.array(response.qpos)
+        qvel = np.array(response.qvel)
+        qacc = np.array(response.qacc)
+        return qpos, qvel, qacc
 
     async def load_keyframe(self, keyframe_name):
         request = mjc_message_pb2.LoadKeyFrameRequest(KeyFrameName=keyframe_name)
@@ -311,14 +380,63 @@ class OrcaGym:
     async def query_all_joints(self):
         request = mjc_message_pb2.QueryAllJointsRequest()
         response = await self.stub.QueryAllJoints(request)
-        joint_dict = {joint.name: {"joint_id": joint.id, "joint_body_id": joint.body_id, "joint_type": joint.type} for joint in response.joint_info}
+        joint_dict = {
+            joint.name: {
+                "ID": joint.id,
+                "BodyID": joint.body_id,
+                "Type": joint.type,
+                "Range": list(joint.range),
+                "QposIdxStart": joint.qpos_idx_start,
+                "QvelIdxStart": joint.qvel_idx_start,
+                "Group": joint.group,
+                "Limited": joint.limited,
+                "ActfrcLimited": joint.actfrclimited,
+                "Solref": list(joint.solref),
+                "Solimp": list(joint.solimp),
+                "Pos": list(joint.pos),
+                "Axis": list(joint.axis),
+                "Stiffness": joint.stiffness,
+                "ActfrcRange": list(joint.actfrcrange),
+                "Margin": joint.margin,
+            }
+            for joint in response.joint_info
+        }
         return joint_dict
-    
+
     async def query_all_bodies(self):
         request = mjc_message_pb2.QueryAllBodiesRequest()
         response = await self.stub.QueryAllBodies(request)
-        body_dict = {body.name: body.id for body in response.body_info}
+        body_dict = {
+            body.name: {
+                "ID": body.id,
+                "ParentID": body.parent_id,
+                "RootID": body.root_id,
+                "WeldID": body.weld_id,
+                "MocapID": body.mocap_id,
+                "JntNum": body.jnt_num,
+                "JntAdr": body.jnt_adr,
+                "DofNum": body.dof_num,
+                "DofAdr": body.dof_adr,
+                "TreeID": body.tree_id,
+                "GeomNum": body.geom_num,
+                "GeomAdr": body.geom_adr,
+                "Simple": body.simple,
+                "SameFrame": body.same_frame,
+                "Pos": list(body.pos),
+                "Quat": list(body.quat),
+                "IPos": list(body.ipos),
+                "IQuat": list(body.iquat),
+                "Mass": body.mass,
+                "SubtreeMass": body.subtree_mass,
+                "Inertia": list(body.inertia),
+                "InvWeight": list(body.inv_weight),
+                "GravComp": body.grav_comp,
+                "Margin": body.margin,
+            }
+            for body in response.body_info
+        }
         return body_dict
+
     
     async def mj_forward(self):
         request = mjc_message_pb2.MJ_ForwardRequest()
@@ -339,14 +457,6 @@ class OrcaGym:
         request = mjc_message_pb2.SetQvelRequest(qvel=qvel)
         response = await self.stub.SetQvel(request)
         return response    
-    
-    async def query_body_com(self, body_names):
-        request = mjc_message_pb2.QueryBodyComRequest(body_names=body_names)
-        response = await self.stub.QueryBodyCom(request)
-        if response.success:
-            return {body_com.body_name: list(body_com.com) for body_com in response.body_coms}
-        else:
-            raise Exception("Failed to query body COM")    
         
     async def query_cfrc_ext(self, body_names):
         request = mjc_message_pb2.QueryCfrcExtRequest(body_names=body_names)
@@ -355,15 +465,6 @@ class OrcaGym:
             return {body_cfrc_ext.body_name: list(body_cfrc_ext.cfrc_ext) for body_cfrc_ext in response.body_cfrc_exts}
         else:
             raise Exception("Failed to query cfrc_ext")        
-        
-    async def query_actuator_ctrl_range(self):
-        request = mjc_message_pb2.QueryActuatorCtrlRangeRequest()
-        response = await self.stub.QueryActuatorCtrlRange(request)
-        if response.success:
-            ranges = [(actuator_ctrl_range.min, actuator_ctrl_range.max) for actuator_ctrl_range in response.actuator_ctrl_ranges]
-            return np.array(ranges, dtype=np.float32)  # 将列表转换为 NumPy 数组
-        else:
-            raise Exception("Failed to query actuator control ranges")
         
     async def set_joint_qpos(self, joint_qpos_list):
         request = mjc_message_pb2.SetJointQposRequest()
@@ -486,7 +587,7 @@ class OrcaGym:
         return site_pos_and_mat
     
     
-    async def query_site_jac(self, site_names):
+    async def mj_jac_site(self, site_names):
         request = mjc_message_pb2.QuerySiteJacRequest(site_names=site_names)
         response = await self.stub.QuerySiteJac(request)
         site_jacs_dict = {}
@@ -507,3 +608,207 @@ class OrcaGym:
 
         response = await self.stub.UpdateEqualityConstraints(request)
         return response.success
+    
+    async def query_all_geoms(self):
+        request = mjc_message_pb2.QueryAllGeomsRequest()
+        response = await self.stub.QueryAllGeoms(request)
+        geom_dict = {
+            geom.geom_name: {
+                "BodyName": geom.body_name,
+                "Type": geom.geom_type,
+                "Contype": geom.geom_contype,
+                "Conaffinity": geom.geom_conaffinity,
+                "Condim": geom.geom_condim,
+                "Solmix": geom.geom_solmix,
+                "Solref": list(geom.geom_solref),
+                "Solimp": list(geom.geom_solimp),
+                "Size": list(geom.geom_size),
+                "Friction": list(geom.geom_friction),
+                "DataID": geom.geom_dataid,
+                "MatID": geom.geom_matid,
+                "Group": geom.geom_group,
+                "Priority": geom.geom_priority,
+                "Plugin": geom.geom_plugin,
+                "SameFrame": geom.geom_sameframe,
+                "Pos": list(geom.geom_pos),
+                "Quat": list(geom.geom_quat),
+                "Margin": geom.geom_margin,
+                "Gap": geom.geom_gap,
+            }
+            for geom in response.geom_data_list
+        }
+        return geom_dict
+
+    async def query_contact(self):
+        request = mjc_message_pb2.QueryContactRequest()
+        response = await self.stub.QueryContact(request)
+        
+        contacts = []
+        for i, contact in enumerate(response.contacts):
+            contact_info = {
+                "ID": i,
+                "Dist": contact.dist,
+                "Pos": list(contact.pos),
+                "Frame": list(contact.frame),
+                "IncludeMargin": contact.includemargin,
+                "Friction": list(contact.friction),
+                "Solref": list(contact.solref),
+                "SolrefFriction": list(contact.solreffriction),
+                "Solimp": list(contact.solimp),
+                "Mu": contact.mu,
+                "H": list(contact.H),
+                "Dim": contact.dim,
+                "Geom1": contact.geom1,
+                "Geom2": contact.geom2,
+                "Geom": list(contact.geom),
+                "Flex": list(contact.flex),
+                "Elem": list(contact.elem),
+                "Vert": list(contact.vert),
+                "Exclude": contact.exclude,
+                "EfcAddress": contact.efc_address,
+            }
+            contacts.append(contact_info)
+        
+        return contacts
+
+    async def query_contact_simple(self):
+        request = mjc_message_pb2.QueryContactSimpleRequest()
+        response = await self.stub.QueryContactSimple(request)
+        
+        contacts = []
+        for i, contact in enumerate(response.contacts):
+            contact_info = {
+                "ID": i,
+                "Dim": contact.dim,
+                "Geom1": contact.geom1,
+                "Geom2": contact.geom2,
+            }
+            contacts.append(contact_info)
+        
+        return contacts
+    
+    async def query_body_com_xpos_xmat(self, body_name_list):
+        request = mjc_message_pb2.QueryBodyComPosMatRequest(body_name_list=body_name_list)
+        response = await self.stub.QueryBodyComPosMat(request)
+        body_com_pos_mat_dict = {
+            body.body_name: {
+                "Pos": list(body.com_pos),
+                "Mat": list(body.com_mat),
+            }
+            for body in response.body_com_pos_mat_list
+        }
+        return body_com_pos_mat_dict
+
+    async def query_body_xpos_xmat_xquat(self, body_name_list):
+        request = mjc_message_pb2.QueryBodyPosMatQuatRequest(body_name_list=body_name_list)
+        response = await self.stub.QueryBodyPosMatQuat(request)
+        body_pos_mat_quat_dict = {
+            body.body_name: {
+                "Pos": list(body.pos),
+                "Mat": list(body.mat),
+                "Quat": list(body.quat),
+            }
+            for body in response.body_pos_mat_quat_list
+        }
+        return body_pos_mat_quat_dict
+
+    async def query_geom_xpos_xmat(self, geom_name_list):
+        request = mjc_message_pb2.QueryGeomPosMatRequest(geom_name_list=geom_name_list)
+        response = await self.stub.QueryGeomPosMat(request)
+        geom_pos_mat_dict = {
+            geom.geom_name: {
+                "Pos": list(geom.pos),
+                "Mat": list(geom.mat),
+            }
+            for geom in response.geom_pos_mat_list
+        }
+        return geom_pos_mat_dict
+
+    async def query_contact_force(self, contact_ids):
+        request = mjc_message_pb2.QueryContactForceRequest(contact_ids=contact_ids)
+        response = await self.stub.QueryContactForce(request)
+        forces_dict = {}
+        for contact_force in response.contact_forces:
+            forces_dict[contact_force.id] = np.array(contact_force.forces)
+        return forces_dict
+    
+    async def mj_jac(self, body_point_list, compute_jacp=True, compute_jacr=True):
+        # 创建请求消息
+        request = mjc_message_pb2.MJ_JacRequest(
+            compute_jacp=compute_jacp,
+            compute_jacr=compute_jacr
+        )
+
+        for body, point in body_point_list:
+            body_point_proto = request.body_point_list.add()
+            body_point_proto.body = body
+            body_point_proto.point.extend(point)
+
+        # 调用gRPC服务并等待响应
+        response = await self.stub.MJ_Jac(request)
+
+        # 处理响应，将结果转换为 numpy 数组
+        jacp_list = []
+        jacr_list = []
+        
+        for jac_result in response.jac_results:
+            if compute_jacp:
+                jacp_list.append(np.array(jac_result.jacp).reshape((3, -1)))
+            if compute_jacr:
+                jacr_list.append(np.array(jac_result.jacr).reshape((3, -1)))
+
+        return jacp_list if compute_jacp else None, jacr_list if compute_jacr else None
+    
+    async def calc_full_mass_matrix(self):
+        request = mjc_message_pb2.CalcFullMassMatrixRequest()
+        response = await self.stub.CalcFullMassMatrix(request)
+
+        # 将响应转换为 numpy 数组，表示全质量矩阵
+        full_mass_matrix = np.array(response.full_mass_matrix).reshape((self.model.nv, self.model.nv))
+
+        return full_mass_matrix
+    
+    async def query_qfrc_bias(self):
+        # 构建请求消息
+        request = mjc_message_pb2.QueryQfrcBiasRequest()
+
+        # 调用 gRPC 服务并等待响应
+        response = await self.stub.QueryQfrcBias(request)
+
+        # 将响应转换为 numpy 数组，表示 qfrc_bias
+        qfrc_bias = np.array(response.qfrc_bias)
+
+        return qfrc_bias
+
+    async def query_subtree_com(self, body_name_list):
+        # 构建请求消息
+        request = mjc_message_pb2.QuerySubtreeComRequest(
+            body_name_list=body_name_list
+        )
+
+        # 调用 gRPC 服务并等待响应
+        response = await self.stub.QuerySubtreeCom(request)
+
+        # 构建结果字典，将 body_name 与对应的 subtree_com 关联
+        subtree_com_dict = {}
+        subtree_com_data = np.array(response.subtree_com).reshape((-1, 3))
+        
+        for body_name, subtree_com in zip(response.body_name_list, subtree_com_data):
+            subtree_com_dict[body_name] = subtree_com
+
+        return subtree_com_dict
+    
+    async def set_geom_friction(self, geom_name_list, friction_list):
+        # 构建请求消息
+        request = mjc_message_pb2.SetGeomFrictionRequest()
+        request.geom_name_list.extend(geom_name_list)
+
+        for friction in friction_list:
+            friction_proto = request.friction_list.add()
+            friction_proto.values.extend(friction)
+
+        # 调用gRPC服务
+        response = await self.stub.SetGeomFriction(request)
+
+        # 返回每个geom的设置成功状态
+        return response.success_list    
