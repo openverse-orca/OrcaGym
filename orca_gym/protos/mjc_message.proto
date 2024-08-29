@@ -840,15 +840,23 @@ message QueryContactForceResponse {
 }
 
 message MJ_JacRequest {
-    repeated double point = 1;  // The 3D point in the world frame
-    int32 body = 2;            // The ID of the body
-    bool compute_jacp = 3;     // Whether to compute the translational component
-    bool compute_jacr = 4;     // Whether to compute the rotational component
+    message BodyPoint {
+        repeated double point = 1;  // The 3D point in the world frame
+        int32 body = 2;             // The ID of the body
+    }
+
+    repeated BodyPoint body_point_list = 1;  // 一组 body 和 point 信息
+    bool compute_jacp = 2;     // 是否计算平移分量
+    bool compute_jacr = 3;     // 是否计算旋转分量
 }
 
 message MJ_JacResponse {
-    repeated double jacp = 1;   // The translational Jacobian
-    repeated double jacr = 2;   // The rotational Jacobian
+    message JacResult {
+        repeated double jacp = 1;  // 平移分量
+        repeated double jacr = 2;  // 旋转分量
+    }
+
+    repeated JacResult jac_results = 1;  // 一组结果
 }
 
 message CalcFullMassMatrixRequest {

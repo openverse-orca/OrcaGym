@@ -76,6 +76,9 @@ class OrcaGym:
     async def update_data(self):
         qpos, qvel, qacc = await self.query_all_qpos_qvel_qacc()
         self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
+        qfrc_bias = await self.query_qfrc_bias()
+        self.data.update_qfrc_bias(qfrc_bias)
+
 
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
@@ -729,23 +732,32 @@ class OrcaGym:
             forces_dict[contact_force.id] = np.array(contact_force.forces)
         return forces_dict
     
-    async def mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
-        # Create the request message
+    async def mj_jac(self, body_point_list, compute_jacp=True, compute_jacr=True):
+        # 创建请求消息
         request = mjc_message_pb2.MJ_JacRequest(
-            point=point,
-            body=body,
             compute_jacp=compute_jacp,
             compute_jacr=compute_jacr
         )
 
-        # Call the gRPC service and await the response
+        for body, point in body_point_list:
+            body_point_proto = request.body_point_list.add()
+            body_point_proto.body = body
+            body_point_proto.point.extend(point)
+
+        # 调用gRPC服务并等待响应
         response = await self.stub.MJ_Jac(request)
 
-        # Convert the response into numpy arrays for ease of use
-        jacp = np.array(response.jacp).reshape((3, -1)) if compute_jacp else None
-        jacr = np.array(response.jacr).reshape((3, -1)) if compute_jacr else None
+        # 处理响应，将结果转换为 numpy 数组
+        jacp_list = []
+        jacr_list = []
+        
+        for jac_result in response.jac_results:
+            if compute_jacp:
+                jacp_list.append(np.array(jac_result.jacp).reshape((3, -1)))
+            if compute_jacr:
+                jacr_list.append(np.array(jac_result.jacr).reshape((3, -1)))
 
-        return jacp, jacr
+        return jacp_list if compute_jacp else None, jacr_list if compute_jacr else None
     
     async def calc_full_mass_matrix(self):
         request = mjc_message_pb2.CalcFullMassMatrixRequest()

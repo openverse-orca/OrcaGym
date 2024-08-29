@@ -110,6 +110,8 @@ class QuadrupedEnv(OrcaGymEnv):
         self._agent_joint_names = None
 
         self._keyboard_controller = KeyboardInput()
+        self._turning_left = False
+        self._turning_right = False
 
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
@@ -202,6 +204,12 @@ class QuadrupedEnv(OrcaGymEnv):
         # Store the ids of visual aid geometries
         self._geom_ids, self._ghost_robots_geom = {}, {}
 
+        self._contact_list = self.query_contact()
+        self._geom_xpos = self.query_geom_xpos()
+        self._jacp_list, self._jacr_list = self.calc_mj_jac()
+        self._full_mass_matrix = self.calc_full_mass_matrix()
+
+
     def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Apply the action to the robot, evolve the simulation, and return the observation, reward, and termination.
 
@@ -218,20 +226,35 @@ class QuadrupedEnv(OrcaGymEnv):
             dict: Additional information.
         """
 
+        # step_time_0 = time.time()
+
         self._key_callback()
+
+        # step_time_1 = time.time()
 
         # Apply action (torque) to the robot
         self.ctrl = action
         self.do_simulation(self.ctrl, self.frame_skip)
 
+        # step_time_2 = time.time()
+
         # self.mjData.ctrl = action
         # mujoco.mj_step(self.mjModel, self.mjData)
+
+        self._contact_list = self.query_contact()
+        self._geom_xpos = self.query_geom_xpos()
+        self._jacp_list, self._jacr_list = self.calc_mj_jac()
+        self._full_mass_matrix = self.calc_full_mass_matrix()
+
+        # step_time_3 = time.time()
 
         # Get observation
         obs = self._get_obs()
 
         # Compute reward (simplified)
         reward = self._compute_reward()
+
+        # step_time_4 = time.time()
 
         # Check if done (simplified, usually more complex)
         invalid_contact, contact_info = self._check_for_invalid_contacts()
@@ -240,6 +263,17 @@ class QuadrupedEnv(OrcaGymEnv):
         # Info dictionary
         # info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
         info = dict(time=0, step_num=self.step_num, invalid_contacts=contact_info)
+
+        # step_time_5 = time.time()
+
+
+        # print("step_time: ",
+        #       "key_callback: ", (step_time_1 - step_time_0) * 1000,
+        #         "do_simulation: ", (step_time_2 - step_time_1) * 1000,
+        #         "query_contact: ", (step_time_3 - step_time_2) * 1000,
+        #         "_get_obs: ", (step_time_4 - step_time_3) * 1000,
+        #         "check_for_invalid_contacts: ", (step_time_5 - step_time_4) * 1000,
+        #         "total: ", (step_time_5 - step_time_0) * 1000)
 
         self.step_num += 1
         return obs, reward, is_terminated, is_truncated, info
@@ -481,7 +515,8 @@ class QuadrupedEnv(OrcaGymEnv):
         # mass_matrix = np.zeros((self.model.nv, self.model.nv))
         # mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
 
-        mass_matrix = self.calc_full_mass_matrix()
+        mass_matrix = self._full_mass_matrix
+        # print("mass_matrix", mass_matrix)
 
         # Extract the 3x3 rotational inertia matrix of the base (assuming the base has 6 DoFs)
         inertia_B_at_qpos = mass_matrix[3:6, 3:6]
@@ -529,6 +564,15 @@ class QuadrupedEnv(OrcaGymEnv):
         #     RL=R.T @ self.mjData.body(RL_hip_id).xpos,
         #     )
 
+    def query_geom_xpos(self) -> np.ndarray:
+        geom_ids = [self._feet_geom_id.FR, 
+                    self._feet_geom_id.FL, 
+                    self._feet_geom_id.RR, 
+                    self._feet_geom_id.RL]
+        geom_names = [self.model.geom_id2name(geom_id) for geom_id in geom_ids]
+        geom_xpos, _ = self.get_geom_xpos_xmat(geom_names)
+        return geom_xpos
+
     def feet_pos(self, frame='world') -> LegsAttr:
         """Get the feet positions in the specified frame.
 
@@ -556,12 +600,7 @@ class QuadrupedEnv(OrcaGymEnv):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
-        geom_ids = [self._feet_geom_id.FR, 
-                    self._feet_geom_id.FL, 
-                    self._feet_geom_id.RR, 
-                    self._feet_geom_id.RL]
-        geom_names = [self.model.geom_id2name(geom_id) for geom_id in geom_ids]
-        geom_xpos, _ = self.get_geom_xpos_xmat(geom_names)
+        geom_xpos = self._geom_xpos
         return LegsAttr(
             FR=homogenous_transform(geom_xpos[0:3], X),
             FL=homogenous_transform(geom_xpos[3:6], X),
@@ -595,6 +634,19 @@ class QuadrupedEnv(OrcaGymEnv):
         """
         feet_jac = self.feet_jacobians(frame=frame)
         return LegsAttr(**{leg_name: feet_jac[leg_name] @ self.data.qvel for leg_name in self.legs_order})
+
+    def calc_mj_jac(self):
+        feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
+        body_point_list = []
+        for leg_name in ["FR", "FL", "RR", "RL"]:
+            body_point = []
+            body_point.append(self._feet_body_id[leg_name])
+            body_point.append(feet_pos[leg_name])
+            body_point_list.append(body_point)
+            
+        jacp_list, jacr_list = self.mj_jac(body_point_list)
+        # print("jacp_list: ", jacp_list)
+        return jacp_list, jacr_list
 
     def feet_jacobians(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
         """Compute the Jacobians of the feet positions.
@@ -640,10 +692,14 @@ class QuadrupedEnv(OrcaGymEnv):
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         feet_trans_jac = LegsAttr(*[np.zeros((3, self.model.nv)) for _ in range(4)])
         feet_rot_jac = LegsAttr(*[np.zeros((3, self.model.nv)) if not return_rot_jac else None for _ in range(4)])
-        feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
 
-        for leg_name in ["FR", "FL", "RR", "RL"]:
-            feet_trans_jac[leg_name], feet_rot_jac[leg_name] = self.mj_jac(point=feet_pos[leg_name], body=self._feet_body_id[leg_name])
+
+        jacp_list = self._jacp_list
+        jacr_list = self._jacr_list
+
+        for i, leg_name in enumerate(["FR", "FL", "RR", "RL"]):
+            feet_trans_jac[leg_name] = jacp_list[i].copy()
+            feet_rot_jac[leg_name] = jacr_list[i].copy()
             # mujoco.mj_jac(m=self.mjModel,
             #               d=self.mjData,
             #               jacp=feet_trans_jac[leg_name],
@@ -695,7 +751,7 @@ class QuadrupedEnv(OrcaGymEnv):
         contact_state = LegsAttr(FL=False, FR=False, RL=False, RR=False)
         feet_contacts = LegsAttr(FL=[], FR=[], RL=[], RR=[])
         feet_contact_forces = LegsAttr(FL=[], FR=[], RL=[], RR=[])
-        contact_list = self.query_contact()
+        contact_list = self._contact_list
         for contact_id, contact in enumerate(contact_list):
             # Get body IDs from geom IDs
             body1_id = self.model.get_geom_bodyid(contact['Geom1'])
@@ -712,6 +768,7 @@ class QuadrupedEnv(OrcaGymEnv):
                                 # Contact normal is R_c[:,0], that is the x-axis of the contact frame
                                 R_c = contact['Frame'].reshape(3, 3)
                                 force_c = self.query_contact_force([contact_id])[contact_id]
+                                print("Query contact force")
                                 # force_c = np.zeros(6)  # 6D wrench vector
                                 # mujoco.mj_contactForce(self.mjModel, self.mjData, id=contact_id, result=force_c)
                                 # Transform the contact force to the world frame
@@ -766,7 +823,7 @@ class QuadrupedEnv(OrcaGymEnv):
     def legs_mass_matrix(self, ):
         # mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
         # mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
-        mass_matrix = self.calc_full_mass_matrix()
+        mass_matrix = self._full_mass_matrix
         # Get the mass matrix of the legs
         legs_mass_matrix = LegsAttr(FL=mass_matrix[np.ix_(self.legs_qvel_idx.FL, self.legs_qvel_idx.FL)],
                                     FR=mass_matrix[np.ix_(self.legs_qvel_idx.FR, self.legs_qvel_idx.FR)],
@@ -777,7 +834,7 @@ class QuadrupedEnv(OrcaGymEnv):
     @property
     def legs_qfrc_bias(self, ):
         # centrifugal, coriolis, gravity
-        qfrc_bias = self.query_qfrc_bias()
+        qfrc_bias = self.data.qfrc_bias
         legs_qfrc_bias = LegsAttr(FL=qfrc_bias[self.legs_qvel_idx.FL],
                                   FR=qfrc_bias[self.legs_qvel_idx.FR],
                                   RL=qfrc_bias[self.legs_qvel_idx.RL],
@@ -956,7 +1013,7 @@ class QuadrupedEnv(OrcaGymEnv):
         """Env termination occurs when a contact is detected on the robot's base."""
         invalid_contacts = {}
         invalid_contact_detected = False
-        contact_list = self.query_contact_simple()
+        contact_list = self._contact_list
         for contact in contact_list:
             body1_name = self.model.get_geom(contact['Geom1'])['BodyName']
             body1_id = self.model.body_name2id(body1_name)
@@ -1052,10 +1109,12 @@ class QuadrupedEnv(OrcaGymEnv):
     #             ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
     #             )
 
+
     def _key_callback(self):
         # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
 
-        input_rate = 0.1
+        move_speed_rate = 0.25 * 0.1
+        turn_speed_rate = 0.1
 
         self._keyboard_controller.update()
 
@@ -1065,13 +1124,26 @@ class QuadrupedEnv(OrcaGymEnv):
             raise KeyboardInterrupt("User interrupted the simulation.")
 
         if key_state['D'] == 1:  # arrow right
-            self._ref_base_ang_yaw_dot -= np.pi / 6 * input_rate
+            self._turning_right = True
+        if key_state['D'] == 0:
+            self._turning_right = False
         if key_state['A'] == 1:  # arrow left
-            self._ref_base_ang_yaw_dot += np.pi / 6 * input_rate
+            self._turning_left = True
+        if key_state['A'] == 0:
+            self._turning_left = False
+
+        if self._turning_right:
+            self._ref_base_ang_yaw_dot -= np.pi / 6 * turn_speed_rate
+        if self._turning_left:
+            self._ref_base_ang_yaw_dot += np.pi / 6 * turn_speed_rate
+        if not self._turning_left and not self._turning_right:
+            self._ref_base_ang_yaw_dot = 0.0
+
         if key_state['W'] == 1:  # arrow up
-            self._ref_base_lin_vel_H[0] += 0.1 * self.hip_height * input_rate  # % of (hip_height / second)
+            self._ref_base_lin_vel_H[0] += self.hip_height * move_speed_rate  # % of (hip_height / second)
         if key_state['S'] == 1:  # arrow down
-            self._ref_base_lin_vel_H[0] -= 0.1 * self.hip_height * input_rate  # % of (hip_height / second)
+            self._ref_base_lin_vel_H[0] -= self.hip_height * move_speed_rate  # % of (hip_height / second)
+
         if key_state['Space'] == 1:  # stop
             self._ref_base_lin_vel_H *= 0.0
             self._ref_base_ang_yaw_dot = 0.0

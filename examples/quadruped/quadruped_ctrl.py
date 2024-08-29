@@ -351,7 +351,7 @@ if __name__ == '__main__':
                         step_height = cfg.simulation_params['step_height']
                         stc.regenerate_swing_trajectory_generator(step_height=step_height, swing_period=stc.swing_period)"""
                 
-                step_timestep_2 = time.time()
+
 
                 # Estimate the terrain slope and elevation -------------------------------------------------------
                 terrain_roll, \
@@ -381,7 +381,7 @@ if __name__ == '__main__':
                                 ref_position=ref_pos
                                 )
                 # -------------------------------------------------------------------------------------------------
-
+                step_timestep_2 = time.time()
 
                 # TODO: this should be hidden inside the controller forward/get_action method
                 # Solve OCP ---------------------------------------------------------------------------------------
@@ -513,6 +513,9 @@ if __name__ == '__main__':
 
                 # Compute Stance Torque ---------------------------------------------------------------------------
                 feet_jac = env.feet_jacobians(frame='world', return_rot_jac=False)
+
+                step_timestep_4 = time.time()
+
                 # Compute feet velocities
                 feet_vel = LegsAttr(**{leg_name: feet_jac[leg_name] @ env.data.qvel for leg_name in legs_order})
                 # Compute jacobian derivatives of the contact points
@@ -562,11 +565,11 @@ if __name__ == '__main__':
                 action_noise = np.random.normal(0, 2, size=env.model.nu)
                 action += action_noise
 
-                step_timestep_4 = time.time()
+                step_timestep_5 = time.time()
 
                 state, reward, is_terminated, is_truncated, info = env.step(action=action)
             
-                step_timestep_5 = time.time()
+                step_timestep_6 = time.time()
 
 
                 # Store the history of observations and control -------------------------------------------------------
@@ -638,18 +641,20 @@ if __name__ == '__main__':
                     current_contact = np.array([0, 0, 0, 0])
                     previous_contact = np.asarray(current_contact)
 
-                step_timestep_6 = time.time()
+                step_timestep_7 = time.time()
 
 
-                print("Step time: ", step_timestep_6 - step_timestep_0)
+                print("Step time: ", (step_timestep_7 - step_timestep_0) * 1000)
 
                 # print("Step times: ", 
-                #         "0-1:", step_timestep_1 - step_timestep_0, 
-                #         "1-2:", step_timestep_2 - step_timestep_1,
-                #         "2-3:", step_timestep_3 - step_timestep_2,
-                #         "3-4:", step_timestep_4 - step_timestep_3,
-                #         "4-5:", step_timestep_5 - step_timestep_4,
-                #         "5-6:", step_timestep_6 - step_timestep_5)
+                #         "0-1:", (step_timestep_1 - step_timestep_0) * 1000, 
+                #         "1-2:", (step_timestep_2 - step_timestep_1) * 1000,
+                #         "2-3:", (step_timestep_3 - step_timestep_2) * 1000,
+                #         "3-4:", (step_timestep_4 - step_timestep_3) * 1000,
+                #         "4-5:", (step_timestep_5 - step_timestep_4) * 1000,
+                #         "5-6:", (step_timestep_6 - step_timestep_5) * 1000,
+                #         "6-7:", (step_timestep_7 - step_timestep_6) * 1000
+                #         )
 
             except KeyboardInterrupt:
                 print("Simulation stopped")        

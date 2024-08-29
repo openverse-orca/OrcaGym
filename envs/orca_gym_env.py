@@ -635,13 +635,13 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         contact_force = self.loop.run_until_complete(self._query_contact_force(contact_ids))
         return contact_force
     
-    async def _mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
-        jacp, jacr = await self.gym.mj_jac(point, body, compute_jacp, compute_jacr)
-        return jacp, jacr
+    async def _mj_jac(self, body_point_list, compute_jacp=True, compute_jacr=True):
+        jacp_list, jacr_list = await self.gym.mj_jac(body_point_list, compute_jacp, compute_jacr)
+        return jacp_list, jacr_list
     
-    def mj_jac(self, point, body, compute_jacp=True, compute_jacr=True):
-        jacp, jacr = self.loop.run_until_complete(self._mj_jac(point, body, compute_jacp, compute_jacr))
-        return jacp, jacr
+    def mj_jac(self, body_point_list, compute_jacp=True, compute_jacr=True):
+        jacp_list, jacr_list = self.loop.run_until_complete(self._mj_jac(body_point_list, compute_jacp, compute_jacr))
+        return jacp_list, jacr_list
     
     async def _calc_full_mass_matrix(self):
         mass_matrix = await self.gym.calc_full_mass_matrix()
