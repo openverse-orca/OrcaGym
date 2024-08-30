@@ -255,6 +255,56 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 return
 
         self.ctrl = self.record_pool.pop(0)
+    
+    def save_record_openloong(self):
+        if self.record_state != RecordState.RECORD:
+            return
+        
+        if self.record_file is None:
+            raise ValueError("record_file is not set.")
+        
+        data_size = 800
+        
+        data_dict = {
+        # 一个是奖励里面的qpos，qvel， effort ,一个是实际发的acition
+        '/observations/qpos': [],
+        '/observations/qvel': [],
+        '/observations/effort': [],
+        '/action': [],
+        '/base_action': []
+        }
+
+        camera_names = ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+        use_depth_image = False
+
+        # 相机字典  观察的图像
+        for cam_name in camera_names:
+            data_dict[f'/observations/images/{cam_name}'] = []
+            if use_depth_image:
+                data_dict[f'/observations/images_depth/{cam_name}'] = []
+
+        with h5py.File(self.record_file, 'a', rdcc_nbytes=1024**2*2) as root:
+            root.attrs['sim'] = False
+            root.attrs['compress'] = False
+
+            # 创建一个新的组observations，观测状态组
+            # 图像组
+            obs = root.create_group('observations')
+            image = obs.create_group('images')
+            for cam_name in camera_names:
+                _ = image.create_dataset(cam_name, (data_size, 480, 640, 3), dtype='uint8',
+                                            chunks=(1, 480, 640, 3), )
+            if use_depth_image:
+                image_depth = obs.create_group('images_depth')
+                for cam_name in camera_names:
+                    _ = image_depth.create_dataset(cam_name, (data_size, 480, 640), dtype='uint16',
+                                                chunks=(1, 480, 640), )
+
+            _ = obs.create_dataset('qpos', (data_size, 14))
+            _ = obs.create_dataset('qvel', (data_size, 14))
+            _ = obs.create_dataset('effort', (data_size, 14))
+            _ = root.create_dataset('action', (data_size, 14))
+            _ = root.create_dataset('base_action', (data_size, 2))
 
     def _set_action(self) -> None:
         if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
