@@ -31,8 +31,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         self.record_state = record_state
         self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
+        self.RECORD_POOL_SIZE = 800
         self.record_cursor = 0
 
         action_size = 3 # 实际并不使用
@@ -93,7 +92,24 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
 
         self.joystick = XboxJoystick()
-        
+
+        self.camera_names = ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+        self.use_depth_image = False
+        self.data_size = 800
+        self.data_dict = {
+            # 一个是奖励里面的qpos，qvel， effort ,一个是实际发的acition
+            '/observations/qpos': [],
+            '/observations/qvel': [],
+            '/observations/effort': [],
+            '/action': [],
+            '/base_action': []
+        }
+
+        # 相机字典  观察的图像
+        for cam_name in self.camera_names:
+            self.data_dict[f'/observations/images/{cam_name}'] = []
+            if self.use_depth_image:
+                self.data_dict[f'/observations/images_depth/{cam_name}'] = []        
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -218,31 +234,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 return True
 
         return False
-    
-    def save_record(self) -> None:
-        if self.record_state != RecordState.RECORD:
-            return
-        
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a') as f:
-            # 如果数据集存在，获取其大小；否则，创建新的数据集
-            if "float_data" in f:
-                dset = f["float_data"]
-                self.record_cursor = dset.shape[0]
-            else:
-                dset = f.create_dataset("float_data", (0, len(self.ctrl)), maxshape=(None, len(self.ctrl)), dtype='f', compression="gzip")
-                self.record_cursor = 0
-
-            # 将record_pool中的数据写入数据集
-            dset.resize((self.record_cursor + len(self.record_pool), len(self.ctrl)))
-            dset[self.record_cursor:] = np.array(self.record_pool)
-            self.record_cursor += len(self.record_pool)
-            self.record_pool.clear()
-
-            print("Record saved.")
-
 
     def _replay(self) -> None:
         if self.record_state == RecordState.REPLAY_FINISHED:
@@ -255,33 +246,13 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 return
 
         self.ctrl = self.record_pool.pop(0)
-    
-    def save_record_openloong(self):
+
+    def save_record_to_file(self):
         if self.record_state != RecordState.RECORD:
             return
         
         if self.record_file is None:
             raise ValueError("record_file is not set.")
-        
-        data_size = 800
-        
-        data_dict = {
-        # 一个是奖励里面的qpos，qvel， effort ,一个是实际发的acition
-        '/observations/qpos': [],
-        '/observations/qvel': [],
-        '/observations/effort': [],
-        '/action': [],
-        '/base_action': []
-        }
-
-        camera_names = ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
-        use_depth_image = False
-
-        # 相机字典  观察的图像
-        for cam_name in camera_names:
-            data_dict[f'/observations/images/{cam_name}'] = []
-            if use_depth_image:
-                data_dict[f'/observations/images_depth/{cam_name}'] = []
 
         with h5py.File(self.record_file, 'a', rdcc_nbytes=1024**2*2) as root:
             root.attrs['sim'] = False
@@ -291,20 +262,25 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             # 图像组
             obs = root.create_group('observations')
             image = obs.create_group('images')
-            for cam_name in camera_names:
-                _ = image.create_dataset(cam_name, (data_size, 480, 640, 3), dtype='uint8',
+            for cam_name in self.camera_names:
+                _ = image.create_dataset(cam_name, (self.data_size, 480, 640, 3), dtype='uint8',
                                             chunks=(1, 480, 640, 3), )
-            if use_depth_image:
+            if self.use_depth_image:
                 image_depth = obs.create_group('images_depth')
-                for cam_name in camera_names:
-                    _ = image_depth.create_dataset(cam_name, (data_size, 480, 640), dtype='uint16',
+                for cam_name in self.camera_names:
+                    _ = image_depth.create_dataset(cam_name, (self.data_size, 480, 640), dtype='uint16',
                                                 chunks=(1, 480, 640), )
 
-            _ = obs.create_dataset('qpos', (data_size, 14))
-            _ = obs.create_dataset('qvel', (data_size, 14))
-            _ = obs.create_dataset('effort', (data_size, 14))
-            _ = root.create_dataset('action', (data_size, 14))
-            _ = root.create_dataset('base_action', (data_size, 2))
+            _ = obs.create_dataset('qpos', (self.data_size, 14))
+            _ = obs.create_dataset('qvel', (self.data_size, 14))
+            _ = obs.create_dataset('effort', (self.data_size, 14))
+            _ = root.create_dataset('action', (self.data_size, 14))
+            _ = root.create_dataset('base_action', (self.data_size, 2))
+
+            # data_dict write into h5py.File
+            for name, array in self.data_dict.items():  
+                root[name][...] = array
+        print("Saved to file.")
 
     def _set_action(self) -> None:
         if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
@@ -384,9 +360,23 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             self._save_record()
 
     def _save_record(self) -> None:
-        self.record_pool.append(self.ctrl.copy())   
-        if (len(self.record_pool) >= self.RECORD_POOL_SIZE):
-            self.save_record()
+        if len(self.data_dict['/observations/qpos']) < self.data_size:
+            joint_qpos = self.query_joint_qpos(self.arm_joint_names)
+            joint_qvel = self.query_joint_qvel(self.arm_joint_names)
+            joint_force = self.query_actuator_force()
+            print(joint_force)
+            self.data_dict['/observations/qpos'].append([joint_qpos[joint_name][0] for joint_name in self.arm_joint_names][:14])
+            self.data_dict['/observations/qvel'].append([joint_qvel[joint_name][0] for joint_name in self.arm_joint_names][:14])
+            # todo:fix
+            self.data_dict['/observations/effort'].append(joint_force[:14])
+            self.data_dict['/action'].append(self.ctrl[:14].tolist())
+            self.data_dict['/base_action'].append([0.0, 0.0])
+            image = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
+            for cam_name in self.camera_names:
+                self.data_dict[f'/observations/images/{cam_name}'].append(image)
+
+            if len(self.data_dict['/observations/qpos']) == self.data_size:
+                self.save_record_to_file()
 
     def _get_obs(self) -> dict:
         # robot
