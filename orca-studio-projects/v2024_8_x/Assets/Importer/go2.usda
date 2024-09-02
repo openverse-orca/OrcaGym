@@ -45,7 +45,7 @@ def Xform "rootPrim"
             point3f physics:centerOfMass = (0.021112, 0, -0.005366)
             float3 physics:diagonalInertia = (0.107027, 0.0980771, 0.0244531)
             float physics:mass = 6.921
-            quatf physics:principalAxes = (-0.000543471, 0.713435, -0.00173769, 0.700719)
+            quatf physics:principalAxes = (-0.0005434711, 0.71343505, -0.0017376902, 0.70071906)
             matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0.4449999928474426, 1) )
             uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -53,7 +53,7 @@ def Xform "rootPrim"
             {
                 def "_geom_0" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @go2\_geom_0.usda@
+                    prepend payload = @go2/_geom_0.usda@
                 )
                 {
                     rel material:binding = </rootPrim/base/base/visuals/Looks/material_black>
@@ -181,7 +181,7 @@ def Xform "rootPrim"
 
                 def "_geom_1" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @go2\_geom_1.usda@
+                    prepend payload = @go2/_geom_1.usda@
                 )
                 {
                     rel material:binding = </rootPrim/base/base/visuals/Looks/material_black_1>
@@ -191,7 +191,7 @@ def Xform "rootPrim"
 
                 def "_geom_2" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @go2\_geom_2.usda@
+                    prepend payload = @go2/_geom_2.usda@
                 )
                 {
                     rel material:binding = </rootPrim/base/base/visuals/Looks/material_black_2>
@@ -201,7 +201,7 @@ def Xform "rootPrim"
 
                 def "_geom_3" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @go2\_geom_3.usda@
+                    prepend payload = @go2/_geom_3.usda@
                 )
                 {
                     rel material:binding = </rootPrim/base/base/visuals/Looks/material_white>
@@ -211,7 +211,7 @@ def Xform "rootPrim"
 
                 def "_geom_4" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @go2\_geom_4.usda@
+                    prepend payload = @go2/_geom_4.usda@
                 )
                 {
                     rel material:binding = </rootPrim/base/base/visuals/Looks/material_gray>
@@ -449,7 +449,7 @@ def Xform "rootPrim"
                 point3f physics:centerOfMass = (-0.0054, 0.00194, -0.000105)
                 float3 physics:diagonalInertia = (0.00088403, 0.000596003, 0.000479967)
                 float physics:mass = 0.678
-                quatf physics:principalAxes = (0.49701387, 0.49924487, 0.5054619, 0.4982369)
+                quatf physics:principalAxes = (0.49701393, 0.49924493, 0.50546193, 0.49823695)
                 matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.19339999556541443, 0.04650000110268593, 0, 1) )
                 uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -457,7 +457,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_8" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_8.usda@
+                        prepend payload = @go2/_geom_8.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/FL_hip/visuals/Looks/material_metal>
@@ -516,7 +516,7 @@ def Xform "rootPrim"
 
                     def "_geom_9" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_9.usda@
+                        prepend payload = @go2/_geom_9.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/FL_hip/visuals/Looks/material_gray>
@@ -634,7 +634,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_11" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_11.usda@
+                            prepend payload = @go2/_geom_11.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/FL_hip/FL_thigh/visuals/Looks/material_metal>
@@ -693,7 +693,7 @@ def Xform "rootPrim"
 
                         def "_geom_12" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_12.usda@
+                            prepend payload = @go2/_geom_12.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/FL_hip/FL_thigh/visuals/Looks/material_gray>
@@ -808,7 +808,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_14" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_14.usda@
+                                prepend payload = @go2/_geom_14.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FL_hip/FL_thigh/FL_calf/visuals/Looks/material_gray>
@@ -890,7 +890,7 @@ def Xform "rootPrim"
 
                             def "_geom_15" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_15.usda@
+                                prepend payload = @go2/_geom_15.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FL_hip/FL_thigh/FL_calf/visuals/Looks/material_black>
@@ -900,7 +900,7 @@ def Xform "rootPrim"
 
                             def "_geom_18" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_18.usda@
+                                prepend payload = @go2/_geom_18.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FL_hip/FL_thigh/FL_calf/visuals/Looks/material_black_1>
@@ -1059,7 +1059,7 @@ def Xform "rootPrim"
                                 custom int contype = 1
                                 custom float density = 1000
                                 float3[] extent = [(-0.022, -0.022, -0.022), (0.022, 0.022, 0.022)]
-                                custom float3 friction = (0.8, 0.02, 0.01)
+                                custom float3 friction = (2, 0.02, 0.01)
                                 custom float3 geomSize = (0.022, 1, 1)
                                 custom int group = 3
                                 custom bool hasFromto = 0
@@ -1105,7 +1105,7 @@ def Xform "rootPrim"
                                 quatf physics:localRot0 = (1, 0, 0, 0)
                                 quatf physics:localRot1 = (1, 0, 0, 0)
                                 float physics:lowerLimit = -155.99922
-                                float physics:upperLimit = -48.000107
+                                float physics:upperLimit = -48.00011
                                 float physxJoint:armature = 0.01
                                 float physxLimit:X:damping = 2
                                 float physxLimit:X:stiffness = 0
@@ -1125,7 +1125,7 @@ def Xform "rootPrim"
                 point3f physics:centerOfMass = (-0.0054, -0.00194, -0.000105)
                 float3 physics:diagonalInertia = (0.00088403, 0.000596003, 0.000479967)
                 float physics:mass = 0.678
-                quatf physics:principalAxes = (0.4982369, 0.5054619, 0.49924487, 0.49701387)
+                quatf physics:principalAxes = (0.49823695, 0.50546193, 0.49924493, 0.49701393)
                 matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.19339999556541443, -0.04650000110268593, 0, 1) )
                 uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -1133,7 +1133,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_19" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_19.usda@
+                        prepend payload = @go2/_geom_19.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/FR_hip/visuals/Looks/material_metal>
@@ -1192,7 +1192,7 @@ def Xform "rootPrim"
 
                     def "_geom_20" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_20.usda@
+                        prepend payload = @go2/_geom_20.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/FR_hip/visuals/Looks/material_gray>
@@ -1310,7 +1310,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_22" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_22.usda@
+                            prepend payload = @go2/_geom_22.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/FR_hip/FR_thigh/visuals/Looks/material_metal>
@@ -1369,7 +1369,7 @@ def Xform "rootPrim"
 
                         def "_geom_23" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_23.usda@
+                            prepend payload = @go2/_geom_23.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/FR_hip/FR_thigh/visuals/Looks/material_gray>
@@ -1476,7 +1476,7 @@ def Xform "rootPrim"
                         point3f physics:centerOfMass = (0.00629595, 0.000622121, -0.141417)
                         float3 physics:diagonalInertia = (0.0014901, 0.00146356, 0.0000531397)
                         float physics:mass = 0.241352
-                        quatf physics:principalAxes = (0.7035078, -0.0045008687, 0.0015409894, 0.7106718)
+                        quatf physics:principalAxes = (0.70350766, -0.004500868, 0.0015409893, 0.71067166)
                         matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, -0.21299999952316284, 1) )
                         uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -1484,7 +1484,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_25" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_25.usda@
+                                prepend payload = @go2/_geom_25.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FR_hip/FR_thigh/FR_calf/visuals/Looks/material_gray>
@@ -1566,7 +1566,7 @@ def Xform "rootPrim"
 
                             def "_geom_26" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_26.usda@
+                                prepend payload = @go2/_geom_26.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FR_hip/FR_thigh/FR_calf/visuals/Looks/material_black>
@@ -1576,7 +1576,7 @@ def Xform "rootPrim"
 
                             def "_geom_29" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_29.usda@
+                                prepend payload = @go2/_geom_29.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/FR_hip/FR_thigh/FR_calf/visuals/Looks/material_black_1>
@@ -1735,7 +1735,7 @@ def Xform "rootPrim"
                                 custom int contype = 1
                                 custom float density = 1000
                                 float3[] extent = [(-0.022, -0.022, -0.022), (0.022, 0.022, 0.022)]
-                                custom float3 friction = (0.8, 0.02, 0.01)
+                                custom float3 friction = (2, 0.02, 0.01)
                                 custom float3 geomSize = (0.022, 1, 1)
                                 custom int group = 3
                                 custom bool hasFromto = 0
@@ -1781,7 +1781,7 @@ def Xform "rootPrim"
                                 quatf physics:localRot0 = (1, 0, 0, 0)
                                 quatf physics:localRot1 = (1, 0, 0, 0)
                                 float physics:lowerLimit = -155.99922
-                                float physics:upperLimit = -48.000107
+                                float physics:upperLimit = -48.00011
                                 float physxJoint:armature = 0.01
                                 float physxLimit:X:damping = 2
                                 float physxLimit:X:stiffness = 0
@@ -1809,7 +1809,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_30" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_30.usda@
+                        prepend payload = @go2/_geom_30.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/RL_hip/visuals/Looks/material_metal>
@@ -1868,7 +1868,7 @@ def Xform "rootPrim"
 
                     def "_geom_31" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_31.usda@
+                        prepend payload = @go2/_geom_31.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/RL_hip/visuals/Looks/material_gray>
@@ -1986,7 +1986,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_33" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_33.usda@
+                            prepend payload = @go2/_geom_33.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/RL_hip/RL_thigh/visuals/Looks/material_metal>
@@ -2045,7 +2045,7 @@ def Xform "rootPrim"
 
                         def "_geom_34" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_34.usda@
+                            prepend payload = @go2/_geom_34.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/RL_hip/RL_thigh/visuals/Looks/material_gray>
@@ -2160,7 +2160,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_36" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_36.usda@
+                                prepend payload = @go2/_geom_36.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RL_hip/RL_thigh/RL_calf/visuals/Looks/material_gray>
@@ -2242,7 +2242,7 @@ def Xform "rootPrim"
 
                             def "_geom_37" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_37.usda@
+                                prepend payload = @go2/_geom_37.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RL_hip/RL_thigh/RL_calf/visuals/Looks/material_black>
@@ -2252,7 +2252,7 @@ def Xform "rootPrim"
 
                             def "_geom_40" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_40.usda@
+                                prepend payload = @go2/_geom_40.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RL_hip/RL_thigh/RL_calf/visuals/Looks/material_black_1>
@@ -2411,7 +2411,7 @@ def Xform "rootPrim"
                                 custom int contype = 1
                                 custom float density = 1000
                                 float3[] extent = [(-0.022, -0.022, -0.022), (0.022, 0.022, 0.022)]
-                                custom float3 friction = (0.8, 0.02, 0.01)
+                                custom float3 friction = (2, 0.02, 0.01)
                                 custom float3 geomSize = (0.022, 1, 1)
                                 custom int group = 3
                                 custom bool hasFromto = 0
@@ -2457,7 +2457,7 @@ def Xform "rootPrim"
                                 quatf physics:localRot0 = (1, 0, 0, 0)
                                 quatf physics:localRot1 = (1, 0, 0, 0)
                                 float physics:lowerLimit = -155.99922
-                                float physics:upperLimit = -48.000107
+                                float physics:upperLimit = -48.00011
                                 float physxJoint:armature = 0.01
                                 float physxLimit:X:damping = 2
                                 float physxLimit:X:stiffness = 0
@@ -2477,7 +2477,7 @@ def Xform "rootPrim"
                 point3f physics:centerOfMass = (0.0054, -0.00194, -0.000105)
                 float3 physics:diagonalInertia = (0.00088403, 0.000596003, 0.000479967)
                 float physics:mass = 0.678
-                quatf physics:principalAxes = (0.49924487, 0.49701387, 0.4982369, 0.5054619)
+                quatf physics:principalAxes = (0.49924493, 0.49701393, 0.49823695, 0.50546193)
                 matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-0.19339999556541443, -0.04650000110268593, 0, 1) )
                 uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -2485,7 +2485,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_41" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_41.usda@
+                        prepend payload = @go2/_geom_41.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/RR_hip/visuals/Looks/material_metal>
@@ -2544,7 +2544,7 @@ def Xform "rootPrim"
 
                     def "_geom_42" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @go2\_geom_42.usda@
+                        prepend payload = @go2/_geom_42.usda@
                     )
                     {
                         rel material:binding = </rootPrim/base/base/RR_hip/visuals/Looks/material_gray>
@@ -2662,7 +2662,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_44" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_44.usda@
+                            prepend payload = @go2/_geom_44.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/RR_hip/RR_thigh/visuals/Looks/material_metal>
@@ -2721,7 +2721,7 @@ def Xform "rootPrim"
 
                         def "_geom_45" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @go2\_geom_45.usda@
+                            prepend payload = @go2/_geom_45.usda@
                         )
                         {
                             rel material:binding = </rootPrim/base/base/RR_hip/RR_thigh/visuals/Looks/material_gray>
@@ -2828,7 +2828,7 @@ def Xform "rootPrim"
                         point3f physics:centerOfMass = (0.00629595, 0.000622121, -0.141417)
                         float3 physics:diagonalInertia = (0.0014901, 0.00146356, 0.0000531397)
                         float physics:mass = 0.241352
-                        quatf physics:principalAxes = (0.7035078, -0.0045008687, 0.0015409894, 0.7106718)
+                        quatf physics:principalAxes = (0.70350766, -0.004500868, 0.0015409893, 0.71067166)
                         matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, -0.21299999952316284, 1) )
                         uniform token[] xformOpOrder = ["xformOp:transform"]
 
@@ -2836,7 +2836,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_47" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_47.usda@
+                                prepend payload = @go2/_geom_47.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RR_hip/RR_thigh/RR_calf/visuals/Looks/material_gray>
@@ -2918,7 +2918,7 @@ def Xform "rootPrim"
 
                             def "_geom_48" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_48.usda@
+                                prepend payload = @go2/_geom_48.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RR_hip/RR_thigh/RR_calf/visuals/Looks/material_black>
@@ -2928,7 +2928,7 @@ def Xform "rootPrim"
 
                             def "_geom_51" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @go2\_geom_51.usda@
+                                prepend payload = @go2/_geom_51.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/base/base/RR_hip/RR_thigh/RR_calf/visuals/Looks/material_black_1>
@@ -3087,7 +3087,7 @@ def Xform "rootPrim"
                                 custom int contype = 1
                                 custom float density = 1000
                                 float3[] extent = [(-0.022, -0.022, -0.022), (0.022, 0.022, 0.022)]
-                                custom float3 friction = (0.8, 0.02, 0.01)
+                                custom float3 friction = (2, 0.02, 0.01)
                                 custom float3 geomSize = (0.022, 1, 1)
                                 custom int group = 3
                                 custom bool hasFromto = 0
@@ -3133,7 +3133,7 @@ def Xform "rootPrim"
                                 quatf physics:localRot0 = (1, 0, 0, 0)
                                 quatf physics:localRot1 = (1, 0, 0, 0)
                                 float physics:lowerLimit = -155.99922
-                                float physics:upperLimit = -48.000107
+                                float physics:upperLimit = -48.00011
                                 float physxJoint:armature = 0.01
                                 float physxLimit:X:damping = 2
                                 float physxLimit:X:stiffness = 0

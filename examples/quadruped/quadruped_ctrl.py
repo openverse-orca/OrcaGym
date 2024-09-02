@@ -149,32 +149,32 @@ if __name__ == '__main__':
     # nominal optimize directly the GRF (not smooth)
     # sampling use GPU
     if cfg.mpc_params['type'] == 'nominal':
-        from quadruped_pympc.controllers.gradient.nominal.centroidal_nmpc_nominal import Acados_NMPC_Nominal
+        from envs.quadruped.controllers.gradient.nominal.centroidal_nmpc_nominal import Acados_NMPC_Nominal
 
         controller = Acados_NMPC_Nominal()
 
         if cfg.mpc_params['optimize_step_freq']:
-            from quadruped_pympc.controllers.gradient.nominal.centroidal_nmpc_gait_adaptive import \
+            from envs.quadruped.controllers.gradient.nominal.centroidal_nmpc_gait_adaptive import \
                 Acados_NMPC_GaitAdaptive
 
             batched_controller = Acados_NMPC_GaitAdaptive()
 
     elif cfg.mpc_params['type'] == 'input_rates':
-        from quadruped_pympc.controllers.gradient.input_rates.centroidal_nmpc_input_rates import Acados_NMPC_InputRates
+        from envs.quadruped.controllers.gradient.input_rates.centroidal_nmpc_input_rates import Acados_NMPC_InputRates
 
         controller = Acados_NMPC_InputRates()
 
         if cfg.mpc_params['optimize_step_freq']:
-            from quadruped_pympc.controllers.gradient.nominal.centroidal_nmpc_gait_adaptive import \
+            from envs.quadruped.controllers.gradient.nominal.centroidal_nmpc_gait_adaptive import \
                 Acados_NMPC_GaitAdaptive
 
             batched_controller = Acados_NMPC_GaitAdaptive()
 
     elif cfg.mpc_params['type'] == 'sampling':
         if cfg.mpc_params['optimize_step_freq']:
-            from quadruped_pympc.controllers.sampling.centroidal_nmpc_jax_gait_adaptive import Sampling_MPC
+            from envs.quadruped.controllers.sampling.centroidal_nmpc_jax_gait_adaptive import Sampling_MPC
         else:
-            from quadruped_pympc.controllers.sampling.centroidal_nmpc_jax import Sampling_MPC
+            from envs.quadruped.controllers.sampling.centroidal_nmpc_jax import Sampling_MPC
 
         controller = Sampling_MPC(horizon=horizon,
                                   dt=mpc_dt,
@@ -643,7 +643,6 @@ if __name__ == '__main__':
 
                 step_timestep_7 = time.time()
 
-
                 print("Step time: ", (step_timestep_7 - step_timestep_0) * 1000)
 
                 # print("Step times: ", 
@@ -655,6 +654,11 @@ if __name__ == '__main__':
                 #         "5-6:", (step_timestep_6 - step_timestep_5) * 1000,
                 #         "6-7:", (step_timestep_7 - step_timestep_6) * 1000
                 #         )
+
+                frame_time = time.time() - step_timestep_0
+                delta_time = simulation_dt - frame_time
+                if (delta_time > 0):
+                    time.sleep(delta_time)
 
             except KeyboardInterrupt:
                 print("Simulation stopped")        

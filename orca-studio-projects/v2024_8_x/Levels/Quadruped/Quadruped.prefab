@@ -2167,7 +2167,6 @@
                             "UseColorTemperature": true,
                             "ColorTemperture": 5300.0,
                             "CameraEntityId": "",
-                            "Enable RayTracing Shadow": true,
                             "ShadowFilterMethod": 1
                         }
                     }
@@ -4793,7 +4792,7 @@
                             0.03099999949336052
                         ],
                         "friction": [
-                            1.0,
+                            2.0,
                             0.019999999552965164,
                             0.009999999776482582
                         ],
@@ -7412,7 +7411,7 @@
                             0.03099999949336052
                         ],
                         "friction": [
-                            1.0,
+                            2.0,
                             0.019999999552965164,
                             0.009999999776482582
                         ],
@@ -7543,7 +7542,7 @@
                             0.03099999949336052
                         ],
                         "friction": [
-                            1.0,
+                            2.0,
                             0.019999999552965164,
                             0.009999999776482582
                         ],
@@ -11074,7 +11073,7 @@
                             0.03099999949336052
                         ],
                         "friction": [
-                            1.0,
+                            2.0,
                             0.019999999552965164,
                             0.009999999776482582
                         ],
@@ -12395,7 +12394,14 @@
                 "TransformComponent": {
                     "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
                     "Id": 13499900522933281375,
-                    "Parent Entity": "Entity_[3237291665973]"
+                    "Parent Entity": "Entity_[3237291665973]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.20057713985443115,
+                            0.0,
+                            0.0
+                        ]
+                    }
                 }
             }
         },
@@ -12560,7 +12566,14 @@
                 "TransformComponent": {
                     "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
                     "Id": 13499900522933281375,
-                    "Parent Entity": "Entity_[3258766502453]"
+                    "Parent Entity": "Entity_[3258766502453]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.3987165689468384,
+                            0.0,
+                            0.0
+                        ]
+                    }
                 }
             }
         },
@@ -13059,7 +13072,14 @@
                 "TransformComponent": {
                     "$type": "{27F1E1A1-8D9D-4C3B-BD3A-AFB9762449C0} TransformComponent",
                     "Id": 13499900522933281375,
-                    "Parent Entity": "Entity_[7343280400949]"
+                    "Parent Entity": "Entity_[7343280400949]",
+                    "Transform Data": {
+                        "Translate": [
+                            0.38733363151550293,
+                            0.0,
+                            0.0701245367527008
+                        ]
+                    }
                 }
             }
         }

@@ -1,0 +1,10 @@
+casadi
+jaxlib
+jax
+meshcat
+pinocchio
+adam-robotics[all]
+tqdm
+readchar
+liecasadi
+mujoco
