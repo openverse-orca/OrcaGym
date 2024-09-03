@@ -12,7 +12,7 @@ import sys
 sys.path.append(dir_path)
 sys.path.append(dir_path + '/../')
 
-from quadruped_pympc import config
+from envs.quadruped import config
 
 import jax.numpy as jnp
 from jax import jit

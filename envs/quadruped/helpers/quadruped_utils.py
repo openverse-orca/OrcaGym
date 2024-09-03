@@ -97,7 +97,7 @@ def plot_swing_mujoco(viewer: Handle,
 
 def check_zmp_constraint_satisfaction(state, contact_status, forces):
     # TODO: This import should go
-    from quadruped_pympc import config
+    from envs.quadruped import config
 
     base_w = copy.deepcopy(state['position'])
     base_vel_w = copy.deepcopy(state['linear_velocity'])

@@ -6,7 +6,7 @@
 import numpy as np
 import casadi as cs
 from acados_template import AcadosModel
-from quadruped_pympc import config
+from envs.quadruped import config
 
 
 # Class that defines the prediction model of the NMPC

@@ -6,12 +6,13 @@ from envs.quadruped.helpers.quadruped_utils import GaitType
 
 # These are used both for a real experiment and a simulation -----------
 # These are the only attributes needed per quadruped, the rest can be computed automatically ----------------------
-robot = 'GO2'  # 'go2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
+robot = 'A01B'  # 'A01B' 'go2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
 robot_leg_joints = dict(FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint',],  # TODO: Make configs per robot.
                         FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint',],
                         RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint',],
                         RR=['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint',])
 robot_feet_geom_names = dict(FL='FL', FR='FR', RL='RL', RR='RR')
+robot_hip_body_names = dict(FL='FL_hip', FR='FR_hip', RL='RL_hip', RR='RR_hip')
 qpos0_js = None  # Zero joint-space configuration. If None it will be extracted from the URDF.
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -43,6 +44,19 @@ elif (robot == 'hyqreal'):
                             RL=['lh_haa_joint', 'lh_hfe_joint', 'lh_kfe_joint',],
                             RR=['rh_haa_joint', 'rh_hfe_joint', 'rh_kfe_joint',])
     hip_height = 0.5
+elif (robot == 'A01B'):
+    mass = 56.82
+    inertia = np.array([[2.2579019331, 0.0380169639, 0.148964589],
+                        [0.0380169639, 6.5213374588, -0.0575256712],
+                        [0.148964589, -0.0575256712, 6.4331332757]])
+    urdf_filename = "a01b.urdf" # 实际不使用
+    robot_leg_joints = dict(FL=['fl_joint0', 'fl_joint1', 'fl_joint2',],
+                            FR=['fr_joint0', 'fr_joint1', 'fr_joint2',],
+                            RL=['hl_joint0', 'hl_joint1', 'hl_joint2',],
+                            RR=['hr_joint0', 'hr_joint1', 'hr_joint2',])
+    robot_feet_geom_names = dict(FL='fl', FR='fr', RL='hl', RR='hr')    
+    robot_hip_body_names = dict(FL='fl_abad', FR='fr_abad', RL='hl_abad', RR='hr_abad')
+    hip_height = 0.47    
 elif (robot == 'mini_cheetah'):
     mass = 12.5
     inertia = np.array([[1.58460467e-01, 1.21660000e-04, -1.55444692e-02],
@@ -57,7 +71,7 @@ mpc_params = {
     # 'input_rates' optimizes the delta GRF
     # 'sampling' is a gpu-based mpc that samples the GRF
     # 'collaborative' optimized directly the GRF and has a passive arm model inside
-    'type':                                    'nominal',
+    'type':                                    'input_rates',
 
     # horizon is the number of timesteps in the future that the mpc will optimize
     # dt is the discretization time used in the mpc

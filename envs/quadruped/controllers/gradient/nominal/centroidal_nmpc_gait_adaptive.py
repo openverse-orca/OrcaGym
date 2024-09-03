@@ -11,7 +11,7 @@ import copy
 import casadi as cs
 from acados_template import AcadosOcp, AcadosOcpBatchSolver, ACADOS_INFTY
 
-from quadruped_pympc import config
+from envs.quadruped import config
 from .centroidal_model_nominal import Centroidal_Model_Nominal
 
 

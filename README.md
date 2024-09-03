@@ -45,7 +45,7 @@ pip install -r requirements.txt
 
 Using a combination of PyTorch and CUDA can effectively speed up reinforcement learning training. Install the corresponding CUDA package based on your GPU device. Here is an example:
 ```bash
-pip install torch==2.3.1+cu121 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch --extra-index-url https://download.pytorch.org/whl/cu12x
 ```
 
 ## Set Up OrcaStudio:

@@ -42,7 +42,7 @@ from envs.quadruped.utils.mujoco.visual import render_sphere
 
 def register_env(grpc_address, record_state, record_file, agent_name,
                  robot_name, hip_height, robot_leg_joints, 
-                 robot_feet_geom_names, scene_name, simulation_dt, state_observables_names):
+                 robot_feet_geom_names, robot_hip_body_names, scene_name, simulation_dt, state_observables_names):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}",
@@ -60,6 +60,7 @@ def register_env(grpc_address, record_state, record_file, agent_name,
                 'hip_height': hip_height,
                 'legs_joint_names': robot_leg_joints,  # Joint names of the legs DoF
                 'feet_geom_name': robot_feet_geom_names,  # Geom/Frame id of feet
+                'hip_body_name' : robot_hip_body_names, # Body names of the hip
                 'scene': scene_name,
                 'sim_dt': simulation_dt,
                 'ref_base_lin_vel': 0.0,  # pass a float for a fixed value
@@ -89,6 +90,7 @@ if __name__ == '__main__':
     hip_height = cfg.hip_height
     robot_leg_joints = {key: [f"{robot_name}_{joint_name}" for joint_name in value] for key, value in cfg.robot_leg_joints.items()}
     robot_feet_geom_names = {key: f"{robot_name}_{geom_name}" for key, geom_name in cfg.robot_feet_geom_names.items()}
+    robot_hip_body_names = {key: f"{robot_name}_{body_name}" for key, body_name in cfg.robot_hip_body_names.items()}
     scene_name = cfg.simulation_params['scene']
     simulation_dt = cfg.simulation_params['dt']
 
@@ -100,7 +102,7 @@ if __name__ == '__main__':
     env_id = f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}"
 
     register_env(grpc_address, RecordState.NONE, 'quadruped_ctrl.h5', robot_name,
-                 robot_name, hip_height, robot_leg_joints, robot_feet_geom_names, 
+                 robot_name, hip_height, robot_leg_joints, robot_feet_geom_names, robot_hip_body_names,
                  scene_name, simulation_dt, state_observables_names)
 
     env = gym.make(env_id)        
@@ -393,6 +395,9 @@ if __name__ == '__main__':
                     # or use the fixed one in cfg.py
                     if(cfg.simulation_params['use_inertia_recomputation']):
                         inertia = env.get_base_inertia().flatten()  # Reflected inertia of base at qpos, in world frame
+                        # np.set_printoptions(precision=10, suppress=False)
+                        # print("Inertia: ", env.get_base_inertia())
+                        # raise NotImplementedError
                     else:
                         inertia = cfg.inertia.flatten()
 

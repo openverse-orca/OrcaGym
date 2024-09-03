@@ -64,6 +64,7 @@ class QuadrupedEnv(OrcaGymEnv):
                  ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
                  legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
                  feet_geom_name: dict = None,
+                 hip_body_name: dict = None,
                  **kwargs,
                  ):
         """Initialize the quadruped environment.
@@ -112,6 +113,8 @@ class QuadrupedEnv(OrcaGymEnv):
         self._keyboard_controller = KeyboardInput()
         self._turning_left = False
         self._turning_right = False
+
+        self._robot_hip_body_names = hip_body_name
 
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
@@ -516,7 +519,6 @@ class QuadrupedEnv(OrcaGymEnv):
         # mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
 
         mass_matrix = self._full_mass_matrix
-        # print("mass_matrix", mass_matrix)
 
         # Extract the 3x3 rotational inertia matrix of the base (assuming the base has 6 DoFs)
         inertia_B_at_qpos = mass_matrix[3:6, 3:6]
@@ -545,7 +547,11 @@ class QuadrupedEnv(OrcaGymEnv):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         # TODO: Name of bodies should not be hardcodd
-        xpos_list, _ = self.get_body_com_xpos_xmat_list([self.body('FR_hip'), self.body('FL_hip'), self.body('RL_hip'), self.body('RR_hip')])
+        # print("hip body names: ", self._robot_hip_body_names)
+        xpos_list, _ = self.get_body_com_xpos_xmat_list([self._robot_hip_body_names['FR'], 
+                                                        self._robot_hip_body_names['FL'], 
+                                                        self._robot_hip_body_names['RL'], 
+                                                        self._robot_hip_body_names['RR']])
         return LegsAttr(
             FR=R.T @ xpos_list[0],
             FL=R.T @ xpos_list[1],

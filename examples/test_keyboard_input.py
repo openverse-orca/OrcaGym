@@ -17,6 +17,9 @@ def test_keyboard_controller():
             controller.update()            
             state = controller.get_state()
             print("Keys:", state)
+            if state["Esc"]:
+                raise KeyboardInterrupt("Esc key pressed")
+                break
             time.sleep(1)
     except KeyboardInterrupt:
         controller.close()

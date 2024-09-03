@@ -133,7 +133,7 @@ if __name__ == "__main__":
     from swing_trajectory_controller import SwingTrajectoryController
     import matplotlib.pyplot as plt
 
-    from quadruped_pympc.helpers.quadruped_utils import plot_swing_mujoco
+    from envs.quadruped.helpers.quadruped_utils import plot_swing_mujoco
 
     # Mujoco model and data
     m = mujoco.MjModel.from_xml_path('./../external/mujoco_menagerie/unitree_go2/scene.xml')

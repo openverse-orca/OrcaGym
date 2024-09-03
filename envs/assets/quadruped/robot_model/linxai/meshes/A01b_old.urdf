@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot name="A01-B">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="base_link.STL"/>
+      </geometry>
+      <material name="base_color">
+        <color rgba="0.79216 0.81961 0.93333 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="base_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_inertia_to_base" type="fixed">
+        <parent link="base_link"/>
+        <child link="base_inertia"/>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+  <link name="base_inertia">
+    <inertial>
+      <origin xyz="0.0107546 -0.0080469 0.0178565" rpy="0 0 0"/>
+      <mass value="30.0746"/>
+      <inertia
+        ixx="0.3193973603"
+        ixy="0.0068169793"
+        ixz="0.0488468142"
+        iyy="1.180104420"
+        iyz="0.0010136007"
+        izz="1.3495092040"/>
+        <!-- <inertia ixx="0.224" ixy="0.002" ixz="-0.007" iyy="1.399" iyz="-8.168E-05" izz="1.521"/> -->
+    </inertial>
+  </link>
+
+  <joint name="j0_fr_joint0" type="revolute">
+    <origin xyz="0.42386 -0.11844 -0.044478" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="fr_abad"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.7854"  upper="0.7854" effort="200"  velocity="9.21"/>
+  </joint>
+
+  <link name="fr_abad">
+    <inertial>
+      <origin xyz="-0.014896 0.015941 0.000233" rpy="0 0 0"/>
+      <mass value="2.4"/>
+      <inertia ixx="0.000525995" ixy="-0.000120548" ixz="-0.00000523" iyy="0.001109" iyz="-0.000004269" izz="0.000940"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fr_abad.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fr_abad.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j1_fr_joint1"  type="revolute">
+    <origin xyz="0 -0.1343 0" rpy="0 0 0"/>
+    <parent link="fr_abad"/>
+    <child  link="fr_thigh"/>
+    <axis  xyz="0 -1 0"/>
+    <limit lower="-2.44"   upper="2.44"  effort="0" velocity="0"/>
+  </joint>
+
+  <link name="fr_thigh">
+    <inertial>
+      <origin xyz="-0.00344 0.057962 -0.023227" rpy="0 0 0"/>
+      <mass value="4.832"/>
+      <inertia
+        ixx="0.034310220"
+        ixy="-0.000914577"
+        ixz="-0.002192411"
+        iyy="0.030729623"
+        iyz="-0.006644699"
+        izz="0.007080026"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fr_thigh.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fr_thigh.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j2_fr_joint2" type="revolute">
+    <origin xyz="0.0 0 -0.35"  rpy="0 0 0"/>
+    <parent link="fr_thigh"/>
+    <child link="fr_calf"/>
+    <axis xyz="0 -1 0"/>
+    <limit  lower="0.53163"  upper="2.58501"  effort="200" velocity="10.94"/>
+  </joint>
+
+  <link name="fr_calf">
+    <inertial>
+      <origin xyz="0.01656 0.000105 -0.179108" rpy="0 0 0"/>
+      <mass value="0.610"/>
+      <inertia
+        ixx="0.015478593"
+        ixy="0.000001262"
+        ixz="0.000740896"
+        iyy="0.015806166"
+        iyz="-0.000014215"
+        izz="0.000413430"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fr_calf.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fr_calf.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  
+  <joint name="fr_fix_joint" type="fixed">
+      <parent link="fr_calf"/>
+      <child link="fr_foot"/>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.39"/>
+  </joint>
+
+  <!-- Foot link -->
+  <link name="fr_foot">
+      <inertial>
+            <origin rpy="0 0 0" xyz="0.0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="1e-8" ixy="0" ixz="0" iyy="1e-8" iyz="0" izz="1e-8"/>
+      </inertial>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+               <sphere radius="0.025"/>
+          </geometry>
+      </visual>
+      <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+      </collision>
+  </link>
+
+  <joint
+    name="j3_fl_joint0"
+    type="revolute">
+    <origin xyz="0.42386 0.081557 -0.044479" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child
+      link="fl_abad"/>
+    <axis
+      xyz="1 0 0"/>
+    <limit lower="-0.7854" upper="0.7854" effort="200" velocity="9.21"/>
+  </joint>
+
+  <link name="fl_abad">
+    <inertial>
+      <origin xyz="-0.022282 -0.0116137 0.000446" rpy="0 0 0"/>
+      <mass value="2.4"/>
+      <inertia ixx="0.000525995" ixy="0.000120548" ixz="-0.00000523" iyy="0.001109" iyz="0.000004269" izz="0.000940"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fl_abad.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fl_abad.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+<joint name="j4_fl_joint1" type="revolute">
+    <origin xyz="0 0.1343 0" rpy="0 0 0"/>
+    <parent link="fl_abad"/>
+    <child link="fl_thigh"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-3.1765" upper="0" effort="200" velocity="14.4"/>
+  </joint>
+  
+  <link name="fl_thigh">
+    <inertial>
+      <origin xyz="-0.00344 -0.057962 -0.023227" rpy="0 0 0"/>
+      <mass value="4.832"/>
+      <inertia
+        ixx="0.034310220"
+        ixy="0.000914577"
+        ixz="-0.002192411"
+        iyy="0.030729623"
+        iyz="0.006644699"
+        izz="0.007080026"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fl_thigh.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/fl_thigh.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="j5_fl_joint2" type="revolute">
+    <origin xyz="0.0 0 -0.35" rpy="0 0 0"/>
+    <parent link="fl_thigh"/>
+    <child link="fl_calf"/>
+    <axis xyz="0 -1 0"/>
+    <limit  lower="0.53163"  upper="2.58501"  effort="200" velocity="10.94"/>
+  </joint>
+
+  <link name="fl_calf">
+    <inertial>
+      <origin
+        xyz="0.01656 -0.000105 -0.179108"
+        rpy="0 0 0"/>
+      <mass value="0.610"/>
+      <inertia
+        ixx="0.015478593"
+        ixy="-0.000001262"
+        ixz="0.000740896"
+        iyy="0.015806166"
+        iyz="0.000014215"
+        izz="0.000413430"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fl_calf.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/fl_calf.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="fl_fix_joint" type="fixed">
+      <parent link="fl_calf"/>
+      <child link="fl_foot"/>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.39"/>
+  </joint>
+
+  <!-- Foot link -->
+  <link name="fl_foot">
+      <inertial>
+            <origin rpy="0 0 0" xyz="0.0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="1e-8" ixy="0" ixz="0" iyy="1e-8" iyz="0" izz="1e-8"/>
+      </inertial>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+               <sphere radius="0.025"/>
+          </geometry>
+      </visual>
+      <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+      </collision>
+  </link>
+
+  <joint name="j6_hr_joint0" type="revolute">
+    <origin xyz="-0.31564 -0.11844 -0.044478" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="hr_abad"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.7854" upper="0.7854" effort="200" velocity="9.21"/>
+  </joint>
+
+  <link name="hr_abad">
+    <!-- <inertial>
+      <origin
+        xyz="0.014896 0.015941 0.000233"
+        rpy="0 0 0"/>
+      <mass
+        value="2.4"/>
+      <inertia
+        ixx="0.003166456"
+        ixy="0.000602743"
+        ixz="0.000014925"
+        iyy="0.006559053"
+        iyz="-0.000022984"
+        izz="0.005561835"/>
+    </inertial> -->
+    <inertial>
+      <origin xyz="0.022282 0.0116137 0.000446" rpy="0 0 0"/>
+      <mass value="2.4"/>
+      <inertia ixx="0.000525995" ixy="0.000120548" ixz="0.00000523" iyy="0.001109" iyz="-0.000004269" izz="0.000940"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hr_abad.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hr_abad.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j7_hr_joint1" type="revolute">
+    <origin xyz="0 -0.1343 0" rpy="0 0 0"/>
+    <parent link="hr_abad"/>
+    <child link="hr_thigh"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-3.1765" upper="0" effort="200" velocity="14.4"/>
+  </joint>
+
+  <link
+    name="hr_thigh">
+    <inertial>
+      <origin
+        xyz="0.00344 0.057962 -0.023227"
+        rpy="0 0 0"/>
+      <mass
+        value="4.832"/>
+      <inertia
+        ixx="0.034310220"
+        ixy="0.000914577"
+        ixz="0.002192411"
+        iyy="0.030729623"
+        iyz="-0.006644699"
+        izz="0.007080026"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hr_thigh.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hr_thigh.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j8_hr_joint2" type="revolute">
+    <origin xyz="0.0 0 -0.35" rpy="0 0 0"/>
+    <parent link="hr_thigh"/>
+    <child link="hr_calf"/>
+    <axis xyz="0 -1 0"/>
+    <limit  lower="0.53163"  upper="2.58501"  effort="200" velocity="10.94"/>
+  </joint>
+
+  <link name="hr_calf">
+    <inertial>
+      <origin xyz="0.01656 0.000105 -0.179108" rpy="0 0 0"/>
+      <mass value="0.610"/>
+      <inertia
+        ixx="0.015478593"
+        ixy="0.000001262"
+        ixz="0.000740896"
+        iyy="0.015806166"
+        iyz="-0.000014215"
+        izz="0.000413430"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://A01B_URDF0229/meshes/hr_calf.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hr_calf.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+
+  <joint name="hr_fix_joint" type="fixed">
+      <parent link="hr_calf"/>
+      <child link="hr_foot"/>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.39"/>
+  </joint>
+
+  <!-- Foot link -->
+  <link name="hr_foot">
+      <inertial>
+            <origin rpy="0 0 0" xyz="0.0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="1e-8" ixy="0" ixz="0" iyy="1e-8" iyz="0" izz="1e-8"/>
+      </inertial>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+               <sphere radius="0.025"/>
+          </geometry>
+      </visual>
+      <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+      </collision>
+  </link>
+
+  <joint name="j9_hl_joint0" type="revolute">
+    <origin xyz="-0.31564 0.081559 -0.044478" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="hl_abad"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.7854" upper="0.7854" effort="200" velocity="9.21"/>
+  </joint>
+
+  <link name="hl_abad">
+    <!-- <inertial>
+      <origin
+        xyz="0.014896 -0.015941 0.000233"
+        rpy="0 0 0"/>
+      <mass value="2.4"/>
+      <inertia
+        ixx="0.003166456"
+        ixy="-0.000602743"
+        ixz="0.000014925"
+        iyy="0.006559053"
+        iyz="0.000022984"
+        izz="0.005561835"/>
+    </inertial> -->
+    <inertial>
+      <origin xyz="0.022282 -0.0116137 0.000446" rpy="0 0 0"/>
+      <mass value="2.4"/>
+      <inertia ixx="0.000525995" ixy="-0.000120548" ixz="0.00000523" iyy="0.001109" iyz="0.000004269" izz="0.000940"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_abad.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_abad.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j10_hl_joint1" type="revolute">
+    <origin xyz="0 0.1343 0" rpy="0 0 0"/>
+    <parent link="hl_abad"/>
+    <child link="hl_thigh"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-3.1765" upper="0" effort="200" velocity="14.4"/>
+  </joint>
+
+  <link
+    name="hl_thigh">
+    <inertial>
+      <origin
+        xyz="0.00344 -0.057962 -0.023227"
+        rpy="0 0 0"/>
+      <mass
+        value="4.832"/>
+      <inertia
+        ixx="0.034310220"
+        ixy="-0.000914577"
+        ixz="0.002192411"
+        iyy="0.030729623"
+        iyz="0.006644699"
+        izz="0.007080026"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_thigh.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_thigh.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="j11_hl_joint2" type="revolute">
+    <origin xyz="0.0 0 -0.35" rpy="0 0 0"/>
+    <parent link="hl_thigh"/>
+    <child link="hl_calf"/>
+    <axis xyz="0 -1 0"/>
+    <limit  lower="0.53163"  upper="2.58501"  effort="200" velocity="10.94"/>
+  </joint>
+
+  <link name="hl_calf">
+    <inertial>
+      <origin xyz="0.01656 -0.000105 -0.179108" rpy="0 0 0"/>
+      <mass value="0.610"/>
+      <inertia
+        ixx="0.015478593"
+        ixy="0.000001262"
+        ixz="0.000740896"
+        iyy="0.015806166"
+        iyz="0.000014215"
+        izz="0.000413430"/>
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_calf.STL"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"/>
+      <geometry>
+        <mesh
+          filename="package://A01B_URDF0229/meshes/hl_calf.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="hl_fix_joint" type="fixed">
+      <parent link="hl_calf"/>
+      <child link="hl_foot"/>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.39"/>
+  </joint>
+
+  <!-- Foot link -->
+  <link name="hl_foot">
+      <inertial>
+            <origin rpy="0 0 0" xyz="0.0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="1e-8" ixy="0" ixz="0" iyy="1e-8" iyz="0" izz="1e-8"/>
+      </inertial>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+          <geometry>
+               <sphere radius="0.025"/>Foot
+          </geometry>
+      </visual>
+      <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+      </collision>
+  </link>
+  
+</robot>

@@ -13,7 +13,7 @@ import sys
 sys.path.append(dir_path)
 sys.path.append(dir_path + '/../')
 
-from quadruped_pympc import config
+from envs.quadruped import config
 from centroidal_model_jax import Centroidal_Model_JAX
 
 import time

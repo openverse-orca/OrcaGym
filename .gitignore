@@ -9,6 +9,8 @@ __pycache__/
 # C extensions
 *.so
 
+*c_generated_code/
+
 # Distribution / packaging
 .Python
 build/

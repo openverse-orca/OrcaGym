@@ -10,7 +10,7 @@ import copy
 from typing import Tuple
 # TODO: Check acados installation and trow error + instructions if needed ->  pip install quadruped_pympc[acados]
 from acados_template import AcadosOcp, AcadosOcpSolver, ACADOS_INFTY
-from quadruped_pympc import config
+from envs.quadruped import config
 from .centroidal_model_input_rates import Centroidal_Model_InputRates
 
 # Class for the Acados NMPC, the model is in another file!

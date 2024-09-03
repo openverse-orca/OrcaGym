@@ -178,6 +178,7 @@ class Acados_NMPC_Nominal:
         init_base_position = np.array([0, 0, 0])
         init_base_yaw = np.array([0])
         init_external_wrench = np.array([0, 0, 0, 0, 0, 0])
+        # raise KeyboardInterrupt("Use the compute_control_with_contact_sequence method instead")
         init_inertia = config.inertia.reshape((9,))
         init_mass = np.array([config.mass])
 
@@ -1085,7 +1086,7 @@ class Acados_NMPC_Nominal:
     # Main loop for computing the control
     def compute_control(self, state, reference, contact_sequence, constraint=None, external_wrenches=np.zeros((6,)),
                         inertia=config.inertia.reshape((9,)), mass=config.mass):
-
+        # raise KeyboardInterrupt("Use the compute_control_with_contact_sequence method instead")
         # Take the array of the contact sequence and split it in 4 arrays,
         # one for each leg
         FL_contact_sequence = contact_sequence[0]

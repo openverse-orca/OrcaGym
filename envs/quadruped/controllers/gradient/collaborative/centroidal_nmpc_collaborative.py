@@ -18,7 +18,7 @@ import sys
 sys.path.append(dir_path)
 sys.path.append(dir_path + '/../../')
 
-from quadruped_pympc import config
+from envs.quadruped import config
 
 
 # Class for the Acados NMPC, the model is in another file!

@@ -13,7 +13,7 @@ import sys
 sys.path.append(dir_path + '/../')
 
 # Parameters for both MPC and simulation
-from quadruped_pympc import config
+from envs.quadruped import config
 
 
 class SrbInertiaComputation:
