@@ -9,6 +9,8 @@ This is an example of a quadruped robot dog walking, using the MPC control algor
 
 ### Install Dependencies
 
+This guide assumes that you have already installed the basic dependencies as described in the [Readme](https://github.com/openverse-orca/OrcaGym/blob/main/README.md) document. Next, we will install additional dependencies needed for the quadruped robot example:
+
 ```bash
 cd $(your-path-to-orcagym)/envs/quadruped
 conda activate orca_gym_test
@@ -54,6 +56,19 @@ export ACADOS_SOURCE_DIR="${path_to_acados}"
 
 ### Run the Example
 
+#### Run OrcaStudio Level
+According to the instructions in the main Readme document, copy the levels and assets to the OrcaStudio project directory. For the quadruped robot example, Level name is:
+
+* **Unitree Go2:** Quadruped. 
+* **LINXAI A01B:** Quadruped_Linxai
+
+#### Run OrcaGym Program
+
+Modify the `envs/quadruped/config.py` file, find the following line, and change the robot model to correspond with the selected level:
+``` python
+robot = 'A01B'  # 'A01B' 'GO2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
+```
+
 In the `examples/quadruped` directory, run:
 
 ```bash
@@ -65,4 +80,6 @@ python run_quadruped_ctrl.py --grpc_address localhost
 * W/S: Move forward/backward
 * A/D: Turn left/right
 * Space: Stop
+
+**Note:** When running the `run_quadruped_ctrl.py` script, a small window will appear in the top left corner of the screen. You need to focus on this window to capture keyboard inputs. Otherwise, the quadruped robot will not respond to the key presses.
 
