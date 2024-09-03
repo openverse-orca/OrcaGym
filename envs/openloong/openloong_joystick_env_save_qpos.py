@@ -7,6 +7,9 @@ from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick
 import h5py
 from scipy.spatial.transform import Rotation as R
+import os
+from envs.openloong.camera_wrapper import CameraWrapper
+import time
 
 class RecordState:
     RECORD = "record"
@@ -111,6 +114,11 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             if self.use_depth_image:
                 self.data_dict[f'/observations/images_depth/{cam_name}'] = []        
 
+        if self.record_state == RecordState.RECORD:
+            if  os.path.exists(self.record_file):
+                os.remove(self.record_file)
+                print("remove existed file.")
+
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
@@ -123,11 +131,31 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         self.mj_forward()
 
+        self.camera_high = CameraWrapper(name="cam_high", port=7070)
+        self.camera_high.start()
+        self.camera_left = CameraWrapper(name="cam_left_wrist", port=7071)
+        self.camera_left.start()
+        self.camera_right = CameraWrapper(name="cam_right_wrist", port=7072)
+        self.camera_right.start()
+        # wait for camera images
+        time.sleep(1)
+
+    def get_camera_image(self, camera_name):
+        if camera_name == "cam_high":
+            return self.camera_high.get_frame()
+        elif camera_name == "cam_left_wrist":
+            return self.camera_left.get_frame()
+        elif camera_name == "cam_right_wrist":
+            return self.camera_right.get_frame()
+        else:
+            return None
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self._set_action()
         # self.ctrl = np.array([0.00, -0.8, -1, 0, -1.3, 1, 0.00, 0.00])         # for test joint control
         self.do_simulation(self.ctrl, self.frame_skip)
+        # print("ctrl:", self.ctrl)
+        # print("qpos:", [self.query_joint_qpos(self.arm_joint_names)[joint_name][0] for joint_name in self.arm_joint_names][:14])
         obs = self._get_obs().copy()
 
         info = {}
@@ -217,6 +245,10 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
         return new_xmat
+    
+    def _iter_dataset(self, name, item):
+        if isinstance(item, h5py.Dataset):
+            self.data_dict["/" + name] = item[...]
 
     def _load_record(self):
         if self.record_file is None:
@@ -224,28 +256,29 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         
         # 读取record_file中的数据，存储到record_pool中
         with h5py.File(self.record_file, 'r') as f:
-            if "float_data" in f:
-                dset = f["float_data"]
-                if self.record_cursor >= dset.shape[0]:
-                    return False
-
-                self.record_pool = dset[self.record_cursor:self.record_cursor + self.RECORD_POOL_SIZE].tolist()
-                self.record_cursor += self.RECORD_POOL_SIZE
-                return True
+            f.visititems(self._iter_dataset)
+            print("read file finished.")
+            return True
 
         return False
 
     def _replay(self) -> None:
+        if self.record_state == RecordState.REPLAY:
+            if self.record_cursor == self.RECORD_POOL_SIZE:
+                self.record_state = RecordState.REPLAY_FINISHED
+                print("Replay finished.")
+
         if self.record_state == RecordState.REPLAY_FINISHED:
-            return
+            return    
         
-        if len(self.record_pool) == 0:
+        if self.record_cursor == 0:
             if not self._load_record():
                 self.record_state = RecordState.REPLAY_FINISHED
                 print("Replay finished.")
                 return
 
-        self.ctrl = self.record_pool.pop(0)
+        self.ctrl[:14] = self.data_dict['/action'][self.record_cursor]
+        self.record_cursor = self.record_cursor + 1
 
     def save_record_to_file(self):
         if self.record_state != RecordState.RECORD:
@@ -364,15 +397,14 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             joint_qpos = self.query_joint_qpos(self.arm_joint_names)
             joint_qvel = self.query_joint_qvel(self.arm_joint_names)
             joint_force = self.query_actuator_force()
-            print(joint_force)
             self.data_dict['/observations/qpos'].append([joint_qpos[joint_name][0] for joint_name in self.arm_joint_names][:14])
             self.data_dict['/observations/qvel'].append([joint_qvel[joint_name][0] for joint_name in self.arm_joint_names][:14])
             # todo:fix
             self.data_dict['/observations/effort'].append(joint_force[:14])
             self.data_dict['/action'].append(self.ctrl[:14].tolist())
             self.data_dict['/base_action'].append([0.0, 0.0])
-            image = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
             for cam_name in self.camera_names:
+                image = self.get_camera_image(cam_name)
                 self.data_dict[f'/observations/images/{cam_name}'].append(image)
 
             if len(self.data_dict['/observations/qpos']) == self.data_size:
