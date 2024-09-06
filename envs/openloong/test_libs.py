@@ -19,13 +19,18 @@ orcagym.setBaseQuat([0.0, 1.0, 0.0, 0.0])
 if not os.path.exists("./records"):
     os.makedirs("./records")
 
+
+
 # 创建 OpenLoongWBC 实例
 open_env = openloong_wbc.OpenLoongWBC("./external/openloong-dyn-control/models/AzureLoong.urdf", 
                                       0.01, 
                                       "./external/openloong-dyn-control/common/joint_ctrl_config.json", 
                                       "./records/datalog.log", 
                                       38, 
-                                      38)
+                                      37)
 
 # 调用类方法
 open_env.InitLogger()
+
+# 输出测试结果
+print("Run test successfully!")
