@@ -15,8 +15,17 @@ orcagym = openloong_wbc.OrcaGym_Interface()
 orcagym.setRPY([1.0, 0.5, 0.0])
 orcagym.setBaseQuat([0.0, 1.0, 0.0, 0.0])
 
+# 创建 records目录
+if not os.path.exists("./records"):
+    os.makedirs("./records")
+
 # 创建 OpenLoongWBC 实例
-open_env = openloong_wbc.OpenLoongWBC("./external/openloong-dyn-control/models/AzureLoong.urdf", 0.01, "./external/openloong-dyn-control/common/joint_ctrl_config.json", "./datalog.log", 42, 42)
+open_env = openloong_wbc.OpenLoongWBC("./external/openloong-dyn-control/models/AzureLoong.urdf", 
+                                      0.01, 
+                                      "./external/openloong-dyn-control/common/joint_ctrl_config.json", 
+                                      "./records/datalog.log", 
+                                      38, 
+                                      38)
 
 # 调用类方法
 open_env.InitLogger()

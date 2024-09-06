@@ -9,6 +9,8 @@ OpenLoongWBC::OpenLoongWBC(const std::string &urdf_path, double timestep, const 
                                                                                                                                                                    RobotState(model_nv),
                                                                                                                                                                    WBC_solv(model_nv, 18, 22, 0.7, timestep)
 {
+    printf("kinDynSolver.model_nv=%d model_nq=%d model_nv=%d\n", kinDynSolver.model_nv, model_nq, model_nv);
+    
     this->model_nv = model_nv;
     this->timestep = timestep;
 
@@ -25,6 +27,7 @@ OpenLoongWBC::OpenLoongWBC(const std::string &urdf_path, double timestep, const 
     motors_vel_cur.resize(model_nv - 6, 0);
     motors_tau_des.resize(model_nv - 6, 0);
     motors_tau_cur.resize(model_nv - 6, 0);
+
 
     // ini position and posture for foot-end and hand
     Eigen::Vector3d fe_l_pos_L_des = {-0.018, 0.113, 0 - stand_legLength};
@@ -43,6 +46,10 @@ OpenLoongWBC::OpenLoongWBC(const std::string &urdf_path, double timestep, const 
 
     resLeg = kinDynSolver.computeInK_Leg(fe_l_rot_des, fe_l_pos_L_des, fe_r_rot_des, fe_r_pos_L_des);
     resHand = kinDynSolver.computeInK_Hand(hd_l_rot_des, hd_l_pos_L_des, hd_r_rot_des, hd_r_pos_L_des);
+
+    // std::cout << "resLeg.jointPosRes.size(): " << resLeg.jointPosRes.size() << std::endl;
+    // std::cout << "resHand.jointPosRes.size(): " << resHand.jointPosRes.size() << std::endl;
+    // std::cout << "model_nq - 7: " << (model_nq - 7) << std::endl;
 
     qIniDes = Eigen::VectorXd::Zero(model_nq, 1);
     qIniDes.block(7, 0, model_nq - 7, 1) = resLeg.jointPosRes + resHand.jointPosRes;

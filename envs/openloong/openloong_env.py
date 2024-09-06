@@ -16,7 +16,7 @@ orcagym.setRPY([1.0, 0.5, 0.0])
 orcagym.setBaseQuat([0.0, 1.0, 0.0, 0.0])
 
 # 创建 OpenLoongWBC 实例
-open_env = openloong_wbc.OpenLoongWBC("urdf_path", 0.01, "json_path", "log_path", 42, 42)
+open_env = openloong_wbc.OpenLoongWBC("urdf_path", 0.01, "json_path", "log_path", 37, 37)
 
 # 调用类方法
 open_env.InitLogger()
