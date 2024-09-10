@@ -217,7 +217,7 @@ class FrankaJoystickEnv(MujocoRobotEnv):
 
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick.update()
-        joystick_state = self.joystick.get_state()
+        joystick_state = self.joystick.get_first_state()
 
         pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
         rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)

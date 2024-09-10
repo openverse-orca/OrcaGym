@@ -309,19 +309,34 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         return
     
     def body(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
     
     def joint(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
     
     def actuator(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
     
     def site(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
     
     def mocap(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
     
 
     async def _close_grpc(self):
