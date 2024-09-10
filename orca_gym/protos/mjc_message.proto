@@ -63,6 +63,7 @@ service GrpcService {
   rpc QueryBodyPosMatQuat (QueryBodyPosMatQuatRequest) returns (QueryBodyPosMatQuatResponse);
   rpc QueryGeomPosMat (QueryGeomPosMatRequest) returns (QueryGeomPosMatResponse);
   rpc QueryContactForce(QueryContactForceRequest) returns (QueryContactForceResponse);
+  rpc QueryJointOffsets (QueryJointOffsetsRequest) returns (QueryJointOffsetsResponse);
 
   // 元素设置
   rpc SetControlInput (SetControlInputRequest) returns (SetControlInputResponse);
@@ -901,11 +902,26 @@ message QuerySensorDataRequest {
 }
 
 message QuerySensorDataResponse {
-  message SensorData {
-      string sensor_name = 1;  // 传感器名称
-      string sensor_type = 2;  // 传感器类型
-      repeated double sensor_value = 3;  // 当前传感器值
-  }
+    message SensorData {
+        string sensor_name = 1;  // 传感器名称
+        string sensor_type = 2;  // 传感器类型
+        repeated double sensor_value = 3;  // 当前传感器值
+    }
 
     repeated SensorData sensor_data_list = 1;  // 包含所有传感器数据
+}
+
+message QueryJointOffsetsRequest {
+    repeated string joint_names = 1;  // 一个关节名称数组
+}
+
+message QueryJointOffsetsResponse {
+    message JointOffset {
+        string joint_name = 1;
+        int32 qpos_offset = 2;
+        int32 qvel_offset = 3;
+        int32 qacc_offset = 4;
+    }
+
+    repeated JointOffset joint_offsets = 1;  // 对应的关节偏移量数组
 }

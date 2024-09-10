@@ -806,3 +806,31 @@ class OrcaGym:
             }
 
         return sensor_data_dict    
+    
+    async def query_joint_offsets(self, joint_names):
+        request = mjc_message_pb2.QueryJointOffsetsRequest(joint_names=joint_names)
+        response = await self.stub.QueryJointOffsets(request)
+
+        # 按顺序构建 offset 数组
+        qpos_offsets = []
+        qvel_offsets = []
+        qacc_offsets = []
+
+        # 记录实际返回的关节名称，以便检查
+        returned_joint_names = [joint_offset.joint_name for joint_offset in response.joint_offsets]
+
+        # 检查是否所有请求的关节都返回了偏移量
+        missing_joints = [joint_name for joint_name in joint_names if joint_name not in returned_joint_names]
+        if missing_joints:
+            raise Exception(f"Joints not found: {', '.join(missing_joints)}")
+
+        # 将响应中每个关节的 offset 按顺序添加到数组中
+        for joint_name in joint_names:
+            for joint_offset in response.joint_offsets:
+                if joint_offset.joint_name == joint_name:
+                    qpos_offsets.append(joint_offset.qpos_offset)
+                    qvel_offsets.append(joint_offset.qvel_offset)
+                    qacc_offsets.append(joint_offset.qacc_offset)
+                    break
+
+        return qpos_offsets, qvel_offsets, qacc_offsets    

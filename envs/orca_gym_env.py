@@ -700,3 +700,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
     def query_sensor_data(self, sensor_names):
         sensor_data_dict = self.loop.run_until_complete(self._query_sensor_data(sensor_names))
         return sensor_data_dict
+    
+    async def _query_joint_offsets(self, joint_names):
+        qpos_offsets, qvel_offsets, qacc_offsets = await self.gym.query_joint_offsets(joint_names)
+        return qpos_offsets, qvel_offsets, qacc_offsets
+    
+    def query_joint_offsets(self, joint_names) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        qpos_offsets, qvel_offsets, qacc_offsets = self.loop.run_until_complete(self._query_joint_offsets(joint_names))
+        return qpos_offsets, qvel_offsets, qacc_offsets

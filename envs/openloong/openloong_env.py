@@ -67,7 +67,11 @@ class OpenLoongEnv(MujocoRobotEnv):
         # Interface 用于传递仿真状态，并接收控制指令
         self._orcagym_interface = OrcaGym_Interface(time_step)
         joint_name_list = self._orcagym_interface.getJointName()
-        self._build_orcagym_interface_map(joint_name_list)
+        joint_name_list = [self.joint(jntName) for jntName in joint_name_list]        
+        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(joint_name_list)
+        self._orcagym_interface.setJointOffsetQpos(qpos_offsets)
+        self._orcagym_interface.setJointOffsetQvel(qvel_offsets)
+
         self._sensor_name_list = []
         # self._sensor_name_list.append(self.sensor(self._orcagym_interface.getBaseName()))
         self._sensor_name_list.append(self.sensor(self._orcagym_interface.getOrientationSensorName()))
@@ -85,16 +89,6 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
-    
-    def _build_orcagym_interface_map(self, joint_name_list):
-        jntId_qpos = np.array([self.model.joint_name2id(self.joint(jntName)) for jntName in joint_name_list])
-        print("joint_name_list: ", joint_name_list)
-        print("jntId_qpos: ", jntId_qpos)
-        self._orcagym_interface.setJntIdQpos(jntId_qpos)
-        jntId_qvel = np.array([self.model.joint_name2id(self.joint(jntName)) for jntName in joint_name_list])
-        print("jntId_qvel: ", jntId_qvel)
-        self._orcagym_interface.setJntIdQvel(jntId_qvel)
-        return
         
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
@@ -177,7 +171,7 @@ class OpenLoongEnv(MujocoRobotEnv):
         self._orcagym_interface.updateSensorValues(self.data.qpos, self.data.qvel, 
                                                    sensor_dict[self.sensor('baselink-quat')]['values'], sensor_dict[self.sensor('baselink-velocity')]['values'], 
                                                    sensor_dict[self.sensor('baselink-gyro')]['values'], sensor_dict[self.sensor('baselink-baseAcc')]['values'], xpos)
-        raise Exception("Test")
+
         # print("Run simulation, time: ", self.data.time)
         try:
             self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, self.data.time)

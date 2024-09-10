@@ -31,8 +31,8 @@ xpos = np.zeros(3)
 
 JntIdQpos = list(range(model_nq))
 JntIdQvel = list(range(model_nv))
-orcagym_interface.setJntIdQpos(JntIdQpos)
-orcagym_interface.setJntIdQvel(JntIdQvel)
+orcagym_interface.setJointOffsetQpos(JntIdQpos)
+orcagym_interface.setJointOffsetQvel(JntIdQvel)
 
 orcagym_interface.updateSensorValues(qpos, qvel, sensordata_quat, sensordata_vel, sensordata_gyro, sensordata_acc, xpos)
 

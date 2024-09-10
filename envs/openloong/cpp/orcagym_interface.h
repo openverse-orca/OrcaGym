@@ -133,12 +133,12 @@ public:
     }
 
     // 由OrcaGym Env类构建转关表，并传给interface
-    void setJntIdQpos(const std::vector<int>& jntId_qposIn) {
-        jntId_qpos = jntId_qposIn;
+    void setJointOffsetQpos(const std::vector<int>& jointOffsetQpos) {
+        this->jointOffsetQpos = jointOffsetQpos;
     }
 
-    void setJntIdQvel(const std::vector<int>& jntId_qvelIn) {
-        jntId_qvel = jntId_qvelIn;
+    void setJointOffsetQvel(const std::vector<int>& jointOffsetQvel) {
+        this->jointOffsetQvel = jointOffsetQvel;
     }
 
     OrcaGym_Interface(double timestep);
@@ -154,7 +154,7 @@ public:
 private:
     // OrcaGymModel *mj_model;
     
-    std::vector<int> jntId_qpos, jntId_qvel;
+    std::vector<int> jointOffsetQpos, jointOffsetQvel;
 
     double timestep{0.001}; // second
     unsigned int jointNum{0};

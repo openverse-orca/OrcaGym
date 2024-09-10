@@ -38,8 +38,8 @@ void bindOrcaGymInterface(py::module &m) {
         .def("setBaseLinVel", &OrcaGym_Interface::setBaseLinVel)
         .def("setMotorCtrl", &OrcaGym_Interface::setMotorCtrl)
         .def("getMotorCtrl", &OrcaGym_Interface::getMotorCtrl)
-        .def("setJntIdQpos", &OrcaGym_Interface::setJntIdQpos)
-        .def("setJntIdQvel", &OrcaGym_Interface::setJntIdQvel)
+        .def("setJointOffsetQpos", &OrcaGym_Interface::setJointOffsetQpos)
+        .def("setJointOffsetQvel", &OrcaGym_Interface::setJointOffsetQvel)
         .def("updateSensorValues", &OrcaGym_Interface::updateSensorValues);
 }
 
