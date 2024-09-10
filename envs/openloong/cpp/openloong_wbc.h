@@ -31,6 +31,16 @@ public:
 
     void InitLogger();
 
+    void SetBaseUp(double offset)
+    {
+        this->stand_legLength += offset;
+    }
+
+    void SetBaseDown(double offset)
+    {
+        this->stand_legLength -= offset;
+    }
+
     void Runsimulation(const ButtonState &buttonState, OrcaGym_Interface &orcagym_interface, double simTime);
 
 private:
@@ -44,7 +54,7 @@ private:
     DataLogger logger;
 
     // variables ini
-    const double stand_legLength = 1.01; // desired baselink height
+    double stand_legLength = 1.01; // desired baselink height
     const double foot_height = 0.07;     // distance between the foot ankel joint and the bottom
     const double xv_des = 0.7;           // desired velocity in x direction
 

@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     grpc_address = f"{args.grpc_address}:50051"
 
-    simulation_frequency = 1000
+    simulation_frequency = 500
     time_step = 1.0 / simulation_frequency
 
     urdf_path = project_root + "/envs/openloong/external/openloong-dyn-control/models/AzureLoong.urdf"

@@ -89,6 +89,7 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self._keyboard_controller = KeyboardInput()
         self._button_state = ButtonState()
+        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0}
 
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
@@ -112,11 +113,11 @@ class OpenLoongEnv(MujocoRobotEnv):
         return acutator_idmap
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        start_set_action_time = datetime.now()
+        # start_set_action_time = datetime.now()
         self._set_action()
-        elapsed_set_action_time = datetime.now() - start_set_action_time
-        print(f"elapsed_set_action_time (ms): {elapsed_set_action_time.total_seconds() * 1000}")
-        
+        # elapsed_set_action_time = datetime.now() - start_set_action_time
+        # print(f"elapsed_set_action_time (ms): {elapsed_set_action_time.total_seconds() * 1000}")
+
         self.do_simulation(self.ctrl, self.frame_skip)
         obs = self._get_obs().copy()
 
@@ -183,6 +184,36 @@ class OpenLoongEnv(MujocoRobotEnv):
         self.ctrl = self.record_pool.pop(0)
 
     
+    def _update_keyboard_control(self) -> None:
+        self._keyboard_controller.update()
+        key_status = self._keyboard_controller.get_state()
+
+        self._button_state.key_w = False
+        self._button_state.key_a = False
+        self._button_state.key_s = False
+        self._button_state.key_d = False
+        self._button_state.key_space = False
+        
+        if self._key_status["W"] == 0 and key_status["W"] == 1:
+            self._button_state.key_w = True
+        if self._key_status["A"] == 0 and key_status["A"] == 1:
+            self._button_state.key_a = True
+        if self._key_status["S"] == 0 and key_status["S"] == 1:
+            self._button_state.key_s = True
+        if self._key_status["D"] == 0 and key_status["D"] == 1:
+            self._button_state.key_d = True
+        if self._key_status["Space"] == 0 and key_status["Space"] == 1:
+            self._button_state.key_space = True
+        if self._key_status["Up"] == 0 and key_status["Up"] == 1:
+            self._openloong_wbc.SetBaseUp(0.025)
+        if self._key_status["Down"] == 0 and key_status["Down"] == 1:
+            self._openloong_wbc.SetBaseDown(0.025)
+
+        self._key_status = key_status.copy()
+
+
+        # print(f"key_w: {self._button_state.key_w}, key_a: {self._button_state.key_a}, key_s: {self._button_state.key_s}, key_d: {self._button_state.key_d}, key_space: {self._button_state.key_space}")
+
     def _set_action(self) -> None:
         if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
             self._replay()
@@ -191,21 +222,16 @@ class OpenLoongEnv(MujocoRobotEnv):
         # 调用青龙控制算法接口，获取控制数据
         xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
         sensor_dict = self.query_sensor_data(self._sensor_name_list)
-        # print("sensor_dict: ", sensor_dict)
         self._orcagym_interface.updateSensorValues(self.data.qpos, self.data.qvel, 
                                                    sensor_dict[self.sensor('baselink-quat')]['values'], sensor_dict[self.sensor('baselink-velocity')]['values'], 
                                                    sensor_dict[self.sensor('baselink-gyro')]['values'], sensor_dict[self.sensor('baselink-baseAcc')]['values'], xpos)
-
-        # print("Run simulation, time: ", self.data.time)
-        try:
-            self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, self.data.time)
-        except Exception as e:
-            print("Error: ", e)
+        
+        self._update_keyboard_control()
+        self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, self.data.time)
 
         ctrl = self._orcagym_interface.getMotorCtrl()
         for i, actuator_id in enumerate(self._actuator_idmap):
             self.ctrl[actuator_id] = ctrl[i]
-
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:

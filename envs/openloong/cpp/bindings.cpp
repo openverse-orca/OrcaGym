@@ -48,7 +48,9 @@ void bindOpenLoongEnv(py::module &m) {
     py::class_<OpenLoongWBC>(m, "OpenLoongWBC")
         .def(py::init<const std::string&, double, const std::string&, const std::string&, int, int>())  // Constructor
         .def("InitLogger", &OpenLoongWBC::InitLogger)
-        .def("Runsimulation", &OpenLoongWBC::Runsimulation);
+        .def("Runsimulation", &OpenLoongWBC::Runsimulation)
+        .def("SetBaseUp", &OpenLoongWBC::SetBaseUp)
+        .def("SetBaseDown", &OpenLoongWBC::SetBaseDown);
 }
 
 PYBIND11_MODULE(openloong_dyn_ctrl, m) {
