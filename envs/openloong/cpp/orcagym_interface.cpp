@@ -17,14 +17,14 @@ void OrcaGym_Interface::updateSensorValues(std::vector<double> &qpos,
                                       std::vector<double> &sensordata_acc,      // baseAcc
                                       std::vector<double> &xpos)
 {
-    std::cout << "jointOffsetQpos, Qvel";
+    // std::cout << "jointOffsetQpos, Qvel";
     for (int i = 0; i < jointNum; i++)
     {
-        std::cout << "[" << jointOffsetQpos[i] << ", " << jointOffsetQvel[i] << "] ";
+        // std::cout << "[" << jointOffsetQpos[i] << ", " << jointOffsetQvel[i] << "] ";
         motor_pos[i] = qpos[jointOffsetQpos[i]];
         motor_vel[i] = qvel[jointOffsetQvel[i]];
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
     for (int i = 0; i < 4; i++)
         baseQuat[i] = sensordata_quat[i];
     double tmp = baseQuat[0];

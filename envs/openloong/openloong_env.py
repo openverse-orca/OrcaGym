@@ -1,5 +1,6 @@
 import sys
 import os
+from datetime import datetime
 
 # 添加 libs 目录到 sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))  # 获取当前文件的目录
@@ -72,6 +73,8 @@ class OpenLoongEnv(MujocoRobotEnv):
         self._orcagym_interface.setJointOffsetQpos(qpos_offsets)
         self._orcagym_interface.setJointOffsetQvel(qvel_offsets)
 
+        self._actuator_idmap = self._build_acutator_idmap()
+
         self._sensor_name_list = []
         # self._sensor_name_list.append(self.sensor(self._orcagym_interface.getBaseName()))
         self._sensor_name_list.append(self.sensor(self._orcagym_interface.getOrientationSensorName()))
@@ -89,10 +92,31 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
+    
+    def _build_acutator_idmap(self) -> list[int]:
+        acutator_idmap = []
+
+        # 来自于 external/openloong-dyn-control/models/AzureLoong.xml
+        actuator_name_list = ['M_arm_l_01', 'M_arm_l_02', 'M_arm_l_03', 'M_arm_l_04', 'M_arm_l_05', 
+                                'M_arm_l_06', 'M_arm_l_07', 'M_arm_r_01', 'M_arm_r_02', 'M_arm_r_03', 
+                                'M_arm_r_04', 'M_arm_r_05', 'M_arm_r_06', 'M_arm_r_07', 'M_head_yaw', 
+                                'M_head_pitch', 'M_waist_pitch', 'M_waist_roll', 'M_waist_yaw', 
+                                'M_hip_l_roll', 'M_hip_l_yaw', 'M_hip_l_pitch', 'M_knee_l_pitch', 
+                                'M_ankle_l_pitch', 'M_ankle_l_roll', 'M_hip_r_roll', 'M_hip_r_yaw', 
+                                'M_hip_r_pitch', 'M_knee_r_pitch', 'M_ankle_r_pitch', 'M_ankle_r_roll']
         
+        for i, actuator_name in enumerate(actuator_name_list):
+            actuator_id = self.model.actuator_name2id(self.actuator(actuator_name))
+            acutator_idmap.append(actuator_id)
+
+        return acutator_idmap
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
+        start_set_action_time = datetime.now()
         self._set_action()
+        elapsed_set_action_time = datetime.now() - start_set_action_time
+        print(f"elapsed_set_action_time (ms): {elapsed_set_action_time.total_seconds() * 1000}")
+        
         self.do_simulation(self.ctrl, self.frame_skip)
         obs = self._get_obs().copy()
 
@@ -158,7 +182,7 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self.ctrl = self.record_pool.pop(0)
 
-
+    
     def _set_action(self) -> None:
         if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
             self._replay()
@@ -178,7 +202,9 @@ class OpenLoongEnv(MujocoRobotEnv):
         except Exception as e:
             print("Error: ", e)
 
-        self.ctrl = self._orcagym_interface.getMotorCtrl()
+        ctrl = self._orcagym_interface.getMotorCtrl()
+        for i, actuator_id in enumerate(self._actuator_idmap):
+            self.ctrl[actuator_id] = ctrl[i]
 
 
         # 将控制数据存储到record_pool中

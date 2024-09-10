@@ -75,6 +75,7 @@ const double openLoopCtrTime = 3;
 
 void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, OrcaGym_Interface &orcagym_interface, double simTime)
 {
+    // printf("-------------%.3f s------------\n",simTime);    
     // orcagym_interface.updateSensorValues();     // 在进入runsim之前，由gym完成数据更新
     orcagym_interface.dataBusWrite(RobotState);
 
@@ -201,7 +202,7 @@ void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, OrcaGym_Interfa
                                                                                              RobotState.dq(1));
         RobotState.des_ddq(5) = k * (jsInterp.wz_L - RobotState.dq(5));
     }
-    printf("js_vx=%.3f js_vy=%.3f wz_L=%.3f px_w=%.3f py_w=%.3f thetaZ=%.3f\n", jsInterp.vx_W, jsInterp.vy_W, jsInterp.wz_L, jsInterp.px_W, jsInterp.py_W, jsInterp.thetaZ);
+    // printf("js_vx=%.3f js_vy=%.3f wz_L=%.3f px_w=%.3f py_w=%.3f thetaZ=%.3f\n", jsInterp.vx_W, jsInterp.vy_W, jsInterp.wz_L, jsInterp.px_W, jsInterp.py_W, jsInterp.thetaZ);
 
     // WBC Calculation
     WBC_solv.dataBusRead(RobotState);
@@ -272,7 +273,7 @@ void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, OrcaGym_Interfa
     logger.recItermData("baseAcc", RobotState.baseAcc);
     logger.finishLine();
 
-    printf("rpyVal=[%.5f, %.5f, %.5f]\n", RobotState.rpy[0], RobotState.rpy[1], RobotState.rpy[2]);
-    printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
-    printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
+    // printf("rpyVal=[%.5f, %.5f, %.5f]\n", RobotState.rpy[0], RobotState.rpy[1], RobotState.rpy[2]);
+    // printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
+    // printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
 }
