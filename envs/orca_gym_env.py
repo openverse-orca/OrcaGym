@@ -337,6 +337,9 @@ class OrcaGymEnv(BaseOrcaGymEnv):
             return f"{self._agent_names[0]}_{name}"
         else:
             return name
+
+    def sensor(self, name: str) -> str:
+        return f"{self._agent_names[0]}_{name}"
     
 
     async def _close_grpc(self):
@@ -372,6 +375,8 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         # return self.data.body(body_name).xpos
         body_dict = self.loop.run_until_complete(self._get_body_xpos_xmat_xquat(body_name_list))
         if len(body_dict) != len(body_name_list):
+            print("Body Nmae List: ", body_name_list)
+            print("Body Dict: ", body_dict)
             raise ValueError("Some body names are not found in the simulation.")
         xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
         xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
@@ -687,3 +692,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
 
     def set_geom_friction(self, geom_name_list, friction_list):
         self.loop.run_until_complete(self._set_geom_friction(geom_name_list, friction_list))
+
+    async def _query_sensor_data(self, sensor_names):
+        sensor_data_dict = await self.gym.query_sensor_data(sensor_names)
+        return sensor_data_dict        
+    
+    def query_sensor_data(self, sensor_names):
+        sensor_data_dict = self.loop.run_until_complete(self._query_sensor_data(sensor_names))
+        return sensor_data_dict

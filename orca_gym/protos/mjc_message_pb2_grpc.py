@@ -5,10 +5,8 @@ import warnings
 
 import mjc_message_pb2 as mjc__message__pb2
 
-GRPC_GENERATED_VERSION = '1.65.4'
+GRPC_GENERATED_VERSION = '1.66.1'
 GRPC_VERSION = grpc.__version__
-EXPECTED_ERROR_RELEASE = '1.66.0'
-SCHEDULED_RELEASE_DATE = 'August 6, 2024'
 _version_not_supported = False
 
 try:
@@ -18,15 +16,12 @@ except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
-    warnings.warn(
+    raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
         + f' but the generated code in mjc_message_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
-        + f' This warning will become an error in {EXPECTED_ERROR_RELEASE},'
-        + f' scheduled for release on {SCHEDULED_RELEASE_DATE}.',
-        RuntimeWarning
     )
 
 
@@ -158,6 +153,11 @@ class GrpcServiceStub(object):
                 '/MujocoMessage.GrpcService/QuerySubtreeCom',
                 request_serializer=mjc__message__pb2.QuerySubtreeComRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QuerySubtreeComResponse.FromString,
+                _registered_method=True)
+        self.QuerySensorData = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QuerySensorData',
+                request_serializer=mjc__message__pb2.QuerySensorDataRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QuerySensorDataResponse.FromString,
                 _registered_method=True)
         self.SetQpos = channel.unary_unary(
                 '/MujocoMessage.GrpcService/SetQpos',
@@ -503,6 +503,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def QuerySubtreeCom(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QuerySensorData(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -869,6 +875,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QuerySubtreeCom,
                     request_deserializer=mjc__message__pb2.QuerySubtreeComRequest.FromString,
                     response_serializer=mjc__message__pb2.QuerySubtreeComResponse.SerializeToString,
+            ),
+            'QuerySensorData': grpc.unary_unary_rpc_method_handler(
+                    servicer.QuerySensorData,
+                    request_deserializer=mjc__message__pb2.QuerySensorDataRequest.FromString,
+                    response_serializer=mjc__message__pb2.QuerySensorDataResponse.SerializeToString,
             ),
             'SetQpos': grpc.unary_unary_rpc_method_handler(
                     servicer.SetQpos,
@@ -1714,6 +1725,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QuerySubtreeCom',
             mjc__message__pb2.QuerySubtreeComRequest.SerializeToString,
             mjc__message__pb2.QuerySubtreeComResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QuerySensorData(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QuerySensorData',
+            mjc__message__pb2.QuerySensorDataRequest.SerializeToString,
+            mjc__message__pb2.QuerySensorDataResponse.FromString,
             options,
             channel_credentials,
             insecure,

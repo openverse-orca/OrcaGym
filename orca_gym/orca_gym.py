@@ -75,9 +75,13 @@ class OrcaGym:
 
     async def update_data(self):
         qpos, qvel, qacc = await self.query_all_qpos_qvel_qacc()
-        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
         qfrc_bias = await self.query_qfrc_bias()
+        
+        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)        
         self.data.update_qfrc_bias(qfrc_bias)
+
+        sim_time = datetime.now() - self.model._init_time
+        self.data.update_time(sim_time.total_seconds())
 
 
     async def query_all_actuators(self):
@@ -733,21 +737,16 @@ class OrcaGym:
         return forces_dict
     
     async def mj_jac(self, body_point_list, compute_jacp=True, compute_jacr=True):
-        # 创建请求消息
         request = mjc_message_pb2.MJ_JacRequest(
             compute_jacp=compute_jacp,
             compute_jacr=compute_jacr
         )
-
         for body, point in body_point_list:
             body_point_proto = request.body_point_list.add()
             body_point_proto.body = body
             body_point_proto.point.extend(point)
 
-        # 调用gRPC服务并等待响应
         response = await self.stub.MJ_Jac(request)
-
-        # 处理响应，将结果转换为 numpy 数组
         jacp_list = []
         jacr_list = []
         
@@ -762,34 +761,20 @@ class OrcaGym:
     async def calc_full_mass_matrix(self):
         request = mjc_message_pb2.CalcFullMassMatrixRequest()
         response = await self.stub.CalcFullMassMatrix(request)
-
-        # 将响应转换为 numpy 数组，表示全质量矩阵
         full_mass_matrix = np.array(response.full_mass_matrix).reshape((self.model.nv, self.model.nv))
-
         return full_mass_matrix
     
     async def query_qfrc_bias(self):
-        # 构建请求消息
         request = mjc_message_pb2.QueryQfrcBiasRequest()
-
-        # 调用 gRPC 服务并等待响应
         response = await self.stub.QueryQfrcBias(request)
-
-        # 将响应转换为 numpy 数组，表示 qfrc_bias
         qfrc_bias = np.array(response.qfrc_bias)
-
         return qfrc_bias
 
     async def query_subtree_com(self, body_name_list):
-        # 构建请求消息
         request = mjc_message_pb2.QuerySubtreeComRequest(
             body_name_list=body_name_list
         )
-
-        # 调用 gRPC 服务并等待响应
         response = await self.stub.QuerySubtreeCom(request)
-
-        # 构建结果字典，将 body_name 与对应的 subtree_com 关联
         subtree_com_dict = {}
         subtree_com_data = np.array(response.subtree_com).reshape((-1, 3))
         
@@ -799,7 +784,6 @@ class OrcaGym:
         return subtree_com_dict
     
     async def set_geom_friction(self, geom_name_list, friction_list):
-        # 构建请求消息
         request = mjc_message_pb2.SetGeomFrictionRequest()
         request.geom_name_list.extend(geom_name_list)
 
@@ -807,8 +791,18 @@ class OrcaGym:
             friction_proto = request.friction_list.add()
             friction_proto.values.extend(friction)
 
-        # 调用gRPC服务
         response = await self.stub.SetGeomFriction(request)
-
-        # 返回每个geom的设置成功状态
         return response.success_list    
+    
+    async def query_sensor_data(self, sensor_names):
+        request = mjc_message_pb2.QuerySensorDataRequest(sensor_names=sensor_names)
+        response = await self.stub.QuerySensorData(request)
+
+        sensor_data_dict = {}
+        for sensor_data in response.sensor_data_list:
+            sensor_data_dict[sensor_data.sensor_name] = {
+                "type": sensor_data.sensor_type,
+                "values": np.array(sensor_data.sensor_value)
+            }
+
+        return sensor_data_dict    

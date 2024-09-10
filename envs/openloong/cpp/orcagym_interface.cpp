@@ -1,75 +1,52 @@
 #include "orcagym_interface.h"
 
-OrcaGym_Interface::OrcaGym_Interface()
+OrcaGym_Interface::OrcaGym_Interface(double timestep)
 {
-    unsigned int jointNum = JointName.size();
+    this->timestep = timestep;
+    jointNum = JointName.size();
     motor_pos.assign(jointNum, 0);
     motor_vel.assign(jointNum, 0);
-    motor_ctrl.assign(jointNum, 0);    
-    // for (int i = 0; i < jointNum; i++)
-    // {
-    //     int tmpId = mj_name2id(mj_model, OrcaGymModel::mjOBJ_JOINT, JointName[i].c_str());
-    //     if (tmpId == -1)
-    //     {
-    //         std::cerr << JointName[i] << " not found in the XML file!" << std::endl;
-    //         std::terminate();
-    //     }
-    //     jntId_qpos[i] = mj_model->jnt_qposadr[tmpId];
-    //     jntId_qvel[i] = mj_model->jnt_dofadr[tmpId];
-    //     std::string motorName = JointName[i];
-    //     motorName = "M" + motorName.substr(1);
-    //     tmpId = mj_name2id(mj_model, mjOBJ_ACTUATOR, motorName.c_str());
-    //     if (tmpId == -1)
-    //     {
-    //         std::cerr << motorName << " not found in the XML file!" << std::endl;
-    //         std::terminate();
-    //     }
-    //     jntId_dctl[i] = tmpId;
-    // }
-    //    int adr = m->sensor_adr[sensorId];
-    //    int dim = m->sensor_dim[sensorId];
-    //    mjtNum sensor_data[dim];
-    //    mju_copy(sensor_data, &d->sensordata[adr], dim);
-    // baseBodyId = mj_name2id(mj_model, mjOBJ_BODY, baseName.c_str());
-    // orientataionSensorId = mj_name2id(mj_model, mjOBJ_SENSOR, orientationSensorName.c_str());
-    // velSensorId = mj_name2id(mj_model, mjOBJ_SENSOR, velSensorName.c_str());
-    // gyroSensorId = mj_name2id(mj_model, mjOBJ_SENSOR, gyroSensorName.c_str());
-    // accSensorId = mj_name2id(mj_model, mjOBJ_SENSOR, accSensorName.c_str());
+    motor_ctrl.assign(jointNum, 0);
 }
 
-// void MJ_Interface::updateSensorValues() {
-//     for (int i=0;i<jointNum;i++){
-//         motor_pos_Old[i]=motor_pos[i];
-//         motor_pos[i]=mj_data->qpos[jntId_qpos[i]];
-//         motor_vel[i]=mj_data->qvel[jntId_qvel[i]];
-//     }
-//     for (int i=0;i<4;i++)
-//         baseQuat[i]=mj_data->sensordata[mj_model->sensor_adr[orientataionSensorId]+i];
-//     double tmp=baseQuat[0];
-//     baseQuat[0]=baseQuat[1];
-//     baseQuat[1]=baseQuat[2];
-//     baseQuat[2]=baseQuat[3];
-//     baseQuat[3]=tmp;
+void OrcaGym_Interface::updateSensorValues(std::vector<double> &qpos,
+                                      std::vector<double> &qvel,
+                                      std::vector<double> &sensordata_quat,     // baselink-quat
+                                      std::vector<double> &sensordata_vel,
+                                      std::vector<double> &sensordata_gyro,     // gyro
+                                      std::vector<double> &sensordata_acc,      // baseAcc
+                                      std::vector<double> &xpos)
+{
+    std::cout << "jntId_qpos";
+    for (int i = 0; i < jointNum; i++)
+    {
+        std::cout << "[" << jntId_qpos[i] << "] ";
+        motor_pos[i] = qpos[jntId_qpos[i]];
+        motor_vel[i] = qvel[jntId_qvel[i]];
+    }
+    std::cout << std::endl;
+    for (int i = 0; i < 4; i++)
+        baseQuat[i] = sensordata_quat[i];
+    double tmp = baseQuat[0];
+    baseQuat[0] = baseQuat[1];
+    baseQuat[1] = baseQuat[2];
+    baseQuat[2] = baseQuat[3];
+    baseQuat[3] = tmp;
 
-//     rpy[0]= atan2(2*(baseQuat[3]*baseQuat[0]+baseQuat[1]*baseQuat[2]),1-2*(baseQuat[0]*baseQuat[0]+baseQuat[1]*baseQuat[1]));
-//     rpy[1]= asin(2*(baseQuat[3]*baseQuat[1]-baseQuat[0]*baseQuat[2]));
-//     rpy[2]= atan2(2*(baseQuat[3]*baseQuat[2]+baseQuat[0]*baseQuat[1]),1-2*(baseQuat[1]*baseQuat[1]+baseQuat[2]*baseQuat[2]));
+    rpy[0] = atan2(2 * (baseQuat[3] * baseQuat[0] + baseQuat[1] * baseQuat[2]), 1 - 2 * (baseQuat[0] * baseQuat[0] + baseQuat[1] * baseQuat[1]));
+    rpy[1] = asin(2 * (baseQuat[3] * baseQuat[1] - baseQuat[0] * baseQuat[2]));
+    rpy[2] = atan2(2 * (baseQuat[3] * baseQuat[2] + baseQuat[0] * baseQuat[1]), 1 - 2 * (baseQuat[1] * baseQuat[1] + baseQuat[2] * baseQuat[2]));
 
-//     for (int i=0;i<3;i++)
-//     {
-//         double posOld=basePos[i];
-//         basePos[i]=mj_data->xpos[3*baseBodyId+i];
-//         baseAcc[i]=mj_data->sensordata[mj_model->sensor_adr[accSensorId]+i];
-//         baseAngVel[i]=mj_data->sensordata[mj_model->sensor_adr[gyroSensorId]+i];
-//         baseLinVel[i]=(basePos[i]-posOld)/(mj_model->opt.timestep);
-//     }
+    for (int i = 0; i < 3; i++)
+    {
+        double posOld = basePos[i];
+        basePos[i] = xpos[i];
+        baseAcc[i] = sensordata_acc[i];
+        baseAngVel[i] = sensordata_gyro[i];
+        baseLinVel[i] = (basePos[i] - posOld) / (timestep);
+    }
+}
 
-// }
-
-// void MJ_Interface::setMotorsTorque(std::vector<double> &tauIn) {
-//     for (int i=0;i<jointNum;i++)
-//         mj_data->ctrl[i]=tauIn.at(i);
-// }
 
 void OrcaGym_Interface::dataBusWrite(DataBus &busIn)
 {

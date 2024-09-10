@@ -132,22 +132,30 @@ public:
         return motor_ctrl;
     }
 
-    OrcaGym_Interface();
-    // void updateSensorValues();
-    // void setMotorsTorque(std::vector<double> &tauIn);
+    // 由OrcaGym Env类构建转关表，并传给interface
+    void setJntIdQpos(const std::vector<int>& jntId_qposIn) {
+        jntId_qpos = jntId_qposIn;
+    }
+
+    void setJntIdQvel(const std::vector<int>& jntId_qvelIn) {
+        jntId_qvel = jntId_qvelIn;
+    }
+
+    OrcaGym_Interface(double timestep);
+    void updateSensorValues(std::vector<double> &qpos,
+                                      std::vector<double> &qvel,
+                                      std::vector<double> &sensordata_quat,     // baselink-quat
+                                      std::vector<double> &sensordata_vel,
+                                      std::vector<double> &sensordata_gyro,     // gyro
+                                      std::vector<double> &sensordata_acc,      // baseAcc
+                                      std::vector<double> &xpos);
     void dataBusWrite(DataBus &busIn);
 
 private:
     // OrcaGymModel *mj_model;
     
-    // std::vector<int> jntId_qpos, jntId_qvel, jntId_dctl;
+    std::vector<int> jntId_qpos, jntId_qvel;
 
-    // int orientataionSensorId;
-    // int velSensorId;
-    // int gyroSensorId;
-    // int accSensorId;
-    // int baseBodyId;
-
-    // double timeStep{0.001}; // second
-    // bool isIni{false};
+    double timestep{0.001}; // second
+    unsigned int jointNum{0};
 };

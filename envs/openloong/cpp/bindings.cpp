@@ -20,7 +20,7 @@ void bindButtonState(py::module &m) {
 // Binding the OrcaGym_Interface class
 void bindOrcaGymInterface(py::module &m) {
     py::class_<OrcaGym_Interface>(m, "OrcaGym_Interface")
-        .def(py::init<>())  // Constructor
+        .def(py::init<double>())  // Constructor
         .def("getJointName", &OrcaGym_Interface::getJointName)
         .def("getBaseName", &OrcaGym_Interface::getBaseName)
         .def("getOrientationSensorName", &OrcaGym_Interface::getOrientationSensorName)
@@ -37,7 +37,10 @@ void bindOrcaGymInterface(py::module &m) {
         .def("setBaseAngVel", &OrcaGym_Interface::setBaseAngVel)
         .def("setBaseLinVel", &OrcaGym_Interface::setBaseLinVel)
         .def("setMotorCtrl", &OrcaGym_Interface::setMotorCtrl)
-        .def("getMotorCtrl", &OrcaGym_Interface::getMotorCtrl);
+        .def("getMotorCtrl", &OrcaGym_Interface::getMotorCtrl)
+        .def("setJntIdQpos", &OrcaGym_Interface::setJntIdQpos)
+        .def("setJntIdQvel", &OrcaGym_Interface::setJntIdQvel)
+        .def("updateSensorValues", &OrcaGym_Interface::updateSensorValues);
 }
 
 // Binding the OpenLoongWBC class
@@ -48,7 +51,7 @@ void bindOpenLoongEnv(py::module &m) {
         .def("Runsimulation", &OpenLoongWBC::Runsimulation);
 }
 
-PYBIND11_MODULE(openloong_wbc, m) {
+PYBIND11_MODULE(openloong_dyn_ctrl, m) {
     bindButtonState(m);
     bindOrcaGymInterface(m);
     bindOpenLoongEnv(m);

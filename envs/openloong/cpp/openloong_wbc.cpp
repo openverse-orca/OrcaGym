@@ -73,7 +73,7 @@ void OpenLoongWBC::InitLogger()
 /// ----------------- sim Loop ---------------
 const double openLoopCtrTime = 3;
 
-void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, double simTime)
+void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, OrcaGym_Interface &orcagym_interface, double simTime)
 {
     // orcagym_interface.updateSensorValues();     // 在进入runsim之前，由gym完成数据更新
     orcagym_interface.dataBusWrite(RobotState);

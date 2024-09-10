@@ -31,11 +31,9 @@ public:
 
     void InitLogger();
 
-    void Runsimulation(const ButtonState &buttonState, double simTime);
+    void Runsimulation(const ButtonState &buttonState, OrcaGym_Interface &orcagym_interface, double simTime);
 
 private:
-    // ini classes
-    OrcaGym_Interface orcagym_interface;
     Pin_KinDyn kinDynSolver;
     DataBus RobotState;
     WBC_priority WBC_solv;

@@ -10,6 +10,7 @@ class OrcaGymData:
         self.qvel = np.zeros(model.nv)
         self.qacc = np.zeros(model.nv)
         self.qfrc_bias = np.zeros(model.nv)
+        self.time = 0
 
     def update_qpos_qvel_qacc(self, qpos, qvel, qacc):
         self.qpos = qpos
@@ -18,4 +19,7 @@ class OrcaGymData:
 
     def update_qfrc_bias(self, qfrc_bias):
         self.qfrc_bias = qfrc_bias
+
+    def update_time(self, time):
+        self.time = time
 

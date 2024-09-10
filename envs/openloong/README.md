@@ -25,7 +25,7 @@
     pip install pybind11
     mkdir build
     cd build
-    cmake ..
+    cmake .. -DCMAKE_PREFIX_PATH=$(python -m pybind11 --cmakedir)
     make -j20
     ```
 3. **测试安装是否正常**

@@ -3,6 +3,7 @@ import os
 import grpc
 import numpy as np
 import json
+from datetime import datetime
 
 
 class OrcaGymModel:
@@ -14,6 +15,7 @@ class OrcaGymModel:
     mjEQ_DISTANCE = 5      # unsupported, will cause an error if used
 
     PRINT_INIT_INFO = False
+    PRINT_FORMATTED_INFO = False
 
     def __init__(self, model_info):
         self.init_model_info(model_info)                
@@ -22,12 +24,16 @@ class OrcaGymModel:
         self._actuator_dict = None
         self._body_dict = None
         self._joint_dict = None
+        self._init_time = datetime.now()
         
     def init_model_info(self, model_info):
         self.model_info = model_info
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(model_info, indent=4)
-            print("Model info: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(model_info, indent=4)
+                print("Model info: ", formatted_dict)
+            else:
+                print("Model info: ", model_info)
 
         self.nq = model_info["nq"]
         self.nv = model_info["nv"]
@@ -37,8 +43,11 @@ class OrcaGymModel:
     def init_eq_list(self, eq_list):
         self._eq_list = eq_list
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(eq_list, indent=4)
-            print("Equality constraints: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(eq_list, indent=4)
+                print("Equality constraints: ", formatted_dict)
+            else:
+                print("Equality constraints: ", eq_list)
 
         self.neq = len(eq_list)
 
@@ -48,8 +57,11 @@ class OrcaGymModel:
     def init_mocap_dict(self, mocap_dict):
         self._mocap_dict = mocap_dict
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(mocap_dict, indent=4)
-            print("Mocap dict: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(mocap_dict, indent=4)
+                print("Mocap dict: ", formatted_dict)
+            else:
+                print("Mocap dict: ", mocap_dict)
 
         self.nmocap = len(mocap_dict)
 
@@ -58,8 +70,11 @@ class OrcaGymModel:
             actuator["ActuatorId"] = i
         self._actuator_dict = actuator_dict.copy()
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(actuator_dict, indent=4)
-            print("Actuator dict: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(actuator_dict, indent=4)
+                print("Actuator dict: ", formatted_dict)
+            else:
+                print("Actuator dict: ", actuator_dict)
 
     def get_actuator_dict(self):
         return self._actuator_dict
@@ -87,8 +102,11 @@ class OrcaGymModel:
             body["BodyId"] = i
         self._body_dict = body_dict.copy()
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(body_dict, indent=4)
-            print("Body dict: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(body_dict, indent=4)
+                print("Body dict: ", formatted_dict)
+            else:
+                print("Body dict: ", body_dict)
 
     def get_body_dict(self):
         return self._body_dict
@@ -116,8 +134,11 @@ class OrcaGymModel:
             joint["JointId"] = i
         self._joint_dict = joint_dict.copy()
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(joint_dict, indent=4)
-            print("Joint dict: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(joint_dict, indent=4)
+                print("Joint dict: ", formatted_dict)
+            else:
+                print("Joint dict: ", joint_dict)
 
     def get_joint_dict(self):
         return self._joint_dict
@@ -145,8 +166,11 @@ class OrcaGymModel:
             geom["GeomId"] = i
         self._geom_dict = geom_dict.copy()
         if self.PRINT_INIT_INFO:
-            formatted_dict = json.dumps(geom_dict, indent=4)
-            print("Geom dict: ", formatted_dict)
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(geom_dict, indent=4)
+                print("Geom dict: ", formatted_dict)
+            else:
+                print("Geom dict: ", geom_dict)
 
     def get_geom_dict(self):
         return self._geom_dict
