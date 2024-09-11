@@ -52,7 +52,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             **kwargs,
         )
 
-        self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0.00, 0.00])
+        self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0, 0, 0, 0])
 
         print("Opt Config before setting: ", self.gym.opt_config)
         # self.gym.opt_config["o_solref"] = [0.005, 0.9]
@@ -74,7 +74,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         # control range
         self.ctrl_range = self.model.get_actuator_ctrlrange()
         actuators_dict = self.model.get_actuator_dict()
-        self.gripper_force_limit = actuators_dict[self.actuator("actuator_gripper1")]["ForceRange"][1]
+        self.gripper_force_limit = 1 #actuators_dict[self.actuator("actuator_gripper1")]["ForceRange"][1]
         self.gripper_state = GripperState.STOPPED
 
         # index used to distinguish arm and gripper joints
@@ -216,14 +216,35 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             if contact_simple["Geom2"] in self.gripper_geom_ids:
                 contact_force_query_ids.append(contact_simple["ID"])
 
-        print("Contact force query ids: ", contact_force_query_ids)
+        # print("Contact force query ids: ", contact_force_query_ids)
         contact_force_dict = self.query_contact_force(contact_force_query_ids)
         return contact_force_dict
 
     def _set_gripper_ctrl(self, joystick_state) -> None:
+        MOVE_STEP = 0.001        
+        # if (joystick_state["buttons"]["A"]):
+        #     self.ctrl[6] += MOVE_STEP
+        #     self.ctrl[7] -= MOVE_STEP
+
+        #     self.ctrl[6] = np.clip(self.ctrl[6], self.ctrl_range[6][0], self.ctrl_range[6][1])
+        #     self.ctrl[7] = np.clip(self.ctrl[7], self.ctrl_range[7][0], self.ctrl_range[7][1])
+
+        #     print("Gripper closing at: ", self.ctrl[6], self.ctrl[7])
+        # elif (joystick_state["buttons"]["B"]):
+        #     self.ctrl[6] -= MOVE_STEP
+        #     self.ctrl[7] += MOVE_STEP
+
+        #     self.ctrl[6] = np.clip(self.ctrl[6], self.ctrl_range[6][0], self.ctrl_range[6][1])
+        #     self.ctrl[7] = np.clip(self.ctrl[7], self.ctrl_range[7][0], self.ctrl_range[7][1])
+            
+        #     print("Gripper opening at: ", self.ctrl[6], self.ctrl[7])            
+
+
         if (joystick_state["buttons"]["A"]):
             self.gripper_state = GripperState.CLOSING
+            print("Gripper closing at: ", self.ctrl[6], self.ctrl[7])
         elif (joystick_state["buttons"]["B"]):
+            print("Gripper opening at: ", self.ctrl[6], self.ctrl[7])
             self.gripper_state = GripperState.OPENNING
 
         if self.gripper_state == GripperState.CLOSING:
@@ -238,25 +259,32 @@ class RM65BJoystickEnv(MujocoRobotEnv):
                 self.gripper_state = GripperState.STOPPED
                 print("Gripper force limit reached. Stop gripper at: ", self.ctrl[6], self.ctrl[7])
 
-        MOVE_STEP = 0.0002
         if self.gripper_state == GripperState.CLOSING:
             self.ctrl[6] += MOVE_STEP
+            self.ctrl[8] -= MOVE_STEP
             self.ctrl[7] -= MOVE_STEP
+            self.ctrl[9] -= MOVE_STEP
             if self.ctrl[6] > self.ctrl_range[6][1]:
                 self.ctrl[6] = self.ctrl_range[6][1]
                 self.gripper_state = GripperState.STOPPED
+                print("Gripper Stop at: ", self.ctrl[6], self.ctrl[7])
             if self.ctrl[7] < self.ctrl_range[7][0]:
                 self.ctrl[7] = self.ctrl_range[7][0]
                 self.gripper_state = GripperState.STOPPED
+                print("Gripper Stop at: ", self.ctrl[6], self.ctrl[7])
         elif self.gripper_state == GripperState.OPENNING:
             self.ctrl[6] -= MOVE_STEP
+            self.ctrl[8] += MOVE_STEP
             self.ctrl[7] += MOVE_STEP
+            self.ctrl[9] += MOVE_STEP
             if self.ctrl[6] < self.ctrl_range[6][0]:
                 self.ctrl[6] = self.ctrl_range[6][0]
                 self.gripper_state = GripperState.STOPPED
+                print("Gripper Stop at: ", self.ctrl[6], self.ctrl[7])
             if self.ctrl[7] > self.ctrl_range[7][1]:
                 self.ctrl[7] = self.ctrl_range[7][1]
                 self.gripper_state = GripperState.STOPPED
+                print("Gripper Stop at: ", self.ctrl[6], self.ctrl[7])
 
     def _load_record(self) -> None:
         if self.record_file is None:
