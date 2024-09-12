@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--grpc_address', type=str, required=True, help='The gRPC address for the simulation')
     args = parser.parse_args()
 
-    grpc_address = f"{args.grpc_address}:50051"
+    grpc_address = f"{args.grpc_address}"
 
     simulation_frequency = 500
     time_step = 1.0 / simulation_frequency
