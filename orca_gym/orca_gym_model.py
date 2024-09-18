@@ -24,6 +24,7 @@ class OrcaGymModel:
         self._actuator_dict = None
         self._body_dict = None
         self._joint_dict = None
+        self._site_dict = None
         self._init_time = datetime.now()
         
     def init_model_info(self, model_info):
@@ -210,6 +211,38 @@ class OrcaGymModel:
             actuator_ctrlrange[actuator_name] = actuator["CtrlRange"]
         ctrlrange = np.array(list(actuator_ctrlrange.values()))
         return ctrlrange
+    
+    def init_site_dict(self, site_dict):
+        for i, (site_name, site) in enumerate(site_dict.items()):
+            site["SiteId"] = i
+        self._site_dict = site_dict.copy()
+        if self.PRINT_INIT_INFO:
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(site_dict, indent=4)
+                print("Site dict: ", formatted_dict)
+            else:
+                print("Site dict: ", site_dict)
+
+    def get_site_dict(self):
+        return self._site_dict
+    
+    def get_site(self, site_name:str):
+        return self._site_dict[site_name]
+    
+    def get_site(self, site_id:int):
+        site_name = self.site_id2name(site_id)
+        if site_name is not None:
+            return self._site_dict[site_name]
+        return None
+    
+    def site_name2id(self, site_name):
+        return self._site_dict[site_name]["SiteId"]
+    
+    def site_id2name(self, site_id):
+        for site_name, site in self._site_dict.items():
+            if site["SiteId"] == site_id:
+                return site_name
+        return None
         
 
     # def stip_agent_name(self, org_name):

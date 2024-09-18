@@ -24,6 +24,7 @@ service GrpcService {
   rpc QueryAllGeoms (QueryAllGeomsRequest) returns (QueryAllGeomsResponse);
   rpc QueryAllMocapBodies (QueryAllMocapBodiesRequest) returns (QueryAllMocapBodiesResponse);
   rpc QueryAllEqualityConstraints (QueryAllEqualityConstraintsRequest) returns (QueryAllEqualityConstraintsResponse);
+  rpc QueryAllSites (QueryAllSitesRequest) returns (QueryAllSitesResponse);
 
   // Data 查询
   rpc QueryAllQposQvelQacc(QueryAllQposQvelQaccRequest) returns (QueryAllQposQvelQaccResponse);
@@ -924,4 +925,20 @@ message QueryJointOffsetsResponse {
     }
 
     repeated JointOffset joint_offsets = 1;  // 对应的关节偏移量数组
+}
+
+message QueryAllSitesRequest {}
+
+message QueryAllSitesResponse {
+    message SiteInfo {
+        string name = 1;
+        int32 id = 2;
+        repeated double pos = 3;        // Site position in the global frame
+        repeated double mat = 4;        // Site orientation matrix in the global frame
+        int32 site_bodyid = 5;         // Body ID the site is attached to
+        int32 site_type = 6;           // Geom type for rendering
+        repeated double local_pos = 7;  // Local position offset relative to the body
+        repeated double local_quat = 8; // Local orientation offset relative to the body
+    }  
+    repeated SiteInfo site_info = 1;
 }

@@ -20,7 +20,7 @@ import os
 import platform
 import subprocess
 
-import robosuite.macros as macros
+import orca_gym.robosuite.macros as macros
 
 _SYSTEM = platform.system()
 if _SYSTEM == "Windows":
@@ -53,11 +53,11 @@ if _MUJOCO_GL not in ("disable", "disabled", "off", "false", "0"):
     if _MUJOCO_GL not in _VALID_MUJOCO_GL:
         raise RuntimeError(f"invalid value for environment variable MUJOCO_GL: {_MUJOCO_GL}")
     if _SYSTEM == "Linux" and _MUJOCO_GL == "osmesa":
-        from robosuite.renderers.context.osmesa_context import OSMesaGLContext as GLContext
+        from orca_gym.robosuite.renderers.context.osmesa_context import OSMesaGLContext as GLContext
     elif _SYSTEM == "Linux" and _MUJOCO_GL == "egl":
-        from robosuite.renderers.context.egl_context import EGLGLContext as GLContext
+        from orca_gym.robosuite.renderers.context.egl_context import EGLGLContext as GLContext
     else:
-        from robosuite.renderers.context.glfw_context import GLFWGLContext as GLContext
+        from orca_gym.robosuite.renderers.context.glfw_context import GLFWGLContext as GLContext
 
 
 class MjRenderContext:

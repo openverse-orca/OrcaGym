@@ -1,6 +1,6 @@
 import numpy as np
 
-from robosuite.controllers.base_controller import Controller
+from orca_gym.robosuite.controllers.base_controller import Controller
 
 
 class JointTorqueController(Controller):

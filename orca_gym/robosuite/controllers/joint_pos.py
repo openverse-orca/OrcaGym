@@ -1,7 +1,7 @@
 import numpy as np
 
-from robosuite.controllers.base_controller import Controller
-from robosuite.utils.control_utils import *
+from orca_gym.robosuite.controllers.base_controller import Controller
+from orca_gym.robosuite.utils.control_utils import *
 
 # Supported impedance modes
 IMPEDANCE_MODES = {"fixed", "variable", "variable_kp"}

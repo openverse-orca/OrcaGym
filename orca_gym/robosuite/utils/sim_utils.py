@@ -2,7 +2,7 @@
 Collection of useful simulation utilities
 """
 
-from robosuite.models.base import MujocoModel
+from orca_gym.robosuite.models.base import MujocoModel
 
 
 def check_contact(sim, geoms_1, geoms_2=None):

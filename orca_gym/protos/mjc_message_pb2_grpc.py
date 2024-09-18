@@ -99,6 +99,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.QueryAllEqualityConstraintsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.QueryAllEqualityConstraintsResponse.FromString,
                 _registered_method=True)
+        self.QueryAllSites = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryAllSites',
+                request_serializer=mjc__message__pb2.QueryAllSitesRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryAllSitesResponse.FromString,
+                _registered_method=True)
         self.QueryAllQposQvelQacc = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryAllQposQvelQacc',
                 request_serializer=mjc__message__pb2.QueryAllQposQvelQaccRequest.SerializeToString,
@@ -441,6 +446,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def QueryAllEqualityConstraints(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryAllSites(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -831,6 +842,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QueryAllEqualityConstraints,
                     request_deserializer=mjc__message__pb2.QueryAllEqualityConstraintsRequest.FromString,
                     response_serializer=mjc__message__pb2.QueryAllEqualityConstraintsResponse.SerializeToString,
+            ),
+            'QueryAllSites': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryAllSites,
+                    request_deserializer=mjc__message__pb2.QueryAllSitesRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryAllSitesResponse.SerializeToString,
             ),
             'QueryAllQposQvelQacc': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryAllQposQvelQacc,
@@ -1444,6 +1460,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QueryAllEqualityConstraints',
             mjc__message__pb2.QueryAllEqualityConstraintsRequest.SerializeToString,
             mjc__message__pb2.QueryAllEqualityConstraintsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryAllSites(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryAllSites',
+            mjc__message__pb2.QueryAllSitesRequest.SerializeToString,
+            mjc__message__pb2.QueryAllSitesResponse.FromString,
             options,
             channel_credentials,
             insecure,

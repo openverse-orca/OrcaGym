@@ -56,6 +56,8 @@ class OrcaGym:
         self.model.init_joint_dict(joint_dict)
         geom_dict = await self.query_all_geoms()
         self.model.init_geom_dict(geom_dict)
+        site_dict = await self.query_all_sites()
+        self.model.init_site_dict(site_dict)
 
         self.data = OrcaGymData(self.model)
         await self.update_data()
@@ -590,14 +592,14 @@ class OrcaGym:
 
         return equality_constraints
     
-    async def query_site_pos_and_mat(self, site_names):
+    async def query_site_pos_and_mat(self, site_names: list[str]):
         request = mjc_message_pb2.QuerySitePosAndMatRequest(site_names=site_names)
         response = await self.stub.QuerySitePosAndMat(request)
         site_pos_and_mat = {site.site_name: {"xpos": np.array(list(site.xpos)), "xmat": np.array(list(site.xmat))} for site in response.site_pos_and_mat}
         return site_pos_and_mat
     
     
-    async def mj_jac_site(self, site_names):
+    async def mj_jac_site(self, site_names: list[str]):
         request = mjc_message_pb2.QuerySiteJacRequest(site_names=site_names)
         response = await self.stub.QuerySiteJac(request)
         site_jacs_dict = {}
@@ -840,3 +842,20 @@ class OrcaGym:
                     break
 
         return qpos_offsets, qvel_offsets, qacc_offsets    
+    
+    async def query_all_sites(self):
+        request = mjc_message_pb2.QueryAllSitesRequest()
+        response = await self.stub.QueryAllSites(request)
+        site_dict = {
+            site.name: {
+                "ID": site.id,
+                "BodyID": site.site_bodyid,
+                "Type": site.site_type,
+                "Pos": np.array(site.pos),
+                "Mat": np.array(site.mat),
+                "LocalPos": np.array(site.local_pos),
+                "LocalQuat": np.array(site.local_quat)
+            }
+            for site in response.site_info
+        }
+        return site_dict    

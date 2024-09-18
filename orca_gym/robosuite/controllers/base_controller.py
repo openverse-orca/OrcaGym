@@ -4,7 +4,8 @@ from collections.abc import Iterable
 from orca_gym.orca_gym import OrcaGym
 import numpy as np
 
-import robosuite.macros as macros
+import orca_gym.robosuite.macros as macros
+import asyncio
 
 
 class Controller(object, metaclass=abc.ABCMeta):
@@ -35,6 +36,8 @@ class Controller(object, metaclass=abc.ABCMeta):
         joint_indexes,
         actuator_range,
     ):
+        # Initialize asyncio event loop
+        self.loop = asyncio.get_event_loop()
 
         # Actuator range
         self.actuator_min = actuator_range[0]
@@ -54,7 +57,7 @@ class Controller(object, metaclass=abc.ABCMeta):
 
         # mujoco simulator state
         self.sim = sim
-        self.model_timestep = sim.model.opt.timestep   #macros.SIMULATION_TIMESTEP
+        self.model_timestep = sim.opt.timestep   #macros.SIMULATION_TIMESTEP
         self.eef_name = eef_name
         self.joint_index = joint_indexes["joints"]
         self.qpos_index = joint_indexes["qpos"]
@@ -84,7 +87,7 @@ class Controller(object, metaclass=abc.ABCMeta):
         self.new_update = True
 
         # Move forward one timestep to propagate updates before taking first update
-        self.sim.forward()
+        self.loop.run_until_complete(self.sim.mj_forward())
 
         # Initialize controller by updating internal state and setting the initial joint, pos, and ori
         self.update()
@@ -136,25 +139,53 @@ class Controller(object, metaclass=abc.ABCMeta):
 
         # Only run update if self.new_update or force flag is set
         if self.new_update or force:
-            self.sim.forward()
 
-            self.ee_pos = np.array(self.sim.data.site_xpos[self.sim.model.site_name2id(self.eef_name)])
-            self.ee_ori_mat = np.array(
-                self.sim.data.site_xmat[self.sim.model.site_name2id(self.eef_name)].reshape([3, 3])
-            )
-            self.ee_pos_vel = np.array(self.sim.data.get_site_xvelp(self.eef_name))
-            self.ee_ori_vel = np.array(self.sim.data.get_site_xvelr(self.eef_name))
+            # 组合下发多个异步请求
+            async def _combined_update():
+                # 首先保障forward完成
+                await self.sim.mj_forward()
+
+                # 信息可以并行查询
+                ee_pos, ee_ori_mat, jacp, jacr, mass_matrix = await asyncio.gather(
+                    self.sim.query_site_pos_and_mat([self.eef_name]),
+                    self.sim.mj_jac_site([self.eef_name]),
+                    self.sim.calc_full_mass_matrix())
+                
+                return ee_pos, ee_ori_mat, jacp, jacr, mass_matrix
+                
+            ee_pos, ee_ori_mat, jacp, jacr, mass_matrix = self.loop.run_until_complete(_combined_update())
+
+            self.ee_pos = ee_pos
+            self.ee_ori_mat = ee_ori_mat.reshape((3, 3))
+
+            # self.ee_pos = np.array(self.sim.data.site_xpos[self.sim.model.site_name2id(self.eef_name)])
+            # self.ee_ori_mat = np.array(
+            #     self.sim.data.site_xmat[self.sim.model.site_name2id(self.eef_name)].reshape([3, 3])
+            # )
+
+            jacp = jacp.reshape((3, -1))
+            jacr = jacr.reshape((3, -1))
+            self.ee_pos_vel = np.dot(jacp, self.sim.data.qvel)
+            self.ee_ori_vel = np.dot(jacr, self.sim.data.qvel)
+
+            # self.ee_pos_vel = np.array(self.sim.data.get_site_xvelp(self.eef_name))
+            # self.ee_ori_vel = np.array(self.sim.data.get_site_xvelr(self.eef_name))
 
             self.joint_pos = np.array(self.sim.data.qpos[self.qpos_index])
             self.joint_vel = np.array(self.sim.data.qvel[self.qvel_index])
 
-            self.J_pos = np.array(self.sim.data.get_site_jacp(self.eef_name).reshape((3, -1))[:, self.qvel_index])
-            self.J_ori = np.array(self.sim.data.get_site_jacr(self.eef_name).reshape((3, -1))[:, self.qvel_index])
+            self.J_pos = np.array(jacp[:, self.qvel_index])
+            self.J_ori = np.array(jacr[:, self.qvel_index])
+
+            # self.J_pos = np.array(self.sim.data.get_site_jacp(self.eef_name).reshape((3, -1))[:, self.qvel_index])
+            # self.J_ori = np.array(self.sim.data.get_site_jacr(self.eef_name).reshape((3, -1))[:, self.qvel_index])
+
             self.J_full = np.array(np.vstack([self.J_pos, self.J_ori]))
 
-            mass_matrix = np.ndarray(shape=(self.sim.model.nv, self.sim.model.nv), dtype=np.float64, order="C")
-            mujoco.mj_fullM(self.sim.model._model, mass_matrix, self.sim.data.qM)
-            mass_matrix = np.reshape(mass_matrix, (len(self.sim.data.qvel), len(self.sim.data.qvel)))
+            # mass_matrix = np.ndarray(shape=(self.sim.model.nv, self.sim.model.nv), dtype=np.float64, order="C")
+            # mujoco.mj_fullM(self.sim.model._model, mass_matrix, self.sim.data.qM)
+            # mass_matrix = np.reshape(mass_matrix, (len(self.sim.data.qvel), len(self.sim.data.qvel)))
+
             self.mass_matrix = mass_matrix[self.qvel_index, :][:, self.qvel_index]
 
             # Clear self.new_update

@@ -1,5 +1,5 @@
-class robosuiteError(Exception):
-    """Base class for exceptions in robosuite."""
+class orca_gym.robosuite.rror(Exception):
+    """Base class for exceptions in orca_gym.robosuite."""
 
     pass
 

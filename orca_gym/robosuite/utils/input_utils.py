@@ -4,11 +4,11 @@ Utility functions for grabbing user inputs
 
 import numpy as np
 
-import robosuite as suite
-import robosuite.utils.transform_utils as T
-from robosuite.devices import *
-from robosuite.models.robots import *
-from robosuite.robots import *
+import orca_gym.robosuite.as suite
+import orca_gym.robosuite.utils.transform_utils as T
+from orca_gym.robosuite.devices import *
+from orca_gym.robosuite.models.robots import *
+from orca_gym.robosuite.robots import *
 
 
 def choose_environment():

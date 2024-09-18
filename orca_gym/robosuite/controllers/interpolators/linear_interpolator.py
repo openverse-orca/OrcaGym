@@ -1,7 +1,7 @@
 import numpy as np
 
-import robosuite.utils.transform_utils as T
-from robosuite.controllers.interpolators.base_interpolator import Interpolator
+import orca_gym.robosuite.utils.transform_utils as T
+from orca_gym.robosuite.controllers.interpolators.base_interpolator import Interpolator
 
 
 class LinearInterpolator(Interpolator):

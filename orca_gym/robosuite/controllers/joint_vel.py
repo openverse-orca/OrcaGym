@@ -1,7 +1,7 @@
 import numpy as np
 
-from robosuite.controllers.base_controller import Controller
-from robosuite.utils.buffers import RingBuffer
+from orca_gym.robosuite.controllers.base_controller import Controller
+from orca_gym.robosuite.utils.buffers import RingBuffer
 
 
 class JointVelocityController(Controller):

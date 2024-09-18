@@ -2,9 +2,9 @@ import math
 
 import numpy as np
 
-import robosuite.utils.transform_utils as T
-from robosuite.controllers.base_controller import Controller
-from robosuite.utils.control_utils import *
+import orca_gym.robosuite.utils.transform_utils as T
+from orca_gym.robosuite.controllers.base_controller import Controller
+from orca_gym.robosuite.utils.control_utils import *
 
 # Supported impedance modes
 IMPEDANCE_MODES = {"fixed", "variable", "variable_kp"}
