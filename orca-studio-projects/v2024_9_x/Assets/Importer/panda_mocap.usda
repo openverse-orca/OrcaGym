@@ -11,7 +11,7 @@ def PhysicsScene "physicsScene"
     custom string integrator = "implicitfast"
     vector3f physics:gravityDirection = (0, 0, -1)
     float physics:gravityMagnitude = 9.81
-    custom float timestep = 0.001
+    custom float timestep = 0.003333333
     custom float viscosity = 0.000018
 }
 
@@ -277,7 +277,7 @@ def Xform "rootPrim"
             {
                 def "_geom_4" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_4.usda@
+                    prepend payload = @panda_mocap/_geom_4.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_off_white>
@@ -543,7 +543,7 @@ def Xform "rootPrim"
 
                 def "_geom_5" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_5.usda@
+                    prepend payload = @panda_mocap/_geom_5.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_black>
@@ -553,7 +553,7 @@ def Xform "rootPrim"
 
                 def "_geom_6" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_6.usda@
+                    prepend payload = @panda_mocap/_geom_6.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_off_white_1>
@@ -563,7 +563,7 @@ def Xform "rootPrim"
 
                 def "_geom_7" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_7.usda@
+                    prepend payload = @panda_mocap/_geom_7.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_black_1>
@@ -573,7 +573,7 @@ def Xform "rootPrim"
 
                 def "_geom_8" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_8.usda@
+                    prepend payload = @panda_mocap/_geom_8.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_off_white_2>
@@ -583,7 +583,7 @@ def Xform "rootPrim"
 
                 def "_geom_9" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_9.usda@
+                    prepend payload = @panda_mocap/_geom_9.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_black_2>
@@ -593,7 +593,7 @@ def Xform "rootPrim"
 
                 def "_geom_10" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_10.usda@
+                    prepend payload = @panda_mocap/_geom_10.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_white>
@@ -603,7 +603,7 @@ def Xform "rootPrim"
 
                 def "_geom_11" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_11.usda@
+                    prepend payload = @panda_mocap/_geom_11.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_white_1>
@@ -613,7 +613,7 @@ def Xform "rootPrim"
 
                 def "_geom_12" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_12.usda@
+                    prepend payload = @panda_mocap/_geom_12.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_black_3>
@@ -623,7 +623,7 @@ def Xform "rootPrim"
 
                 def "_geom_13" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_13.usda@
+                    prepend payload = @panda_mocap/_geom_13.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_off_white_3>
@@ -633,7 +633,7 @@ def Xform "rootPrim"
 
                 def "_geom_14" (
                     prepend apiSchemas = ["MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_14.usda@
+                    prepend payload = @panda_mocap/_geom_14.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/visuals/Looks/material_white_2>
@@ -646,7 +646,7 @@ def Xform "rootPrim"
             {
                 def "_geom_15" (
                     prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                    prepend payload = @panda_mocap\_geom_15.usda@
+                    prepend payload = @panda_mocap/_geom_15.usda@
                 )
                 {
                     rel material:binding = </rootPrim/link0/link0/collisions/Looks/material_rgba>
@@ -699,7 +699,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_16" (
                         prepend apiSchemas = ["MaterialBindingAPI"]
-                        prepend payload = @panda_mocap\_geom_16.usda@
+                        prepend payload = @panda_mocap/_geom_16.usda@
                     )
                     {
                         rel material:binding = </rootPrim/link0/link0/link1/visuals/Looks/material_white>
@@ -738,7 +738,7 @@ def Xform "rootPrim"
                 {
                     def "_geom_17" (
                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                        prepend payload = @panda_mocap\_geom_17.usda@
+                        prepend payload = @panda_mocap/_geom_17.usda@
                     )
                     {
                         rel material:binding = </rootPrim/link0/link0/link1/collisions/Looks/material_rgba>
@@ -819,7 +819,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_18" (
                             prepend apiSchemas = ["MaterialBindingAPI"]
-                            prepend payload = @panda_mocap\_geom_18.usda@
+                            prepend payload = @panda_mocap/_geom_18.usda@
                         )
                         {
                             rel material:binding = </rootPrim/link0/link0/link1/link2/visuals/Looks/material_white>
@@ -858,7 +858,7 @@ def Xform "rootPrim"
                     {
                         def "_geom_19" (
                             prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                            prepend payload = @panda_mocap\_geom_19.usda@
+                            prepend payload = @panda_mocap/_geom_19.usda@
                         )
                         {
                             rel material:binding = </rootPrim/link0/link0/link1/link2/collisions/Looks/material_rgba>
@@ -939,7 +939,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_20" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @panda_mocap\_geom_20.usda@
+                                prepend payload = @panda_mocap/_geom_20.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/visuals/Looks/material_white>
@@ -1044,7 +1044,7 @@ def Xform "rootPrim"
 
                             def "_geom_21" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @panda_mocap\_geom_21.usda@
+                                prepend payload = @panda_mocap/_geom_21.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/visuals/Looks/material_white_1>
@@ -1054,7 +1054,7 @@ def Xform "rootPrim"
 
                             def "_geom_22" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @panda_mocap\_geom_22.usda@
+                                prepend payload = @panda_mocap/_geom_22.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/visuals/Looks/material_white_2>
@@ -1064,7 +1064,7 @@ def Xform "rootPrim"
 
                             def "_geom_23" (
                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                prepend payload = @panda_mocap\_geom_23.usda@
+                                prepend payload = @panda_mocap/_geom_23.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/visuals/Looks/material_black>
@@ -1077,7 +1077,7 @@ def Xform "rootPrim"
                         {
                             def "_geom_24" (
                                 prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                prepend payload = @panda_mocap\_geom_24.usda@
+                                prepend payload = @panda_mocap/_geom_24.usda@
                             )
                             {
                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/collisions/Looks/material_rgba>
@@ -1158,7 +1158,7 @@ def Xform "rootPrim"
                             {
                                 def "_geom_25" (
                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                    prepend payload = @panda_mocap\_geom_25.usda@
+                                    prepend payload = @panda_mocap/_geom_25.usda@
                                 )
                                 {
                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/visuals/Looks/material_white>
@@ -1263,7 +1263,7 @@ def Xform "rootPrim"
 
                                 def "_geom_26" (
                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                    prepend payload = @panda_mocap\_geom_26.usda@
+                                    prepend payload = @panda_mocap/_geom_26.usda@
                                 )
                                 {
                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/visuals/Looks/material_white_1>
@@ -1273,7 +1273,7 @@ def Xform "rootPrim"
 
                                 def "_geom_27" (
                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                    prepend payload = @panda_mocap\_geom_27.usda@
+                                    prepend payload = @panda_mocap/_geom_27.usda@
                                 )
                                 {
                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/visuals/Looks/material_black>
@@ -1283,7 +1283,7 @@ def Xform "rootPrim"
 
                                 def "_geom_28" (
                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                    prepend payload = @panda_mocap\_geom_28.usda@
+                                    prepend payload = @panda_mocap/_geom_28.usda@
                                 )
                                 {
                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/visuals/Looks/material_white_2>
@@ -1296,7 +1296,7 @@ def Xform "rootPrim"
                             {
                                 def "_geom_29" (
                                     prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                    prepend payload = @panda_mocap\_geom_29.usda@
+                                    prepend payload = @panda_mocap/_geom_29.usda@
                                 )
                                 {
                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/collisions/Looks/material_rgba>
@@ -1351,7 +1351,7 @@ def Xform "rootPrim"
                                     point3f physics:localPos1 = (0, 0, 0)
                                     quatf physics:localRot0 = (0.99999994, 0, 0, 0)
                                     quatf physics:localRot1 = (0.99999994, 0, 0, 0)
-                                    float physics:lowerLimit = -176.00116
+                                    float physics:lowerLimit = -176.00117
                                     float physics:upperLimit = -3.999245
                                     float physxJoint:armature = 0.1
                                     float physxLimit:X:damping = 1
@@ -1377,7 +1377,7 @@ def Xform "rootPrim"
                                 {
                                     def "_geom_30" (
                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_30.usda@
+                                        prepend payload = @panda_mocap/_geom_30.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/visuals/Looks/material_black>
@@ -1459,7 +1459,7 @@ def Xform "rootPrim"
 
                                     def "_geom_31" (
                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_31.usda@
+                                        prepend payload = @panda_mocap/_geom_31.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/visuals/Looks/material_white>
@@ -1469,7 +1469,7 @@ def Xform "rootPrim"
 
                                     def "_geom_32" (
                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_32.usda@
+                                        prepend payload = @panda_mocap/_geom_32.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/visuals/Looks/material_white_1>
@@ -1482,7 +1482,7 @@ def Xform "rootPrim"
                                 {
                                     def "_geom_33" (
                                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_33.usda@
+                                        prepend payload = @panda_mocap/_geom_33.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/collisions/Looks/material_rgba>
@@ -1560,7 +1560,7 @@ def Xform "rootPrim"
 
                                     def "_geom_34" (
                                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_34.usda@
+                                        prepend payload = @panda_mocap/_geom_34.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/collisions/Looks/material_rgba_1>
@@ -1572,7 +1572,7 @@ def Xform "rootPrim"
 
                                     def "_geom_35" (
                                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                        prepend payload = @panda_mocap\_geom_35.usda@
+                                        prepend payload = @panda_mocap/_geom_35.usda@
                                     )
                                     {
                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/collisions/Looks/material_rgba_2>
@@ -1629,7 +1629,7 @@ def Xform "rootPrim"
                                     {
                                         def "_geom_36" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_36.usda@
+                                            prepend payload = @panda_mocap/_geom_36.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_off_white>
@@ -2033,7 +2033,7 @@ def Xform "rootPrim"
 
                                         def "_geom_37" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_37.usda@
+                                            prepend payload = @panda_mocap/_geom_37.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white>
@@ -2043,7 +2043,7 @@ def Xform "rootPrim"
 
                                         def "_geom_38" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_38.usda@
+                                            prepend payload = @panda_mocap/_geom_38.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_black>
@@ -2053,7 +2053,7 @@ def Xform "rootPrim"
 
                                         def "_geom_39" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_39.usda@
+                                            prepend payload = @panda_mocap/_geom_39.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_1>
@@ -2063,7 +2063,7 @@ def Xform "rootPrim"
 
                                         def "_geom_40" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_40.usda@
+                                            prepend payload = @panda_mocap/_geom_40.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_2>
@@ -2073,7 +2073,7 @@ def Xform "rootPrim"
 
                                         def "_geom_41" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_41.usda@
+                                            prepend payload = @panda_mocap/_geom_41.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_3>
@@ -2083,7 +2083,7 @@ def Xform "rootPrim"
 
                                         def "_geom_42" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_42.usda@
+                                            prepend payload = @panda_mocap/_geom_42.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_4>
@@ -2093,7 +2093,7 @@ def Xform "rootPrim"
 
                                         def "_geom_43" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_43.usda@
+                                            prepend payload = @panda_mocap/_geom_43.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_light_blue>
@@ -2103,7 +2103,7 @@ def Xform "rootPrim"
 
                                         def "_geom_44" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_44.usda@
+                                            prepend payload = @panda_mocap/_geom_44.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_light_blue_1>
@@ -2113,7 +2113,7 @@ def Xform "rootPrim"
 
                                         def "_geom_45" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_45.usda@
+                                            prepend payload = @panda_mocap/_geom_45.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_black_1>
@@ -2123,7 +2123,7 @@ def Xform "rootPrim"
 
                                         def "_geom_46" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_46.usda@
+                                            prepend payload = @panda_mocap/_geom_46.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_black_2>
@@ -2133,7 +2133,7 @@ def Xform "rootPrim"
 
                                         def "_geom_47" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_47.usda@
+                                            prepend payload = @panda_mocap/_geom_47.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_5>
@@ -2143,7 +2143,7 @@ def Xform "rootPrim"
 
                                         def "_geom_48" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_48.usda@
+                                            prepend payload = @panda_mocap/_geom_48.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_green>
@@ -2153,7 +2153,7 @@ def Xform "rootPrim"
 
                                         def "_geom_49" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_49.usda@
+                                            prepend payload = @panda_mocap/_geom_49.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_6>
@@ -2163,7 +2163,7 @@ def Xform "rootPrim"
 
                                         def "_geom_50" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_50.usda@
+                                            prepend payload = @panda_mocap/_geom_50.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_black_3>
@@ -2173,7 +2173,7 @@ def Xform "rootPrim"
 
                                         def "_geom_51" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_51.usda@
+                                            prepend payload = @panda_mocap/_geom_51.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_black_4>
@@ -2183,7 +2183,7 @@ def Xform "rootPrim"
 
                                         def "_geom_52" (
                                             prepend apiSchemas = ["MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_52.usda@
+                                            prepend payload = @panda_mocap/_geom_52.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/visuals/Looks/material_white_7>
@@ -2196,7 +2196,7 @@ def Xform "rootPrim"
                                     {
                                         def "_geom_53" (
                                             prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                            prepend payload = @panda_mocap\_geom_53.usda@
+                                            prepend payload = @panda_mocap/_geom_53.usda@
                                         )
                                         {
                                             rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/collisions/Looks/material_rgba>
@@ -2277,7 +2277,7 @@ def Xform "rootPrim"
                                         {
                                             def "_geom_54" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_54.usda@
+                                                prepend payload = @panda_mocap/_geom_54.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_white>
@@ -2474,7 +2474,7 @@ def Xform "rootPrim"
 
                                             def "_geom_55" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_55.usda@
+                                                prepend payload = @panda_mocap/_geom_55.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black>
@@ -2484,7 +2484,7 @@ def Xform "rootPrim"
 
                                             def "_geom_56" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_56.usda@
+                                                prepend payload = @panda_mocap/_geom_56.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black_1>
@@ -2494,7 +2494,7 @@ def Xform "rootPrim"
 
                                             def "_geom_57" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_57.usda@
+                                                prepend payload = @panda_mocap/_geom_57.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black_2>
@@ -2504,7 +2504,7 @@ def Xform "rootPrim"
 
                                             def "_geom_58" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_58.usda@
+                                                prepend payload = @panda_mocap/_geom_58.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black_3>
@@ -2514,7 +2514,7 @@ def Xform "rootPrim"
 
                                             def "_geom_59" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_59.usda@
+                                                prepend payload = @panda_mocap/_geom_59.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black_4>
@@ -2524,7 +2524,7 @@ def Xform "rootPrim"
 
                                             def "_geom_60" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_60.usda@
+                                                prepend payload = @panda_mocap/_geom_60.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_black_5>
@@ -2534,7 +2534,7 @@ def Xform "rootPrim"
 
                                             def "_geom_61" (
                                                 prepend apiSchemas = ["MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_61.usda@
+                                                prepend payload = @panda_mocap/_geom_61.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/visuals/Looks/material_white_1>
@@ -2547,7 +2547,7 @@ def Xform "rootPrim"
                                         {
                                             def "_geom_62" (
                                                 prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                                prepend payload = @panda_mocap\_geom_62.usda@
+                                                prepend payload = @panda_mocap/_geom_62.usda@
                                             )
                                             {
                                                 rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/collisions/Looks/material_rgba>
@@ -2628,7 +2628,7 @@ def Xform "rootPrim"
                                             {
                                                 def "_geom_63" (
                                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_63.usda@
+                                                    prepend payload = @panda_mocap/_geom_63.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/visuals/Looks/material_off_white>
@@ -2756,7 +2756,7 @@ def Xform "rootPrim"
 
                                                 def "_geom_64" (
                                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_64.usda@
+                                                    prepend payload = @panda_mocap/_geom_64.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/visuals/Looks/material_black>
@@ -2766,7 +2766,7 @@ def Xform "rootPrim"
 
                                                 def "_geom_65" (
                                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_65.usda@
+                                                    prepend payload = @panda_mocap/_geom_65.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/visuals/Looks/material_black_1>
@@ -2776,7 +2776,7 @@ def Xform "rootPrim"
 
                                                 def "_geom_66" (
                                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_66.usda@
+                                                    prepend payload = @panda_mocap/_geom_66.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/visuals/Looks/material_white>
@@ -2786,7 +2786,7 @@ def Xform "rootPrim"
 
                                                 def "_geom_67" (
                                                     prepend apiSchemas = ["MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_67.usda@
+                                                    prepend payload = @panda_mocap/_geom_67.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/visuals/Looks/material_off_white_1>
@@ -2799,7 +2799,7 @@ def Xform "rootPrim"
                                             {
                                                 def "_geom_68" (
                                                     prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                                    prepend payload = @panda_mocap\_geom_68.usda@
+                                                    prepend payload = @panda_mocap/_geom_68.usda@
                                                 )
                                                 {
                                                     rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/collisions/Looks/material_rgba>
@@ -2940,7 +2940,7 @@ def Xform "rootPrim"
                                                 {
                                                     def "_geom_69" (
                                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_69.usda@
+                                                        prepend payload = @panda_mocap/_geom_69.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/left_finger/visuals/Looks/material_off_white>
@@ -2999,7 +2999,7 @@ def Xform "rootPrim"
 
                                                     def "_geom_70" (
                                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_70.usda@
+                                                        prepend payload = @panda_mocap/_geom_70.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/left_finger/visuals/Looks/material_black>
@@ -3012,7 +3012,7 @@ def Xform "rootPrim"
                                                 {
                                                     def "_geom_71" (
                                                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_71.usda@
+                                                        prepend payload = @panda_mocap/_geom_71.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/left_finger/collisions/Looks/material_rgba>
@@ -3364,7 +3364,7 @@ def Xform "rootPrim"
                                                 {
                                                     def "_geom_77" (
                                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_77.usda@
+                                                        prepend payload = @panda_mocap/_geom_77.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/right_finger/visuals/Looks/material_off_white>
@@ -3423,7 +3423,7 @@ def Xform "rootPrim"
 
                                                     def "_geom_78" (
                                                         prepend apiSchemas = ["MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_78.usda@
+                                                        prepend payload = @panda_mocap/_geom_78.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/right_finger/visuals/Looks/material_black>
@@ -3436,7 +3436,7 @@ def Xform "rootPrim"
                                                 {
                                                     def "_geom_79" (
                                                         prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
-                                                        prepend payload = @panda_mocap\_geom_79.usda@
+                                                        prepend payload = @panda_mocap/_geom_79.usda@
                                                     )
                                                     {
                                                         rel material:binding = </rootPrim/link0/link0/link1/link2/link3/link4/link5/link6/link7/hand/right_finger/collisions/Looks/material_rgba>

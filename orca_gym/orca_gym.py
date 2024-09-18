@@ -15,12 +15,16 @@ from datetime import datetime
 
 from orca_gym.orca_gym_model import OrcaGymModel
 from orca_gym.orca_gym_data import OrcaGymData
+from orca_gym.orca_gym_opt_config import OrcaGymOptConfig
 
 class OrcaGym:
+    """
+    OrcaGym class
+    """
     def __init__(self, stub):
         self.stub = stub
         self.model = None
-        self.opt_config = None
+        self.opt = None
     
 
     # async def query_agents(self):
@@ -32,7 +36,8 @@ class OrcaGym:
     #     self.model.update_actuator_info(actuator_info_list)
 
     async def init_simulation(self):
-        self.opt_config = await self.query_opt_config()
+        opt_config = await self.query_opt_config()
+        self.opt = OrcaGymOptConfig(opt_config)
         self.print_opt_config()
 
         model_info = await self.query_model_info()
@@ -56,12 +61,13 @@ class OrcaGym:
         await self.update_data()
 
     def print_opt_config(self):
-        print("Opt config: ", f"timestep:{self.opt_config['timestep']}", 
-              f"iterations:{self.opt_config['iterations']}", 
-              f"noslip_iterations:{self.opt_config['noslip_iterations']}",
-              f"mpr_iterations:{self.opt_config['mpr_iterations']}",
-              f"sdf_iterations:{self.opt_config['sdf_iterations']}",
-              f"gravity:{self.opt_config['gravity']}",)
+        print("Opt config: ", 
+              f"timestep:{self.opt.timestep}", 
+              f"iterations:{self.opt.iterations}", 
+              f"noslip_iterations:{self.opt.noslip_iterations}",
+              f"mpr_iterations:{self.opt.mpr_iterations}",
+              f"sdf_iterations:{self.opt.sdf_iterations}",
+              f"gravity:{self.opt.gravity}",)
         
     def print_model_info(self, model_info):
         print("Model info: ", f"nq:{model_info['nq']}",

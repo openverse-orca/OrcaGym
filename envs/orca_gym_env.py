@@ -192,7 +192,7 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     @property
     def dt(self) -> float:
         # return self.model.opt.timestep * self.frame_skip
-        return self.gym.opt_config['timestep'] * self.frame_skip
+        return self.gym.opt.timestep * self.frame_skip
 
     def do_simulation(self, ctrl, n_frames) -> None:
         """
@@ -625,14 +625,45 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         opt_config = self.loop.run_until_complete(self._query_opt_config())
         return opt_config
 
-    async def _set_opt_config(self, opt_config):
+    async def _set_opt_config(self, opt_config: dict):
         await self.gym.set_opt_config(opt_config)
 
-    def set_opt_config(self, opt_config):
+    def set_opt_config(self):
+        opt_config = {
+            "timestep": self.gym.opt.timestep,
+            "apirate": self.gym.opt.apirate,
+            "impratio": self.gym.opt.impratio,
+            "tolerance": self.gym.opt.tolerance,
+            "ls_tolerance": self.gym.opt.ls_tolerance,
+            "noslip_tolerance": self.gym.opt.noslip_tolerance,
+            "mpr_tolerance": self.gym.opt.mpr_tolerance,
+            "gravity": self.gym.opt.gravity,
+            "wind": self.gym.opt.wind,
+            "magnetic": self.gym.opt.magnetic,
+            "density": self.gym.opt.density,
+            "viscosity": self.gym.opt.viscosity,
+            "o_margin": self.gym.opt.o_margin,
+            "o_solref": self.gym.opt.o_solref,
+            "o_solimp": self.gym.opt.o_solimp,
+            "o_friction": self.gym.opt.o_friction,
+            "integrator": self.gym.opt.integrator,
+            "cone": self.gym.opt.cone,
+            "jacobian": self.gym.opt.jacobian,
+            "solver": self.gym.opt.solver,
+            "iterations": self.gym.opt.iterations,
+            "ls_iterations": self.gym.opt.ls_iterations,
+            "noslip_iterations": self.gym.opt.noslip_iterations,
+            "mpr_iterations": self.gym.opt.mpr_iterations,
+            "disableflags": self.gym.opt.disableflags,
+            "enableflags": self.gym.opt.enableflags,
+            "disableactuator": self.gym.opt.disableactuator,
+            "sdf_initpoints": self.gym.opt.sdf_initpoints,
+            "sdf_iterations": self.gym.opt.sdf_iterations
+        }
         self.loop.run_until_complete(self._set_opt_config(opt_config))
 
     async def _query_contact_simple(self):
-        contact_simple = await self.gym.query_contact_simple()
+        contact_simple =  await self.gym.query_contact_simple()
         return contact_simple
     
     def query_contact_simple(self):

@@ -54,15 +54,6 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
         self.neutral_joint_values = np.array([0.00, 0.8, 1, 0, 1.3, 0, 0, 0, 0, 0])
 
-        print("Opt Config before setting: ", self.gym.opt_config)
-        # self.gym.opt_config["o_solref"] = [0.005, 0.9]
-        # self.gym.opt_config['o_solimp'] = [0.99, 0.99, 0.001, 0.5, 2.0]
-        self.gym.opt_config['noslip_iterations'] = 10
-        self.set_opt_config(self.gym.opt_config)
-
-        self.gym.opt_config = self.query_opt_config()
-        print("Opt Config after setting: ", self.gym.opt_config)
-
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
         self.nu = self.model.nu

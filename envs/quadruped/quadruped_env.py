@@ -916,7 +916,7 @@ class QuadrupedEnv(OrcaGymEnv):
     @property
     def simulation_dt(self):
         """Returns the simulation dt in seconds."""
-        return self.gym.opt_config['timestep']
+        return self.gym.opt.timestep
 
     @property
     def simulation_time(self):

@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 
-import mujoco
+from orca_gym.orca_gym import OrcaGym
 import numpy as np
 
 import robosuite.macros as macros
@@ -30,7 +30,7 @@ class Controller(object, metaclass=abc.ABCMeta):
 
     def __init__(
         self,
-        sim,
+        sim: OrcaGym,
         eef_name,
         joint_indexes,
         actuator_range,
@@ -54,7 +54,7 @@ class Controller(object, metaclass=abc.ABCMeta):
 
         # mujoco simulator state
         self.sim = sim
-        self.model_timestep = macros.SIMULATION_TIMESTEP
+        self.model_timestep = sim.model.opt.timestep   #macros.SIMULATION_TIMESTEP
         self.eef_name = eef_name
         self.joint_index = joint_indexes["joints"]
         self.qpos_index = joint_indexes["qpos"]
