@@ -7,6 +7,7 @@ from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
+import orca_gym.robosuite.utils.transform_utils as transform_utils
 import h5py
 
 class RecordState:
@@ -107,6 +108,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._controller_config["actuator_range"] = self._ctrl_range
         self._controller_config["policy_freq"] = self.control_freq
         self._controller_config["ndim"] = len(self._arm_joint_names)
+        self._controller_config["control_delta"] = False
 
 
         self._controller = controller_factory(self._controller_config["type"], self._controller_config)
@@ -119,9 +121,6 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
         self.ctrl = np.array(self._neutral_joint_values[0:9])
         self.set_ctrl(self.ctrl)
-
-        self.reset_mocap_welds()
-
         self.mj_forward()
 
 
@@ -209,7 +208,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
         mocap_xpos = self._saved_xpos
         mocap_xquat = self._saved_xquat
-
+        
         # 根据xbox手柄的输入，设置机械臂的动作
         if self._joystick is not None:
             mocap_xpos, mocap_xquat = self._process_xbox_controller(mocap_xpos, mocap_xquat)
@@ -217,8 +216,15 @@ class FrankaPandaEnv(MujocoRobotEnv):
             self._saved_xpos = mocap_xpos
             self._saved_xquat = mocap_xquat
 
-        action = np.zeros(len(self._arm_joint_names))
-        self._controller.set_goal(action, set_pos = mocap_xpos, set_ori = mocap_xquat)
+        # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
+        mocap_axisangle = transform_utils.quat2axisangle(np.array([mocap_xquat[1], 
+                                                                   mocap_xquat[2], 
+                                                                   mocap_xquat[3], 
+                                                                   mocap_xquat[0]]))
+        # mocap_axisangle[1] = -mocap_axisangle[1]
+        action = np.concatenate([mocap_xpos, mocap_axisangle])
+        print("action:", action)
+        self._controller.set_goal(action)
         
         self.ctrl[0:7] = self._controller.run_controller()
         print("ctrl: ", self.ctrl)
@@ -238,19 +244,19 @@ class FrankaPandaEnv(MujocoRobotEnv):
         CTRL_MIN = 0.10000000
         if np.linalg.norm(pos_ctrl) < CTRL_MIN and np.linalg.norm(rot_ctrl) < CTRL_MIN:
             return mocap_xpos, mocap_xquat
-        
-        ee_xpos, ee_xmat = self.get_ee_xform()
+
+        mocap_xmat = rotations.quat2mat(mocap_xquat)
 
         # 平移控制
-        MOVE_SPEED = 0.02
-        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * MOVE_SPEED
+        MOVE_SPEED = self.gym.opt.timestep * 0.2
+        mocap_xpos = mocap_xpos + np.dot(mocap_xmat, pos_ctrl) * MOVE_SPEED
         mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
 
         # 旋转控制
-        ROUTE_SPEED = 0.2
+        ROUTE_SPEED = self.gym.opt.timestep * 0.5
         rot_offset = rot_ctrl * ROUTE_SPEED
         new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
-        mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
+        mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
         return mocap_xpos, mocap_xquat
 
@@ -299,19 +305,6 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
     # custom methods
     # -----------------------------
-    def reset_mocap_welds(self) -> None:
-        if self.model.nmocap > 0 and self.model.neq > 0:
-            eq_list = self.model.get_eq_list()
-            for eq in eq_list:
-                if eq['eq_type'] == self.model.mjEQ_WELD:
-                    obj1_id = eq['obj1_id']
-                    obj2_id = eq['obj2_id']
-                    eq_data = eq['eq_data'].copy()
-                    eq_data[3:10] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-                    self.update_equality_constraints([{"obj1_id": obj1_id, "obj2_id": obj2_id, "eq_data": eq_data}])
-        self.mj_forward()
-
-
     def set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)

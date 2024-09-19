@@ -56,6 +56,14 @@ async def continue_training(env):
     
 
 if __name__ == "__main__":
+    """
+    OSC运动算法控制Franka机械臂的示例。
+    对应关卡: Franka_Joystick_osc
+    和 Franka_Joystick的区别：
+    1. 电机控制采用moto，输出扭矩，而不是设定角度
+    2. 扭矩计算采用OSC算法输出
+    3. mocap点随意移动，和site不建立weld，不采用牵引方式
+    """
     try:
         grpc_address = "localhost:50051"
         print("simulation running... , grpc_address: ", grpc_address)

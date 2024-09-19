@@ -599,9 +599,6 @@
                     "$type": "EditorMjGlobalSettingsComponent",
                     "Id": 17393790191920001271,
                     "Config": {
-                        "timestep": 0.016666600480675697,
-                        "density": 1.225000023841858,
-                        "viscosity": 0.000018000000636675395,
                         "robot_name_space": true,
                         "导出XML": true
                     }
@@ -1888,7 +1885,7 @@
                 {
                     "op": "replace",
                     "path": "/ContainerEntity/Components/TransformComponent/Transform Data/Translate/0",
-                    "value": 1.6341830492019653
+                    "value": 1.634183049201965
                 },
                 {
                     "op": "replace",
