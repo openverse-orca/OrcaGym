@@ -4,7 +4,7 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystick
+from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import h5py
@@ -27,6 +27,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
         time_step: float = 0.00333333,
         record_state: str = RecordState.NONE,        
         record_file: Optional[str] = None,
+        control_freq: int = 20,
         **kwargs,
     ):
 
@@ -38,6 +39,8 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
         action_size = 3 # 实际并不使用
 
+        self.control_freq = control_freq
+
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
@@ -48,14 +51,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
             **kwargs,
         )
 
-        self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
-
-        self.controller_config = controller_config.load_config("ocs_pose")
-        print("controller_config: ", self.controller_config)
-
-        self.controller = controller_factory(self.controller_config["type"], self.controller_config)
-
-        raise Exception("Not implemented")
+        self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -66,30 +62,62 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self.nv = self.model.nv
 
         # control range
-        self.ctrl_range = self.model.get_actuator_ctrlrange()
+        self._ctrl_range = self.model.get_actuator_ctrlrange()
 
         # index used to distinguish arm and gripper joints
-        self.arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6"), self.joint("joint7")]
-        self.gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
+        self._arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6"), self.joint("joint7")]
+        self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         self._set_init_state()
 
         EE_NAME  = self.site("ee_center_site")
         site_dict = self.query_site_pos_and_quat([EE_NAME])
-        self.initial_grasp_site_xpos = site_dict[EE_NAME]['xpos']
-        self.initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
-        self.save_xquat = self.initial_grasp_site_xquat.copy()
+        self._initial_grasp_site_xpos = site_dict[EE_NAME]['xpos']
+        self._initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
+        self._saved_xpos = self._initial_grasp_site_xpos
+        self._saved_xquat = self._initial_grasp_site_xquat
 
-        self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
-        self.joystick = XboxJoystick()
-        
+        self._joystick_manager = XboxJoystickManager()
+        joystick_names = self._joystick_manager.get_joystick_names()
+        if len(joystick_names) == 0:
+            raise ValueError("No joystick detected.")
+
+        self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
+        if self._joystick is None:
+            raise ValueError("Joystick not found.")
+
+        self._controller_config = controller_config.load_config("osc_pose")
+        # print("controller_config: ", self.controller_config)
+
+        # Add to the controller dict additional relevant params:
+        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
+        #   policy (control) freq, and ndim (# joints)
+        self._controller_config["robot_name"] = agent_names[0]
+        self._controller_config["sim"] = self.gym
+        self._controller_config["eef_name"] = EE_NAME
+        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._arm_joint_names)
+        self._controller_config["joint_indexes"] = {
+            "joints": self._arm_joint_names,
+            "qpos": qpos_offsets,
+            "qvel": qvel_offsets,
+        }
+        self._controller_config["actuator_range"] = self._ctrl_range
+        self._controller_config["policy_freq"] = self.control_freq
+        self._controller_config["ndim"] = len(self._arm_joint_names)
+
+
+        self._controller = controller_factory(self._controller_config["type"], self._controller_config)
+        self._controller.update_initial_joints(self._neutral_joint_values[0:7])
+
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
 
-        self.ctrl = np.array(self.neutral_joint_values[0:9])
+        self.ctrl = np.array(self._neutral_joint_values[0:9])
         self.set_ctrl(self.ctrl)
 
         self.reset_mocap_welds()
@@ -108,42 +136,6 @@ class FrankaPandaEnv(MujocoRobotEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
-
-    def _capture_joystick_pos_ctrl(self, joystick_state) -> np.ndarray:
-        move_left_right = joystick_state["axes"]["LeftStickX"]
-        move_up_down = -joystick_state["axes"]["LeftStickY"]
-        move_forward_backward = (1 + joystick_state["axes"]["RT"]) * 0.5 - (1 + joystick_state["axes"]["LT"]) * 0.5
-        pos_ctrl = np.array([move_up_down, move_left_right, move_forward_backward])
-        return pos_ctrl
-    
-    def _capture_joystick_rot_ctrl(self, joystick_state) -> np.ndarray:
-        yaw = joystick_state["axes"]["RightStickX"]
-        pitch = joystick_state["axes"]["RightStickY"]
-        roll = joystick_state["buttons"]["RB"] * 0.5 - joystick_state["buttons"]["LB"] * 0.5
-        rot_ctrl = np.array([roll, pitch, yaw])
-        return rot_ctrl
-    
-    def _calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
-        R_yaw = np.array([
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw), np.cos(yaw), 0],
-            [0, 0, 1]
-        ])
-
-        R_pitch = np.array([
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ])
-
-        R_roll = np.array([
-            [1, 0, 0],
-            [0, np.cos(roll), -np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)]
-        ])
-
-        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
-        return new_xmat
     
     def _set_gripper_ctrl(self, joystick_state) -> None:
         if (joystick_state["buttons"]["A"]):
@@ -215,45 +207,52 @@ class FrankaPandaEnv(MujocoRobotEnv):
             self._replay()
             return
 
+        mocap_xpos = self._saved_xpos
+        mocap_xquat = self._saved_xquat
+
         # 根据xbox手柄的输入，设置机械臂的动作
-        self.joystick.update()
-        joystick_state = self.joystick.get_first_state()
+        if self._joystick is not None:
+            mocap_xpos, mocap_xquat = self._process_xbox_controller(mocap_xpos, mocap_xquat)
+            self.set_grasp_mocap(mocap_xpos, mocap_xquat)
+            self._saved_xpos = mocap_xpos
+            self._saved_xquat = mocap_xquat
 
-        pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
-        rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
-        self._set_gripper_ctrl(joystick_state)
-
-        # 如果控制量太小，不执行动作
-        CTRL_THRESHOLD = 0.1
-        if np.linalg.norm(pos_ctrl) < CTRL_THRESHOLD and np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
-
-        ee_xpos, ee_xmat = self.get_ee_xform()
-
-        # 平移控制
-        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * 0.02
-        mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
-
-        # 旋转控制，如果输入量小，需要记录当前姿态并在下一帧还原（保持姿态）
-        if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-            mocap_xquat = self.save_xquat
-        else:
-            rot_offset = rot_ctrl * 0.2
-            new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
-            mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
-            self.save_xquat = mocap_xquat
-
-        # 直接根据新的qpos位置设置控制量，类似于牵引示教
-        self.set_grasp_mocap(mocap_xpos, mocap_xquat)
-        self.mj_forward()
-        joint_qpos = self.query_joint_qpos(self.arm_joint_names)
-        self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
+        action = np.zeros(len(self._arm_joint_names))
+        self._controller.set_goal(action, set_pos = mocap_xpos, set_ori = mocap_xquat)
+        
+        self.ctrl[0:7] = self._controller.run_controller()
+        print("ctrl: ", self.ctrl)
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:
             self._save_record()
+
+    def _process_xbox_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
+        self._joystick_manager.update()
+
+        pos_ctrl = self._joystick.capture_joystick_pos_ctrl()
+        rot_ctrl = self._joystick.capture_joystick_rot_ctrl()
+        self._set_gripper_ctrl(self._joystick.get_state())
+
+        # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
+        CTRL_MIN = 0.10000000
+        if np.linalg.norm(pos_ctrl) < CTRL_MIN and np.linalg.norm(rot_ctrl) < CTRL_MIN:
+            return mocap_xpos, mocap_xquat
+        
+        ee_xpos, ee_xmat = self.get_ee_xform()
+
+        # 平移控制
+        MOVE_SPEED = 0.02
+        mocap_xpos = ee_xpos + np.dot(ee_xmat, pos_ctrl) * MOVE_SPEED
+        mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
+
+        # 旋转控制
+        ROUTE_SPEED = 0.2
+        rot_offset = rot_ctrl * ROUTE_SPEED
+        new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+        mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
+
+        return mocap_xpos, mocap_xquat
 
 
     def _save_record(self) -> None:
@@ -294,7 +293,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
     def _reset_sim(self) -> bool:
         self._set_init_state()
-        self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.mj_forward()
         return True
 
@@ -324,13 +323,13 @@ class FrankaPandaEnv(MujocoRobotEnv):
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
         arm_joint_qpos_list = {}
-        for name, value in zip(self.arm_joint_names, self.neutral_joint_values[0:7]):
+        for name, value in zip(self._arm_joint_names, self._neutral_joint_values[0:7]):
             arm_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(arm_joint_qpos_list)
 
         # assign value to finger joints
         gripper_joint_qpos_list = {}
-        for name, value in zip(self.gripper_joint_names, self.neutral_joint_values[7:9]):
+        for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
             gripper_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos_list)
 

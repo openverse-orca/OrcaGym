@@ -4,7 +4,7 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystick
+from orca_gym.devices.xbox_joystick import XboxJoystickManager
 import h5py
 
 class RecordState:
@@ -73,7 +73,14 @@ class FrankaJoystickEnv(MujocoRobotEnv):
 
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
-        self.joystick = XboxJoystick()
+        self.joystick_manager = XboxJoystickManager()
+        joystick_names = self.joystick_manager.get_joystick_names()
+        if len(joystick_names) == 0:
+            raise ValueError("No joystick detected.")
+
+        self.joystick = self.joystick_manager.get_joystick(joystick_names[0])
+        if self.joystick is None:
+            raise ValueError("Joystick not found.")
         
 
     def _set_init_state(self) -> None:
@@ -100,42 +107,6 @@ class FrankaJoystickEnv(MujocoRobotEnv):
 
         return obs, reward, terminated, truncated, info
 
-    def _capture_joystick_pos_ctrl(self, joystick_state) -> np.ndarray:
-        move_left_right = joystick_state["axes"]["LeftStickX"]
-        move_up_down = -joystick_state["axes"]["LeftStickY"]
-        move_forward_backward = (1 + joystick_state["axes"]["RT"]) * 0.5 - (1 + joystick_state["axes"]["LT"]) * 0.5
-        pos_ctrl = np.array([move_up_down, move_left_right, move_forward_backward])
-        return pos_ctrl
-    
-    def _capture_joystick_rot_ctrl(self, joystick_state) -> np.ndarray:
-        yaw = joystick_state["axes"]["RightStickX"]
-        pitch = joystick_state["axes"]["RightStickY"]
-        roll = joystick_state["buttons"]["RB"] * 0.5 - joystick_state["buttons"]["LB"] * 0.5
-        rot_ctrl = np.array([roll, pitch, yaw])
-        return rot_ctrl
-    
-    def _calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
-        R_yaw = np.array([
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw), np.cos(yaw), 0],
-            [0, 0, 1]
-        ])
-
-        R_pitch = np.array([
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ])
-
-        R_roll = np.array([
-            [1, 0, 0],
-            [0, np.cos(roll), -np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)]
-        ])
-
-        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
-        return new_xmat
-    
     def _set_gripper_ctrl(self, joystick_state) -> None:
         if (joystick_state["buttons"]["A"]):
             self.ctrl[7] += 0.001
@@ -207,12 +178,10 @@ class FrankaJoystickEnv(MujocoRobotEnv):
             return
 
         # 根据xbox手柄的输入，设置机械臂的动作
-        self.joystick.update()
-        joystick_state = self.joystick.get_first_state()
-
-        pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
-        rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
-        self._set_gripper_ctrl(joystick_state)
+        self.joystick_manager.update()
+        pos_ctrl = self.joystick.capture_joystick_pos_ctrl()
+        rot_ctrl = self.joystick.capture_joystick_rot_ctrl()
+        self._set_gripper_ctrl(self.joystick.get_state())
 
         # 如果控制量太小，不执行动作
         CTRL_THRESHOLD = 0.1
@@ -232,7 +201,7 @@ class FrankaJoystickEnv(MujocoRobotEnv):
             mocap_xquat = self.save_xquat
         else:
             rot_offset = rot_ctrl * 0.2
-            new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+            new_xmat = self.joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
             mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
             self.save_xquat = mocap_xquat
 

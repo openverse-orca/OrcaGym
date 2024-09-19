@@ -4,7 +4,7 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystick
+from orca_gym.devices.xbox_joystick import XboxJoystickManager
 import h5py
 from scipy.spatial.transform import Rotation as R
 
@@ -88,7 +88,14 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
-        self.joystick = XboxJoystick()
+        self.joystick_manager = XboxJoystickManager()
+        joystick_names = self.joystick_manager.get_joystick_names()
+        if len(joystick_names) == 0:
+            raise ValueError("No joystick detected.")
+
+        self.joystick = self.joystick_manager.get_joystick(joystick_names[0])
+        if self.joystick is None:
+            raise ValueError("Joystick not found.")
         
 
     def _set_init_state(self) -> None:
@@ -115,88 +122,6 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
-
-    def _capture_joystick_pos_ctrl(self, joystick_state) -> np.ndarray:
-        move_left_right = -joystick_state["axes"]["LeftStickX"]
-        move_up_down = -joystick_state["axes"]["LeftStickY"]
-        move_forward_backward = (1 + joystick_state["axes"]["RT"]) * 0.5 - (1 + joystick_state["axes"]["LT"]) * 0.5
-        pos_ctrl = np.array([move_forward_backward, move_left_right, move_up_down])
-        return pos_ctrl
-    
-    def _capture_joystick_rot_ctrl(self, joystick_state) -> np.ndarray:
-        yaw = joystick_state["axes"]["RightStickX"]
-        pitch = joystick_state["axes"]["RightStickY"]
-        roll = joystick_state["buttons"]["RB"] * 0.5 - joystick_state["buttons"]["LB"] * 0.5
-        rot_ctrl = np.array([yaw, pitch, roll])
-        return rot_ctrl
-    
-    def _joint_rot_ctrl_compensation(self, rot_ctrl) -> None:
-        self.ctrl[3] += rot_ctrl[0] * 0.05   # yaw
-        self.ctrl[4] += rot_ctrl[1] * 0.05   # pitch
-        self.ctrl[5] += rot_ctrl[2] * 0.1   # roll
-        pass
-
-    def _calculate_delta_quat(self, ee_xquat, mocap_xquat):
-        # 将四元数转换为Rotation对象
-        ee_rotation = R.from_quat(ee_xquat)
-        mocap_rotation = R.from_quat(mocap_xquat)
-        
-        # 计算相对旋转四元数
-        delta_rotation = mocap_rotation * ee_rotation.inv()
-        delta_xquat = delta_rotation.as_quat()  # 转换为四元数表示
-        return delta_xquat
-
-    def _quat_to_rot_matrix(self, delta_xquat):
-        delta_rotation = R.from_quat(delta_xquat)
-        rot_matrix = delta_rotation.as_matrix()  # 转换为旋转矩阵
-        return rot_matrix
-
-    def _extract_yaw_pitch_roll(self, rot_matrix):
-        pitch = np.arcsin(-rot_matrix[2, 0])
-
-        if np.cos(pitch) != 0:
-            roll = np.arctan2(rot_matrix[2, 1], rot_matrix[2, 2])
-            yaw = np.arctan2(rot_matrix[1, 0], rot_matrix[0, 0])
-        else:
-            # Gimbal lock: pitch is +/- 90 degrees
-            roll = 0  # Roll can be set to any value
-            yaw = np.arctan2(-rot_matrix[0, 1], rot_matrix[1, 1])
-
-        return yaw, pitch, roll
-
-    def _calculate_yaw_pitch_roll(self, ee_xquat, mocap_xquat):
-        # Step 1: Calculate the relative quaternion
-        delta_xquat = self._calculate_delta_quat(ee_xquat, mocap_xquat)
-        
-        # Step 2: Convert the quaternion to a rotation matrix
-        rot_matrix = self._quat_to_rot_matrix(delta_xquat)
-        
-        # Step 3: Extract yaw, pitch, roll from the rotation matrix
-        yaw, pitch, roll = self._extract_yaw_pitch_roll(rot_matrix)
-        
-        return np.array([yaw, pitch, roll])
-    
-    def _calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
-        R_yaw = np.array([
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw), np.cos(yaw), 0],
-            [0, 0, 1]
-        ])
-
-        R_pitch = np.array([
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ])
-
-        R_roll = np.array([
-            [1, 0, 0],
-            [0, np.cos(roll), -np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)]
-        ])
-
-        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
-        return new_xmat
     
     def _query_gripper_contact_force(self) -> dict:
         contact_simple_list = self.query_contact_simple()
@@ -337,12 +262,11 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             return
 
         # 根据xbox手柄的输入，设置机械臂的动作
-        self.joystick.update()
-        joystick_state = self.joystick.get_first_state()
+        self.joystick_manager.update()
 
-        pos_ctrl = self._capture_joystick_pos_ctrl(joystick_state)
-        rot_ctrl = self._capture_joystick_rot_ctrl(joystick_state)
-        self._set_gripper_ctrl(joystick_state)
+        pos_ctrl = self.joystick.capture_joystick_pos_ctrl()
+        rot_ctrl = self.joystick.capture_joystick_rot_ctrl()
+        self._set_gripper_ctrl(self.joystick.get_state())
 
         # 如果控制量太小，不执行动作
         CTRL_THRESHOLD = 0.1
@@ -365,7 +289,7 @@ class RM65BJoystickEnv(MujocoRobotEnv):
             mocap_xquat = self.save_xquat
         else:
             rot_offset = rot_ctrl * rot_ctrl_rate
-            new_xmat = self._calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+            new_xmat = self.joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
             mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
             self.save_xquat = mocap_xquat
 
@@ -375,13 +299,6 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         joint_qpos = self.query_joint_qpos(self.arm_joint_names)
         self.ctrl[:6] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
 
-        # 补偿旋转控制
-        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
-        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
-        #     print("Rot_ctrl: ", rot_ctrl)
-
-        self._joint_rot_ctrl_compensation(rot_ctrl)
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:

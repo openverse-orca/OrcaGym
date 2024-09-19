@@ -142,29 +142,29 @@ class Controller(object, metaclass=abc.ABCMeta):
 
             # 组合下发多个异步请求
             async def _combined_update():
-                # 首先保障forward完成
-                await self.sim.mj_forward()
+                # 在 Env 中，controller 是在 step 函数内调用的，已经完成了 foward，不用多做一次
+                # await self.sim.mj_forward()
 
                 # 信息可以并行查询
-                ee_pos, ee_ori_mat, jacp, jacr, mass_matrix = await asyncio.gather(
+                ee_pos_mat_dict, jac_site_dict, mass_matrix = await asyncio.gather(
                     self.sim.query_site_pos_and_mat([self.eef_name]),
                     self.sim.mj_jac_site([self.eef_name]),
                     self.sim.calc_full_mass_matrix())
                 
-                return ee_pos, ee_ori_mat, jacp, jacr, mass_matrix
+                return ee_pos_mat_dict, jac_site_dict, mass_matrix
                 
-            ee_pos, ee_ori_mat, jacp, jacr, mass_matrix = self.loop.run_until_complete(_combined_update())
+            ee_pos_mat_dict, jac_site_dict, mass_matrix = self.loop.run_until_complete(_combined_update())
 
-            self.ee_pos = ee_pos
-            self.ee_ori_mat = ee_ori_mat.reshape((3, 3))
+            self.ee_pos = np.array(ee_pos_mat_dict[self.eef_name]['xpos'])
+            self.ee_ori_mat = np.array(ee_pos_mat_dict[self.eef_name]['xmat']).reshape((3, 3))
 
             # self.ee_pos = np.array(self.sim.data.site_xpos[self.sim.model.site_name2id(self.eef_name)])
             # self.ee_ori_mat = np.array(
             #     self.sim.data.site_xmat[self.sim.model.site_name2id(self.eef_name)].reshape([3, 3])
             # )
 
-            jacp = jacp.reshape((3, -1))
-            jacr = jacr.reshape((3, -1))
+            jacp = jac_site_dict[self.eef_name]['jacp'].reshape((3, -1))
+            jacr = jac_site_dict[self.eef_name]['jacr'].reshape((3, -1))
             self.ee_pos_vel = np.dot(jacp, self.sim.data.qvel)
             self.ee_ori_vel = np.dot(jacr, self.sim.data.qvel)
 

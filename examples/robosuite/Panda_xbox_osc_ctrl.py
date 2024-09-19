@@ -22,7 +22,7 @@ nest_asyncio.apply()
 # TIME_STEP = 0.016666666666666
 TIME_STEP = 0.005
 
-def register_env(grpc_address, record_state, record_file):
+def register_env(grpc_address, record_state, record_file, control_freq=20):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
@@ -35,7 +35,8 @@ def register_env(grpc_address, record_state, record_file):
                 'agent_names': ['Panda'], 
                 'time_step': TIME_STEP,
                 'record_state': record_state,
-                'record_file': record_file},
+                'record_file': record_file,
+                'control_freq': control_freq},
         max_episode_steps=60 * 60 * 60,  # 60fps @ 1 hour
         reward_threshold=0.0,
     )
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
         # RecordState controls the recording of the simulation data
-        register_env(grpc_address, RecordState.NONE, 'xbox_control_record.h5')
+        register_env(grpc_address, RecordState.NONE, 'xbox_control_record.h5', 20)
 
         env = gym.make(env_id)        
         print("Starting simulation...")
