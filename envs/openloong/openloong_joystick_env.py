@@ -186,8 +186,10 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         changed = False
         for index, joystick in enumerate(self.joysticks):
             # print(index, joystick_state)
-            pos_ctrl = joystick.capture_joystick_pos_ctrl()
-            rot_ctrl = joystick.capture_joystick_rot_ctrl()
+            pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
+            pos_ctrl = np.array([pos_ctrl_dict['x'], pos_ctrl_dict['y'], pos_ctrl_dict['z']])
+            rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
+            rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
             # self._set_gripper_ctrl(joystick_state)
 
             # 如果控制量太小，不执行动作

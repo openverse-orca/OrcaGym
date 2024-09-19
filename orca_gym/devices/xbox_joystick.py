@@ -15,18 +15,18 @@ class XboxJoystick:
         return self._joystick_state.copy()
 
 
-    def capture_joystick_pos_ctrl(self) -> np.ndarray:
-        move_left_right = self._joystick_state["axes"]["LeftStickX"]
-        move_up_down = -self._joystick_state["axes"]["LeftStickY"]
-        move_forward_backward = (1 + self._joystick_state["axes"]["RT"]) * 0.5 - (1 + self._joystick_state["axes"]["LT"]) * 0.5
-        pos_ctrl = np.array([move_up_down, move_left_right, move_forward_backward])
+    def capture_joystick_pos_ctrl(self) -> dict:
+        move_x = self._joystick_state["axes"]["LeftStickX"]
+        move_y = -self._joystick_state["axes"]["LeftStickY"]
+        move_z = (1 + self._joystick_state["axes"]["RT"]) * 0.5 - (1 + self._joystick_state["axes"]["LT"]) * 0.5
+        pos_ctrl = {'x': move_x, 'y': move_y, 'z': move_z}
         return pos_ctrl
     
-    def capture_joystick_rot_ctrl(self) -> np.ndarray:
+    def capture_joystick_rot_ctrl(self) -> dict:
         yaw = self._joystick_state["axes"]["RightStickX"]
         pitch = self._joystick_state["axes"]["RightStickY"]
         roll = self._joystick_state["buttons"]["RB"] * 0.5 - self._joystick_state["buttons"]["LB"] * 0.5
-        rot_ctrl = np.array([roll, pitch, yaw])
+        rot_ctrl = {'yaw': yaw, 'pitch': pitch, 'roll': roll}
         return rot_ctrl
     
     def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:

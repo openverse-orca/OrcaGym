@@ -16,9 +16,9 @@ class RecordState:
     REPLAY_FINISHED = "replay_finished"
     NONE = "none"
 
-class FrankaPandaEnv(MujocoRobotEnv):
+class OpenloongArmEnv(MujocoRobotEnv):
     """
-    通过xbox手柄控制franka机械臂
+    控制青龙机器人机械臂
     """
     def __init__(
         self,
@@ -52,7 +52,6 @@ class FrankaPandaEnv(MujocoRobotEnv):
             **kwargs,
         )
 
-        self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -62,13 +61,25 @@ class FrankaPandaEnv(MujocoRobotEnv):
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
 
-        # control range
-        self._ctrl_range = self.model.get_actuator_ctrlrange()
-
         # index used to distinguish arm and gripper joints
-        self._arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6"), self.joint("joint7")]
-        self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
+        self._arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
+                                 self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
+                                 self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")]
+        self._arm_moto_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
+                                self.actuator("M_arm_r_03"),self.actuator("M_arm_r_04"),
+                                self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
+        self._arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._arm_moto_names]
+        self._neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
 
+        print("arm_actuator_id: ", self._arm_actuator_id)
+        # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
+
+        # control range
+        all_actuator_ctrlrange = self.model.get_actuator_ctrlrange()
+        self._ctrl_range = [all_actuator_ctrlrange[actoator_id] for actoator_id in self._arm_actuator_id]
+        print("ctrl_range: ", self._ctrl_range)
+
+        self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
         EE_NAME  = self.site("ee_center_site")
@@ -112,14 +123,15 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
 
         self._controller = controller_factory(self._controller_config["type"], self._controller_config)
-        self._controller.update_initial_joints(self._neutral_joint_values[0:7])
+        self._controller.update_initial_joints(self._neutral_joint_values)
 
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
 
-        self.ctrl = np.array(self._neutral_joint_values[0:9])
+        for i in range(len(self._arm_actuator_id)):
+            self.ctrl[self._arm_actuator_id[i]] = self._neutral_joint_values[i]
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
@@ -223,11 +235,13 @@ class FrankaPandaEnv(MujocoRobotEnv):
                                                                    mocap_xquat[0]]))
         # mocap_axisangle[1] = -mocap_axisangle[1]
         action = np.concatenate([mocap_xpos, mocap_axisangle])
-        print("action:", action)
+        # print("action:", action)
         self._controller.set_goal(action)
         
-        self.ctrl[0:7] = self._controller.run_controller()
-        print("ctrl: ", self.ctrl)
+        ctrl = self._controller.run_controller()
+        for i in range(len(self._arm_actuator_id)):
+            self.ctrl[self._arm_actuator_id[i]] = ctrl[i]
+        # print("ctrl: ", self.ctrl)
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:
@@ -237,11 +251,10 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._joystick_manager.update()
 
         pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
-        pos_ctrl = np.array([pos_ctrl_dict['x'], pos_ctrl_dict['y'], pos_ctrl_dict['z']])
+        pos_ctrl = np.array([-pos_ctrl_dict['y'], -pos_ctrl_dict['z'], -pos_ctrl_dict['x']])
         rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
-        rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
-        
-        self._set_gripper_ctrl(self._joystick.get_state())
+        rot_ctrl = np.array([rot_ctrl_dict['yaw'], -rot_ctrl_dict['roll'], rot_ctrl_dict['pitch']])
+        # self._set_gripper_ctrl(self._joystick.get_state())
 
         # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
         CTRL_MIN = 0.10000000
@@ -275,7 +288,6 @@ class FrankaPandaEnv(MujocoRobotEnv):
         ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME]['xpos'].copy()
         ee_xvalp, _ = self.query_site_xvalp_xvalr([EE_NAME])
         ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
-        fingers_width = self.get_fingers_width().copy()
 
 
         achieved_goal = np.array([0,0,0])
@@ -284,7 +296,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
                 [
                     ee_position,
                     ee_velocity,
-                    fingers_width
+                    [0]
                 ]).copy()            
         result = {
             "observation": obs,
@@ -319,15 +331,15 @@ class FrankaPandaEnv(MujocoRobotEnv):
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
         arm_joint_qpos_list = {}
-        for name, value in zip(self._arm_joint_names, self._neutral_joint_values[0:7]):
+        for name, value in zip(self._arm_joint_names, self._neutral_joint_values):
             arm_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(arm_joint_qpos_list)
 
         # assign value to finger joints
-        gripper_joint_qpos_list = {}
-        for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
-            gripper_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(gripper_joint_qpos_list)
+        # gripper_joint_qpos_list = {}
+        # for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
+        #     gripper_joint_qpos_list[name] = np.array([value])
+        # self.set_joint_qpos(gripper_joint_qpos_list)
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
@@ -341,8 +353,3 @@ class FrankaPandaEnv(MujocoRobotEnv):
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
-    def get_fingers_width(self) -> np.ndarray:
-        qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
-        finger1 = qpos_dict[self.joint("finger_joint1")]
-        finger2 = qpos_dict[self.joint("finger_joint2")]
-        return finger1 + finger2
