@@ -5,6 +5,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick
+from orca_gym.devices.pico_joytsick import PicoJoystick
 import h5py
 from scipy.spatial.transform import Rotation as R
 import os
@@ -94,7 +95,8 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
 
-        self.joystick = XboxJoystick()
+        # self.joystick = XboxJoystick()
+        self.joystick = PicoJoystick()
 
         self.camera_names = ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
         self.use_depth_image = False
@@ -320,6 +322,35 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             self._replay()
             return
 
+        changed = False
+        if isinstance(self.joystick, XboxJoystick):
+            changed = self.handle_xbox_joystick()
+        elif isinstance(self.joystick, PicoJoystick):
+            changed = self.handle_pico_joystick()
+        
+        if not changed:
+            if self.record_state == RecordState.RECORD:
+                self._save_record()
+            return
+
+        self.mj_forward()
+        joint_qpos = self.query_joint_qpos(self.arm_joint_names)
+        self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.left_arm_joint_names]).flat.copy()
+        self.ctrl[7:14] = np.array([joint_qpos[joint_name] for joint_name in self.right_arm_joint_names]).flat.copy()
+
+        # 补偿旋转控制
+        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
+        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
+        #     print("Rot_ctrl: ", rot_ctrl)
+
+        # self._joint_rot_ctrl_compensation(rot_ctrl)
+
+        # 将控制数据存储到record_pool中
+        if self.record_state == RecordState.RECORD:
+            self._save_record()
+
+    def handle_xbox_joystick(self):
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick.update()
         joystick_states = self.joystick.get_all_state()
@@ -369,28 +400,35 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             else:
                 self.set_grasp_mocap_r(mocap_xpos, mocap_xquat)
             # print(index, mocap_xpos, mocap_xquat)
-        
-        if not changed:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
+        return changed
+    
+    def handle_pico_joystick(self):
+        transform = self.joystick.get_all_state()
 
-        self.mj_forward()
-        joint_qpos = self.query_joint_qpos(self.arm_joint_names)
-        self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.left_arm_joint_names]).flat.copy()
-        self.ctrl[7:14] = np.array([joint_qpos[joint_name] for joint_name in self.right_arm_joint_names]).flat.copy()
+        if transform is None:
+            return False
 
-        # 补偿旋转控制
-        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
-        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
-        #     print("Rot_ctrl: ", rot_ctrl)
+        # left_relative_position, left_relative_rotation = self.joystick.get_left_relative_move(transform)
+        # right_relative_postion, right_relative_rotation = self.joystick.get_right_relative_move(transform)
+        left_relative_position, left_relative_rotation = self.joystick.get_motion_trackers_relative_move(transform)[0]
+        right_relative_postion, right_relative_rotation = self.joystick.get_motion_trackers_relative_move(transform)[1]
 
-        # self._joint_rot_ctrl_compensation(rot_ctrl)
+        # ee_l_xpos, ee_l_xmat = self.get_ee_xform()
+        # ee_r_xpos, ee_r_xmat = self.get_ee_r_xform()
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
+        mocap_l_xpos = self.initial_grasp_site_xpos + left_relative_position
+        mocap_r_xpos = self.initial_grasp_site_xpos_r + right_relative_postion
+
+        # print("left:", (left_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat())
+        # print("right:", (right_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat())
+        self.set_grasp_mocap(mocap_l_xpos, (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat())
+        self.set_grasp_mocap_r(mocap_r_xpos, (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat())
+        # print("left:", R.from_matrix(left_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(left_relative_rotation))
+        # print("right:", R.from_matrix(right_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(right_relative_rotation))
+        # self.set_grasp_mocap(mocap_l_xpos, rotations.mat2quat(left_relative_rotation))
+        # self.set_grasp_mocap_r(mocap_r_xpos, rotations.mat2quat(right_relative_rotation))
+
+        return True
 
     def _save_record(self) -> None:
         if len(self.data_dict['/observations/qpos']) < self.data_size:
