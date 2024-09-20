@@ -36,7 +36,20 @@ cmake ..
 make install -j4
 pip install -e ./../interfaces/acados_template
 ```
+Download and Install Tera Renderer
 
+To render the templates for acados, you need the Tera Renderer. Follow the steps below to download and install it:
+
+    Download the Linux version of Tera Renderer from the following link:
+    
+    https://github.com/acados/tera_renderer/releases
+
+    After downloading, move the t_renderer executable to the acados/bin directory:
+
+```bash
+mv /path/to/downloaded/t_renderer /path/to/acados/bin/t_renderer
+chmod +x /path/to/acados/bin/t_renderer
+```
 ### Set Environment Variables
 
 1. You can choose to add the paths to the bash environment variables:

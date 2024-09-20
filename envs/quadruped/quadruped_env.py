@@ -1300,14 +1300,18 @@ class QuadrupedEnv(OrcaGymEnv):
     def _find_feet_model_attrs(self, feet_geom_name):
         """Find the geom and body IDs of the feet based on the provided feet_geom_name."""
         geom_dict = self.model.get_geom_dict()
-        for lef_name in ["FR", "FL", "RR", "RL"]:
-            geom_name = feet_geom_name[lef_name]
-            foot_geom_id = self.model.geom_name2id(geom_name)
-            assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {geom_dict.keys()}."
-            foot_body_id = self.model.body_name2id(geom_dict[feet_geom_name[lef_name]]['BodyName'])
-            assert foot_body_id != -1, f"Foot BODY {geom_dict[feet_geom_name[lef_name]]['BodyName']} not found."
-            self._feet_geom_id[lef_name] = foot_geom_id
-            self._feet_body_id[lef_name] = foot_body_id
+        for leg_name in ["FR", "FL", "RR", "RL"]:
+            geom_name = feet_geom_name[leg_name]
+            # 查找以 geom_name 开头的几何体
+            matching_geom_names = [key for key in geom_dict.keys() if key.startswith(geom_name)]
+            if not matching_geom_names:
+                raise KeyError(f"Foot GEOM {geom_name} not found in {geom_dict.keys()}.")
+            foot_geom_id = self.model.geom_name2id(matching_geom_names[0])
+            foot_body_id = self.model.body_name2id(geom_dict[matching_geom_names[0]]['BodyName'])
+            self._feet_geom_id[leg_name] = foot_geom_id
+            self._feet_body_id[leg_name] = foot_body_id
+    
+    
 
 
         # _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
