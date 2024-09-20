@@ -3,6 +3,7 @@ import h5py
 class CtrlRecorder:
 
     def __init__():
+        return
         
 
     class RecordState:

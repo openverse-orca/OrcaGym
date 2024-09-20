@@ -47,7 +47,7 @@ def register_env(grpc_address, record_state, record_file, agent_name,
     gym.register(
         id=f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}",
         entry_point="envs.quadruped.quadruped_env:QuadrupedEnv",
-        kwargs={'frame_skip': 1,   # 1 action per frame
+        kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
                 'action_step_count': 0,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
                  scene_name, simulation_dt, state_observables_names)
 
     env = gym.make(env_id)        
-    print("启动仿真环境")
+    print("Start Simulation!")
     
     # Create the quadruped robot environment -----------------------------------------------------------
     # env = QuadrupedEnv(robot=robot_name,

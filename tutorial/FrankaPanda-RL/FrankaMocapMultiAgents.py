@@ -242,7 +242,7 @@ def testing_model(env, model):
 
             total_reward += reward
 
-            # 帧率为 60fps ，为显示为正常速度，每次渲染间隔 16ms
+            # 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < 0.01:
                 time.sleep(0.01 - elapsed_time.total_seconds())
@@ -267,7 +267,7 @@ def train_model(grpc_addresses, task, max_episode_steps, frame_skip, model_type,
         env_fns = [make_env(grpc_address, task, max_episode_steps, frame_skip, env_id) for grpc_address, env_id in zip(grpc_addresses, env_ids)]
         env = SubprocVecEnv(env_fns)
 
-        print("启动仿真环境")
+        print("Start Simulation!")
         if model_type == "ppo":
             continue_training_ppo(env, env_num, total_timesteps, max_episode_steps, model_file)
         elif model_type == "tqc":

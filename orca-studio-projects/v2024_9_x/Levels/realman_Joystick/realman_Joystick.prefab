@@ -493,7 +493,7 @@
         },
         "Entity_[1252198295043]": {
             "Id": "Entity_[1252198295043]",
-            "Name": "rm_65_with_gripper_usda",
+            "Name": "rm_65_modify_gripper",
             "Components": {
                 "EditorDisabledCompositionComponent": {
                     "$type": "EditorDisabledCompositionComponent",
@@ -518,84 +518,66 @@
                     "$type": "EditorLockComponent",
                     "Id": 234115838838267472
                 },
-                "EditorMjActuatorComponent_2": {
+                "EditorMjActuatorComponent": {
                     "$type": "EditorMjActuatorComponent",
-                    "Id": 11018126192828569720,
+                    "Id": 6438357760503711547,
                     "Config": [
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -2000 -200",
-                                "biastype": "affine",
-                                "ctrlrange": "-3.1 3.1",
-                                "dyntype": "none",
-                                "forcerange": "-100 100",
-                                "gainprm": "2000",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-80 80",
+                                "gear": "100",
                                 "joint": "joint1",
                                 "name": "actuator1"
                             }
                         },
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -2000 -200",
-                                "biastype": "affine",
-                                "ctrlrange": "-2.268 2.268",
-                                "dyntype": "none",
-                                "forcerange": "-100 100",
-                                "gainprm": "2000",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-80 80",
+                                "gear": "1",
                                 "joint": "joint2",
                                 "name": "actuator2"
                             }
                         },
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -1500 -150",
-                                "biastype": "affine",
-                                "ctrlrange": "-2.355 2.355",
-                                "dyntype": "none",
-                                "forcerange": "-75 75",
-                                "gainprm": "1500",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-48 48",
+                                "gear": "1",
                                 "joint": "joint3",
                                 "name": "actuator3"
                             }
                         },
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -1500 -150",
-                                "biastype": "affine",
-                                "ctrlrange": "-3.1 3.1",
-                                "dyntype": "none",
-                                "forcerange": "-75 75",
-                                "gainprm": "1500",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-48 48",
+                                "gear": "1",
                                 "joint": "joint4",
                                 "name": "actuator4"
                             }
                         },
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -1000 -100",
-                                "biastype": "affine",
-                                "ctrlrange": "-2.233 2.233",
-                                "dyntype": "none",
-                                "forcerange": "-50 50",
-                                "gainprm": "1000",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-12.4 12.4",
+                                "gear": "1",
                                 "joint": "joint5",
                                 "name": "actuator5"
                             }
                         },
                         {
-                            "Actuator Type": 3,
+                            "Actuator Type": 0,
                             "Actuator Attributes": {
-                                "biasprm": "0 -1000 -100",
-                                "biastype": "affine",
-                                "ctrlrange": "-6.28 6.28",
-                                "dyntype": "none",
-                                "forcerange": "-50 50",
-                                "gainprm": "1000",
+                                "ctrllimited": "true",
+                                "ctrlrange": "-12.4 12.4",
+                                "gear": "100",
                                 "joint": "joint6",
                                 "name": "actuator6"
                             }
@@ -1103,9 +1085,9 @@
                     "Parent Entity": "Entity_[1256493262339]",
                     "Transform Data": {
                         "Translate": [
-                            0.10000000149011612,
-                            0.0,
-                            -0.011360585689544678
+                            -0.05377393960952759,
+                            -3.5762786865234375e-7,
+                            -0.011360406875610352
                         ]
                     }
                 }
@@ -7623,21 +7605,6 @@
                 "EditorLockComponent": {
                     "$type": "EditorLockComponent",
                     "Id": 13831879163933235937
-                },
-                "EditorMjEqualityComponent": {
-                    "$type": "EditorMjEqualityComponent",
-                    "Id": 4847790166968715405,
-                    "Configs": [
-                        {
-                            "equalityMap": {
-                                "body1": "rm65b_mocap",
-                                "body2": "ee_center_body",
-                                "solimp": "0.9 0.95 0.001",
-                                "solref": "0.02 1"
-                            },
-                            "type": 1
-                        }
-                    ]
                 },
                 "EditorOnlyEntityComponent": {
                     "$type": "EditorOnlyEntityComponent",

@@ -22,7 +22,7 @@ def register_env(grpc_address, record_state, record_file, agent_name, time_step,
     gym.register(
         id=f"Openloong-v0-OrcaGym-{grpc_address[-2:]}",
         entry_point="envs.openloong.openloong_env:OpenLoongEnv",
-        kwargs={'frame_skip': 1,   # 1 action per frame
+        kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
                 'action_step_count': 0,
@@ -47,7 +47,7 @@ def run_simulation(env, time_step):
         action = env.action_space.sample()
         observation, reward, terminated, truncated, info = env.step(action)
 
-        # 帧率为 60fps ，为显示为正常速度，每次渲染间隔 16ms
+        # 
         elapsed_time = datetime.now() - start_time
 
         print(f"elapsed_time (ms): {elapsed_time.total_seconds() * 1000}")
@@ -83,11 +83,11 @@ if __name__ == '__main__':
     register_env(grpc_address, RecordState.NONE, 'openloong_ctrl.h5', "AzureLoong", time_step, urdf_path, json_path, log_path)
 
     env = gym.make(env_id)        
-    print("启动仿真环境")    
+    print("Start Simulation!")    
 
     try:
         run_simulation(env, time_step)
     except KeyboardInterrupt:
-        print("关闭仿真环境")        
+        print("Exit Simulation!")        
         env.save_record()
         env.close()

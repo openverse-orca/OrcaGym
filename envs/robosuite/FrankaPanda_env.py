@@ -223,11 +223,11 @@ class FrankaPandaEnv(MujocoRobotEnv):
                                                                    mocap_xquat[0]]))
         # mocap_axisangle[1] = -mocap_axisangle[1]
         action = np.concatenate([mocap_xpos, mocap_axisangle])
-        print("action:", action)
+        # print("action:", action)
         self._controller.set_goal(action)
         
         self.ctrl[0:7] = self._controller.run_controller()
-        print("ctrl: ", self.ctrl)
+        # print("ctrl: ", self.ctrl)
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:
@@ -237,7 +237,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._joystick_manager.update()
 
         pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
-        pos_ctrl = np.array([pos_ctrl_dict['x'], pos_ctrl_dict['y'], pos_ctrl_dict['z']])
+        pos_ctrl = np.array([pos_ctrl_dict['y'], pos_ctrl_dict['x'], pos_ctrl_dict['z']])
         rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
         rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
         

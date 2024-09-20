@@ -117,20 +117,17 @@
     </body>
   </worldbody>
 
-  <equality>
-    <weld body1="ee_mocap" body2="ee_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
-  </equality>
-
   <actuator>
-    <general name="actuator1" joint="joint1" gainprm="2000" biasprm="0 -2000 -200"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-100 100"/>
-    <general name="actuator2" joint="joint2" gainprm="2000" biasprm="0 -2000 -200"  biastype="affine" dyntype="none" ctrlrange="-2.268 2.268" forcerange="-100 100"/>
-    <general name="actuator3" joint="joint3" gainprm="1500" biasprm="0 -1500 -150"  biastype="affine" dyntype="none" ctrlrange="-2.355 2.355" forcerange="-75 75"/>
-    <general name="actuator4" joint="joint4" gainprm="1500" biasprm="0 -1500 -150"  biastype="affine" dyntype="none" ctrlrange="-3.1 3.1" forcerange="-75 75"/>
-    <general name="actuator5" joint="joint5" gainprm="1000" biasprm="0 -1000 -100"  biastype="affine" dyntype="none" ctrlrange="-2.233 2.233" forcerange="-50 50"/>
-    <general name="actuator6" joint="joint6" gainprm="1000" biasprm="0 -1000 -100"  biastype="affine" dyntype="none" ctrlrange="-6.28 6.28" forcerange="-50 50"/>
-    <general name="actuator_gripper1" joint="Gripper_Link1" ctrlrange="0 1" forcerange="-15 15" />
-    <general name="actuator_gripper2" joint="Gripper_Link2" ctrlrange="-1 0" forcerange="-15 15" />
-    <general name="actuator_gripper11" joint="Gripper_Link11" ctrlrange="-1 0" forcerange="-15 15" />
-    <general name="actuator_gripper22" joint="Gripper_Link22" ctrlrange="0 1" forcerange="-15 15" />
+    <motor name="actuator1" joint="joint1" gear="100" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="actuator2" joint="joint2" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="actuator3" joint="joint3" gear="1" ctrllimited="true" ctrlrange="-48 48"/>
+    <motor name="actuator4" joint="joint4" gear="1" ctrllimited="true" ctrlrange="-48 48"/>
+    <motor name="actuator5" joint="joint5" gear="1" ctrllimited="true" ctrlrange="-12.4 12.4"/>
+    <motor name="actuator6" joint="joint6" gear="100" ctrllimited="true" ctrlrange="-12.4 12.4"/>
+
+    <position name="actuator_gripper1" joint="Gripper_Link1" ctrlrange="0 0.6981" forcerange="-15 15" />
+    <position name="actuator_gripper2" joint="Gripper_Link2" ctrlrange="-0.6981 0" forcerange="-15 15" />
+    <position name="actuator_gripper11" joint="Gripper_Link11" ctrlrange="-0.6981 0" forcerange="-15 15" />
+    <position name="actuator_gripper22" joint="Gripper_Link22" ctrlrange="-0.6981 0" forcerange="-15 15" />
   </actuator>  
 </mujoco>
