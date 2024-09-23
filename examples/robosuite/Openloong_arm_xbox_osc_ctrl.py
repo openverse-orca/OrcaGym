@@ -2,9 +2,10 @@ import os
 import sys
 import time
 
-current_file_path = os.path.abspath('./')
+current_file_path = os.path.abspath('./../../')
 
 if current_file_path not in sys.path:
+    print("add path: ", current_file_path)
     sys.path.append(current_file_path)
 
 

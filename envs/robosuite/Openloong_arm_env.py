@@ -72,6 +72,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
         self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_moto_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
+        # self._r_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._r_arm_actuator_id)
         # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
@@ -84,7 +85,8 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_l_03"),self.actuator("M_arm_l_04"),
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
         self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
-        self._l_neutral_joint_values = np.array([1.225, -0.626, 1.128, 1.427, -0.505, -0.453, 0.255])
+        self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
+        # self._l_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._l_arm_actuator_id)
         # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
@@ -101,21 +103,24 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._set_init_state()
 
         EE_NAME  = self.site("ee_center_site")
-        site_dict = self.query_site_pos_and_quat([EE_NAME])
-        self._initial_grasp_site_xpos = site_dict[EE_NAME]['xpos']
-        self._initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
+        _site_dict = self.query_site_pos_and_quat([EE_NAME])
+        self._initial_grasp_site_xpos = _site_dict[EE_NAME]['xpos']
+        self._initial_grasp_site_xquat = _site_dict[EE_NAME]['xquat']
+        self._initial_grasp_site_euler = rotations.quat2euler(self._initial_grasp_site_xquat)
         self._saved_xpos = self._initial_grasp_site_xpos
         self._saved_xquat = self._initial_grasp_site_xquat
 
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
         EE_NAME_R  = self.site("ee_center_site_r")
-        site_dict_r = self.query_site_pos_and_quat([EE_NAME_R])
-        self.initial_grasp_site_xpos_r = site_dict_r[EE_NAME_R]['xpos']
-        self.initial_grasp_site_xquat_r = site_dict_r[EE_NAME_R]['xquat']
-        self.save_xquat_r = self.initial_grasp_site_xquat_r.copy()
+        _site_dict_r = self.query_site_pos_and_quat([EE_NAME_R])
+        self._initial_grasp_site_xpos_r = _site_dict_r[EE_NAME_R]['xpos']
+        self._initial_grasp_site_xquat_r = _site_dict_r[EE_NAME_R]['xquat']
+        # self._initial_grasp_site_xquat_r[3] *= -1
+        self._initial_grasp_site_euler_r = rotations.quat2euler(self._initial_grasp_site_xquat_r)
+        self._save_xquat_r = self._initial_grasp_site_xquat_r.copy()
 
-        self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
+        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
 
         # self._joystick_manager = XboxJoystickManager()
         # joystick_names = self._joystick_manager.get_joystick_names()
@@ -286,8 +291,9 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         elif self._pico_joystick is not None:
             mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = self._processe_pico_joystick()
-            if mocap_l_xpos is None:
-                return
+            # mocap_r_xquat[1] *= -1
+            # mocap_r_xquat[2] *= -1
+            # mocap_r_xquat[3] *= -1
             self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
             self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
         
@@ -302,10 +308,10 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                                                    mocap_r_xquat[0]]))              
         # mocap_axisangle[1] = -mocap_axisangle[1]
         action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
-        print("action r:", action_r)
+        # print("action r:", action_r)
         self._r_controller.set_goal(action_r)
         ctrl = self._r_controller.run_controller()
-        print("ctrl r: ", ctrl)
+        # print("ctrl r: ", ctrl)
         for i in range(len(self._r_arm_actuator_id)):
             self.ctrl[self._r_arm_actuator_id[i]] = ctrl[i]
 
@@ -315,11 +321,11 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                                                    mocap_l_xquat[3], 
                                                                    mocap_l_xquat[0]]))  
         action_l = np.concatenate([mocap_l_xpos, mocap_l_axisangle])
-        print("action l:", action_l)        
+        # print("action l:", action_l)        
         # print(action)
         self._l_controller.set_goal(action_l)
         ctrl = self._l_controller.run_controller()
-        print("ctrl l: ", ctrl)
+        # print("ctrl l: ", ctrl)
         for i in range(len(self._l_arm_actuator_id)):
             self.ctrl[self._l_arm_actuator_id[i]] = ctrl[i]
         
@@ -362,7 +368,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
         transform = self._pico_joystick.get_all_state()
 
         if transform is None:
-            return self._initial_grasp_site_xpos, self._initial_grasp_site_xquat, self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r
+            return self._initial_grasp_site_xpos, self._initial_grasp_site_xquat, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r
 
         left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform)
         right_relative_postion, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform)
@@ -373,16 +379,17 @@ class OpenloongArmEnv(MujocoRobotEnv):
         # ee_r_xpos, ee_r_xmat = self.get_ee_r_xform()
 
         mocap_l_xpos = self._initial_grasp_site_xpos + left_relative_position
-        mocap_r_xpos = self.initial_grasp_site_xpos_r + right_relative_postion
+        mocap_r_xpos = self._initial_grasp_site_xpos_r + right_relative_postion
 
-        # print("left:", (left_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat())
-        # print("right:", (right_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat())
-        mocap_l_xquat = (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat()
-        mocap_r_xquat = (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat()
-        # print("left:", R.from_matrix(left_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(left_relative_rotation))
-        # print("right:", R.from_matrix(right_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(right_relative_rotation))
-        # self.set_grasp_mocap(mocap_l_xpos, rotations.mat2quat(left_relative_rotation))
-        # self.set_grasp_mocap_r(mocap_r_xpos, rotations.mat2quat(right_relative_rotation))
+
+
+        # mocap_l_xquat = (R.from_euler('xyz', self._initial_grasp_site_euler) * left_relative_rotation).as_quat()
+        left_relative_xquat = (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat()
+        mocap_l_xquat = (R.from_quat(self._initial_grasp_site_xquat) * R.from_quat(left_relative_xquat)).as_quat()
+        # mocap_r_xquat = (R.from_euler('xyz', self._initial_grasp_site_euler_r) * right_relative_rotation).as_quat()
+        right_relative_xquat = (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat()
+        mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r) * R.from_quat(right_relative_xquat)).as_quat()
+
 
         return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
 
@@ -424,7 +431,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
     def _reset_sim(self) -> bool:
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
-        self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
+        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
         return True
 
