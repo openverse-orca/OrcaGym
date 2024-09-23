@@ -13,12 +13,17 @@ class CameraWrapper:
         self.name = name
         self.port = port
         self.image = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
+        self.enabled = False
 
     def __del__(self):
+        if not self.enabled:
+            return
         self.running = False
         self.thread.join()
 
     def start(self):
+        if not self.enabled:
+            return
         self.running = True
         self.thread = threading.Thread(target=self.loop)
         self.thread.start()

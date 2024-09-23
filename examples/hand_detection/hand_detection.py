@@ -1,45 +1,47 @@
 import os
 import sys
-import time
 
 current_file_path = os.path.abspath('./')
 
+# 将项目根目录添加到 PYTHONPATH
+print(current_file_path)
 if current_file_path not in sys.path:
     sys.path.append(current_file_path)
 
 
 import gymnasium as gym
+import asyncio
+import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
 from envs.franka_control.franka_joystick_env import RecordState
 
 
+nest_asyncio.apply()
 
+# TIME_STEP = 0.016666666666666
+TIME_STEP = 0.005
 
-# 
-TIME_STEP = 0.01
-
-def register_env(grpc_address, record_state, record_file, control_freq=20):
+def register_env(grpc_address, record_state, record_file):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
-        entry_point="envs.robosuite.Openloong_arm_env:OpenloongArmEnv",
-        kwargs={'frame_skip': 1,   
+        entry_point="envs.hand_detection.hand_detection_env:HandDetectionEnv",
+        kwargs={'frame_skip': 1,   # 1 action per frame
                 'reward_type': "dense",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
                 'action_step_count': 0,
                 'grpc_address': grpc_address, 
-                'agent_names': ['AzureLoong'], 
+                'agent_names': [''], 
                 'time_step': TIME_STEP,
                 'record_state': record_state,
-                'record_file': record_file,
-                'control_freq': control_freq},
-        max_episode_steps=sys.maxsize,
+                'record_file': record_file},
+        max_episode_steps=60 * 60 * 60,  # 60fps @ 1 hour
         reward_threshold=0.0,
     )
 
-def continue_training(env):
+async def continue_training(env):
     observation, info = env.reset(seed=42)
     while True:
         start_time = datetime.now()
@@ -47,29 +49,27 @@ def continue_training(env):
         action = env.action_space.sample()
         observation, reward, terminated, truncated, info = env.step(action)
 
+        # 帧率为 60fps ，为显示为正常速度，每次渲染间隔 16ms
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < TIME_STEP:
-            time.sleep(TIME_STEP - elapsed_time.total_seconds())
+            await asyncio.sleep(TIME_STEP - elapsed_time.total_seconds())
 
     
 
 if __name__ == "__main__":
-    """
-    OSC运动算法控制青龙机器人机械臂的示例
-    """
     try:
         grpc_address = "localhost:50051"
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState controls the recording of the simulation data
-        register_env(grpc_address, RecordState.NONE, 'xbox_control_record.h5', 20)
+        # RecordState 控制录制和回放状态
+        register_env(grpc_address, RecordState.NONE, 'hand_detection_record.h5')
 
         env = gym.make(env_id)        
-        print("Starting simulation...")
+        print("启动仿真环境")
 
-        continue_training(env)
+        asyncio.run(continue_training(env))
     except KeyboardInterrupt:
-        print("Simulation stopped")        
+        print("关闭仿真环境")        
         env.save_record()
         env.close()
