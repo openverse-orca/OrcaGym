@@ -4,7 +4,8 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from orca_gym.devices.xbox_joystick import XboxJoystickManager, XboxJoystick
+from orca_gym.devices.pico_joytsick import PicoJoystick
 import h5py
 from scipy.spatial.transform import Rotation as R
 import os
@@ -23,11 +24,11 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
     """
     def __init__(
         self,
-        frame_skip: int = 5,        
+        frame_skip: int = 5,
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
-        time_step: float = 0.016,  # 0.016 for 60 fps        
-        record_state: str = RecordState.NONE,        
+        time_step: float = 0.016,  # 0.016 for 60 fps
+        record_state: str = RecordState.NONE,
         record_file: Optional[str] = None,
         **kwargs,
     ):
@@ -43,7 +44,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             frame_skip = frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,
-            time_step = time_step,            
+            time_step = time_step,
             n_actions=action_size,
             observation_space = None,
             **kwargs,
@@ -85,16 +86,20 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         self.set_grasp_mocap_r(self.initial_grasp_site_xpos_r, self.initial_grasp_site_xquat_r)
 
-        self.joystick_manager = XboxJoystickManager()
-        joystick_names = self.joystick_manager.get_joystick_names()
-        if len(joystick_names) == 0:
-            raise ValueError("No joystick detected.")
+        # self.joystick_manager = XboxJoystickManager()
+        # joystick_names = self.joystick_manager.get_joystick_names()
+        # if len(joystick_names) == 0:
+        #     raise ValueError("No joystick detected.")
 
-        self.joysticks = []
-        for name in joystick_names:
-            self.joysticks.append(self.joystick_manager.get_joystick(name))
-            if len(self.joysticks) >= 2:
-                break
+        # self.joysticks = []
+        # for name in joystick_names:
+        #     self.joysticks.append(self.joystick_manager.get_joystick(name))
+        #     if len(self.joysticks) >= 2:
+        #         break
+
+
+        # self.joystick = XboxJoystick()
+        self.joystick = PicoJoystick()
 
         self.camera_names = ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
         self.use_depth_image = False
@@ -112,7 +117,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         for cam_name in self.camera_names:
             self.data_dict[f'/observations/images/{cam_name}'] = []
             if self.use_depth_image:
-                self.data_dict[f'/observations/images_depth/{cam_name}'] = []        
+                self.data_dict[f'/observations/images_depth/{cam_name}'] = []
 
         if self.record_state == RecordState.RECORD:
             if  os.path.exists(self.record_file):
@@ -164,7 +169,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
-    
+
     def _iter_dataset(self, name, item):
         if isinstance(item, h5py.Dataset):
             self.data_dict["/" + name] = item[...]
@@ -172,7 +177,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
     def _load_record(self):
         if self.record_file is None:
             raise ValueError("record_file is not set.")
-        
+
         # 读取record_file中的数据，存储到record_pool中
         with h5py.File(self.record_file, 'r') as f:
             f.visititems(self._iter_dataset)
@@ -188,8 +193,8 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 print("Replay finished.")
 
         if self.record_state == RecordState.REPLAY_FINISHED:
-            return    
-        
+            return
+
         if self.record_cursor == 0:
             if not self._load_record():
                 self.record_state = RecordState.REPLAY_FINISHED
@@ -202,7 +207,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
     def save_record_to_file(self):
         if self.record_state != RecordState.RECORD:
             return
-        
+
         if self.record_file is None:
             raise ValueError("record_file is not set.")
 
@@ -230,7 +235,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             _ = root.create_dataset('base_action', (self.data_size, 2))
 
             # data_dict write into h5py.File
-            for name, array in self.data_dict.items():  
+            for name, array in self.data_dict.items():
                 root[name][...] = array
         print("Saved to file.")
 
@@ -239,6 +244,35 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             self._replay()
             return
 
+        changed = False
+        if isinstance(self.joystick, XboxJoystick):
+            changed = self.handle_xbox_joystick()
+        elif isinstance(self.joystick, PicoJoystick):
+            changed = self.handle_pico_joystick()
+
+        if not changed:
+            if self.record_state == RecordState.RECORD:
+                self._save_record()
+            return
+
+        self.mj_forward()
+        joint_qpos = self.query_joint_qpos(self.arm_joint_names)
+        self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.left_arm_joint_names]).flat.copy()
+        self.ctrl[7:14] = np.array([joint_qpos[joint_name] for joint_name in self.right_arm_joint_names]).flat.copy()
+
+        # 补偿旋转控制
+        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
+        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
+        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
+        #     print("Rot_ctrl: ", rot_ctrl)
+
+        # self._joint_rot_ctrl_compensation(rot_ctrl)
+
+        # 将控制数据存储到record_pool中
+        if self.record_state == RecordState.RECORD:
+            self._save_record()
+
+    def handle_xbox_joystick(self):
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick_manager.update()
 
@@ -286,28 +320,35 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             else:
                 self.set_grasp_mocap_r(mocap_xpos, mocap_xquat)
             # print(index, mocap_xpos, mocap_xquat)
-        
-        if not changed:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
+        return changed
 
-        self.mj_forward()
-        joint_qpos = self.query_joint_qpos(self.arm_joint_names)
-        self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.left_arm_joint_names]).flat.copy()
-        self.ctrl[7:14] = np.array([joint_qpos[joint_name] for joint_name in self.right_arm_joint_names]).flat.copy()
+    def handle_pico_joystick(self):
+        transform = self.joystick.get_all_state()
 
-        # 补偿旋转控制
-        # if np.linalg.norm(rot_ctrl) < CTRL_THRESHOLD:
-        #     # 如果输入量小，纠正当前旋转姿态到目标姿态
-        #     rot_ctrl = self._calculate_yaw_pitch_roll(ee_xquat, mocap_xquat)
-        #     print("Rot_ctrl: ", rot_ctrl)
+        if transform is None:
+            return False
 
-        # self._joint_rot_ctrl_compensation(rot_ctrl)
+        # left_relative_position, left_relative_rotation = self.joystick.get_left_relative_move(transform)
+        # right_relative_postion, right_relative_rotation = self.joystick.get_right_relative_move(transform)
+        left_relative_position, left_relative_rotation = self.joystick.get_motion_trackers_relative_move(transform)[0]
+        right_relative_postion, right_relative_rotation = self.joystick.get_motion_trackers_relative_move(transform)[1]
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
+        # ee_l_xpos, ee_l_xmat = self.get_ee_xform()
+        # ee_r_xpos, ee_r_xmat = self.get_ee_r_xform()
+
+        mocap_l_xpos = self.initial_grasp_site_xpos + left_relative_position
+        mocap_r_xpos = self.initial_grasp_site_xpos_r + right_relative_postion
+
+        # print("left:", (left_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat())
+        # print("right:", (right_relative_rotation).as_euler('yzx', degrees=True), (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat())
+        self.set_grasp_mocap(mocap_l_xpos, (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat())
+        self.set_grasp_mocap_r(mocap_r_xpos, (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat())
+        # print("left:", R.from_matrix(left_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(left_relative_rotation))
+        # print("right:", R.from_matrix(right_relative_rotation).as_euler('yzx', degrees=True), rotations.mat2quat(right_relative_rotation))
+        # self.set_grasp_mocap(mocap_l_xpos, rotations.mat2quat(left_relative_rotation))
+        # self.set_grasp_mocap_r(mocap_r_xpos, rotations.mat2quat(right_relative_rotation))
+
+        return True
 
     def _save_record(self) -> None:
         if len(self.data_dict['/observations/qpos']) < self.data_size:
@@ -342,7 +383,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 [
                     ee_position,
                     ee_velocity
-                ]).copy()            
+                ]).copy()
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
@@ -423,4 +464,4 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         finger1 = qpos_dict[self.joint("Gripper_Link11")]
         finger2 = qpos_dict[self.joint("Gripper_Link22")]
         return finger1 + finger2
-    
+
