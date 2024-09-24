@@ -16,6 +16,7 @@ class PicoJoystick:
         self.thread.start()
         self.first_transform = None
         self.current_transform = None
+        self.reset_pos = False
     
     def __del__(self):
         self.running = False
@@ -34,6 +35,7 @@ class PicoJoystick:
                     self.current_transform = self.extact_all_transform(json.loads(message))
                     if is_first_message:
                         self.first_transform = copy.deepcopy(self.current_transform)
+                        self.reset_pos = True
                         is_first_message = False
         except Exception as e:
             print("disconnected", e)
@@ -44,6 +46,12 @@ class PicoJoystick:
 
     def update(self):
         pass
+
+    def is_reset_pos(self):
+        if self.reset_pos:
+            self.reset_pos = False
+            return True
+        return False
 
     def get_all_state(self):
         with self.mutex:

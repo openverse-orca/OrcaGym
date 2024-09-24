@@ -25,7 +25,7 @@ def register_env(grpc_address, record_state, record_file, control_freq=20):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
-        entry_point="envs.robosuite.Openloong_arm_env:OpenloongArmEnv",
+        entry_point="envs.robosuite.Openloong_arm_xbox_env:OpenloongArmEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
