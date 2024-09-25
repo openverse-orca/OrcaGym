@@ -43,7 +43,7 @@ class HandInfo:
         self.hand_points = [HandPointLocation() for i in range(mediapipe_hand_point_count)]
         self.qpos = np.zeros(openloong_hand_point_count)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return f"hand_index: {self.hand_index}, qpos: {self.qpos}"
 
 
@@ -53,6 +53,7 @@ class HandJoystick:
         self.running = True
         self.thread = threading.Thread(target=self._loop)
         self.thread.start()
+        self.current_hand_infos = None
     
     def __del__(self):
         self.running = False
@@ -60,7 +61,6 @@ class HandJoystick:
 
     def _loop(self):
         asyncio.run(self._start_server())
-        
 
     async def _handler(self, websocket):
         print("new connection")
@@ -68,14 +68,14 @@ class HandJoystick:
             async for message in websocket:
                 # print(message)
                 hand_infos = self.parse_message(message)
-                print(hand_infos)
+                # print(hand_infos)
                 with self.mutex:
-                    pass
+                    self.current_hand_infos = hand_infos
         except Exception as e:
             print("disconnected", e)
 
     async def _start_server(self):
-        async with serve(self._handler, "0.0.0.0", 8001, ping_interval=None):
+        async with serve(self._handler, "0.0.0.0", 8787, ping_interval=None):
             await asyncio.get_running_loop().create_future()  # run forever
 
     def calculate_qpos(self, hand_infos: list[HandInfo]):
@@ -108,3 +108,7 @@ class HandJoystick:
 
     def update(self):
         pass
+
+    def get_hand_infos(self):
+        with self.mutex:
+            return copy.deepcopy(self.current_hand_infos)

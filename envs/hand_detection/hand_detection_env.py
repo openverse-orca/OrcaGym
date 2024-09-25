@@ -50,15 +50,6 @@ class HandDetectionEnv(MujocoRobotEnv):
 
         self.neutral_joint_values = np.zeros(11)
 
-        print("Opt Config before setting: ", self.gym.opt_config)
-        # self.gym.opt_config["o_solref"] = [0.005, 0.9]
-        # self.gym.opt_config['o_solimp'] = [0.99, 0.99, 0.001, 0.5, 2.0]
-        self.gym.opt_config['noslip_iterations'] = 10
-        self.set_opt_config(self.gym.opt_config)
-
-        self.gym.opt_config = self.query_opt_config()
-        print("Opt Config after setting: ", self.gym.opt_config)
-
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
         self.nu = self.model.nu
@@ -69,17 +60,19 @@ class HandDetectionEnv(MujocoRobotEnv):
 
         self._set_init_state()
 
-
         self.joystick = HandJoystick()
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
 
+        self.ctrl = np.array([0.00] * 11)
+
         self.mj_forward()
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self._set_action()
+        self.do_simulation(self.ctrl, self.frame_skip)
         obs = self._get_obs().copy()
 
         info = {}
@@ -128,14 +121,26 @@ class HandDetectionEnv(MujocoRobotEnv):
             self._replay()
             return
 
-        changed = self.handle_hand_joystick()
-        
-        if not changed:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
-
         self.mj_forward()
+
+        hand_infos = self.joystick.get_hand_infos()
+        radian_tolerance = 0.0
+        if hand_infos is not None:
+            for hand_info in hand_infos:
+                if hand_info.hand_index == 0:
+                    hand_point_names = ["J1", "J2", "J3", "J4", "J5", "J6", "J7", "J8", "J9", "J10", "J11"]
+                    real_hand_qpos_dict = self.query_joint_qpos(hand_point_names)
+                    hand_qpos_list = {}
+                    for name, value in zip(hand_point_names, hand_info.qpos):
+                        if name in real_hand_qpos_dict:
+                            real_value = real_hand_qpos_dict[name]
+                            if abs(value - real_value) > radian_tolerance:
+                                hand_qpos_list[name] = np.array([value])
+                            else:
+                                hand_qpos_list[name] = np.array([real_value])
+                        # hand_qpos_list[name] = np.array([value])
+                    # self.set_joint_qpos(hand_qpos_list)
+                    self.ctrl[:11] = np.array([hand_qpos_list[name] for name in hand_point_names]).flat.copy()
 
         # 将控制数据存储到record_pool中
         if self.record_state == RecordState.RECORD:
