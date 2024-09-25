@@ -323,7 +323,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         return changed
 
     def handle_pico_joystick(self):
-        transform = self.joystick.get_all_state()
+        transform = self.joystick.get_transform_list()
 
         if transform is None:
             return False

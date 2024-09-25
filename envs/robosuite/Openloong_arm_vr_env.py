@@ -72,10 +72,15 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
         self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_moto_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
-        # self._r_neutral_joint_values = np.zeros(7)
+        
+        self._r_hand_moto_names = [self.actuator("M_zbr_J1"), self.actuator("M_zbr_J2"), self.actuator("M_zbr_J3")
+                                   ,self.actuator("M_zbr_J4"),self.actuator("M_zbr_J5"),self.actuator("M_zbr_J6"),
+                                   self.actuator("M_zbr_J7"),self.actuator("M_zbr_J8"),self.actuator("M_zbr_J9"),
+                                   self.actuator("M_zbr_J10"),self.actuator("M_zbr_J11")]
+        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_moto_names]
 
         print("arm_actuator_id: ", self._r_arm_actuator_id)
-        # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
+        print("hand_actuator_id: ", self._r_hand_actuator_id)
 
         # index used to distinguish arm and gripper joints
         self._l_arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), 
@@ -86,18 +91,21 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
         self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
-        # self._l_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._l_arm_actuator_id)
-        # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
+        self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
+                                    ,self.actuator("M_zbll_J4"),self.actuator("M_zbll_J5"),self.actuator("M_zbll_J6"),
+                                    self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
+                                    self.actuator("M_zbll_J10"),self.actuator("M_zbll_J11")]
+        self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
 
         # control range
-        all_actuator_ctrlrange = self.model.get_actuator_ctrlrange()
-        self._r_ctrl_range = [all_actuator_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
-        print("ctrl_range: ", self._r_ctrl_range)
+        self._all_ctrlrange = self.model.get_actuator_ctrlrange()
+        r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
+        print("ctrl_range: ", r_ctrl_range)
 
-        self._l_ctrl_range = [all_actuator_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
-        print("ctrl_range: ", self._l_ctrl_range)
+        l_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
+        print("ctrl_range: ", l_ctrl_range)
 
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
@@ -106,7 +114,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         _site_dict = self.query_site_pos_and_quat([EE_NAME])
         self._initial_grasp_site_xpos = _site_dict[EE_NAME]['xpos']
         self._initial_grasp_site_xquat = _site_dict[EE_NAME]['xquat']
-        self._initial_grasp_site_euler = rotations.quat2euler(self._initial_grasp_site_xquat)
         self._saved_xpos = self._initial_grasp_site_xpos
         self._saved_xquat = self._initial_grasp_site_xquat
 
@@ -116,9 +123,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         _site_dict_r = self.query_site_pos_and_quat([EE_NAME_R])
         self._initial_grasp_site_xpos_r = _site_dict_r[EE_NAME_R]['xpos']
         self._initial_grasp_site_xquat_r = _site_dict_r[EE_NAME_R]['xquat']
-        # self._initial_grasp_site_xquat_r[3] *= -1
-        self._initial_grasp_site_euler_r = rotations.quat2euler(self._initial_grasp_site_xquat_r)
-        self._save_xquat_r = self._initial_grasp_site_xquat_r.copy()
 
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         
@@ -140,7 +144,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
             "qpos": qpos_offsets,
             "qvel": qvel_offsets,
         }
-        self._r_controller_config["actuator_range"] = self._r_ctrl_range
+        self._r_controller_config["actuator_range"] = r_ctrl_range
         self._r_controller_config["policy_freq"] = self.control_freq
         self._r_controller_config["ndim"] = len(self._r_arm_joint_names)
         self._r_controller_config["control_delta"] = False
@@ -165,7 +169,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
             "qpos": qpos_offsets,
             "qvel": qvel_offsets,
         }
-        self._l_controller_config["actuator_range"] = self._l_ctrl_range
+        self._l_controller_config["actuator_range"] = l_ctrl_range
         self._l_controller_config["policy_freq"] = self.control_freq
         self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
         self._l_controller_config["control_delta"] = False
@@ -173,6 +177,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
         self._l_controller.update_initial_joints(self._l_neutral_joint_values)
+
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -196,15 +201,54 @@ class OpenloongArmEnv(MujocoRobotEnv):
         return obs, reward, terminated, truncated, info
     
     def _set_gripper_ctrl(self, joystick_state) -> None:
-        if (joystick_state["buttons"]["A"]):
-            self.ctrl[7] += 0.001
-            self.ctrl[8] += 0.001
-        elif (joystick_state["buttons"]["B"]):
-            self.ctrl[7] -= 0.001
-            self.ctrl[8] -= 0.001
+        trigger_value = joystick_state["leftHand"]["triggerValue"]  # Value in [0, 1]
+        
+        # Adjust sensitivity using an exponential function
+        k = 5  # Adjust 'k' to change the curvature of the exponential function
+        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
+        offset_rate = -adjusted_value
 
-        self.ctrl[7] = np.clip(self.ctrl[7], 0, 0.08)
-        self.ctrl[8] = np.clip(self.ctrl[8], 0, 0.08)
+        for actuator_id in self._l_hand_actuator_id:
+            actuator_name = self.model.actuator_id2name(actuator_id)
+            if actuator_name == self.actuator("M_zbll_J2") or actuator_name == self.actuator("M_zbll_J3"):
+                offset_rate *= -1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self.ctrl[actuator_id] = offset_rate * abs_ctrlrange
+            self.ctrl[actuator_id] = np.clip(
+                self.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
+
+    def _set_gripper_ctrl_r(self, joystick_state) -> None:
+        trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
+        
+        # Adjust sensitivity using an exponential function
+        k = 5  # Adjust 'k' to change the curvature of the exponential function
+        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
+        offset_rate = -adjusted_value
+
+        for actuator_id in self._r_hand_actuator_id:
+            actuator_name = self.model.actuator_id2name(actuator_id)
+            if actuator_name == self.actuator("M_zbr_J2") or actuator_name == self.actuator("M_zbr_J3"):
+                offset_rate *= -1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self.ctrl[actuator_id] = offset_rate * abs_ctrlrange
+            self.ctrl[actuator_id] = np.clip(
+                self.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
+        # offset_rate = -joystick_state["rightHand"]["triggerValue"]
+        # print("offset_rate: ", offset_rate)
+
+        # for actuator_id in self._r_hand_actuator_id:
+        #     if self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J2") or self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J3"):
+        #         offset_rate *= -1
+
+        #     abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+        #     self.ctrl[actuator_id] = offset_rate * abs_ctrlrange
+        #     self.ctrl[actuator_id] = np.clip(self.ctrl[actuator_id], self._all_ctrlrange[actuator_id][0], self._all_ctrlrange[actuator_id][1])
 
     def _load_record(self) -> None:
         if self.record_file is None:
@@ -268,9 +312,10 @@ class OpenloongArmEnv(MujocoRobotEnv):
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
 
         if self._pico_joystick is not None:
-            mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = self._processe_pico_joystick()
+            mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = self._processe_pico_joystick_move()
             self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
             self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
+            self._process_pico_joystick_operation()
         else:
             return
 
@@ -309,16 +354,16 @@ class OpenloongArmEnv(MujocoRobotEnv):
         if self.record_state == RecordState.RECORD:
             self._save_record()
 
-    def _processe_pico_joystick(self):
+    def _processe_pico_joystick_move(self):
         if self._pico_joystick.is_reset_pos():
             self._set_init_state()
 
-        transform = self._pico_joystick.get_all_state()
-        if transform is None:
+        transform_list = self._pico_joystick.get_transform_list()
+        if transform_list is None:
             return self._initial_grasp_site_xpos, self._initial_grasp_site_xquat, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r
 
-        left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform)
-        right_relative_postion, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform)
+        left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform_list)
+        right_relative_postion, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
         # left_relative_position, left_relative_rotation = self._pico_joystick.get_motion_trackers_relative_move(transform)[0]
         # right_relative_postion, right_relative_rotation = self._pico_joystick.get_motion_trackers_relative_move(transform)[1]
 
@@ -339,6 +384,14 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
 
         return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
+    
+    def _process_pico_joystick_operation(self):
+        joystick_state = self._pico_joystick.get_key_state()
+        if joystick_state is None:
+            return
+
+        self._set_gripper_ctrl_r(joystick_state)
+        self._set_gripper_ctrl(joystick_state)
 
     def _save_record(self) -> None:
         self.record_pool.append(self.ctrl.copy())   
@@ -353,13 +406,13 @@ class OpenloongArmEnv(MujocoRobotEnv):
         ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
 
 
-        achieved_goal = np.array([0,0,0])
+        achieved_goal = np.zeros(3)
         desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     ee_position,
                     ee_velocity,
-                    [0]
+                    np.zeros(1),
                 ]).copy()            
         result = {
             "observation": obs,
@@ -380,6 +433,11 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
+
+        print("""
+              To use VR controllers, please press both B and Y buttons to establish connection.
+              And then press A and X buttons to reset the position.
+              """)        
         return True
 
     # custom methods
@@ -405,7 +463,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
             arm_joint_qpos_list[name] = np.array([value])     
         self.set_joint_qpos(arm_joint_qpos_list)
-        print("set init joint state: " , arm_joint_qpos_list)
+        # print("set init joint state: " , arm_joint_qpos_list)
         # assign value to finger joints
         # gripper_joint_qpos_list = {}
         # for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):

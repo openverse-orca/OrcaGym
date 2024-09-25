@@ -16,6 +16,7 @@ class PicoJoystick:
         self.thread.start()
         self.first_transform = None
         self.current_transform = None
+        self.current_key_state = None
         self.reset_pos = False
     
     def __del__(self):
@@ -33,6 +34,7 @@ class PicoJoystick:
                 # print(message)
                 with self.mutex:
                     self.current_transform = self.extact_all_transform(json.loads(message))
+                    self.current_key_state = self.extact_key_state(json.loads(message))
                     if is_first_message:
                         self.first_transform = copy.deepcopy(self.current_transform)
                         self.reset_pos = True
@@ -53,13 +55,21 @@ class PicoJoystick:
             return True
         return False
 
-    def get_all_state(self):
+    def get_transform_list(self):
         with self.mutex:
             if self.current_transform is None:
                 return None
             else:
                 transform = copy.deepcopy(self.current_transform)
                 return transform
+            
+    def get_key_state(self):
+        with self.mutex:
+            if self.current_key_state is None:
+                return None
+            else:
+                key_state = copy.deepcopy(self.current_key_state)
+                return key_state
             
     def _calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
         R_yaw = np.array([
@@ -105,6 +115,20 @@ class PicoJoystick:
                 motion_trackers_transform.append(self.extact_single_transform(motionTracker))
         return [left_hand_transform, right_hand_transform, motion_trackers_transform]
     
+    def extact_key_state(self, message) -> dict:
+        left_hand_key_state = {"triggerValue": message["leftHand"]["triggerValue"],
+                               "primaryButtonPressed": message["leftHand"]["primaryButtonPressed"],
+                               "secondaryButtonPressed": message["leftHand"]["secondaryButtonPressed"],
+                               "joystickPosition": [message["leftHand"]["joystickPosition"]["x"], message["leftHand"]["joystickPosition"]["y"]],
+                               "joystickPressed": message["leftHand"]["joystickPressed"]}
+
+        right_hand_key_state = {"triggerValue": message["rightHand"]["triggerValue"],
+                                "primaryButtonPressed": message["rightHand"]["primaryButtonPressed"],
+                                "secondaryButtonPressed": message["rightHand"]["secondaryButtonPressed"],
+                                "joystickPosition": [message["rightHand"]["joystickPosition"]["x"], message["rightHand"]["joystickPosition"]["y"]],
+                                "joystickPressed": message["rightHand"]["joystickPressed"]}
+        return {"leftHand": left_hand_key_state, "rightHand": right_hand_key_state}
+
     def get_left_relative_move(self, transform):
         relative_position = [x - y for x, y in zip(transform[0][0], self.first_transform[0][0])]
         relative_rotation = self.first_transform[0][1].inv() * transform[0][1]
