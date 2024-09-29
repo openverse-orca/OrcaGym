@@ -63,6 +63,11 @@ class OpenloongArmEnv(MujocoRobotEnv):
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
 
+        self._base_body_name = [self.body("base_link")]
+        self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
+        print("base_body_xpos: ", self._base_body_xpos)
+        print("base_body_xquat: ", self._base_body_xquat)
+
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
                                  self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
@@ -91,6 +96,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
         self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
+        # self._l_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._l_arm_actuator_id)
         self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
@@ -316,6 +322,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
             self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
             self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
             self._process_pico_joystick_operation()
+            # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
         else:
             return
 
@@ -356,6 +363,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
     def _processe_pico_joystick_move(self):
         if self._pico_joystick.is_reset_pos():
+            self._pico_joystick.set_reset_pos(False)
             self._set_init_state()
 
         transform_list = self._pico_joystick.get_transform_list()
@@ -363,28 +371,43 @@ class OpenloongArmEnv(MujocoRobotEnv):
             return self._initial_grasp_site_xpos, self._initial_grasp_site_xquat, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r
 
         left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform_list)
-        right_relative_postion, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
-        # left_relative_position, left_relative_rotation = self._pico_joystick.get_motion_trackers_relative_move(transform)[0]
-        # right_relative_postion, right_relative_rotation = self._pico_joystick.get_motion_trackers_relative_move(transform)[1]
+        right_relative_position, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
 
-        # ee_l_xpos, ee_l_xmat = self.get_ee_xform()
-        # ee_r_xpos, ee_r_xmat = self.get_ee_r_xform()
+        # left_relative_position_org, left_relative_rotation_org = self._pico_joystick.get_left_relative_move_org(transform_list)
+        # right_relative_position_org, right_relative_rotation_org = self._pico_joystick.get_right_relative_move_org(transform_list)
 
-        mocap_l_xpos = self._initial_grasp_site_xpos + left_relative_position
-        mocap_r_xpos = self._initial_grasp_site_xpos_r + right_relative_postion
+        # print("left_relative_position: ", left_relative_position)
+        # print("left_relative_rotation: ", rotations.quat2euler(left_relative_rotation) * 180 / np.pi)
+        # print("right_relative_position: ", right_relative_position)
+        # print("right_relative_rotation: ", R.from_quat(right_relative_rotation, scalar_first=True).as_euler('xzy', degrees=True))
+        # print("right_relative_rotation_org: ", R.from_quat(right_relative_rotation_org, scalar_first=True).as_euler('xzy', degrees=True))
 
+        # def decompose(quat):
+        #     v = R.from_quat(quat, scalar_first=True).as_rotvec(degrees=True)
+        #     l = np.linalg.norm(v)
+        #     v = v / l
+        #     return [f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}', l]
+        
 
+            # v = R.from_quat(quat, scalar_first=True).as_euler('zxy', degrees=True)
+            # return f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}'
 
-        # mocap_l_xquat = (R.from_euler('xyz', self._initial_grasp_site_euler) * left_relative_rotation).as_quat()
-        left_relative_xquat = (R.from_euler('xyz', [0, 0, 0]) * left_relative_rotation).as_quat()
-        mocap_l_xquat = (R.from_quat(self._initial_grasp_site_xquat) * R.from_quat(left_relative_xquat)).as_quat()
-        # mocap_r_xquat = (R.from_euler('xyz', self._initial_grasp_site_euler_r) * right_relative_rotation).as_quat()
-        right_relative_xquat = (R.from_euler('xyz', [0, 0, 0]) * right_relative_rotation).as_quat()
-        mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r) * R.from_quat(right_relative_xquat)).as_quat()
+        # print("rotation_org: ", decompose(right_relative_rotation_org))
+        # print("rotation_mujo:", decompose(right_relative_rotation))
 
+        mocap_l_xpos = self._initial_grasp_site_xpos + rotations.quat_rot_vec(self._base_body_xquat, left_relative_position)
+        mocap_r_xpos = self._initial_grasp_site_xpos_r + rotations.quat_rot_vec(self._base_body_xquat, right_relative_position)
+
+        mocap_l_xquat = rotations.quat_mul(self._initial_grasp_site_xquat, left_relative_rotation)
+        # mocap_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
+        mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r, scalar_first=True) * 
+                         R.from_quat(right_relative_rotation, scalar_first=True)).as_quat(scalar_first=True, canonical=True)
+        
+   
 
         return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
-    
+
+
     def _process_pico_joystick_operation(self):
         joystick_state = self._pico_joystick.get_key_state()
         if joystick_state is None:
@@ -435,19 +458,19 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.mj_forward()
 
         print("""
-              To use VR controllers, please press both B and Y buttons to establish connection.
-              And then press A and X buttons to reset the position.
+              To use VR controllers, please press both B and Y buttons to connect / disconnect to the simulator.
+              And then press A and X buttons to reset the robot's hands to the initial position.
               """)        
         return True
 
     # custom methods
     # -----------------------------
     def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("leftHandMocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_grasp_mocap_r(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap_r"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("rightHandMocap"): {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 

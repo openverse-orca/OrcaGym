@@ -417,11 +417,11 @@ class OpenloongArmEnv(MujocoRobotEnv):
     # custom methods
     # -----------------------------
     def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("leftHandMocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_grasp_mocap_r(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rm65b_mocap_r"): {'pos': position, 'quat': orientation}}
+        mocap_pos_and_quat_dict = {self.mocap("rightHandMocap"): {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
