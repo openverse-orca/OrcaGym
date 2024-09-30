@@ -8,6 +8,8 @@
 1. **获取青龙机器人仓库源代码**
     
     Clone 青龙机器人源码，并安装编译依赖库。
+    
+    **注意** 青龙机器人源码托管在[OPENATOM社区](https://atomgit.com/OpenAtomFoundation/)，您需要首先注册该平台账户（免费），并**添加 SSH 公钥**，才能顺利clone代码。[点击查看如何生成 SSH KEY](https://docs.atomgit.com/user/sshkey/)
 
     ```bash
     git submodule update --init --recursive
