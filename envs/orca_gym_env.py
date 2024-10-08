@@ -89,7 +89,9 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     def _set_continuous_action_space(self):
         bounds = self.model.get_actuator_ctrlrange().copy().astype(np.float32)
-        low, high = bounds.T
+        low, high = 0.0, 0.0
+        if len(bounds.T) > 0:
+            low, high = bounds.T
         self.action_space = spaces.Box(low=low, high=high, dtype=np.float32)
         return self.action_space
     

@@ -2,11 +2,11 @@ import os
 import sys
 import time
 
-current_file_path = os.path.abspath('')
-project_root = os.path.dirname(os.path.dirname(current_file_path))
+current_file_path = os.path.abspath('./../../')
 
-if project_root not in sys.path:
-    sys.path.append(project_root)
+if current_file_path not in sys.path:
+    print("add path: ", current_file_path)
+    sys.path.append(current_file_path)
 
 
 import gymnasium as gym
@@ -19,13 +19,13 @@ from envs.franka_control.franka_joystick_env import RecordState
 
 
 # 
-TIME_STEP = 0.005
+TIME_STEP = 0.01
 
 def register_env(grpc_address, record_state, record_file, control_freq=20):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
-        entry_point="envs.robosuite.Openloong_arm_env:OpenloongArmEnv",
+        entry_point="envs.robosuite.Openloong_arm_xbox_env:OpenloongArmEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
