@@ -158,7 +158,7 @@ class PicoJoystick:
         try:
             is_first_message = True
             async for message in websocket:
-                # print(message)
+                print(message)
                 with self.mutex:
                     self.current_transform = self.extact_all_transform(json.loads(message))
                     self.current_key_state = self.extact_key_state(json.loads(message))
