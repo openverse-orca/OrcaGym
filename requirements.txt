@@ -9,3 +9,5 @@ sb3_contrib>=2.3.0
 pygame>=2.6.0
 h5py
 websockets
+numba
+termcolor

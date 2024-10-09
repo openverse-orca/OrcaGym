@@ -1,0 +1,1800 @@
+#usda 1.0
+(
+    defaultPrim = "rootPrim"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def PhysicsScene "physicsScene"
+{
+    custom float density = 1.225
+    custom string integrator = "implicitfast"
+    vector3f physics:gravityDirection = (0, 0, -1)
+    float physics:gravityMagnitude = 9.81
+    custom float timestep = 0.003333333
+    custom float viscosity = 0.000018
+}
+
+def Xform "rootPrim"
+{
+    def Xform "ee_mocap"
+    {
+        def Xform "ee_mocap" (
+            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+        )
+        {
+            custom int keyframeIndex = 0
+            custom bool mocap = 1
+            float physics:density = 1000
+            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-0.6000000238418579, 0, 0.4000000059604645, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+            def "joints"
+            {
+                def PhysicsFixedJoint "rootJoint_ee_mocap"
+                {
+                    rel physics:body1 = </rootPrim/ee_mocap/ee_mocap/ee_mocap>
+                }
+            }
+
+            def "visuals"
+            {
+                def Cube "_geom_0" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 0
+                    custom int condim = 3
+                    custom int contype = 0
+                    custom float density = 1000
+                    float3[] extent = [(-0.01, -0.01, -0.01), (0.01, 0.01, 0.01)]
+                    custom float3 friction = (1, 0.005, 0.0001)
+                    custom float3 geomSize = (0.005, 0.005, 0.005)
+                    custom int group = 0
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    custom float margin = 0
+                    custom string material = ""
+                    rel material:binding = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba>
+                    custom bool mjcfGeom = 1
+                    custom string name = "_geom_0"
+                    custom float3 pos = (0, 0, 0)
+                    custom quatf quat = (1, 0, 0, 0)
+                    custom float4 rgba = (0, 0.5, 0, 0.7)
+                    custom float3 solimp = (0.9, 0.95, 0.001)
+                    custom float2 solref = (0.02, 1)
+                    custom string type = "box"
+                    matrix4d xformOp:transform = ( (0.009999999776482582, 0, 0, 0), (0, 0.009999999776482582, 0, 0), (0, 0, 0.009999999776482582, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+
+                def Scope "Looks"
+                {
+                    def Material "material_rgba"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0, 0.5, 0)
+                            token outputs:surface
+                        }
+                    }
+
+                    def Material "material_rgba_1"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_1/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_1.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0, 0.5, 0)
+                            token outputs:surface
+                        }
+                    }
+
+                    def Material "material_rgba_2"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_2/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_2.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0, 0.5, 0)
+                            token outputs:surface
+                        }
+                    }
+
+                    def Material "material_rgba_3"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_3/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_3.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0, 0.5, 0)
+                            token outputs:surface
+                        }
+                    }
+                }
+
+                def Cube "_geom_1" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 0
+                    custom int condim = 3
+                    custom int contype = 0
+                    custom float density = 1000
+                    float3[] extent = [(-1, -0.01, -0.01), (1, 0.01, 0.01)]
+                    custom float3 friction = (1, 0.005, 0.0001)
+                    custom float3 geomSize = (0.5, 0.005, 0.005)
+                    custom int group = 0
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    custom float margin = 0
+                    custom string material = ""
+                    rel material:binding = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_1>
+                    custom bool mjcfGeom = 1
+                    custom string name = "_geom_1"
+                    custom float3 pos = (0, 0, 0)
+                    custom quatf quat = (1, 0, 0, 0)
+                    custom float4 rgba = (0, 0.5, 0, 0.1)
+                    custom float3 solimp = (0.9, 0.95, 0.001)
+                    custom float2 solref = (0.02, 1)
+                    custom string type = "box"
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 0.009999999776482582, 0, 0), (0, 0, 0.009999999776482582, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+
+                def Cube "_geom_2" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 0
+                    custom int condim = 3
+                    custom int contype = 0
+                    custom float density = 1000
+                    float3[] extent = [(-0.01, -1, -0.002), (0.01, 1, 0.002)]
+                    custom float3 friction = (1, 0.005, 0.0001)
+                    custom float3 geomSize = (0.005, 0.5, 0.001)
+                    custom int group = 0
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    custom float margin = 0
+                    custom string material = ""
+                    rel material:binding = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_2>
+                    custom bool mjcfGeom = 1
+                    custom string name = "_geom_2"
+                    custom float3 pos = (0, 0, 0)
+                    custom quatf quat = (1, 0, 0, 0)
+                    custom float4 rgba = (0, 0.5, 0, 0.1)
+                    custom float3 solimp = (0.9, 0.95, 0.001)
+                    custom float2 solref = (0.02, 1)
+                    custom string type = "box"
+                    matrix4d xformOp:transform = ( (0.009999999776482582, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0.0020000000949949026, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+
+                def Cube "_geom_3" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 0
+                    custom int condim = 3
+                    custom int contype = 0
+                    custom float density = 1000
+                    float3[] extent = [(-0.01, -0.01, -1), (0.01, 0.01, 1)]
+                    custom float3 friction = (1, 0.005, 0.0001)
+                    custom float3 geomSize = (0.005, 0.005, 0.5)
+                    custom int group = 0
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    custom float margin = 0
+                    custom string material = ""
+                    rel material:binding = </rootPrim/ee_mocap/ee_mocap/visuals/Looks/material_rgba_3>
+                    custom bool mjcfGeom = 1
+                    custom string name = "_geom_3"
+                    custom float3 pos = (0, 0, 0)
+                    custom quatf quat = (1, 0, 0, 0)
+                    custom float4 rgba = (0, 0.5, 0, 0.1)
+                    custom float3 solimp = (0.9, 0.95, 0.001)
+                    custom float2 solref = (0.02, 1)
+                    custom string type = "box"
+                    matrix4d xformOp:transform = ( (0.009999999776482582, 0, 0, 0), (0, 0.009999999776482582, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+            }
+        }
+    }
+
+    def Xform "base_link"
+    {
+        def Xform "base_link" (
+            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+        )
+        {
+            custom int keyframeIndex = 1
+            custom bool mocap = 0
+            float physics:density = 1000
+            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+            def "joints"
+            {
+                def PhysicsFixedJoint "rootJoint_base_link"
+                {
+                    rel physics:body1 = </rootPrim/base_link/base_link/base_link>
+                }
+            }
+
+            def "visuals"
+            {
+                def "_geom_4" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                    prepend payload = @rm_65_with_gripper/_geom_4.usda@
+                )
+                {
+                    rel material:binding = </rootPrim/base_link/base_link/visuals/Looks/material_rgba>
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                }
+
+                def Scope "Looks"
+                {
+                    def Material "material_rgba"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/base_link/base_link/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/base_link/base_link/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (1, 1, 1)
+                            token outputs:surface
+                        }
+                    }
+                }
+            }
+
+            def "collisions"
+            {
+                def "_geom_5" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                    prepend payload = @rm_65_with_gripper/_geom_5.usda@
+                )
+                {
+                    rel material:binding = </rootPrim/base_link/base_link/collisions/Looks/material_rgba>
+                    uniform token physics:approximation = "convexHull"
+                    uniform token purpose = "guide"
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                }
+
+                def Scope "Looks"
+                {
+                    def Material "material_rgba"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/base_link/base_link/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/base_link/base_link/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (1, 1, 1)
+                            float inputs:opacity = 0
+                            token outputs:surface
+                        }
+                    }
+                }
+            }
+
+            def Xform "Link1" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+            )
+            {
+                custom int keyframeIndex = 0
+                custom bool mjcfInertial = 1
+                custom bool mocap = 0
+                point3f physics:centerOfMass = (1.22263e-8, 0.021108, -0.0251854)
+                float3 physics:diagonalInertia = (0.00126614, 0.00124677, 0.000496264)
+                float physics:mass = 0.593563
+                quatf physics:principalAxes = (0.98885137, -0.14890607, -0.000028007411, -0.0002434751)
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0.24050000309944153, 1) )
+                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                def "visuals"
+                {
+                    def "_geom_6" (
+                        prepend apiSchemas = ["MaterialBindingAPI"]
+                        prepend payload = @rm_65_with_gripper/_geom_6.usda@
+                    )
+                    {
+                        rel material:binding = </rootPrim/base_link/base_link/Link1/visuals/Looks/material_rgba>
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_rgba"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (1, 1, 1)
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "collisions"
+                {
+                    def "_geom_7" (
+                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                        prepend payload = @rm_65_with_gripper/_geom_7.usda@
+                    )
+                    {
+                        rel material:binding = </rootPrim/base_link/base_link/Link1/collisions/Looks/material_rgba>
+                        uniform token physics:approximation = "convexHull"
+                        uniform token purpose = "guide"
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_rgba"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (1, 1, 1)
+                                float inputs:opacity = 0
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "joints"
+                {
+                    def PhysicsRevoluteJoint "joint1" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 1
+                        float drive:X:physics:stiffness = 0
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 0
+                        custom bool limited = 1
+                        float3 physics:axisVector = (0, 0, 1)
+                        rel physics:body0 = </rootPrim/base_link/base_link>
+                        rel physics:body1 = </rootPrim/base_link/base_link/Link1>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, 0, 0.2405)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -177.61691
+                        float physics:upperLimit = 177.61691
+                        float physxJoint:armature = 0
+                        float physxLimit:X:damping = 1
+                        float physxLimit:X:stiffness = 0
+                    }
+                }
+
+                def Xform "Link2" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                )
+                {
+                    custom int keyframeIndex = 0
+                    custom bool mjcfInertial = 1
+                    custom bool mocap = 0
+                    point3f physics:centerOfMass = (0.152256, 4.75384e-7, -0.0062026)
+                    float3 physics:diagonalInertia = (0.00735632, 0.00733754, 0.000513875)
+                    float physics:mass = 0.864175
+                    quatf physics:principalAxes = (0.000012834002, 0.7857871, 0.000019051202, 0.6184971)
+                    matrix4d xformOp:transform = ( (-0.000004053124058600588, 2.9794229305935005e-8, 1.0000000298023224, 0), (-1.0000000297942293, -0.000004053124058600588, -0.000004023313522338867, 0), (0.000004023313522338867, -1.0000000298023224, 0, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                    def "visuals"
+                    {
+                        def "_geom_8" (
+                            prepend apiSchemas = ["MaterialBindingAPI"]
+                            prepend payload = @rm_65_with_gripper/_geom_8.usda@
+                        )
+                        {
+                            rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/visuals/Looks/material_rgba>
+                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                        }
+
+                        def Scope "Looks"
+                        {
+                            def Material "material_rgba"
+                            {
+                                token inputs:frame:stPrimvarName = "st"
+                                token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                def Shader "stReader"
+                                {
+                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                    token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                    float2 outputs:result
+                                }
+
+                                def Shader "PBRShader"
+                                {
+                                    uniform token info:id = "UsdPreviewSurface"
+                                    color3f inputs:diffuseColor = (1, 1, 1)
+                                    token outputs:surface
+                                }
+                            }
+                        }
+                    }
+
+                    def "collisions"
+                    {
+                        def "_geom_9" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                            prepend payload = @rm_65_with_gripper/_geom_9.usda@
+                        )
+                        {
+                            rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/collisions/Looks/material_rgba>
+                            uniform token physics:approximation = "convexHull"
+                            uniform token purpose = "guide"
+                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                        }
+
+                        def Scope "Looks"
+                        {
+                            def Material "material_rgba"
+                            {
+                                token inputs:frame:stPrimvarName = "st"
+                                token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                def Shader "stReader"
+                                {
+                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                    token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                    float2 outputs:result
+                                }
+
+                                def Shader "PBRShader"
+                                {
+                                    uniform token info:id = "UsdPreviewSurface"
+                                    color3f inputs:diffuseColor = (1, 1, 1)
+                                    float inputs:opacity = 0
+                                    token outputs:surface
+                                }
+                            }
+                        }
+                    }
+
+                    def "joints"
+                    {
+                        def PhysicsRevoluteJoint "joint2" (
+                            prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                        )
+                        {
+                            float drive:X:physics:damping = 1
+                            float drive:X:physics:stiffness = 0
+                            uniform token drive:X:physics:type = "force"
+                            custom int keyframeIndex = 0
+                            custom bool limited = 1
+                            float3 physics:axisVector = (0, 0, 1)
+                            rel physics:body0 = </rootPrim/base_link/base_link/Link1>
+                            rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2>
+                            float physics:breakForce = 3.4028235e38
+                            float physics:breakTorque = 3.4028235e38
+                            point3f physics:localPos0 = (0, 0, -0.2405)
+                            point3f physics:localPos1 = (0, 0, 0)
+                            quatf physics:localRot0 = (0.499998, 0.5, -0.5, 0.500002)
+                            quatf physics:localRot1 = (1, 0, 0, 0)
+                            float physics:lowerLimit = -129.94682
+                            float physics:upperLimit = 129.94682
+                            float physxJoint:armature = 0
+                            float physxLimit:X:damping = 1
+                            float physxLimit:X:stiffness = 0
+                        }
+                    }
+
+                    def Xform "Link3" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                    )
+                    {
+                        custom int keyframeIndex = 0
+                        custom bool mjcfInertial = 1
+                        custom bool mocap = 0
+                        point3f physics:centerOfMass = (0.00000505313, -0.0595926, 0.0105691)
+                        float3 physics:diagonalInertia = (0.00065604, 0.000637371, 0.000114622)
+                        float physics:mass = 0.289634
+                        quatf physics:principalAxes = (0.42467785, 0.5649598, -0.56555384, 0.42499185)
+                        matrix4d xformOp:transform = ( (-0.000004517636199352637, 1.0000002186479406, 0, 0), (-1.0000002186479406, -0.000004517636199352637, 0, 0), (0, 0, 1, 0), (0.25600001215934753, 0, 0, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                        def "visuals"
+                        {
+                            def "_geom_10" (
+                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                prepend payload = @rm_65_with_gripper/_geom_10.usda@
+                            )
+                            {
+                                rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/visuals/Looks/material_rgba>
+                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_rgba"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (1, 1, 1)
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "collisions"
+                        {
+                            def "_geom_11" (
+                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                prepend payload = @rm_65_with_gripper/_geom_11.usda@
+                            )
+                            {
+                                rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/collisions/Looks/material_rgba>
+                                uniform token physics:approximation = "convexHull"
+                                uniform token purpose = "guide"
+                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_rgba"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (1, 1, 1)
+                                        float inputs:opacity = 0
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "joints"
+                        {
+                            def PhysicsRevoluteJoint "joint3" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 1
+                                float drive:X:physics:stiffness = 0
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 0
+                                custom bool limited = 1
+                                float3 physics:axisVector = (0, 0, 1)
+                                rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2>
+                                rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (-0.0000010281801, -0.25600004, 0.0000010281801)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (0.7071069, 0.0000015199184, 0.7071068, -0.0000013113022)
+                                quatf physics:localRot1 = (1.0000002, 0, 0, 0)
+                                float physics:lowerLimit = -134.93155
+                                float physics:upperLimit = 134.93155
+                                float physxJoint:armature = 0
+                                float physxLimit:X:damping = 1
+                                float physxLimit:X:stiffness = 0
+                            }
+                        }
+
+                        def Xform "Link4" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                        )
+                        {
+                            custom int keyframeIndex = 0
+                            custom bool mjcfInertial = 1
+                            custom bool mocap = 0
+                            point3f physics:centerOfMass = (0.00000115517, -0.0180424, -0.0215395)
+                            float3 physics:diagonalInertia = (0.000285939, 0.000275318, 0.000107298)
+                            float physics:mass = 0.23942
+                            quatf physics:principalAxes = (0.990405, 0.138195, -0.00000701319, 0.000110532)
+                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, -0.000004517636199352637, 1.0000002186479406, 0), (0, -1.0000002186479406, -0.000004517636199352637, 0), (0, -0.20999999344348907, 0, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                            def "visuals"
+                            {
+                                def "_geom_12" (
+                                    prepend apiSchemas = ["MaterialBindingAPI"]
+                                    prepend payload = @rm_65_with_gripper/_geom_12.usda@
+                                )
+                                {
+                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/visuals/Looks/material_rgba>
+                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                }
+
+                                def Scope "Looks"
+                                {
+                                    def Material "material_rgba"
+                                    {
+                                        token inputs:frame:stPrimvarName = "st"
+                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                        def Shader "stReader"
+                                        {
+                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                            float2 outputs:result
+                                        }
+
+                                        def Shader "PBRShader"
+                                        {
+                                            uniform token info:id = "UsdPreviewSurface"
+                                            color3f inputs:diffuseColor = (1, 1, 1)
+                                            token outputs:surface
+                                        }
+                                    }
+                                }
+                            }
+
+                            def "collisions"
+                            {
+                                def "_geom_13" (
+                                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                    prepend payload = @rm_65_with_gripper/_geom_13.usda@
+                                )
+                                {
+                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/collisions/Looks/material_rgba>
+                                    uniform token physics:approximation = "convexHull"
+                                    uniform token purpose = "guide"
+                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                }
+
+                                def Scope "Looks"
+                                {
+                                    def Material "material_rgba"
+                                    {
+                                        token inputs:frame:stPrimvarName = "st"
+                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                        def Shader "stReader"
+                                        {
+                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                            float2 outputs:result
+                                        }
+
+                                        def Shader "PBRShader"
+                                        {
+                                            uniform token info:id = "UsdPreviewSurface"
+                                            color3f inputs:diffuseColor = (1, 1, 1)
+                                            float inputs:opacity = 0
+                                            token outputs:surface
+                                        }
+                                    }
+                                }
+                            }
+
+                            def "joints"
+                            {
+                                def PhysicsRevoluteJoint "joint4" (
+                                    prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                )
+                                {
+                                    float drive:X:physics:damping = 1
+                                    float drive:X:physics:stiffness = 0
+                                    uniform token drive:X:physics:type = "force"
+                                    custom int keyframeIndex = 0
+                                    custom bool limited = 1
+                                    float3 physics:axisVector = (0, 0, 1)
+                                    rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3>
+                                    rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4>
+                                    float physics:breakForce = 3.4028235e38
+                                    float physics:breakTorque = 3.4028235e38
+                                    point3f physics:localPos0 = (-0.209999, 0.25600094, 0)
+                                    point3f physics:localPos1 = (0, 0, 0)
+                                    quatf physics:localRot0 = (0.49999797, 0.5000001, -0.50000226, -0.5000001)
+                                    quatf physics:localRot1 = (1.0000002, 0, 0, 0)
+                                    float physics:lowerLimit = -177.61691
+                                    float physics:upperLimit = 177.61691
+                                    float physxJoint:armature = 0
+                                    float physxLimit:X:damping = 1
+                                    float physxLimit:X:stiffness = 0
+                                }
+                            }
+
+                            def Xform "Link5" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                            )
+                            {
+                                custom int keyframeIndex = 0
+                                custom bool mjcfInertial = 1
+                                custom bool mocap = 0
+                                point3f physics:centerOfMass = (0.00000319795, -0.0593808, 0.00736804)
+                                float3 physics:diagonalInertia = (0.000358615, 0.00035054, 0.0000807958)
+                                float physics:mass = 0.2188
+                                quatf physics:principalAxes = (0.41976523, 0.56865937, -0.56920034, 0.42004123)
+                                matrix4d xformOp:transform = ( (1, 0, -0, 0), (-0, -0.000004517636199352637, -1.0000002186479406, 0), (0, 1.0000002186479406, -0.000004517636199352637, 0), (0, 0, 0, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                def "visuals"
+                                {
+                                    def "_geom_14" (
+                                        prepend apiSchemas = ["MaterialBindingAPI"]
+                                        prepend payload = @rm_65_with_gripper/_geom_14.usda@
+                                    )
+                                    {
+                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/visuals/Looks/material_rgba>
+                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                    }
+
+                                    def Scope "Looks"
+                                    {
+                                        def Material "material_rgba"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (1, 1, 1)
+                                                token outputs:surface
+                                            }
+                                        }
+                                    }
+                                }
+
+                                def "collisions"
+                                {
+                                    def "_geom_15" (
+                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                        prepend payload = @rm_65_with_gripper/_geom_15.usda@
+                                    )
+                                    {
+                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/collisions/Looks/material_rgba>
+                                        uniform token physics:approximation = "convexHull"
+                                        uniform token purpose = "guide"
+                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                    }
+
+                                    def Scope "Looks"
+                                    {
+                                        def Material "material_rgba"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (1, 1, 1)
+                                                float inputs:opacity = 0
+                                                token outputs:surface
+                                            }
+                                        }
+                                    }
+                                }
+
+                                def "joints"
+                                {
+                                    def PhysicsRevoluteJoint "joint5" (
+                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                    )
+                                    {
+                                        float drive:X:physics:damping = 1
+                                        float drive:X:physics:stiffness = 0
+                                        uniform token drive:X:physics:type = "force"
+                                        custom int keyframeIndex = 0
+                                        custom bool limited = 1
+                                        float3 physics:axisVector = (0, 0, 1)
+                                        rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4>
+                                        rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5>
+                                        float physics:breakForce = 3.4028235e38
+                                        float physics:breakTorque = 3.4028235e38
+                                        point3f physics:localPos0 = (0, -8.511543e-7, -0.21000004)
+                                        point3f physics:localPos1 = (0, 0, 0)
+                                        quatf physics:localRot0 = (-0.0000042915344, -1.0000002, 0, 0)
+                                        quatf physics:localRot1 = (1.0000002, 0, 0, 0)
+                                        float physics:lowerLimit = -127.941475
+                                        float physics:upperLimit = 127.941475
+                                        float physxJoint:armature = 0
+                                        float physxLimit:X:damping = 1
+                                        float physxLimit:X:stiffness = 0
+                                    }
+                                }
+
+                                def Xform "Link6" (
+                                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                )
+                                {
+                                    custom int keyframeIndex = 0
+                                    custom bool mjcfInertial = 1
+                                    custom bool mocap = 0
+                                    point3f physics:centerOfMass = (0.000714235, -0.000396719, -0.0126724)
+                                    float3 physics:diagonalInertia = (0.0000317886, 0.0000210548, 0.0000180205)
+                                    float physics:mass = 0.0649018
+                                    quatf physics:principalAxes = (0.6130632, 0.35071713, -0.61430126, 0.3518311)
+                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, -0.000004517636199352637, 1.0000002186479406, 0), (0, -1.0000002186479406, -0.000004517636199352637, 0), (0, -0.14399999380111694, 0, 1) )
+                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                    def "visuals"
+                                    {
+                                        def "_geom_16" (
+                                            prepend apiSchemas = ["MaterialBindingAPI"]
+                                            prepend payload = @rm_65_with_gripper/_geom_16.usda@
+                                        )
+                                        {
+                                            rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/visuals/Looks/material_rgba>
+                                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        }
+
+                                        def Scope "Looks"
+                                        {
+                                            def Material "material_rgba"
+                                            {
+                                                token inputs:frame:stPrimvarName = "st"
+                                                token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                def Shader "stReader"
+                                                {
+                                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                                    token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                    float2 outputs:result
+                                                }
+
+                                                def Shader "PBRShader"
+                                                {
+                                                    uniform token info:id = "UsdPreviewSurface"
+                                                    color3f inputs:diffuseColor = (1, 1, 1)
+                                                    token outputs:surface
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    def "collisions"
+                                    {
+                                        def "_geom_17" (
+                                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                            prepend payload = @rm_65_with_gripper/_geom_17.usda@
+                                        )
+                                        {
+                                            rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/collisions/Looks/material_rgba>
+                                            uniform token physics:approximation = "convexHull"
+                                            uniform token purpose = "guide"
+                                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        }
+
+                                        def Scope "Looks"
+                                        {
+                                            def Material "material_rgba"
+                                            {
+                                                token inputs:frame:stPrimvarName = "st"
+                                                token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                def Shader "stReader"
+                                                {
+                                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                                    token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                    float2 outputs:result
+                                                }
+
+                                                def Shader "PBRShader"
+                                                {
+                                                    uniform token info:id = "UsdPreviewSurface"
+                                                    color3f inputs:diffuseColor = (1, 1, 1)
+                                                    float inputs:opacity = 0
+                                                    token outputs:surface
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    def "joints"
+                                    {
+                                        def PhysicsRevoluteJoint "joint6" (
+                                            prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                        )
+                                        {
+                                            float drive:X:physics:damping = 1
+                                            float drive:X:physics:stiffness = 0
+                                            uniform token drive:X:physics:type = "force"
+                                            custom int keyframeIndex = 0
+                                            custom bool limited = 1
+                                            float3 physics:axisVector = (0, 0, 1)
+                                            rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5>
+                                            rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6>
+                                            float physics:breakForce = 3.4028235e38
+                                            float physics:breakTorque = 3.4028235e38
+                                            point3f physics:localPos0 = (0, 5.8364867e-7, -0.14400002)
+                                            point3f physics:localPos1 = (0, 0, 0)
+                                            quatf physics:localRot0 = (-0.0000042915344, 1.0000002, 0, 0)
+                                            quatf physics:localRot1 = (1.0000002, 0, 0, 0)
+                                            float physics:lowerLimit = -359.8175
+                                            float physics:upperLimit = 359.8175
+                                            float physxJoint:armature = 0
+                                            float physxLimit:X:damping = 1
+                                            float physxLimit:X:stiffness = 0
+                                        }
+                                    }
+
+                                    def Xform "Gripper_base_link" (
+                                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                    )
+                                    {
+                                        custom int keyframeIndex = 0
+                                        custom bool mocap = 0
+                                        float physics:density = 1000
+                                        matrix4d xformOp:transform = ( (-0.000004517636199352637, 0, 1.0000002186479406, 0), (-0, 1, 0, 0), (-1.0000002186479406, -0, -0.000004517636199352637, 0), (-0.009652003645896912, -5.99999978589949e-8, 0.04241257905960083, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                        def "visuals"
+                                        {
+                                            def "_geom_18" (
+                                                prepend apiSchemas = ["MaterialBindingAPI"]
+                                                prepend payload = @rm_65_with_gripper/_geom_18.usda@
+                                            )
+                                            {
+                                                rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/visuals/Looks/material_rgba>
+                                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                            }
+
+                                            def Scope "Looks"
+                                            {
+                                                def Material "material_rgba"
+                                                {
+                                                    token inputs:frame:stPrimvarName = "st"
+                                                    token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                    def Shader "stReader"
+                                                    {
+                                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                                        token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                        float2 outputs:result
+                                                    }
+
+                                                    def Shader "PBRShader"
+                                                    {
+                                                        uniform token info:id = "UsdPreviewSurface"
+                                                        color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                        token outputs:surface
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        def "collisions"
+                                        {
+                                            def "_geom_19" (
+                                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                                prepend payload = @rm_65_with_gripper/_geom_19.usda@
+                                            )
+                                            {
+                                                rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/collisions/Looks/material_rgba>
+                                                uniform token physics:approximation = "convexHull"
+                                                uniform token purpose = "guide"
+                                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                            }
+
+                                            def Scope "Looks"
+                                            {
+                                                def Material "material_rgba"
+                                                {
+                                                    token inputs:frame:stPrimvarName = "st"
+                                                    token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                    def Shader "stReader"
+                                                    {
+                                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                                        token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                        float2 outputs:result
+                                                    }
+
+                                                    def Shader "PBRShader"
+                                                    {
+                                                        uniform token info:id = "UsdPreviewSurface"
+                                                        color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                        float inputs:opacity = 0
+                                                        token outputs:surface
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        def "joints"
+                                        {
+                                            def PhysicsFixedJoint "Gripper_base_link"
+                                            {
+                                                rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6>
+                                                rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link>
+                                                float physics:breakForce = 3.4028235e38
+                                                float physics:breakTorque = 3.4028235e38
+                                                point3f physics:localPos0 = (-0.009652004, -6e-8, 0.04241258)
+                                                point3f physics:localPos1 = (0, 0, 0)
+                                                quatf physics:localRot0 = (0.70710534, 0, -0.7071084, 0)
+                                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                            }
+                                        }
+
+                                        def Xform "ee_center_body" (
+                                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                                        )
+                                        {
+                                            custom int keyframeIndex = 0
+                                            custom bool mocap = 0
+                                            float physics:density = 1000
+                                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.10000000149011612, 0, -0.011360585689544678, 1) )
+                                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                            def "sites"
+                                            {
+                                                def Sphere "ee_center_site" (
+                                                    prepend apiSchemas = ["MaterialBindingAPI"]
+                                                )
+                                                {
+                                                    float3[] extent = [(-0.01, -0.01, -0.01), (0.01, 0.01, 0.01)]
+                                                    custom int group = 0
+                                                    custom bool hasFromto = 0
+                                                    custom string material = ""
+                                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/ee_center_body/sites/Looks/material_rgba>
+                                                    custom bool mjcfSite = 1
+                                                    custom string name = "ee_center_site"
+                                                    custom float3 pos = (0, 0, 0)
+                                                    custom quatf quat = (1, 0, 0, 0)
+                                                    double radius = 0.009999999776482582
+                                                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                                    custom float3 siteSize = (0.01, 0.005, 0.005)
+                                                    custom string type = "sphere"
+                                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                }
+
+                                                def Scope "Looks"
+                                                {
+                                                    def Material "material_rgba"
+                                                    {
+                                                        token inputs:frame:stPrimvarName = "st"
+                                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/ee_center_body/sites/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                        def Shader "stReader"
+                                                        {
+                                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/ee_center_body/sites/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                            float2 outputs:result
+                                                        }
+
+                                                        def Shader "PBRShader"
+                                                        {
+                                                            uniform token info:id = "UsdPreviewSurface"
+                                                            color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+                                                            token outputs:surface
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            def "joints"
+                                            {
+                                                def PhysicsFixedJoint "ee_center_body"
+                                                {
+                                                    rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link>
+                                                    rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/ee_center_body>
+                                                    float physics:breakForce = 3.4028235e38
+                                                    float physics:breakTorque = 3.4028235e38
+                                                    point3f physics:localPos0 = (0.1, 0, -0.011360586)
+                                                    point3f physics:localPos1 = (0, 0, 0)
+                                                    quatf physics:localRot0 = (1, 0, 0, 0)
+                                                    quatf physics:localRot1 = (1, 0, 0, 0)
+                                                }
+                                            }
+                                        }
+
+                                        def Xform "Gripper_Link1" (
+                                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                        )
+                                        {
+                                            custom int keyframeIndex = 1
+                                            custom bool mjcfInertial = 1
+                                            custom bool mocap = 0
+                                            point3f physics:centerOfMass = (0.016415, 9.75755e-9, 0.00898194)
+                                            float3 physics:diagonalInertia = (0.0000016998, 0.00000145017, 2.95066e-7)
+                                            float physics:mass = 0.00647716
+                                            quatf physics:principalAxes = (0.5004154, 0.49958435, 0.49958435, 0.5004154)
+                                            matrix4d xformOp:transform = ( (0.9531868532048335, -0.3023819370638563, -0, 0), (0.3023819370638563, 0.9531868532048335, 0, 0), (0, -0, 1, 0), (0.035999998450279236, -0.03999999910593033, -0.01899999938905239, 1) )
+                                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                            def "visuals"
+                                            {
+                                                def "_geom_20" (
+                                                    prepend apiSchemas = ["MaterialBindingAPI"]
+                                                    prepend payload = @rm_65_with_gripper/_geom_20.usda@
+                                                )
+                                                {
+                                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/visuals/Looks/material_rgba>
+                                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                }
+
+                                                def Scope "Looks"
+                                                {
+                                                    def Material "material_rgba"
+                                                    {
+                                                        token inputs:frame:stPrimvarName = "st"
+                                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                        def Shader "stReader"
+                                                        {
+                                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                            float2 outputs:result
+                                                        }
+
+                                                        def Shader "PBRShader"
+                                                        {
+                                                            uniform token info:id = "UsdPreviewSurface"
+                                                            color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                            token outputs:surface
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            def "collisions"
+                                            {
+                                                def "_geom_21" (
+                                                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                                    prepend payload = @rm_65_with_gripper/_geom_21.usda@
+                                                )
+                                                {
+                                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/collisions/Looks/material_rgba>
+                                                    uniform token physics:approximation = "convexHull"
+                                                    uniform token purpose = "guide"
+                                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                }
+
+                                                def Scope "Looks"
+                                                {
+                                                    def Material "material_rgba"
+                                                    {
+                                                        token inputs:frame:stPrimvarName = "st"
+                                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                        def Shader "stReader"
+                                                        {
+                                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                            float2 outputs:result
+                                                        }
+
+                                                        def Shader "PBRShader"
+                                                        {
+                                                            uniform token info:id = "UsdPreviewSurface"
+                                                            color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                            float inputs:opacity = 0
+                                                            token outputs:surface
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            def "joints"
+                                            {
+                                                def PhysicsRevoluteJoint "Gripper_Link1" (
+                                                    prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                                )
+                                                {
+                                                    float drive:X:physics:damping = 0.2
+                                                    float drive:X:physics:stiffness = 0
+                                                    uniform token drive:X:physics:type = "force"
+                                                    custom int keyframeIndex = 0
+                                                    custom bool limited = 1
+                                                    float3 physics:axisVector = (0, 0, 1)
+                                                    rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link>
+                                                    rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1>
+                                                    float physics:breakForce = 3.4028235e38
+                                                    float physics:breakTorque = 3.4028235e38
+                                                    point3f physics:localPos0 = (-0.061412774, -0.039999954, -0.04565176)
+                                                    point3f physics:localPos1 = (0, 0, 0)
+                                                    quatf physics:localRot0 = (0.69878095, -0.108181976, 0.69878393, -0.10818151)
+                                                    quatf physics:localRot1 = (1.0000001, 0, 0, 0)
+                                                    float physics:lowerLimit = 0
+                                                    float physics:upperLimit = 57.295776
+                                                    float physxJoint:armature = 0
+                                                    float physxLimit:X:damping = 0.2
+                                                    float physxLimit:X:stiffness = 0
+                                                }
+                                            }
+
+                                            def Xform "Gripper_Link11" (
+                                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                            )
+                                            {
+                                                custom int keyframeIndex = 0
+                                                custom bool mjcfInertial = 1
+                                                custom bool mocap = 0
+                                                point3f physics:centerOfMass = (0.0113666, 0.0118643, 0.00600001)
+                                                float3 physics:diagonalInertia = (0.00000152644, 0.00000150565, 4.93551e-7)
+                                                float physics:mass = 0.0127543
+                                                quatf physics:principalAxes = (0.42736295, 0.42736295, 0.56334794, 0.56334794)
+                                                matrix4d xformOp:transform = ( (0.9531868532048335, 0.3023819370638563, 0, 0), (-0.3023819370638563, 0.9531868532048335, 0, 0), (0, 0, 1, 0), (0.041999999433755875, 0, 0.003000000026077032, 1) )
+                                                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                                def "visuals"
+                                                {
+                                                    def "_geom_22" (
+                                                        prepend apiSchemas = ["MaterialBindingAPI"]
+                                                        prepend payload = @rm_65_with_gripper/_geom_22.usda@
+                                                    )
+                                                    {
+                                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/visuals/Looks/material_rgba>
+                                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                    }
+
+                                                    def Scope "Looks"
+                                                    {
+                                                        def Material "material_rgba"
+                                                        {
+                                                            token inputs:frame:stPrimvarName = "st"
+                                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                            def Shader "stReader"
+                                                            {
+                                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                                float2 outputs:result
+                                                            }
+
+                                                            def Shader "PBRShader"
+                                                            {
+                                                                uniform token info:id = "UsdPreviewSurface"
+                                                                color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                                token outputs:surface
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                def "collisions"
+                                                {
+                                                    def "_geom_23" (
+                                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                                        prepend payload = @rm_65_with_gripper/_geom_23.usda@
+                                                    )
+                                                    {
+                                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/collisions/Looks/material_rgba>
+                                                        uniform token physics:approximation = "convexHull"
+                                                        uniform token purpose = "guide"
+                                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                    }
+
+                                                    def Scope "Looks"
+                                                    {
+                                                        def Material "material_rgba"
+                                                        {
+                                                            token inputs:frame:stPrimvarName = "st"
+                                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                            def Shader "stReader"
+                                                            {
+                                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                                float2 outputs:result
+                                                            }
+
+                                                            def Shader "PBRShader"
+                                                            {
+                                                                uniform token info:id = "UsdPreviewSurface"
+                                                                color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                                float inputs:opacity = 0
+                                                                token outputs:surface
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                def "joints"
+                                                {
+                                                    def PhysicsRevoluteJoint "Gripper_Link11" (
+                                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                                    )
+                                                    {
+                                                        float drive:X:physics:damping = 0.2
+                                                        float drive:X:physics:stiffness = 1
+                                                        uniform token drive:X:physics:type = "force"
+                                                        custom int keyframeIndex = 0
+                                                        custom bool limited = 1
+                                                        float3 physics:axisVector = (0, 0, 1)
+                                                        rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1>
+                                                        rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link1/Gripper_Link11>
+                                                        float physics:breakForce = 3.4028235e38
+                                                        float physics:breakTorque = 3.4028235e38
+                                                        point3f physics:localPos0 = (-0.006376151, 0.039941773, 0.022000005)
+                                                        point3f physics:localPos1 = (0, 0, 0)
+                                                        quatf physics:localRot0 = (0.953187, 0, 0, 0.30238193)
+                                                        quatf physics:localRot1 = (1.0000001, 0, 0, 0)
+                                                        float physics:lowerLimit = -57.295776
+                                                        float physics:upperLimit = 0
+                                                        float physxJoint:armature = 0
+                                                        float physxLimit:X:damping = 0.2
+                                                        float physxLimit:X:stiffness = 1
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        def Xform "Gripper_Link2" (
+                                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                        )
+                                        {
+                                            custom int keyframeIndex = 2
+                                            custom bool mjcfInertial = 1
+                                            custom bool mocap = 0
+                                            point3f physics:centerOfMass = (0.016415, 9.75755e-9, 0.00898194)
+                                            float3 physics:diagonalInertia = (0.0000016998, 0.00000145017, 2.95066e-7)
+                                            float physics:mass = 0.00647716
+                                            quatf physics:principalAxes = (0.5004154, 0.49958435, 0.49958435, 0.5004154)
+                                            matrix4d xformOp:transform = ( (0.9531868532048335, 0.3023819370638563, 0, 0), (-0.3023819370638563, 0.9531868532048335, 0, 0), (0, 0, 1, 0), (0.035999998450279236, 0.03999999910593033, -0.01899999938905239, 1) )
+                                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                            def "visuals"
+                                            {
+                                                def "_geom_24" (
+                                                    prepend apiSchemas = ["MaterialBindingAPI"]
+                                                    prepend payload = @rm_65_with_gripper/_geom_24.usda@
+                                                )
+                                                {
+                                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/visuals/Looks/material_rgba>
+                                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                }
+
+                                                def Scope "Looks"
+                                                {
+                                                    def Material "material_rgba"
+                                                    {
+                                                        token inputs:frame:stPrimvarName = "st"
+                                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                        def Shader "stReader"
+                                                        {
+                                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                            float2 outputs:result
+                                                        }
+
+                                                        def Shader "PBRShader"
+                                                        {
+                                                            uniform token info:id = "UsdPreviewSurface"
+                                                            color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                            token outputs:surface
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            def "collisions"
+                                            {
+                                                def "_geom_25" (
+                                                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                                    prepend payload = @rm_65_with_gripper/_geom_25.usda@
+                                                )
+                                                {
+                                                    rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/collisions/Looks/material_rgba>
+                                                    uniform token physics:approximation = "convexHull"
+                                                    uniform token purpose = "guide"
+                                                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                }
+
+                                                def Scope "Looks"
+                                                {
+                                                    def Material "material_rgba"
+                                                    {
+                                                        token inputs:frame:stPrimvarName = "st"
+                                                        token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                        def Shader "stReader"
+                                                        {
+                                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                                            token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                            float2 outputs:result
+                                                        }
+
+                                                        def Shader "PBRShader"
+                                                        {
+                                                            uniform token info:id = "UsdPreviewSurface"
+                                                            color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                            float inputs:opacity = 0
+                                                            token outputs:surface
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            def "joints"
+                                            {
+                                                def PhysicsRevoluteJoint "Gripper_Link2" (
+                                                    prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                                )
+                                                {
+                                                    float drive:X:physics:damping = 0.2
+                                                    float drive:X:physics:stiffness = 0
+                                                    uniform token drive:X:physics:type = "force"
+                                                    custom int keyframeIndex = 0
+                                                    custom bool limited = 1
+                                                    float3 physics:axisVector = (0, 0, 1)
+                                                    rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link>
+                                                    rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2>
+                                                    float physics:breakForce = 3.4028235e38
+                                                    float physics:breakTorque = 3.4028235e38
+                                                    point3f physics:localPos0 = (-0.061412774, 0.040000074, -0.04565176)
+                                                    point3f physics:localPos1 = (0, 0, 0)
+                                                    quatf physics:localRot0 = (0.69878095, 0.108181976, 0.69878393, 0.10818151)
+                                                    quatf physics:localRot1 = (1.0000001, 0, 0, 0)
+                                                    float physics:lowerLimit = -57.295776
+                                                    float physics:upperLimit = 0
+                                                    float physxJoint:armature = 0
+                                                    float physxLimit:X:damping = 0.2
+                                                    float physxLimit:X:stiffness = 0
+                                                }
+                                            }
+
+                                            def Xform "Gripper_Link22" (
+                                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                                            )
+                                            {
+                                                custom int keyframeIndex = 0
+                                                custom bool mjcfInertial = 1
+                                                custom bool mocap = 0
+                                                point3f physics:centerOfMass = (-0.0113666, 0.0118643, -0.00600001)
+                                                float3 physics:diagonalInertia = (0.00000152644, 0.00000150565, 4.93551e-7)
+                                                float physics:mass = 0.0127543
+                                                quatf physics:principalAxes = (0.56334794, 0.56334794, 0.42736295, 0.42736295)
+                                                matrix4d xformOp:transform = ( (-0.9531866593611085, 0.30238384438476373, 0, 0), (-0.30238384438476373, -0.9531866593611085, 0, 0), (0, 0, 1, 0), (0.041999999433755875, 0, 0.014999999664723873, 1) )
+                                                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                                def "visuals"
+                                                {
+                                                    def "_geom_26" (
+                                                        prepend apiSchemas = ["MaterialBindingAPI"]
+                                                        prepend payload = @rm_65_with_gripper/_geom_26.usda@
+                                                    )
+                                                    {
+                                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/visuals/Looks/material_rgba>
+                                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                    }
+
+                                                    def Scope "Looks"
+                                                    {
+                                                        def Material "material_rgba"
+                                                        {
+                                                            token inputs:frame:stPrimvarName = "st"
+                                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/visuals/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                            def Shader "stReader"
+                                                            {
+                                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/visuals/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                                float2 outputs:result
+                                                            }
+
+                                                            def Shader "PBRShader"
+                                                            {
+                                                                uniform token info:id = "UsdPreviewSurface"
+                                                                color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                                token outputs:surface
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                def "collisions"
+                                                {
+                                                    def "_geom_27" (
+                                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                                        prepend payload = @rm_65_with_gripper/_geom_27.usda@
+                                                    )
+                                                    {
+                                                        rel material:binding = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/collisions/Looks/material_rgba>
+                                                        uniform token physics:approximation = "convexHull"
+                                                        uniform token purpose = "guide"
+                                                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                                    }
+
+                                                    def Scope "Looks"
+                                                    {
+                                                        def Material "material_rgba"
+                                                        {
+                                                            token inputs:frame:stPrimvarName = "st"
+                                                            token outputs:surface.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/collisions/Looks/material_rgba/PBRShader.outputs:surface>
+
+                                                            def Shader "stReader"
+                                                            {
+                                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                                token inputs:varname.connect = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22/collisions/Looks/material_rgba.inputs:frame:stPrimvarName>
+                                                                float2 outputs:result
+                                                            }
+
+                                                            def Shader "PBRShader"
+                                                            {
+                                                                uniform token info:id = "UsdPreviewSurface"
+                                                                color3f inputs:diffuseColor = (0.894118, 0.913725, 0.929412)
+                                                                float inputs:opacity = 0
+                                                                token outputs:surface
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                def "joints"
+                                                {
+                                                    def PhysicsRevoluteJoint "Gripper_Link22" (
+                                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                                    )
+                                                    {
+                                                        float drive:X:physics:damping = 0.2
+                                                        float drive:X:physics:stiffness = 1
+                                                        uniform token drive:X:physics:type = "force"
+                                                        custom int keyframeIndex = 0
+                                                        custom bool limited = 1
+                                                        float3 physics:axisVector = (0, 0, 1)
+                                                        rel physics:body0 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2>
+                                                        rel physics:body1 = </rootPrim/base_link/base_link/Link1/Link2/Link3/Link4/Link5/Link6/Gripper_base_link/Gripper_Link2/Gripper_Link22>
+                                                        float physics:breakForce = 3.4028235e38
+                                                        float physics:breakTorque = 3.4028235e38
+                                                        point3f physics:localPos0 = (-0.006376151, -0.039941773, 0.03400001)
+                                                        point3f physics:localPos1 = (0, 0, 0)
+                                                        quatf physics:localRot0 = (0.3023829, 0, 0, 0.9531867)
+                                                        quatf physics:localRot1 = (1.0000002, 0, 0, 0)
+                                                        float physics:lowerLimit = 0
+                                                        float physics:upperLimit = 57.295776
+                                                        float physxJoint:armature = 0
+                                                        float physxLimit:X:damping = 0.2
+                                                        float physxLimit:X:stiffness = 1
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    def Xform "worldBody" (
+        prepend apiSchemas = ["PhysicsArticulationRootAPI"]
+    )
+    {
+    }
+}
+
+def "actuators"
+{
+    def "actuator_0"
+    {
+        custom int actuatorIdx = 1
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-80 80", "100", "joint1", "actuator1"]
+    }
+
+    def "actuator_1"
+    {
+        custom int actuatorIdx = 2
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-80 80", "1", "joint2", "actuator2"]
+    }
+
+    def "actuator_2"
+    {
+        custom int actuatorIdx = 3
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-48 48", "1", "joint3", "actuator3"]
+    }
+
+    def "actuator_3"
+    {
+        custom int actuatorIdx = 4
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-48 48", "1", "joint4", "actuator4"]
+    }
+
+    def "actuator_4"
+    {
+        custom int actuatorIdx = 5
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-12.4 12.4", "1", "joint5", "actuator5"]
+    }
+
+    def "actuator_5"
+    {
+        custom int actuatorIdx = 6
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-12.4 12.4", "100", "joint6", "actuator6"]
+    }
+
+    def "actuator_6"
+    {
+        custom int actuatorIdx = 7
+        custom int actuatorType = 1
+        custom string[] keys = ["ctrlrange", "forcerange", "joint", "name"]
+        custom string[] values = ["0 0.6981", "-15 15", "Gripper_Link1", "actuator_gripper1"]
+    }
+
+    def "actuator_7"
+    {
+        custom int actuatorIdx = 8
+        custom int actuatorType = 1
+        custom string[] keys = ["ctrlrange", "forcerange", "joint", "name"]
+        custom string[] values = ["-0.6981 0", "-15 15", "Gripper_Link2", "actuator_gripper2"]
+    }
+
+    def "actuator_8"
+    {
+        custom int actuatorIdx = 9
+        custom int actuatorType = 1
+        custom string[] keys = ["ctrlrange", "forcerange", "joint", "name"]
+        custom string[] values = ["-0.6981 0", "-15 15", "Gripper_Link11", "actuator_gripper11"]
+    }
+
+    def "actuator_9"
+    {
+        custom int actuatorIdx = 10
+        custom int actuatorType = 1
+        custom string[] keys = ["ctrlrange", "forcerange", "joint", "name"]
+        custom string[] values = ["-0.6981 0", "-15 15", "Gripper_Link22", "actuator_gripper22"]
+    }
+}
+
+def "tendons"
+{
+}
+
+def "equalities"
+{
+}
+

@@ -1,0 +1,2369 @@
+#usda 1.0
+(
+    defaultPrim = "rootPrim"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def PhysicsScene "physicsScene"
+{
+    custom float density = 1.225
+    custom string integrator = "implicitfast"
+    vector3f physics:gravityDirection = (0, 0, -1)
+    float physics:gravityMagnitude = 9.81
+    custom float timestep = 0.005
+    custom float viscosity = 0.000018
+}
+
+def "keyframe"
+{
+    def "key_0"
+    {
+        custom string act = ""
+        custom string ctrl = ""
+        custom string mpos = ""
+        custom string mquat = ""
+        custom string name = "squat"
+        custom string qpos = """0 0 0.596
+               0.988015 0 0.154359 0
+               0 0.4 0
+               -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+               -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+               0 0 0 0 0 0"""
+        custom string qvel = ""
+        custom float time = 0
+    }
+
+    def "key_1"
+    {
+        custom string act = ""
+        custom string ctrl = ""
+        custom string mpos = ""
+        custom string mquat = ""
+        custom string name = "stand_on_left_leg"
+        custom string qpos = """0 0 1.21948
+               0.971588 -0.179973 0.135318 -0.0729076
+               -0.0516 -0.202 0.23
+               -0.24 -0.007 -0.34 -1.76 -0.466 -0.0415
+               -0.08 -0.01 -0.37 -0.685 -0.35 -0.09
+               0.109 -0.067 -0.7 -0.05 0.12 0.16"""
+        custom string qvel = ""
+        custom float time = 0
+    }
+
+    def "key_2"
+    {
+        custom string act = ""
+        custom string ctrl = ""
+        custom string mpos = ""
+        custom string mquat = ""
+        custom string name = "prone"
+        custom string qpos = """0.4 0 0.0757706
+               0.7325 0 0.680767 0
+               0 0.0729 0
+               0.0077 0.0019 -0.026 -0.351 -0.27 0
+               0.0077 0.0019 -0.026 -0.351 -0.27 0
+               0.56 -0.62 -1.752
+               0.56 -0.62 -1.752"""
+        custom string qvel = ""
+        custom float time = 0
+    }
+
+    def "key_3"
+    {
+        custom string act = ""
+        custom string ctrl = ""
+        custom string mpos = ""
+        custom string mquat = ""
+        custom string name = "supine"
+        custom string qpos = """-0.4 0 0.08122
+               0.722788 0 -0.69107 0
+               0 -0.25 0
+               0.0182 0.0142 0.3 0.042 -0.44 -0.02
+               0.0182 0.0142 0.3 0.042 -0.44 -0.02
+               0.186 -0.73 -1.73
+               0.186 -0.73 -1.73"""
+        custom string qvel = ""
+        custom float time = 0
+    }
+}
+
+def Xform "rootPrim"
+{
+    def Xform "torso"
+    {
+        def Xform "torso" (
+            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+        )
+        {
+            custom bool hasFreeJoint = 1
+            custom int keyframeIndex = 0
+            custom bool mocap = 0
+            float physics:density = 1000
+            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 1.281999945640564, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+            def "collisions"
+            {
+                def Capsule "torso" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                )
+                {
+                    uniform token axis = "X"
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 1
+                    custom int condim = 1
+                    custom int contype = 1
+                    custom float density = 1000
+                    float3[] extent = [(-0.14, -0.07, -0.07), (0.14, 0.07, 0.07)]
+                    custom float3 friction = (0.7, 0.005, 0.0001)
+                    custom float3 geomSize = (0.07, 0.07, 1)
+                    custom int group = 1
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    double height = 0.14000000059604645
+                    custom float margin = 0
+                    custom string material = "body"
+                    rel material:binding = </rootPrim/torso/torso/collisions/Looks/material_body>
+                    custom bool mjcfGeom = 1
+                    custom string name = "torso"
+                    uniform token physics:approximation = "convexHull"
+                    custom float3 pos = (0, 0, 0)
+                    uniform token purpose = "guide"
+                    custom quatf quat = (0.70710677, -0.70710677, 0, 0)
+                    double radius = 0.07000000029802322
+                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                    custom float3 solimp = (0.9, 0.99, 0.003)
+                    custom float2 solref = (0.015, 1)
+                    custom string type = "capsule"
+                    matrix4d xformOp:transform = ( (1.1920928599806757e-7, 0.999999880790714, 0, 0), (0, 1.1920928599806757e-7, -0.999999880790714, 0), (-0.999999880790714, 0, 1.1920928599806757e-7, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+
+                def Scope "Looks"
+                {
+                    def Material "material_body"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/torso/torso/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/torso/torso/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                            float inputs:metallic = 0
+                            float inputs:roughness = 0.5
+                            float inputs:specular_level = 0.5
+                            token outputs:surface
+                        }
+                    }
+
+                    def Material "material_body_1"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/torso/torso/collisions/Looks/material_body_1/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/torso/torso/collisions/Looks/material_body_1.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                            float inputs:metallic = 0
+                            float inputs:roughness = 0.5
+                            float inputs:specular_level = 0.5
+                            token outputs:surface
+                        }
+                    }
+                }
+
+                def Capsule "waist_upper" (
+                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                )
+                {
+                    uniform token axis = "X"
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 1
+                    custom int condim = 1
+                    custom int contype = 1
+                    custom float density = 1000
+                    float3[] extent = [(-0.12, -0.06, -0.06), (0.12, 0.06, 0.06)]
+                    custom float3 friction = (0.7, 0.005, 0.0001)
+                    custom float3 geomSize = (0.06, 0.06, 1)
+                    custom int group = 1
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    double height = 0.11999999731779099
+                    custom float margin = 0
+                    custom string material = "body"
+                    rel material:binding = </rootPrim/torso/torso/collisions/Looks/material_body_1>
+                    custom bool mjcfGeom = 1
+                    custom string name = "waist_upper"
+                    uniform token physics:approximation = "convexHull"
+                    custom float3 pos = (-0.01, 0, -0.12)
+                    uniform token purpose = "guide"
+                    custom quatf quat = (0.70710677, -0.70710677, 0, 0)
+                    double radius = 0.05999999865889549
+                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                    custom float3 solimp = (0.9, 0.99, 0.003)
+                    custom float2 solref = (0.015, 1)
+                    custom string type = "capsule"
+                    matrix4d xformOp:transform = ( (1.1920928599806757e-7, 0.999999880790714, 0, 0), (0, 1.1920928599806757e-7, -0.999999880790714, 0), (-0.999999880790714, 0, 1.1920928599806757e-7, 0), (-0.009999999776482582, 0, -0.11999999731779099, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+            }
+
+            def Xform "head" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+            )
+            {
+                custom int keyframeIndex = 0
+                custom bool mocap = 0
+                float physics:density = 1000
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0.1899999976158142, 1) )
+                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                def "collisions"
+                {
+                    def Sphere "head" (
+                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                    )
+                    {
+                        custom float4 axisangle = (0, 0, 0, 0)
+                        custom int conaffinity = 1
+                        custom int condim = 1
+                        custom int contype = 1
+                        custom float density = 1000
+                        float3[] extent = [(-0.09, -0.09, -0.09), (0.09, 0.09, 0.09)]
+                        custom float3 friction = (0.7, 0.005, 0.0001)
+                        custom float3 geomSize = (0.09, 1, 1)
+                        custom int group = 1
+                        custom bool hasFromto = 0
+                        custom bool hasMass = 0
+                        custom float margin = 0
+                        custom string material = "body"
+                        rel material:binding = </rootPrim/torso/torso/head/collisions/Looks/material_body>
+                        custom bool mjcfGeom = 1
+                        custom string name = "head"
+                        uniform token physics:approximation = "boundingSphere"
+                        custom float3 pos = (0, 0, 0)
+                        uniform token purpose = "guide"
+                        custom quatf quat = (1, 0, 0, 0)
+                        double radius = 0.09000000357627869
+                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                        custom float3 solimp = (0.9, 0.99, 0.003)
+                        custom float2 solref = (0.015, 1)
+                        custom string type = "sphere"
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                        custom float3 zaxis = (0, 0, 0)
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_body"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/torso/torso/head/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/torso/torso/head/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                float inputs:metallic = 0
+                                float inputs:roughness = 0.5
+                                float inputs:specular_level = 0.5
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "joints"
+                {
+                    def PhysicsFixedJoint "head"
+                    {
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/head>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, 0, 0.19)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                    }
+                }
+            }
+
+            def Xform "waist_lower" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+            )
+            {
+                custom int keyframeIndex = 1
+                custom bool mocap = 0
+                float physics:density = 1000
+                prepend rel physics:filteredPairs = [
+                    </rootPrim/torso/torso/waist_lower/pelvis/thigh_right>,
+                    </rootPrim/torso/torso/waist_lower/pelvis/thigh_left>,
+                ]
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-0.009999999776482582, 0, -0.25999999046325684, 1) )
+                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                def "collisions"
+                {
+                    def Capsule "waist_lower" (
+                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                    )
+                    {
+                        uniform token axis = "X"
+                        custom float4 axisangle = (0, 0, 0, 0)
+                        custom int conaffinity = 1
+                        custom int condim = 1
+                        custom int contype = 1
+                        custom float density = 1000
+                        float3[] extent = [(-0.12, -0.06, -0.06), (0.12, 0.06, 0.06)]
+                        custom float3 friction = (0.7, 0.005, 0.0001)
+                        custom float3 geomSize = (0.06, 0.06, 1)
+                        custom int group = 1
+                        custom bool hasFromto = 0
+                        custom bool hasMass = 0
+                        double height = 0.11999999731779099
+                        custom float margin = 0
+                        custom string material = "body"
+                        rel material:binding = </rootPrim/torso/torso/waist_lower/collisions/Looks/material_body>
+                        custom bool mjcfGeom = 1
+                        custom string name = "waist_lower"
+                        uniform token physics:approximation = "convexHull"
+                        custom float3 pos = (0, 0, 0)
+                        uniform token purpose = "guide"
+                        custom quatf quat = (0.70710677, -0.70710677, 0, 0)
+                        double radius = 0.05999999865889549
+                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                        custom float3 solimp = (0.9, 0.99, 0.003)
+                        custom float2 solref = (0.015, 1)
+                        custom string type = "capsule"
+                        matrix4d xformOp:transform = ( (1.1920928599806757e-7, 0.999999880790714, 0, 0), (0, 1.1920928599806757e-7, -0.999999880790714, 0), (-0.999999880790714, 0, 1.1920928599806757e-7, 0), (0, 0, 0, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                        custom float3 zaxis = (0, 0, 0)
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_body"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                float inputs:metallic = 0
+                                float inputs:roughness = 0.5
+                                float inputs:specular_level = 0.5
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "joints"
+                {
+                    def PhysicsRevoluteJoint "abdomen_z" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 5
+                        float drive:X:physics:stiffness = 20
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 0
+                        custom bool limited = 1
+                        float3 physics:axisVector = (0, 0, 1)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/waist_lower>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (-0.01, 0, -1.477)
+                        point3f physics:localPos1 = (0, 0, 0.065)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -45.000004
+                        float physics:upperLimit = 45.000004
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 5
+                        float physxLimit:X:stiffness = 20
+                    }
+
+                    def PhysicsRevoluteJoint "abdomen_y" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 5
+                        float drive:X:physics:stiffness = 10
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 1
+                        custom bool limited = 1
+                        float3 physics:axisVector = (0, 1, 0)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/waist_lower>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (-0.01, 0, -1.477)
+                        point3f physics:localPos1 = (0, 0, 0.065)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -75
+                        float physics:upperLimit = 30.000002
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 5
+                        float physxLimit:X:stiffness = 10
+                    }
+                }
+
+                def Xform "pelvis" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                )
+                {
+                    custom int keyframeIndex = 0
+                    custom bool mocap = 0
+                    float physics:density = 1000
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, -0.16500000655651093, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                    def "collisions"
+                    {
+                        def Capsule "butt" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                        )
+                        {
+                            uniform token axis = "X"
+                            custom float4 axisangle = (0, 0, 0, 0)
+                            custom int conaffinity = 1
+                            custom int condim = 1
+                            custom int contype = 1
+                            custom float density = 1000
+                            float3[] extent = [(-0.16, -0.09, -0.09), (0.16, 0.09, 0.09)]
+                            custom float3 friction = (0.7, 0.005, 0.0001)
+                            custom float3 geomSize = (0.09, 0.07, 1)
+                            custom int group = 1
+                            custom bool hasFromto = 0
+                            custom bool hasMass = 0
+                            double height = 0.14000000059604645
+                            custom float margin = 0
+                            custom string material = "body"
+                            rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/collisions/Looks/material_body>
+                            custom bool mjcfGeom = 1
+                            custom string name = "butt"
+                            uniform token physics:approximation = "convexHull"
+                            custom float3 pos = (-0.02, 0, 0)
+                            uniform token purpose = "guide"
+                            custom quatf quat = (0.70710677, -0.70710677, 0, 0)
+                            double radius = 0.09000000357627869
+                            custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                            custom float3 solimp = (0.9, 0.99, 0.003)
+                            custom float2 solref = (0.015, 1)
+                            custom string type = "capsule"
+                            matrix4d xformOp:transform = ( (1.1920928599806757e-7, 0.999999880790714, 0, 0), (0, 1.1920928599806757e-7, -0.999999880790714, 0), (-0.999999880790714, 0, 1.1920928599806757e-7, 0), (-0.019999999552965164, 0, 0, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                            custom float3 zaxis = (0, 0, 0)
+                        }
+
+                        def Scope "Looks"
+                        {
+                            def Material "material_body"
+                            {
+                                token inputs:frame:stPrimvarName = "st"
+                                token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                def Shader "stReader"
+                                {
+                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                    token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                    float2 outputs:result
+                                }
+
+                                def Shader "PBRShader"
+                                {
+                                    uniform token info:id = "UsdPreviewSurface"
+                                    color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                    float inputs:metallic = 0
+                                    float inputs:roughness = 0.5
+                                    float inputs:specular_level = 0.5
+                                    token outputs:surface
+                                }
+                            }
+                        }
+                    }
+
+                    def "joints"
+                    {
+                        def PhysicsRevoluteJoint "abdomen_x" (
+                            prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                        )
+                        {
+                            float drive:X:physics:damping = 5
+                            float drive:X:physics:stiffness = 10
+                            uniform token drive:X:physics:type = "force"
+                            custom int keyframeIndex = 0
+                            custom bool limited = 1
+                            float3 physics:axisVector = (1, 0, 0)
+                            rel physics:body0 = </rootPrim/torso/torso/waist_lower>
+                            rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis>
+                            float physics:breakForce = 3.4028235e38
+                            float physics:breakTorque = 3.4028235e38
+                            point3f physics:localPos0 = (0.01, 0, 0.195)
+                            point3f physics:localPos1 = (0, 0, 0.1)
+                            quatf physics:localRot0 = (1, 0, 0, 0)
+                            quatf physics:localRot1 = (1, 0, 0, 0)
+                            float physics:lowerLimit = -35
+                            float physics:upperLimit = 35
+                            float physxJoint:armature = 0.01
+                            float physxLimit:X:damping = 5
+                            float physxLimit:X:stiffness = 10
+                        }
+                    }
+
+                    def Xform "thigh_right" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                    )
+                    {
+                        custom int keyframeIndex = 0
+                        custom bool mocap = 0
+                        float physics:density = 1000
+                        prepend rel physics:filteredPairs = </rootPrim/torso/torso/waist_lower>
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, -0.10000000149011612, -0.03999999910593033, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                        def "collisions"
+                        {
+                            def Capsule "thigh_right" (
+                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                            )
+                            {
+                                uniform token axis = "X"
+                                custom float4 axisangle = (0, 0, 0, 0)
+                                custom int conaffinity = 1
+                                custom int condim = 1
+                                custom int contype = 1
+                                custom float density = 1000
+                                float3[] extent = [(-0.23007353, -0.06, -0.06), (0.23007353, 0.06, 0.06)]
+                                custom float3 friction = (0.7, 0.005, 0.0001)
+                                custom float3 geomSize = (0.06, 0.17007352, 1)
+                                custom int group = 1
+                                custom bool hasFromto = 0
+                                custom bool hasMass = 0
+                                double height = 0.3401470482349396
+                                custom float margin = 0
+                                custom string material = "body"
+                                rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/collisions/Looks/material_body>
+                                custom bool mjcfGeom = 1
+                                custom string name = "thigh_right"
+                                uniform token physics:approximation = "convexHull"
+                                custom float3 pos = (0, 0.005, -0.17)
+                                uniform token purpose = "guide"
+                                custom quatf quat = (0.014699337, -0.999892, 0, 0)
+                                double radius = 0.05999999865889549
+                                custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                custom float3 solimp = (0.9, 0.99, 0.003)
+                                custom float2 solref = (0.015, 1)
+                                custom string type = "capsule"
+                                matrix4d xformOp:transform = ( (-8.74737515754731e-8, 0.0293954978240909, -0.9995679464924756, 0), (0, -0.9995680339662272, -0.0293954978240909, 0), (-1.0000000874737516, 0, -8.74737515754731e-8, 0), (0, 0.004999999888241291, -0.17000000178813934, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                custom float3 zaxis = (0, 0, 0)
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_body"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                        float inputs:metallic = 0
+                                        float inputs:roughness = 0.5
+                                        float inputs:specular_level = 0.5
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "joints"
+                        {
+                            def PhysicsRevoluteJoint "hip_x_right" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 0
+                                custom bool limited = 1
+                                float3 physics:axisVector = (1, 0, 0)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, -0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -30.000002
+                                float physics:upperLimit = 10.000001
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+
+                            def PhysicsRevoluteJoint "hip_z_right" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 1
+                                custom bool limited = 1
+                                float3 physics:axisVector = (0, 0, 1)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, -0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -60.000004
+                                float physics:upperLimit = 35
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+
+                            def PhysicsRevoluteJoint "hip_y_right" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 2
+                                custom bool limited = 1
+                                float3 physics:axisVector = (0, 1, 0)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, -0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -150
+                                float physics:upperLimit = 20.000002
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+                        }
+
+                        def Xform "shin_right" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                        )
+                        {
+                            custom int keyframeIndex = 0
+                            custom bool mocap = 0
+                            float physics:density = 1000
+                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0.009999999776482582, -0.4000000059604645, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                            def "collisions"
+                            {
+                                def Capsule "shin_right" (
+                                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                )
+                                {
+                                    uniform token axis = "X"
+                                    custom float4 axisangle = (0, 0, 0, 0)
+                                    custom int conaffinity = 1
+                                    custom int condim = 1
+                                    custom int contype = 1
+                                    custom float density = 1000
+                                    float3[] extent = [(-0.199, -0.049, -0.049), (0.199, 0.049, 0.049)]
+                                    custom float3 friction = (0.7, 0.005, 0.0001)
+                                    custom float3 geomSize = (0.049, 0.15, 1)
+                                    custom int group = 1
+                                    custom bool hasFromto = 0
+                                    custom bool hasMass = 0
+                                    double height = 0.30000001192092896
+                                    custom float margin = 0
+                                    custom string material = "body"
+                                    rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/collisions/Looks/material_body>
+                                    custom bool mjcfGeom = 1
+                                    custom string name = "shin_right"
+                                    uniform token physics:approximation = "convexHull"
+                                    custom float3 pos = (0, 0, -0.15)
+                                    uniform token purpose = "guide"
+                                    custom quatf quat = (-8.742278e-8, 0, -0.99999994, 0)
+                                    double radius = 0.04899999871850014
+                                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                    custom float3 solimp = (0.9, 0.99, 0.003)
+                                    custom float2 solref = (0.015, 1)
+                                    custom string type = "capsule"
+                                    matrix4d xformOp:transform = ( (3.714032956736446e-7, 0, -0.9999997971840671, 0), (0, 1, 0, 0), (0.9999997971840671, 0, 3.714032956736446e-7, 0), (0, 0, -0.15000000596046448, 1) )
+                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                    custom float3 zaxis = (0, 0, 0)
+                                }
+
+                                def Scope "Looks"
+                                {
+                                    def Material "material_body"
+                                    {
+                                        token inputs:frame:stPrimvarName = "st"
+                                        token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                        def Shader "stReader"
+                                        {
+                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                            token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                            float2 outputs:result
+                                        }
+
+                                        def Shader "PBRShader"
+                                        {
+                                            uniform token info:id = "UsdPreviewSurface"
+                                            color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                            float inputs:metallic = 0
+                                            float inputs:roughness = 0.5
+                                            float inputs:specular_level = 0.5
+                                            token outputs:surface
+                                        }
+                                    }
+                                }
+                            }
+
+                            def "joints"
+                            {
+                                def PhysicsRevoluteJoint "knee_right" (
+                                    prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                )
+                                {
+                                    float drive:X:physics:damping = 0.2
+                                    float drive:X:physics:stiffness = 1
+                                    uniform token drive:X:physics:type = "force"
+                                    custom int keyframeIndex = 0
+                                    custom bool limited = 1
+                                    float3 physics:axisVector = (0, -1, 0)
+                                    rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right>
+                                    rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right>
+                                    float physics:breakForce = 3.4028235e38
+                                    float physics:breakTorque = 3.4028235e38
+                                    point3f physics:localPos0 = (0, 0.11, -0.34)
+                                    point3f physics:localPos1 = (0, 0, 0.02000001)
+                                    quatf physics:localRot0 = (1, 0, 0, 0)
+                                    quatf physics:localRot1 = (1, 0, 0, 0)
+                                    float physics:lowerLimit = -160.00002
+                                    float physics:upperLimit = 2
+                                    float physxJoint:armature = 0.01
+                                    float physxLimit:X:damping = 0.2
+                                    float physxLimit:X:stiffness = 1
+                                }
+                            }
+
+                            def Xform "foot_right" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                            )
+                            {
+                                custom int keyframeIndex = 0
+                                custom bool mocap = 0
+                                float physics:density = 1000
+                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, -0.38999998569488525, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                def "collisions"
+                                {
+                                    def Capsule "foot1_right" (
+                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                    )
+                                    {
+                                        uniform token axis = "X"
+                                        custom float4 axisangle = (0, 0, 0, 0)
+                                        custom int conaffinity = 1
+                                        custom int condim = 1
+                                        custom int contype = 1
+                                        custom float density = 1000
+                                        float3[] extent = [(-0.13247512, -0.027, -0.027), (0.13247512, 0.027, 0.027)]
+                                        custom float3 friction = (0.7, 0.005, 0.0001)
+                                        custom float3 geomSize = (0.027, 0.10547512, 1)
+                                        custom int group = 1
+                                        custom bool hasFromto = 0
+                                        custom bool hasMass = 0
+                                        double height = 0.21095024049282074
+                                        custom float margin = 0
+                                        custom string material = "body"
+                                        rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body>
+                                        custom bool mjcfGeom = 1
+                                        custom string name = "foot1_right"
+                                        uniform token physics:approximation = "convexHull"
+                                        custom float3 pos = (0.035, -0.02, 0)
+                                        uniform token purpose = "guide"
+                                        custom quatf quat = (0.70710677, 0.06704015, 0.7039217, -0)
+                                        double radius = 0.027000000700354576
+                                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                        custom float3 solimp = (0.9, 0.99, 0.003)
+                                        custom float2 solref = (0.015, 1)
+                                        custom string type = "capsule"
+                                        matrix4d xformOp:transform = ( (0.9954954732506078, -0.09480908975574098, -1.442733122136719e-7, 0), (0.09438203332781758, 0.9910112359639158, 0.09480908975574098, 0), (-0.008988619762772015, -0.09438203332781758, 0.9954954732506078, 0), (0.03500000014901161, -0.019999999552965164, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        custom float3 zaxis = (0, 0, 0)
+                                    }
+
+                                    def Scope "Looks"
+                                    {
+                                        def Material "material_body"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                                float inputs:metallic = 0
+                                                float inputs:roughness = 0.5
+                                                float inputs:specular_level = 0.5
+                                                token outputs:surface
+                                            }
+                                        }
+
+                                        def Material "material_body_1"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body_1/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body_1.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                                float inputs:metallic = 0
+                                                float inputs:roughness = 0.5
+                                                float inputs:specular_level = 0.5
+                                                token outputs:surface
+                                            }
+                                        }
+                                    }
+
+                                    def Capsule "foot2_right" (
+                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                    )
+                                    {
+                                        uniform token axis = "X"
+                                        custom float4 axisangle = (0, 0, 0, 0)
+                                        custom int conaffinity = 1
+                                        custom int condim = 1
+                                        custom int contype = 1
+                                        custom float density = 1000
+                                        float3[] extent = [(-0.13247512, -0.027, -0.027), (0.13247512, 0.027, 0.027)]
+                                        custom float3 friction = (0.7, 0.005, 0.0001)
+                                        custom float3 geomSize = (0.027, 0.10547512, 1)
+                                        custom int group = 1
+                                        custom bool hasFromto = 0
+                                        custom bool hasMass = 0
+                                        double height = 0.21095024049282074
+                                        custom float margin = 0
+                                        custom string material = "body"
+                                        rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/collisions/Looks/material_body_1>
+                                        custom bool mjcfGeom = 1
+                                        custom string name = "foot2_right"
+                                        uniform token physics:approximation = "convexHull"
+                                        custom float3 pos = (0.035, 0.02, 0)
+                                        uniform token purpose = "guide"
+                                        custom quatf quat = (0.70710677, -0.06704015, 0.7039217, 0)
+                                        double radius = 0.027000000700354576
+                                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                        custom float3 solimp = (0.9, 0.99, 0.003)
+                                        custom float2 solref = (0.015, 1)
+                                        custom string type = "capsule"
+                                        matrix4d xformOp:transform = ( (0.9954954732506078, 0.09480908975574098, -1.442733122136719e-7, 0), (-0.09438203332781758, 0.9910112359639158, -0.09480908975574098, 0), (-0.008988619762772015, 0.09438203332781758, 0.9954954732506078, 0), (0.03500000014901161, 0.019999999552965164, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        custom float3 zaxis = (0, 0, 0)
+                                    }
+                                }
+
+                                def "joints"
+                                {
+                                    def PhysicsRevoluteJoint "ankle_y_right" (
+                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                    )
+                                    {
+                                        float drive:X:physics:damping = 0.2
+                                        float drive:X:physics:stiffness = 6
+                                        uniform token drive:X:physics:type = "force"
+                                        custom int keyframeIndex = 0
+                                        custom bool limited = 1
+                                        float3 physics:axisVector = (0, 1, 0)
+                                        rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right>
+                                        rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right>
+                                        float physics:breakForce = 3.4028235e38
+                                        float physics:breakTorque = 3.4028235e38
+                                        point3f physics:localPos0 = (0, -0.01, 0.09)
+                                        point3f physics:localPos1 = (0, 0, 0.07999998)
+                                        quatf physics:localRot0 = (1, 0, 0, 0)
+                                        quatf physics:localRot1 = (1, 0, 0, 0)
+                                        float physics:lowerLimit = -50
+                                        float physics:upperLimit = 50
+                                        float physxJoint:armature = 0.01
+                                        float physxLimit:X:damping = 0.2
+                                        float physxLimit:X:stiffness = 6
+                                    }
+
+                                    def PhysicsRevoluteJoint "ankle_x_right" (
+                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                    )
+                                    {
+                                        float drive:X:physics:damping = 0.2
+                                        float drive:X:physics:stiffness = 3
+                                        uniform token drive:X:physics:type = "force"
+                                        custom int keyframeIndex = 1
+                                        custom bool limited = 1
+                                        float3 physics:axisVector = (1, 0, 0.5)
+                                        rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right>
+                                        rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_right/shin_right/foot_right>
+                                        float physics:breakForce = 3.4028235e38
+                                        float physics:breakTorque = 3.4028235e38
+                                        point3f physics:localPos0 = (0, -0.01, 0.09)
+                                        point3f physics:localPos1 = (0, 0, 0.07999998)
+                                        quatf physics:localRot0 = (1, 0, 0, 0)
+                                        quatf physics:localRot1 = (1, 0, 0, 0)
+                                        float physics:lowerLimit = -50
+                                        float physics:upperLimit = 50
+                                        float physxJoint:armature = 0.01
+                                        float physxLimit:X:damping = 0.2
+                                        float physxLimit:X:stiffness = 3
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    def Xform "thigh_left" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                    )
+                    {
+                        custom int keyframeIndex = 1
+                        custom bool mocap = 0
+                        float physics:density = 1000
+                        prepend rel physics:filteredPairs = </rootPrim/torso/torso/waist_lower>
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0.10000000149011612, -0.03999999910593033, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                        def "collisions"
+                        {
+                            def Capsule "thigh_left" (
+                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                            )
+                            {
+                                uniform token axis = "X"
+                                custom float4 axisangle = (0, 0, 0, 0)
+                                custom int conaffinity = 1
+                                custom int condim = 1
+                                custom int contype = 1
+                                custom float density = 1000
+                                float3[] extent = [(-0.23007353, -0.06, -0.06), (0.23007353, 0.06, 0.06)]
+                                custom float3 friction = (0.7, 0.005, 0.0001)
+                                custom float3 geomSize = (0.06, 0.17007352, 1)
+                                custom int group = 1
+                                custom bool hasFromto = 0
+                                custom bool hasMass = 0
+                                double height = 0.3401470482349396
+                                custom float margin = 0
+                                custom string material = "body"
+                                rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/collisions/Looks/material_body>
+                                custom bool mjcfGeom = 1
+                                custom string name = "thigh_left"
+                                uniform token physics:approximation = "convexHull"
+                                custom float3 pos = (0, -0.005, -0.17)
+                                uniform token purpose = "guide"
+                                custom quatf quat = (0.014699337, 0.999892, 0, -0)
+                                double radius = 0.05999999865889549
+                                custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                custom float3 solimp = (0.9, 0.99, 0.003)
+                                custom float2 solref = (0.015, 1)
+                                custom string type = "capsule"
+                                matrix4d xformOp:transform = ( (-8.74737515754731e-8, -0.0293954978240909, -0.9995679464924756, 0), (0, -0.9995680339662272, 0.0293954978240909, 0), (-1.0000000874737516, 0, -8.74737515754731e-8, 0), (0, -0.004999999888241291, -0.17000000178813934, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                custom float3 zaxis = (0, 0, 0)
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_body"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                        float inputs:metallic = 0
+                                        float inputs:roughness = 0.5
+                                        float inputs:specular_level = 0.5
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "joints"
+                        {
+                            def PhysicsRevoluteJoint "hip_x_left" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 0
+                                custom bool limited = 1
+                                float3 physics:axisVector = (-1, 0, 0)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, 0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -30.000002
+                                float physics:upperLimit = 10.000001
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+
+                            def PhysicsRevoluteJoint "hip_z_left" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 1
+                                custom bool limited = 1
+                                float3 physics:axisVector = (0, 0, -1)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, 0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -60.000004
+                                float physics:upperLimit = 35
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+
+                            def PhysicsRevoluteJoint "hip_y_left" (
+                                prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                            )
+                            {
+                                float drive:X:physics:damping = 5
+                                float drive:X:physics:stiffness = 10
+                                uniform token drive:X:physics:type = "force"
+                                custom int keyframeIndex = 2
+                                custom bool limited = 1
+                                float3 physics:axisVector = (0, 1, 0)
+                                rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis>
+                                rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0, 0.1, 0.125)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                                float physics:lowerLimit = -150
+                                float physics:upperLimit = 20.000002
+                                float physxJoint:armature = 0.01
+                                float physxLimit:X:damping = 5
+                                float physxLimit:X:stiffness = 10
+                            }
+                        }
+
+                        def Xform "shin_left" (
+                            prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                        )
+                        {
+                            custom int keyframeIndex = 0
+                            custom bool mocap = 0
+                            float physics:density = 1000
+                            matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, -0.009999999776482582, -0.4000000059604645, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                            def "collisions"
+                            {
+                                def Capsule "shin_left" (
+                                    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                )
+                                {
+                                    uniform token axis = "X"
+                                    custom float4 axisangle = (0, 0, 0, 0)
+                                    custom int conaffinity = 1
+                                    custom int condim = 1
+                                    custom int contype = 1
+                                    custom float density = 1000
+                                    float3[] extent = [(-0.199, -0.049, -0.049), (0.199, 0.049, 0.049)]
+                                    custom float3 friction = (0.7, 0.005, 0.0001)
+                                    custom float3 geomSize = (0.049, 0.15, 1)
+                                    custom int group = 1
+                                    custom bool hasFromto = 0
+                                    custom bool hasMass = 0
+                                    double height = 0.30000001192092896
+                                    custom float margin = 0
+                                    custom string material = "body"
+                                    rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/collisions/Looks/material_body>
+                                    custom bool mjcfGeom = 1
+                                    custom string name = "shin_left"
+                                    uniform token physics:approximation = "convexHull"
+                                    custom float3 pos = (0, 0, -0.15)
+                                    uniform token purpose = "guide"
+                                    custom quatf quat = (-8.742278e-8, 0, -0.99999994, 0)
+                                    double radius = 0.04899999871850014
+                                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                    custom float3 solimp = (0.9, 0.99, 0.003)
+                                    custom float2 solref = (0.015, 1)
+                                    custom string type = "capsule"
+                                    matrix4d xformOp:transform = ( (3.714032956736446e-7, 0, -0.9999997971840671, 0), (0, 1, 0, 0), (0.9999997971840671, 0, 3.714032956736446e-7, 0), (0, 0, -0.15000000596046448, 1) )
+                                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                                    custom float3 zaxis = (0, 0, 0)
+                                }
+
+                                def Scope "Looks"
+                                {
+                                    def Material "material_body"
+                                    {
+                                        token inputs:frame:stPrimvarName = "st"
+                                        token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                        def Shader "stReader"
+                                        {
+                                            uniform token info:id = "UsdPrimvarReader_float2"
+                                            token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                            float2 outputs:result
+                                        }
+
+                                        def Shader "PBRShader"
+                                        {
+                                            uniform token info:id = "UsdPreviewSurface"
+                                            color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                            float inputs:metallic = 0
+                                            float inputs:roughness = 0.5
+                                            float inputs:specular_level = 0.5
+                                            token outputs:surface
+                                        }
+                                    }
+                                }
+                            }
+
+                            def "joints"
+                            {
+                                def PhysicsRevoluteJoint "knee_left" (
+                                    prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                )
+                                {
+                                    float drive:X:physics:damping = 0.2
+                                    float drive:X:physics:stiffness = 1
+                                    uniform token drive:X:physics:type = "force"
+                                    custom int keyframeIndex = 0
+                                    custom bool limited = 1
+                                    float3 physics:axisVector = (0, -1, 0)
+                                    rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left>
+                                    rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left>
+                                    float physics:breakForce = 3.4028235e38
+                                    float physics:breakTorque = 3.4028235e38
+                                    point3f physics:localPos0 = (0, -0.11, -0.34)
+                                    point3f physics:localPos1 = (0, 0, 0.02000001)
+                                    quatf physics:localRot0 = (1, 0, 0, 0)
+                                    quatf physics:localRot1 = (1, 0, 0, 0)
+                                    float physics:lowerLimit = -160.00002
+                                    float physics:upperLimit = 2
+                                    float physxJoint:armature = 0.01
+                                    float physxLimit:X:damping = 0.2
+                                    float physxLimit:X:stiffness = 1
+                                }
+                            }
+
+                            def Xform "foot_left" (
+                                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                            )
+                            {
+                                custom int keyframeIndex = 0
+                                custom bool mocap = 0
+                                float physics:density = 1000
+                                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, -0.38999998569488525, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                                def "collisions"
+                                {
+                                    def Capsule "foot1_left" (
+                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                    )
+                                    {
+                                        uniform token axis = "X"
+                                        custom float4 axisangle = (0, 0, 0, 0)
+                                        custom int conaffinity = 1
+                                        custom int condim = 1
+                                        custom int contype = 1
+                                        custom float density = 1000
+                                        float3[] extent = [(-0.13247512, -0.027, -0.027), (0.13247512, 0.027, 0.027)]
+                                        custom float3 friction = (0.7, 0.005, 0.0001)
+                                        custom float3 geomSize = (0.027, 0.10547512, 1)
+                                        custom int group = 1
+                                        custom bool hasFromto = 0
+                                        custom bool hasMass = 0
+                                        double height = 0.21095024049282074
+                                        custom float margin = 0
+                                        custom string material = "body"
+                                        rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body>
+                                        custom bool mjcfGeom = 1
+                                        custom string name = "foot1_left"
+                                        uniform token physics:approximation = "convexHull"
+                                        custom float3 pos = (0.035, -0.02, 0)
+                                        uniform token purpose = "guide"
+                                        custom quatf quat = (0.70710677, 0.06704015, 0.7039217, -0)
+                                        double radius = 0.027000000700354576
+                                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                        custom float3 solimp = (0.9, 0.99, 0.003)
+                                        custom float2 solref = (0.015, 1)
+                                        custom string type = "capsule"
+                                        matrix4d xformOp:transform = ( (0.9954954732506078, -0.09480908975574098, -1.442733122136719e-7, 0), (0.09438203332781758, 0.9910112359639158, 0.09480908975574098, 0), (-0.008988619762772015, -0.09438203332781758, 0.9954954732506078, 0), (0.03500000014901161, -0.019999999552965164, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        custom float3 zaxis = (0, 0, 0)
+                                    }
+
+                                    def Scope "Looks"
+                                    {
+                                        def Material "material_body"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                                float inputs:metallic = 0
+                                                float inputs:roughness = 0.5
+                                                float inputs:specular_level = 0.5
+                                                token outputs:surface
+                                            }
+                                        }
+
+                                        def Material "material_body_1"
+                                        {
+                                            token inputs:frame:stPrimvarName = "st"
+                                            token outputs:surface.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body_1/PBRShader.outputs:surface>
+
+                                            def Shader "stReader"
+                                            {
+                                                uniform token info:id = "UsdPrimvarReader_float2"
+                                                token inputs:varname.connect = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body_1.inputs:frame:stPrimvarName>
+                                                float2 outputs:result
+                                            }
+
+                                            def Shader "PBRShader"
+                                            {
+                                                uniform token info:id = "UsdPreviewSurface"
+                                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                                float inputs:metallic = 0
+                                                float inputs:roughness = 0.5
+                                                float inputs:specular_level = 0.5
+                                                token outputs:surface
+                                            }
+                                        }
+                                    }
+
+                                    def Capsule "foot2_left" (
+                                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                                    )
+                                    {
+                                        uniform token axis = "X"
+                                        custom float4 axisangle = (0, 0, 0, 0)
+                                        custom int conaffinity = 1
+                                        custom int condim = 1
+                                        custom int contype = 1
+                                        custom float density = 1000
+                                        float3[] extent = [(-0.13247512, -0.027, -0.027), (0.13247512, 0.027, 0.027)]
+                                        custom float3 friction = (0.7, 0.005, 0.0001)
+                                        custom float3 geomSize = (0.027, 0.10547512, 1)
+                                        custom int group = 1
+                                        custom bool hasFromto = 0
+                                        custom bool hasMass = 0
+                                        double height = 0.21095024049282074
+                                        custom float margin = 0
+                                        custom string material = "body"
+                                        rel material:binding = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/collisions/Looks/material_body_1>
+                                        custom bool mjcfGeom = 1
+                                        custom string name = "foot2_left"
+                                        uniform token physics:approximation = "convexHull"
+                                        custom float3 pos = (0.035, 0.02, 0)
+                                        uniform token purpose = "guide"
+                                        custom quatf quat = (0.70710677, -0.06704015, 0.7039217, 0)
+                                        double radius = 0.027000000700354576
+                                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                        custom float3 solimp = (0.9, 0.99, 0.003)
+                                        custom float2 solref = (0.015, 1)
+                                        custom string type = "capsule"
+                                        matrix4d xformOp:transform = ( (0.9954954732506078, 0.09480908975574098, -1.442733122136719e-7, 0), (-0.09438203332781758, 0.9910112359639158, -0.09480908975574098, 0), (-0.008988619762772015, 0.09438203332781758, 0.9954954732506078, 0), (0.03500000014901161, 0.019999999552965164, 0, 1) )
+                                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                                        custom float3 zaxis = (0, 0, 0)
+                                    }
+                                }
+
+                                def "joints"
+                                {
+                                    def PhysicsRevoluteJoint "ankle_y_left" (
+                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                    )
+                                    {
+                                        float drive:X:physics:damping = 0.2
+                                        float drive:X:physics:stiffness = 6
+                                        uniform token drive:X:physics:type = "force"
+                                        custom int keyframeIndex = 0
+                                        custom bool limited = 1
+                                        float3 physics:axisVector = (0, 1, 0)
+                                        rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left>
+                                        rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left>
+                                        float physics:breakForce = 3.4028235e38
+                                        float physics:breakTorque = 3.4028235e38
+                                        point3f physics:localPos0 = (0, 0.01, 0.09)
+                                        point3f physics:localPos1 = (0, 0, 0.07999998)
+                                        quatf physics:localRot0 = (1, 0, 0, 0)
+                                        quatf physics:localRot1 = (1, 0, 0, 0)
+                                        float physics:lowerLimit = -50
+                                        float physics:upperLimit = 50
+                                        float physxJoint:armature = 0.01
+                                        float physxLimit:X:damping = 0.2
+                                        float physxLimit:X:stiffness = 6
+                                    }
+
+                                    def PhysicsRevoluteJoint "ankle_x_left" (
+                                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                                    )
+                                    {
+                                        float drive:X:physics:damping = 0.2
+                                        float drive:X:physics:stiffness = 3
+                                        uniform token drive:X:physics:type = "force"
+                                        custom int keyframeIndex = 1
+                                        custom bool limited = 1
+                                        float3 physics:axisVector = (-1, 0, -0.5)
+                                        rel physics:body0 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left>
+                                        rel physics:body1 = </rootPrim/torso/torso/waist_lower/pelvis/thigh_left/shin_left/foot_left>
+                                        float physics:breakForce = 3.4028235e38
+                                        float physics:breakTorque = 3.4028235e38
+                                        point3f physics:localPos0 = (0, 0.01, 0.09)
+                                        point3f physics:localPos1 = (0, 0, 0.07999998)
+                                        quatf physics:localRot0 = (1, 0, 0, 0)
+                                        quatf physics:localRot1 = (1, 0, 0, 0)
+                                        float physics:lowerLimit = -50
+                                        float physics:upperLimit = 50
+                                        float physxJoint:armature = 0.01
+                                        float physxLimit:X:damping = 0.2
+                                        float physxLimit:X:stiffness = 3
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            def Xform "upper_arm_right" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+            )
+            {
+                custom int keyframeIndex = 2
+                custom bool mocap = 0
+                float physics:density = 1000
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, -0.17000000178813934, 0.05999999865889549, 1) )
+                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                def "collisions"
+                {
+                    def Capsule "upper_arm_right" (
+                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                    )
+                    {
+                        uniform token axis = "X"
+                        custom float4 axisangle = (0, 0, 0, 0)
+                        custom int conaffinity = 1
+                        custom int condim = 1
+                        custom int contype = 1
+                        custom float density = 1000
+                        float3[] extent = [(-0.17856407, -0.04, -0.04), (0.17856407, 0.04, 0.04)]
+                        custom float3 friction = (0.7, 0.005, 0.0001)
+                        custom float3 geomSize = (0.04, 0.13856407, 1)
+                        custom int group = 1
+                        custom bool hasFromto = 0
+                        custom bool hasMass = 0
+                        double height = 0.277128130197525
+                        custom float margin = 0
+                        custom string material = "body"
+                        rel material:binding = </rootPrim/torso/torso/upper_arm_right/collisions/Looks/material_body>
+                        custom bool mjcfGeom = 1
+                        custom string name = "upper_arm_right"
+                        uniform token physics:approximation = "convexHull"
+                        custom float3 pos = (0.08, -0.08, -0.08)
+                        uniform token purpose = "guide"
+                        custom quatf quat = (0.45970082, 0.62796307, 0.62796307, -0)
+                        double radius = 0.03999999910593033
+                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                        custom float3 solimp = (0.9, 0.99, 0.003)
+                        custom float2 solref = (0.015, 1)
+                        custom string type = "capsule"
+                        matrix4d xformOp:transform = ( (0.5773502297551367, -0.5773502295872053, -0.5773503339201529, 0), (0.7886751571886403, 0.21132481634469613, 0.5773502295872053, 0), (-0.21132484973515098, -0.7886751571886403, 0.5773502297551367, 0), (0.07999999821186066, -0.07999999821186066, -0.07999999821186066, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                        custom float3 zaxis = (0, 0, 0)
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_body"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                float inputs:metallic = 0
+                                float inputs:roughness = 0.5
+                                float inputs:specular_level = 0.5
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "joints"
+                {
+                    def PhysicsRevoluteJoint "shoulder1_right" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 0.2
+                        float drive:X:physics:stiffness = 1
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 0
+                        custom bool limited = 1
+                        float3 physics:axisVector = (2, 1, 1)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/upper_arm_right>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, -0.17, -1.222)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -85.00001
+                        float physics:upperLimit = 60.000004
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 0.2
+                        float physxLimit:X:stiffness = 1
+                    }
+
+                    def PhysicsRevoluteJoint "shoulder2_right" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 0.2
+                        float drive:X:physics:stiffness = 1
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 1
+                        custom bool limited = 1
+                        float3 physics:axisVector = (0, -1, 1)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/upper_arm_right>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, -0.17, -1.222)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -85.00001
+                        float physics:upperLimit = 60.000004
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 0.2
+                        float physxLimit:X:stiffness = 1
+                    }
+                }
+
+                def Xform "lower_arm_right" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                )
+                {
+                    custom int keyframeIndex = 0
+                    custom bool mocap = 0
+                    float physics:density = 1000
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.18000000715255737, -0.18000000715255737, -0.18000000715255737, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                    def "collisions"
+                    {
+                        def Capsule "lower_arm_right" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                        )
+                        {
+                            uniform token axis = "X"
+                            custom float4 axisangle = (0, 0, 0, 0)
+                            custom int conaffinity = 1
+                            custom int condim = 1
+                            custom int contype = 1
+                            custom float density = 1000
+                            float3[] extent = [(-0.16956407, -0.031, -0.031), (0.16956407, 0.031, 0.031)]
+                            custom float3 friction = (0.7, 0.005, 0.0001)
+                            custom float3 geomSize = (0.031, 0.13856407, 1)
+                            custom int group = 1
+                            custom bool hasFromto = 0
+                            custom bool hasMass = 0
+                            double height = 0.277128130197525
+                            custom float margin = 0
+                            custom string material = "body"
+                            rel material:binding = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/collisions/Looks/material_body>
+                            custom bool mjcfGeom = 1
+                            custom string name = "lower_arm_right"
+                            uniform token physics:approximation = "convexHull"
+                            custom float3 pos = (0.09, 0.09, 0.09)
+                            uniform token purpose = "guide"
+                            custom quatf quat = (0.88807386, -0.3250576, 0.3250576, 0)
+                            double radius = 0.03099999949336052
+                            custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                            custom float3 solimp = (0.9, 0.99, 0.003)
+                            custom float2 solref = (0.015, 1)
+                            custom string type = "capsule"
+                            matrix4d xformOp:transform = ( (0.5773501914022385, 0.5773503138167939, 0.5773503645632085, 0), (-0.21132486021091523, 0.7886751260889318, -0.5773503138167939, 0), (-0.7886752384742768, 0.21132486021091523, 0.5773501914022385, 0), (0.09000000357627869, 0.09000000357627869, 0.09000000357627869, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                            custom float3 zaxis = (0, 0, 0)
+                        }
+
+                        def Scope "Looks"
+                        {
+                            def Material "material_body"
+                            {
+                                token inputs:frame:stPrimvarName = "st"
+                                token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                def Shader "stReader"
+                                {
+                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                    token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                    float2 outputs:result
+                                }
+
+                                def Shader "PBRShader"
+                                {
+                                    uniform token info:id = "UsdPreviewSurface"
+                                    color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                    float inputs:metallic = 0
+                                    float inputs:roughness = 0.5
+                                    float inputs:specular_level = 0.5
+                                    token outputs:surface
+                                }
+                            }
+                        }
+                    }
+
+                    def "joints"
+                    {
+                        def PhysicsRevoluteJoint "elbow_right" (
+                            prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                        )
+                        {
+                            float drive:X:physics:damping = 0.2
+                            float drive:X:physics:stiffness = 0
+                            uniform token drive:X:physics:type = "force"
+                            custom int keyframeIndex = 0
+                            custom bool limited = 1
+                            float3 physics:axisVector = (0, -1, 1)
+                            rel physics:body0 = </rootPrim/torso/torso/upper_arm_right>
+                            rel physics:body1 = </rootPrim/torso/torso/upper_arm_right/lower_arm_right>
+                            float physics:breakForce = 3.4028235e38
+                            float physics:breakTorque = 3.4028235e38
+                            point3f physics:localPos0 = (0.18, -0.010000005, -0.24000001)
+                            point3f physics:localPos1 = (0, 0, 0)
+                            quatf physics:localRot0 = (1, 0, 0, 0)
+                            quatf physics:localRot1 = (1, 0, 0, 0)
+                            float physics:lowerLimit = -100
+                            float physics:upperLimit = 50
+                            float physxJoint:armature = 0.01
+                            float physxLimit:X:damping = 0.2
+                            float physxLimit:X:stiffness = 0
+                        }
+                    }
+
+                    def Xform "hand_right" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                    )
+                    {
+                        custom int keyframeIndex = 0
+                        custom bool mocap = 0
+                        float physics:density = 1000
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.18000000715255737, 0.18000000715255737, 0.18000000715255737, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                        def "collisions"
+                        {
+                            def Sphere "hand_right" (
+                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                            )
+                            {
+                                custom float4 axisangle = (0, 0, 0, 0)
+                                custom int conaffinity = 1
+                                custom int condim = 1
+                                custom int contype = 1
+                                custom float density = 1000
+                                float3[] extent = [(-0.04, -0.04, -0.04), (0.04, 0.04, 0.04)]
+                                custom float3 friction = (0.7, 0.005, 0.0001)
+                                custom float3 geomSize = (0.04, 1, 1)
+                                custom int group = 1
+                                custom bool hasFromto = 0
+                                custom bool hasMass = 0
+                                custom float margin = 0
+                                custom string material = "body"
+                                rel material:binding = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/hand_right/collisions/Looks/material_body>
+                                custom bool mjcfGeom = 1
+                                custom string name = "hand_right"
+                                uniform token physics:approximation = "boundingSphere"
+                                custom float3 pos = (0, 0, 0)
+                                uniform token purpose = "guide"
+                                custom quatf quat = (0.88807374, -0.32505763, 0.32505763, 0)
+                                double radius = 0.03999999910593033
+                                custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                custom float3 solimp = (0.9, 0.99, 0.003)
+                                custom float2 solref = (0.015, 1)
+                                custom string type = "sphere"
+                                matrix4d xformOp:transform = ( (0.7886750798568016, -0.21132492014319837, -0.5773502844207457, 0), (-0.21132492014319837, 0.7886750798568016, -0.5773502844207457, 0), (0.5773502844207457, 0.5773502844207457, 0.5773501597136033, 0), (0, 0, 0, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                custom float3 zaxis = (0, 0, 0)
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_body"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/hand_right/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/hand_right/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                        float inputs:metallic = 0
+                                        float inputs:roughness = 0.5
+                                        float inputs:specular_level = 0.5
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "joints"
+                        {
+                            def PhysicsFixedJoint "hand_right"
+                            {
+                                rel physics:body0 = </rootPrim/torso/torso/upper_arm_right/lower_arm_right>
+                                rel physics:body1 = </rootPrim/torso/torso/upper_arm_right/lower_arm_right/hand_right>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0.18, 0.18, 0.18)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                            }
+                        }
+                    }
+                }
+            }
+
+            def Xform "upper_arm_left" (
+                prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+            )
+            {
+                custom int keyframeIndex = 3
+                custom bool mocap = 0
+                float physics:density = 1000
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0.17000000178813934, 0.05999999865889549, 1) )
+                uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                def "collisions"
+                {
+                    def Capsule "upper_arm_left" (
+                        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                    )
+                    {
+                        uniform token axis = "X"
+                        custom float4 axisangle = (0, 0, 0, 0)
+                        custom int conaffinity = 1
+                        custom int condim = 1
+                        custom int contype = 1
+                        custom float density = 1000
+                        float3[] extent = [(-0.17856407, -0.04, -0.04), (0.17856407, 0.04, 0.04)]
+                        custom float3 friction = (0.7, 0.005, 0.0001)
+                        custom float3 geomSize = (0.04, 0.13856407, 1)
+                        custom int group = 1
+                        custom bool hasFromto = 0
+                        custom bool hasMass = 0
+                        double height = 0.277128130197525
+                        custom float margin = 0
+                        custom string material = "body"
+                        rel material:binding = </rootPrim/torso/torso/upper_arm_left/collisions/Looks/material_body>
+                        custom bool mjcfGeom = 1
+                        custom string name = "upper_arm_left"
+                        uniform token physics:approximation = "convexHull"
+                        custom float3 pos = (0.08, 0.08, -0.08)
+                        uniform token purpose = "guide"
+                        custom quatf quat = (0.45970082, -0.62796307, 0.62796307, 0)
+                        double radius = 0.03999999910593033
+                        custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                        custom float3 solimp = (0.9, 0.99, 0.003)
+                        custom float2 solref = (0.015, 1)
+                        custom string type = "capsule"
+                        matrix4d xformOp:transform = ( (0.5773502297551367, 0.5773502295872053, -0.5773503339201529, 0), (-0.7886751571886403, 0.21132481634469613, -0.5773502295872053, 0), (-0.21132484973515098, 0.7886751571886403, 0.5773502297551367, 0), (0.07999999821186066, 0.07999999821186066, -0.07999999821186066, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+                        custom float3 zaxis = (0, 0, 0)
+                    }
+
+                    def Scope "Looks"
+                    {
+                        def Material "material_body"
+                        {
+                            token inputs:frame:stPrimvarName = "st"
+                            token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                            def Shader "stReader"
+                            {
+                                uniform token info:id = "UsdPrimvarReader_float2"
+                                token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                float2 outputs:result
+                            }
+
+                            def Shader "PBRShader"
+                            {
+                                uniform token info:id = "UsdPreviewSurface"
+                                color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                float inputs:metallic = 0
+                                float inputs:roughness = 0.5
+                                float inputs:specular_level = 0.5
+                                token outputs:surface
+                            }
+                        }
+                    }
+                }
+
+                def "joints"
+                {
+                    def PhysicsRevoluteJoint "shoulder1_left" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 0.2
+                        float drive:X:physics:stiffness = 1
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 0
+                        custom bool limited = 1
+                        float3 physics:axisVector = (-2, 1, -1)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/upper_arm_left>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, 0.17, -1.222)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -85.00001
+                        float physics:upperLimit = 60.000004
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 0.2
+                        float physxLimit:X:stiffness = 1
+                    }
+
+                    def PhysicsRevoluteJoint "shoulder2_left" (
+                        prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                    )
+                    {
+                        float drive:X:physics:damping = 0.2
+                        float drive:X:physics:stiffness = 1
+                        uniform token drive:X:physics:type = "force"
+                        custom int keyframeIndex = 1
+                        custom bool limited = 1
+                        float3 physics:axisVector = (0, -1, -1)
+                        rel physics:body0 = </rootPrim/torso/torso>
+                        rel physics:body1 = </rootPrim/torso/torso/upper_arm_left>
+                        float physics:breakForce = 3.4028235e38
+                        float physics:breakTorque = 3.4028235e38
+                        point3f physics:localPos0 = (0, 0.17, -1.222)
+                        point3f physics:localPos1 = (0, 0, 0)
+                        quatf physics:localRot0 = (1, 0, 0, 0)
+                        quatf physics:localRot1 = (1, 0, 0, 0)
+                        float physics:lowerLimit = -85.00001
+                        float physics:upperLimit = 60.000004
+                        float physxJoint:armature = 0.01
+                        float physxLimit:X:damping = 0.2
+                        float physxLimit:X:stiffness = 1
+                    }
+                }
+
+                def Xform "lower_arm_left" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                )
+                {
+                    custom int keyframeIndex = 0
+                    custom bool mocap = 0
+                    float physics:density = 1000
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.18000000715255737, 0.18000000715255737, -0.18000000715255737, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                    def "collisions"
+                    {
+                        def Capsule "lower_arm_left" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                        )
+                        {
+                            uniform token axis = "X"
+                            custom float4 axisangle = (0, 0, 0, 0)
+                            custom int conaffinity = 1
+                            custom int condim = 1
+                            custom int contype = 1
+                            custom float density = 1000
+                            float3[] extent = [(-0.16956407, -0.031, -0.031), (0.16956407, 0.031, 0.031)]
+                            custom float3 friction = (0.7, 0.005, 0.0001)
+                            custom float3 geomSize = (0.031, 0.13856407, 1)
+                            custom int group = 1
+                            custom bool hasFromto = 0
+                            custom bool hasMass = 0
+                            double height = 0.277128130197525
+                            custom float margin = 0
+                            custom string material = "body"
+                            rel material:binding = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/collisions/Looks/material_body>
+                            custom bool mjcfGeom = 1
+                            custom string name = "lower_arm_left"
+                            uniform token physics:approximation = "convexHull"
+                            custom float3 pos = (0.09, -0.09, 0.09)
+                            uniform token purpose = "guide"
+                            custom quatf quat = (0.88807386, 0.3250576, 0.3250576, -0)
+                            double radius = 0.03099999949336052
+                            custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                            custom float3 solimp = (0.9, 0.99, 0.003)
+                            custom float2 solref = (0.015, 1)
+                            custom string type = "capsule"
+                            matrix4d xformOp:transform = ( (0.5773501914022385, -0.5773503138167939, 0.5773503645632085, 0), (0.21132486021091523, 0.7886751260889318, 0.5773503138167939, 0), (-0.7886752384742768, -0.21132486021091523, 0.5773501914022385, 0), (0.09000000357627869, -0.09000000357627869, 0.09000000357627869, 1) )
+                            uniform token[] xformOpOrder = ["xformOp:transform"]
+                            custom float3 zaxis = (0, 0, 0)
+                        }
+
+                        def Scope "Looks"
+                        {
+                            def Material "material_body"
+                            {
+                                token inputs:frame:stPrimvarName = "st"
+                                token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                def Shader "stReader"
+                                {
+                                    uniform token info:id = "UsdPrimvarReader_float2"
+                                    token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                    float2 outputs:result
+                                }
+
+                                def Shader "PBRShader"
+                                {
+                                    uniform token info:id = "UsdPreviewSurface"
+                                    color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                    float inputs:metallic = 0
+                                    float inputs:roughness = 0.5
+                                    float inputs:specular_level = 0.5
+                                    token outputs:surface
+                                }
+                            }
+                        }
+                    }
+
+                    def "joints"
+                    {
+                        def PhysicsRevoluteJoint "elbow_left" (
+                            prepend apiSchemas = ["PhysxJointAPI", "PhysxLimitAPI:X", "PhysicsDriveAPI:X"]
+                        )
+                        {
+                            float drive:X:physics:damping = 0.2
+                            float drive:X:physics:stiffness = 0
+                            uniform token drive:X:physics:type = "force"
+                            custom int keyframeIndex = 0
+                            custom bool limited = 1
+                            float3 physics:axisVector = (0, -1, -1)
+                            rel physics:body0 = </rootPrim/torso/torso/upper_arm_left>
+                            rel physics:body1 = </rootPrim/torso/torso/upper_arm_left/lower_arm_left>
+                            float physics:breakForce = 3.4028235e38
+                            float physics:breakTorque = 3.4028235e38
+                            point3f physics:localPos0 = (0.18, 0.010000005, -0.24000001)
+                            point3f physics:localPos1 = (0, 0, 0)
+                            quatf physics:localRot0 = (1, 0, 0, 0)
+                            quatf physics:localRot1 = (1, 0, 0, 0)
+                            float physics:lowerLimit = -100
+                            float physics:upperLimit = 50
+                            float physxJoint:armature = 0.01
+                            float physxLimit:X:damping = 0.2
+                            float physxLimit:X:stiffness = 0
+                        }
+                    }
+
+                    def Xform "hand_left" (
+                        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI", "PhysicsFilteredPairsAPI"]
+                    )
+                    {
+                        custom int keyframeIndex = 0
+                        custom bool mocap = 0
+                        float physics:density = 1000
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0.18000000715255737, -0.18000000715255737, 0.18000000715255737, 1) )
+                        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+                        def "collisions"
+                        {
+                            def Sphere "hand_left" (
+                                prepend apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "MaterialBindingAPI"]
+                            )
+                            {
+                                custom float4 axisangle = (0, 0, 0, 0)
+                                custom int conaffinity = 1
+                                custom int condim = 1
+                                custom int contype = 1
+                                custom float density = 1000
+                                float3[] extent = [(-0.04, -0.04, -0.04), (0.04, 0.04, 0.04)]
+                                custom float3 friction = (0.7, 0.005, 0.0001)
+                                custom float3 geomSize = (0.04, 1, 1)
+                                custom int group = 1
+                                custom bool hasFromto = 0
+                                custom bool hasMass = 0
+                                custom float margin = 0
+                                custom string material = "body"
+                                rel material:binding = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/hand_left/collisions/Looks/material_body>
+                                custom bool mjcfGeom = 1
+                                custom string name = "hand_left"
+                                uniform token physics:approximation = "boundingSphere"
+                                custom float3 pos = (0, 0, 0)
+                                uniform token purpose = "guide"
+                                custom quatf quat = (0.88807374, 0.32505763, 0.32505763, 0)
+                                double radius = 0.03999999910593033
+                                custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                                custom float3 solimp = (0.9, 0.99, 0.003)
+                                custom float2 solref = (0.015, 1)
+                                custom string type = "sphere"
+                                matrix4d xformOp:transform = ( (0.7886750798568016, 0.21132492014319837, -0.5773502844207457, 0), (0.21132492014319837, 0.7886750798568016, 0.5773502844207457, 0), (0.5773502844207457, -0.5773502844207457, 0.5773501597136033, 0), (0, 0, 0, 1) )
+                                uniform token[] xformOpOrder = ["xformOp:transform"]
+                                custom float3 zaxis = (0, 0, 0)
+                            }
+
+                            def Scope "Looks"
+                            {
+                                def Material "material_body"
+                                {
+                                    token inputs:frame:stPrimvarName = "st"
+                                    token outputs:surface.connect = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/hand_left/collisions/Looks/material_body/PBRShader.outputs:surface>
+
+                                    def Shader "stReader"
+                                    {
+                                        uniform token info:id = "UsdPrimvarReader_float2"
+                                        token inputs:varname.connect = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/hand_left/collisions/Looks/material_body.inputs:frame:stPrimvarName>
+                                        float2 outputs:result
+                                    }
+
+                                    def Shader "PBRShader"
+                                    {
+                                        uniform token info:id = "UsdPreviewSurface"
+                                        color3f inputs:diffuseColor = (0.8, 0.6, 0.4)
+                                        float inputs:metallic = 0
+                                        float inputs:roughness = 0.5
+                                        float inputs:specular_level = 0.5
+                                        token outputs:surface
+                                    }
+                                }
+                            }
+                        }
+
+                        def "joints"
+                        {
+                            def PhysicsFixedJoint "hand_left"
+                            {
+                                rel physics:body0 = </rootPrim/torso/torso/upper_arm_left/lower_arm_left>
+                                rel physics:body1 = </rootPrim/torso/torso/upper_arm_left/lower_arm_left/hand_left>
+                                float physics:breakForce = 3.4028235e38
+                                float physics:breakTorque = 3.4028235e38
+                                point3f physics:localPos0 = (0.18, -0.18, 0.18)
+                                point3f physics:localPos1 = (0, 0, 0)
+                                quatf physics:localRot0 = (1, 0, 0, 0)
+                                quatf physics:localRot1 = (1, 0, 0, 0)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    def Xform "worldBody" (
+        prepend apiSchemas = ["PhysicsArticulationRootAPI"]
+    )
+    {
+        def Xform "floor" (
+            prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+        )
+        {
+            bool physics:kinematicEnabled = 1
+
+            def "collisions"
+            {
+                def Mesh "floor" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    custom float4 axisangle = (0, 0, 0, 0)
+                    custom int conaffinity = 1
+                    custom int condim = 3
+                    custom int contype = 1
+                    custom float density = 1000
+                    uniform bool doubleSided = 1
+                    int[] faceVertexCounts = [4]
+                    int[] faceVertexIndices = [0, 1, 2, 3]
+                    custom float3 friction = (1, 0.005, 0.0001)
+                    custom float3 geomSize = (0, 0, 0.05)
+                    custom int group = 0
+                    custom bool hasFromto = 0
+                    custom bool hasMass = 0
+                    custom float margin = 0
+                    custom string material = "grid"
+                    rel material:binding = </rootPrim/worldBody/floor/collisions/Looks/material_grid>
+                    custom bool mjcfGeom = 1
+                    custom string name = "floor"
+                    normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)]
+                    point3f[] points = [(-100, -100, 0), (-100, 100, 0), (100, 100, 0), (100, -100, 0)]
+                    custom float3 pos = (0, 0, 0)
+                    color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+                    custom quatf quat = (1, 0, 0, 0)
+                    custom float4 rgba = (0.5, 0.5, 0.5, 1)
+                    custom float3 solimp = (0.9, 0.95, 0.001)
+                    custom float2 solref = (0.02, 1)
+                    custom string type = "plane"
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+                    uniform token[] xformOpOrder = ["xformOp:transform"]
+                    custom float3 zaxis = (0, 0, 0)
+                }
+
+                def Scope "Looks"
+                {
+                    def Material "material_grid"
+                    {
+                        token inputs:frame:stPrimvarName = "st"
+                        token outputs:surface.connect = </rootPrim/worldBody/floor/collisions/Looks/material_grid/PBRShader.outputs:surface>
+
+                        def Shader "stReader"
+                        {
+                            uniform token info:id = "UsdPrimvarReader_float2"
+                            token inputs:varname.connect = </rootPrim/worldBody/floor/collisions/Looks/material_grid.inputs:frame:stPrimvarName>
+                            float2 outputs:result
+                        }
+
+                        def Shader "PBRShader"
+                        {
+                            uniform token info:id = "UsdPreviewSurface"
+                            color3f inputs:diffuseColor = (0.2, 0.2, 0.2)
+                            float inputs:metallic = 0
+                            float inputs:roughness = 0.5
+                            float inputs:specular_level = 0.5
+                            token outputs:surface
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def "actuators"
+{
+    def "actuator_0"
+    {
+        custom int actuatorIdx = 1
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "abdomen_z", "abdomen_z"]
+    }
+
+    def "actuator_1"
+    {
+        custom int actuatorIdx = 2
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "abdomen_y", "abdomen_y"]
+    }
+
+    def "actuator_2"
+    {
+        custom int actuatorIdx = 3
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "abdomen_x", "abdomen_x"]
+    }
+
+    def "actuator_3"
+    {
+        custom int actuatorIdx = 4
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "hip_x_right", "hip_x_right"]
+    }
+
+    def "actuator_4"
+    {
+        custom int actuatorIdx = 5
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "hip_z_right", "hip_z_right"]
+    }
+
+    def "actuator_5"
+    {
+        custom int actuatorIdx = 6
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "120", "hip_y_right", "hip_y_right"]
+    }
+
+    def "actuator_6"
+    {
+        custom int actuatorIdx = 7
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "80", "knee_right", "knee_right"]
+    }
+
+    def "actuator_7"
+    {
+        custom int actuatorIdx = 8
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "ankle_y_right", "ankle_y_right"]
+    }
+
+    def "actuator_8"
+    {
+        custom int actuatorIdx = 9
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "ankle_x_right", "ankle_x_right"]
+    }
+
+    def "actuator_9"
+    {
+        custom int actuatorIdx = 10
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "hip_x_left", "hip_x_left"]
+    }
+
+    def "actuator_10"
+    {
+        custom int actuatorIdx = 11
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "hip_z_left", "hip_z_left"]
+    }
+
+    def "actuator_11"
+    {
+        custom int actuatorIdx = 12
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "120", "hip_y_left", "hip_y_left"]
+    }
+
+    def "actuator_12"
+    {
+        custom int actuatorIdx = 13
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "80", "knee_left", "knee_left"]
+    }
+
+    def "actuator_13"
+    {
+        custom int actuatorIdx = 14
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "ankle_y_left", "ankle_y_left"]
+    }
+
+    def "actuator_14"
+    {
+        custom int actuatorIdx = 15
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "ankle_x_left", "ankle_x_left"]
+    }
+
+    def "actuator_15"
+    {
+        custom int actuatorIdx = 16
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "shoulder1_right", "shoulder1_right"]
+    }
+
+    def "actuator_16"
+    {
+        custom int actuatorIdx = 17
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "shoulder2_right", "shoulder2_right"]
+    }
+
+    def "actuator_17"
+    {
+        custom int actuatorIdx = 18
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "elbow_right", "elbow_right"]
+    }
+
+    def "actuator_18"
+    {
+        custom int actuatorIdx = 19
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "shoulder1_left", "shoulder1_left"]
+    }
+
+    def "actuator_19"
+    {
+        custom int actuatorIdx = 20
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "20", "shoulder2_left", "shoulder2_left"]
+    }
+
+    def "actuator_20"
+    {
+        custom int actuatorIdx = 21
+        custom int actuatorType = 0
+        custom string[] keys = ["ctrllimited", "ctrlrange", "gear", "joint", "name"]
+        custom string[] values = ["true", "-1 1", "40", "elbow_left", "elbow_left"]
+    }
+}
+
+def "tendons"
+{
+    def "fixed_0"
+    {
+        custom float[] ceofs = [0.5, -0.5]
+        custom string[] keys = ["limited", "name", "range"]
+        custom string[] names = ["hip_y_right", "knee_right"]
+        custom int tendonType = 1
+        custom string[] values = ["true", "hamstring_right", "-0.3 2"]
+    }
+
+    def "fixed_1"
+    {
+        custom float[] ceofs = [0.5, -0.5]
+        custom string[] keys = ["limited", "name", "range"]
+        custom string[] names = ["hip_y_left", "knee_left"]
+        custom int tendonType = 1
+        custom string[] values = ["true", "hamstring_left", "-0.3 2"]
+    }
+}
+
+def "equalities"
+{
+}
+
