@@ -16,10 +16,8 @@ from envs.orca_gym_env import ActionSpaceType
 from envs.franka_control.franka_joystick_env import RecordState
 
 
-
-
 # 
-TIME_STEP = 0.01
+TIME_STEP = 0.005
 
 def register_env(grpc_address, record_state, record_file, control_freq=20):
     print("register_env: ", grpc_address)
@@ -42,6 +40,10 @@ def register_env(grpc_address, record_state, record_file, control_freq=20):
 
 def continue_training(env):
     observation, info = env.reset(seed=42)
+    print("""
+        To use VR controllers, please press left joystick to connect / disconnect to the simulator.
+        And then press right joystick to reset the robot's hands to the initial position.
+        """)  
     while True:
         start_time = datetime.now()
 

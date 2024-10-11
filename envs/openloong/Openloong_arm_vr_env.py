@@ -151,6 +151,33 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._pico_joystick = PicoJoystick()
 
         # -----------------------------
+        # Neck controller
+        self._neck_controller_config = controller_config.load_config("osc_pose")
+        # print("controller_config: ", self.controller_config)
+
+        # Add to the controller dict additional relevant params:
+        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
+        #   policy (control) freq, and ndim (# joints)
+        self._neck_controller_config["robot_name"] = agent_names[0]
+        self._neck_controller_config["sim"] = self.gym
+        self._neck_controller_config["eef_name"] = NECK_NAME
+        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._neck_joint_names)
+        self._neck_controller_config["joint_indexes"] = {
+            "joints": self._neck_joint_names,
+            "qpos": qpos_offsets,
+            "qvel": qvel_offsets,
+        }
+        self._neck_controller_config["actuator_range"] = neck_ctrl_range
+        self._neck_controller_config["policy_freq"] = self.control_freq
+        self._neck_controller_config["ndim"] = len(self._neck_joint_names)
+        self._neck_controller_config["control_delta"] = False
+
+
+        self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
+        self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
+
+        # -----------------------------
         # Right controller
         self._r_controller_config = controller_config.load_config("osc_pose")
         # print("controller_config: ", self.controller_config)
@@ -177,32 +204,8 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._r_controller = controller_factory(self._r_controller_config["type"], self._r_controller_config)
         self._r_controller.update_initial_joints(self._r_neutral_joint_values)
 
-        # -----------------------------
-        # Neck controller
-        self._neck_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
+        self._r_gripper_offset_rate_clip = 0.0
 
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._neck_controller_config["robot_name"] = agent_names[0]
-        self._neck_controller_config["sim"] = self.gym
-        self._neck_controller_config["eef_name"] = NECK_NAME
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._neck_joint_names)
-        self._neck_controller_config["joint_indexes"] = {
-            "joints": self._neck_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._neck_controller_config["actuator_range"] = neck_ctrl_range
-        self._neck_controller_config["policy_freq"] = self.control_freq
-        self._neck_controller_config["ndim"] = len(self._neck_joint_names)
-        self._neck_controller_config["control_delta"] = False
-
-
-        self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
-        self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
 
         # -----------------------------
         # Left controller
@@ -231,6 +234,8 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
         self._l_controller.update_initial_joints(self._l_neutral_joint_values)
 
+        self._l_gripper_offset_rate_clip = 0.0
+
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -239,6 +244,10 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.ctrl = np.zeros(self.nu)       
         self.set_ctrl(self.ctrl)
         self.mj_forward()
+
+    def _reset_gripper(self) -> None:
+        self._l_gripper_offset_rate_clip = 0.0
+        self._r_gripper_offset_rate_clip = 0.0
 
     def _reset_neck_mocap(self) -> None:
         self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
@@ -319,12 +328,22 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.set_neck_mocap(mocap_neck_xpos, self._mocap_neck_xquat)
 
     def _set_gripper_ctrl(self, joystick_state) -> None:
-        trigger_value = joystick_state["leftHand"]["triggerValue"]  # Value in [0, 1]
-        
+        # Press secondary button to set gripper minimal value
+        offset_rate_clip_adjust_rate = 0.1  # 10% per second
+        if joystick_state["leftHand"]["secondaryButtonPressed"]:
+            self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
+            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
+        elif joystick_state["leftHand"]["primaryButtonPressed"]:
+            self._l_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
+            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
+
+        # Press trigger to close gripper
         # Adjust sensitivity using an exponential function
+        trigger_value = joystick_state["leftHand"]["triggerValue"]  # Value in [0, 1]
         k = np.e  # Adjust 'k' to change the curvature of the exponential function
         adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
         offset_rate = -adjusted_value
+        offset_rate = np.clip(offset_rate, -1, self._l_gripper_offset_rate_clip)
 
         for actuator_id in self._l_hand_actuator_id:
             actuator_name = self.model.actuator_id2name(actuator_id)
@@ -341,12 +360,21 @@ class OpenloongArmEnv(MujocoRobotEnv):
                 self._all_ctrlrange[actuator_id][1])
 
     def _set_gripper_ctrl_r(self, joystick_state) -> None:
-        trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
-        
+        # Press secondary button to set gripper minimal value
+        offset_rate_clip_adjust_rate = 0.1
+        if joystick_state["rightHand"]["secondaryButtonPressed"]:
+            self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
+            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
+        elif joystick_state["rightHand"]["primaryButtonPressed"]:
+            self._r_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
+            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
+
         # Adjust sensitivity using an exponential function
+        trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
         k = np.e  # Adjust 'k' to change the curvature of the exponential function
         adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
         offset_rate = -adjusted_value
+        offset_rate = np.clip(offset_rate, -1, self._r_gripper_offset_rate_clip)
 
         for actuator_id in self._r_hand_actuator_id:
             actuator_name = self.model.actuator_id2name(actuator_id)
@@ -361,16 +389,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
                 self.ctrl[actuator_id],
                 self._all_ctrlrange[actuator_id][0],
                 self._all_ctrlrange[actuator_id][1])
-        # offset_rate = -joystick_state["rightHand"]["triggerValue"]
-        # print("offset_rate: ", offset_rate)
-
-        # for actuator_id in self._r_hand_actuator_id:
-        #     if self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J2") or self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J3"):
-        #         offset_rate *= -1
-
-        #     abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-        #     self.ctrl[actuator_id] = offset_rate * abs_ctrlrange
-        #     self.ctrl[actuator_id] = np.clip(self.ctrl[actuator_id], self._all_ctrlrange[actuator_id][0], self._all_ctrlrange[actuator_id][1])
 
     def _load_record(self) -> None:
         if self.record_file is None:
@@ -481,6 +499,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
         if self._pico_joystick.is_reset_pos():
             self._pico_joystick.set_reset_pos(False)
             self._set_init_state()
+            self._reset_gripper()
             self._reset_neck_mocap()
 
         transform_list = self._pico_joystick.get_transform_list()
@@ -573,13 +592,9 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
+        self._reset_gripper()
         self._reset_neck_mocap()
-        self.mj_forward()
-
-        print("""
-              To use VR controllers, please press both B and Y buttons to connect / disconnect to the simulator.
-              And then press A and X buttons to reset the robot's hands to the initial position.
-              """)        
+        self.mj_forward()      
         return True
 
     # custom methods
