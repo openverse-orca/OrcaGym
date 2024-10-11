@@ -63,6 +63,13 @@ class OpenloongArmEnv(MujocoRobotEnv):
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
 
+        self.gym.opt.iterations = 150
+        self.gym.opt.noslip_tolerance = 50
+        self.gym.opt.mpr_iterations = 100
+        self.gym.opt.sdf_iterations = 50
+        self.set_opt_config()
+        print("opt_config: ", self.query_opt_config())
+
         self._base_body_name = [self.body("base_link")]
         self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
         print("base_body_xpos: ", self._base_body_xpos)

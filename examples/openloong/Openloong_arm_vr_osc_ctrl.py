@@ -17,7 +17,7 @@ from envs.franka_control.franka_joystick_env import RecordState
 
 
 # 
-TIME_STEP = 0.005
+TIME_STEP = 0.01
 
 def register_env(grpc_address, record_state, record_file, control_freq=20):
     print("register_env: ", grpc_address)
