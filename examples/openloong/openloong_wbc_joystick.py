@@ -50,7 +50,7 @@ def run_simulation(env, time_step):
         # 
         elapsed_time = datetime.now() - start_time
 
-        print(f"elapsed_time (ms): {elapsed_time.total_seconds() * 1000}")
+        # print(f"elapsed_time (ms): {elapsed_time.total_seconds() * 1000}")
 
         if elapsed_time.total_seconds() < time_step:
             time.sleep(time_step - elapsed_time.total_seconds())
@@ -63,11 +63,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Simulation Configuration')
     parser.add_argument('--grpc_address', type=str, required=True, help='The gRPC address for the simulation')
+    parser.add_argument('--agent_name', type=str, required=True, help='The agent name for the simulation')
     args = parser.parse_args()
 
     grpc_address = f"{args.grpc_address}"
+    agent_name = f"{args.agent_name}"
 
-    simulation_frequency = 500
+    simulation_frequency = 1000
     time_step = 1.0 / simulation_frequency
 
     urdf_path = project_root + "/envs/openloong/external/openloong-dyn-control/models/AzureLoong.urdf"
@@ -77,10 +79,10 @@ if __name__ == '__main__':
     if not os.path.exists(project_root + "/envs/openloong/records"):
         os.makedirs(project_root + "/envs/openloong/records")
 
-    print("simulation running... , grpc_address: ", grpc_address)
+    print("simulation running... , grpc_address: ", grpc_address, ", agent_name: ", agent_name)
     env_id = f"Openloong-v0-OrcaGym-{grpc_address[-2:]}"
 
-    register_env(grpc_address, RecordState.NONE, 'openloong_ctrl.h5', "AzureLoong", time_step, urdf_path, json_path, log_path)
+    register_env(grpc_address, RecordState.NONE, 'openloong_ctrl.h5', agent_name, time_step, urdf_path, json_path, log_path)
 
     env = gym.make(env_id)        
     print("Start Simulation!")    
