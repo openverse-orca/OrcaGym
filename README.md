@@ -1,3 +1,4 @@
+[中文版](doc/README-CN.md)
 # OrcaGym Project
 Welcome to the OrcaGym project! OrcaGym is an enhanced simulation environment based on the OpenAI Gymnasium framework, designed for seamless integration with existing OpenAI Gym simulation environments and algorithms. Developed by Songying Technology, OrcaStudio offers robust support for various physics engines and ray-tracing rendering, delivering both physical and visual precision. This document serves as an introduction to OrcaGym, its background, purpose, usage, and important considerations.
 
@@ -57,8 +58,15 @@ Please note that OrcaStudio is a program that runs on Windows and Linux. Therefo
 
 ## Usage
 Using OrcaGym is straightforward. Here are the examples to get you started:
+* **Download Project Files**
+Run the following script in your terminal to download the latest project files:
+```bash
+cd orca_gym
+python down_projects.py
+```
+* **Move the Downloaded Files**
+After downloading and extracting the project files, move the folder to your OrcaStudio installation directory.Copy the files (levels, assets) from the `orca-studio-projects/{your-orca-studio-version}` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
 
-* **Copy the Files**: Copy the files (levels, assets) from the `orca-studio-projects/{your-orca-studio-version}` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
 
 * **Validate OrcaGym Environment:**
     * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`. Click the "Start" button (Ctrl-G) to enter Game Play mode.

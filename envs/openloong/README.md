@@ -12,6 +12,8 @@
     **注意** 青龙机器人源码托管在[OPENATOM社区](https://atomgit.com/OpenAtomFoundation/)，您需要首先注册该平台账户（免费），并**添加 SSH 公钥**，才能顺利clone代码。[点击查看如何生成 SSH KEY](https://docs.atomgit.com/user/sshkey/)
 
     ```bash
+    cd openloong/external
+    git clone https://atomgit.com/openloong/openloong-dyn-control.git
     git submodule update --init --recursive
     sudo apt-get update
     sudo apt install git cmake gcc-11 g++-11
@@ -25,6 +27,7 @@
     ``` bash
     conda activate orca_gym_test
     pip install pybind11
+    cd ..  #注意此路径为envs/openloong
     mkdir build
     cd build
     cmake .. -DCMAKE_PREFIX_PATH=$(python -m pybind11 --cmakedir)
