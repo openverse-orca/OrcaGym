@@ -27,6 +27,8 @@ To install OrcaGym, follow these steps:
 ```bash
 git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
+git lfs install
+git lfs pull
 ```
 
 2. **Install Dependencies:**
