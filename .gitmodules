@@ -1,3 +1,6 @@
 [submodule "envs/openloong/external/openloong-dyn-control"]
 	path = envs/openloong/external/openloong-dyn-control
 	url = git@atomgit.com:openloong/openloong-dyn-control.git
+[submodule "3rd_party/robomimic"]
+	path = 3rd_party/robomimic
+	url = https://github.com/openverse-orca/robomimic.git

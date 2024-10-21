@@ -107,3 +107,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# hdf5 files
+*.h5
+*.hdf5
