@@ -92,6 +92,14 @@ def find_latest_version(files, year, month):
     print("未找到匹配的版本")
     return None
 
+def delete_file(file_path):
+    """删除指定文件。"""
+    try:
+        os.remove(file_path)
+        print(f"压缩包 {file_path} 已删除")
+    except Exception as e:
+        print(f"删除文件时出错：{e}")
+
 def main():
     # 获取当前年月
     now = datetime.datetime.now()
@@ -104,11 +112,15 @@ def main():
     ftp_port = 20080  # FTP 端口
     remote_directory = "/orca-studio-projects"  # 远程目录路径
 
-    # 本地路径
-    local_folder = os.path.abspath("/home/orcatest/OrcaWorkPath/orca-studio-projects")
-    extract_folder = local_folder  # 解压目录与下载目录一致
+    # 获取当前脚本的运行目录
+    current_working_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 定义解压目录为当前目录的同级目录：orca-studio-projects
+    parent_dir = os.path.dirname(current_working_dir)  # 获取当前目录的上一级目录
+    extract_folder = os.path.join(parent_dir, "orca-studio-projects")
+    ensure_directory_exists(extract_folder)  # 确保解压目录存在
 
-    print(f"本地下载目录: {local_folder}")
+    print(f"本地下载目录: {extract_folder}")
     print(f"解压目录: {extract_folder}")
 
     # 连接到 FTP 服务器
@@ -127,12 +139,15 @@ def main():
         return
 
     # 下载文件
-    local_path = os.path.join(local_folder, version)
+    local_path = os.path.join(extract_folder, version)  # 下载到解压目录
     remote_path = f"{remote_directory}/{version}"
     download_file(ftp, remote_path, local_path)
 
     # 解压文件
     extract_tar_xz(local_path, extract_folder)
+
+    # 删除压缩包
+    delete_file(local_path)
 
     # 关闭 FTP 连接
     try:
