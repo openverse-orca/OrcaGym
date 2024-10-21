@@ -22,6 +22,7 @@ class ActionSpaceType:
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
 
+
 class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     """Superclass for all OrcaSim environments."""
 

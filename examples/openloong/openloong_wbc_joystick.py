@@ -14,7 +14,7 @@ if project_root not in sys.path:
 
 from envs.orca_gym_env import ActionSpaceType
 import gymnasium as gym
-from envs.franka_control.franka_joystick_env import RecordState
+from envs.franka_control.franka_teleoperation_env import RecordState
 
 
 def register_env(grpc_address, record_state, record_file, agent_name, time_step, urdf_path, json_path, log_path):

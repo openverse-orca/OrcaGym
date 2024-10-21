@@ -15,7 +15,7 @@ import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_joystick_env import RecordState
+from envs.franka_control.franka_teleoperation_env import RecordState
 
 
 nest_asyncio.apply()

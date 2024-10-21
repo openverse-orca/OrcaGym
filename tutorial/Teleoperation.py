@@ -3,7 +3,7 @@ import sys
 import time
 
 current_file_path = os.path.abspath('')
-project_root = os.path.dirname(os.path.dirname(current_file_path))
+project_root = os.path.dirname(current_file_path)
 
 if project_root not in sys.path:
     sys.path.append(project_root)
@@ -13,28 +13,22 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_joystick_env import RecordState
 
+TIME_STEP = 0.01
 
-
-
-# 
-TIME_STEP = 0.005
-
-def register_env(grpc_address, record_state, record_file, control_freq=20):
+def register_env(grpc_address, control_type = "None", control_freq=20):
     print("register_env: ", grpc_address)
     gym.register(
-        id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
-        entry_point="envs.robosuite.FrankaPanda_env:FrankaPandaEnv",
+        id=f"Franka-Control-v0-OrcaGym-{grpc_address[-2:]}",
+        entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
         kwargs={'frame_skip': 1,   
-                'reward_type': "dense",
+                'reward_type': "sparse",
                 'action_space_type': ActionSpaceType.CONTINUOUS,
                 'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': ['Panda'], 
                 'time_step': TIME_STEP,
-                'record_state': record_state,
-                'record_file': record_file,
+                'control_type': control_type,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,
         reward_threshold=0.0,
@@ -56,20 +50,20 @@ def continue_training(env):
 
 if __name__ == "__main__":
     """
-    OSC运动算法控制Franka机械臂的示例。
-    对应关卡: Franka_Joystick_osc
-    和 Franka_Joystick的区别：
-    1. 电机控制采用moto，输出扭矩，而不是设定角度
-    2. 扭矩计算采用OSC算法输出
-    3. mocap点随意移动，和site不建立weld，不采用牵引方式
+    An example of an OSC (Operational Space Control) motion algorithm controlling a Franka robotic arm.
+    Level: Franka_Teleoperation
+    Differences from Franka_Joystick:
+    1. Motor control uses torque output (moto) instead of setting joint angles.
+    2. Torque calculation is based on the OSC algorithm.
+    3. The mocap point can move freely and is not welded to the site; the pulling method is not used.
     """
     try:
         grpc_address = "localhost:50051"
         print("simulation running... , grpc_address: ", grpc_address)
-        env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
+        env_id = f"Franka-Control-v0-OrcaGym-{grpc_address[-2:]}"
 
         # RecordState controls the recording of the simulation data
-        register_env(grpc_address, RecordState.NONE, 'xbox_control_record.h5', 20)
+        register_env(grpc_address, "Xbox", 20)
 
         env = gym.make(env_id)        
         print("Starting simulation...")
@@ -77,5 +71,4 @@ if __name__ == "__main__":
         continue_training(env)
     except KeyboardInterrupt:
         print("Simulation stopped")        
-        env.save_record()
         env.close()

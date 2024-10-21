@@ -23,7 +23,7 @@ from envs.quadruped import config as cfg
 from envs.orca_gym_env import ActionSpaceType
 from gymnasium.envs.registration import register
 import gymnasium as gym
-from envs.franka_control.franka_joystick_env import RecordState
+from envs.franka_control.franka_teleoperation_env import RecordState
 from envs.quadruped.utils.mujoco.visual import render_vector
 from envs.quadruped.utils.quadruped_utils import LegsAttr
 from envs.quadruped.helpers.foothold_reference_generator import FootholdReferenceGenerator
