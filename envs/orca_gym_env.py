@@ -183,8 +183,8 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         ob = self.reset_model()
         info = self._get_reset_info()
 
-        if self.render_mode == "human":
-            self.render()
+        # if self.render_mode == "human":
+        #     self.render()
         return ob, info
 
     def set_seed_value(self, seed=None):
@@ -194,7 +194,6 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     @property
     def dt(self) -> float:
-        # return self.model.opt.timestep * self.frame_skip
         return self.gym.opt.timestep * self.frame_skip
 
     def do_simulation(self, ctrl, n_frames) -> None:

@@ -6,11 +6,23 @@ with metadata present in datasets.
 import json
 import numpy as np
 from copy import deepcopy
+from typing import Any, Dict, Optional, Tuple, Union
 
 from envs.orca_gym_env import OrcaGymEnv, ActionSpaceType
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
+import gymnasium as gym
+from gymnasium import error, spaces
+from gymnasium.spaces import Space
+
+class ControlType:
+    """
+    Enum class for control type
+    """
+    TELEOPERATION = "teleoperation"
+    POLICY = "policy"
+    REPLAY = "replay"
 
 class RobomimicEnv(OrcaGymEnv):
     """
@@ -78,35 +90,70 @@ class RobomimicEnv(OrcaGymEnv):
         (Optional) Reset to a specific simulator state. Useful for reproducing results.
     """
 
+
     def __init__(
         self,
-        frame_skip: int = 5,        
-        grpc_address: str = 'localhost:50051',
-        agent_names: list = ['Agent0'],
-        time_step: float = 0.00333333,
-        **kwargs,
+        frame_skip: int,
+        grpc_address: str,
+        agent_names: list[str],
+        time_step: float,        
+        observation_space: Space,
+        action_space_type: Optional[ActionSpaceType],
+        action_step_count: Optional[float],
+        **kwargs        
     ):
-
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
-            **kwargs,
+            observation_space = observation_space,
+            action_space_type = action_space_type,
+            action_step_count = action_step_count,
+            **kwargs
         )
 
+        self.observation_space = self._generate_observation_space()
+
+    def _generate_observation_space(self):
+        """
+        Generate the observation space for the environment.
+        """
+        obs = self.get_observation()
+        obs_space_dict = {}
+        for obs_key, obs_data in obs.items():
+            if isinstance(obs_data, np.ndarray):
+                obs_space_dict[obs_key] = spaces.Box(
+                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
+                )
+            else:
+                raise ValueError(f"Unsupported observation type: {type(obs_data)}")
+            
+        observation_space = spaces.Dict(obs_space_dict)
+        return observation_space
+
+
     def _check_success(self):
+        """
+        Check if the task condition(s) is reached. Should return a dictionary
+        { str: bool } with at least a "task" key for the overall task success,
+        and additional optional keys corresponding to other task criteria.
+        """        
         raise NotImplementedError
     
-    def reset(self):
-        raise NotImplementedError
-    
-    def step(self, action):
+    def step(self, action) -> tuple:
         raise NotImplementedError
     
     def get_env_version(self):
         """
         The dataset version must correspond to the version of the environment that was used to collect the data.
+        """
+        raise NotImplementedError
+    
+    def get_observation(self, obs=None):
+        """
+        Return the current environment observation as a dictionary, unless obs is not None.
+        This function should process the raw environment observation to align with the input expected by the policy model.
+        For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
         """
         raise NotImplementedError

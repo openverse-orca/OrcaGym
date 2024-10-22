@@ -111,9 +111,6 @@ class BaseRobotEnv(GoalEnv):
         self._mujoco_step(action)
 
         self._step_callback()
-
-        # if self.render_mode == "human":
-        #     self.render()
         obs = self._get_obs()
 
         info = {
@@ -156,8 +153,6 @@ class BaseRobotEnv(GoalEnv):
             did_reset_sim = self._reset_sim()
         self.goal = self._sample_goal().copy()
         obs = self._get_obs()
-        # if self.render_mode == "human":
-        #     self.render()
 
         return obs, {}
 

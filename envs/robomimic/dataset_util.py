@@ -97,24 +97,22 @@ class DatasetWriter:
             data_group.attrs['total'] = total_samples
             data_group.attrs['demo_count'] = demo_count
 
-    def _generate_next_obs(self, obs_data):
+    def _generate_next_obs(self, obs):
         """
-        从 obs_data 自动生成 next_obs_data。
+        从 obs 自动生成 next_obs。
 
         参数：
-        - obs_data: 观测数据字典，键为观测名称，值为 np.ndarray。
+        - obs: 观测数据字典
 
         返回：
-        - next_obs_data: 下一个观测数据字典，结构与 obs_data 相同。
+        - next_obs: 下一个观测数据字典，结构与 obs 相同。
         """
-        next_obs_data = {}
-        for obs_key, obs_array in obs_data.items():
-            N = obs_array.shape[0]
-            next_obs_array = np.zeros_like(obs_array)
-            next_obs_array[:-1] = obs_array[1:]
-            next_obs_array[-1] = obs_array[-1]
-            next_obs_data[obs_key] = next_obs_array
-        return next_obs_data
+        next_obs = {obs_key: [] for obs_key in obs.keys()}
+        for obs_key, obs_data in obs.items():
+            next_obs_data = obs_data[1:]
+            next_obs_data.append(obs_data[-1])
+            next_obs[obs_key].append(next_obs_data)
+        return next_obs
 
     def add_filter_key(self, filter_key_name, demo_names):
         """
