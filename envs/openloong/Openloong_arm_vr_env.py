@@ -652,3 +652,5 @@ class OpenloongArmEnv(MujocoRobotEnv):
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
+    def close(self):
+        self._pico_joystick.close()
