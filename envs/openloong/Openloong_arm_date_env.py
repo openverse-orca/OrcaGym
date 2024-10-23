@@ -5,7 +5,6 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
-from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
@@ -63,24 +62,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
 
-        self.gym.opt.iterations = 150
-        self.gym.opt.noslip_tolerance = 50
-        self.gym.opt.mpr_iterations = 100
-        self.gym.opt.sdf_iterations = 50
-        self.set_opt_config()
-        print("opt_config: ", self.query_opt_config())
-
-        self._base_body_name = [self.body("base_link")]
-        self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
-        print("base_body_xpos: ", self._base_body_xpos)
-        print("base_body_xquat: ", self._base_body_xquat)
-
-        self._neck_joint_names = [self.joint("J_head_yaw"), self.joint("J_head_pitch")]
-        self._neck_actuator_names = [self.actuator("M_head_yaw"), self.actuator("M_head_pitch")]
-        self._neck_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-        self._neck_neutral_joint_values = np.array([0.0, 0.0])
-        self._neck_ctrl_values = {"yaw": 0.0, "pitch": 0.0}
-
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
                                  self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
@@ -99,6 +80,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         print("arm_actuator_id: ", self._r_arm_actuator_id)
         print("hand_actuator_id: ", self._r_hand_actuator_id)
+        # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         # index used to distinguish arm and gripper joints
         self._l_arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), 
@@ -109,20 +91,12 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
         self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
-        # self._l_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._l_arm_actuator_id)
-        self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
-                                    ,self.actuator("M_zbll_J4"),self.actuator("M_zbll_J5"),self.actuator("M_zbll_J6"),
-                                    self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
-                                    self.actuator("M_zbll_J10"),self.actuator("M_zbll_J11")]
-        self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
+        # self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         # control range
         self._all_ctrlrange = self.model.get_actuator_ctrlrange()
-        neck_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._neck_actuator_id]
-        print("ctrl_range: ", neck_ctrl_range)
-
         r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
         print("ctrl_range: ", r_ctrl_range)
 
@@ -132,19 +106,12 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
-        NECK_NAME  = self.site("neck_center_site")
-        _site_dict = self.query_site_pos_and_quat([NECK_NAME])
-        self._initial_neck_site_xpos = _site_dict[NECK_NAME]['xpos']
-        self._initial_neck_site_xquat = _site_dict[NECK_NAME]['xquat']
-
-        self.set_neck_mocap(self._initial_neck_site_xpos, self._initial_neck_site_xquat)
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self._neck_angle_x, self._neck_angle_y = 0, 0
-
         EE_NAME  = self.site("ee_center_site")
         _site_dict = self.query_site_pos_and_quat([EE_NAME])
         self._initial_grasp_site_xpos = _site_dict[EE_NAME]['xpos']
         self._initial_grasp_site_xquat = _site_dict[EE_NAME]['xquat']
+        self._saved_xpos = self._initial_grasp_site_xpos
+        self._saved_xquat = self._initial_grasp_site_xquat
 
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
@@ -152,40 +119,20 @@ class OpenloongArmEnv(MujocoRobotEnv):
         _site_dict_r = self.query_site_pos_and_quat([EE_NAME_R])
         self._initial_grasp_site_xpos_r = _site_dict_r[EE_NAME_R]['xpos']
         self._initial_grasp_site_xquat_r = _site_dict_r[EE_NAME_R]['xquat']
+        self._saved_xpos_r = self._initial_grasp_site_xpos_r
+        self._saved_xquat_r = self._initial_grasp_site_xquat_r
 
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
-        
-        self._pico_joystick = PicoJoystick()
 
-        # -----------------------------
-        # Neck controller
-        self._neck_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
+        # self._joystick_manager = XboxJoystickManager()
+        # joystick_names = self._joystick_manager.get_joystick_names()
+        # if len(joystick_names) == 0:
+        #     raise ValueError("No joystick detected.")
 
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._neck_controller_config["robot_name"] = agent_names[0]
-        self._neck_controller_config["sim"] = self.gym
-        self._neck_controller_config["eef_name"] = NECK_NAME
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._neck_joint_names)
-        self._neck_controller_config["joint_indexes"] = {
-            "joints": self._neck_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._neck_controller_config["actuator_range"] = neck_ctrl_range
-        self._neck_controller_config["policy_freq"] = self.control_freq
-        self._neck_controller_config["ndim"] = len(self._neck_joint_names)
-        self._neck_controller_config["control_delta"] = False
+        # self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
+        #if self._joystick is None:
+        #    raise ValueError("Joystick not found.")
 
-
-        self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
-        self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
-
-        # -----------------------------
-        # Right controller
         self._r_controller_config = controller_config.load_config("osc_pose")
         # print("controller_config: ", self.controller_config)
 
@@ -211,11 +158,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._r_controller = controller_factory(self._r_controller_config["type"], self._r_controller_config)
         self._r_controller.update_initial_joints(self._r_neutral_joint_values)
 
-        self._r_gripper_offset_rate_clip = 0.0
-
-
-        # -----------------------------
-        # Left controller
         self._l_controller_config = controller_config.load_config("osc_pose")
         # print("controller_config: ", self.controller_config)
 
@@ -241,9 +183,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
         self._l_controller.update_initial_joints(self._l_neutral_joint_values)
 
-        self._l_gripper_offset_rate_clip = 0.0
-
-
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
@@ -252,17 +191,9 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
-    def _reset_gripper(self) -> None:
-        self._l_gripper_offset_rate_clip = 0.0
-        self._r_gripper_offset_rate_clip = 0.0
-
-    def _reset_neck_mocap(self) -> None:
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self.set_neck_mocap(self._mocap_neck_xpos, self._mocap_neck_xquat)
-        self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        self._set_action()
+        self._set_action(action)
         self.do_simulation(self.ctrl, self.frame_skip)
         obs = self._get_obs().copy()
 
@@ -273,129 +204,30 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         return obs, reward, terminated, truncated, info
     
-    def _set_head_ctrl(self, joystick_state) -> None:
-        x_axis = joystick_state["rightHand"]["joystickPosition"][0]
-        if x_axis == 0:
-            x_axis = joystick_state["leftHand"]["joystickPosition"][0]
-
-        y_axis = joystick_state["rightHand"]["joystickPosition"][1]
-        if y_axis == 0:
-            y_axis = joystick_state["leftHand"]["joystickPosition"][1]
-            
-        mocap_neck_xpos, mocap_neck_xquat = self._mocap_neck_xpos, self._mocap_neck_xquat
-
-        # 将 x_axis 和 y_axis 输入转换为旋转角度，按需要调节比例系数
-        angle_x = x_axis * np.pi / 180  # 转换为弧度，模拟绕 X 轴的旋转
-        angle_y = y_axis * np.pi / 180  # 转换为弧度，模拟绕 Y 轴的旋转
-
-        # 设置旋转角度的限制
-        self._neck_angle_x += angle_x
-        if self._neck_angle_x > np.pi / 3 or self._neck_angle_x < -np.pi / 3:
-            self._neck_angle_x = np.clip(self._neck_angle_x, -np.pi / 3, np.pi / 3)
-            angle_x = 0
-        
-        self._neck_angle_y += angle_y
-        if self._neck_angle_y > np.pi / 3 or self._neck_angle_y < -np.pi / 3:
-            self._neck_angle_y = np.clip(self._neck_angle_y, -np.pi / 3, np.pi / 3)
-            angle_y = 0
-
-        # 创建绕 X 轴和 Y 轴的旋转四元数 (局部坐标系旋转)
-        rotation_x = R.from_euler('x', angle_x).as_quat()  # 绕 X 轴的旋转
-        rotation_y = R.from_euler('y', angle_y).as_quat()  # 绕 Y 轴的旋转
-
-        # 将初始的局部旋转四元数应用到增量旋转中，形成局部旋转的总四元数
-        initial_neck_quat = R.from_quat(self._initial_neck_site_xquat)
-        local_rotation = R.from_quat(rotation_x) * R.from_quat(rotation_y)
-        new_neck_quat_local = initial_neck_quat * local_rotation  # 在局部坐标系应用旋转
-
-        # 将局部坐标系的旋转转换为全局坐标系，乘以当前全局旋转四元数
-        new_neck_quat_global = (R.from_quat(mocap_neck_xquat) * new_neck_quat_local).as_quat()
-
-        # 将新的全局旋转四元数转换为轴角表示
-        mocap_neck_axisangle = transform_utils.quat2axisangle(np.array([new_neck_quat_global[1], 
-                                                                        new_neck_quat_global[2],
-                                                                        new_neck_quat_global[3],
-                                                                        new_neck_quat_global[0]]))
-
-        # 可选：将轴角重新转换回四元数进行夹紧或其他操作
-        new_neck_quat_cliped = transform_utils.axisangle2quat(mocap_neck_axisangle)
-
-        # 将动作信息打包并发送到控制器
-        action_neck = np.concatenate([mocap_neck_xpos, mocap_neck_axisangle])
-
-        # 更新 _mocap_neck_xquat 为新的全局旋转值
-        self._mocap_neck_xquat = new_neck_quat_global.copy()
-
-        self._neck_controller.set_goal(action_neck)
-        ctrl = self._neck_controller.run_controller()
-        for i in range(len(self._neck_actuator_id)):
-            self.ctrl[self._neck_actuator_id[i]] = ctrl[i]
-
-        # 更新头部位置
-        self.set_neck_mocap(mocap_neck_xpos, self._mocap_neck_xquat)
+    def _set_reset_pos(self, joystick_state) -> None:
+        if (joystick_state["buttons"]["X"] and joystick_state["buttons"]["Y"]):
+            self._saved_xpos = self._initial_grasp_site_xpos
+            self._saved_xquat = self._initial_grasp_site_xquat
+            self._saved_xpos_r = self._initial_grasp_site_xpos_r
+            self._saved_xquat_r = self._initial_grasp_site_xquat_r
+            self._set_init_state()
+            return True
 
     def _set_gripper_ctrl(self, joystick_state) -> None:
-        # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1  # 10% per second
-        if joystick_state["leftHand"]["secondaryButtonPressed"]:
-            self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
-            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
-        elif joystick_state["leftHand"]["primaryButtonPressed"]:
-            self._l_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
-
-        # Press trigger to close gripper
-        # Adjust sensitivity using an exponential function
-        trigger_value = joystick_state["leftHand"]["triggerValue"]  # Value in [0, 1]
-        k = np.e  # Adjust 'k' to change the curvature of the exponential function
-        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
-        offset_rate = -adjusted_value
-        offset_rate = np.clip(offset_rate, -1, self._l_gripper_offset_rate_clip)
-
-        for actuator_id in self._l_hand_actuator_id:
-            actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbll_J3"):
-                offset_dir = -1
-            else:
-                offset_dir = 1
-
-            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
-            self.ctrl[actuator_id] = np.clip(
-                self.ctrl[actuator_id],
-                self._all_ctrlrange[actuator_id][0],
-                self._all_ctrlrange[actuator_id][1])
-
-    def _set_gripper_ctrl_r(self, joystick_state) -> None:
-        # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1
-        if joystick_state["rightHand"]["secondaryButtonPressed"]:
-            self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
-            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
-        elif joystick_state["rightHand"]["primaryButtonPressed"]:
-            self._r_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
-
-        # Adjust sensitivity using an exponential function
-        trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
-        k = np.e  # Adjust 'k' to change the curvature of the exponential function
-        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
-        offset_rate = -adjusted_value
-        offset_rate = np.clip(offset_rate, -1, self._r_gripper_offset_rate_clip)
+        offset_rate = 0
+        if (joystick_state["buttons"]["A"]):
+            offset_rate = -0.1 * self.dt
+        elif (joystick_state["buttons"]["B"]):
+            offset_rate = 0.1 * self.dt
 
         for actuator_id in self._r_hand_actuator_id:
-            actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbr_J2") or actuator_name == self.actuator("M_zbr_J3"):
-                offset_dir = -1
-            else:
-                offset_dir = 1
+            if self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J2") or self.model.actuator_id2name(actuator_id) == self.actuator("M_zbr_J3"):
+                offset_rate *= -1
 
             abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
-            self.ctrl[actuator_id] = np.clip(
-                self.ctrl[actuator_id],
-                self._all_ctrlrange[actuator_id][0],
-                self._all_ctrlrange[actuator_id][1])
+            self.ctrl[actuator_id] += offset_rate * abs_ctrlrange
+            self.ctrl[actuator_id] = np.clip(self.ctrl[actuator_id], self._all_ctrlrange[actuator_id][0], self._all_ctrlrange[actuator_id][1])
+
 
     def _load_record(self) -> None:
         if self.record_file is None:
@@ -451,21 +283,32 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         self.ctrl = self.record_pool.pop(0)
 
-    def _set_action(self) -> None:
+    def _set_action(self, action) -> None:
         if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
             self._replay()
             return
 
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
+        mocap_l_xpos, mocap_l_xquat = self._saved_xpos, self._saved_xquat
 
-        if self._pico_joystick is not None:
-            mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = self._processe_pico_joystick_move()
+        if action is not None:
+            mocap_r_xpos, mocap_r_xquat = action[0], action[1]
+            #print("mocap_r_xpos: ", mocap_r_xpos, "\n")
+            #print("mocap_r_xquat: ", mocap_r_xquat, "\n")
+            #根据xbox手柄的输入，设置机械臂的动作
+        elif self._joystick is not None:
+            mocap_l_xpos, mocap_l_xquat = self._process_xbox_controller(self._saved_xpos, self._saved_xquat)
             self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
-            self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
-            self._process_pico_joystick_operation()
-            # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
+            self._saved_xpos, self._saved_xquat = mocap_l_xpos, mocap_l_xquat
+
+            mocap_r_xpos, mocap_r_xquat = self._process_xbox_controller_r(self._saved_xpos_r, self._saved_xquat_r)
+            print("mocap_r_xpos: ", mocap_r_xpos, "\n")
+            print("mocap_r_xquat: ", mocap_r_xquat, "\n")
         else:
             return
+
+        self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
+        self._saved_xpos_r, self._saved_xquat_r = mocap_r_xpos, mocap_r_xquat  
 
 
         # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
@@ -502,63 +345,39 @@ class OpenloongArmEnv(MujocoRobotEnv):
         if self.record_state == RecordState.RECORD:
             self._save_record()
 
-    def _processe_pico_joystick_move(self):
-        if self._pico_joystick.is_reset_pos():
-            self._pico_joystick.set_reset_pos(False)
+    def _process_xbox_controller_r(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
+        self._joystick_manager.update()
+
+        if self._set_reset_pos(self._joystick.get_state()):
             self._set_init_state()
-            self._reset_gripper()
-            self._reset_neck_mocap()
+            return self._saved_xpos_r, self._saved_xquat_r
 
-        transform_list = self._pico_joystick.get_transform_list()
-        if transform_list is None:
-            return self._initial_grasp_site_xpos, self._initial_grasp_site_xquat, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r
-
-        left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform_list)
-        right_relative_position, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
-
-        # left_relative_position_org, left_relative_rotation_org = self._pico_joystick.get_left_relative_move_org(transform_list)
-        # right_relative_position_org, right_relative_rotation_org = self._pico_joystick.get_right_relative_move_org(transform_list)
-
-        # print("left_relative_position: ", left_relative_position)
-        # print("left_relative_rotation: ", rotations.quat2euler(left_relative_rotation) * 180 / np.pi)
-        # print("right_relative_position: ", right_relative_position)
-        # print("right_relative_rotation: ", R.from_quat(right_relative_rotation, scalar_first=True).as_euler('xzy', degrees=True))
-        # print("right_relative_rotation_org: ", R.from_quat(right_relative_rotation_org, scalar_first=True).as_euler('xzy', degrees=True))
-
-        # def decompose(quat):
-        #     v = R.from_quat(quat, scalar_first=True).as_rotvec(degrees=True)
-        #     l = np.linalg.norm(v)
-        #     v = v / l
-        #     return [f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}', l]
+        pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
+        pos_ctrl = np.array([-pos_ctrl_dict['x'], pos_ctrl_dict['y'], pos_ctrl_dict['z']])
+        rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
+        rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['roll'] * 2, rot_ctrl_dict['pitch']])
         
+        self._set_gripper_ctrl(self._joystick.get_state())
 
-            # v = R.from_quat(quat, scalar_first=True).as_euler('zxy', degrees=True)
-            # return f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}'
+        # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
+        CTRL_MIN = 0.10000000
+        if np.linalg.norm(pos_ctrl) < CTRL_MIN and np.linalg.norm(rot_ctrl) < CTRL_MIN:
+            return mocap_xpos, mocap_xquat
 
-        # print("rotation_org: ", decompose(right_relative_rotation_org))
-        # print("rotation_mujo:", decompose(right_relative_rotation))
+        mocap_xmat = rotations.quat2mat(mocap_xquat)
 
-        mocap_l_xpos = self._initial_grasp_site_xpos + rotations.quat_rot_vec(self._base_body_xquat, left_relative_position)
-        mocap_r_xpos = self._initial_grasp_site_xpos_r + rotations.quat_rot_vec(self._base_body_xquat, right_relative_position)
+        # 平移控制
+        MOVE_SPEED = self.gym.opt.timestep * 0.2
+        mocap_xpos = mocap_xpos + np.dot(mocap_xmat, pos_ctrl) * MOVE_SPEED
+        mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
 
-        mocap_l_xquat = rotations.quat_mul(self._initial_grasp_site_xquat, left_relative_rotation)
-        # mocap_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
-        mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r, scalar_first=True) * 
-                         R.from_quat(right_relative_rotation, scalar_first=True)).as_quat(scalar_first=True, canonical=True)
-        
-   
+        # 旋转控制
+        ROUTE_SPEED = self.gym.opt.timestep * 0.5
+        rot_offset = rot_ctrl * ROUTE_SPEED
+        new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+        mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
-        return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
-
-
-    def _process_pico_joystick_operation(self):
-        joystick_state = self._pico_joystick.get_key_state()
-        if joystick_state is None:
-            return
-
-        self._set_gripper_ctrl_r(joystick_state)
-        self._set_gripper_ctrl(joystick_state)
-        self._set_head_ctrl(joystick_state)
+        return mocap_xpos, mocap_xquat
 
     def _save_record(self) -> None:
         self.record_pool.append(self.ctrl.copy())   
@@ -573,13 +392,13 @@ class OpenloongArmEnv(MujocoRobotEnv):
         ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
 
 
-        achieved_goal = np.zeros(3)
+        achieved_goal = np.array([0,0,0])
         desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     ee_position,
                     ee_velocity,
-                    np.zeros(1),
+                    [0]
                 ]).copy()            
         result = {
             "observation": obs,
@@ -599,17 +418,11 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
-        self._reset_gripper()
-        self._reset_neck_mocap()
-        self.mj_forward()      
+        self.mj_forward()
         return True
 
     # custom methods
     # -----------------------------
-    def set_neck_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("neckMocap"): {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
-
     def set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self.mocap("leftHandMocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
@@ -630,10 +443,8 @@ class OpenloongArmEnv(MujocoRobotEnv):
             arm_joint_qpos_list[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
             arm_joint_qpos_list[name] = np.array([value])     
-        for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(arm_joint_qpos_list)
-        # print("set init joint state: " , arm_joint_qpos_list)
+        print("set init joint state: " , arm_joint_qpos_list)
         # assign value to finger joints
         # gripper_joint_qpos_list = {}
         # for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
@@ -652,5 +463,3 @@ class OpenloongArmEnv(MujocoRobotEnv):
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
-    def close(self):
-        self._pico_joystick.close()
