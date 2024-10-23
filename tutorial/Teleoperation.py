@@ -12,19 +12,19 @@ if project_root not in sys.path:
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
-from envs.orca_gym_env import ActionSpaceType
+from envs.orca_gym_env import ActionSpaceType, RewardType
 from envs.robomimic.robomimic_env import ControlType
 from envs.robomimic.dataset_util import DatasetWriter
 
 import numpy as np
 
 TIME_STEP = 0.01
-MAX_EPISODE_STEPS = 1 / TIME_STEP # 10 seconds in normal speed.
+MAX_EPISODE_STEPS = 10 / TIME_STEP # 10 seconds in normal speed.
 
 def register_env(grpc_address, control_type = ControlType.TELEOPERATION, control_freq=20) -> dict:
     print("register_env: ", grpc_address)
     kwargs = {'frame_skip': 1,   
-                'reward_type': "sparse",
+                'reward_type': RewardType.SPARSE,
                 'action_space_type': ActionSpaceType.CONTINUOUS,
                 'action_step_count': 0,
                 'grpc_address': grpc_address, 
@@ -47,6 +47,7 @@ def run_episode(env, dataset_writer):
     reward_list = []
     done_list = []
     info_list = []    
+    terminated_times = 0
     while True:
         start_time = datetime.now()
 
@@ -59,8 +60,9 @@ def run_episode(env, dataset_writer):
         reward_list.append(reward)
         done_list.append(0 if not terminated else 1)
         info_list.append(info)
+        terminated_times = terminated_times + 1 if terminated else 0
 
-        if terminated or truncated:
+        if terminated_times >= 5 or truncated:
             return obs_list, reward_list, done_list, info_list
 
         elapsed_time = datetime.now() - start_time
@@ -69,16 +71,28 @@ def run_episode(env, dataset_writer):
         else:
             print("Over time! elapsed_time (ms): ", elapsed_time.total_seconds() * 1000)
 
+def user_comfirm_save_record():
+    while True:
+        user_input = input("Do you want to save the record? (y/n): ")
+        if user_input == 'y':
+            return True
+        elif user_input == 'n':
+            return False
+        else:
+            print("Invalid input! Please input 'y' or 'n'.")
+
 def do_teleoperation(env, dataset_writer):
     while True:
         obs_list, reward_list, done_list, info_list = run_episode(env, dataset_writer)
-        dataset_writer.add_demo({
-            'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-            'actions': np.array([info["action"] for info in info_list]),
-            'rewards': np.array(reward_list),
-            'dones': np.array(done_list),
-            'obs': obs_list
-        })
+        save_record = user_comfirm_save_record()
+        if save_record:
+            dataset_writer.add_demo({
+                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
+                'actions': np.array([info["action"] for info in info_list]),
+                'rewards': np.array(reward_list),
+                'dones': np.array(done_list),
+                'obs': obs_list
+            })
 
     
 
@@ -102,7 +116,8 @@ if __name__ == "__main__":
         env = gym.make(env_id)        
         print("Starting simulation...")
 
-        dataset_writer = DatasetWriter(file_path="teleoperation_dataset.hdf5",
+        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5",
                                        env_name=env_id,
                                        env_version=env.get_env_version(),
                                        env_kwargs=kwargs)

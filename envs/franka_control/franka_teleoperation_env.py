@@ -10,6 +10,7 @@ import orca_gym.robosuite.utils.transform_utils as transform_utils
 import h5py
 from envs.robomimic.robomimic_env import RobomimicEnv
 from envs.robomimic.robomimic_env import ControlType
+from envs.orca_gym_env import ActionSpaceType, RewardType
 
 
 class FrankaTeleoperationEnv(RobomimicEnv):
@@ -20,17 +21,18 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
     def __init__(
         self,
-        frame_skip: int = 5,        
-        grpc_address: str = 'localhost:50051',
-        agent_names: list = ['Agent0'],
-        time_step: float = 0.00333333,
-        control_type: ControlType = ControlType.TELEOPERATION,
-        control_freq: int = 20,
+        frame_skip: int,        
+        grpc_address: str,
+        agent_names: list,
+        time_step: float,
+        control_type: ControlType,
+        control_freq: int,
         **kwargs,
     ):
 
         self.control_type = control_type
         self.control_freq = control_freq
+        self.reward_type = kwargs["reward_type"]
 
         super().__init__(
             frame_skip = frame_skip,
@@ -60,14 +62,17 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
         self._set_init_state()
 
-        EE_NAME  = self.site("ee_center_site")
-        site_dict = self.query_site_pos_and_quat([EE_NAME])
-        self._initial_grasp_site_xpos = site_dict[EE_NAME]['xpos']
-        self._initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
-        self._saved_xpos = self._initial_grasp_site_xpos
-        self._saved_xquat = self._initial_grasp_site_xquat
+        self.EE_NAME  = self.site("ee_center_site")
+        site_dict = self.query_site_pos_and_quat([self.EE_NAME])
+        self._initial_grasp_site_xpos = site_dict[self.EE_NAME]['xpos']
+        self._initial_grasp_site_xquat = site_dict[self.EE_NAME]['xquat']
+        self._reset_grasp_mocap()
 
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        self.OBJ_NAME = "Toys_Object"
+        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
+        self._initial_obj_site_xpos = site_dict[self.OBJ_NAME]['xpos']
+        self._initial_obj_site_xquat = site_dict[self.OBJ_NAME]['xquat']
+        self._sample_object()
 
         self._joystick_manager = XboxJoystickManager()
         joystick_names = self._joystick_manager.get_joystick_names()
@@ -86,7 +91,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         #   policy (control) freq, and ndim (# joints)
         self._controller_config["robot_name"] = agent_names[0]
         self._controller_config["sim"] = self.gym
-        self._controller_config["eef_name"] = EE_NAME
+        self._controller_config["eef_name"] = self.EE_NAME
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
         qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._arm_joint_names)
         self._controller_config["joint_indexes"] = {
@@ -104,6 +109,11 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._controller.update_initial_joints(self._neutral_joint_values[0:7])
 
 
+    def _reset_grasp_mocap(self) -> None:
+        self._saved_xpos = self._initial_grasp_site_xpos
+        self._saved_xquat = self._initial_grasp_site_xquat
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+
     def get_env_version(self):
         return FrankaTeleoperationEnv.ENV_VERSION
 
@@ -116,12 +126,16 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.mj_forward()
 
     def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
-        # 计算奖励
-        return 0
+        if self.reward_type == RewardType.SPARSE:
+            return 1 if self._is_success(achieved_goal, desired_goal) else 0
+        elif self.reward_type == RewardType.DENSE:
+            return -np.linalg.norm(achieved_goal - desired_goal)
+        else:
+            raise ValueError("Invalid reward type")
     
     def _is_success(self, achieved_goal, desired_goal) -> bool:
-        # 判断是否成功
-        return False
+        success_threshold = 0.01
+        return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
     def step(self, action) -> tuple:
         if (self.control_type == ControlType.TELEOPERATION):
@@ -218,23 +232,32 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return mocap_xpos, mocap_xquat
 
     def _get_obs(self) -> dict:
-        EE_NAME = self.site("ee_center_site")
-        ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME].copy()
-        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([EE_NAME])
+        ee_position = self.query_site_pos_and_quat([self.EE_NAME])[self.EE_NAME].copy()
+        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self.EE_NAME])
         fingers_width = self.get_fingers_width().copy()
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        joint_values = self.get_arm_joint_values().copy()
+        joint_values_sin = np.sin(joint_values)
+        joint_values_cos = np.cos(joint_values)
+        joint_velocities = self.get_arm_joint_velocities().copy()
 
         obs = {
+            "object": np.concatenate([obj_xpos, obj_xquat]),
             "ee_pos": ee_position["xpos"],
             "ee_quat": ee_position["xquat"],
-            "ee_vel_linear": ee_xvalp[EE_NAME],
-            "ee_vel_angular": ee_xvalr[EE_NAME],
+            "ee_vel_linear": ee_xvalp[self.EE_NAME],
+            "ee_vel_angular": ee_xvalr[self.EE_NAME],
+            "joint_qpos": joint_values,
+            "joint_qpos_sin": joint_values_sin,
+            "joint_qpos_cos": joint_values_cos,
+            "joint_vel": joint_velocities,
             "fingers_width": fingers_width,
         }
         return obs
     
     def _get_achieved_goal(self) -> dict:
-        # TODO: 从环境中获取当前的 achieved_goal
-        achieved_goal = {"achieved_goal": np.array([0,0,0])}
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        achieved_goal = {"achieved_goal": obj_xpos.copy()}
         return achieved_goal
     
     def _get_desired_goal(self) -> dict:
@@ -249,7 +272,8 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         Reset the environment, return observation
         """
         self._set_init_state()
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        self._reset_grasp_mocap()
+        self._sample_object()
         self.goal = self._sample_goal()
         self.mj_forward()
         obs = self._get_obs().copy()
@@ -259,6 +283,10 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     # -----------------------------
     def set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+
+    def set_object_mocap(self, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {"Toys_Box1": {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_joint_neutral(self) -> None:
@@ -274,10 +302,31 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             gripper_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos_list)
 
+    def _query_obj_pos_and_quat(self) -> tuple:
+        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
+        obj_xpos, obj_xquat = site_dict[self.OBJ_NAME]['xpos'], site_dict[self.OBJ_NAME]['xquat']
+        return obj_xpos, obj_xquat
+
     def _sample_goal(self) -> np.ndarray:
-        # TODO: 从环境中采样一个目标
-        goal = np.array([0, 0, 0])
-        return goal
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        goal_xpos = obj_xpos.copy()
+        goal_xpos[2] += 0.1
+        return goal_xpos
+
+    def _sample_object(self) -> None:
+        """
+        随机采样一个物体的位置
+        """
+        obj_xpos = self._initial_obj_site_xpos
+        obj_xquat = self._initial_obj_site_xquat
+        obj_euler = rotations.quat2euler(obj_xquat)
+
+        obj_xpos[0] = np.random.uniform(-0.3, 0.3) + obj_xpos[0]
+        obj_xpos[1] = np.random.uniform(-0.3, 0.3) + obj_xpos[1]
+        obj_euler[2] = np.random.uniform(-np.pi, np.pi)
+        obj_xquat = rotations.euler2quat(obj_euler)
+
+        self.set_object_mocap(obj_xpos, obj_xquat)
 
 
     def get_ee_xform(self) -> np.ndarray:
@@ -291,6 +340,14 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
         return finger1 + finger2
+    
+    def get_arm_joint_values(self) -> np.ndarray:
+        qpos_dict = self.query_joint_qpos(self._arm_joint_names)
+        return np.array([qpos_dict[joint_name] for joint_name in self._arm_joint_names])
+    
+    def get_arm_joint_velocities(self) -> np.ndarray:
+        qvel_dict = self.query_joint_qvel(self._arm_joint_names)
+        return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names])
 
     def get_observation(self, obs=None):
         """
