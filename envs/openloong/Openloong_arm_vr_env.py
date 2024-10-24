@@ -96,6 +96,14 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                    self.actuator("M_zbr_J7"),self.actuator("M_zbr_J8"),self.actuator("M_zbr_J9"),
                                    self.actuator("M_zbr_J10"),self.actuator("M_zbr_J11")]
         self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_moto_names]
+        self._r_hand_body_names = [self.body("zbr_Link1"), self.body("zbr_Link2"), self.body("zbr_Link3"),
+                                   self.body("zbr_Link4"), self.body("zbr_Link5"), self.body("zbr_Link6"), 
+                                   self.body("zbr_Link7"), self.body("zbr_Link8"), self.body("zbr_Link9"),
+                                   self.body("zbr_Link10"), self.body("zbr_Link11")]
+        self._r_hand_gemo_ids = []
+        for geom_info in self.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self._r_hand_body_names:
+                self._r_hand_gemo_ids.append(geom_info["GeomId"])
 
         print("arm_actuator_id: ", self._r_arm_actuator_id)
         print("hand_actuator_id: ", self._r_hand_actuator_id)
@@ -117,6 +125,16 @@ class OpenloongArmEnv(MujocoRobotEnv):
                                     self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
                                     self.actuator("M_zbll_J10"),self.actuator("M_zbll_J11")]
         self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
+        self._l_hand_body_names = [self.body("zbll_Link1"), self.body("zbll_Link2"), self.body("zbll_Link3"),
+                                   self.body("zbll_Link4"), self.body("zbll_Link5"), self.body("zbll_Link6"), 
+                                   self.body("zbll_Link7"), self.body("zbll_Link8"), self.body("zbll_Link9"),
+                                   self.body("zbll_Link10"), self.body("zbll_Link11")]
+        self._l_hand_gemo_ids = []
+        for geom_info in self.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self._l_hand_body_names:
+                self._l_hand_gemo_ids.append(geom_info["GeomId"])
+
+
 
         # control range
         self._all_ctrlrange = self.model.get_actuator_ctrlrange()
@@ -265,6 +283,9 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._set_action()
         self.do_simulation(self.ctrl, self.frame_skip)
         obs = self._get_obs().copy()
+        r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
+        l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
+        self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
         info = {}
         terminated = False
@@ -273,6 +294,21 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
         return obs, reward, terminated, truncated, info
     
+    def _query_hand_force(self, hand_geom_ids):
+        contact_simple_list = self.query_contact_simple()
+        contact_force_query_ids = []
+        for contact_simple in contact_simple_list:
+            if contact_simple["Geom1"] in hand_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+            if contact_simple["Geom2"] in hand_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+
+        contact_force_dict = self.query_contact_force(contact_force_query_ids)
+        compose_force = 0
+        for force in contact_force_dict.values():
+            compose_force += np.linalg.norm(force[:3])
+        return compose_force
+
     def _set_head_ctrl(self, joystick_state) -> None:
         x_axis = joystick_state["rightHand"]["joystickPosition"][0]
         if x_axis == 0:

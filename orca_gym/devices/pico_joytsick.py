@@ -30,6 +30,7 @@ class PicoJoystick:
         self.current_key_state = None
         self.reset_pos = False
         self.loop = asyncio.new_event_loop()
+        self.clients = set()  # 初始化 self.clients
         self.thread = threading.Thread(target=self._start_server_thread)
         self.thread.start()
 
@@ -56,6 +57,7 @@ class PicoJoystick:
 
     async def _handle_client(self, reader, writer):
         try:
+            self.clients.add(writer)  # 添加客户端 writer
             buffer = ""
             while self.running:
                 data = await reader.read(1024)
@@ -71,8 +73,25 @@ class PicoJoystick:
         except Exception as e:
             print("Client disconnected:", e)
         finally:
+            self.clients.discard(writer)  # 移除客户端 writer
             writer.close()
             await writer.wait_closed()
+
+    def send_force_message(self, l_hand_force, r_hand_force):
+        message = json.dumps({"l_hand_force": l_hand_force, "r_hand_force": r_hand_force})
+        asyncio.run_coroutine_threadsafe(self._broadcast_message(message), self.loop)
+
+    async def _broadcast_message(self, message):
+        clients = list(self.clients)
+        for writer in clients:
+            try:
+                writer.write((message + '\n').encode('utf-8'))
+                await writer.drain()
+            except Exception as e:
+                print("send message error：", e)
+                self.clients.discard(writer)
+                writer.close()
+
 
     def update(self):
         pass
