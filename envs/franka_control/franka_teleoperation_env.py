@@ -7,7 +7,6 @@ from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
-import h5py
 from envs.robomimic.robomimic_env import RobomimicEnv
 from envs.robomimic.robomimic_env import ControlType
 from envs.orca_gym_env import ActionSpaceType, RewardType

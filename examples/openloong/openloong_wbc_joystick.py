@@ -91,5 +91,4 @@ if __name__ == '__main__':
         run_simulation(env, time_step)
     except KeyboardInterrupt:
         print("Exit Simulation!")        
-        env.save_record()
         env.close()

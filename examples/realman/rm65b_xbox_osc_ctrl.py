@@ -71,5 +71,4 @@ if __name__ == "__main__":
         continue_training(env)
     except KeyboardInterrupt:
         print("Exit Simulation!")        
-        env.save_record()
         env.close()

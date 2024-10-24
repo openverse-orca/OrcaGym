@@ -71,5 +71,4 @@ if __name__ == "__main__":
         asyncio.run(continue_training(env))
     except KeyboardInterrupt:
         print("关闭仿真环境")        
-        env.save_record()
         env.close()
