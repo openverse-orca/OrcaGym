@@ -1,6 +1,5 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -8,51 +7,45 @@ from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
-import h5py
+from envs.robomimic.robomimic_env import RobomimicEnv
+from envs.robomimic.robomimic_env import ControlType
+from envs.orca_gym_env import ActionSpaceType, RewardType
 
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
 
-class FrankaPandaEnv(MujocoRobotEnv):
+class FrankaTeleoperationEnv(RobomimicEnv):
     """
-    通过xbox手柄控制franka机械臂
+    通过遥操作控制franka机械臂
     """
+    ENV_VERSION = "2024.10.1"
+
     def __init__(
         self,
-        frame_skip: int = 5,        
-        grpc_address: str = 'localhost:50051',
-        agent_names: list = ['Agent0'],
-        time_step: float = 0.00333333,
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
-        control_freq: int = 20,
+        frame_skip: int,        
+        grpc_address: str,
+        agent_names: list,
+        time_step: float,
+        control_type: ControlType,
+        control_freq: int,
         **kwargs,
     ):
 
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
-
-        action_size = 3 # 实际并不使用
-
+        self.control_type = control_type
         self.control_freq = control_freq
-
+        self.reward_type = kwargs["reward_type"]
+        self.EE_NAME  = f"{agent_names[0]}_ee_center_site"
+        self.OBJ_NAME = "Toys_Object"
+        
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
             observation_space = None,
             **kwargs,
         )
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
+
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -70,15 +63,16 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         self._set_init_state()
+        site_dict = self.query_site_pos_and_quat([self.EE_NAME])
+        self._initial_grasp_site_xpos = site_dict[self.EE_NAME]['xpos']
+        self._initial_grasp_site_xquat = site_dict[self.EE_NAME]['xquat']
+        self._reset_grasp_mocap()
 
-        EE_NAME  = self.site("ee_center_site")
-        site_dict = self.query_site_pos_and_quat([EE_NAME])
-        self._initial_grasp_site_xpos = site_dict[EE_NAME]['xpos']
-        self._initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
-        self._saved_xpos = self._initial_grasp_site_xpos
-        self._saved_xquat = self._initial_grasp_site_xquat
 
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
+        self._initial_obj_site_xpos = site_dict[self.OBJ_NAME]['xpos']
+        self._initial_obj_site_xquat = site_dict[self.OBJ_NAME]['xquat']
+        self._sample_object()
 
         self._joystick_manager = XboxJoystickManager()
         joystick_names = self._joystick_manager.get_joystick_names()
@@ -97,7 +91,7 @@ class FrankaPandaEnv(MujocoRobotEnv):
         #   policy (control) freq, and ndim (# joints)
         self._controller_config["robot_name"] = agent_names[0]
         self._controller_config["sim"] = self.gym
-        self._controller_config["eef_name"] = EE_NAME
+        self._controller_config["eef_name"] = self.EE_NAME
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
         qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._arm_joint_names)
         self._controller_config["joint_indexes"] = {
@@ -115,6 +109,14 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._controller.update_initial_joints(self._neutral_joint_values[0:7])
 
 
+    def _reset_grasp_mocap(self) -> None:
+        self._saved_xpos = self._initial_grasp_site_xpos
+        self._saved_xquat = self._initial_grasp_site_xquat
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+
+    def get_env_version(self):
+        return FrankaTeleoperationEnv.ENV_VERSION
+
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
@@ -123,18 +125,43 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
+    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
+        if self.reward_type == RewardType.SPARSE:
+            return 1 if self._is_success(achieved_goal, desired_goal) else 0
+        elif self.reward_type == RewardType.DENSE:
+            return -np.linalg.norm(achieved_goal - desired_goal)
+        else:
+            raise ValueError("Invalid reward type")
+    
+    def _is_success(self, achieved_goal, desired_goal) -> bool:
+        success_threshold = 0.01
+        return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
-    def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        self._set_action()
-        self.do_simulation(self.ctrl, self.frame_skip)
+    def step(self, action) -> tuple:
+        if (self.control_type == ControlType.TELEOPERATION):
+            action = self._teleoperation_action().copy()
+            
+        self.do_simulation(action, self.frame_skip)
         obs = self._get_obs().copy()
+        achieved_goal = self._get_achieved_goal().copy()
+        desired_goal = self._get_desired_goal().copy()
 
-        info = {}
-        terminated = False
+        info = {"state": self.get_state(), "action": action}
+        terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
-        reward = 0
+        reward = self._compute_reward(achieved_goal, desired_goal, info)
 
         return obs, reward, terminated, truncated, info
+    
+    def get_state(self) -> dict:
+        state = {
+            "time": self.data.time,
+            "qpos": self.data.qpos.copy(),
+            "qvel": self.data.qvel.copy(),
+            "qacc": self.data.qacc.copy(),
+            "ctrl": self.ctrl.copy(),
+        }
+        return state
     
     def _set_gripper_ctrl(self, joystick_state) -> None:
         if (joystick_state["buttons"]["A"]):
@@ -147,65 +174,8 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self.ctrl[7] = np.clip(self.ctrl[7], 0, 0.08)
         self.ctrl[8] = np.clip(self.ctrl[8], 0, 0.08)
 
-    def _load_record(self) -> None:
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-        
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            if "float_data" in f:
-                dset = f["float_data"]
-                if self.record_cursor >= dset.shape[0]:
-                    return False
 
-                self.record_pool = dset[self.record_cursor:self.record_cursor + self.RECORD_POOL_SIZE].tolist()
-                self.record_cursor += self.RECORD_POOL_SIZE
-                return True
-
-        return False
-    
-    def save_record(self) -> None:
-        if self.record_state != RecordState.RECORD:
-            return
-        
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a') as f:
-            # 如果数据集存在，获取其大小；否则，创建新的数据集
-            if "float_data" in f:
-                dset = f["float_data"]
-                self.record_cursor = dset.shape[0]
-            else:
-                dset = f.create_dataset("float_data", (0, len(self.ctrl)), maxshape=(None, len(self.ctrl)), dtype='f', compression="gzip")
-                self.record_cursor = 0
-
-            # 将record_pool中的数据写入数据集
-            dset.resize((self.record_cursor + len(self.record_pool), len(self.ctrl)))
-            dset[self.record_cursor:] = np.array(self.record_pool)
-            self.record_cursor += len(self.record_pool)
-            self.record_pool.clear()
-
-            print("Record saved.")
-
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return
-        
-        if len(self.record_pool) == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl = self.record_pool.pop(0)
-
-    def _set_action(self) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-
+    def _teleoperation_action(self) -> np.ndarray:
         mocap_xpos = self._saved_xpos
         mocap_xquat = self._saved_xquat
         
@@ -227,11 +197,9 @@ class FrankaPandaEnv(MujocoRobotEnv):
         self._controller.set_goal(action)
         
         self.ctrl[0:7] = self._controller.run_controller()
-        # print("ctrl: ", self.ctrl)
+        
+        return self.ctrl
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
 
     def _process_xbox_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
         self._joystick_manager.update()
@@ -263,48 +231,53 @@ class FrankaPandaEnv(MujocoRobotEnv):
 
         return mocap_xpos, mocap_xquat
 
-
-    def _save_record(self) -> None:
-        self.record_pool.append(self.ctrl.copy())   
-        if (len(self.record_pool) >= self.RECORD_POOL_SIZE):
-            self.save_record()
-
     def _get_obs(self) -> dict:
-        # robot
-        EE_NAME = self.site("ee_center_site")
-        ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME]['xpos'].copy()
-        ee_xvalp, _ = self.query_site_xvalp_xvalr([EE_NAME])
-        ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
+        ee_position = self.query_site_pos_and_quat([self.EE_NAME])[self.EE_NAME].copy()
+        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self.EE_NAME])
         fingers_width = self.get_fingers_width().copy()
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        joint_values = self.get_arm_joint_values().copy()
+        joint_values_sin = np.sin(joint_values)
+        joint_values_cos = np.cos(joint_values)
+        joint_velocities = self.get_arm_joint_velocities().copy()
 
-
-        achieved_goal = np.array([0,0,0])
-        desired_goal = self.goal.copy()
-        obs = np.concatenate(
-                [
-                    ee_position,
-                    ee_velocity,
-                    fingers_width
-                ]).copy()            
-        result = {
-            "observation": obs,
-            "achieved_goal": achieved_goal,
-            "desired_goal": desired_goal,
+        obs = {
+            "object": np.concatenate([obj_xpos, obj_xquat]),
+            "ee_pos": ee_position["xpos"],
+            "ee_quat": ee_position["xquat"],
+            "ee_vel_linear": ee_xvalp[self.EE_NAME],
+            "ee_vel_angular": ee_xvalr[self.EE_NAME],
+            "joint_qpos": joint_values,
+            "joint_qpos_sin": joint_values_sin,
+            "joint_qpos_cos": joint_values_cos,
+            "joint_vel": joint_velocities,
+            "fingers_width": fingers_width,
         }
-        return result
+        return obs
+    
+    def _get_achieved_goal(self) -> dict:
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        achieved_goal = {"achieved_goal": obj_xpos.copy()}
+        return achieved_goal
+    
+    def _get_desired_goal(self) -> dict:
+        desired_goal = {"desired_goal": self.goal.copy()}
+        return desired_goal
 
     def _render_callback(self) -> None:
         pass
 
-    def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
-
-    def _reset_sim(self) -> bool:
+    def reset_model(self) -> dict:
+        """
+        Reset the environment, return observation
+        """
         self._set_init_state()
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        self._reset_grasp_mocap()
+        self._sample_object()
+        self.goal = self._sample_goal()
         self.mj_forward()
-        return True
+        obs = self._get_obs().copy()
+        return obs
 
     # custom methods
     # -----------------------------
@@ -312,8 +285,8 @@ class FrankaPandaEnv(MujocoRobotEnv):
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_goal_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
+    def set_object_mocap(self, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {"Toys_Box1": {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_joint_neutral(self) -> None:
@@ -329,10 +302,31 @@ class FrankaPandaEnv(MujocoRobotEnv):
             gripper_joint_qpos_list[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos_list)
 
+    def _query_obj_pos_and_quat(self) -> tuple:
+        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
+        obj_xpos, obj_xquat = site_dict[self.OBJ_NAME]['xpos'], site_dict[self.OBJ_NAME]['xquat']
+        return obj_xpos, obj_xquat
+
     def _sample_goal(self) -> np.ndarray:
-        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
-        return goal
+        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        goal_xpos = obj_xpos.copy()
+        goal_xpos[2] += 0.1
+        return goal_xpos
+
+    def _sample_object(self) -> None:
+        """
+        随机采样一个物体的位置
+        """
+        obj_xpos = self._initial_obj_site_xpos
+        obj_xquat = self._initial_obj_site_xquat
+        obj_euler = rotations.quat2euler(obj_xquat)
+
+        obj_xpos[0] = np.random.uniform(-0.3, 0.3) + obj_xpos[0]
+        obj_xpos[1] = np.random.uniform(-0.3, 0.3) + obj_xpos[1]
+        obj_euler[2] = np.random.uniform(-np.pi, np.pi)
+        obj_xquat = rotations.euler2quat(obj_euler)
+
+        self.set_object_mocap(obj_xpos, obj_xquat)
 
 
     def get_ee_xform(self) -> np.ndarray:
@@ -346,3 +340,22 @@ class FrankaPandaEnv(MujocoRobotEnv):
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
         return finger1 + finger2
+    
+    def get_arm_joint_values(self) -> np.ndarray:
+        qpos_dict = self.query_joint_qpos(self._arm_joint_names)
+        return np.array([qpos_dict[joint_name] for joint_name in self._arm_joint_names])
+    
+    def get_arm_joint_velocities(self) -> np.ndarray:
+        qvel_dict = self.query_joint_qvel(self._arm_joint_names)
+        return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names])
+
+    def get_observation(self, obs=None):
+        """
+        Return the current environment observation as a dictionary, unless obs is not None.
+        This function should process the raw environment observation to align with the input expected by the policy model.
+        For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
+        """
+        if obs is not None:
+            return obs
+        
+        return self._get_obs().copy()

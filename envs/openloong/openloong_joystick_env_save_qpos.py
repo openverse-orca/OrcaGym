@@ -6,17 +6,10 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager, XboxJoystick
 from orca_gym.devices.pico_joytsick import PicoJoystick
-import h5py
 from scipy.spatial.transform import Rotation as R
 import os
 from envs.openloong.camera_wrapper import CameraWrapper
 import time
-
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
 
 class OpenloongJoystickEnv(MujocoRobotEnv):
     """
@@ -28,15 +21,8 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps
-        record_state: str = RecordState.NONE,
-        record_file: Optional[str] = None,
         **kwargs,
     ):
-
-        self.record_state = record_state
-        self.record_file = record_file
-        self.RECORD_POOL_SIZE = 800
-        self.record_cursor = 0
 
         action_size = 3 # 实际并不使用
 
@@ -119,11 +105,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             if self.use_depth_image:
                 self.data_dict[f'/observations/images_depth/{cam_name}'] = []
 
-        if self.record_state == RecordState.RECORD:
-            if  os.path.exists(self.record_file):
-                os.remove(self.record_file)
-                print("remove existed file.")
-
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
@@ -170,90 +151,12 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         return obs, reward, terminated, truncated, info
 
-    def _iter_dataset(self, name, item):
-        if isinstance(item, h5py.Dataset):
-            self.data_dict["/" + name] = item[...]
-
-    def _load_record(self):
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            f.visititems(self._iter_dataset)
-            print("read file finished.")
-            return True
-
-        return False
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY:
-            if self.record_cursor == self.RECORD_POOL_SIZE:
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return
-
-        if self.record_cursor == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl[:14] = self.data_dict['/action'][self.record_cursor]
-        self.record_cursor = self.record_cursor + 1
-
-    def save_record_to_file(self):
-        if self.record_state != RecordState.RECORD:
-            return
-
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a', rdcc_nbytes=1024**2*2) as root:
-            root.attrs['sim'] = False
-            root.attrs['compress'] = False
-
-            # 创建一个新的组observations，观测状态组
-            # 图像组
-            obs = root.create_group('observations')
-            image = obs.create_group('images')
-            for cam_name in self.camera_names:
-                _ = image.create_dataset(cam_name, (self.data_size, 480, 640, 3), dtype='uint8',
-                                            chunks=(1, 480, 640, 3), )
-            if self.use_depth_image:
-                image_depth = obs.create_group('images_depth')
-                for cam_name in self.camera_names:
-                    _ = image_depth.create_dataset(cam_name, (self.data_size, 480, 640), dtype='uint16',
-                                                chunks=(1, 480, 640), )
-
-            _ = obs.create_dataset('qpos', (self.data_size, 14))
-            _ = obs.create_dataset('qvel', (self.data_size, 14))
-            _ = obs.create_dataset('effort', (self.data_size, 14))
-            _ = root.create_dataset('action', (self.data_size, 14))
-            _ = root.create_dataset('base_action', (self.data_size, 2))
-
-            # data_dict write into h5py.File
-            for name, array in self.data_dict.items():
-                root[name][...] = array
-        print("Saved to file.")
-
     def _set_action(self) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-
         changed = False
         if isinstance(self.joystick, XboxJoystick):
             changed = self.handle_xbox_joystick()
         elif isinstance(self.joystick, PicoJoystick):
             changed = self.handle_pico_joystick()
-
-        if not changed:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
 
         self.mj_forward()
         joint_qpos = self.query_joint_qpos(self.arm_joint_names)
@@ -267,10 +170,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         #     print("Rot_ctrl: ", rot_ctrl)
 
         # self._joint_rot_ctrl_compensation(rot_ctrl)
-
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
 
     def handle_xbox_joystick(self):
         # 根据xbox手柄的输入，设置机械臂的动作
@@ -349,24 +248,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         # self.set_grasp_mocap_r(mocap_r_xpos, rotations.mat2quat(right_relative_rotation))
 
         return True
-
-    def _save_record(self) -> None:
-        if len(self.data_dict['/observations/qpos']) < self.data_size:
-            joint_qpos = self.query_joint_qpos(self.arm_joint_names)
-            joint_qvel = self.query_joint_qvel(self.arm_joint_names)
-            joint_force = self.query_actuator_force()
-            self.data_dict['/observations/qpos'].append([joint_qpos[joint_name][0] for joint_name in self.arm_joint_names][:14])
-            self.data_dict['/observations/qvel'].append([joint_qvel[joint_name][0] for joint_name in self.arm_joint_names][:14])
-            # todo:fix
-            self.data_dict['/observations/effort'].append(joint_force[:14])
-            self.data_dict['/action'].append(self.ctrl[:14].tolist())
-            self.data_dict['/base_action'].append([0.0, 0.0])
-            for cam_name in self.camera_names:
-                image = self.get_camera_image(cam_name)
-                self.data_dict[f'/observations/images/{cam_name}'].append(image)
-
-            if len(self.data_dict['/observations/qpos']) == self.data_size:
-                self.save_record_to_file()
 
     def _get_obs(self) -> dict:
         # robot

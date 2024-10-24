@@ -5,14 +5,8 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
-import h5py
 from scipy.spatial.transform import Rotation as R
 
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
 
 class OpenloongJoystickEnv(MujocoRobotEnv):
     """
@@ -24,16 +18,9 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps        
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
         **kwargs,
     ):
 
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
 
         action_size = 3 # 实际并不使用
 
@@ -121,65 +108,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         return obs, reward, terminated, truncated, info
 
-    def _load_record(self):
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-        
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            if "float_data" in f:
-                dset = f["float_data"]
-                if self.record_cursor >= dset.shape[0]:
-                    return False
-
-                self.record_pool = dset[self.record_cursor:self.record_cursor + self.RECORD_POOL_SIZE].tolist()
-                self.record_cursor += self.RECORD_POOL_SIZE
-                return True
-
-        return False
-    
-    def save_record(self) -> None:
-        if self.record_state != RecordState.RECORD:
-            return
-        
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a') as f:
-            # 如果数据集存在，获取其大小；否则，创建新的数据集
-            if "float_data" in f:
-                dset = f["float_data"]
-                self.record_cursor = dset.shape[0]
-            else:
-                dset = f.create_dataset("float_data", (0, len(self.ctrl)), maxshape=(None, len(self.ctrl)), dtype='f', compression="gzip")
-                self.record_cursor = 0
-
-            # 将record_pool中的数据写入数据集
-            dset.resize((self.record_cursor + len(self.record_pool), len(self.ctrl)))
-            dset[self.record_cursor:] = np.array(self.record_pool)
-            self.record_cursor += len(self.record_pool)
-            self.record_pool.clear()
-
-            print("Record saved.")
-
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return
-        
-        if len(self.record_pool) == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl = self.record_pool.pop(0)
-
     def _set_action(self) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-
         # 根据xbox手柄的输入，设置机械臂的动作
         self.joystick_manager.update()
 
@@ -227,11 +156,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
             else:
                 self.set_grasp_mocap_r(mocap_xpos, mocap_xquat)
             # print(index, mocap_xpos, mocap_xquat)
-        
-        if not changed:
-            if self.record_state == RecordState.RECORD:
-                self._save_record()
-            return
 
         self.mj_forward()
         joint_qpos = self.query_joint_qpos(self.arm_joint_names)
@@ -246,14 +170,6 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         # self._joint_rot_ctrl_compensation(rot_ctrl)
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
-
-    def _save_record(self) -> None:
-        self.record_pool.append(self.ctrl.copy())   
-        if (len(self.record_pool) >= self.RECORD_POOL_SIZE):
-            self.save_record()
 
     def _get_obs(self) -> dict:
         # robot

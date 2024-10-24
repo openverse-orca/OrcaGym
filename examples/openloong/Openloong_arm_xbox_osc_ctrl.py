@@ -13,15 +13,11 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_joystick_env import RecordState
-
-
-
 
 # 
 TIME_STEP = 0.01
 
-def register_env(grpc_address, record_state, record_file, control_freq=20):
+def register_env(grpc_address, control_freq=20):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
@@ -33,8 +29,6 @@ def register_env(grpc_address, record_state, record_file, control_freq=20):
                 'grpc_address': grpc_address, 
                 'agent_names': ['AzureLoong'], 
                 'time_step': TIME_STEP,
-                'record_state': record_state,
-                'record_file': record_file,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,
         reward_threshold=0.0,
@@ -63,8 +57,7 @@ if __name__ == "__main__":
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState controls the recording of the simulation data
-        register_env(grpc_address, RecordState.NONE, 'xbox_control_record.h5', 20)
+        register_env(grpc_address, 20)
 
         env = gym.make(env_id)        
         print("Starting simulation...")
@@ -72,5 +65,4 @@ if __name__ == "__main__":
         continue_training(env)
     except KeyboardInterrupt:
         print("Simulation stopped")        
-        env.save_record()
         env.close()

@@ -14,10 +14,8 @@ if project_root not in sys.path:
 
 from envs.orca_gym_env import ActionSpaceType
 import gymnasium as gym
-from envs.franka_control.franka_joystick_env import RecordState
 
-
-def register_env(grpc_address, record_state, record_file, agent_name, time_step, urdf_path, json_path, log_path):
+def register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_path, individual_control):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"Openloong-v0-OrcaGym-{grpc_address[-2:]}",
@@ -29,11 +27,10 @@ def register_env(grpc_address, record_state, record_file, agent_name, time_step,
                 'grpc_address': grpc_address, 
                 'agent_names': [agent_name], 
                 'time_step': time_step,
-                'record_state': record_state,
-                'record_file': record_file,
                 'urdf_path': urdf_path,
                 'json_path': json_path,
                 'log_path': log_path,
+                'individual_control': individual_control
                 },
         max_episode_steps=sys.maxsize,  # never stop
         reward_threshold=0.0,
@@ -62,12 +59,14 @@ if __name__ == '__main__':
     """
 
     parser = argparse.ArgumentParser(description='Simulation Configuration')
-    parser.add_argument('--grpc_address', type=str, required=True, help='The gRPC address for the simulation')
-    parser.add_argument('--agent_name', type=str, required=True, help='The agent name for the simulation')
+    parser.add_argument('--grpc_address', type=str, default="localhost:50051", help='The gRPC address for the simulation')
+    parser.add_argument('--agent_name', type=str, default="AzureLoong", help='The agent name for the simulation')
+    parser.add_argument('--individual_control', type=str, default="True", help='Control the robots individually')
     args = parser.parse_args()
 
     grpc_address = f"{args.grpc_address}"
     agent_name = f"{args.agent_name}"
+    individual_control = True if f"{args.individual_control}" == "True" else False
 
     simulation_frequency = 1000
     time_step = 1.0 / simulation_frequency
@@ -82,7 +81,7 @@ if __name__ == '__main__':
     print("simulation running... , grpc_address: ", grpc_address, ", agent_name: ", agent_name)
     env_id = f"Openloong-v0-OrcaGym-{grpc_address[-2:]}"
 
-    register_env(grpc_address, RecordState.NONE, 'openloong_ctrl.h5', agent_name, time_step, urdf_path, json_path, log_path)
+    register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_path, individual_control)
 
     env = gym.make(env_id)        
     print("Start Simulation!")    
@@ -91,5 +90,4 @@ if __name__ == '__main__':
         run_simulation(env, time_step)
     except KeyboardInterrupt:
         print("Exit Simulation!")        
-        env.save_record()
         env.close()

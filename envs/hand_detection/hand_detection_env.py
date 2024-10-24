@@ -7,17 +7,10 @@ from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.devices.hand_joytstick import HandJoystick
-import h5py
 from scipy.spatial.transform import Rotation as R
 import os
 from envs.openloong.camera_wrapper import CameraWrapper
 import time
-
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
 
 class HandDetectionEnv(MujocoRobotEnv):
     def __init__(
@@ -26,15 +19,8 @@ class HandDetectionEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps        
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
         **kwargs,
     ):
-
-        self.record_state = record_state
-        self.record_file = record_file
-        self.RECORD_POOL_SIZE = 800
-        self.record_cursor = 0
 
         action_size = 3 # 实际并不使用
 
@@ -81,46 +67,8 @@ class HandDetectionEnv(MujocoRobotEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
-    
-    def _iter_dataset(self, name, item):
-        if isinstance(item, h5py.Dataset):
-            self.data_dict["/" + name] = item[...]
-
-    def _load_record(self):
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-        
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            f.visititems(self._iter_dataset)
-            print("read file finished.")
-            return True
-
-        return False
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY:
-            if self.record_cursor == self.RECORD_POOL_SIZE:
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return    
-        
-        if self.record_cursor == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl[:14] = self.data_dict['/action'][self.record_cursor]
-        self.record_cursor = self.record_cursor + 1
 
     def _set_action(self) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-
         self.mj_forward()
 
         hand_infos = self.joystick.get_hand_infos()
@@ -142,15 +90,9 @@ class HandDetectionEnv(MujocoRobotEnv):
                     # self.set_joint_qpos(hand_qpos_list)
                     self.ctrl[:11] = np.array([hand_qpos_list[name] for name in hand_point_names]).flat.copy()
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
-
     def handle_hand_joystick(self):
         return
 
-    def _save_record(self) -> None:
-        return 
 
     def _render_callback(self) -> None:
         return
