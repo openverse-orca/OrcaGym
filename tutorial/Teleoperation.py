@@ -110,8 +110,6 @@ if __name__ == "__main__":
         grpc_address = "localhost:50051"
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"Franka-Control-v0-OrcaGym-{grpc_address[-2:]}"
-
-        # RecordState controls the recording of the simulation data
         kwargs = register_env(grpc_address, ControlType.TELEOPERATION, 20)
 
         env = gym.make(env_id)        

@@ -15,7 +15,7 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.keyboard import KeyboardClient
+from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
 class OpenLoongEnv(MujocoRobotEnv):
     """
@@ -39,6 +39,8 @@ class OpenLoongEnv(MujocoRobotEnv):
     ):
 
         action_size = 3 # 实际并不使用
+        individual_control = kwargs['individual_control']
+        print("individual_control: ", individual_control)
 
         super().__init__(
             frame_skip = frame_skip,
@@ -72,7 +74,11 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self._openloong_wbc.InitLogger()
 
-        self._keyboard_controller = KeyboardClient()
+        if individual_control:
+            self._keyboard_controller = KeyboardInput()
+        else:
+            self._keyboard_controller = KeyboardClient()
+
         self._button_state = ButtonState()
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0}
 

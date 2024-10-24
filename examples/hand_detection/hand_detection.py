@@ -15,7 +15,6 @@ import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_teleoperation_env import RecordState
 
 
 nest_asyncio.apply()
@@ -60,7 +59,6 @@ if __name__ == "__main__":
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState 控制录制和回放状态
         register_env(grpc_address)
 
         env = gym.make(env_id)        

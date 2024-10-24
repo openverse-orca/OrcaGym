@@ -12,12 +12,6 @@ import os
 from envs.openloong.camera_wrapper import CameraWrapper
 import time
 
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
-
 class HandDetectionEnv(MujocoRobotEnv):
     def __init__(
         self,

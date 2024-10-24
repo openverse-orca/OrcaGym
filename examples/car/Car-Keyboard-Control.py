@@ -12,7 +12,6 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 from envs.orca_gym_env import ActionSpaceType
-from envs.car_control.car_keyboard_env import CarKeyboardEnv, RecordState  # 使用car_keyboard_env模块
 
 nest_asyncio.apply()
 
@@ -55,7 +54,6 @@ if __name__ == "__main__":
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"KeyboardControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState controls the recording of the simulation data
         register_env(grpc_address)
 
         env = gym.make(env_id)

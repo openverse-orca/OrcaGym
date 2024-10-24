@@ -13,8 +13,6 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_teleoperation_env import RecordState
-
 
 # 
 TIME_STEP = 0.01
@@ -63,7 +61,6 @@ if __name__ == "__main__":
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState controls the recording of the simulation data
         register_env(grpc_address, 20)
 
         env = gym.make(env_id)        
