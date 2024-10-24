@@ -31,17 +31,9 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps        
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
         control_freq: int = 20,        
         **kwargs,
     ):
-
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
 
         action_size = 3 # 实际并不使用
 

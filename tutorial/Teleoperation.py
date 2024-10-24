@@ -18,6 +18,7 @@ from envs.robomimic.dataset_util import DatasetWriter
 
 import numpy as np
 
+
 TIME_STEP = 0.01
 MAX_EPISODE_STEPS = 10 / TIME_STEP # 10 seconds in normal speed.
 

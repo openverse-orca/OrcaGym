@@ -40,7 +40,7 @@ from envs.quadruped.utils.mujoco.visual import render_sphere
 
 
 
-def register_env(grpc_address, record_state, record_file, agent_name,
+def register_env(grpc_address, agent_name,
                  robot_name, hip_height, robot_leg_joints, 
                  robot_feet_geom_names, robot_hip_body_names, scene_name, simulation_dt, state_observables_names):
     print("register_env: ", grpc_address)
@@ -54,8 +54,6 @@ def register_env(grpc_address, record_state, record_file, agent_name,
                 'grpc_address': grpc_address, 
                 'agent_names': [agent_name], 
                 'time_step': simulation_dt,
-                'record_state': record_state,
-                'record_file': record_file,
                 'robot': robot_name,
                 'hip_height': hip_height,
                 'legs_joint_names': robot_leg_joints,  # Joint names of the legs DoF
@@ -102,7 +100,7 @@ if __name__ == '__main__':
     print("robot_feet_geom_names:", robot_feet_geom_names)
     env_id = f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}"
 
-    register_env(grpc_address, RecordState.NONE, 'quadruped_ctrl.h5', robot_name,
+    register_env(grpc_address, robot_name,
                  robot_name, hip_height, robot_leg_joints, robot_feet_geom_names, robot_hip_body_names,
                  scene_name, simulation_dt, state_observables_names)
 

@@ -32,7 +32,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.control_type = control_type
         self.control_freq = control_freq
         self.reward_type = kwargs["reward_type"]
-
+        self.EE_NAME  = f"{agent_names[0]}_ee_center_site"
+        self.OBJ_NAME = "Toys_Object"
+        
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
@@ -43,6 +45,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         )
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
+
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -60,14 +63,12 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         self._set_init_state()
-
-        self.EE_NAME  = self.site("ee_center_site")
         site_dict = self.query_site_pos_and_quat([self.EE_NAME])
         self._initial_grasp_site_xpos = site_dict[self.EE_NAME]['xpos']
         self._initial_grasp_site_xquat = site_dict[self.EE_NAME]['xquat']
         self._reset_grasp_mocap()
 
-        self.OBJ_NAME = "Toys_Object"
+
         site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
         self._initial_obj_site_xpos = site_dict[self.OBJ_NAME]['xpos']
         self._initial_obj_site_xquat = site_dict[self.OBJ_NAME]['xquat']

@@ -17,19 +17,12 @@ class CarEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps
-        record_state: str = RecordState.NONE,
-        record_file: Optional[str] = None,
         **kwargs,
     ):
 
         action_size = 2  # 这里的 action size 根据汽车控制的需求设置
         self.ctrl = np.zeros(action_size)  # 提前初始化self.ctrl
         self.n_actions = 2  # 示例值；根据你的动作空间进行调整
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
 
         super().__init__(
             frame_skip=frame_skip,

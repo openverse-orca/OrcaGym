@@ -19,7 +19,7 @@ nest_asyncio.apply()
 # TIME_STEP = 0.016666666666666
 TIME_STEP = 0.005
 
-def register_env(grpc_address, record_state, record_file):
+def register_env(grpc_address):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"KeyboardControl-v0-OrcaGym-{grpc_address[-2:]}",
@@ -29,8 +29,6 @@ def register_env(grpc_address, record_state, record_file):
             'grpc_address': grpc_address,
             'agent_names': ['Agent0'],
             'time_step': TIME_STEP,
-            'record_state': record_state,
-            'record_file': record_file,
             'action_space_type': ActionSpaceType.CONTINUOUS,  # Example value
             'action_step_count': 0,  # Example value, adjust as needed
         },
@@ -58,7 +56,7 @@ if __name__ == "__main__":
         env_id = f"KeyboardControl-v0-OrcaGym-{grpc_address[-2:]}"
 
         # RecordState controls the recording of the simulation data
-        register_env(grpc_address, RecordState.RECORD, 'keyboard_control_record.h5')
+        register_env(grpc_address)
 
         env = gym.make(env_id)
         print("Starting simulation...")

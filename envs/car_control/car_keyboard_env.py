@@ -6,6 +6,7 @@ from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import numpy as np
+from envs.orca_gym_env import ActionSpaceType
 
 ObsType = Any
 
@@ -70,8 +71,6 @@ class CarKeyboardEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps
-        record_state: str = RecordState.NONE,
-        record_file: Optional[str] = None,
         action_space_type: ActionSpaceType = ActionSpaceType.CONTINUOUS,  # 添加 action_space_type 参数
         action_step_count: int = 0,  # 添加 action_step_count 参数
         **kwargs,
@@ -79,11 +78,6 @@ class CarKeyboardEnv(MujocoRobotEnv):
         action_size = 2  # 这里的 action size 根据汽车控制的需求设置
         self.ctrl = np.zeros(action_size)  # 提前初始化self.ctrl
         self.n_actions = 2  # 示例值；根据你的动作空间进行调整
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
 
         # 初始化父类环境
         super().__init__(
