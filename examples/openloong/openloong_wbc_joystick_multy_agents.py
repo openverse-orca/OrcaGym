@@ -11,14 +11,6 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-import psutil
-
-def kill_process_tree(process):
-    parent = psutil.Process(process.pid)
-    for child in parent.children(recursive=True):  # 递归终止子进程
-        child.kill()
-    parent.kill()  # 最后终止父进程
-
 def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_control):
 
     server_command = ["python", "run_server.py"]
@@ -49,7 +41,7 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
             process.wait()
 
     finally:
-        # Kill all processes if interrupted
+        # 先杀client再杀server，避免残留
         for process in processes[1:]:
             process.kill()
 

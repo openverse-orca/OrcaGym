@@ -11,11 +11,6 @@ import orca_gym.robosuite.utils.transform_utils as transform_utils
 import h5py
 from scipy.spatial.transform import Rotation as R
 
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
 
 class OpenloongArmEnv(MujocoRobotEnv):
     """
@@ -27,8 +22,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.00333333,
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
         control_freq: int = 20,
         **kwargs,
     ):
@@ -229,65 +222,7 @@ class OpenloongArmEnv(MujocoRobotEnv):
             self.ctrl[actuator_id] = np.clip(self.ctrl[actuator_id], self._all_ctrlrange[actuator_id][0], self._all_ctrlrange[actuator_id][1])
 
 
-    def _load_record(self) -> None:
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-        
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            if "float_data" in f:
-                dset = f["float_data"]
-                if self.record_cursor >= dset.shape[0]:
-                    return False
-
-                self.record_pool = dset[self.record_cursor:self.record_cursor + self.RECORD_POOL_SIZE].tolist()
-                self.record_cursor += self.RECORD_POOL_SIZE
-                return True
-
-        return False
-    
-    def save_record(self) -> None:
-        if self.record_state != RecordState.RECORD:
-            return
-        
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a') as f:
-            # 如果数据集存在，获取其大小；否则，创建新的数据集
-            if "float_data" in f:
-                dset = f["float_data"]
-                self.record_cursor = dset.shape[0]
-            else:
-                dset = f.create_dataset("float_data", (0, len(self.ctrl)), maxshape=(None, len(self.ctrl)), dtype='f', compression="gzip")
-                self.record_cursor = 0
-
-            # 将record_pool中的数据写入数据集
-            dset.resize((self.record_cursor + len(self.record_pool), len(self.ctrl)))
-            dset[self.record_cursor:] = np.array(self.record_pool)
-            self.record_cursor += len(self.record_pool)
-            self.record_pool.clear()
-
-            print("Record saved.")
-
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return
-        
-        if len(self.record_pool) == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl = self.record_pool.pop(0)
-
     def _set_action(self, action) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
         mocap_l_xpos, mocap_l_xquat = self._saved_xpos, self._saved_xquat
 
@@ -339,11 +274,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         for i in range(len(self._l_arm_actuator_id)):
             self.ctrl[self._l_arm_actuator_id[i]] = ctrl[i]
         
-        # print("ctrl: ", self.ctrl)
-
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
 
     def _process_xbox_controller_r(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
         self._joystick_manager.update()
@@ -378,11 +308,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
         return mocap_xpos, mocap_xquat
-
-    def _save_record(self) -> None:
-        self.record_pool.append(self.ctrl.copy())   
-        if (len(self.record_pool) >= self.RECORD_POOL_SIZE):
-            self.save_record()
 
     def _get_obs(self) -> dict:
         # robot
