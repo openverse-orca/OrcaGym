@@ -16,7 +16,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     """
     通过遥操作控制franka机械臂
     """
-    ENV_VERSION = "2024.10.1"
+    ENV_VERSION = "1.0.0"
 
     def __init__(
         self,
@@ -32,8 +32,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.control_type = control_type
         self.control_freq = control_freq
         self.reward_type = kwargs["reward_type"]
-        self.EE_NAME  = f"{agent_names[0]}_ee_center_site"
-        self.OBJ_NAME = "Toys_Object"
+
         
         super().__init__(
             frame_skip = frame_skip,
@@ -45,7 +44,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         )
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
-
+        self.EE_NAME  = self.site("ee_center_site")
+        self.OBJ_NAME = "Toys_Object"
+        self.OBJ_JOINT_NAME = "Toys_Box1"
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -108,10 +109,13 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._controller = controller_factory(self._controller_config["type"], self._controller_config)
         self._controller.update_initial_joints(self._neutral_joint_values[0:7])
 
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        if not hasattr(self, "observation_space") or self.observation_space is None:
+            self.observation_space = self.generate_observation_space()
 
     def _reset_grasp_mocap(self) -> None:
-        self._saved_xpos = self._initial_grasp_site_xpos
-        self._saved_xquat = self._initial_grasp_site_xquat
+        self._saved_xpos = self._initial_grasp_site_xpos.copy()
+        self._saved_xquat = self._initial_grasp_site_xquat.copy()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
     def get_env_version(self):
@@ -134,17 +138,17 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             raise ValueError("Invalid reward type")
     
     def _is_success(self, achieved_goal, desired_goal) -> bool:
-        success_threshold = 0.01
+        success_threshold = 0.02
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
     def step(self, action) -> tuple:
         if (self.control_type == ControlType.TELEOPERATION):
-            action = self._teleoperation_action().copy()
+            action = self._teleoperation_action()
             
         self.do_simulation(action, self.frame_skip)
-        obs = self._get_obs().copy()
-        achieved_goal = self._get_achieved_goal().copy()
-        desired_goal = self._get_desired_goal().copy()
+        obs = self._get_obs()
+        achieved_goal = self._get_achieved_goal()
+        desired_goal = self._get_desired_goal()
 
         info = {"state": self.get_state(), "action": action}
         terminated = self._is_success(achieved_goal, desired_goal)
@@ -164,10 +168,10 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return state
     
     def _set_gripper_ctrl(self, joystick_state) -> None:
-        if (joystick_state["buttons"]["A"]):
+        if (joystick_state["buttons"]["B"]):
             self.ctrl[7] += 0.001
             self.ctrl[8] += 0.001
-        elif (joystick_state["buttons"]["B"]):
+        elif (joystick_state["buttons"]["A"]):
             self.ctrl[7] -= 0.001
             self.ctrl[8] -= 0.001
 
@@ -198,7 +202,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         
         self.ctrl[0:7] = self._controller.run_controller()
         
-        return self.ctrl
+        return self.ctrl.copy()
 
 
     def _process_xbox_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
@@ -224,22 +228,46 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
 
         # 旋转控制
-        ROUTE_SPEED = self.gym.opt.timestep * 0.5
+        ROUTE_SPEED = self.gym.opt.timestep * 2
         rot_offset = rot_ctrl * ROUTE_SPEED
-        new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+        new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
         mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
         return mocap_xpos, mocap_xquat
+    
+    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
+        # x = yaw, y = pitch, z = roll
+        R_yaw = np.array([
+            [1, 0, 0],
+            [0, np.cos(yaw), -np.sin(yaw)],
+            [0, np.sin(yaw), np.cos(yaw)]
+        ])
+
+        R_pitch = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+
+        R_roll = np.array([
+            [np.cos(roll), -np.sin(roll), 0],
+            [np.sin(roll), np.cos(roll), 0],
+            [0, 0, 1]
+        ])
+
+        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
+        return new_xmat
 
     def _get_obs(self) -> dict:
-        ee_position = self.query_site_pos_and_quat([self.EE_NAME])[self.EE_NAME].copy()
+        ee_position = self.query_site_pos_and_quat([self.EE_NAME])[self.EE_NAME]
         ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self.EE_NAME])
-        fingers_width = self.get_fingers_width().copy()
+        gripper_qpos = self.get_gripper_qpos()
+        gripper_qvel = self.get_gripper_qvel()
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
-        joint_values = self.get_arm_joint_values().copy()
+        joint_values = self.get_arm_joint_values()
         joint_values_sin = np.sin(joint_values)
         joint_values_cos = np.cos(joint_values)
-        joint_velocities = self.get_arm_joint_velocities().copy()
+        joint_velocities = self.get_arm_joint_velocities()
 
         obs = {
             "object": np.concatenate([obj_xpos, obj_xquat]),
@@ -251,18 +279,19 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             "joint_qpos_sin": joint_values_sin,
             "joint_qpos_cos": joint_values_cos,
             "joint_vel": joint_velocities,
-            "fingers_width": fingers_width,
+            "gripper_qpos": gripper_qpos,
+            "gripper_qvel": gripper_qvel,
         }
         return obs
     
-    def _get_achieved_goal(self) -> dict:
+    def _get_achieved_goal(self) -> np.ndarray:
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
-        achieved_goal = {"achieved_goal": obj_xpos.copy()}
-        return achieved_goal
+        print("achieved goal position: ", obj_xpos)
+        return obj_xpos.copy()
     
-    def _get_desired_goal(self) -> dict:
-        desired_goal = {"desired_goal": self.goal.copy()}
-        return desired_goal
+    def _get_desired_goal(self) -> np.ndarray:
+        print("desired goal position: ", self.goal)
+        return self.goal.copy()
 
     def _render_callback(self) -> None:
         pass
@@ -273,8 +302,12 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         """
         self._set_init_state()
         self._reset_grasp_mocap()
-        self._sample_object()
-        self.goal = self._sample_goal()
+
+        obj_xpos, obj_xquat = self._sample_object()
+        self.set_object_qpos(obj_xpos, obj_xquat)
+
+        self.goal = self._sample_goal(obj_xpos)
+
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs
@@ -285,48 +318,52 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_object_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {"Toys_Box1": {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+    def set_object_qpos(self, position, orientation) -> None:
+        obj_qpos = {self.OBJ_JOINT_NAME: np.concatenate([position, orientation])}
+        self.set_joint_qpos(obj_qpos)
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self._arm_joint_names, self._neutral_joint_values[0:7]):
-            arm_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(arm_joint_qpos)
 
         # assign value to finger joints
-        gripper_joint_qpos_list = {}
+        gripper_joint_qpos = {}
         for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
-            gripper_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(gripper_joint_qpos_list)
+            gripper_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(gripper_joint_qpos)
 
     def _query_obj_pos_and_quat(self) -> tuple:
         site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
         obj_xpos, obj_xquat = site_dict[self.OBJ_NAME]['xpos'], site_dict[self.OBJ_NAME]['xquat']
         return obj_xpos, obj_xquat
 
-    def _sample_goal(self) -> np.ndarray:
-        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+    def _sample_goal(self, obj_xpos) -> np.ndarray:
         goal_xpos = obj_xpos.copy()
         goal_xpos[2] += 0.1
+        print("sample goal position: ", goal_xpos)
         return goal_xpos
 
     def _sample_object(self) -> None:
         """
         随机采样一个物体的位置
         """
-        obj_xpos = self._initial_obj_site_xpos
-        obj_xquat = self._initial_obj_site_xquat
+        object_offset = 0.2
+        obj_xpos = self._initial_obj_site_xpos.copy()
+        obj_xquat = self._initial_obj_site_xquat.copy()
         obj_euler = rotations.quat2euler(obj_xquat)
 
-        obj_xpos[0] = np.random.uniform(-0.3, 0.3) + obj_xpos[0]
-        obj_xpos[1] = np.random.uniform(-0.3, 0.3) + obj_xpos[1]
+        obj_xpos[0] = np.random.uniform(-object_offset, object_offset) + obj_xpos[0]
+        obj_xpos[1] = np.random.uniform(-object_offset, object_offset) + obj_xpos[1]
         obj_euler[2] = np.random.uniform(-np.pi, np.pi)
         obj_xquat = rotations.euler2quat(obj_euler)
 
-        self.set_object_mocap(obj_xpos, obj_xquat)
+        print("sample object position, quaternion: ", obj_xpos, obj_xquat)
+
+        return obj_xpos, obj_xquat
+
 
 
     def get_ee_xform(self) -> np.ndarray:
@@ -335,19 +372,25 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
-    def get_fingers_width(self) -> np.ndarray:
+    def get_gripper_qpos(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
-        return finger1 + finger2
+        return np.concatenate([finger1, finger2])
+    
+    def get_gripper_qvel(self) -> np.ndarray:
+        qvel_dict = self.query_joint_qvel([self.joint("finger_joint1"), self.joint("finger_joint2")])
+        finger1 = qvel_dict[self.joint("finger_joint1")]
+        finger2 = qvel_dict[self.joint("finger_joint2")]
+        return np.concatenate([finger1, finger2])
     
     def get_arm_joint_values(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos(self._arm_joint_names)
-        return np.array([qpos_dict[joint_name] for joint_name in self._arm_joint_names])
+        return np.array([qpos_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
     
     def get_arm_joint_velocities(self) -> np.ndarray:
         qvel_dict = self.query_joint_qvel(self._arm_joint_names)
-        return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names])
+        return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
 
     def get_observation(self, obs=None):
         """

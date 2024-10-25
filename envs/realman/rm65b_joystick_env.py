@@ -273,10 +273,33 @@ class RM65BJoystickEnv(MujocoRobotEnv):
         # 旋转控制
         ROUTE_SPEED = self.gym.opt.timestep * 0.5
         rot_offset = rot_ctrl * ROUTE_SPEED
-        new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+        new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
         mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
         return mocap_xpos, mocap_xquat
+
+    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
+        # x = yaw, y = pitch, z = roll
+        R_yaw = np.array([
+            [1, 0, 0],
+            [0, np.cos(yaw), -np.sin(yaw)],
+            [0, np.sin(yaw), np.cos(yaw)]
+        ])
+
+        R_pitch = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+
+        R_roll = np.array([
+            [np.cos(roll), -np.sin(roll), 0],
+            [np.sin(roll), np.cos(roll), 0],
+            [0, 0, 1]
+        ])
+
+        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
+        return new_xmat
 
     def _get_obs(self) -> dict:
         # robot
@@ -329,16 +352,16 @@ class RM65BJoystickEnv(MujocoRobotEnv):
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self._arm_joint_names, self._neutral_joint_values[0:6]):
-            arm_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(arm_joint_qpos)
 
         # assign value to finger joints
-        gripper_joint_qpos_list = {}
+        gripper_joint_qpos = {}
         for name, value in zip(self.gripper_joint_names, self._neutral_joint_values[6:10]):
-            gripper_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(gripper_joint_qpos_list)
+            gripper_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(gripper_joint_qpos)
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样

@@ -290,10 +290,33 @@ class OpenloongArmEnv(MujocoRobotEnv):
         # 旋转控制
         ROUTE_SPEED = self.gym.opt.timestep * 0.5
         rot_offset = rot_ctrl * ROUTE_SPEED
-        new_xmat = self._joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+        new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
         mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
 
         return mocap_xpos, mocap_xquat
+
+    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
+        # x = roll, y = pitch, z = yaw
+        R_yaw = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1]
+        ])
+
+        R_pitch = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+
+        R_roll = np.array([
+            [1, 0, 0],
+            [0, np.cos(roll), -np.sin(roll)],
+            [0, np.sin(roll), np.cos(roll)]
+        ])
+
+        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
+        return new_xmat
 
     def _get_obs(self) -> dict:
         # robot
@@ -349,13 +372,13 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self._r_arm_joint_names, self._r_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])
+            arm_joint_qpos[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])     
-        self.set_joint_qpos(arm_joint_qpos_list)
-        print("set init joint state: " , arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])     
+        self.set_joint_qpos(arm_joint_qpos)
+        print("set init joint state: " , arm_joint_qpos)
         # assign value to finger joints
         # gripper_joint_qpos_list = {}
         # for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):

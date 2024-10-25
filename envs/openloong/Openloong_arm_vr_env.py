@@ -581,14 +581,14 @@ class OpenloongArmEnv(MujocoRobotEnv):
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self._r_arm_joint_names, self._r_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])
+            arm_joint_qpos[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])     
+            arm_joint_qpos[name] = np.array([value])     
         for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
-            arm_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(arm_joint_qpos)
         # print("set init joint state: " , arm_joint_qpos_list)
         # assign value to finger joints
         # gripper_joint_qpos_list = {}

@@ -142,7 +142,7 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
                 mocap_xquat = self.save_xquat if index == 0 else self.save_xquat_r
             else:
                 rot_offset = rot_ctrl * rot_ctrl_rate
-                new_xmat = joystick.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
+                new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
                 mocap_xquat = rotations.mat2quat(np.dot(ee_xmat, new_xmat))
                 if index == 0:
                     self.save_xquat = mocap_xquat
@@ -170,6 +170,28 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
         # self._joint_rot_ctrl_compensation(rot_ctrl)
 
+    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
+        # x = roll, y = pitch, z = yaw
+        R_yaw = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1]
+        ])
+
+        R_pitch = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+
+        R_roll = np.array([
+            [1, 0, 0],
+            [0, np.cos(roll), -np.sin(roll)],
+            [0, np.sin(roll), np.cos(roll)]
+        ])
+
+        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
+        return new_xmat
 
     def _get_obs(self) -> dict:
         # robot
@@ -239,10 +261,10 @@ class OpenloongJoystickEnv(MujocoRobotEnv):
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self.arm_joint_names, self.neutral_joint_values[0:16]):
-            arm_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(arm_joint_qpos)
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样

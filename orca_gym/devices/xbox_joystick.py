@@ -29,27 +29,7 @@ class XboxJoystick:
         rot_ctrl = {'yaw': yaw, 'pitch': pitch, 'roll': roll}
         return rot_ctrl
     
-    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
-        R_yaw = np.array([
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw), np.cos(yaw), 0],
-            [0, 0, 1]
-        ])
 
-        R_pitch = np.array([
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ])
-
-        R_roll = np.array([
-            [1, 0, 0],
-            [0, np.cos(roll), -np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)]
-        ])
-
-        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
-        return new_xmat
 
 class XboxJoystickManager:
     def __init__(self):

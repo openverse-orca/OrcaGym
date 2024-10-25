@@ -484,11 +484,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         joint_qvel_dict = self.loop.run_until_complete(self._query_joint_qvel(joint_names))
         return joint_qvel_dict
     
-    async def _set_joint_qpos(self, joint_qpos_list):
-        await self.gym.set_joint_qpos(joint_qpos_list)
+    async def _set_joint_qpos(self, joint_qpos):
+        await self.gym.set_joint_qpos(joint_qpos)
 
-    def set_joint_qpos(self, joint_qpos_list):
-        self.loop.run_until_complete(self._set_joint_qpos(joint_qpos_list))
+    def set_joint_qpos(self, joint_qpos):
+        self.loop.run_until_complete(self._set_joint_qpos(joint_qpos))
 
     async def _query_cfrc_ext(self, body_names):
         cfrc_ext_dict = await self.gym.query_cfrc_ext(body_names)

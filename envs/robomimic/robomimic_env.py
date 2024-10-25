@@ -113,9 +113,7 @@ class RobomimicEnv(OrcaGymEnv):
             **kwargs
         )
 
-        self.observation_space = self._generate_observation_space()
-
-    def _generate_observation_space(self):
+    def generate_observation_space(self):
         """
         Generate the observation space for the environment.
         """
@@ -133,7 +131,7 @@ class RobomimicEnv(OrcaGymEnv):
         return observation_space
 
 
-    def _check_success(self):
+    def check_success(self):
         """
         Check if the task condition(s) is reached. Should return a dictionary
         { str: bool } with at least a "task" key for the overall task success,
