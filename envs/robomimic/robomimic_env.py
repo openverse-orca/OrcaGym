@@ -19,10 +19,13 @@ from gymnasium.spaces import Space
 class ControlType:
     """
     Enum class for control type
+    Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
+    Policy: control the robot with a policy. Use the normalized action passed to the step function.
+    Direct: control the robot directly. Use the original action passed to the step function.
     """
     TELEOPERATION = "teleoperation"
     POLICY = "policy"
-    REPLAY = "replay"
+    DIRECT = "direct"
 
 class RobomimicEnv(OrcaGymEnv):
     """
@@ -155,3 +158,27 @@ class RobomimicEnv(OrcaGymEnv):
         For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
         """
         raise NotImplementedError
+    
+    def normalize_action(self, action, min_action, max_action):
+        """
+        将原始动作归一化到 [-1, 1] 范围。
+        
+        :param action: 原始动作值
+        :param min_action: 动作的最小值
+        :param max_action: 动作的最大值
+        :return: 归一化后的动作值
+        """
+        normalized_action = 2 * (action - min_action) / (max_action - min_action) - 1
+        return normalized_action
+
+    def denormalize_action(self, normalized_action, min_action, max_action):
+        """
+        将归一化的动作值反归一化回原始范围。
+        
+        :param normalized_action: 归一化后的动作值
+        :param min_action: 动作的最小值
+        :param max_action: 动作的最大值
+        :return: 反归一化后的原始动作值
+        """
+        original_action = (normalized_action + 1) / 2 * (max_action - min_action) + min_action
+        return original_action    

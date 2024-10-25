@@ -58,6 +58,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
         # control range
         self._ctrl_range = self.model.get_actuator_ctrlrange()
+        self._ctrl_range_min = self._ctrl_range[:, 0]
+        self._ctrl_range_max = self._ctrl_range[:, 1]
+        print("ctrl range: ", self._ctrl_range)
 
         # index used to distinguish arm and gripper joints
         self._arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6"), self.joint("joint7")]
@@ -141,16 +144,26 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         success_threshold = 0.02
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
+
+    
     def step(self, action) -> tuple:
-        if (self.control_type == ControlType.TELEOPERATION):
-            action = self._teleoperation_action()
+        if self.control_type == ControlType.TELEOPERATION:
+            ctrl = self._teleoperation_action()
+        elif self.control_type == ControlType.POLICY:
+            ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
+        else:
+            ctrl = action.copy()
             
-        self.do_simulation(action, self.frame_skip)
+        # step the simulation with original action space
+        self.do_simulation(ctrl, self.frame_skip)
         obs = self._get_obs()
         achieved_goal = self._get_achieved_goal()
         desired_goal = self._get_desired_goal()
 
-        info = {"state": self.get_state(), "action": action}
+        # normalize the action space for recording
+        normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
+
+        info = {"state": self.get_state(), "action": normalized_action}
         terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
@@ -175,8 +188,8 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             self.ctrl[7] -= 0.001
             self.ctrl[8] -= 0.001
 
-        self.ctrl[7] = np.clip(self.ctrl[7], 0, 0.08)
-        self.ctrl[8] = np.clip(self.ctrl[8], 0, 0.08)
+        self.ctrl[7] = np.clip(self.ctrl[7], self._ctrl_range_min[7], self._ctrl_range_max[7])
+        self.ctrl[8] = np.clip(self.ctrl[8], self._ctrl_range_min[8], self._ctrl_range_max[8])
 
 
     def _teleoperation_action(self) -> np.ndarray:
@@ -286,11 +299,11 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     
     def _get_achieved_goal(self) -> np.ndarray:
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
-        print("achieved goal position: ", obj_xpos)
+        # print("achieved goal position: ", obj_xpos)
         return obj_xpos.copy()
     
     def _get_desired_goal(self) -> np.ndarray:
-        print("desired goal position: ", self.goal)
+        # print("desired goal position: ", self.goal)
         return self.goal.copy()
 
     def _render_callback(self) -> None:

@@ -20,7 +20,7 @@ class DatasetWriter:
         self.file_path = file_path
         self.env_args = {
             "env_name": env_name,
-            "env_type": EB.EnvType.ORCA_GYM_TYPE,
+            "type": EB.EnvType.ORCA_GYM_TYPE,
             "env_version": env_version,
             "env_kwargs": env_kwargs or {}
         }
