@@ -88,6 +88,6 @@ if __name__ == '__main__':
 
     try:
         run_simulation(env, time_step)
-    except KeyboardInterrupt:
+    finally:
         print("Exit Simulation!")        
         env.close()

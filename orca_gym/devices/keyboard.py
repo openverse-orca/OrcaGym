@@ -98,8 +98,8 @@ class KeyboardServer:
             self.close()
 
     def close(self):
-        pygame.quit()
         self.server_socket.close()
+        pygame.quit()
         print("Keyboard server closed")
 
 

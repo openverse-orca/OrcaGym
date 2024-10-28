@@ -15,12 +15,11 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
 
     server_command = ["python", "run_server.py"]
     server_process = subprocess.Popen(server_command, cwd="../teleoperation/keyboard_input")
-    processes = []
-    processes.append(server_process)
 
+    
     # Define the base command
     base_command = ["python", "./openloong_wbc_joystick.py"]
-
+    client_processes = []
     try:
         for i in range(agent_num):
             port = 50051 + i
@@ -34,19 +33,24 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
             print(f"Running command: {' '.join(command)}")
             # Start the subprocess for each agent
             process = subprocess.Popen(command)
-            processes.append(process)
+            client_processes.append(process)
 
         # Wait for all processes to complete
-        for process in processes:
+        server_process.wait()
+        time.sleep(0.1)
+        
+        for process in client_processes:
             process.wait()
+            time.sleep(0.1)
 
     finally:
-        # 先杀client再杀server，避免残留
-        for process in processes[1:]:
+        for process in client_processes:
             process.kill()
+            time.sleep(0.1)
 
-        time.sleep(1)
-        processes[0].kill()
+        # 先杀client再杀server，避免残留     
+        server_process.kill()
+
 
 if __name__ == '__main__':
     """
@@ -55,7 +59,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulation Configuration')
     parser.add_argument('--grpc_address', type=str, default="localhost", help='The gRPC address for the simulation')
     parser.add_argument('--agent_name', type=str, default="AzureLoong", help='The agent name for the simulation')
-    parser.add_argument('--agent_num', type=int, default=8, help='The number of agents for the simulation')
+    parser.add_argument('--agent_num', type=int, default=10, help='The number of agents for the simulation')
     parser.add_argument('--individual_control', type=str, default="False", help='Control the robots individually')
     args = parser.parse_args()
 
