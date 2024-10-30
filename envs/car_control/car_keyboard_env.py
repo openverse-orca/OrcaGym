@@ -6,7 +6,6 @@ from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import numpy as np
-from envs.orca_gym_env import ActionSpaceType
 
 ObsType = Any
 
@@ -71,8 +70,6 @@ class CarKeyboardEnv(OrcaGymRemoteEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps
-        action_space_type: ActionSpaceType = ActionSpaceType.CONTINUOUS,  # 添加 action_space_type 参数
-        action_step_count: int = 0,  # 添加 action_step_count 参数
         **kwargs,
     ):
         action_size = 2  # 这里的 action size 根据汽车控制的需求设置
@@ -85,9 +82,6 @@ class CarKeyboardEnv(OrcaGymRemoteEnv):
             grpc_address=grpc_address,
             agent_names=agent_names,
             time_step=time_step,
-            observation_space=None,
-            action_space_type=action_space_type,  # 传递 action_space_type 参数
-            action_step_count=action_step_count,  # 传递 action_step_count 参数
             **kwargs,
         )
 
@@ -99,8 +93,14 @@ class CarKeyboardEnv(OrcaGymRemoteEnv):
         self._set_init_state()
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # 初始化控制变量

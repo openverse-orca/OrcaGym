@@ -33,7 +33,6 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
             **kwargs,
         )
 
@@ -45,6 +44,8 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.nq = self.model.nq
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
+
+        self.goal = self._sample_goal()
 
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
@@ -167,8 +168,14 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self._l_controller.update_initial_joints(self._l_neutral_joint_values)
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -353,15 +360,12 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         pass
 
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
-
-    def _reset_sim(self) -> bool:
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
-        return True
+        obs = self._get_obs().copy()
+        return obs
 
     # custom methods
     # -----------------------------

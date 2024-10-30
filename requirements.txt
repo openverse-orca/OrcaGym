@@ -11,3 +11,4 @@ h5py
 websockets
 numba
 termcolor
+mujoco==3.2.2

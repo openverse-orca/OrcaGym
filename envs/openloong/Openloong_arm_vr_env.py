@@ -25,7 +25,6 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         **kwargs,
     ):
 
-
         self.control_freq = control_freq
 
         super().__init__(
@@ -33,7 +32,6 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
             **kwargs,
         )
 
@@ -52,6 +50,8 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.gym.opt.sdf_iterations = 50
         self.set_opt_config()
         print("opt_config: ", self.query_opt_config())
+
+        self.goal = self._sample_goal()
 
         self._base_body_name = [self.body("base_link")]
         self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
@@ -245,8 +245,14 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self._l_gripper_offset_rate_clip = 0.0
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # print("Set initial state")

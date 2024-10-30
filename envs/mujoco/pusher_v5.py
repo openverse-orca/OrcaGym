@@ -192,15 +192,12 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
         self._reward_dist_weight = reward_dist_weight
         self._reward_control_weight = reward_control_weight
 
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(23,), dtype=np.float64)
-
         OrcaGymRemoteEnv.__init__(
             self,
             frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,       
-            time_step=time_step,                 
-            observation_space=observation_space,         
+            time_step=time_step,                    
             **kwargs,
         )
 
@@ -212,6 +209,15 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
             ],
             "render_fps": int(np.round(1.0 / self.dt)),
         }
+
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
@@ -272,12 +278,11 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
 
     def _get_obs(self):
         xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])
-        return np.concatenate(
-            [
-                self.data.qpos.flatten()[:7],
-                self.data.qvel.flatten()[:7],
-                xpos[:3],
-                xpos[3:6],
-                xpos[6:],
-            ]
-        )
+        obs = {
+            "qpos": self.data.qpos.flatten()[:7],
+            "qvel": self.data.qvel.flatten()[:7],
+            "tips_arm": xpos[:3],
+            "object": xpos[3:6],
+            "goal": xpos[6:],
+        }
+        return obs

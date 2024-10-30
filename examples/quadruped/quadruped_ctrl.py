@@ -20,7 +20,6 @@ if project_root not in sys.path:
 
 from envs.quadruped.quadruped_env import QuadrupedEnv
 from envs.quadruped import config as cfg
-from envs.orca_gym_env import ActionSpaceType
 from gymnasium.envs.registration import register
 import gymnasium as gym
 from envs.quadruped.utils.mujoco.visual import render_vector
@@ -48,8 +47,6 @@ def register_env(grpc_address, agent_name,
         entry_point="envs.quadruped.quadruped_env:QuadrupedEnv",
         kwargs={'frame_skip': 1,   # 1 action per frame
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': [agent_name], 
                 'time_step': simulation_dt,

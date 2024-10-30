@@ -12,7 +12,6 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from envs.orca_gym_env import ActionSpaceType
 import gymnasium as gym
 
 def register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_path, individual_control):
@@ -22,8 +21,6 @@ def register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_
         entry_point="envs.openloong.openloong_env:OpenLoongEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': [agent_name], 
                 'time_step': time_step,

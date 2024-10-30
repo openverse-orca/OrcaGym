@@ -18,9 +18,8 @@ from orca_gym.utils.rotations import mat2quat, quat2mat
 from orca_gym.orca_gym import OrcaGymModel
 from orca_gym.orca_gym import OrcaGymData
 
-class ActionSpaceType:
-    CONTINUOUS = "continuous"
-    DISCRETE = "discrete"
+import mujoco
+
 
 class RewardType:
     SPARSE = "sparse"
@@ -36,16 +35,12 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         grpc_address: str,
         agent_names: list[str],
         time_step: float,
-        observation_space: Space,
-        action_space_type: Optional[ActionSpaceType],
-        action_step_count: Optional[float],
         **kwargs
     ):
         """Base abstract class for OrcaSim based environments.
 
         Args:
             frame_skip: Number of MuJoCo simulation steps per gym `step()`.
-            observation_space: The observation space of the environment.
             grpc_address: The address of the gRPC server.
             agent_names: The names of the agents in the environment.
             time_step: The time step of the simulation.
@@ -65,73 +60,13 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.pause_simulation()  # 暂停仿真，Gym 采用被动模式，OrcaSim侧不执行周期循环
         self.set_time_step(time_step)  # 设置仿真时间步长
 
-        # may use width and height
-        self.model, self.data = self._initialize_simulation()
-        print("Agent Names: ", self._agent_names)
+        self.model, self.data = self.initialize_simulation()
         
         self.reset_simulation() # 重置仿真环境
 
-        self._init_qpos_qvel()
+        self.init_qpos_qvel()
 
         self.frame_skip = frame_skip
-
-        if observation_space is not None:
-            self.observation_space = observation_space
-
-        if action_space_type is None:
-            self.action_space_type = ActionSpaceType.CONTINUOUS
-        else:    
-            self.action_space_type = action_space_type
-
-        if self.action_space_type == ActionSpaceType.CONTINUOUS:
-            self._set_continuous_action_space()
-        elif self.action_space_type == ActionSpaceType.DISCRETE:
-            if action_step_count is None:
-                raise ValueError("Action step count must be provided for discrete action space")
-            self._set_discrete_action_space(action_step_count)
-        else:
-            raise ValueError("Invalid action space type")
-
-    def _set_continuous_action_space(self):
-        bounds = self.model.get_actuator_ctrlrange().copy().astype(np.float32)
-        low, high = 0.0, 0.0
-        if len(bounds.T) > 0:
-            low, high = bounds.T
-        self.action_space = spaces.Box(low=low, high=high, dtype=np.float32)
-        return self.action_space
-    
-    def _set_discrete_action_space(self, action_step_count):
-        # 将连续动作空间转换为离散动作空间
-        self.ctrl = self.get_default_ctrl()
-        self.ctrl_step = []
-        self.ctrl_bounds = self.model.get_actuator_ctrlrange().copy().astype(np.float32)
-        for b in self.ctrl_bounds:
-            self.ctrl_step.append((b[1] - b[0]) / action_step_count)  # 每次操作的步长
-        self.ctrl_step = np.array(self.ctrl_step)
-
-        print("Ctrl Bounds: ", self.ctrl_bounds)
-        print("Ctrl Step: ", self.ctrl_step)
-        print("Ctrl: ", self.ctrl)
-
-        self.action_space = spaces.MultiDiscrete([3] * len(self.ctrl_bounds))
-        return self.action_space
-
-    def _discrete_to_continuous(self, action):
-        # 将离散动作 0, 1, 2 映射到 -1, 0, 1
-        mapped_action = action - 1
-
-        for i in range(len(mapped_action)):
-            self.ctrl[i] += mapped_action[i] * self.ctrl_step[i]
-
-        # 确保控制值在范围内
-        self.ctrl = np.clip(self.ctrl, self.ctrl_bounds[:, 0], self.ctrl_bounds[:, 1])
-        return self.ctrl
-
-    def apply_action(self, action):
-        if self.action_space_type == ActionSpaceType.CONTINUOUS:
-            return action
-        elif self.action_space_type == ActionSpaceType.DISCRETE:
-            return self._discrete_to_continuous(action)
 
     # methods to override:
     # ----------------------------
@@ -147,7 +82,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """
         raise NotImplementedError
 
-    def _initialize_simulation(self) -> Tuple[OrcaGymModel, OrcaGymData]:
+    def initialize_simulation(self) -> Tuple[OrcaGymModel, OrcaGymData]:
         """
         Initialize MuJoCo simulation data structures mjModel and mjData.
         """
@@ -164,6 +99,32 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         Render a frame from the MuJoCo simulation as specified by the render_mode.
         """
         raise NotImplementedError
+
+    def generate_action_space(self, bounds : NDArray[np.float64]) -> Space:
+        """
+        Generate the action space for the environment.
+        """
+        low, high = 0.0, 0.0
+        if len(bounds.T) > 0:
+            low, high = bounds.T
+        action_space = spaces.Box(low=low, high=high, dtype=np.float32)
+        return action_space
+
+    def generate_observation_space(self, obs : Dict[str, Any] = None) -> Space:
+        """
+        Generate the observation space for the environment.
+        """
+        obs_space_dict = {}
+        for obs_key, obs_data in obs.items():
+            if isinstance(obs_data, np.ndarray):
+                obs_space_dict[obs_key] = spaces.Box(
+                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
+                )
+            else:
+                raise ValueError(f"Unsupported observation type: {type(obs_data)}")
+            
+        observation_space = spaces.Dict(obs_space_dict)
+        return observation_space
 
     # -----------------------------
     def _get_reset_info(self) -> Dict[str, float]:
@@ -262,7 +223,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """Resume the simulation."""
         raise NotImplementedError
     
-    def _init_qpos_qvel(self):
+    def init_qpos_qvel(self):
         """Init qpos and qvel of the model."""
         raise NotImplementedError
     
@@ -285,9 +246,6 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         grpc_address: str,
         agent_names: list[str],
         time_step: float,        
-        observation_space: Space,
-        action_space_type: Optional[ActionSpaceType],
-        action_step_count: Optional[float],
         **kwargs        
     ):
         super().__init__(
@@ -295,11 +253,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = observation_space,
-            action_space_type = action_space_type,
-            action_step_count = action_step_count,
             **kwargs
         )
+
+    def initialize_simulation(
+        self,
+    ) -> Tuple[OrcaGymModel, OrcaGymData]:
+        print(f"Initializing simulation: Class: {self.__class__.__name__}")
+        self.loop.run_until_complete(self._initialize_orca_sim())
+        model = self.gym.model
+        data = self.gym.data
+        return model, data
 
 class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     def __init__(
@@ -308,9 +272,6 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
         grpc_address: str,
         agent_names: list[str],
         time_step: float,        
-        observation_space: Space,
-        action_space_type: Optional[ActionSpaceType],
-        action_step_count: Optional[float],
         **kwargs        
     ):
         super().__init__(
@@ -318,13 +279,10 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = observation_space,
-            action_space_type = action_space_type,
-            action_step_count = action_step_count,
             **kwargs
         )
 
-    def _initialize_simulation(
+    def initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
         print(f"Initializing simulation: Class: {self.__class__.__name__}")
@@ -364,23 +322,7 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     def render(self):
         # Do nothing.
         return
-    
-    def generate_observation_space(self):
-        """
-        Generate the observation space for the environment.
-        """
-        obs = self.get_observation()
-        obs_space_dict = {}
-        for obs_key, obs_data in obs.items():
-            if isinstance(obs_data, np.ndarray):
-                obs_space_dict[obs_key] = spaces.Box(
-                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
-                )
-            else:
-                raise ValueError(f"Unsupported observation type: {type(obs_data)}")
-            
-        observation_space = spaces.Dict(obs_space_dict)
-        return observation_space
+
 
     def get_observation(self, obs=None):
         """
@@ -460,7 +402,7 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     async def _resume_simulation(self):
         await self.gym.resume_simulation()
 
-    def _init_qpos_qvel(self):
+    def init_qpos_qvel(self):
         self.loop.run_until_complete(self.gym.update_data())
         self.init_qpos = self.gym.data.qpos.ravel().copy()
         self.init_qvel = self.gym.data.qvel.ravel().copy()

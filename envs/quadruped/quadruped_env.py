@@ -103,7 +103,6 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
             grpc_address=grpc_address,
             agent_names=agent_names,
             time_step=time_step,            
-            observation_space=None,  # needs to be defined after   
             **kwargs,
         )
 

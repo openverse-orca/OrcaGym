@@ -26,14 +26,11 @@ class FrankaEnv(OrcaGymRemoteEnv):
         self.block_gripper = block_gripper
         self.has_object = has_object
 
-        action_size += 0 if self.block_gripper else 1
-
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
             **kwargs,
         )
 
@@ -91,9 +88,22 @@ class FrankaEnv(OrcaGymRemoteEnv):
 
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
+        self.goal = self._sample_goal()
+
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        action_size = 3 if self.block_gripper else 4
+        self.action_space = spaces.Box(
+            low=np.array([-1.0] * action_size),
+            high=np.array([1.0] * action_size),
+            dtype=np.float32,
+        )
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -123,7 +133,7 @@ class FrankaEnv(OrcaGymRemoteEnv):
         info = {"is_success": self._is_success(obs["achieved_goal"], obs["desired_goal"])}
 
         terminated = bool(info["is_success"] != 0)
-        truncated = self.compute_truncated(obs["achieved_goal"], obs["desired_goal"], info)
+        truncated = False
         reward = self.compute_reward(obs["achieved_goal"], obs["desired_goal"], info)
 
         return obs, reward, terminated, truncated, info
@@ -239,6 +249,7 @@ class FrankaEnv(OrcaGymRemoteEnv):
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
         self._sample_object()
+        self.goal = self._sample_goal()
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs

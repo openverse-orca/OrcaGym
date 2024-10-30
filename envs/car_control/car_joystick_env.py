@@ -29,7 +29,6 @@ class CarEnv(OrcaGymRemoteEnv):
             grpc_address=grpc_address,
             agent_names=agent_names,
             time_step=time_step,
-            observation_space=None,
             **kwargs,
         )
 
@@ -42,8 +41,14 @@ class CarEnv(OrcaGymRemoteEnv):
         self._set_init_state()
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # 初始化控制变量
@@ -110,9 +115,3 @@ class CarEnv(OrcaGymRemoteEnv):
         self._set_init_state()
         obs = self._get_obs().copy()
         return obs
-
-    def get_observation(self, obs=None):
-        if obs is not None:
-            return obs
-        else:
-            return self._get_obs().copy()

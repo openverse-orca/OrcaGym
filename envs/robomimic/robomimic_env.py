@@ -8,7 +8,7 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple, Union
 
-from envs.orca_gym_env import OrcaGymRemoteEnv, ActionSpaceType
+from envs.orca_gym_env import OrcaGymRemoteEnv
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
@@ -100,9 +100,6 @@ class RobomimicEnv(OrcaGymRemoteEnv):
         grpc_address: str,
         agent_names: list[str],
         time_step: float,        
-        observation_space: Space,
-        action_space_type: Optional[ActionSpaceType],
-        action_step_count: Optional[float],
         **kwargs        
     ):
         super().__init__(
@@ -110,9 +107,6 @@ class RobomimicEnv(OrcaGymRemoteEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = observation_space,
-            action_space_type = action_space_type,
-            action_step_count = action_step_count,
             **kwargs
         )
 

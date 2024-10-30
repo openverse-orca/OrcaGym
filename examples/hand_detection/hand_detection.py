@@ -14,7 +14,6 @@ import asyncio
 import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
-from envs.orca_gym_env import ActionSpaceType
 
 
 nest_asyncio.apply()
@@ -29,8 +28,6 @@ def register_env(grpc_address):
         entry_point="envs.hand_detection.hand_detection_env:HandDetectionEnv",
         kwargs={'frame_skip': 1,   # 1 action per frame
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': [''], 
                 'time_step': TIME_STEP,},

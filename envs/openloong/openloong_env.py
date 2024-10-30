@@ -46,7 +46,6 @@ class OpenLoongEnv(OrcaGymRemoteEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
             **kwargs,
         )
 
@@ -83,8 +82,14 @@ class OpenLoongEnv(OrcaGymRemoteEnv):
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
     
     def _build_acutator_idmap(self) -> list[int]:
         acutator_idmap = []
