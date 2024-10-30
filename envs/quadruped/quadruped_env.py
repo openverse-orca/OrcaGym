@@ -20,7 +20,7 @@ from envs.quadruped.utils.math_utils import homogenous_transform
 from envs.quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-from envs.orca_gym_env import OrcaGymEnv
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 
 BASE_OBS = ['base_pos',
@@ -33,7 +33,7 @@ FEET_OBS = ['feet_pos', 'feet_pos:base', 'feet_vel', 'feet_vel:base', 'contact_s
             'contact_forces:base']
 
 
-class QuadrupedEnv(OrcaGymEnv):
+class QuadrupedEnv(OrcaGymRemoteEnv):
     """A simple quadruped environment for testing model-based controllers and imitation learning algorithms.
 
     To deal with different quadruped robots, which might have different joint naming and ordering conventions, this
@@ -211,7 +211,6 @@ class QuadrupedEnv(OrcaGymEnv):
         self._geom_xpos = self.query_geom_xpos()
         self._jacp_list, self._jacr_list = self.calc_mj_jac()
         self._full_mass_matrix = self.calc_full_mass_matrix()
-
 
     def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Apply the action to the robot, evolve the simulation, and return the observation, reward, and termination.

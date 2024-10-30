@@ -5,7 +5,7 @@ from typing import Dict, Union
 import numpy as np
 
 from gymnasium import utils
-from envs.orca_gym_env import OrcaGymEnv
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from gymnasium.spaces import Box
 
 
@@ -15,7 +15,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class PusherEnv(OrcaGymEnv, utils.EzPickle):
+class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
     r"""
     ## Description
     "Pusher" is a multi-jointed robot arm that is very similar to a human arm.
@@ -194,7 +194,7 @@ class PusherEnv(OrcaGymEnv, utils.EzPickle):
 
         observation_space = Box(low=-np.inf, high=np.inf, shape=(23,), dtype=np.float64)
 
-        OrcaGymEnv.__init__(
+        OrcaGymRemoteEnv.__init__(
             self,
             frame_skip,
             grpc_address = grpc_address,

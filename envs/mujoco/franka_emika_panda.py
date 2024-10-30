@@ -1,12 +1,12 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-from envs.orca_gym_env import OrcaGymEnv, ActionSpaceType
+from envs.orca_gym_env import OrcaGymRemoteEnv, ActionSpaceType
 from orca_gym.utils.low_pass_filter import LowPassFilter
 
 
 
-class FrankaEnv(OrcaGymEnv):
+class FrankaEnv(OrcaGymRemoteEnv):
     r"""
     ## Description
     "Franka" is a multi-jointed robot arm used in various manipulation tasks.
@@ -33,7 +33,7 @@ class FrankaEnv(OrcaGymEnv):
         action_step_count = 100,        
         **kwargs,
     ):
-        OrcaGymEnv.__init__(
+        OrcaGymRemoteEnv.__init__(
             self,
             frame_skip,
             grpc_address = grpc_address,

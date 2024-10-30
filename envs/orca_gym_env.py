@@ -11,7 +11,7 @@ from gymnasium.spaces import Space
 import asyncio
 import sys
 from orca_gym import orca_gym
-from orca_gym.orca_gym import OrcaGym
+from orca_gym.orca_gym import OrcaGymRemote, OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
@@ -27,7 +27,7 @@ class RewardType:
     DENSE = "dense"
 
 
-class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
+class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     """Superclass for all OrcaSim environments."""
 
     def __init__(
@@ -61,9 +61,9 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self._agent_names = agent_names
         self.seed = 0
         self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(self._initialize_grpc())
-        self.loop.run_until_complete(self._pause_simulation())  # 暂停仿真，Gym 采用被动模式，OrcaSim侧不执行周期循环
-        self.loop.run_until_complete(self._set_time_step(time_step))  # 设置仿真时间步长
+        self.initialize_grpc()
+        self.pause_simulation()  # 暂停仿真，Gym 采用被动模式，OrcaSim侧不执行周期循环
+        self.set_time_step(time_step)  # 设置仿真时间步长
 
         # may use width and height
         self.model, self.data = self._initialize_simulation()
@@ -196,6 +196,40 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.np_random = np.random.RandomState(seed)
         return [seed]
 
+    def body(self, name: str) -> str:
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
+    
+    def joint(self, name: str) -> str:
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
+    
+    def actuator(self, name: str) -> str:
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
+    
+    def site(self, name: str) -> str:
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
+    
+    def mocap(self, name: str) -> str:
+        if len(self._agent_names[0]) > 0:
+            return f"{self._agent_names[0]}_{name}"
+        else:
+            return name
+
+    def sensor(self, name: str) -> str:
+        return f"{self._agent_names[0]}_{name}"
+
+
     @property
     def dt(self) -> float:
         return self.gym.opt.timestep * self.frame_skip
@@ -216,11 +250,11 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """Close all processes like rendering contexts"""
         raise NotImplementedError
 
-    async def _initialize_grpc(self):
+    def initialize_grpc(self):
         """Initialize the GRPC communication channel."""
         raise NotImplementedError
     
-    async def _pause_simulation(self):
+    def pause_simulation(self):
         """Pause the simulation."""
         raise NotImplementedError
 
@@ -239,18 +273,35 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     def reset_simulation(self):
         """Reset the simulation."""
         raise NotImplementedError
-    
-    async def _query_actuator_ctrlrange(self):
-        """Query the actuator control range."""
-        raise NotImplementedError
-    
-    async def _set_time_step(self, time_step):
+
+    def set_time_step(self, time_step):
         """Set the time step of the simulation."""
         raise NotImplementedError
 
-class OrcaGymEnv(BaseOrcaGymEnv):
-    """Superclass for OrcaSim environments."""
+class OrcaGymLocalEnv(OrcaGymBaseEnv):
+    def __init__(
+        self,
+        frame_skip: int,
+        grpc_address: str,
+        agent_names: list[str],
+        time_step: float,        
+        observation_space: Space,
+        action_space_type: Optional[ActionSpaceType],
+        action_step_count: Optional[float],
+        **kwargs        
+    ):
+        super().__init__(
+            frame_skip = frame_skip,
+            grpc_address = grpc_address,
+            agent_names = agent_names,
+            time_step = time_step,            
+            observation_space = observation_space,
+            action_space_type = action_space_type,
+            action_step_count = action_step_count,
+            **kwargs
+        )
 
+class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     def __init__(
         self,
         frame_skip: int,
@@ -314,39 +365,30 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         # Do nothing.
         return
     
-    def body(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def joint(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def actuator(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def site(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def mocap(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
+    def generate_observation_space(self):
+        """
+        Generate the observation space for the environment.
+        """
+        obs = self.get_observation()
+        obs_space_dict = {}
+        for obs_key, obs_data in obs.items():
+            if isinstance(obs_data, np.ndarray):
+                obs_space_dict[obs_key] = spaces.Box(
+                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
+                )
+            else:
+                raise ValueError(f"Unsupported observation type: {type(obs_data)}")
+            
+        observation_space = spaces.Dict(obs_space_dict)
+        return observation_space
 
-    def sensor(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
-    
+    def get_observation(self, obs=None):
+        """
+        Return the current environment observation as a dictionary, unless obs is not None.
+        This function should process the raw environment observation to align with the input expected by the policy model.
+        For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
+        """
+        raise NotImplementedError
 
     async def _close_grpc(self):
         if self.channel:
@@ -401,10 +443,16 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         await self.gym.init_simulation()
         return
 
+    def initialize_grpc(self):
+        self.loop.run_until_complete(self._initialize_grpc())
+
     async def _initialize_grpc(self):
         self.channel = orca_gym.grpc.aio.insecure_channel(self.grpc_address)
         self.stub = GrpcServiceStub(self.channel)
-        self.gym = orca_gym.OrcaGym(self.stub)
+        self.gym = orca_gym.OrcaGymRemote(self.stub)
+
+    def pause_simulation(self):
+        self.loop.run_until_complete(self._pause_simulation())
 
     async def _pause_simulation(self):
         await self.gym.pause_simulation()

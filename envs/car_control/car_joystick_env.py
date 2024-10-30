@@ -1,13 +1,13 @@
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick, XboxJoystickManager  # 引入 XboxJoystick 和 XboxJoystickManager
 import numpy as np
 ObsType = Any
 
 
-class CarEnv(MujocoRobotEnv):
+class CarEnv(OrcaGymRemoteEnv):
     """
     通过xbox手柄控制汽车模型
     """
@@ -29,7 +29,6 @@ class CarEnv(MujocoRobotEnv):
             grpc_address=grpc_address,
             agent_names=agent_names,
             time_step=time_step,
-            n_actions=action_size,
             observation_space=None,
             **kwargs,
         )
@@ -41,6 +40,10 @@ class CarEnv(MujocoRobotEnv):
 
         # 定义初始位置和其他状态信息
         self._set_init_state()
+
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        if not hasattr(self, "observation_space") or self.observation_space is None:
+            self.observation_space = self.generate_observation_space()
 
     def _set_init_state(self) -> None:
         # 初始化控制变量
@@ -100,17 +103,16 @@ class CarEnv(MujocoRobotEnv):
         obs = np.concatenate([self.ctrl]).copy()
         result = {
             "observation": obs,
-            "achieved_goal": np.array([0, 0]),
-            "desired_goal": np.array([0, 0]),
         }
         return result
 
     def reset_model(self):
         self._set_init_state()
+        obs = self._get_obs().copy()
+        return obs
 
-    def _reset_sim(self) -> bool:
-        self._set_init_state()
-        return True
-
-    def _sample_goal(self):
-        return np.zeros((self.model.nq,))  # 例如，返回一个全零的目标
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()

@@ -17,15 +17,31 @@ from orca_gym.orca_gym_model import OrcaGymModel
 from orca_gym.orca_gym_data import OrcaGymData
 from orca_gym.orca_gym_opt_config import OrcaGymOptConfig
 
-class OrcaGym:
+
+class OrcaGymBase:
     """
-    OrcaGym class
+    OrcaGymBase class
     """
     def __init__(self, stub):
         self.stub = stub
         self.model = None
         self.opt = None
-    
+        self.data = None
+
+class OrcaGymLocal(OrcaGymBase):
+    """
+    OrcaGymLocal class
+    """
+    def __init__(self, stub):
+        super().__init__(stub = stub)
+
+
+class OrcaGymRemote(OrcaGymBase):
+    """
+    OrcaGymRemote class
+    """
+    def __init__(self, stub):
+        super().__init__(stub = stub)
 
     # async def query_agents(self):
     #     body_info_list = await self.query_all_bodies()

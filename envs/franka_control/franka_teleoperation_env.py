@@ -406,12 +406,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
 
     def get_observation(self, obs=None):
-        """
-        Return the current environment observation as a dictionary, unless obs is not None.
-        This function should process the raw environment observation to align with the input expected by the policy model.
-        For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
-        """
         if obs is not None:
             return obs
-        
-        return self._get_obs().copy()
+        else:
+            return self._get_obs().copy()

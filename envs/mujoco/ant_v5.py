@@ -5,7 +5,7 @@ from typing import Dict, Tuple, Union
 import numpy as np
 
 from gymnasium import utils
-from envs.orca_gym_env import OrcaGymEnv
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from gymnasium.spaces import Box
 
 
@@ -14,7 +14,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class AntEnv(OrcaGymEnv, utils.EzPickle):
+class AntEnv(OrcaGymRemoteEnv, utils.EzPickle):
     r"""
     ## Description
     This environment is based on the one introduced by Schulman, Moritz, Levine, Jordan, and Abbeel in ["High-Dimensional Continuous Control Using Generalized Advantage Estimation"](https://arxiv.org/abs/1506.02438).
@@ -286,7 +286,7 @@ class AntEnv(OrcaGymEnv, utils.EzPickle):
         )
         self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
-        OrcaGymEnv.__init__(
+        OrcaGymRemoteEnv.__init__(
             self,
             frame_skip = frame_skip,
             grpc_address=grpc_address,

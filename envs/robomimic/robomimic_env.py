@@ -8,7 +8,7 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple, Union
 
-from envs.orca_gym_env import OrcaGymEnv, ActionSpaceType
+from envs.orca_gym_env import OrcaGymRemoteEnv, ActionSpaceType
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
@@ -27,7 +27,7 @@ class ControlType:
     POLICY = "policy"
     DIRECT = "direct"
 
-class RobomimicEnv(OrcaGymEnv):
+class RobomimicEnv(OrcaGymRemoteEnv):
     """
     Below we outline important methods that each EnvBase subclass needs to implement or override. 
     The implementation mostly follows the OpenAI-Gym convention.
@@ -115,24 +115,6 @@ class RobomimicEnv(OrcaGymEnv):
             action_step_count = action_step_count,
             **kwargs
         )
-
-    def generate_observation_space(self):
-        """
-        Generate the observation space for the environment.
-        """
-        obs = self.get_observation()
-        obs_space_dict = {}
-        for obs_key, obs_data in obs.items():
-            if isinstance(obs_data, np.ndarray):
-                obs_space_dict[obs_key] = spaces.Box(
-                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
-                )
-            else:
-                raise ValueError(f"Unsupported observation type: {type(obs_data)}")
-            
-        observation_space = spaces.Dict(obs_space_dict)
-        return observation_space
-
 
     def check_success(self):
         """

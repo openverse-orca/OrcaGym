@@ -1,11 +1,11 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 
-class FrankaEnv(MujocoRobotEnv):
+class FrankaEnv(OrcaGymRemoteEnv):
     def __init__(
         self,
         frame_skip: int,        
@@ -26,7 +26,6 @@ class FrankaEnv(MujocoRobotEnv):
         self.block_gripper = block_gripper
         self.has_object = has_object
 
-        action_size = 3
         action_size += 0 if self.block_gripper else 1
 
         super().__init__(
@@ -34,7 +33,6 @@ class FrankaEnv(MujocoRobotEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
             observation_space = None,
             **kwargs,
         )
@@ -92,6 +90,10 @@ class FrankaEnv(MujocoRobotEnv):
         self.initial_grasp_site_xquat = site_dict[EE_NAME]['xquat']
 
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
+
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        if not hasattr(self, "observation_space") or self.observation_space is None:
+            self.observation_space = self.generate_observation_space()
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -232,20 +234,14 @@ class FrankaEnv(MujocoRobotEnv):
             print("Task Sussecced: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
         return (d < self.distance_threshold).astype(np.float32)
 
-    def _render_callback(self) -> None:
-        pass
-
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
-
-    def _reset_sim(self) -> bool:        
         self._set_init_state()
         self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
         self._sample_object()
         self.mj_forward()
-        return True
+        obs = self._get_obs().copy()
+        return obs
 
     # custom methods
     # -----------------------------
@@ -334,3 +330,9 @@ class FrankaEnv(MujocoRobotEnv):
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
         return finger1 + finger2
+
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()

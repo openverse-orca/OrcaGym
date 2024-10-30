@@ -11,13 +11,13 @@ from openloong_dyn_ctrl import OpenLoongWBC, OrcaGym_Interface, ButtonState
 
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
-class OpenLoongEnv(MujocoRobotEnv):
+class OpenLoongEnv(OrcaGymRemoteEnv):
     """
     Control the walking of the OpenLoong robot.
 
@@ -38,7 +38,6 @@ class OpenLoongEnv(MujocoRobotEnv):
         **kwargs,
     ):
 
-        action_size = 3 # 实际并不使用
         individual_control = kwargs['individual_control']
         print("individual_control: ", individual_control)
 
@@ -47,7 +46,6 @@ class OpenLoongEnv(MujocoRobotEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
             observation_space = None,
             **kwargs,
         )
@@ -84,6 +82,9 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        if not hasattr(self, "observation_space") or self.observation_space is None:
+            self.observation_space = self.generate_observation_space()
     
     def _build_acutator_idmap(self) -> list[int]:
         acutator_idmap = []
@@ -167,9 +168,6 @@ class OpenLoongEnv(MujocoRobotEnv):
 
 
     def _get_obs(self) -> dict:
-        # robot
-        achieved_goal = np.array([0,0,0])
-        desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     [0, 0, 0],
@@ -178,24 +176,15 @@ class OpenLoongEnv(MujocoRobotEnv):
                 ]).copy()            
         result = {
             "observation": obs,
-            "achieved_goal": achieved_goal,
-            "desired_goal": desired_goal,
         }
         return result
 
-    def _render_callback(self) -> None:
-        pass
-
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
+        obs = self._get_obs().copy()
+        return obs
 
-    def _reset_sim(self) -> bool:
-        # print("reset simulation")
-        self.do_simulation(self.ctrl, self.frame_skip)
-        return True
-
-    def _sample_goal(self) -> np.ndarray:
-        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
-        return goal
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()
