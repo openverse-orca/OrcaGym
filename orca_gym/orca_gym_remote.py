@@ -333,11 +333,6 @@ class OrcaGymRemote(OrcaGymBase):
         response = await self.stub.QueryQfrcActuator(request)
         return np.array(response.qfrc_actuator)
 
-    async def set_qpos(self, qpos):
-        request = mjc_message_pb2.SetQposRequest(qpos=qpos)
-        response = await self.stub.SetQpos(request)
-        return response
-
     async def query_body_subtreemass_by_name(self, body_name):
         request = mjc_message_pb2.QueryBodySubtreeMassByNameRequest(body_name=body_name)
         response = await self.stub.QueryBodySubtreeMassByName(request)
@@ -424,25 +419,6 @@ class OrcaGymRemote(OrcaGymBase):
         return body_dict
 
     
-    async def mj_forward(self):
-        request = mjc_message_pb2.MJ_ForwardRequest()
-        response = await self.stub.MJ_Forward(request)
-        return response
-
-    async def mj_inverse(self):
-        request = mjc_message_pb2.MJ_InverseRequest()
-        response = await self.stub.MJ_Inverse(request)
-        return response
-    
-    async def mj_step(self, nstep):
-        request = mjc_message_pb2.MJ_StepRequest(nstep=nstep)
-        response = await self.stub.MJ_Step(request)
-        return response    
-    
-    async def set_qvel(self, qvel):
-        request = mjc_message_pb2.SetQvelRequest(qvel=qvel)
-        response = await self.stub.SetQvel(request)
-        return response    
         
     async def query_cfrc_ext(self, body_names):
         request = mjc_message_pb2.QueryCfrcExtRequest(body_names=body_names)
@@ -786,6 +762,8 @@ class OrcaGymRemote(OrcaGymBase):
                 "type": sensor_data.sensor_type,
                 "values": np.array(sensor_data.sensor_value)
             }
+
+        # print("sensor_data_dict", sensor_data_dict)
 
         return sensor_data_dict    
     

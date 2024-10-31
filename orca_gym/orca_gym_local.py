@@ -30,7 +30,6 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
 
-
     async def init_simulation(self):
 
         model_xml_path = "/home/superfhwl/repo/OrcaStudio_2409/build/bin/profile/out.xml"
@@ -66,6 +65,10 @@ class OrcaGymLocal(OrcaGymBase):
 
         self.data = OrcaGymData(self.model)
         self.update_data()
+
+    async def render(self):
+        await self.set_qpos(self.data.qpos)
+        await self.mj_forward()
 
     def set_time_step(self, time_step):
         self._timestep = time_step
@@ -345,3 +348,68 @@ class OrcaGymLocal(OrcaGymBase):
     
     def load_initial_frame(self):
         mujoco.mj_resetData(self._mjModel, self._mjData)
+
+    def query_joint_offsets(self, joint_names):
+        # 按顺序构建 offset 数组
+        qpos_offsets = []
+        qvel_offsets = []
+        qacc_offsets = []
+
+        # 将响应中每个关节的 offset 按顺序添加到数组中
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            qpos_offsets.append(self._mjModel.jnt_qposadr[joint_id])
+            qvel_offsets.append(self._mjModel.jnt_dofadr[joint_id])
+            qacc_offsets.append(self._mjModel.jnt_dofadr[joint_id] + self._mjModel.njnt)
+
+        return qpos_offsets, qvel_offsets, qacc_offsets    
+    
+    def query_body_xpos_xmat_xquat(self, body_name_list):
+        body_pos_mat_quat_list = {}
+        for body_name in body_name_list:
+            body_id = self._mjModel.body(body_name).id
+            body_pos_mat_quat = {
+                "Pos": self._mjData.xpos[body_id],
+                "Mat": self._mjData.xmat[body_id],
+                "Quat": self._mjData.xquat[body_id],
+            }
+            body_pos_mat_quat_list[body_name] = body_pos_mat_quat
+            
+        return body_pos_mat_quat_list
+    
+    def query_sensor_data(self, sensor_names):
+        sensor_data_dict = {}
+        for sensor_name in sensor_names:
+            sensor_id = self._mjModel.sensor(sensor_name).id
+            sensor_dim = self._mjModel.sensor_dim[sensor_id]
+            sensor_type = self._mjModel.sensor_type[sensor_id]
+
+            if sensor_type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
+                sensor_type_str = "accelerometer"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_GYRO:
+                sensor_type_str = "gyro"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_TOUCH:
+                sensor_type_str = "touch"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_VELOCIMETER:
+                sensor_type_str = "velocimeter"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
+                sensor_type_str = "framequat"
+            else:
+                sensor_type_str = "unknown"
+
+            sensor_values = np.copy(self._mjData.sensordata[sensor_id:sensor_id + sensor_dim])
+
+            sensor_data_dict[sensor_name] = {
+                "type": sensor_type_str,
+                "values": sensor_values,
+            }
+
+        # print("Sensor Data Dict: ", sensor_data_dict)
+
+        return sensor_data_dict    
+    
+    def set_ctrl(self, ctrl):
+        self._mjData.ctrl = ctrl.copy()
+
+    def mj_step(self, nstep):
+        mujoco.mj_step(self._mjModel, self._mjData, nstep)

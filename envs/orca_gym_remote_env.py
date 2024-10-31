@@ -47,6 +47,18 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
         data = self.gym.data
         return model, data
 
+    def do_simulation(self, ctrl, n_frames) -> None:
+        """
+        Step the simulation n number of frames and applying a control action.
+        """
+        # Check control input is contained in the action space
+        if np.array(ctrl).shape != (self.model.nu,):
+            raise ValueError(
+                f"Action dimension mismatch. Expected {(self.model.nu,)}, found {np.array(ctrl).shape}"
+            )
+        self._step_orca_sim_simulation(ctrl, n_frames)
+        self.loop.run_until_complete(self.gym.update_data())
+
     def set_qpos_qvel(self, qpos, qvel):
         """Set the joints position qpos and velocity qvel of the model.
 

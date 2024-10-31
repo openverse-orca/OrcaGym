@@ -48,3 +48,28 @@ class OrcaGymBase:
               f"ngeom:{model_info['ngeom']}",
               f"nsite:{model_info['nsite']}",
               )
+
+    async def set_qpos(self, qpos):
+        request = mjc_message_pb2.SetQposRequest(qpos=qpos)
+        response = await self.stub.SetQpos(request)
+        return response
+
+    async def mj_forward(self):
+        request = mjc_message_pb2.MJ_ForwardRequest()
+        response = await self.stub.MJ_Forward(request)
+        return response
+
+    async def mj_inverse(self):
+        request = mjc_message_pb2.MJ_InverseRequest()
+        response = await self.stub.MJ_Inverse(request)
+        return response
+    
+    async def mj_step(self, nstep):
+        request = mjc_message_pb2.MJ_StepRequest(nstep=nstep)
+        response = await self.stub.MJ_Step(request)
+        return response    
+    
+    async def set_qvel(self, qvel):
+        request = mjc_message_pb2.SetQvelRequest(qvel=qvel)
+        response = await self.stub.SetQvel(request)
+        return response    

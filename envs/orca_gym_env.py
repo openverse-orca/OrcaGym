@@ -144,8 +144,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         ob = self.reset_model()
         info = self._get_reset_info()
 
-        # if self.render_mode == "human":
-        #     self.render()
+        self.render()
         return ob, info
 
     def set_seed_value(self, seed=None):
@@ -195,13 +194,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """
         Step the simulation n number of frames and applying a control action.
         """
-        # Check control input is contained in the action space
-        if np.array(ctrl).shape != (self.model.nu,):
-            raise ValueError(
-                f"Action dimension mismatch. Expected {(self.model.nu,)}, found {np.array(ctrl).shape}"
-            )
-        self._step_orca_sim_simulation(ctrl, n_frames)
-        self.loop.run_until_complete(self.gym.update_data())
+        raise NotImplementedError
 
     def close(self):
         """Close all processes like rendering contexts"""

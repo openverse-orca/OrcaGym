@@ -39,11 +39,17 @@ def run_simulation(env, time_step):
         start_time = datetime.now()
 
         action = env.action_space.sample()
+
         observation, reward, terminated, truncated, info = env.step(action)
+
+        elapsed_time_1 = datetime.now() - start_time
+
+        env.render()
 
         # 
         elapsed_time = datetime.now() - start_time
 
+        # print(f"elapsed_time_1 (ms): {elapsed_time_1.total_seconds() * 1000}")
         # print(f"elapsed_time (ms): {elapsed_time.total_seconds() * 1000}")
 
         if elapsed_time.total_seconds() < time_step:
