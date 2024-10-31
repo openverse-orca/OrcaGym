@@ -109,7 +109,7 @@ public:
             baseAcc[i] = new_baseAcc[i];
         }
     }
-
+ 
     void setBaseAngVel(const std::array<double, 3>& new_baseAngVel) {
         for (int i = 0; i < 3; ++i) {
             baseAngVel[i] = new_baseAngVel[i];
