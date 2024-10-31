@@ -14,7 +14,7 @@ class OrcaGymModel:
     mjEQ_FLEX = 4          # fix all edge lengths of a flex
     mjEQ_DISTANCE = 5      # unsupported, will cause an error if used
 
-    PRINT_INIT_INFO = False
+    PRINT_INIT_INFO = True
     PRINT_FORMATTED_INFO = False
 
     def __init__(self, model_info):
