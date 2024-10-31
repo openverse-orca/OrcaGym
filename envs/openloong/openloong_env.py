@@ -49,6 +49,8 @@ class OpenLoongEnv(OrcaGymLocalEnv):
             **kwargs,
         )
 
+        self._sim_init_time = datetime.now()
+
         # Interface 用于传递仿真状态，并接收控制指令
         self._orcagym_interface = OrcaGym_Interface(time_step)
         joint_name_list = self._orcagym_interface.getJointName()
@@ -165,7 +167,8 @@ class OpenLoongEnv(OrcaGymLocalEnv):
                                                    sensor_dict[self.sensor('baselink-gyro')]['values'], sensor_dict[self.sensor('baselink-baseAcc')]['values'], xpos)
         
         self._update_keyboard_control()
-        self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, self.data.time)
+        sim_time = (datetime.now() - self._sim_init_time).total_seconds()
+        self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, sim_time)
 
         ctrl = self._orcagym_interface.getMotorCtrl()
         for i, actuator_id in enumerate(self._actuator_idmap):

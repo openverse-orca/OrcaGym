@@ -116,7 +116,6 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     
     
     def get_body_xpos_xmat_xquat(self, body_name_list):
-        # return self.data.body(body_name).xpos
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)
         if len(body_dict) != len(body_name_list):
             print("Body Nmae List: ", body_name_list)

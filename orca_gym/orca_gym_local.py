@@ -330,20 +330,15 @@ class OrcaGymLocal(OrcaGymBase):
         self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)        
         self.data.update_qfrc_bias(qfrc_bias)
 
-        sim_time = datetime.now() - self.model._init_time
-        self.data.update_time(sim_time.total_seconds())
-
     def query_all_qpos_qvel_qacc(self):
-        data = self._mjData
-        qpos = data.qpos.copy()
-        qvel = data.qvel.copy()
-        qacc = data.qacc.copy()
+        qpos = self._mjData.qpos
+        qvel = self._mjData.qvel
+        qacc = self._mjData.qacc
 
         return qpos, qvel, qacc
     
     def query_qfrc_bias(self):
-        data = self._mjData
-        qfrc_bias = data.qfrc_bias.copy()
+        qfrc_bias = self._mjData.qfrc_bias
         return qfrc_bias
     
     def load_initial_frame(self):

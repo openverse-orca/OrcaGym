@@ -71,7 +71,7 @@ if __name__ == '__main__':
     agent_name = f"{args.agent_name}"
     individual_control = True if f"{args.individual_control}" == "True" else False
 
-    simulation_frequency = 1000
+    simulation_frequency = 500
     time_step = 1.0 / simulation_frequency
 
     urdf_path = project_root + "/envs/openloong/external/openloong-dyn-control/models/AzureLoong.urdf"

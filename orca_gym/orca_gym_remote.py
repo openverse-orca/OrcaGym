@@ -67,10 +67,6 @@ class OrcaGymRemote(OrcaGymBase):
         self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)        
         self.data.update_qfrc_bias(qfrc_bias)
 
-        sim_time = datetime.now() - self.model._init_time
-        self.data.update_time(sim_time.total_seconds())
-
-
     async def query_all_actuators(self):
         request = mjc_message_pb2.QueryAllActuatorsRequest()
         response = await self.stub.QueryAllActuators(request)
