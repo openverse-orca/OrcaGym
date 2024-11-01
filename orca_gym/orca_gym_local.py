@@ -408,3 +408,25 @@ class OrcaGymLocal(OrcaGymBase):
 
     def mj_step(self, nstep):
         mujoco.mj_step(self._mjModel, self._mjData, nstep)
+
+    def query_joint_qpos(self, joint_names):
+        joint_qpos_dict = {}
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            joint_qpos_dict[joint_name] = self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]]
+        return joint_qpos_dict
+    
+    def query_joint_qvel(self, joint_names):
+        joint_qvel_dict = {}
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]]
+        return joint_qvel_dict
+    
+    def jnt_qposadr(self, joint_name):
+        joint_id = self._mjModel.joint(joint_name).id
+        return self._mjModel.jnt_qposadr[joint_id]
+    
+    def jnt_dofadr(self, joint_name):
+        joint_id = self._mjModel.joint(joint_name).id
+        return self._mjModel.jnt_dofadr[joint_id]

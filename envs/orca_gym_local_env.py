@@ -129,3 +129,19 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_sensor_data(self, sensor_names):
         sensor_data_dict = self.gym.query_sensor_data(sensor_names)
         return sensor_data_dict
+    
+    def query_joint_qpos(self, joint_names):
+        joint_qpos_dict = self.gym.query_joint_qpos(joint_names)
+        return joint_qpos_dict
+    
+    def query_joint_qvel(self, joint_names):
+        joint_qvel_dict = self.gym.query_joint_qvel(joint_names)
+        return joint_qvel_dict
+    
+    def jnt_qposadr(self, joint_name):
+        joint_qposadr = self.gym.jnt_qposadr(joint_name)
+        return joint_qposadr
+    
+    def jnt_dofadr(self, joint_name):
+        joint_dofadr = self.gym.jnt_dofadr(joint_name)
+        return joint_dofadr

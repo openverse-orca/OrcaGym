@@ -152,39 +152,57 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.np_random = np.random.RandomState(seed)
         return [seed]
 
-    def body(self, name: str) -> str:
+    def _name_with_agent0(self, name: str) -> str:
         if len(self._agent_names[0]) > 0:
             return f"{self._agent_names[0]}_{name}"
         else:
             return name
-    
-    def joint(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def actuator(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def site(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
-        else:
-            return name
-    
-    def mocap(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
-            return f"{self._agent_names[0]}_{name}"
+        
+    def _name_with_agent(self, agent_id: int, name: str) -> str:
+        if len(self._agent_names[agent_id]) > 0:
+            return f"{self._agent_names[agent_id]}_{name}"
         else:
             return name
 
-    def sensor(self, name: str) -> str:
-        return f"{self._agent_names[0]}_{name}"
+    def body(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
+        
+    def joint(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
+        
+    
+    def actuator(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
+        
+    
+    def site(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
+        
+    
+    def mocap(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
 
+    def sensor(self, name: str, agent_id = None) -> str:
+        if agent_id == None:
+            return self._name_with_agent0(name)
+        else:
+            return self._name_with_agent(agent_id, name)
+    
 
     @property
     def dt(self) -> float:
