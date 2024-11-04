@@ -67,8 +67,12 @@ class OrcaGymLocal(OrcaGymBase):
         self.update_data()
 
     async def render(self):
-        await self.set_qpos(self.data.qpos)
-        await self.mj_forward()
+        await self.update_local_env(self.data.qpos, self._mjData.time)
+
+    async def update_local_env(self, qpos, time):
+        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        response = await self.stub.UpdateLocalEnv(request)
+        return response
 
     def set_time_step(self, time_step):
         self._timestep = time_step
@@ -430,3 +434,4 @@ class OrcaGymLocal(OrcaGymBase):
     def jnt_dofadr(self, joint_name):
         joint_id = self._mjModel.joint(joint_name).id
         return self._mjModel.jnt_dofadr[joint_id]
+    

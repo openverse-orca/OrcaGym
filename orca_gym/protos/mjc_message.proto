@@ -7,6 +7,7 @@ service GrpcService {
   rpc SetSimulationState (SetSimulationStateRequest) returns (SetSimulationStateResponse);
   rpc LoadInitialFrame (LoadInitialFrameRequest) returns (LoadInitialFrameResponse);
   rpc LoadKeyFrame (LoadKeyFrameRequest) returns (LoadKeyFrameResponse);
+  rpc UpdateLocalEnv (UpdateLocalEnvRequest) returns (UpdateLocalEnvResponse);
 
 
   // 配置查询
@@ -942,3 +943,10 @@ message QueryAllSitesResponse {
     }  
     repeated SiteInfo site_info = 1;
 }
+
+message UpdateLocalEnvRequest{
+    repeated double qpos = 1;
+    double time = 2;
+}
+
+message UpdateLocalEnvResponse{}
