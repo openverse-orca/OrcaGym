@@ -14,7 +14,6 @@ if current_file_path not in sys.path:
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
-from envs.orca_gym_env import ActionSpaceType
 
 # 
 TIME_STEP = 0.01
@@ -88,8 +87,6 @@ def register_env(grpc_address, control_freq=20):
         entry_point="envs.openloong.Openloong_arm_date_env:OpenloongArmEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': ['AzureLoong'], 
                 'time_step': TIME_STEP,

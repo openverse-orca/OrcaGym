@@ -1,6 +1,7 @@
 import sys
 import os
 from datetime import datetime
+import time
 
 # 添加 libs 目录到 sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))  # 获取当前文件的目录
@@ -11,13 +12,13 @@ from openloong_dyn_ctrl import OpenLoongWBC, OrcaGym_Interface, ButtonState
 
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
+from envs import OrcaGymRemoteEnv, OrcaGymLocalEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
-class OpenLoongEnv(MujocoRobotEnv):
+class OpenLoongEnv(OrcaGymLocalEnv):
     """
     Control the walking of the OpenLoong robot.
 
@@ -38,7 +39,6 @@ class OpenLoongEnv(MujocoRobotEnv):
         **kwargs,
     ):
 
-        action_size = 3 # 实际并不使用
         individual_control = kwargs['individual_control']
         print("individual_control: ", individual_control)
 
@@ -47,20 +47,26 @@ class OpenLoongEnv(MujocoRobotEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
-            observation_space = None,
             **kwargs,
         )
+
+        self._sim_init_time = datetime.now()
+        self._agent_num = len(agent_names)
+        self._agent0_nq = int(self.model.nq / self._agent_num)
+        self._agent0_nv = int(self.model.nv / self._agent_num)
+        self._agent0_nu = int(self.model.nu / self._agent_num)
 
         # Interface 用于传递仿真状态，并接收控制指令
         self._orcagym_interface = OrcaGym_Interface(time_step)
         joint_name_list = self._orcagym_interface.getJointName()
-        joint_name_list = [self.joint(jntName) for jntName in joint_name_list]        
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(joint_name_list)
+        self._joint_name_list = [self.joint(jntName) for jntName in joint_name_list]        
+        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._joint_name_list)
         self._orcagym_interface.setJointOffsetQpos(qpos_offsets)
         self._orcagym_interface.setJointOffsetQvel(qvel_offsets)
 
-        self._actuator_idmap = self._build_acutator_idmap()
+        self._actuator_idmap = []
+        for agent_id in range(self._agent_num):
+            self._actuator_idmap.append(self._build_acutator_idmap(agent_id))
 
         self._sensor_name_list = []
         # self._sensor_name_list.append(self.sensor(self._orcagym_interface.getBaseName()))
@@ -70,9 +76,9 @@ class OpenLoongEnv(MujocoRobotEnv):
         self._sensor_name_list.append(self.sensor(self._orcagym_interface.getAccSensorName()))
 
         # OpenLoongWBC调用青龙控制算法接口，解算控制数据
-        self._openloong_wbc = OpenLoongWBC(urdf_path, time_step, json_path, log_path, self.model.nq, self.model.nv)
+        self._openloong_wbc = OpenLoongWBC(urdf_path, time_step, json_path, log_path, self._agent0_nq, self._agent0_nv)
 
-        self._openloong_wbc.InitLogger()
+        # self._openloong_wbc.InitLogger()
 
         if individual_control:
             self._keyboard_controller = KeyboardInput()
@@ -84,8 +90,17 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self.ctrl = np.zeros(self.model.nu) # 初始化控制数组
 
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
     
-    def _build_acutator_idmap(self) -> list[int]:
+    def _build_acutator_idmap(self, agent_id) -> list[int]:
         acutator_idmap = []
 
         # 来自于 external/openloong-dyn-control/models/AzureLoong.xml
@@ -98,7 +113,7 @@ class OpenLoongEnv(MujocoRobotEnv):
                                 'M_hip_r_pitch', 'M_knee_r_pitch', 'M_ankle_r_pitch', 'M_ankle_r_roll']
         
         for i, actuator_name in enumerate(actuator_name_list):
-            actuator_id = self.model.actuator_name2id(self.actuator(actuator_name))
+            actuator_id = self.model.actuator_name2id(self.actuator(actuator_name, agent_id=agent_id))
             acutator_idmap.append(actuator_id)
 
         return acutator_idmap
@@ -150,26 +165,37 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         # print(f"key_w: {self._button_state.key_w}, key_a: {self._button_state.key_a}, key_s: {self._button_state.key_s}, key_d: {self._button_state.key_d}, key_space: {self._button_state.key_space}")
 
+    time_counter = 0
     def _set_action(self) -> None:
         # 调用青龙控制算法接口，获取控制数据
+        # start_time = time.perf_counter()
+
         xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
         sensor_dict = self.query_sensor_data(self._sensor_name_list)
-        self._orcagym_interface.updateSensorValues(self.data.qpos, self.data.qvel, 
-                                                   sensor_dict[self.sensor('baselink-quat')]['values'], sensor_dict[self.sensor('baselink-velocity')]['values'], 
-                                                   sensor_dict[self.sensor('baselink-gyro')]['values'], sensor_dict[self.sensor('baselink-baseAcc')]['values'], xpos)
+        self._orcagym_interface.updateSensorValues(self.data.qpos, 
+                                                   self.data.qvel,
+                                                   sensor_dict[self.sensor('baselink-quat')]['values'], 
+                                                   sensor_dict[self.sensor('baselink-velocity')]['values'], 
+                                                   sensor_dict[self.sensor('baselink-gyro')]['values'], 
+                                                   sensor_dict[self.sensor('baselink-baseAcc')]['values'], 
+                                                   xpos)
         
         self._update_keyboard_control()
-        self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, self.data.time)
-
+        sim_time = (datetime.now() - self._sim_init_time).total_seconds()
+        self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, sim_time)
         ctrl = self._orcagym_interface.getMotorCtrl()
-        for i, actuator_id in enumerate(self._actuator_idmap):
-            self.ctrl[actuator_id] = ctrl[i]
+
+        # end_time = time.perf_counter()
+        # OpenLoongEnv.time_counter += 1
+        # if (OpenLoongEnv.time_counter % 1000 == 0):
+        #     print("elapsed_time (ms): ", (end_time - start_time) * 1000)
+
+        for actuator_idmap in self._actuator_idmap:
+            for i, actuator_id in enumerate(actuator_idmap):
+                self.ctrl[actuator_id] = ctrl[i]
 
 
     def _get_obs(self) -> dict:
-        # robot
-        achieved_goal = np.array([0,0,0])
-        desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     [0, 0, 0],
@@ -178,24 +204,15 @@ class OpenLoongEnv(MujocoRobotEnv):
                 ]).copy()            
         result = {
             "observation": obs,
-            "achieved_goal": achieved_goal,
-            "desired_goal": desired_goal,
         }
         return result
 
-    def _render_callback(self) -> None:
-        pass
-
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
+        obs = self._get_obs().copy()
+        return obs
 
-    def _reset_sim(self) -> bool:
-        # print("reset simulation")
-        self.do_simulation(self.ctrl, self.frame_skip)
-        return True
-
-    def _sample_goal(self) -> np.ndarray:
-        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
-        return goal
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()

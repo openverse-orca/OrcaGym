@@ -1,6 +1,5 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -8,11 +7,12 @@ from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
+from envs.orca_gym_env import OrcaGymRemoteEnv
 import h5py
 from scipy.spatial.transform import Rotation as R
 
 
-class OpenloongArmEnv(MujocoRobotEnv):
+class OpenloongArmEnv(OrcaGymRemoteEnv):
     """
     控制青龙机器人机械臂
     """
@@ -26,14 +26,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
         **kwargs,
     ):
 
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
-
-        action_size = 3 # 实际并不使用
-
         self.control_freq = control_freq
 
         super().__init__(
@@ -41,8 +33,6 @@ class OpenloongArmEnv(MujocoRobotEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
-            observation_space = None,
             **kwargs,
         )
 
@@ -54,6 +44,8 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self.nq = self.model.nq
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
+
+        self.goal = self._sample_goal()
 
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
@@ -172,9 +164,18 @@ class OpenloongArmEnv(MujocoRobotEnv):
         self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
         self._l_controller_config["control_delta"] = False
 
-
         self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
         self._l_controller.update_initial_joints(self._l_neutral_joint_values)
+
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -359,15 +360,12 @@ class OpenloongArmEnv(MujocoRobotEnv):
         pass
 
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
-
-    def _reset_sim(self) -> bool:
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
-        return True
+        obs = self._get_obs().copy()
+        return obs
 
     # custom methods
     # -----------------------------
@@ -404,10 +402,14 @@ class OpenloongArmEnv(MujocoRobotEnv):
         goal = np.array([0, 0, 0])
         return goal
 
-
     def get_ee_xform(self) -> np.ndarray:
         pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site")])
         xpos = pos_dict[self.site("ee_center_site")]['xpos'].copy()
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()

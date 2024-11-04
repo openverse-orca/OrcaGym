@@ -11,7 +11,7 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 # 将项目根目录添加到 PYTHONPATH
 if project_root not in sys.path:
     sys.path.append(project_root)
-from envs.orca_gym_env import ActionSpaceType
+
 
 nest_asyncio.apply()
 
@@ -28,8 +28,6 @@ def register_env(grpc_address):
             'grpc_address': grpc_address,
             'agent_names': ['Agent0'],
             'time_step': TIME_STEP,
-            'action_space_type': ActionSpaceType.CONTINUOUS,  # Example value
-            'action_step_count': 0,  # Example value, adjust as needed
         },
         max_episode_steps=60 * 60 * 60,  # 60fps @ 1 hour
         reward_threshold=0.0,

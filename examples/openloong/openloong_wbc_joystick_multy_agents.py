@@ -4,6 +4,8 @@ import argparse
 import sys
 from datetime import datetime
 import time
+import psutil
+import multiprocessing
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -11,34 +13,47 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_control):
+import subprocess
+import time
+import psutil
+import multiprocessing
 
+def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_control, enable_cpu_affinity=False):
     server_command = ["python", "run_server.py"]
     server_process = subprocess.Popen(server_command, cwd="../teleoperation/keyboard_input")
 
-    
-    # Define the base command
+    # 获取 CPU 核心数量
+    num_cpus = multiprocessing.cpu_count()
+
+    # 定义基础命令
     base_command = ["python", "./openloong_wbc_joystick.py"]
     client_processes = []
     try:
         for i in range(agent_num):
             port = 50051 + i
             grpc_address = f"{ip_addr}:{port}"
-            # Construct the command for each agent
+            # 构建每个代理的命令
             command = base_command + [
                 "--grpc_address", grpc_address,
-                "--agent_name", agent_name,                
+                "--agent_name", agent_name,
                 "--individual_control", individual_control
             ]
             print(f"Running command: {' '.join(command)}")
-            # Start the subprocess for each agent
+            # 启动每个代理的子进程
             process = subprocess.Popen(command)
             client_processes.append(process)
 
-        # Wait for all processes to complete
+            # 如果启用 CPU 亲和性，设置每个子进程的 CPU 绑定
+            if enable_cpu_affinity:
+                cpu_num = i % num_cpus  # 循环分配 CPU 核心
+                p = psutil.Process(process.pid)
+                p.cpu_affinity([cpu_num])
+
+        # 等待服务器进程完成
         server_process.wait()
         time.sleep(0.1)
-        
+
+        # 等待所有客户端进程完成
         for process in client_processes:
             process.wait()
             time.sleep(0.1)
@@ -48,8 +63,9 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
             process.kill()
             time.sleep(0.1)
 
-        # 先杀client再杀server，避免残留     
+        # 先杀掉客户端，再杀掉服务器，避免残留
         server_process.kill()
+
 
 
 if __name__ == '__main__':
@@ -68,4 +84,4 @@ if __name__ == '__main__':
     agent_num = args.agent_num
     individual_control = f"{args.individual_control}"
 
-    run_openloong_wbc_multi_agents(grpc_address, agent_name, agent_num, individual_control)
+    run_openloong_wbc_multi_agents(grpc_address, agent_name, agent_num, individual_control, enable_cpu_affinity=False)

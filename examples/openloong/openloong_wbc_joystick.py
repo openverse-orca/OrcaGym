@@ -12,20 +12,17 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from envs.orca_gym_env import ActionSpaceType
 import gymnasium as gym
 
-def register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_path, individual_control):
+def register_env(grpc_address, agent_names, time_step, urdf_path, json_path, log_path, individual_control):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"Openloong-v0-OrcaGym-{grpc_address[-2:]}",
         entry_point="envs.openloong.openloong_env:OpenLoongEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
-                'agent_names': [agent_name], 
+                'agent_names': agent_names, 
                 'time_step': time_step,
                 'urdf_path': urdf_path,
                 'json_path': json_path,
@@ -36,21 +33,27 @@ def register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_
         reward_threshold=0.0,
     )
 
+
+
 def run_simulation(env, time_step):
     observation, info = env.reset(seed=42)
+    time_counter = 0
     while True:
-        start_time = datetime.now()
+        start_time = time.perf_counter()
 
         action = env.action_space.sample()
         observation, reward, terminated, truncated, info = env.step(action)
+        env.render()
 
-        # 
-        elapsed_time = datetime.now() - start_time
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
 
-        # print(f"elapsed_time (ms): {elapsed_time.total_seconds() * 1000}")
+        time_counter += 1
+        if time_counter % 1000 == 0:
+            print(f"elapsed_time (ms): {elapsed_time * 1000}")
 
-        if elapsed_time.total_seconds() < time_step:
-            time.sleep(time_step - elapsed_time.total_seconds())
+        # if elapsed_time < time_step:
+        #     time.sleep(time_step - elapsed_time)
 
 
 if __name__ == '__main__':
@@ -68,7 +71,7 @@ if __name__ == '__main__':
     agent_name = f"{args.agent_name}"
     individual_control = True if f"{args.individual_control}" == "True" else False
 
-    simulation_frequency = 1000
+    simulation_frequency = 500
     time_step = 1.0 / simulation_frequency
 
     urdf_path = project_root + "/envs/openloong/external/openloong-dyn-control/models/AzureLoong.urdf"
@@ -81,8 +84,8 @@ if __name__ == '__main__':
     print("simulation running... , grpc_address: ", grpc_address, ", agent_name: ", agent_name)
     env_id = f"Openloong-v0-OrcaGym-{grpc_address[-2:]}"
 
-    register_env(grpc_address, agent_name, time_step, urdf_path, json_path, log_path, individual_control)
-
+    # register_env(grpc_address, [agent_name, f"{agent_name}_01", f"{agent_name}_02"], time_step, urdf_path, json_path, log_path, individual_control)
+    register_env(grpc_address, [agent_name], time_step, urdf_path, json_path, log_path, individual_control)
     env = gym.make(env_id)        
     print("Start Simulation!")    
 

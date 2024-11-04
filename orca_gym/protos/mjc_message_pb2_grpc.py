@@ -49,6 +49,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.LoadKeyFrameRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.LoadKeyFrameResponse.FromString,
                 _registered_method=True)
+        self.UpdateLocalEnv = channel.unary_unary(
+                '/MujocoMessage.GrpcService/UpdateLocalEnv',
+                request_serializer=mjc__message__pb2.UpdateLocalEnvRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.UpdateLocalEnvResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -383,6 +388,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def LoadKeyFrame(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateLocalEnv(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -793,6 +804,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.LoadKeyFrameRequest.FromString,
                     response_serializer=mjc__message__pb2.LoadKeyFrameResponse.SerializeToString,
             ),
+            'UpdateLocalEnv': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateLocalEnv,
+                    request_deserializer=mjc__message__pb2.UpdateLocalEnvRequest.FromString,
+                    response_serializer=mjc__message__pb2.UpdateLocalEnvResponse.SerializeToString,
+            ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
                     request_deserializer=mjc__message__pb2.QueryModelInfoRequest.FromString,
@@ -1190,6 +1206,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/LoadKeyFrame',
             mjc__message__pb2.LoadKeyFrameRequest.SerializeToString,
             mjc__message__pb2.LoadKeyFrameResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateLocalEnv(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/UpdateLocalEnv',
+            mjc__message__pb2.UpdateLocalEnvRequest.SerializeToString,
+            mjc__message__pb2.UpdateLocalEnvResponse.FromString,
             options,
             channel_credentials,
             insecure,

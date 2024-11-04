@@ -20,6 +20,3 @@ class OrcaGymData:
     def update_qfrc_bias(self, qfrc_bias):
         self.qfrc_bias = qfrc_bias
 
-    def update_time(self, time):
-        self.time = time
-

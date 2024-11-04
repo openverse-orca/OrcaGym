@@ -1,12 +1,11 @@
 # car_keyboard_env.py
 
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
+from envs.orca_gym_env import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import numpy as np
-from envs.orca_gym_env import ActionSpaceType
 
 ObsType = Any
 
@@ -61,7 +60,7 @@ class ButtonState:
         }
 
 
-class CarKeyboardEnv(MujocoRobotEnv):
+class CarKeyboardEnv(OrcaGymRemoteEnv):
     """
     通过键盘控制汽车模型
     """
@@ -71,8 +70,6 @@ class CarKeyboardEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps
-        action_space_type: ActionSpaceType = ActionSpaceType.CONTINUOUS,  # 添加 action_space_type 参数
-        action_step_count: int = 0,  # 添加 action_step_count 参数
         **kwargs,
     ):
         action_size = 2  # 这里的 action size 根据汽车控制的需求设置
@@ -85,10 +82,6 @@ class CarKeyboardEnv(MujocoRobotEnv):
             grpc_address=grpc_address,
             agent_names=agent_names,
             time_step=time_step,
-            n_actions=action_size,
-            observation_space=None,
-            action_space_type=action_space_type,  # 传递 action_space_type 参数
-            action_step_count=action_step_count,  # 传递 action_step_count 参数
             **kwargs,
         )
 
@@ -99,6 +92,15 @@ class CarKeyboardEnv(MujocoRobotEnv):
         # 定义初始位置和其他状态信息
         self._set_init_state()
 
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # 初始化控制变量
@@ -154,17 +156,16 @@ class CarKeyboardEnv(MujocoRobotEnv):
         obs = np.concatenate([self.ctrl]).copy()
         result = {
             "observation": obs,
-            "achieved_goal": np.array([0, 0]),
-            "desired_goal": np.array([0, 0]),
         }
         return result
 
     def reset_model(self):
         self._set_init_state()
+        obs = self._get_obs().copy()
+        return obs
 
-    def _reset_sim(self) -> bool:
-        self._set_init_state()
-        return True
-
-    def _sample_goal(self):
-        return np.zeros((self.model.nq,))  # 例如，返回一个全零的目标
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()
