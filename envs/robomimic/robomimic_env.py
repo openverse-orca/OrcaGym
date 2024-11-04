@@ -24,6 +24,7 @@ class ControlType:
     Direct: control the robot directly. Use the original action passed to the step function.
     """
     TELEOPERATION = "teleoperation"
+    KEYBOARD = "keyborad"
     POLICY = "policy"
     DIRECT = "direct"
 

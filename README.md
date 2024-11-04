@@ -29,6 +29,7 @@ git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
 git lfs install
 git lfs pull
+git submodule update
 ```
 
 2. **Install Dependencies:**
@@ -42,6 +43,8 @@ conda activate orca_gym_test
 Then install the dependencies in the newly created environment:
 ```bash
 pip install -r requirements.txt
+cd 3rd_party/robomimic
+pip install -e .
 ```
 
 2. **Install PyTorch:**

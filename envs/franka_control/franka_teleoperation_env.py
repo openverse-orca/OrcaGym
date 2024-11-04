@@ -4,6 +4,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from orca_gym.devices.keyboard import KeyboardInput
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
@@ -78,14 +79,19 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._initial_obj_site_xquat = site_dict[self.OBJ_NAME]['xquat']
         self._sample_object()
 
-        self._joystick_manager = XboxJoystickManager()
-        joystick_names = self._joystick_manager.get_joystick_names()
-        if len(joystick_names) == 0:
-            raise ValueError("No joystick detected.")
 
-        self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
-        if self._joystick is None:
-            raise ValueError("Joystick not found.")
+        if self.control_type == ControlType.TELEOPERATION:
+            self._joystick_manager = XboxJoystickManager()
+            joystick_names = self._joystick_manager.get_joystick_names()
+            if len(joystick_names) == 0:
+                raise ValueError("No joystick detected.")
+
+            self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
+            if self._joystick is None:
+                raise ValueError("Joystick not found.")
+        elif self.control_type == ControlType.KEYBOARD:
+            self._keyboard = KeyboardInput()
+
 
         self._controller_config = controller_config.load_config("osc_pose")
         # print("controller_config: ", self.controller_config)
@@ -147,7 +153,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
     
     def step(self, action) -> tuple:
-        if self.control_type == ControlType.TELEOPERATION:
+        if self.control_type == ControlType.TELEOPERATION or self.control_type == ControlType.KEYBOARD:
             ctrl = self._teleoperation_action()
         elif self.control_type == ControlType.POLICY:
             ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
@@ -180,13 +186,21 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         }
         return state
     
-    def _set_gripper_ctrl(self, joystick_state) -> None:
-        if (joystick_state["buttons"]["B"]):
-            self.ctrl[7] += 0.001
-            self.ctrl[8] += 0.001
-        elif (joystick_state["buttons"]["A"]):
-            self.ctrl[7] -= 0.001
-            self.ctrl[8] -= 0.001
+    def _set_gripper_ctrl(self, state) -> None:
+        if self.control_type == ControlType.TELEOPERATION:
+            if (state["buttons"]["B"]):
+                self.ctrl[7] += 0.001
+                self.ctrl[8] += 0.001
+            elif (state["buttons"]["A"]):
+                self.ctrl[7] -= 0.001
+                self.ctrl[8] -= 0.001
+        elif self.control_type == ControlType.KEYBOARD:
+            if (state["LShift"]):
+                self.ctrl[7] += 0.001
+                self.ctrl[8] += 0.001
+            elif (state["RShift"]):
+                self.ctrl[7] -= 0.001
+                self.ctrl[8] -= 0.001
 
         self.ctrl[7] = np.clip(self.ctrl[7], self._ctrl_range_min[7], self._ctrl_range_max[7])
         self.ctrl[8] = np.clip(self.ctrl[8], self._ctrl_range_min[8], self._ctrl_range_max[8])
@@ -196,12 +210,11 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         mocap_xpos = self._saved_xpos
         mocap_xquat = self._saved_xquat
         
-        # 根据xbox手柄的输入，设置机械臂的动作
-        if self._joystick is not None:
-            mocap_xpos, mocap_xquat = self._process_xbox_controller(mocap_xpos, mocap_xquat)
-            self.set_grasp_mocap(mocap_xpos, mocap_xquat)
-            self._saved_xpos = mocap_xpos
-            self._saved_xquat = mocap_xquat
+
+        mocap_xpos, mocap_xquat = self._process_controller(mocap_xpos, mocap_xquat)
+        self.set_grasp_mocap(mocap_xpos, mocap_xquat)
+        self._saved_xpos = mocap_xpos
+        self._saved_xquat = mocap_xquat
 
         # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
         mocap_axisangle = transform_utils.quat2axisangle(np.array([mocap_xquat[1], 
@@ -218,15 +231,19 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return self.ctrl.copy()
 
 
-    def _process_xbox_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
-        self._joystick_manager.update()
-
-        pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
+    def _process_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
+        if self.control_type == ControlType.TELEOPERATION:
+            self._joystick_manager.update()
+            pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
+            rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
+            self._set_gripper_ctrl(self._joystick.get_state())
+        elif self.control_type == ControlType.KEYBOARD:
+            self._keyboard.update()
+            pos_ctrl_dict = self._keyboard.capture_keyboard_pos_ctrl()
+            rot_ctrl_dict = self._keyboard.capture_keyboard_rot_ctrl()
+            self._set_gripper_ctrl(self._keyboard.get_state())
         pos_ctrl = np.array([pos_ctrl_dict['y'], pos_ctrl_dict['x'], pos_ctrl_dict['z']])
-        rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
         rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
-        
-        self._set_gripper_ctrl(self._joystick.get_state())
 
         # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
         CTRL_MIN = 0.10000000
@@ -248,6 +265,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
         return mocap_xpos, mocap_xquat
     
+
     def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
         # x = yaw, y = pitch, z = roll
         R_yaw = np.array([

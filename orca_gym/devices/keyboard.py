@@ -12,25 +12,27 @@ class KeyboardInput:
 
         # Initialize the display (even if not used, it's required for capturing events)
         os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
-        pygame.display.set_mode((100, 100))
-        
+        pygame.display.set_mode((400, 400))
 
         # Initialize keyboard state
         self.keyboard_state = {
             "W": 0, "A": 0, "S": 0, "D": 0,
-            "Space": 0, "Shift": 0, "Ctrl": 0, "Alt": 0,
+            "Space": 0, "LShift": 0, "RShift": 0, "Ctrl": 0, "Alt": 0,
             "Esc": 0, "Enter": 0, "Up": 0, "Down": 0,
-            "Left": 0, "Right": 0
+            "Left": 0, "Right": 0, "Q": 0, "E": 0
         }
 
-        # Define the key mapping (you can customize this)
+        # Define the key mapping
         self.key_map = {
             pygame.K_a: "A", pygame.K_b: "B", pygame.K_c: "C", pygame.K_d: "D",
             pygame.K_w: "W", pygame.K_s: "S", pygame.K_x: "X", pygame.K_y: "Y",
+            pygame.K_q: "Q", pygame.K_e: "E",
             pygame.K_UP: "Up", pygame.K_DOWN: "Down", pygame.K_LEFT: "Left", pygame.K_RIGHT: "Right",
-            pygame.K_SPACE: "Space", pygame.K_RETURN: "Enter", pygame.K_ESCAPE: "Escape"
+            pygame.K_SPACE: "Space", pygame.K_RETURN: "Enter", pygame.K_ESCAPE: "Esc",
+            pygame.K_LSHIFT: "LShift", pygame.K_RSHIFT: "RShift",
+            pygame.K_LCTRL: "Ctrl", pygame.K_RCTRL: "Ctrl",
+            pygame.K_LALT: "Alt", pygame.K_RALT: "Alt"
         }
-
 
     def update(self):
         for event in pygame.event.get():
@@ -49,9 +51,28 @@ class KeyboardInput:
     def get_state(self):
         return self.keyboard_state.copy()
 
+    def capture_keyboard_pos_ctrl(self) -> dict:
+        # Capture positional control based on keyboard input
+        state = self.get_state()
+        move_x = state["D"] - state["A"]
+        move_y = state["W"] - state["S"]
+        move_z = state["Space"] - state["Ctrl"]
+        pos_ctrl = {'x': move_x, 'y': move_y, 'z': move_z}
+        return pos_ctrl
+
+    def capture_keyboard_rot_ctrl(self) -> dict:
+        # Capture rotational control based on keyboard input
+        state = self.get_state()
+        yaw = state["Right"] - state["Left"]
+        pitch = state["Up"] - state["Down"]
+        roll = state["E"] - state["Q"]
+        rot_ctrl = {'yaw': yaw, 'pitch': pitch, 'roll': roll}
+        return rot_ctrl
+
     def close(self):
         pygame.quit()
         print("Keyboard controller closed")
+
 
 
 class KeyboardServer:
