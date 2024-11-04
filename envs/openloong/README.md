@@ -13,7 +13,6 @@
 
     ```bash
     cd openloong/external
-    git clone https://atomgit.com/openloong/openloong-dyn-control.git
     git submodule update --init --recursive
     sudo apt-get update
     sudo apt install git cmake gcc-11 g++-11

@@ -15,7 +15,6 @@ import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
 from envs.orca_gym_env import ActionSpaceType
-from envs.franka_control.franka_joystick_env import RecordState
 
 
 nest_asyncio.apply()
@@ -23,7 +22,7 @@ nest_asyncio.apply()
 # TIME_STEP = 0.016666666666666
 TIME_STEP = 0.005
 
-def register_env(grpc_address, record_state, record_file):
+def register_env(grpc_address):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
@@ -34,9 +33,7 @@ def register_env(grpc_address, record_state, record_file):
                 'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': [''], 
-                'time_step': TIME_STEP,
-                'record_state': record_state,
-                'record_file': record_file},
+                'time_step': TIME_STEP,},
         max_episode_steps=60 * 60 * 60,  # 60fps @ 1 hour
         reward_threshold=0.0,
     )
@@ -62,8 +59,7 @@ if __name__ == "__main__":
         print("simulation running... , grpc_address: ", grpc_address)
         env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
 
-        # RecordState 控制录制和回放状态
-        register_env(grpc_address, RecordState.NONE, 'hand_detection_record.h5')
+        register_env(grpc_address)
 
         env = gym.make(env_id)        
         print("启动仿真环境")
@@ -71,5 +67,4 @@ if __name__ == "__main__":
         asyncio.run(continue_training(env))
     except KeyboardInterrupt:
         print("关闭仿真环境")        
-        env.save_record()
         env.close()

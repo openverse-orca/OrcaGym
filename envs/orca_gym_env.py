@@ -22,6 +22,11 @@ class ActionSpaceType:
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
 
+class RewardType:
+    SPARSE = "sparse"
+    DENSE = "dense"
+
+
 class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     """Superclass for all OrcaSim environments."""
 
@@ -182,8 +187,8 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         ob = self.reset_model()
         info = self._get_reset_info()
 
-        if self.render_mode == "human":
-            self.render()
+        # if self.render_mode == "human":
+        #     self.render()
         return ob, info
 
     def set_seed_value(self, seed=None):
@@ -193,7 +198,6 @@ class BaseOrcaGymEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     @property
     def dt(self) -> float:
-        # return self.model.opt.timestep * self.frame_skip
         return self.gym.opt.timestep * self.frame_skip
 
     def do_simulation(self, ctrl, n_frames) -> None:
@@ -480,11 +484,11 @@ class OrcaGymEnv(BaseOrcaGymEnv):
         joint_qvel_dict = self.loop.run_until_complete(self._query_joint_qvel(joint_names))
         return joint_qvel_dict
     
-    async def _set_joint_qpos(self, joint_qpos_list):
-        await self.gym.set_joint_qpos(joint_qpos_list)
+    async def _set_joint_qpos(self, joint_qpos):
+        await self.gym.set_joint_qpos(joint_qpos)
 
-    def set_joint_qpos(self, joint_qpos_list):
-        self.loop.run_until_complete(self._set_joint_qpos(joint_qpos_list))
+    def set_joint_qpos(self, joint_qpos):
+        self.loop.run_until_complete(self._set_joint_qpos(joint_qpos))
 
     async def _query_cfrc_ext(self, body_names):
         cfrc_ext_dict = await self.gym.query_cfrc_ext(body_names)

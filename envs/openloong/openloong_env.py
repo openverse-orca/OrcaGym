@@ -15,14 +15,7 @@ from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.keyboard import KeyboardInput
-import h5py
-
-class RecordState:
-    RECORD = "record"
-    REPLAY = "replay"
-    REPLAY_FINISHED = "replay_finished"
-    NONE = "none"
+from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
 class OpenLoongEnv(MujocoRobotEnv):
     """
@@ -39,21 +32,15 @@ class OpenLoongEnv(MujocoRobotEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps        
-        record_state: str = RecordState.NONE,        
-        record_file: Optional[str] = None,
         urdf_path: str = "",
         json_path: str = "",
         log_path: str = "",
         **kwargs,
     ):
 
-        self.record_state = record_state
-        self.record_file = record_file
-        self.record_pool = []
-        self.RECORD_POOL_SIZE = 1000
-        self.record_cursor = 0
-
         action_size = 3 # 实际并不使用
+        individual_control = kwargs['individual_control']
+        print("individual_control: ", individual_control)
 
         super().__init__(
             frame_skip = frame_skip,
@@ -87,7 +74,11 @@ class OpenLoongEnv(MujocoRobotEnv):
 
         self._openloong_wbc.InitLogger()
 
-        self._keyboard_controller = KeyboardInput()
+        if individual_control:
+            self._keyboard_controller = KeyboardInput()
+        else:
+            self._keyboard_controller = KeyboardClient()
+
         self._button_state = ButtonState()
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0}
 
@@ -129,61 +120,6 @@ class OpenLoongEnv(MujocoRobotEnv):
         return obs, reward, terminated, truncated, info
 
     
-    def _load_record(self) -> None:
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-        
-        # 读取record_file中的数据，存储到record_pool中
-        with h5py.File(self.record_file, 'r') as f:
-            if "float_data" in f:
-                dset = f["float_data"]
-                if self.record_cursor >= dset.shape[0]:
-                    return False
-
-                self.record_pool = dset[self.record_cursor:self.record_cursor + self.RECORD_POOL_SIZE].tolist()
-                self.record_cursor += self.RECORD_POOL_SIZE
-                return True
-
-        return False
-    
-    def save_record(self) -> None:
-        if self.record_state != RecordState.RECORD:
-            return
-        
-        if self.record_file is None:
-            raise ValueError("record_file is not set.")
-
-        with h5py.File(self.record_file, 'a') as f:
-            # 如果数据集存在，获取其大小；否则，创建新的数据集
-            if "float_data" in f:
-                dset = f["float_data"]
-                self.record_cursor = dset.shape[0]
-            else:
-                dset = f.create_dataset("float_data", (0, len(self.ctrl)), maxshape=(None, len(self.ctrl)), dtype='f', compression="gzip")
-                self.record_cursor = 0
-
-            # 将record_pool中的数据写入数据集
-            dset.resize((self.record_cursor + len(self.record_pool), len(self.ctrl)))
-            dset[self.record_cursor:] = np.array(self.record_pool)
-            self.record_cursor += len(self.record_pool)
-            self.record_pool.clear()
-
-            print("Record saved.")
-
-
-    def _replay(self) -> None:
-        if self.record_state == RecordState.REPLAY_FINISHED:
-            return
-        
-        if len(self.record_pool) == 0:
-            if not self._load_record():
-                self.record_state = RecordState.REPLAY_FINISHED
-                print("Replay finished.")
-                return
-
-        self.ctrl = self.record_pool.pop(0)
-
-    
     def _update_keyboard_control(self) -> None:
         self._keyboard_controller.update()
         key_status = self._keyboard_controller.get_state()
@@ -215,10 +151,6 @@ class OpenLoongEnv(MujocoRobotEnv):
         # print(f"key_w: {self._button_state.key_w}, key_a: {self._button_state.key_a}, key_s: {self._button_state.key_s}, key_d: {self._button_state.key_d}, key_space: {self._button_state.key_space}")
 
     def _set_action(self) -> None:
-        if self.record_state == RecordState.REPLAY or self.record_state == RecordState.REPLAY_FINISHED:
-            self._replay()
-            return
-        
         # 调用青龙控制算法接口，获取控制数据
         xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
         sensor_dict = self.query_sensor_data(self._sensor_name_list)
@@ -233,15 +165,6 @@ class OpenLoongEnv(MujocoRobotEnv):
         for i, actuator_id in enumerate(self._actuator_idmap):
             self.ctrl[actuator_id] = ctrl[i]
 
-        # 将控制数据存储到record_pool中
-        if self.record_state == RecordState.RECORD:
-            self._save_record()
-
-
-    def _save_record(self) -> None:
-        self.record_pool.append(self.ctrl.copy())   
-        if (len(self.record_pool) >= self.RECORD_POOL_SIZE):
-            self.save_record()
 
     def _get_obs(self) -> dict:
         # robot

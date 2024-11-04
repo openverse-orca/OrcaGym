@@ -275,16 +275,16 @@ class FrankaEnv(MujocoRobotEnv):
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos_list = {}
+        arm_joint_qpos = {}
         for name, value in zip(self.arm_joint_names, self.neutral_joint_values[0:7]):
-            arm_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos_list)
+            arm_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(arm_joint_qpos)
 
         # assign value to finger joints
-        gripper_joint_qpos_list = {}
+        gripper_joint_qpos = {}
         for name, value in zip(self.gripper_joint_names, self.neutral_joint_values[7:9]):
-            gripper_joint_qpos_list[name] = np.array([value])
-        self.set_joint_qpos(gripper_joint_qpos_list)
+            gripper_joint_qpos[name] = np.array([value])
+        self.set_joint_qpos(gripper_joint_qpos)
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样

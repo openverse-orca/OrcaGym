@@ -478,9 +478,9 @@ class OrcaGym:
         else:
             raise Exception("Failed to query cfrc_ext")        
         
-    async def set_joint_qpos(self, joint_qpos_list):
+    async def set_joint_qpos(self, joint_qpos):
         request = mjc_message_pb2.SetJointQposRequest()
-        for joint_name, qpos in joint_qpos_list.items():
+        for joint_name, qpos in joint_qpos.items():
             joint_qpos = request.joint_qpos_list.add()
             joint_qpos.JointName = joint_name
             joint_qpos.Qpos.extend(qpos)        
