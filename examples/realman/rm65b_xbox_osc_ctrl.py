@@ -13,7 +13,6 @@ if project_root not in sys.path:
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
-from envs.orca_gym_env import ActionSpaceType
 
 # 
 TIME_STEP = 0.005
@@ -25,8 +24,6 @@ def register_env(grpc_address, control_freq=20):
         entry_point="envs.realman.rm65b_joystick_env:RM65BJoystickEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'action_space_type': ActionSpaceType.CONTINUOUS,
-                'action_step_count': 0,
                 'grpc_address': grpc_address, 
                 'agent_names': ['RM65B'], 
                 'time_step': TIME_STEP,

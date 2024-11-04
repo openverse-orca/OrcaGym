@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 
-from orca_gym.orca_gym import OrcaGym
+from orca_gym.orca_gym import OrcaGymRemote
 import numpy as np
 
 import orca_gym.robosuite.macros as macros
@@ -31,7 +31,7 @@ class Controller(object, metaclass=abc.ABCMeta):
 
     def __init__(
         self,
-        sim: OrcaGym,
+        sim: OrcaGymRemote,
         eef_name,
         joint_indexes,
         actuator_range,

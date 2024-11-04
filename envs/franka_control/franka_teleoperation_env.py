@@ -10,7 +10,7 @@ import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from envs.robomimic.robomimic_env import RobomimicEnv
 from envs.robomimic.robomimic_env import ControlType
-from envs.orca_gym_env import ActionSpaceType, RewardType
+from envs.orca_gym_env import RewardType
 
 
 class FrankaTeleoperationEnv(RobomimicEnv):
@@ -40,7 +40,6 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            observation_space = None,
             **kwargs,
         )
 
@@ -119,8 +118,14 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._controller.update_initial_joints(self._neutral_joint_values[0:7])
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
-        if not hasattr(self, "observation_space") or self.observation_space is None:
-            self.observation_space = self.generate_observation_space()
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _reset_grasp_mocap(self) -> None:
         self._saved_xpos = self._initial_grasp_site_xpos.copy()
@@ -424,12 +429,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
 
     def get_observation(self, obs=None):
-        """
-        Return the current environment observation as a dictionary, unless obs is not None.
-        This function should process the raw environment observation to align with the input expected by the policy model.
-        For example, it should cast an image observation to float with value range 0-1 and shape format [C, H, W].
-        """
         if obs is not None:
             return obs
-        
-        return self._get_obs().copy()
+        else:
+            return self._get_obs().copy()

@@ -17,7 +17,6 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 import torch
 import torch.nn as nn
-from envs.orca_gym_env import ActionSpaceType
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from sb3_contrib import TQC
 from stable_baselines3.her import GoalSelectionStrategy, HerReplayBuffer
@@ -35,8 +34,6 @@ def register_env(grpc_addresses, task, max_episode_steps, frame_skip):
             entry_point=f"envs.panda_mocap.{task}",
             kwargs={'frame_skip': frame_skip, 
                     'reward_type': "sparse",
-                    'action_space_type': ActionSpaceType.CONTINUOUS,
-                    'action_step_count': 0,
                     'grpc_address': grpc_address, 
                     'agent_names': ['Panda'], 
                     'time_step': 0.01},

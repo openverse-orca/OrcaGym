@@ -261,17 +261,17 @@ void OpenLoongWBC::Runsimulation(const ButtonState &buttonState, OrcaGym_Interfa
 
     // data record
 
-    logger.startNewLine();
-    logger.recItermData("simTime", simTime);
-    logger.recItermData("motors_pos_cur", RobotState.motors_pos_cur);
-    logger.recItermData("motors_vel_cur", RobotState.motors_vel_cur);
-    logger.recItermData("rpy", RobotState.rpy);
-    logger.recItermData("fL", RobotState.fL);
-    logger.recItermData("fR", RobotState.fR);
-    logger.recItermData("basePos", RobotState.basePos);
-    logger.recItermData("baseLinVel", RobotState.baseLinVel);
-    logger.recItermData("baseAcc", RobotState.baseAcc);
-    logger.finishLine();
+    // logger.startNewLine();
+    // logger.recItermData("simTime", simTime);
+    // logger.recItermData("motors_pos_cur", RobotState.motors_pos_cur);
+    // logger.recItermData("motors_vel_cur", RobotState.motors_vel_cur);
+    // logger.recItermData("rpy", RobotState.rpy);
+    // logger.recItermData("fL", RobotState.fL);
+    // logger.recItermData("fR", RobotState.fR);
+    // logger.recItermData("basePos", RobotState.basePos);
+    // logger.recItermData("baseLinVel", RobotState.baseLinVel);
+    // logger.recItermData("baseAcc", RobotState.baseAcc);
+    // logger.finishLine();
 
     // printf("rpyVal=[%.5f, %.5f, %.5f]\n", RobotState.rpy[0], RobotState.rpy[1], RobotState.rpy[2]);
     // printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);

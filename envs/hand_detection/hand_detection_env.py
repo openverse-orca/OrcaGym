@@ -1,6 +1,5 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robot_env import MujocoRobotEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -10,9 +9,10 @@ from orca_gym.devices.hand_joytstick import HandJoystick
 from scipy.spatial.transform import Rotation as R
 import os
 from envs.openloong.camera_wrapper import CameraWrapper
+from envs.orca_gym_env import OrcaGymRemoteEnv
 import time
 
-class HandDetectionEnv(MujocoRobotEnv):
+class HandDetectionEnv(OrcaGymRemoteEnv):
     def __init__(
         self,
         frame_skip: int = 5,        
@@ -22,15 +22,11 @@ class HandDetectionEnv(MujocoRobotEnv):
         **kwargs,
     ):
 
-        action_size = 3 # 实际并不使用
-
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
             agent_names = agent_names,
             time_step = time_step,            
-            n_actions=action_size,
-            observation_space = None,
             **kwargs,
         )
 
@@ -47,6 +43,16 @@ class HandDetectionEnv(MujocoRobotEnv):
         self._set_init_state()
 
         self.joystick = HandJoystick()
+
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        self._set_obs_space()
+        self._set_action_space()
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -93,27 +99,14 @@ class HandDetectionEnv(MujocoRobotEnv):
     def handle_hand_joystick(self):
         return
 
-
-    def _render_callback(self) -> None:
-        return
-
     def reset_model(self):
-        # Robot_env 统一处理，这里实现空函数就可以
-        pass
-
-    def _reset_sim(self) -> bool:
         self._set_init_state()
-        self.mj_forward()
-        return True
+        obs = self._get_obs().copy()
+        return obs
 
     def set_joint_neutral(self) -> None:
         return
 
-    def _sample_goal(self) -> np.ndarray:
-        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
-        return goal
-    
     def _get_obs(self) -> dict:          
         result = {
             "observation": np.ndarray([0, 0, 0]),
@@ -121,3 +114,9 @@ class HandDetectionEnv(MujocoRobotEnv):
             "desired_goal": np.ndarray([0, 0, 0]),
         }
         return result
+
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()
