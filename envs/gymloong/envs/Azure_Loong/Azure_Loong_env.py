@@ -7,6 +7,23 @@ from gymnasium import spaces
 from typing import Optional
 from envs.robot_env import MujocoRobotEnv
 from envs.gymloong.envs.base.legged_robot_config import LeggedRobotCfg
+from envs.gymloong.utils.task_registry import task_registry
+
+def torch_rand_float(min_val, max_val, shape, device='cpu'):
+    """
+    在给定范围 [min_val, max_val] 之间生成随机浮点数，返回指定形状的张量。
+    
+    Args:
+        min_val (float): 随机数的最小值
+        max_val (float): 随机数的最大值
+        shape (tuple): 输出张量的形状
+        device (str or torch.device): 张量所在的设备（'cpu' 或 'cuda'）
+    
+    Returns:
+        torch.Tensor: 具有指定形状和范围的随机浮点数张量
+    """
+    # 生成 [0, 1) 的随机浮点数，然后缩放并平移到 [min_val, max_val] 范围
+    return min_val + (max_val - min_val) * torch.rand(shape, device=device)
 
 
 class Azure_Loong_env(MujocoRobotEnv):
@@ -194,31 +211,31 @@ class Azure_Loong_env(MujocoRobotEnv):
                 2.3 create actor with these properties and add them to the env
              3. Store indices of different bodies of the robot
         """
-        asset_path = self.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
-        asset_root = os.path.dirname(asset_path)
-        asset_file = os.path.basename(asset_path)
+        # asset_path = self.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        # asset_root = os.path.dirname(asset_path)
+        # asset_file = os.path.basename(asset_path)
 
-        asset_options = gymapi.AssetOptions()
-        asset_options.default_dof_drive_mode = self.cfg.asset.default_dof_drive_mode
-        asset_options.collapse_fixed_joints = self.cfg.asset.collapse_fixed_joints
-        asset_options.replace_cylinder_with_capsule = self.cfg.asset.replace_cylinder_with_capsule
-        asset_options.flip_visual_attachments = self.cfg.asset.flip_visual_attachments
-        asset_options.fix_base_link = self.cfg.asset.fix_base_link
-        asset_options.density = self.cfg.asset.density
-        asset_options.angular_damping = self.cfg.asset.angular_damping
-        asset_options.linear_damping = self.cfg.asset.linear_damping
-        asset_options.max_angular_velocity = self.cfg.asset.max_angular_velocity
-        asset_options.max_linear_velocity = self.cfg.asset.max_linear_velocity
-        asset_options.armature = self.cfg.asset.armature
-        asset_options.thickness = self.cfg.asset.thickness
-        asset_options.disable_gravity = self.cfg.asset.disable_gravity
+        # asset_options = gymapi.AssetOptions()
+        # asset_options.default_dof_drive_mode = self.cfg.asset.default_dof_drive_mode
+        # asset_options.collapse_fixed_joints = self.cfg.asset.collapse_fixed_joints
+        # asset_options.replace_cylinder_with_capsule = self.cfg.asset.replace_cylinder_with_capsule
+        # asset_options.flip_visual_attachments = self.cfg.asset.flip_visual_attachments
+        # asset_options.fix_base_link = self.cfg.asset.fix_base_link
+        # asset_options.density = self.cfg.asset.density
+        # asset_options.angular_damping = self.cfg.asset.angular_damping
+        # asset_options.linear_damping = self.cfg.asset.linear_damping
+        # asset_options.max_angular_velocity = self.cfg.asset.max_angular_velocity
+        # asset_options.max_linear_velocity = self.cfg.asset.max_linear_velocity
+        # asset_options.armature = self.cfg.asset.armature
+        # asset_options.thickness = self.cfg.asset.thickness
+        # asset_options.disable_gravity = self.cfg.asset.disable_gravity
 
-        robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
-        self.num_dof = self.gym.get_asset_dof_count(robot_asset)
-        self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
-        dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
-        rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
-        self.num_rigid_shape = len(rigid_shape_props_asset)
+        # robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+        # self.num_dof = self.gym.get_asset_dof_count(robot_asset)
+        # self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
+        # dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
+        # rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
+        # self.num_rigid_shape = len(rigid_shape_props_asset)
 
         self.friction_buf = torch.ones((self.num_envs, 1), device=self.device, requires_grad=False, dtype=torch.float32)
         self.damping_buf = torch.ones((self.num_envs, self.num_dof), device=self.device, requires_grad=False)
@@ -1358,3 +1375,5 @@ class Azure_Loong_env(MujocoRobotEnv):
         r_s -= torch.square(self.dof_vel)
         r_s -= 4. * torch.square((self.dof_vel_hist[:, :self.num_dof] - self.dof_vel))
         return torch.exp(0.00012*torch.sum(r_s, dim=-1))
+    
+task_registry.register("AzureLoong", AzureLoongEnv, Azure_Loong_config(), Azure_Loong_configPPO())

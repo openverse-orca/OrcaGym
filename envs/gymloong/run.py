@@ -8,6 +8,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+print(f'Project root: {project_root}')
+
 from envs.gymloong import LEGGED_GYM_ROOT_DIR
 from envs.gymloong.utils.wandb_helper import wandb_helper
 from envs.gymloong.utils.task_registry import task_registry
