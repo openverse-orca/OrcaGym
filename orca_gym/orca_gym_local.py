@@ -32,7 +32,8 @@ class OrcaGymLocal(OrcaGymBase):
 
     async def init_simulation(self):
 
-        model_xml_path = "/home/superfhwl/repo/OrcaStudio_2409/build/bin/profile/out.xml"
+        model_xml_path = await self.load_local_env()
+        print("Model XML Path: ", model_xml_path)
 
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
@@ -73,6 +74,11 @@ class OrcaGymLocal(OrcaGymBase):
         request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
         response = await self.stub.UpdateLocalEnv(request)
         return response
+    
+    async def load_local_env(self):
+        request = mjc_message_pb2.LoadLocalEnvRequest()
+        response = await self.stub.LoadLocalEnv(request)
+        return response.xml_path
 
     def set_time_step(self, time_step):
         self._timestep = time_step

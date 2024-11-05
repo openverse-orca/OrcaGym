@@ -8,6 +8,7 @@ service GrpcService {
   rpc LoadInitialFrame (LoadInitialFrameRequest) returns (LoadInitialFrameResponse);
   rpc LoadKeyFrame (LoadKeyFrameRequest) returns (LoadKeyFrameResponse);
   rpc UpdateLocalEnv (UpdateLocalEnvRequest) returns (UpdateLocalEnvResponse);
+  rpc LoadLocalEnv (LoadLocalEnvRequest) returns (LoadLocalEnvResponse);
 
 
   // 配置查询
@@ -950,3 +951,9 @@ message UpdateLocalEnvRequest{
 }
 
 message UpdateLocalEnvResponse{}
+
+message LoadLocalEnvRequest {}
+
+message LoadLocalEnvResponse{
+    string xml_path = 1;
+}
