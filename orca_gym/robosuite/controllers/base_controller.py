@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 
-from orca_gym.orca_gym import OrcaGymRemote
+from orca_gym import OrcaGymRemote
 import numpy as np
 
 import orca_gym.robosuite.macros as macros

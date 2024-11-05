@@ -20,7 +20,7 @@ from envs.quadruped.utils.math_utils import homogenous_transform
 from envs.quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-from envs.orca_gym_env import OrcaGymRemoteEnv
+from envs import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 
 BASE_OBS = ['base_pos',

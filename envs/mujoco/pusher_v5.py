@@ -5,7 +5,7 @@ from typing import Dict, Union
 import numpy as np
 
 from gymnasium import utils
-from envs.orca_gym_env import OrcaGymRemoteEnv
+from envs import OrcaGymRemoteEnv
 from gymnasium.spaces import Box
 
 
