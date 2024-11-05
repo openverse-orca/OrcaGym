@@ -19,6 +19,8 @@ from gymnasium import spaces
 from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
 class OpenLoongEnv(OrcaGymLocalEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1'}
+
     """
     Control the walking of the OpenLoong robot.
 
@@ -33,6 +35,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         grpc_address: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.016,  # 0.016 for 60 fps        
+        render_mode: str = "human",
         urdf_path: str = "",
         json_path: str = "",
         log_path: str = "",
@@ -40,7 +43,8 @@ class OpenLoongEnv(OrcaGymLocalEnv):
     ):
 
         individual_control = kwargs['individual_control']
-        print("individual_control: ", individual_control)
+        self._render_mode = render_mode
+        print("Render_mode is: ", self._render_mode)
 
         super().__init__(
             frame_skip = frame_skip,
@@ -124,16 +128,15 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         # elapsed_set_action_time = datetime.now() - start_set_action_time
         # print(f"elapsed_set_action_time (ms): {elapsed_set_action_time.total_seconds() * 1000}")
 
-        start_time = time.perf_counter()
+        # start_time = time.perf_counter()
 
 
         self.do_simulation(self.ctrl, self.frame_skip)
 
 
-        end_time = time.perf_counter()
-        OpenLoongEnv.time_counter += 1
-        if (OpenLoongEnv.time_counter % 1000 == 0):
-            print("step elapsed_time (ms): ", (end_time - start_time) * 1000)
+        # end_time = time.perf_counter()
+        # if (OpenLoongEnv.time_counter % 1000 == 0):
+        #     print("step elapsed_time (ms): ", (end_time - start_time) * 1000)
 
         obs = self._get_obs().copy()
 
@@ -179,7 +182,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
     time_counter = 0
     def _set_action(self) -> None:
         # 调用青龙控制算法接口，获取控制数据
-        start_time = time.perf_counter()
+        # start_time = time.perf_counter()
 
         xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
         sensor_dict = self.query_sensor_data(self._sensor_name_list)
@@ -196,10 +199,10 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, sim_time)
         ctrl = self._orcagym_interface.getMotorCtrl()
 
-        end_time = time.perf_counter()
-        OpenLoongEnv.time_counter += 1
-        if (OpenLoongEnv.time_counter % 1000 == 0):
-            print("_set_action elapsed_time (ms): ", (end_time - start_time) * 1000)
+        # end_time = time.perf_counter()
+        # OpenLoongEnv.time_counter += 1
+        # if (OpenLoongEnv.time_counter % 1000 == 0):
+        #     print("_set_action elapsed_time (ms): ", (end_time - start_time) * 1000)
 
         for actuator_idmap in self._actuator_idmap:
             for i, actuator_id in enumerate(actuator_idmap):

@@ -22,6 +22,7 @@ import grpc
 
 import mujoco
 from datetime import datetime
+import time
 
 class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def __init__(
@@ -40,8 +41,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             **kwargs
         )
 
-        self._render_fps = 30
-        self._render_time_step = datetime.now()
+        render_fps = 30
+        self._render_interval = 1.0 / render_fps
+        self._render_time_step = time.perf_counter()
 
 
     def initialize_simulation(
@@ -80,12 +82,21 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self._step_orca_sim_simulation(ctrl, n_frames)
         self.gym.update_data()
 
+
+    @property
+    def render_mode(self) -> str:
+        if hasattr(self, "_render_mode"):
+            return self._render_mode
+        else:
+            return "human"
+
     def render(self):
-        time_diff = datetime.now() - self._render_time_step
-        if (time_diff.total_seconds() > 1.0 / self._render_fps):
-            self._render_time_step = datetime.now()
-            self.loop.run_until_complete(self.gym.render())
-            # print("Rendered")
+        time_diff = time.perf_counter() - self._render_time_step
+        if (time_diff > self._render_interval):
+            self._render_time_step = time.perf_counter()
+            if self.render_mode == "human":
+                self.loop.run_until_complete(self.gym.render())
+            
 
     def set_ctrl(self, ctrl):
         self.gym.set_ctrl(ctrl)

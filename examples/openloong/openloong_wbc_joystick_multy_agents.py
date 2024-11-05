@@ -31,12 +31,18 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
     try:
         for i in range(agent_num):
             port = 50051 + i
+            render_mode = "human"
+            
+            # port = 50051
+            # render_mode = "human" if i == 0 else "none"
+
             grpc_address = f"{ip_addr}:{port}"
             # 构建每个代理的命令
             command = base_command + [
                 "--grpc_address", grpc_address,
                 "--agent_name", agent_name,
-                "--individual_control", individual_control
+                "--individual_control", individual_control,
+                "--render_mode", render_mode
             ]
             print(f"Running command: {' '.join(command)}")
             # 启动每个代理的子进程

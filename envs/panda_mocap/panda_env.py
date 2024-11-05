@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs.orca_gym_env import OrcaGymRemoteEnv
+from envs import OrcaGymRemoteEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces

@@ -14,7 +14,7 @@ if project_root not in sys.path:
 
 import gymnasium as gym
 
-def register_env(grpc_address, agent_names, time_step, urdf_path, json_path, log_path, individual_control):
+def register_env(grpc_address, agent_names, time_step, render_mode, urdf_path, json_path, log_path, individual_control):
     print("register_env: ", grpc_address)
     gym.register(
         id=f"Openloong-v0-OrcaGym-{grpc_address[-2:]}",
@@ -24,6 +24,7 @@ def register_env(grpc_address, agent_names, time_step, urdf_path, json_path, log
                 'grpc_address': grpc_address, 
                 'agent_names': agent_names, 
                 'time_step': time_step,
+                'render_mode': render_mode,
                 'urdf_path': urdf_path,
                 'json_path': json_path,
                 'log_path': log_path,
@@ -65,11 +66,14 @@ if __name__ == '__main__':
     parser.add_argument('--grpc_address', type=str, default="localhost:50051", help='The gRPC address for the simulation')
     parser.add_argument('--agent_name', type=str, default="AzureLoong", help='The agent name for the simulation')
     parser.add_argument('--individual_control', type=str, default="True", help='Control the robots individually')
+    parser.add_argument('--render_mode' , type=str, default="human", help='The render mode for the simulation')
     args = parser.parse_args()
 
     grpc_address = f"{args.grpc_address}"
     agent_name = f"{args.agent_name}"
     individual_control = True if f"{args.individual_control}" == "True" else False
+    render_mode = f"{args.render_mode}"
+    print("___render_mode: ", render_mode)
 
     simulation_frequency = 1000
     time_step = 1.0 / simulation_frequency
@@ -85,7 +89,7 @@ if __name__ == '__main__':
     env_id = f"Openloong-v0-OrcaGym-{grpc_address[-2:]}"
 
     # register_env(grpc_address, [agent_name, f"{agent_name}_01", f"{agent_name}_02"], time_step, urdf_path, json_path, log_path, individual_control)
-    register_env(grpc_address, [agent_name], time_step, urdf_path, json_path, log_path, individual_control)
+    register_env(grpc_address, [agent_name], time_step, render_mode, urdf_path, json_path, log_path, individual_control)
     env = gym.make(env_id)        
     print("Start Simulation!")    
 
