@@ -1,7 +1,7 @@
 import numpy as np
 from gymnasium.core import ObsType
 from orca_gym.utils import rotations
-from env.orca_gym_env import OrcaGymRemoteEnv
+from envs import OrcaGymRemoteEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager

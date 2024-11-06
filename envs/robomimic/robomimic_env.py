@@ -8,7 +8,7 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple, Union
 
-from envs.orca_gym_env import OrcaGymRemoteEnv
+from envs import OrcaGymRemoteEnv
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
