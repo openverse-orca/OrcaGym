@@ -11,7 +11,7 @@ if project_root not in sys.path:
 print(f'Project root: {project_root}')
 
 from envs.gymloong import LEGGED_GYM_ROOT_DIR
-from envs.gymloong.env import *
+from envs.gymloong.environ import *
 from envs.gymloong.utils import wandb_helper
 from envs.gymloong.utils.task_registry import task_registry
 from envs.gymloong.utils.helpers import get_args
