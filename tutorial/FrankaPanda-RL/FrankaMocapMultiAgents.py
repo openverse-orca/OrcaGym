@@ -24,32 +24,30 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
 
-def register_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip):
-    env_ids = []
-    for env_name in env_names:
-        env_id = f"PandaMocap-v0-OrcaGym-{env_name}"
-        print("register_env: ", env_id)
-        gym.register(
-            id=env_id,
-            entry_point=f"envs.panda_mocap.{task}",
-            kwargs={'frame_skip': frame_skip, 
-                    'reward_type': "sparse",
-                    'orcagym_addr': orcagym_addr, 
-                    'agent_names': ['Panda'], 
-                    'time_step': 0.01,
-                    'render_mode': "human",},
-            max_episode_steps=max_episode_steps,
-            reward_threshold=0.0,
-        )
-        env_ids.append(env_id)
-    return env_ids
+def register_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip, render_mode) -> str:
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
+    gym.register(
+        id=env_id,
+        entry_point=f"envs.panda_mocap.{task}",
+        kwargs={'frame_skip': frame_skip, 
+                'reward_type': "sparse",
+                'orcagym_addr': orcagym_addr, 
+                'agent_names': ['Panda'], 
+                'time_step': 0.01,
+                'render_mode': render_mode,},
+        max_episode_steps=max_episode_steps,
+        reward_threshold=0.0,
+    )
+    return env_id
 
-def make_env(orcagym_addr, env_index, agents_per_env, task, max_episode_steps, frame_skip):
-    print("make_env: ", orcagym_addr, env_index)
+
+def make_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip, render_mode):
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_name = "PandaMocap-v0"
-        register_env([orcagym_addr], agents_per_env, task, max_episode_steps, frame_skip)
+        env_id = register_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip, render_mode)
+        print("Registering environment with id: ", env_id)
+
         env = gym.make(env_id)
         seed = int(env_id[-3:])
         env.unwrapped.set_seed_value(seed)
@@ -258,13 +256,28 @@ def testing_model(env, model):
 
     env.close()
 
-def train_model(grpc_addresses, agents_per_env, task, max_episode_steps, frame_skip, model_type, total_timesteps, model_file):
-    try:
-        print("simulation running... , grpc_addresses: ", grpc_addresses)
-        env_ids = register_env(env_name, task, max_episode_steps, frame_skip)
-        env_num = len(env_ids)
+def generate_env_list(orcagym_addresses, envs_per_orcagym):
+    orcagym_addr_list = []
+    env_index_list = []
+    render_mode_list = []
+    
+    for orcagym_addr in orcagym_addresses:
+        for i in range(envs_per_orcagym):
+            orcagym_addr_list.append(orcagym_addr)
+            env_index_list.append(i)
+            render_mode_list.append("human" if envs_per_orcagym == 1 else "none")
 
-        env_fns = [make_env(orcagym_addr, agents_per_env, task, max_episode_steps, frame_skip, env_id) for orcagym_addr, env_id in zip(grpc_addresses, env_ids)]
+    return orcagym_addr_list, env_index_list, render_mode_list
+
+
+def train_model(orcagym_addresses, envs_per_orcagym, task, max_episode_steps, frame_skip, model_type, total_timesteps, model_file):
+    try:
+        print("simulation running... , orcagym_addresses: ", orcagym_addresses)
+
+        env_name = "PandaMocap-v0"
+        orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, envs_per_orcagym)
+        env_num = len(orcagym_addr_list)
+        env_fns = [make_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip, render_mode) for orcagym_addr, env_index, render_mode in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnv(env_fns)
 
         print("Start Simulation!")
@@ -309,16 +322,16 @@ def test_model(orcagym_addr, task, max_episode_steps, frame_skip, model_type, mo
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
-    parser.add_argument('--grpc_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--agents_per_env', type=int, default=1, help='The number of agents per env')
+    parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
+    parser.add_argument('--envs_per_orcagym', type=int, default=1, help='The number of agents per env')
     parser.add_argument('--task', type=str, default='reach', help='The task to run (reach or pick_and_place)')
     parser.add_argument('--model_type', type=str, default='tqc', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
     parser.add_argument('--total_timesteps', type=int, default=100000, help='The total timesteps to train the model')
     args = parser.parse_args()
 
-    grpc_addresses = args.grpc_addresses
-    agents_per_env = args.agents_per_env
+    orcagym_addresses = args.orcagym_addresses
+    envs_per_orcagym = args.envs_per_orcagym
     task = args.task
     model_type = args.model_type
     run_mode = args.run_mode
@@ -346,10 +359,10 @@ if __name__ == "__main__":
 
 
     if run_mode == "training":
-        train_model(grpc_addresses, agents_per_env, task, MAX_EPISODE_STEPS_TRAINING, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
-        test_model(grpc_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)
+        train_model(orcagym_addresses, envs_per_orcagym, task, MAX_EPISODE_STEPS_TRAINING, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
+        test_model(orcagym_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)
     elif run_mode == "testing":
-        test_model(grpc_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)    
+        test_model(orcagym_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)    
     else:
         raise ValueError("Invalid run mode")
 

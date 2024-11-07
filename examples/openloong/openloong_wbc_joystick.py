@@ -15,7 +15,8 @@ if project_root not in sys.path:
 import gymnasium as gym
 
 def register_env(orcagym_addr, env_name, env_index, agent_names, time_step, render_mode, urdf_path, json_path, log_path, individual_control):
-    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
         entry_point="envs.openloong.openloong_env:OpenLoongEnv",

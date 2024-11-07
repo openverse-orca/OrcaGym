@@ -19,7 +19,8 @@ nest_asyncio.apply()
 TIME_STEP = 0.005
 
 def register_env(orcagym_addr, env_name, env_index) -> str:
-    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
         entry_point="envs.car_keyboard_env.CarKeyboardEnv",

@@ -41,7 +41,8 @@ from envs.quadruped.utils.mujoco.visual import render_sphere
 def register_env(orcagym_addr, env_name, env_index, agent_name,
                  robot_name, hip_height, robot_leg_joints, 
                  robot_feet_geom_names, robot_hip_body_names, scene_name, simulation_dt, state_observables_names) -> str:
-    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
         entry_point="envs.quadruped.quadruped_env:QuadrupedEnv",

@@ -17,7 +17,8 @@ from datetime import datetime
 TIME_STEP = 0.01
 
 def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
-    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
         entry_point="envs.openloong.Openloong_arm_xbox_env:OpenloongArmEnv",

@@ -205,4 +205,4 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.update_equality_constraints(eq_list)
 
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
-        self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)    
+        self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict))

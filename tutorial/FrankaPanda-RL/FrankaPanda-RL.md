@@ -26,7 +26,7 @@ python ./RunFrankaMocapMultiAgents.py --ip_addr localhost --agent_num 16 --task 
 
 The training ended in just a few seconds. Unfortunately, the agents did not seem to learn the reach task. Performing 10 tests all failed. You can move the camera closer to the first robotic arm (the furthest one) and run the previous testing command to observe the execution result. The reason for this issue is that with multiple agents training in parallel, the number of steps grows quickly, and there may not have been enough sample information collected for the agent to learn. Therefore, we will set `total_timesteps` to 30,000 to ensure sufficient samples.
 ```bash
-python ./RunFrankaMocapMultiAgents.py --ip_addr localhost --agent_num 16 --task reach --model_type tqc --run_mode training --total_timesteps 30000
+python ./FrankaMocapMultiAgents.py --orcagym_addresses localhost:50051 localhost:50052 localhost:50053 localhost:50054 localhost:50055 localhost:50056 localhost:50057 localhost:50058 localhost:50059 localhost:50060 localhost:50061 localhost:50062 localhost:50063 localhost:50064 localhost:50065 localhost:50066 --envs_per_orcagym 1 --task reach --model_type tqc --run_mode training --total_timesteps 30000
 ```
 This time, the training ended in about 1 minute, and the agent has learned the reach task.
 

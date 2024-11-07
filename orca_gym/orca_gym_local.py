@@ -510,7 +510,19 @@ class OrcaGymLocal(OrcaGymBase):
             # self._mjModel.eq_data[obj1_id:obj1_id + len(eq_data)] = eq_data.copy()
             # print("model.eq_data: ", self._mjModel.eq_data)
 
-    def set_mocap_pos_and_quat(self, mocap_data):
+
+    async def _remote_set_mocap_pos_and_quat(self, mocap_data):
+        request = mjc_message_pb2.SetMocapPosAndQuatRequest()
+        for name, data in mocap_data.items():
+            mocap_body_info = request.mocap_body_info.add()
+            mocap_body_info.mocap_body_name = name
+            mocap_body_info.pos.extend(data['pos'])
+            mocap_body_info.quat.extend(data['quat'])
+
+        response = await self.stub.SetMocapPosAndQuat(request)
+        return response.success
+
+    async def set_mocap_pos_and_quat(self, mocap_data):
         for name, data in mocap_data.items():
             body_id = self._mjModel.body(name).id
             mocap_id = self._mjModel.body_mocapid[body_id]
@@ -520,3 +532,4 @@ class OrcaGymLocal(OrcaGymBase):
                 self._mjData.mocap_pos[mocap_id] = data['pos'].copy()
                 self._mjData.mocap_quat[mocap_id] = data['quat'].copy()
                 
+        await self._remote_set_mocap_pos_and_quat(mocap_data)
