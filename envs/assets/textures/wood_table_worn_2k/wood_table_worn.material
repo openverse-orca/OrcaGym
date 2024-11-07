@@ -1,0 +1,12 @@
+{
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.textureMap": "textures/wood_table_worn_diff_2k.png",
+        "metallic.textureChannel": "B",
+        "metallic.textureMap": "textures/wood_table_worn_arm_2k.png",
+        "normal.textureMap": "textures/wood_table_worn_nor_dx_2k.png",
+        "occlusion.diffuseTextureMap": "textures/wood_table_worn_ao_2k.png",
+        "roughness.textureMap": "textures/wood_table_worn_rough_2k.png"
+    }
+}
