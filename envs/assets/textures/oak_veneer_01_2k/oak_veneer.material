@@ -1,0 +1,12 @@
+{
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.textureMap": "textures/oak_veneer_01_diff_2k.png",
+        "metallic.textureChannel": "B",
+        "metallic.textureMap": "textures/oak_veneer_01_arm_2k.png",
+        "normal.textureMap": "textures/oak_veneer_01_nor_dx_2k.png",
+        "occlusion.diffuseTextureMap": "textures/oak_veneer_01_ao_2k.png",
+        "roughness.textureMap": "textures/oak_veneer_01_rough_2k.png"
+    }
+}
