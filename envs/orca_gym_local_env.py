@@ -28,14 +28,14 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def __init__(
         self,
         frame_skip: int,
-        grpc_address: str,
+        orcagym_addr: str,
         agent_names: list[str],
         time_step: float,        
         **kwargs        
     ):
         super().__init__(
             frame_skip = frame_skip,
-            grpc_address = grpc_address,
+            orcagym_addr = orcagym_addr,
             agent_names = agent_names,
             time_step = time_step,            
             **kwargs
@@ -60,7 +60,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return
 
     def initialize_grpc(self):
-        self.channel = grpc.aio.insecure_channel(self.grpc_address)
+        self.channel = grpc.aio.insecure_channel(self.orcagym_addr)
         self.stub = GrpcServiceStub(self.channel)
         self.gym = OrcaGymLocal(self.stub)
     

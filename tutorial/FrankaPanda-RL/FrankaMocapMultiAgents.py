@@ -24,7 +24,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
 
-def register_env(env_names, task, max_episode_steps, frame_skip):
+def register_env(orcagym_addr, env_name, env_index, task, max_episode_steps, frame_skip):
     env_ids = []
     for env_name in env_names:
         env_id = f"PandaMocap-v0-OrcaGym-{env_name}"
@@ -34,7 +34,7 @@ def register_env(env_names, task, max_episode_steps, frame_skip):
             entry_point=f"envs.panda_mocap.{task}",
             kwargs={'frame_skip': frame_skip, 
                     'reward_type': "sparse",
-                    'grpc_address': grpc_address, 
+                    'orcagym_addr': orcagym_addr, 
                     'agent_names': ['Panda'], 
                     'time_step': 0.01,
                     'render_mode': "human",},
@@ -44,11 +44,12 @@ def register_env(env_names, task, max_episode_steps, frame_skip):
         env_ids.append(env_id)
     return env_ids
 
-def make_env(grpc_address, agents_per_env, task, max_episode_steps, frame_skip, env_id):
-    print("make_env: ", grpc_address, env_id)
+def make_env(orcagym_addr, env_index, agents_per_env, task, max_episode_steps, frame_skip):
+    print("make_env: ", orcagym_addr, env_index)
     def _init():
         # 注册环境，确保子进程中也能访问
-        register_env([grpc_address], agents_per_env, task, max_episode_steps, frame_skip)
+        env_name = "PandaMocap-v0"
+        register_env([orcagym_addr], agents_per_env, task, max_episode_steps, frame_skip)
         env = gym.make(env_id)
         seed = int(env_id[-3:])
         env.unwrapped.set_seed_value(seed)
@@ -263,7 +264,7 @@ def train_model(grpc_addresses, agents_per_env, task, max_episode_steps, frame_s
         env_ids = register_env(env_name, task, max_episode_steps, frame_skip)
         env_num = len(env_ids)
 
-        env_fns = [make_env(grpc_address, agents_per_env, task, max_episode_steps, frame_skip, env_id) for grpc_address, env_id in zip(grpc_addresses, env_ids)]
+        env_fns = [make_env(orcagym_addr, agents_per_env, task, max_episode_steps, frame_skip, env_id) for orcagym_addr, env_id in zip(grpc_addresses, env_ids)]
         env = SubprocVecEnv(env_fns)
 
         print("Start Simulation!")
@@ -281,10 +282,10 @@ def train_model(grpc_addresses, agents_per_env, task, max_episode_steps, frame_s
         print("退出仿真环境")
         env.close()
 
-def test_model(grpc_address, task, max_episode_steps, frame_skip, model_type, model_file):
+def test_model(orcagym_addr, task, max_episode_steps, frame_skip, model_type, model_file):
     try:
-        print("simulation running... , grpc_address: ", grpc_address)
-        env_id = register_env([grpc_address], task, max_episode_steps, frame_skip)[0]
+        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        env_id = register_env([orcagym_addr], task, max_episode_steps, frame_skip)[0]
         env = gym.make(env_id)
         seed = int(env_id[-3:])
         env.unwrapped.set_seed_value(seed)

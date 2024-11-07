@@ -18,20 +18,21 @@ nest_asyncio.apply()
 # TIME_STEP = 0.016666666666666
 TIME_STEP = 0.005
 
-def register_env(grpc_address):
-    print("register_env: ", grpc_address)
+def register_env(orcagym_addr, env_name, env_index) -> str:
+    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
     gym.register(
-        id=f"KeyboardControl-v0-OrcaGym-{grpc_address[-2:]}",
-        entry_point=CarKeyboardEnv,
+        id=env_id,
+        entry_point="envs.car_keyboard_env.CarKeyboardEnv",
         kwargs={
             'frame_skip': 1,   # 1 action per frame
-            'grpc_address': grpc_address,
+            'orcagym_addr': orcagym_addr,
             'agent_names': ['Agent0'],
             'time_step': TIME_STEP,
         },
         max_episode_steps=60 * 60 * 60,  # 60fps @ 1 hour
         reward_threshold=0.0,
     )
+    return env_id
 
 async def continue_training(env):
     observation, info = env.reset(seed=42)
@@ -48,11 +49,13 @@ async def continue_training(env):
 
 if __name__ == "__main__":
     try:
-        grpc_address = "localhost:50051"
-        print("simulation running... , grpc_address: ", grpc_address)
-        env_id = f"KeyboardControl-v0-OrcaGym-{grpc_address[-2:]}"
+        orcagym_addr = "localhost:50051"
+        print("simulation running... , orcagym_addr: ", orcagym_addr)
 
-        register_env(grpc_address)
+        env_name = "CarKeyboardControl-v0"
+        env_index = 0
+        env_id = register_env(orcagym_addr, env_name, env_index)
+        print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
         print("Starting simulation...")

@@ -38,16 +38,16 @@ from envs.quadruped.utils.mujoco.visual import render_sphere
 
 
 
-def register_env(grpc_address, agent_name,
+def register_env(orcagym_addr, env_name, env_index, agent_name,
                  robot_name, hip_height, robot_leg_joints, 
-                 robot_feet_geom_names, robot_hip_body_names, scene_name, simulation_dt, state_observables_names):
-    print("register_env: ", grpc_address)
+                 robot_feet_geom_names, robot_hip_body_names, scene_name, simulation_dt, state_observables_names) -> str:
+    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
     gym.register(
-        id=f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}",
+        id=env_id,
         entry_point="envs.quadruped.quadruped_env:QuadrupedEnv",
         kwargs={'frame_skip': 1,   # 1 action per frame
                 'reward_type': "dense",
-                'grpc_address': grpc_address, 
+                'orcagym_addr': orcagym_addr, 
                 'agent_names': [agent_name], 
                 'time_step': simulation_dt,
                 'robot': robot_name,
@@ -65,6 +65,7 @@ def register_env(grpc_address, agent_name,
         max_episode_steps=sys.maxsize,  # never stop
         reward_threshold=0.0,
     )
+    return env_id
 
 
 
@@ -73,11 +74,11 @@ if __name__ == '__main__':
 
     # Parse the arguments
     parser = argparse.ArgumentParser(description='Simulation Configuration')
-    parser.add_argument('--grpc_address', type=str, required=True, help='The gRPC address for the simulation')
+    parser.add_argument('--orcagym_addr', type=str, required=True, help='The gRPC address for the simulation')
 
     args = parser.parse_args()
 
-    grpc_address = f"{args.grpc_address}:50051"
+    orcagym_addr = f"{args.orcagym_addr}:50051"
 
 
     robot_name = cfg.robot
@@ -92,13 +93,15 @@ if __name__ == '__main__':
                                'qpos_js', 'qvel_js', 'tau_ctrl_setpoint',
                                'feet_pos_base', 'feet_vel_base', 'contact_state', 'contact_forces_base',)
 
-    print("simulation running... , grpc_address: ", grpc_address)
+    print("simulation running... , orcagym_addr: ", orcagym_addr)
     print("robot_feet_geom_names:", robot_feet_geom_names)
-    env_id = f"Quadruped-v0-OrcaGym-{grpc_address[-2:]}"
 
-    register_env(grpc_address, robot_name,
+    env_name = "Quadruped-v0"
+    env_index = 0
+    env_id = register_env(orcagym_addr, env_name, env_index, robot_name,
                  robot_name, hip_height, robot_leg_joints, robot_feet_geom_names, robot_hip_body_names,
                  scene_name, simulation_dt, state_observables_names)
+    print("Registered env: ", env_id)
 
     env = gym.make(env_id)        
     print("启动仿真环境")

@@ -16,20 +16,21 @@ from datetime import datetime
 # 
 TIME_STEP = 0.01
 
-def register_env(grpc_address, control_freq=20):
-    print("register_env: ", grpc_address)
+def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
+    env_id = env_name + "-OrcaGym-" + orcagym_addr + f"-{env_index}"
     gym.register(
-        id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
+        id=env_id,
         entry_point="envs.openloong.Openloong_arm_xbox_env:OpenloongArmEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'grpc_address': grpc_address, 
+                'orcagym_addr': orcagym_addr, 
                 'agent_names': ['AzureLoong'], 
                 'time_step': TIME_STEP,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,
         reward_threshold=0.0,
     )
+    return env_id
 
 def continue_training(env):
     observation, info = env.reset(seed=42)
@@ -50,11 +51,13 @@ if __name__ == "__main__":
     OSC运动算法控制青龙机器人机械臂的示例
     """
     try:
-        grpc_address = "localhost:50051"
-        print("simulation running... , grpc_address: ", grpc_address)
-        env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
+        orcagym_addr = "localhost:50051"
+        print("simulation running... , orcagym_addr: ", orcagym_addr)
 
-        register_env(grpc_address, 20)
+        env_name = "OpenloongArmXbox-v0"
+        env_index = 0
+        env_id = register_env(orcagym_addr, env_name, env_index, 20)
+        print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)        
         print("Starting simulation...")

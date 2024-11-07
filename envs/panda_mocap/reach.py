@@ -6,14 +6,14 @@ class FrankaReachEnv(FrankaEnv):
         self,
         frame_skip: int,                
         reward_type: str,
-        grpc_address: str,
+        orcagym_addr: str,
         agent_names: list[str],
         time_step: float,  
         **kwargs,
     ):
         super().__init__(
             frame_skip=frame_skip,
-            grpc_address=grpc_address,
+            orcagym_addr=orcagym_addr,
             agent_names=agent_names,
             time_step=time_step,
             reward_type=reward_type,

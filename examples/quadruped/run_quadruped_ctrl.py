@@ -12,10 +12,10 @@ if __name__ == '__main__':
     os.environ['ACADOS_SOURCE_DIR'] = "/home/superfhwl/repo/acados"
 
     parser = argparse.ArgumentParser(description='Simulation Configuration')
-    parser.add_argument('--grpc_address', type=str, required=True, help='The gRPC address for the simulation')
+    parser.add_argument('--orcagym_addr', type=str, required=True, help='The gRPC address for the simulation')
     args = parser.parse_args()
-    grpc_address = args.grpc_address
+    orcagym_addr = args.orcagym_addr
 
-    subprocess.run(["python", "./quadruped_ctrl.py", "--grpc_address", grpc_address])
+    subprocess.run(["python", "./quadruped_ctrl.py", "--orcagym_addr", orcagym_addr])
 
 
