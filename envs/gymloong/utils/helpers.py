@@ -113,7 +113,7 @@ def get_args():
 
     # 自定义参数列表
     custom_parameters = [
-        {"name": "--task", "type": str, "default": "anymal_c_flat", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
+        {"name": "--task", "type": str, "default": "AzureLoong", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
         {"name": "--resume", "action": "store_true", "default": False, "help": "Resume training from a checkpoint"},
         {"name": "--experiment_name", "type": str, "help": "Name of the experiment to run or load. Overrides config file if provided."},
         {"name": "--run_name", "type": str, "help": "Name of the run. Overrides config file if provided."},
@@ -141,9 +141,11 @@ def get_args():
     # 解析参数
     args = parser.parse_args()
 
+    args.sim_device = "cpu"
+
     # name alignment
-    args.sim_device_id = args.compute_device_id
-    args.sim_device = args.sim_device_type
+    # args.sim_device_id = args.compute_device_id
+    # args.sim_device = args.sim_device_type
     if args.sim_device=='cuda':
         args.sim_device += f":{args.sim_device_id}"
     return args
