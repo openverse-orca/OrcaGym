@@ -1,17 +1,20 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs import OrcaGymRemoteEnv
+from envs import OrcaGymLocalEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 
-class FrankaEnv(OrcaGymRemoteEnv):
+class FrankaEnv(OrcaGymLocalEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1'}
+
     def __init__(
         self,
         frame_skip: int,        
         grpc_address: str,
         agent_names: list,
         time_step: float,    
+        render_mode: str,
         reward_type: str,
         has_object: bool,
         block_gripper: bool,
@@ -25,6 +28,8 @@ class FrankaEnv(OrcaGymRemoteEnv):
 
         self.block_gripper = block_gripper
         self.has_object = has_object
+        self._render_mode = render_mode
+        # print("Render mode: ", self._render_mode)
 
         super().__init__(
             frame_skip = frame_skip,
@@ -264,6 +269,7 @@ class FrankaEnv(OrcaGymRemoteEnv):
                     obj1_id = eq['obj1_id']
                     obj2_id = eq['obj2_id']
                     eq_data = eq['eq_data'].copy()
+                    # print("org eq_data: ", eq_data)
                     eq_data[3:10] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
                     self.update_equality_constraints([{"obj1_id": obj1_id, "obj2_id": obj2_id, "eq_data": eq_data}])
         self.mj_forward()

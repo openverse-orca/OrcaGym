@@ -19,6 +19,28 @@ from orca_gym.orca_gym import OrcaGymBase
 
 import mujoco
 
+
+
+def get_qpos_size(joint_type):
+    if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+        return 7
+    elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
+        return 4
+    elif joint_type == mujoco.mjtJoint.mjJNT_SLIDE or joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+        return 1
+    else:
+        return 0
+
+def get_qvel_size(joint_type):
+    if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+        return 6
+    elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
+        return 3
+    elif joint_type == mujoco.mjtJoint.mjJNT_SLIDE or joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+        return 1
+    else:
+        return 0
+
 class OrcaGymLocal(OrcaGymBase):
     """
     OrcaGymLocal class
@@ -419,11 +441,19 @@ class OrcaGymLocal(OrcaGymBase):
     def mj_step(self, nstep):
         mujoco.mj_step(self._mjModel, self._mjData, nstep)
 
+    def mj_forward(self):
+        mujoco.mj_forward(self._mjModel, self._mjData)
+
+    def mj_inverse(self):
+        mujoco.mj_inverse(self._mjModel, self._mjData)
+
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
         for joint_name in joint_names:
             joint_id = self._mjModel.joint(joint_name).id
-            joint_qpos_dict[joint_name] = self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]]
+            joint_type = self._mjModel.jnt_type[joint_id]
+            joint_qpos = self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]:self._mjModel.jnt_qposadr[joint_id] + get_qpos_size(joint_type)]
+            joint_qpos_dict[joint_name] = joint_qpos
         return joint_qpos_dict
     
     def query_joint_qvel(self, joint_names):
@@ -441,3 +471,52 @@ class OrcaGymLocal(OrcaGymBase):
         joint_id = self._mjModel.joint(joint_name).id
         return self._mjModel.jnt_dofadr[joint_id]
     
+    def query_site_pos_and_mat(self, site_names: list[str]):
+        site_pos_and_mat = {}
+        for site_name in site_names:
+            site_id = self._mjModel.site(site_name).id
+            site = self._mjData.site_xpos[site_id]
+            site_mat = self._mjData.site_xmat[site_id]
+            site_pos_and_mat[site_name] = {"xpos": site, "xmat": site_mat}
+        return site_pos_and_mat
+    
+    def set_joint_qpos(self, joint_qpos):
+        for joint_name, qpos in joint_qpos.items():
+            joint_id = self._mjModel.joint(joint_name).id
+            qpos_size = get_qpos_size(self._mjModel.jnt_type[joint_id])
+            self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]:self._mjModel.jnt_qposadr[joint_id] + qpos_size] = qpos.copy()
+
+    def mj_jac_site(self, site_names: list[str]):
+        site_jacs_dict = {}
+        for site_name in site_names:
+            site_id = self._mjModel.site(site_name).id
+            jacp = np.zeros((3, self.model.nv))
+            jacr = np.zeros((3, self.model.nv))
+            mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, site_id)
+            site_jacs_dict[site_name] = {"jacp": jacp, "jacr": jacr}
+        return site_jacs_dict            
+    
+    def update_equality_constraints(self, constraint_list):
+        for constraint in constraint_list:
+            obj1_id = constraint['obj1_id']
+            obj2_id = constraint['obj2_id']
+            eq_data = constraint['eq_data']
+            for i in range(self.model.neq):
+                if self._mjModel.eq_obj1id[i] == obj1_id and self._mjModel.eq_obj2id[i] == obj2_id:
+                    self._mjModel.eq_data[i] = eq_data.copy()
+                    break
+
+            # print("eq_data: ", eq_data)
+            # self._mjModel.eq_data[obj1_id:obj1_id + len(eq_data)] = eq_data.copy()
+            # print("model.eq_data: ", self._mjModel.eq_data)
+
+    def set_mocap_pos_and_quat(self, mocap_data):
+        for name, data in mocap_data.items():
+            body_id = self._mjModel.body(name).id
+            mocap_id = self._mjModel.body_mocapid[body_id]
+            if mocap_id != -1:
+                # print("mocap_pos: ", self._mjData.mocap_pos[mocap_id])
+                # print("mocap_quat: ", self._mjData.mocap_quat[mocap_id])
+                self._mjData.mocap_pos[mocap_id] = data['pos'].copy()
+                self._mjData.mocap_quat[mocap_id] = data['quat'].copy()
+                

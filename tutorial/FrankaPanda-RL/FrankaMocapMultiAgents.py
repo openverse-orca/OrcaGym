@@ -24,10 +24,10 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
 
-def register_env(grpc_addresses, task, max_episode_steps, frame_skip):
+def register_env(env_names, task, max_episode_steps, frame_skip):
     env_ids = []
-    for grpc_address in grpc_addresses:
-        env_id = f"PandaMocap-v0-OrcaGym-{grpc_address[-3:]}"
+    for env_name in env_names:
+        env_id = f"PandaMocap-v0-OrcaGym-{env_name}"
         print("register_env: ", env_id)
         gym.register(
             id=env_id,
@@ -36,18 +36,19 @@ def register_env(grpc_addresses, task, max_episode_steps, frame_skip):
                     'reward_type': "sparse",
                     'grpc_address': grpc_address, 
                     'agent_names': ['Panda'], 
-                    'time_step': 0.01},
+                    'time_step': 0.01,
+                    'render_mode': "human",},
             max_episode_steps=max_episode_steps,
             reward_threshold=0.0,
         )
         env_ids.append(env_id)
     return env_ids
 
-def make_env(grpc_address, task, max_episode_steps, frame_skip, env_id):
+def make_env(grpc_address, agents_per_env, task, max_episode_steps, frame_skip, env_id):
     print("make_env: ", grpc_address, env_id)
     def _init():
         # 注册环境，确保子进程中也能访问
-        register_env([grpc_address], task, max_episode_steps, frame_skip)
+        register_env([grpc_address], agents_per_env, task, max_episode_steps, frame_skip)
         env = gym.make(env_id)
         seed = int(env_id[-3:])
         env.unwrapped.set_seed_value(seed)
@@ -234,6 +235,7 @@ def testing_model(env, model):
 
             # setp_start = datetime.now()
             observation, reward, terminated, truncated, info = env.step(action)
+            env.render()
             # step_time = datetime.now() - setp_start
             # print("Step Time: ", step_time.total_seconds(), flush=True)
 
@@ -255,13 +257,13 @@ def testing_model(env, model):
 
     env.close()
 
-def train_model(grpc_addresses, task, max_episode_steps, frame_skip, model_type, total_timesteps, model_file):
+def train_model(grpc_addresses, agents_per_env, task, max_episode_steps, frame_skip, model_type, total_timesteps, model_file):
     try:
         print("simulation running... , grpc_addresses: ", grpc_addresses)
-        env_ids = register_env(grpc_addresses, task, max_episode_steps, frame_skip)
+        env_ids = register_env(env_name, task, max_episode_steps, frame_skip)
         env_num = len(env_ids)
 
-        env_fns = [make_env(grpc_address, task, max_episode_steps, frame_skip, env_id) for grpc_address, env_id in zip(grpc_addresses, env_ids)]
+        env_fns = [make_env(grpc_address, agents_per_env, task, max_episode_steps, frame_skip, env_id) for grpc_address, env_id in zip(grpc_addresses, env_ids)]
         env = SubprocVecEnv(env_fns)
 
         print("Start Simulation!")
@@ -307,6 +309,7 @@ def test_model(grpc_address, task, max_episode_steps, frame_skip, model_type, mo
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--grpc_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
+    parser.add_argument('--agents_per_env', type=int, default=1, help='The number of agents per env')
     parser.add_argument('--task', type=str, default='reach', help='The task to run (reach or pick_and_place)')
     parser.add_argument('--model_type', type=str, default='tqc', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
@@ -314,6 +317,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     grpc_addresses = args.grpc_addresses
+    agents_per_env = args.agents_per_env
     task = args.task
     model_type = args.model_type
     run_mode = args.run_mode
@@ -341,7 +345,7 @@ if __name__ == "__main__":
 
 
     if run_mode == "training":
-        train_model(grpc_addresses, task, MAX_EPISODE_STEPS_TRAINING, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
+        train_model(grpc_addresses, agents_per_env, task, MAX_EPISODE_STEPS_TRAINING, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
         test_model(grpc_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)
     elif run_mode == "testing":
         test_model(grpc_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)    
