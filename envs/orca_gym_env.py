@@ -207,6 +207,10 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     @property
     def dt(self) -> float:
         return self.gym.opt.timestep * self.frame_skip
+    
+    @property
+    def agent_num(self) -> int:
+        return len(self._agent_names)
 
     def do_simulation(self, ctrl, n_frames) -> None:
         """
