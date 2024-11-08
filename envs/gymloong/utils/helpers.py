@@ -130,7 +130,12 @@ def get_args():
         {"name": "--wandb_entity", "type": str, "help": "Enter your wandb entity username to track your experiment on your account."},
         {"name": "--wandb_group", "type": str, "default": "training_run", "help": "Enter the group name of the runs."},
         {"name": "--reward_scale", "type": float, "help": "Value to override reward scale with (which reward hard-coded in train.py)"},
-        {"name": "--pbrs", "type": int, "help": "PBRS or not (1, 0)"}
+        {"name": "--pbrs", "type": int, "help": "PBRS or not (1, 0)"},
+
+        {"name": "--frame_skip", "type": int, "default": 50, "help": "frame_skip"},
+        {"name": "--grpc_address", "type": str, "default": 'localhost:50051', "help": "grpc_address"},
+        {"name": "--agent_names", "type": str, "default": "", "help": "agent_names"},
+        {"name": "--time_step", "type": float, "default": 100000, "help": "time_step"},
     ]
 
     # 动态添加参数到解析器
@@ -141,7 +146,7 @@ def get_args():
     # 解析参数
     args = parser.parse_args()
 
-    args.sim_device = "cpu"
+    args.sim_device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # name alignment
     # args.sim_device_id = args.compute_device_id

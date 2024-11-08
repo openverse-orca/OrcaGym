@@ -48,7 +48,7 @@ class BaseRobotEnv(GoalEnv):
         super().__init__(
             frame_skip = frame_skip,
             grpc_address = grpc_address,
-            agent_names = agent_names,
+            agent_names = [agent_names],
             time_step = time_step,            
             observation_space = observation_space,
             action_space_type = action_space_type,
