@@ -33,6 +33,7 @@ class FrankaRobot:
         self._obj_site_name = self.name('obj_site')
         self._ee_name = self.name('ee_center_site')
         self._mocap_name = self.name('panda_mocap')
+        self._goal_name = self.name('goal')
         self._arm_joint_names = self.names(["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"])
         self._gripper_joint_names = self.names(["finger_joint1", "finger_joint2"])
 
@@ -89,6 +90,10 @@ class FrankaRobot:
     @property
     def mocap_name(self) -> str:
         return self._mocap_name
+    
+    @property
+    def goal_name(self) -> str:
+        return self._goal_name
     
     @property
     def goal(self) -> np.ndarray:
@@ -229,6 +234,13 @@ class FrankaRobot:
         # self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
         return mocap_xpos, self._initial_grasp_site_xquat, self._ctrl
 
+    def sample_object(self, np_random) -> None:
+        object_position = self._initial_object_qpos[0:3].copy()
+        noise = np_random.uniform(self._obj_range_low, self._obj_range_high)
+        object_position += noise
+        object_qpos = np.concatenate([object_position, self._initial_object_qpos[3:7].copy()])
+        # self.set_joint_qpos({"obj_joint": object_qpos})
+        return {self.obj_joint_name: object_qpos}
 
 class FrankaEnv(OrcaGymLocalEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1'}
@@ -277,7 +289,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         # self.goal_z_range = goal_z_range
 
 
-        self._agents = list[FrankaRobot]
+        self._agents = []
         for agent_name in agent_names:
             agent = FrankaRobot(agent_name, reward_type, has_object, block_gripper, distance_threshold, goal_xy_range, obj_xy_range, goal_x_offset, goal_z_range)
             self._agents.append(agent)
@@ -336,12 +348,12 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         [agent.set_initial_grasp_site_xpos(self.query_site_pos_and_quat([agent.ee_name])) for agent in self._agents]
 
-        [self.set_grasp_mocap(agent.mocap_name, agent.initial_grasp_site_xpos, 
+        [self._set_grasp_mocap(agent.mocap_name, agent.initial_grasp_site_xpos, 
                               agent.initial_grasp_site_xquat) for agent in self._agents]
 
         for agent in self._agents:
             agent_goal = agent.sample_goal(self.query_site_pos_and_quat([agent.ee_name]), self.np_random)
-            self.set_goal_mocap(agent_goal, agent.initial_grasp_site_xquat)
+            self._set_goal_mocap(agent_goal, agent.initial_grasp_site_xquat)
 
         # self.goal = self._sample_goal()
 
@@ -362,7 +374,7 @@ class FrankaEnv(OrcaGymLocalEnv):
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
-        self.set_joint_neutral()
+        self._set_joint_neutral()
 
         ctrl = [agent.neutral_joint_values for agent in self._agents]
         self.ctrl = np.array(ctrl).flat.copy()
@@ -370,7 +382,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         # self.ctrl = np.array(self.neutral_joint_values)
         self.set_ctrl(self.ctrl)
 
-        self.reset_mocap_welds()
+        self._reset_mocap_welds()
 
         self.mj_forward()
 
@@ -387,8 +399,8 @@ class FrankaEnv(OrcaGymLocalEnv):
         for agent, act in zip(self._agents, action):
             act = np.clip(act, self.action_space.low, self.action_space.high)
             mocap_xpos, mocap_xquat, ctrl = agent.set_action(act, ee_pos_quat)
-            self.set_grasp_mocap(agent.mocap_name, mocap_xpos, mocap_xquat)
-            self.set_gripper_ctrl(agent.gripper_joint_names, ctrl[-2:])
+            self._set_grasp_mocap(agent.mocap_name, mocap_xpos, mocap_xquat)
+            self._set_gripper_ctrl(agent.gripper_joint_names, ctrl[-2:])
 
         self.mj_forward()
         joint_qpos = self.query_joint_qpos(self._agent_joint_names)
@@ -405,12 +417,12 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         terminated = [bool(agent_info["is_success"] != 0) for agent_info in info]
         truncated = [False for _ in range(len(terminated))]
-        reward = [self.compute_reward(agent_obs["achieved_goal"], agent_obs["desired_goal"], agent_info) for agent_obs, agent_info in zip(obs, info)]
+        reward = [self._compute_reward(agent_obs["achieved_goal"], agent_obs["desired_goal"], agent_info) for agent_obs, agent_info in zip(obs, info)]
 
         return obs, reward, terminated, truncated, info
 
-    def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
-        d = self.goal_distance(achieved_goal, desired_goal)
+    def _compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
+        d = self._goal_distance(achieved_goal, desired_goal)
         if self._reward_type == "sparse":
             return -(d > self._distance_threshold).astype(np.float32)
         else:
@@ -450,7 +462,7 @@ class FrankaEnv(OrcaGymLocalEnv):
     #     joint_qpos = self.query_joint_qpos(self.arm_joint_names)
     #     self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
 
-    def _get_obs(self) -> dict:
+    def _get_obs(self) -> list[dict]:
         site_pos_quat = self.query_site_pos_and_quat(self._agent_ee_names)
         site_pos_mat = self.query_site_pos_and_mat(self._agent_obj_site_names)
         site_xvalp, site_xvalr = self.query_site_xvalp_xvalr(self._agent_obj_site_names)
@@ -519,24 +531,31 @@ class FrankaEnv(OrcaGymLocalEnv):
         # return result
 
     def _is_success(self, achieved_goal, desired_goal) -> np.float32:
-        d = self.goal_distance(achieved_goal, desired_goal)
+        d = self._goal_distance(achieved_goal, desired_goal)
         if d < self._distance_threshold:
             print("Task Sussecced: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
         return (d < self._distance_threshold).astype(np.float32)
 
-    def reset_model(self):
+    def reset_model(self) -> list[dict]:
         self._set_init_state()
-        self.set_grasp_mocap(self.initial_grasp_site_xpos, self.initial_grasp_site_xquat)
 
-        self._sample_object()
-        self.goal = self._sample_goal()
+        [self._set_grasp_mocap(agent.mocap_name, agent.initial_grasp_site_xpos, 
+                              agent.initial_grasp_site_xquat) for agent in self._agents]
+
+        [self.set_joint_qpos(agent.sample_object(self.np_random)) for agent in self._agents]
+
+        
+        [self._set_goal_mocap(agent.goal_name, agent.sample_goal(self.query_site_pos_and_quat([agent.ee_name]), self.np_random), 
+                              agent.initial_grasp_site_xquat) for agent in self._agents]
+
+        # self.goal = self._sample_goal()
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs
 
     # custom methods
     # -----------------------------
-    def reset_mocap_welds(self) -> None:
+    def _reset_mocap_welds(self) -> None:
         if self.model.nmocap > 0 and self.model.neq > 0:
             eq_list = self.model.get_eq_list()
             for eq in eq_list:
@@ -549,25 +568,25 @@ class FrankaEnv(OrcaGymLocalEnv):
                     self.update_equality_constraints([{"obj1_id": obj1_id, "obj2_id": obj2_id, "eq_data": eq_data}])
         self.mj_forward()
 
-    def goal_distance(self, goal_a, goal_b) -> SupportsFloat:
+    def _goal_distance(self, goal_a, goal_b) -> SupportsFloat:
         assert goal_a.shape == goal_b.shape
         return np.linalg.norm(goal_a - goal_b, axis=-1)
 
-    def set_grasp_mocap(self, mocap_name, position, orientation) -> None:
+    def _set_grasp_mocap(self, mocap_name, position, orientation) -> None:
         mocap_pos_and_quat_dict = {mocap_name: {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_gripper_ctrl(self, gripper_joint_names, ctrl) -> None:
+    def _set_gripper_ctrl(self, gripper_joint_names, ctrl) -> None:
         gripper_joint_qpos = {}
         for name, value in zip(gripper_joint_names, ctrl):
             gripper_joint_qpos[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos)
 
-    def set_goal_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
+    def _set_goal_mocap(self, goal_name, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {goal_name: {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_joint_neutral(self) -> None:
+    def _set_joint_neutral(self) -> None:
         # assign value to arm joints
         arm_joint_qpos = {}
         for agent in self._agents:
@@ -582,54 +601,54 @@ class FrankaEnv(OrcaGymLocalEnv):
             gripper_joint_qpos[name] = np.array([value])
         self.set_joint_qpos(gripper_joint_qpos)
 
-    def _sample_goal(self) -> np.ndarray:
-        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        if not self.has_object:
-            # goal = self.initial_grasp_site_xpos.copy()
-            EE_NAME = self.site("ee_center_site")
-            ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME]['xpos'].copy()
-            goal = ee_position.copy()
-        else:
-            goal = self.initial_object_xpos.copy()
+    # def _sample_goal(self) -> np.ndarray:
+    #     # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
+    #     if not self.has_object:
+    #         # goal = self.initial_grasp_site_xpos.copy()
+    #         EE_NAME = self.site("ee_center_site")
+    #         ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME]['xpos'].copy()
+    #         goal = ee_position.copy()
+    #     else:
+    #         goal = self.initial_object_xpos.copy()
 
-        noise = self.np_random.uniform(self.goal_range_low, self.goal_range_high)
+    #     noise = self.np_random.uniform(self.goal_range_low, self.goal_range_high)
 
-        # 避免与obj过度接近的情况
-        for i in range(2):
-            if noise[i] < self._distance_threshold + 0.01 and noise[i] > 0:
-                noise[i] = self._distance_threshold + 0.01
-            if noise[i] > -self._distance_threshold - 0.01 and noise[i] < 0:
-                noise[i] = -self._distance_threshold - 0.01
+    #     # 避免与obj过度接近的情况
+    #     for i in range(2):
+    #         if noise[i] < self._distance_threshold + 0.01 and noise[i] > 0:
+    #             noise[i] = self._distance_threshold + 0.01
+    #         if noise[i] > -self._distance_threshold - 0.01 and noise[i] < 0:
+    #             noise[i] = -self._distance_threshold - 0.01
 
-        # for the pick and place task
-        if not self.block_gripper and self.goal_z_range > 0.0:
-            if self.np_random.random() < 0.3:
-                noise[2] = 0.0
+    #     # for the pick and place task
+    #     if not self.block_gripper and self.goal_z_range > 0.0:
+    #         if self.np_random.random() < 0.3:
+    #             noise[2] = 0.0
         
-        goal += noise
-        goal[2] = max(0.02, goal[2])  # 确保在地面以上，考虑方块的高度，最低为0.02
-        # print("Goal position: ", goal)
-        self.set_goal_mocap(goal, self.initial_grasp_site_xquat)
-        return goal
+    #     goal += noise
+    #     goal[2] = max(0.02, goal[2])  # 确保在地面以上，考虑方块的高度，最低为0.02
+    #     # print("Goal position: ", goal)
+    #     self._set_goal_mocap(goal, self.initial_grasp_site_xquat)
+    #     return goal
 
-    def _sample_object(self) -> None:
-        object_position = self.initial_object_qpos[0:3].copy()
-        noise = self.np_random.uniform(self.obj_range_low, self.obj_range_high)
-        object_position += noise
-        object_qpos = np.concatenate([object_position, self.initial_object_qpos[3:7].copy()])
-        self.set_joint_qpos({"obj_joint": object_qpos})
+    # def _sample_object(self) -> None:
+    #     object_position = self.initial_object_qpos[0:3].copy()
+    #     noise = self.np_random.uniform(self.obj_range_low, self.obj_range_high)
+    #     object_position += noise
+    #     object_qpos = np.concatenate([object_position, self.initial_object_qpos[3:7].copy()])
+    #     self.set_joint_qpos({"obj_joint": object_qpos})
         # print("Object position: ", object_position)
 
-    def get_ee_position(self) -> np.ndarray:
-        xpos = self.query_site_pos_and_mat([self.site("ee_center_site")])[self.site("ee_center_site")]['xpos'].copy()
-        # print("EE position: ", xpos)
-        return xpos
+    # def get_ee_position(self) -> np.ndarray:
+    #     xpos = self.query_site_pos_and_mat([self.site("ee_center_site")])[self.site("ee_center_site")]['xpos'].copy()
+    #     # print("EE position: ", xpos)
+    #     return xpos
 
-    def get_fingers_width(self) -> np.ndarray:
-        qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
-        finger1 = qpos_dict[self.joint("finger_joint1")]
-        finger2 = qpos_dict[self.joint("finger_joint2")]
-        return finger1 + finger2
+    # def get_fingers_width(self) -> np.ndarray:
+    #     qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
+    #     finger1 = qpos_dict[self.joint("finger_joint1")]
+    #     finger2 = qpos_dict[self.joint("finger_joint2")]
+    #     return finger1 + finger2
 
     def get_observation(self, obs=None):
         if obs is not None:
