@@ -104,8 +104,10 @@ class FrankaRobot:
             self._gripper_ctrl_range = []
             
         for key, item in actuator_dict.items():
-            if key in self._gripper_joint_names:
-                self._gripper_ctrl_range.append(["CtrlRange"])
+            if item["JointName"] in self._gripper_joint_names:
+                self._gripper_ctrl_range.append(item["CtrlRange"])
+
+        print("Gripper control range: ", self._gripper_ctrl_range)
 
     def set_init_joint_state(self, obj_qpos, obj_site_xpos) -> None:
         self._initial_object_qpos = obj_qpos.copy()
@@ -120,7 +122,7 @@ class FrankaRobot:
     def sample_goal(self, ee_pos_quat, np_random) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
         if not self._has_object:
-            ee_position = ee_pos_quat['xpos'].copy()
+            ee_position = ee_pos_quat[self.ee_name]['xpos'].copy()
             goal = ee_position.copy()
         else:
             goal = self._initial_object_xpos.copy()
@@ -145,10 +147,10 @@ class FrankaRobot:
         self._goal = goal.copy()
         return goal
 
-    def get_obs(self, site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos) -> dict:
+    def get_obs(self, site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos, dt) -> dict:
         # robot
         ee_position = site_pos_quat[self.ee_name]['xpos'].copy()
-        ee_velocity = site_xvalp[self.ee_name].copy() * self.dt
+        ee_velocity = site_xvalp[self.obj_site_name].copy() * dt
 
         if not self._block_gripper:
             fingers_qpos = self._get_fingers_qpos(joint_qpos)
@@ -163,8 +165,8 @@ class FrankaRobot:
 
 
         # object linear velocities
-        object_velp = site_xvalp[self.obj_site_name].copy() * self.dt
-        object_velr = site_xvalr[self.obj_site_name].copy() * self.dt
+        object_velp = site_xvalp[self.obj_site_name].copy() * dt
+        object_velr = site_xvalr[self.obj_site_name].copy() * dt
 
         if not self._has_object:
             achieved_goal = ee_position.copy()
@@ -294,12 +296,19 @@ class FrankaEnv(OrcaGymLocalEnv):
             agent = FrankaRobot(agent_name, reward_type, has_object, block_gripper, distance_threshold, goal_xy_range, obj_xy_range, goal_x_offset, goal_z_range)
             self._agents.append(agent)
 
-        self._agent_ee_names = [agent.ee_name for agent in self._agents].flat.copy()
-        self._agent_obj_joint_names = [agent.obj_joint_name for agent in self._agents].flat.copy()
-        self._agent_obj_site_names = [agent.obj_site_name for agent in self._agents].flat.copy()
-        self._agent_mocap_names = [agent.mocap_name for agent in self._agents].flat.copy()
-        self._agent_gripper_joint_names = [agent.gripper_joint_names for agent in self._agents].flat.copy()
-        self._agent_joint_names = [agent.joint_names for agent in self._agents].flat.copy()
+        self._agent_ee_names = [agent.ee_name for agent in self._agents]
+        self._agent_obj_joint_names = [agent.obj_joint_name for agent in self._agents]
+        self._agent_obj_site_names = [agent.obj_site_name for agent in self._agents]
+        self._agent_mocap_names = [agent.mocap_name for agent in self._agents]
+        self._agent_gripper_joint_names = [gripper_joint_name for agent in self._agents for gripper_joint_name in agent.gripper_joint_names]
+        self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names]
+
+        print("Agent ee names: ", self._agent_ee_names)
+        print("Agent obj joint names: ", self._agent_obj_joint_names)
+        print("Agent obj site names: ", self._agent_obj_site_names)
+        print("Agent mocap names: ", self._agent_mocap_names)
+        print("Agent gripper joint names: ", self._agent_gripper_joint_names)
+        print("Agent joint names: ", self._agent_joint_names)
 
         # self.goal_range_low = np.array([-self.goal_xy_range / 2 + goal_x_offset, -self.goal_xy_range / 2, 0])
         # self.goal_range_high = np.array([self.goal_xy_range / 2 + goal_x_offset, self.goal_xy_range / 2, self.goal_z_range])
@@ -322,7 +331,7 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         # control range
         # self.ctrl_range = self.model.get_actuator_ctrlrange()
-        all_actuator = self.model.get_actuator()
+        all_actuator = self.model.get_actuator_dict()
         [agent.set_gripper_ctrl_range(all_actuator) for agent in self._agents]
 
         # index used to distinguish arm and gripper joints
@@ -353,7 +362,7 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         for agent in self._agents:
             agent_goal = agent.sample_goal(self.query_site_pos_and_quat([agent.ee_name]), self.np_random)
-            self._set_goal_mocap(agent_goal, agent.initial_grasp_site_xquat)
+            self._set_goal_mocap(agent.goal_name, agent_goal, agent.initial_grasp_site_xquat)
 
         # self.goal = self._sample_goal()
 
@@ -468,7 +477,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         site_xvalp, site_xvalr = self.query_site_xvalp_xvalr(self._agent_obj_site_names)
         joint_qpos = self.query_joint_qpos(self._agent_gripper_joint_names)
 
-        obs = [agent.get_obs(site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos) for agent in self._agents]
+        obs = [agent.get_obs(site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos, self.dt) for agent in self._agents]
         
         return obs
         
@@ -588,18 +597,16 @@ class FrankaEnv(OrcaGymLocalEnv):
 
     def _set_joint_neutral(self) -> None:
         # assign value to arm joints
-        arm_joint_qpos = {}
+        joint_qpos = {}
         for agent in self._agents:
             for name, value in zip(agent.arm_joint_names, agent.neutral_joint_values[0:7]):
-                arm_joint_qpos[name] = np.array([value])
-        
-        self.set_joint_qpos(arm_joint_qpos)
+                joint_qpos[name] = np.array([value])
+            for name, value in zip(agent.gripper_joint_names, agent.neutral_joint_values[7:9]):
+                joint_qpos[name] = np.array([value])
+
+        self.set_joint_qpos(joint_qpos)
 
         # assign value to finger joints
-        gripper_joint_qpos = {}
-        for name, value in zip(self.gripper_joint_names, self.neutral_joint_values[7:9]):
-            gripper_joint_qpos[name] = np.array([value])
-        self.set_joint_qpos(gripper_joint_qpos)
 
     # def _sample_goal(self) -> np.ndarray:
     #     # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
