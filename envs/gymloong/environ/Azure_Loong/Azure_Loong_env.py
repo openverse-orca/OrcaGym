@@ -23,6 +23,21 @@ def torch_rand_float(min_val, max_val, shape, device='cpu'):
     # 生成 [0, 1) 的随机浮点数，然后缩放并平移到 [min_val, max_val] 范围
     return min_val + (max_val - min_val) * torch.rand(shape, device=device)
 
+def exp_avg_filter(current_value, previous_avg, decay):
+    """
+    计算当前值的指数加权移动平均。
+
+    Args:
+        current_value (torch.Tensor): 当前输入值，shape = (num_envs, data_dim)
+        previous_avg (torch.Tensor): 前一时间步的平滑值，shape 与 current_value 相同
+        decay (float): 平滑因子，范围在 (0, 1] 之间
+
+    Returns:
+        torch.Tensor: 更新后的平滑值，shape = (num_envs, data_dim)
+    """
+    # 计算指数加权移动平均值
+    return decay * current_value + (1 - decay) * previous_avg
+
 
 class AzureLoongEnv(MujocoRobotEnv):
 
