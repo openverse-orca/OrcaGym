@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import warnings
 from collections import OrderedDict
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union, Iterable
 
 import gymnasium as gym
 import numpy as np
@@ -141,17 +141,18 @@ class SubprocVecEnvMA(VecEnv):
         print("rews: ", rews)
         print("dones: ", dones)
         print("infos: ", infos)
-        return _flatten_obs(obs, self.observation_space), np.stack(rews), np.stack(dones), infos  # type: ignore[return-value]
+        return _flatten_obs(obs, self.observation_space, self.agent_num), np.stack(rews), np.stack(dones), infos  # type: ignore[return-value]
 
     def reset(self) -> VecEnvObs:
         for env_idx, remote in enumerate(self.remotes):
             remote.send(("reset", (self._seeds[env_idx], self._options[env_idx])))
         results = [remote.recv() for remote in self.remotes]
         obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
+        print("subproc reset, obs: ", obs)
         # Seeds and options are only used once
         self._reset_seeds()
         self._reset_options()
-        return _flatten_obs(obs, self.observation_space)
+        return _flatten_obs(obs, self.observation_space, self.agent_num)
 
     def close(self) -> None:
         if self.closed:
@@ -217,8 +218,26 @@ class SubprocVecEnvMA(VecEnv):
         indices = self._get_indices(indices)
         return [self.remotes[i] for i in indices]
 
+    def _get_indices(self, indices: VecEnvIndices) -> Iterable[int]:
+        """
+        Override the base class method to handle the multi agent case.
+        """
+        remote_num = self.num_envs // self.agent_num
+        if indices is None:
+            indices = range(remote_num)
+        elif isinstance(indices, int):
+            indices = [indices]
+            if any(i >= remote_num for i in indices):
+                raise ValueError("Out of range indices")
+        return indices
 
-def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space) -> VecEnvObs:
+def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvObs]:
+    """
+    Split a list of observations into a list of observations per agent.
+    """
+
+
+def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space, agent_num) -> VecEnvObs:
     """
     Flatten observations, depending on the observation space.
 
@@ -235,6 +254,7 @@ def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Sp
     if isinstance(space, spaces.Dict):
         assert isinstance(space.spaces, OrderedDict), "Dict space must have ordered subspaces"
         assert isinstance(obs[0], dict), "non-dict observation for environment with Dict observation space"
+
         return OrderedDict([(k, np.stack([o[k] for o in obs])) for k in space.spaces.keys()])
     elif isinstance(space, spaces.Tuple):
         assert isinstance(obs[0], tuple), "non-tuple observation for environment with Tuple observation space"

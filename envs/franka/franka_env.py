@@ -29,13 +29,13 @@ class FrankaRobot:
         self._goal_z_range = goal_z_range
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
-        self._obj_joint_name = self.name('obj_joint')
-        self._obj_site_name = self.name('obj_site')
-        self._ee_name = self.name('ee_center_site')
-        self._mocap_name = self.name('panda_mocap')
-        self._goal_name = self.name('goal')
-        self._arm_joint_names = self.names(["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"])
-        self._gripper_joint_names = self.names(["finger_joint1", "finger_joint2"])
+        self._obj_joint_name = self.name_space('obj_joint')
+        self._obj_site_name = self.name_space('obj_site')
+        self._ee_name = self.name_space('ee_center_site')
+        self._mocap_name = self.name_space('panda_mocap')
+        self._goal_name = self.name_space('goal')
+        self._arm_joint_names = self.name_space_list(["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"])
+        self._gripper_joint_names = self.name_space_list(["finger_joint1", "finger_joint2"])
 
         self._goal_range_low = np.array([-self._goal_xy_range / 2 + goal_x_offset, -self._goal_xy_range / 2, 0])
         self._goal_range_high = np.array([self._goal_xy_range / 2 + goal_x_offset, self._goal_xy_range / 2, self._goal_z_range])
@@ -44,12 +44,15 @@ class FrankaRobot:
 
         self._ctrl = self._neutral_joint_values.copy()
 
+    @property
+    def name(self) -> str:
+        return self._agent_name
 
-    def name(self, name : str) -> str:
+    def name_space(self, name : str) -> str:
         return f"{self._agent_name}_{name}"
     
-    def names(self, names : list[str]) -> list[str]:
-        return [self.name(name) for name in names]
+    def name_space_list(self, names : list[str]) -> list[str]:
+        return [self.name_space(name) for name in names]
     
     @property
     def obj_joint_name(self) -> str:
@@ -371,7 +374,8 @@ class FrankaEnv(OrcaGymLocalEnv):
         self._set_action_space(block_gripper)
 
     def _set_obs_space(self):
-        self.observation_space = self.generate_observation_space(self._get_obs()[0])
+        self.observation_space = self.generate_observation_space(self._get_obs([self._agents[0]]))
+        print("Observation space: ", self.observation_space)
 
     def _set_action_space(self, block_gripper : bool):
         action_size = 3 if block_gripper else 4
@@ -420,7 +424,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         if self.render_mode == "human":
             self.render()
 
-        obs = self._get_obs().copy()
+        obs = self._get_obs(self._agents).copy()
 
         info = [{"is_success": self._is_success(agent_obs["achieved_goal"], agent_obs["desired_goal"])} for agent_obs in obs]
 
@@ -471,13 +475,17 @@ class FrankaEnv(OrcaGymLocalEnv):
     #     joint_qpos = self.query_joint_qpos(self.arm_joint_names)
     #     self.ctrl[:7] = np.array([joint_qpos[joint_name] for joint_name in self.arm_joint_names]).flat.copy()
 
-    def _get_obs(self) -> list[dict]:
+    def _get_obs(self, agents : list[FrankaRobot]) -> list[dict]:
         site_pos_quat = self.query_site_pos_and_quat(self._agent_ee_names)
         site_pos_mat = self.query_site_pos_and_mat(self._agent_obj_site_names)
         site_xvalp, site_xvalr = self.query_site_xvalp_xvalr(self._agent_obj_site_names)
         joint_qpos = self.query_joint_qpos(self._agent_gripper_joint_names)
 
-        obs = [agent.get_obs(site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos, self.dt) for agent in self._agents]
+        # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成mxn份
+        obs = agents[0].get_obs(site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos, self.dt)
+        for i in range(1, len(agents)):
+            agent_obs = agents[i].get_obs(site_pos_quat, site_pos_mat, site_xvalp, site_xvalr, joint_qpos, self.dt)
+            obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
         
         return obs
         
@@ -559,7 +567,7 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         # self.goal = self._sample_goal()
         self.mj_forward()
-        obs = self._get_obs().copy()
+        obs = self._get_obs(self._agents).copy()
         return obs
 
     # custom methods
@@ -661,4 +669,4 @@ class FrankaEnv(OrcaGymLocalEnv):
         if obs is not None:
             return obs
         else:
-            return self._get_obs().copy()
+            return self._get_obs(self._agents).copy()
