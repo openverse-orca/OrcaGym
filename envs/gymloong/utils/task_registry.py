@@ -151,6 +151,31 @@ class TaskRegistry():
             print(f"Loading model from: {resume_path}")
             runner.load(resume_path)
         return runner, train_cfg
+    
+    def make_alg_runner_baseline(self, env, name=None, args=None, train_cfg=None, log_root="default") -> Tuple[OnPolicyRunner, LeggedRobotCfgPPO]:
+        if args is None:
+            args = get_args()
+        # if config files are passed use them, otherwise load from the name
+        if train_cfg is None:
+            if name is None:
+                raise ValueError("Either 'name' or 'train_cfg' must be not None")
+            # load config files
+            _, train_cfg = self.get_cfgs(name)
+        else:
+            if name is not None:
+                print(f"'train_cfg' provided -> Ignoring 'name={name}'")
+        # override cfg from args (if specified)
+        _, train_cfg = update_cfg_from_args(None, train_cfg, args)
+
+        if log_root=="default":
+            log_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)
+            log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
+        elif log_root is None:
+            log_dir = None
+        else:
+            log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
+        
+        train_cfg_dict = class_to_dict(train_cfg)
 
 # make global task registry
 task_registry = TaskRegistry()
