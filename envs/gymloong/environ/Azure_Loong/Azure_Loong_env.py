@@ -1099,23 +1099,23 @@ class AzureLoongEnv(MujocoRobotEnv):
                     dtype=torch.float, device=self.device, requires_grad=False)
             # todo check for consistency (low first, high second)
 
-    def _create_heightfield(self):
-        """ Adds a heightfield terrain to the simulation, sets parameters based on the cfg.
-        """
-        hf_params = gymapi.HeightFieldParams()
-        hf_params.column_scale = self.cfg.terrain.horizontal_scale
-        hf_params.row_scale = self.cfg.terrain.horizontal_scale
-        hf_params.vertical_scale = self.cfg.terrain.vertical_scale
-        hf_params.nbRows = self.terrain.tot_cols
-        hf_params.nbColumns = self.terrain.tot_rows 
-        hf_params.transform.p.x = -self.cfg.terrain.border_size 
-        hf_params.transform.p.y = -self.cfg.terrain.border_size
-        hf_params.transform.p.z = 0.0
-        hf_params.static_friction = self.cfg.terrain.static_friction
-        hf_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        hf_params.restitution = self.cfg.terrain.restitution
-        self.gym.add_heightfield(self.sim, self.terrain.heightsamples, hf_params)
-        self.height_samples = torch.tensor(self.terrain.heightsamples).view(self.terrain.tot_rows, self.terrain.tot_cols).to(self.device)
+    # def _create_heightfield(self):
+    #     """ Adds a heightfield terrain to the simulation, sets parameters based on the cfg.
+    #     """
+    #     hf_params = gymapi.HeightFieldParams()
+    #     hf_params.column_scale = self.cfg.terrain.horizontal_scale
+    #     hf_params.row_scale = self.cfg.terrain.horizontal_scale
+    #     hf_params.vertical_scale = self.cfg.terrain.vertical_scale
+    #     hf_params.nbRows = self.terrain.tot_cols
+    #     hf_params.nbColumns = self.terrain.tot_rows 
+    #     hf_params.transform.p.x = -self.cfg.terrain.border_size 
+    #     hf_params.transform.p.y = -self.cfg.terrain.border_size
+    #     hf_params.transform.p.z = 0.0
+    #     hf_params.static_friction = self.cfg.terrain.static_friction
+    #     hf_params.dynamic_friction = self.cfg.terrain.dynamic_friction
+    #     hf_params.restitution = self.cfg.terrain.restitution
+    #     self.gym.add_heightfield(self.sim, self.terrain.heightsamples, hf_params)
+    #     self.height_samples = torch.tensor(self.terrain.heightsamples).view(self.terrain.tot_rows, self.terrain.tot_cols).to(self.device)
         
 # ########################## REWARDS ######################## #
 
