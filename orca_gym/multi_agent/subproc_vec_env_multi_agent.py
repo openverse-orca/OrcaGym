@@ -127,9 +127,12 @@ class SubprocVecEnvMA(VecEnv):
         super().__init__(len(env_fns) * agent_num, observation_space, action_space)
 
     def step_async(self, actions: np.ndarray) -> None:
-        print("actions: ", actions)
-        actions = np.split(actions, self.agent_num)
-        for remote, action in zip(self.remotes, actions):
+        # print("actions before : ", actions)
+        # 拼接 actions，将 remote_num * agent_num 个动作拼接成 remote_num 个动作
+        remote_actions = np.reshape(actions, (len(self.remotes), -1))
+            
+        # print("actions end : ", remote_actions)
+        for remote, action in zip(self.remotes, remote_actions):
             remote.send(("step", action))
         self.waiting = True
 
@@ -137,11 +140,11 @@ class SubprocVecEnvMA(VecEnv):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
         obs, rews, dones, infos, self.reset_infos = zip(*results)  # type: ignore[assignment]
-        print("obs: ", obs)
-        print("rews: ", rews)
-        print("dones: ", dones)
-        print("infos: ", infos)
-        return _flatten_obs(obs, self.observation_space, self.agent_num), np.stack(rews), np.stack(dones), infos  # type: ignore[return-value]
+        # print("obs: ", obs)
+        # print("rews: ", rews)
+        # print("dones: ", dones)
+        # print("infos: ", infos)
+        return _flatten_obs(obs, self.observation_space, self.agent_num), _flatten_reward(rews), _flatten_dones(dones), _flatten_info(infos, self.agent_num)  # type: ignore[return-value]
 
     def reset(self) -> VecEnvObs:
         for env_idx, remote in enumerate(self.remotes):
@@ -235,6 +238,23 @@ def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvO
     """
     Split a list of observations into a list of observations per agent.
     """
+    # 将 remote_num 个 obs 中，每个 nd.array 切成 agent_num 份，最后返回 agent_num * remote_num 个 obs
+
+    # print("Split multi agent obs list begin: ", obs)
+
+    splited_obs = []
+    for remote_obs in obs:
+        for i in range(agent_num):
+            splited_obs.append({})
+            for key, value in remote_obs.items():
+                assert len(value) >= agent_num, f"Number of agents in observation {key} is less than agent_num"
+                slice_len = len(value) // agent_num
+                value_slice = value[i * slice_len: (i + 1) * slice_len]
+                splited_obs[-1][key] = value_slice
+
+    # print("Split multi agent obs list end: ", splited_obs)
+
+    return splited_obs
 
 
 def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space, agent_num) -> VecEnvObs:
@@ -254,11 +274,120 @@ def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Sp
     if isinstance(space, spaces.Dict):
         assert isinstance(space.spaces, OrderedDict), "Dict space must have ordered subspaces"
         assert isinstance(obs[0], dict), "non-dict observation for environment with Dict observation space"
-
+        obs = _split_multi_agent_obs_list(obs, agent_num)
         return OrderedDict([(k, np.stack([o[k] for o in obs])) for k in space.spaces.keys()])
     elif isinstance(space, spaces.Tuple):
         assert isinstance(obs[0], tuple), "non-tuple observation for environment with Tuple observation space"
-        obs_len = len(space.spaces)
+        obs_len = len(space.spaces) * agent_num
         return tuple(np.stack([o[i] for o in obs]) for i in range(obs_len))  # type: ignore[index]
     else:
         return np.stack(obs)  # type: ignore[arg-type]
+
+def _slice_multi_agent_obs(obs: VecEnvObs, agent_num, agent_index) -> VecEnvObs:
+    """
+    Slice a dictionary of observations into a dictionary of observations per agent.
+    """
+    assert isinstance(obs, dict), "expected dict of observations"
+    assert agent_index < agent_num, "agent_index is out of range"
+    # 从 obs 中，取出指定 agent_index 的观测数据
+
+    # print("Slice multi agent obs begin: ", obs)
+
+    sliced_obs = {}
+    for key, value in obs.items():
+        assert len(value) >= agent_num, f"Number of agents in observation {key} is less than agent_num"
+        slice_len = len(value) // agent_num
+        sliced_obs[key] = value[agent_index * slice_len: (agent_index + 1) * slice_len]
+
+    # print("Slice multi agent obs end: ", sliced_obs)
+
+    return sliced_obs
+
+
+
+def _flatten_info(infos: Union[List[Dict[str, Any]], Tuple[Dict[str, Any]]], agent_num) -> Dict[str, List[Any]]:
+    """
+    Flatten infos, depending on the info space.
+
+    :param infos: infos.
+                  A list of infos, one per environment.
+                  Each environment info may be a dict.
+    :return: flattened infos.
+            A dict of lists.
+            Each list has the environment index as its first axis.
+    """
+    assert isinstance(infos, (tuple, list)), "expected list or tuple of infos per environment, got {}".format(type(infos))
+    assert len(infos) > 0, "need infos from at least one environment"
+
+    # 将 remote_num 个 info 中，每个 nd.array 切成 agent_num 份，最后返回 agent_num * remote_num 个 info
+    # is_success 原为每个 remote 有  agent_num 个值，现在切成 agent_num * remote_num 份
+    # TimeLimit.truncated 原为 remote_num 个值，现在切成 agent_num * remote_num 份
+    # terminal_observation 结构与 obs 相同，切分为 agent_num * remote_num 份
+
+    # print("Flatte info begin: ", infos)
+
+    flattened_infos = []
+    for info in infos:
+        for i in range(agent_num):
+            flattened_infos.append({})
+            for key, value in info.items():
+                if key == "is_success":
+                    assert len(value) >= agent_num, "Number of agents in info is_success is less than agent_num"
+                    slice_len = len(value) // agent_num
+                    value_slice = value[i * slice_len: (i + 1) * slice_len]
+                    flattened_infos[-1][key] = value_slice
+                if key == "TimeLimit.truncated":
+                    flattened_infos[-1][key] = value
+                elif key == "terminal_observation":
+                    flattened_infos[-1][key] = _slice_multi_agent_obs(value, agent_num, i)
+                else:
+                    flattened_infos[-1][key] = value
+            
+
+    # print("Flatte info end: ", flattened_infos)
+
+    return flattened_infos
+
+def _flatten_reward(rewards: Union[tuple, list]) -> np.ndarray:
+    """
+    Flatten rewards, depending on the reward space.
+
+    :param rewards: rewards.
+                    A list of rewards, one per environment.
+                    Each environment reward may be a NumPy array.
+    :return: flattened rewards.
+            A flattened NumPy array.
+            Each NumPy array has the environment index as its first axis.
+    """
+    assert isinstance(rewards, (tuple, list)), "expected list or tuple of rewards per environment, got {}".format(type(rewards))
+    assert len(rewards) > 0, "need rewards from at least one environment"
+
+    # print("Flatte reward begin: ", rewards)
+
+    flattened_rewards = tuple(np.concatenate(rewards))
+
+    # print("Flatte reward end: ", flattened_rewards)
+
+    return np.stack(flattened_rewards)  # type: ignore[arg-type]
+
+def _flatten_dones(dones: Union[tuple, list]) -> np.ndarray:
+    """
+    Flatten dones, depending on the done space.
+
+    :param dones: dones.
+                  A list of dones, one per environment.
+                  Each environment done may be a NumPy array.
+    :return: flattened dones.
+            A flattened NumPy array.
+            Each NumPy array has the environment index as its first axis.
+    """
+    assert isinstance(dones, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(dones))
+    assert len(dones) > 0, "need dones from at least one environment"
+
+    # print("Flatte dones begin: ", dones)
+
+    flattend_dones = tuple(np.concatenate(dones))
+
+    # print("Flatte dones end: ", flattend_dones)
+
+    return np.stack(flattend_dones)  # type: ignore[arg-type]

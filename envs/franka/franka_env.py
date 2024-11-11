@@ -205,6 +205,9 @@ class FrankaRobot:
             "achieved_goal": achieved_goal,
             "desired_goal": desired_goal,
         }
+
+        # print("Agent Obs: ", result)
+
         return result
 
     def _get_fingers_qpos(self, joint_qpos) -> np.ndarray:
@@ -401,11 +404,12 @@ class FrankaEnv(OrcaGymLocalEnv):
 
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        if len(action) != len(self._agents):
+        if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
-
-        if np.array(action[0]).shape != self.action_space.shape:
-            raise ValueError("Action dimension mismatch")
+        
+        # 切分action 给每个 agent
+        action = np.array(action).reshape(len(self._agents), -1)
+        # print("Split action: ", action)
 
         # for every agent, calculate the mocap and gripper control
         ee_pos_quat = self.query_site_pos_and_quat(self._agent_ee_names)
@@ -426,15 +430,30 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         obs = self._get_obs(self._agents).copy()
 
-        info = [{"is_success": self._is_success(agent_obs["achieved_goal"], agent_obs["desired_goal"])} for agent_obs in obs]
+        # print("step Obs: ", obs)
 
-        terminated = [bool(agent_info["is_success"] != 0) for agent_info in info]
-        truncated = [False for _ in range(len(terminated))]
-        reward = [self._compute_reward(agent_obs["achieved_goal"], agent_obs["desired_goal"], agent_info) for agent_obs, agent_info in zip(obs, info)]
+        achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
+        desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
+
+        info = {"is_success": np.zeros(len(self._agents))}
+        reward = np.zeros(len(self._agents))
+        terminated = [False for _ in range(len(self._agents))]
+        truncated = [False for _ in range(len(self._agents))]
+        for i in range(len(self._agents)):
+            info["is_success"][i] = self._is_success(obs["achieved_goal"][i * achieved_goal_shape : (i + 1) * achieved_goal_shape], 
+                                                    obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape])
+            terminated[i] = bool(info["is_success"][i] != 0)
+            reward[i] = self.compute_reward(obs["achieved_goal"][i * achieved_goal_shape : (i + 1) * achieved_goal_shape],
+                                                obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape], info)
+        
+        # print("step Reward: ", reward)
+        # print("step Terminated: ", terminated)
+        # print("step Truncated: ", truncated)
+        # print("step Info: ", info)
 
         return obs, reward, terminated, truncated, info
 
-    def _compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
+    def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
         d = self._goal_distance(achieved_goal, desired_goal)
         if self._reward_type == "sparse":
             return -(d > self._distance_threshold).astype(np.float32)

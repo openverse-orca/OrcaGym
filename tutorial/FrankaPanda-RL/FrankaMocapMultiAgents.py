@@ -266,7 +266,7 @@ def generate_env_list(orcagym_addresses, subenv_num):
         for i in range(subenv_num):
             orcagym_addr_list.append(orcagym_addr)
             env_index_list.append(i)
-            render_mode_list.append("human")
+            render_mode_list.append("force")
 
     return orcagym_addr_list, env_index_list, render_mode_list
 
@@ -362,7 +362,7 @@ if __name__ == "__main__":
 
 
     if run_mode == "training":
-        train_model(orcagym_addresses, subenv_num, agent_num, task, MAX_EPISODE_STEPS_TRAINING, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
+        train_model(orcagym_addresses, subenv_num, agent_num, task, MAX_EPISODE_STEPS_TRAINING * agent_num, FRAME_SKIP_TRAINING, model_type, total_timesteps, model_file)
         test_model(orcagym_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)
     elif run_mode == "testing":
         test_model(orcagym_addresses[0], task, MAX_EPISODE_STEPS_TESTING, FRAME_SKIP_TESTING, model_type, model_file)    
