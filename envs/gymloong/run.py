@@ -3,13 +3,14 @@ import sys
 import argparse
 import time
 
-current_file_path = os.path.abspath('')
-project_root = os.path.dirname(os.path.dirname(current_file_path))
+current_file_path = os.path.realpath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
 
 # 将项目根目录添加到 PYTHONPATH
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+print(f'Project root: {project_root}')
 
 import gymnasium as gym
 from stable_baselines3 import PPO, SAC, DDPG
@@ -28,11 +29,11 @@ import numpy as np
 def register_env(grpc_addresses, task, max_episode_steps, frame_skip):
     env_ids = []
     for grpc_address in grpc_addresses:
-        env_id = f"PandaMocap-v0-OrcaGym-{grpc_address[-3:]}"
+        env_id = f"AzureLoong-v0-OrcaGym-{grpc_address[-3:]}"
         print("register_env: ", env_id)
         gym.register(
             id=env_id,
-            entry_point=f"envs.panda_mocap.{task}",
+            entry_point=f"envs.gymloong.environ.Azure_Loong.{task}",
             kwargs={'frame_skip': frame_skip, 
                     'reward_type': "sparse",
                     'action_space_type': ActionSpaceType.CONTINUOUS,
@@ -147,14 +148,14 @@ def train_model(grpc_addresses, task, max_episode_steps, frame_skip, model_type,
         print("Start Simulation!")
         if model_type == "ppo":
             continue_training_ppo(env, env_num, total_timesteps, max_episode_steps, model_file)
-        elif model_type == "tqc":
-            continue_training_tqc(env, env_num, total_timesteps, max_episode_steps, model_file)
-        elif model_type == "sac":
-            continue_training_sac(env, env_num, total_timesteps, max_episode_steps, model_file)
-        elif model_type == "ddpg":
-            continue_training_ddpg(env, env_num, total_timesteps, max_episode_steps, model_file)
-        else:
-            raise ValueError("Invalid model type")
+        # elif model_type == "tqc":
+        #     continue_training_tqc(env, env_num, total_timesteps, max_episode_steps, model_file)
+        # elif model_type == "sac":
+        #     continue_training_sac(env, env_num, total_timesteps, max_episode_steps, model_file)
+        # elif model_type == "ddpg":
+        #     continue_training_ddpg(env, env_num, total_timesteps, max_episode_steps, model_file)
+        # else:
+        #     raise ValueError("Invalid model type")
     except KeyboardInterrupt:
         print("退出仿真环境")
         env.close()
@@ -187,8 +188,8 @@ def test_model(grpc_address, task, max_episode_steps, frame_skip, model_type, mo
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--grpc_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--task', type=str, default='reach', help='The task to run (reach or pick_and_place)')
-    parser.add_argument('--model_type', type=str, default='tqc', help='The model to use (ppo/tqc/sac/ddpg)')
+    parser.add_argument('--task', type=str, default='Azure_Loong_env', help='The task to run (reach or pick_and_place)')
+    parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
     parser.add_argument('--total_timesteps', type=int, default=100000, help='The total timesteps to train the model')
     args = parser.parse_args()
@@ -199,18 +200,20 @@ if __name__ == "__main__":
     run_mode = args.run_mode
     total_timesteps = args.total_timesteps
 
-    model_file = f"panda_mocap_{task}_{model_type}_{total_timesteps}_model"
+    model_file = f"azureloong_{task}_{model_type}_{total_timesteps}_model"
 
-    if task == 'reach':
-        task = 'reach:FrankaReachEnv'
-    elif task == 'pick_and_place':
-        task = 'pick_and_place:FrankaPickAndPlaceEnv'
-    elif task == 'push':
-        task = 'push:FrankaPushEnv'
-    elif task == 'slide':
-        task = 'slide:FrankaSlideEnv'
-    else:
-        raise ValueError("Invalid task")
+    # if task == 'reach':
+    #     task = 'reach:FrankaReachEnv'
+    # elif task == 'pick_and_place':
+    #     task = 'pick_and_place:FrankaPickAndPlaceEnv'
+    # elif task == 'push':
+    #     task = 'push:FrankaPushEnv'
+    # elif task == 'slide':
+    #     task = 'slide:FrankaSlideEnv'
+    # else:
+    #     raise ValueError("Invalid task")
+    
+    task = 'Azure_Loong_env:AzureLoongEnv'
 
     # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
     MAX_EPISODE_STEPS_TRAINING = 50

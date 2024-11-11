@@ -5,6 +5,7 @@ import random
 from typing import Optional
 from envs.robot_env import MujocoRobotEnv
 from envs.gymloong.environ.base.legged_robot_config import LeggedRobotCfg
+from .Azure_Loong_config import Azure_Loong_config
 
 
 def torch_rand_float(min_val, max_val, shape, device='cpu'):
@@ -41,7 +42,13 @@ def exp_avg_filter(current_value, previous_avg, decay):
 
 class AzureLoongEnv(MujocoRobotEnv):
 
-    def __init__(self, cfg: LeggedRobotCfg, args):
+    def __init__(self,
+                frame_skip: int,        
+                grpc_address: str,
+                agent_names: list,
+                time_step: float,    
+                reward_type: str,
+                **kwargs,):
         """ Parses the provided config file,
             calls create_sim() (which creates, simulation, terrain and environments),
             initilizes pytorch buffers used during training
@@ -54,20 +61,20 @@ class AzureLoongEnv(MujocoRobotEnv):
             device_id (int): 0, 1, ...
             headless (bool): Run without rendering if True
         """
+        self.cfg = Azure_Loong_config()
         super().__init__(
-            frame_skip=args.frame_skip,
-            grpc_address=args.grpc_address,
-            agent_names=args.agent_names,
-            time_step=args.time_step,
-            n_actions=cfg.env.num_actions,
+            frame_skip=frame_skip,
+            grpc_address=grpc_address,
+            agent_names=agent_names,
+            time_step=time_step,
+            n_actions=self.cfg.env.num_actions,
             observation_space=None,  # 将在下面定义
-            action_space_type=None,
-            action_step_count=None
+            **kwargs,
         )
         if hasattr(self, "_custom_init"):
-            self._custom_init(cfg)
+            self._custom_init()
 
-    def _custom_init(self, cfg):
+    def _custom_init(self):
         self.dt_step = self.cfg.sim.dt * self.cfg.control.decimation
         self.pbrs_gamma = 0.99
         self.phase = torch.zeros(
