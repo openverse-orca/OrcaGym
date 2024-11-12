@@ -1,0 +1,133 @@
+<mujoco model="OGHR_wholeBody">
+  <compiler angle="radian"/>
+
+  <worldbody>
+    <geom size="0.174519 0.250794" pos="-0.0139522 -0.00175001 0.195282" type="cylinder" rgba="0.752941 0.752941 0.752941 1"/>
+    <body name="Link-head" pos="0.009 -0.00175 0.415197">
+      <inertial pos="0.00675716 -0.00156849 0.0869803" quat="0.701744 0.712422 0.00287511 -0.00134849" mass="6.17377" diaginertia="0.00531355 0.005263 0.00411666"/>
+      <joint name="Joint-head" pos="0 0 0" axis="0 0 1" range="-1.5708 1.5708" actuatorfrcrange="-26 26"/>
+    </body>
+    <body name="Link-waist-pitch" pos="0 -0.066 0">
+      <inertial pos="-0.000763112 0.0406491 -2.2388e-05" quat="0.500587 0.503814 0.505293 0.490167" mass="2.51932" diaginertia="0.00468571 0.00408474 0.00308493"/>
+      <joint name="Joint-waist-pitch" pos="0 0 0" axis="0 1 0" range="-0.29671 0.7854" actuatorfrcrange="-315 315"/>
+      <body name="Link-waist-roll" pos="-0.065 0.0645002 0">
+        <inertial pos="0.00845282 1.33729e-05 -0.0178675" quat="0.420221 0.568292 0.570969 0.417676" mass="2.80248" diaginertia="0.006529 0.00594661 0.00485849"/>
+        <joint name="Joint-waist-roll" pos="0 0 0" axis="-1 0 0" range="-0.69813 0.69813" actuatorfrcrange="-315 315"/>
+        <body name="Link-waist-yaw" pos="0.0685 0 -0.0980001">
+          <inertial pos="-0.0929736 0.000149482 -0.0563712" quat="0.705292 0.704354 0.0563181 -0.0572447" mass="7.75175" diaginertia="0.0229678 0.0185135 0.010643"/>
+          <joint name="Joint-waist-yaw" pos="0 0 0" axis="0 0 -1" range="-0.7854 0.7854" actuatorfrcrange="-121 121"/>
+          <body name="Link-hip-r-roll" pos="-0.08925 -0.12 -0.069">
+            <inertial pos="0.0763902 3.03512e-05 0.0143062" quat="0.00119945 0.714396 -0.00126727 0.69974" mass="1.80239" diaginertia="0.00272605 0.00169536 0.00125115"/>
+            <joint name="Joint-hip-r-roll" pos="0 0 0" axis="1 0 0" range="-0.17453 0.43633" actuatorfrcrange="-320 320"/>
+            <body name="Link-hip-r-yaw" pos="0.084 0 -0.0085">
+              <inertial pos="1.96935e-08 0.00792742 -0.0418047" quat="0.946912 0.321492 0 0" mass="0.454709" diaginertia="0.000973165 0.000904719 0.000402039"/>
+              <joint name="Joint-hip-r-yaw" pos="0 0 0" axis="0 0 1" range="-0.69813 0.69813" actuatorfrcrange="-160 160"/>
+              <body name="Link-hip-r-pitch" pos="0 0.042 -0.0915">
+                <inertial pos="0.00082061 -0.0604024 -0.109517" quat="0.708092 -0.0083477 -0.000601604 0.706071" mass="7.95221" diaginertia="0.0594962 0.0503949 0.0130436"/>
+                <joint name="Joint-hip-r-pitch" pos="0 0 0" axis="0 -1 0" range="-0.7854 1.8326" actuatorfrcrange="-396 396"/>
+                <body name="Link-knee-r-pitch" pos="0 -0.03675 -0.4">
+                  <inertial pos="0.000639236 9.62808e-05 -0.15349" quat="0.70769 -0.0011083 0.00395068 0.706511" mass="3.11551" diaginertia="0.0198799 0.0186295 0.00190828"/>
+                  <joint name="Joint-knee-r-pitch" pos="0 0 0" axis="0 -1 0" range="-2.35619 0.08727" actuatorfrcrange="-396 396"/>
+                  <body name="Link-ankel-r-pitch" pos="0 0 -0.387">
+                    <inertial pos="0 0 0" mass="0.106605" diaginertia="1.57904e-05 1.57904e-05 1.31288e-05"/>
+                    <joint name="Joint-ankel-r-pitch" pos="0 0 0" axis="0 -1 0" range="-0.43633 0.61087" actuatorfrcrange="-58.5 58.5"/>
+                    <geom size="0.0192257 0.019001" pos="-4.38146e-06 -4.34282e-06 4.45046e-10" quat="1 -4.90973e-05 2.12538e-06 4.90973e-05" type="cylinder" rgba="0.65098 0.619608 0.588235 1"/>
+                    <body name="Link-ankel-r-roll">
+                      <inertial pos="0.0250704 1.34105e-06 -0.0402505" quat="4.9772e-05 0.735975 -1.8251e-05 0.677009" mass="0.961268" diaginertia="0.00487628 0.0044402 0.000704242"/>
+                      <joint name="Joint-ankel-r-roll" pos="0 0 0" axis="1 0 0" range="-0.43633 0.43633" actuatorfrcrange="-58.5 58.5"/>
+                      <geom size="0.005 0.125" pos="0.0485 -0.04 -0.063" quat="0.707105 0 0.707108 0" type="cylinder" rgba="0.752941 0.752941 0.752941 1"/>
+                      <geom size="0.005 0.125" pos="0.0485 0.04 -0.063" quat="0.707105 0 0.707108 0" type="cylinder" rgba="0.752941 0.752941 0.752941 1"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+          <body name="Link-hip-l-roll" pos="-0.08925 0.12 -0.069">
+            <inertial pos="0.0763902 3.03513e-05 0.0143062" quat="0.00119945 0.714396 -0.00126728 0.69974" mass="1.80239" diaginertia="0.00272605 0.00169536 0.00125115"/>
+            <joint name="Joint-hip-l-roll" pos="0 0 0" axis="1 0 0" range="-0.17453 0.43633" actuatorfrcrange="-320 320"/>
+            <body name="Link-hip-l-yaw" pos="0.084 0 -0.0085">
+              <inertial pos="-1.96942e-08 -0.00792742 -0.0418047" quat="0.946912 -0.321492 0 0" mass="0.454709" diaginertia="0.000973165 0.000904719 0.000402039"/>
+              <joint name="Joint-hip-l-yaw" pos="0 0 0" axis="0 0 1" range="-0.69813 0.69813" actuatorfrcrange="-160 160"/>
+              <body name="Link-hip-l-pitch" pos="0 -0.042 -0.0915">
+                <inertial pos="0.00105388 0.0604023 -0.109523" quat="0.706427 -0.000327805 -0.00807602 0.70774" mass="7.95222" diaginertia="0.0594963 0.0503975 0.0130413"/>
+                <joint name="Joint-hip-l-pitch" pos="0 0 0" axis="0 -1 0" range="-0.7854 1.8326" actuatorfrcrange="-396 396"/>
+                <body name="Link-knee-l-pitch" pos="0 0.03675 -0.4">
+                  <inertial pos="0.000859577 -9.62775e-05 -0.15332" quat="0.706564 0.0041656 -0.000830509 0.707636" mass="3.11551" diaginertia="0.0198798 0.0186225 0.00191536"/>
+                  <joint name="Joint-knee-l-pitch" pos="0 0 0" axis="0 -1 0" range="-2.35619 0.08727" actuatorfrcrange="-396 396"/>
+                  <body name="Link-ankel-l-pitch" pos="0 0 -0.387">
+                    <inertial pos="0 0 0" mass="0.106605" diaginertia="1.57904e-05 1.57904e-05 1.31288e-05"/>
+                    <joint name="Joint-ankel-l-pitch" pos="0 0 0" axis="0 -1 0" range="-0.43644 0.61087" actuatorfrcrange="-58.5 58.5"/>
+                    <geom size="0.0192257 0.019001" pos="4.38146e-06 4.34282e-06 4.45046e-10" quat="1 4.90973e-05 -2.12538e-06 4.90973e-05" type="cylinder" rgba="0.65098 0.619608 0.588235 1"/>
+                    <body name="Link-ankel-l-roll">
+                      <inertial pos="0.0250707 1.34004e-06 -0.0402494" quat="6.46646e-05 0.735975 -1.23541e-06 0.677008" mass="0.961268" diaginertia="0.00487628 0.0044402 0.000704241"/>
+                      <joint name="Joint-ankel-l-roll" pos="0 0 0" axis="1 0 0" range="-0.43633 0.43633" actuatorfrcrange="-58.5 58.5"/>
+                      <geom size="0.005 0.125" pos="0.0485 -0.04 -0.063" quat="0.707105 0 0.707108 0" type="cylinder" rgba="0.752941 0.752941 0.752941 1"/>
+                      <geom size="0.005 0.125" pos="0.0485 0.04 -0.063" quat="0.707105 0 0.707108 0" type="cylinder" rgba="0.752941 0.752941 0.752941 1"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="Link-arm-l-01" pos="0.004 0.15985 0.3922">
+      <inertial pos="-0.00306104 0.0383761 -1.81718e-06" quat="-0.00469068 0.707099 0.00404108 0.707087" mass="0.78" diaginertia="0.000900041 0.00085998 0.000598217"/>
+      <joint name="Joint-arm-l-01" pos="0 0 0" axis="0 1 0" range="-2.96706 2.96706" actuatorfrcrange="-80 80" damping="2"/>
+      <body name="Link-arm-l-02" pos="-0.0416 0.041 0">
+        <inertial pos="0.0416 0.0674307 0" quat="0.5 0.5 -0.5 0.5" mass="0.985" diaginertia="0.00226269 0.00173099 0.00115402"/>
+        <joint name="Joint-arm-l-02" pos="0 0 0" axis="-1 0 0" range="-1.8326 1.8326" actuatorfrcrange="-80 80" damping="2"/>
+        <body name="Link-arm-l-03" pos="0.0416 0.1226 0">
+          <inertial pos="0.00141358 0.164663 0.0207579" quat="0.443733 0.531498 -0.560481 0.454392" mass="0.959" diaginertia="0.00210134 0.00206459 0.000754802"/>
+          <joint name="Joint-arm-l-03" pos="0 0 0" axis="0 1 0" range="-2.96706 2.96706" actuatorfrcrange="-48 48" damping="2"/>
+          <body name="Link-arm-l-04" pos="-0.0353 0.1774 0.024">
+            <inertial pos="0.038727 0.0607672 -0.0210032" quat="0.467371 0.52344 -0.327692 0.632608" mass="0.6" diaginertia="0.00109257 0.000712419 0.000645098"/>
+            <joint name="Joint-arm-l-04" pos="0 0 0" axis="1 0 0" range="0 2.96706" actuatorfrcrange="-48 48" damping="2"/>
+            <body name="Link-arm-l-05" pos="0.0353 0.1035 -0.024">
+              <inertial pos="-3.27118e-05 0.0686581 -0.000111778" quat="0.7078 0.706411 -0.00120729 0.0014061" mass="0.689758" diaginertia="0.00235883 0.00215128 0.000352535"/>
+              <joint name="Joint-arm-l-05" pos="0 0 0" axis="0 1 0" range="-2.96706 2.96706" actuatorfrcrange="-12.4 12.4" damping="2"/>
+              <body name="Link-arm-l-06" pos="0.0262 0.1965 0">
+                <inertial pos="-0.0257777 8.95877e-07 0.00166373" quat="0.707081 -0.00185128 -0.00188402 0.707128" mass="0.28" diaginertia="0.000156927 0.000145598 0.000104981"/>
+                <joint name="Joint-arm-l-06" pos="0 0 0" axis="-1 0 0" range="-1.8326 1.8326" actuatorfrcrange="-12.4 12.4" damping="2"/>
+                <body name="Link-arm-l-07" pos="-0.0262 0 0.0318">
+                  <inertial pos="0.0077671 0.156741 -0.0352773" quat="0.561019 0.548973 -0.435112 0.441094" mass="0.593416" diaginertia="0.00226945 0.0018047 0.00068408"/>
+                  <joint name="Joint-arm-l-07" pos="0 0 0" axis="0 0 1" range="-1.0472 1.0472" actuatorfrcrange="-12.4 12.4" damping="2"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="Link-arm-r-01" pos="0.004 -0.16335 0.392197">
+      <inertial pos="0.00306104 -0.0383761 -1.81718e-06" quat="-0.00404108 0.707087 0.00469068 0.707099" mass="0.78" diaginertia="0.000900041 0.00085998 0.000598217"/>
+      <joint name="Joint-arm-r-01" pos="0 0 0" axis="0 -1 0" range="-2.96706 2.96706" actuatorfrcrange="-80 80" damping="2"/>
+      <body name="Link-arm-r-02" pos="-0.0438 -0.041 0">
+        <inertial pos="0.0438 -0.0674307 0" quat="0.5 0.5 -0.5 0.5" mass="0.985" diaginertia="0.00226269 0.00173099 0.00115402"/>
+        <joint name="Joint-arm-r-02" pos="0 0 0" axis="-1 0 0" range="-1.8326 1.8326" actuatorfrcrange="-80 80" damping="2"/>
+        <body name="Link-arm-r-03" pos="0.0438 -0.1226 0">
+          <inertial pos="-0.00141358 -0.164663 0.0207579" quat="0.560481 0.454392 -0.443733 0.531498" mass="0.959" diaginertia="0.00210134 0.00206459 0.000754802"/>
+          <joint name="Joint-arm-r-03" pos="0 0 0" axis="0 -1 0" range="-2.96706 2.96706" actuatorfrcrange="-48 48" damping="2"/>
+          <body name="Link-arm-r-04" pos="-0.0425 -0.1774 0.024">
+            <inertial pos="0.039073 -0.0607672 -0.0210032" quat="0.327692 0.632608 -0.467371 0.52344" mass="0.6" diaginertia="0.00109257 0.000712419 0.000645098"/>
+            <joint name="Joint-arm-r-04" pos="0 0 0" axis="-1 0 0" range="0 2.96706" actuatorfrcrange="-48 48" damping="2"/>
+            <body name="Link-arm-r-05" pos="0.0425 -0.1035 -0.024">
+              <inertial pos="3.27118e-05 -0.0686581 -0.000111778" quat="0.706411 0.7078 0.0014061 -0.00120729" mass="0.689758" diaginertia="0.00235883 0.00215128 0.000352535"/>
+              <joint name="Joint-arm-r-05" pos="0 0 0" axis="0 -1 0" range="-2.96706 2.96706" actuatorfrcrange="-12.4 12.4" damping="2"/>
+              <body name="Link-arm-r-06" pos="-0.0265 -0.1965 0">
+                <inertial pos="0.0260777 -8.95882e-07 0.00166373" quat="0.707081 0.00185128 0.00188402 0.707128" mass="0.28" diaginertia="0.000156927 0.000145598 0.000104981"/>
+                <joint name="Joint-arm-r-06" pos="0 0 0" axis="1 0 0" range="-1.8326 1.8326" actuatorfrcrange="-12.4 12.4" damping="2"/>
+                <body name="Link-arm-r-07" pos="0.0265 0 0.0318">
+                  <inertial pos="0.0077674 -0.156754 -0.0352738" quat="0.549017 0.560992 -0.441113 0.435073" mass="0.593523" diaginertia="0.00226997 0.00180519 0.000684114"/>
+                  <joint name="Joint-arm-r-07" pos="0 0 0" axis="0 0 1" range="-1.0472 1.0472" actuatorfrcrange="-12.4 12.4" damping="2"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>
