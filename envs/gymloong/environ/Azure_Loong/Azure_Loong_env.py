@@ -1,5 +1,6 @@
 import torch
 import os
+import numpy as np
 from collections import deque
 import random
 from typing import Optional
@@ -62,6 +63,18 @@ class AzureLoongEnv(MujocoRobotEnv):
             headless (bool): Run without rendering if True
         """
         self.cfg = Azure_Loong_config()
+        self.obs_buf = None
+
+        self.num_envs = self.cfg.env.num_envs
+        self.num_obs = self.cfg.env.num_observations
+        self.num_privileged_obs = self.cfg.env.num_privileged_obs
+        self.num_actions = self.cfg.env.num_actions
+
+        self.num_dof = 1
+        self.num_bodies = 1
+
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
         super().__init__(
             frame_skip=frame_skip,
             grpc_address=grpc_address,
@@ -71,6 +84,7 @@ class AzureLoongEnv(MujocoRobotEnv):
             observation_space=None,  # 将在下面定义
             **kwargs,
         )
+        self._create_envs()
         if hasattr(self, "_custom_init"):
             self._custom_init()
 
@@ -382,6 +396,14 @@ class AzureLoongEnv(MujocoRobotEnv):
         if self.add_noise:
             self.obs_buf += (2*torch.rand_like(self.obs_buf) - 1) \
                 * self.noise_scale_vec
+    
+    def _get_obs(self):
+        result = {
+            "observation": self.obs_buf if self.obs_buf is not None else np.array([]),
+            "achieved_goal": np.array([]),
+            "desired_goal": np.array([]),
+        }
+        return result
 
 
     def _get_noise_scale_vec(self, cfg):
