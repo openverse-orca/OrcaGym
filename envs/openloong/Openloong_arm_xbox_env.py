@@ -43,7 +43,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.nq = self.model.nq
         # 9 arm joints and 6 free joints
         self.nv = self.model.nv
-
+        self.goal = self._sample_goal()
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
                                  self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
@@ -346,7 +346,13 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             "desired_goal": desired_goal,
         }
         return result
-
+    def set_goal_mocap(self, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+    def _sample_goal(self) -> np.ndarray:
+        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
+        goal = np.array([0, 0, 0])
+        return goal
     def reset_model(self):
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
