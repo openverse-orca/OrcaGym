@@ -40,6 +40,20 @@ def exp_avg_filter(current_value, previous_avg, decay):
     # 计算指数加权移动平均值
     return decay * current_value + (1 - decay) * previous_avg
 
+def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
+    return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
+
+@torch.jit.script
+def quat_rotate_inverse(q, v):
+    shape = q.shape
+    q_w = q[:, -1]
+    q_vec = q[:, :3]
+    a = v * (2.0 * q_w ** 2 - 1.0).unsqueeze(-1)
+    b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
+    c = q_vec * \
+        torch.bmm(q_vec.view(shape[0], 1, 3), v.view(
+            shape[0], 3, 1)).squeeze(-1) * 2.0
+    return a - b + c
 
 class AzureLoongEnv(MujocoRobotEnv):
 
@@ -70,9 +84,6 @@ class AzureLoongEnv(MujocoRobotEnv):
         self.num_privileged_obs = self.cfg.env.num_privileged_obs
         self.num_actions = self.cfg.env.num_actions
 
-        self.num_dof = 1
-        self.num_bodies = 1
-
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         super().__init__(
@@ -84,7 +95,23 @@ class AzureLoongEnv(MujocoRobotEnv):
             observation_space=None,  # 将在下面定义
             **kwargs,
         )
+
+        # allocate buffers
+        self.obs_buf = torch.zeros(self.num_envs, self.num_obs, device=self.device, dtype=torch.float)
+        self.rew_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
+        self.reset_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
+        self.episode_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        self.time_out_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
+        if self.num_privileged_obs is not None:
+            self.privileged_obs_buf = torch.zeros(self.num_envs, self.num_privileged_obs, device=self.device, dtype=torch.float)
+        else: 
+            self.privileged_obs_buf = None
+            # self.num_privileged_obs = self.num_obs
+
+        self._init_buffers()
+
         self._create_envs()
+
         if hasattr(self, "_custom_init"):
             self._custom_init()
 
@@ -270,6 +297,16 @@ class AzureLoongEnv(MujocoRobotEnv):
         # rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
         # self.num_rigid_shape = len(rigid_shape_props_asset)
 
+        
+        body_dict = self.model.get_body_dict()
+        joint_dict = self.model.get_joint_dict()
+
+        self.num_dof = len(joint_dict)
+        self.num_bodies = len(body_dict)
+
+        # print("body_dict:", body_dict)
+        # print("joint_dict:", joint_dict)
+
         self.friction_buf = torch.ones((self.num_envs, 1), device=self.device, requires_grad=False, dtype=torch.float32)
         self.damping_buf = torch.ones((self.num_envs, self.num_dof), device=self.device, requires_grad=False)
         self.mass_mask = torch.ones((self.num_envs, self.num_bodies), device=self.device, requires_grad=False)
@@ -291,8 +328,8 @@ class AzureLoongEnv(MujocoRobotEnv):
         # print("num dof:", self.num_dof)
 
         # save body names from the asset
-        body_names = self.gym.get_asset_rigid_body_names(robot_asset)
-        self.dof_names = self.gym.get_asset_dof_names(robot_asset)
+        body_names = body_dict.keys()
+        self.dof_names = joint_dict.keys()
         self.num_bodies = len(body_names)
         # self.num_dofs = len(self.dof_names)  # ! replaced with num_dof
         feet_names = self.cfg.asset.foot_name
@@ -303,57 +340,57 @@ class AzureLoongEnv(MujocoRobotEnv):
         for name in self.cfg.asset.terminate_after_contacts_on:
             termination_contact_names.extend([s for s in body_names if name in s])
 
-        base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
-        self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
-        start_pose = gymapi.Transform()
-        start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
+        # base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
+        # self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
+        # start_pose = gymapi.Transform()
+        # start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
 
-        self._get_env_origins()
-        env_lower = gymapi.Vec3(0., 0., 0.)
-        env_upper = gymapi.Vec3(0., 0., 0.)
-        self.actor_handles = []
-        self.envs = []
-        for i in range(self.num_envs):
-            # create env instance
-            env_handle = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
-            pos = self.env_origins[i].clone()
-            pos[:2] += torch_rand_float(-1., 1., (2,1), device=self.device).squeeze(1)
-            start_pose.p = gymapi.Vec3(*pos)
+        # self._get_env_origins()
+        # env_lower = gymapi.Vec3(0., 0., 0.)
+        # env_upper = gymapi.Vec3(0., 0., 0.)
+        # self.actor_handles = []
+        # self.envs = []
+        # for i in range(self.num_envs):
+        #     # create env instance
+        #     env_handle = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
+        #     pos = self.env_origins[i].clone()
+        #     pos[:2] += torch_rand_float(-1., 1., (2,1), device=self.device).squeeze(1)
+        #     start_pose.p = gymapi.Vec3(*pos)
 
-            rigid_shape_props = self._process_rigid_shape_props(rigid_shape_props_asset, i)
-            self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
-            legged_robot_handle = self.gym.create_actor(env_handle, robot_asset, start_pose, "legged_robot", i, self.cfg.asset.self_collisions, 0)
-            dof_props = self._process_dof_props(dof_props_asset, i)
-            self.gym.set_actor_dof_properties(env_handle, legged_robot_handle, dof_props)
-            body_props = self.gym.get_actor_rigid_body_properties(env_handle, legged_robot_handle)
-            body_props = self._process_rigid_body_props(body_props, i)
-            self.gym.set_actor_rigid_body_properties(env_handle, legged_robot_handle, body_props, recomputeInertia=True)
-            self.envs.append(env_handle)
-            self.actor_handles.append(legged_robot_handle)
+        #     rigid_shape_props = self._process_rigid_shape_props(rigid_shape_props_asset, i)
+        #     self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
+        #     legged_robot_handle = self.gym.create_actor(env_handle, robot_asset, start_pose, "legged_robot", i, self.cfg.asset.self_collisions, 0)
+        #     dof_props = self._process_dof_props(dof_props_asset, i)
+        #     self.gym.set_actor_dof_properties(env_handle, legged_robot_handle, dof_props)
+        #     body_props = self.gym.get_actor_rigid_body_properties(env_handle, legged_robot_handle)
+        #     body_props = self._process_rigid_body_props(body_props, i)
+        #     self.gym.set_actor_rigid_body_properties(env_handle, legged_robot_handle, body_props, recomputeInertia=True)
+        #     self.envs.append(env_handle)
+        #     self.actor_handles.append(legged_robot_handle)
 
         
-        self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(feet_names)):
-            self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], feet_names[i])
+        # self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
+        # for i in range(len(feet_names)):
+        #     self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], feet_names[i])
 
 
-        self.penalised_contact_indices = torch.zeros(len(penalized_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(penalized_contact_names)):
-            self.penalised_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], penalized_contact_names[i])
+        # self.penalised_contact_indices = torch.zeros(len(penalized_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
+        # for i in range(len(penalized_contact_names)):
+        #     self.penalised_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], penalized_contact_names[i])
 
-        self.termination_contact_indices = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(termination_contact_names)):
-            self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], termination_contact_names[i])
+        # self.termination_contact_indices = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
+        # for i in range(len(termination_contact_names)):
+        #     self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], termination_contact_names[i])
 
-        #foot sensors
-        sensor_pose = gymapi.Transform()
-        for name in feet_names:
-            sensor_options = gymapi.ForceSensorProperties()
-            sensor_options.enable_forward_dynamics_forces = False # for example gravity
-            sensor_options.enable_constraint_solver_forces = True # for example contacts
-            sensor_options.use_world_frame = True # report forces in world frame (easier to get vertical components)
-            index = self.gym.find_asset_rigid_body_index(robot_asset, name)
-            self.gym.create_asset_force_sensor(robot_asset, index, sensor_pose, sensor_options)
+        # #foot sensors
+        # sensor_pose = gymapi.Transform()
+        # for name in feet_names:
+        #     sensor_options = gymapi.ForceSensorProperties()
+        #     sensor_options.enable_forward_dynamics_forces = False # for example gravity
+        #     sensor_options.enable_constraint_solver_forces = True # for example contacts
+        #     sensor_options.use_world_frame = True # report forces in world frame (easier to get vertical components)
+        #     index = self.gym.find_asset_rigid_body_index(robot_asset, name)
+        #     self.gym.create_asset_force_sensor(robot_asset, index, sensor_pose, sensor_options)
     
     def compute_observations(self):
         ##################            check           ########################
