@@ -45,7 +45,7 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
         self.nu = self.model.nu
         self.nq = self.model.nq
         self.nv = self.model.nv
-
+        self.goal = self._sample_goal()
 
 
         # index used to distinguish arm and gripper joints
@@ -138,7 +138,10 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
 
         self.mj_forward()
 
-
+    def _sample_goal(self) -> np.ndarray:
+        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
+        goal = np.array([0, 0, 0])
+        return goal
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self._set_action()
         self.do_simulation(self.ctrl, self.frame_skip)
