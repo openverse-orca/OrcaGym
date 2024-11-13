@@ -4,7 +4,7 @@
 
 <robot name="OGHR_wholeBody">
   <mujoco>
-    <compiler  meshdir="../meshes/" />
+    <compiler  meshdir="../meshes/" discardvisual="false"/>
   </mujoco>
   <link name="base_link">
     <visual>
