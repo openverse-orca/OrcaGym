@@ -96,12 +96,19 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return self._render_mode
         else:
             return "human"
+        
+    @property
+    def render_remote(self) -> bool:
+        if hasattr(self, "_render_remote"):
+            return self._render_remote
+        else:
+            return False
 
     def render(self):
         time_diff = time.perf_counter() - self._render_time_step
         if (time_diff > self._render_interval):
             self._render_time_step = time.perf_counter()
-            if self.render_mode == "human":
+            if self.render_mode == "human" or self.render_mode == "force":
                 self.loop.run_until_complete(self.gym.render())
             
 
@@ -205,4 +212,5 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.update_equality_constraints(eq_list)
 
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
-        self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict))
+        send_remote = self.render_mode == "human" and self.render_remote
+        self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))

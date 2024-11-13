@@ -34,14 +34,29 @@ def _worker(
             cmd, data = remote.recv()
             if cmd == "step":
                 observation, reward, terminated, truncated, info = env.step(data)
+
+                # 返回的 terminated 和 truncated 为每个 agent 的状态
+                # 在 env 中已经单独 reset 过 agent，因此这里不需要reset环境
+                # info 在后面展开，这里不需要处理
+
                 # convert to SB3 VecEnv api
-                done = terminated or truncated
-                info["TimeLimit.truncated"] = truncated and not terminated
-                if done:
-                    # save final observation where user can get it, then reset
-                    info["terminal_observation"] = observation
-                    observation, reset_info = env.reset()
-                remote.send((observation, reward, done, info, reset_info))
+                # done = terminated or truncated
+                # info["TimeLimit.truncated"] = truncated and not terminated
+                # if done:
+                #     # save final observation where user can get it, then reset
+                #     info["terminal_observation"] = observation
+                #     observation, reset_info = env.reset()
+
+                # 根据每个 agent 的 is_success 信息，从新填充 dones 列表
+                # dones : List[bool] = []
+                # for i in range(len(info["is_success"])):
+                #     if truncated:
+                #         # 如果达到终止条件，每个agent都返回done
+                #         dones.append(True)
+                #     else:
+                #         dones.append(info["is_success"][i] != 0)
+
+                remote.send((observation, reward, terminated, truncated))
             elif cmd == "reset":
                 maybe_options = {"options": data[1]} if data[1] else {}
                 observation, reset_info = env.reset(seed=data[0], **maybe_options)
@@ -139,19 +154,15 @@ class SubprocVecEnvMA(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, rews, dones, infos, self.reset_infos = zip(*results)  # type: ignore[assignment]
-        # print("obs: ", obs)
-        # print("rews: ", rews)
-        # print("dones: ", dones)
-        # print("infos: ", infos)
-        return _flatten_obs(obs, self.observation_space, self.agent_num), _flatten_reward(rews), _flatten_dones(dones), _flatten_info(infos, self.agent_num)  # type: ignore[return-value]
+        obs, rewords, terminated, truncated = zip(*results)  # type: ignore[assignment]
+        return _flatten_obs(obs, self.observation_space, self.agent_num), _flatten_reward(rewords), _flatten_dones(terminated, truncated), _flatten_info(obs, terminated, truncated)  # type: ignore[return-value]
 
     def reset(self) -> VecEnvObs:
         for env_idx, remote in enumerate(self.remotes):
             remote.send(("reset", (self._seeds[env_idx], self._options[env_idx])))
         results = [remote.recv() for remote in self.remotes]
         obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
-        print("subproc reset, obs: ", obs)
+        # print("subproc reset, obs: ", obs)
         # Seeds and options are only used once
         self._reset_seeds()
         self._reset_options()
@@ -305,7 +316,7 @@ def _slice_multi_agent_obs(obs: VecEnvObs, agent_num, agent_index) -> VecEnvObs:
 
 
 
-def _flatten_info(infos: Union[List[Dict[str, Any]], Tuple[Dict[str, Any]]], agent_num) -> Dict[str, List[Any]]:
+def _flatten_info(obs, terminated, truncated) -> Dict[str, List[Any]]:
     """
     Flatten infos, depending on the info space.
 
@@ -316,33 +327,49 @@ def _flatten_info(infos: Union[List[Dict[str, Any]], Tuple[Dict[str, Any]]], age
             A dict of lists.
             Each list has the environment index as its first axis.
     """
-    assert isinstance(infos, (tuple, list)), "expected list or tuple of infos per environment, got {}".format(type(infos))
-    assert len(infos) > 0, "need infos from at least one environment"
+    assert isinstance(terminated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(terminated))
+    assert len(terminated) > 0, "need dones from at least one environment"
+
+    assert isinstance(truncated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(truncated))
+    assert len(truncated) > 0, "need dones from at least one environment"
+    assert len(terminated) == len(truncated), "terminated and truncated should have the same length"
 
     # 将 remote_num 个 info 中，每个 nd.array 切成 agent_num 份，最后返回 agent_num * remote_num 个 info
     # is_success 原为每个 remote 有  agent_num 个值，现在切成 agent_num * remote_num 份
     # TimeLimit.truncated 原为 remote_num 个值，现在切成 agent_num * remote_num 份
     # terminal_observation 结构与 obs 相同，切分为 agent_num * remote_num 份
 
-    # print("Flatte info begin: ", infos)
+    # print("Flatte info begin: ", obs, terminated, truncated)
 
     flattened_infos = []
-    for info in infos:
-        for i in range(agent_num):
-            flattened_infos.append({})
-            for key, value in info.items():
-                if key == "is_success":
-                    assert len(value) >= agent_num, "Number of agents in info is_success is less than agent_num"
-                    slice_len = len(value) // agent_num
-                    value_slice = value[i * slice_len: (i + 1) * slice_len]
-                    flattened_infos[-1][key] = value_slice
-                if key == "TimeLimit.truncated":
-                    flattened_infos[-1][key] = value
-                elif key == "terminal_observation":
-                    flattened_infos[-1][key] = _slice_multi_agent_obs(value, agent_num, i)
-                else:
-                    flattened_infos[-1][key] = value
+    for remote in range(len(terminated)):
+        remote_terminated = terminated[remote]
+        remote_truncated = truncated[remote]
+        remote_obs = obs[remote]
+        assert len(remote_terminated) == len(remote_truncated), "terminated and truncated should have the same length"
+        agent_num = len(remote_terminated)
+        for agent_index in range(agent_num):
+            info = {}
+            info["is_success"] = 1.0 if remote_terminated[agent_index] else 0.0
+            info["TimeLimit.truncated"] = remote_truncated[agent_index]
+            info["terminal_observation"] = _slice_multi_agent_obs(remote_obs, agent_num, agent_index)
+            flattened_infos.append(info)
+
+    # for info in infos:
+    #     for i in range(agent_num):
+    #         flattened_infos.append({})
+    #         for key, value in info.items():
+    #             if key == "is_success":
+    #                 assert len(value) >= agent_num, "Number of agents in info is_success is less than agent_num"
+    #                 flattened_infos[-1][key] = value[i]
+    #             elif key == "TimeLimit.truncated":
+    #                 flattened_infos[-1][key] = value
+    #             elif key == "terminal_observation":
+    #                 flattened_infos[-1][key] = _slice_multi_agent_obs(obs, agent_num, i)
+    #             else:
+    #                 flattened_infos[-1][key] = value
             
+    flattened_infos = tuple(flattened_infos)
 
     # print("Flatte info end: ", flattened_infos)
 
@@ -370,23 +397,39 @@ def _flatten_reward(rewards: Union[tuple, list]) -> np.ndarray:
 
     return np.stack(flattened_rewards)  # type: ignore[arg-type]
 
-def _flatten_dones(dones: Union[tuple, list]) -> np.ndarray:
+def _flatten_dones(terminated, truncated) -> np.ndarray:
     """
     Flatten dones, depending on the done space.
 
-    :param dones: dones.
-                  A list of dones, one per environment.
-                  Each environment done may be a NumPy array.
+    :param terminated, truncated: done state for each agent.
+
     :return: flattened dones.
             A flattened NumPy array.
             Each NumPy array has the environment index as its first axis.
     """
-    assert isinstance(dones, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(dones))
-    assert len(dones) > 0, "need dones from at least one environment"
+    assert isinstance(terminated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(terminated))
+    assert len(terminated) > 0, "need dones from at least one environment"
 
-    # print("Flatte dones begin: ", dones)
+    assert isinstance(truncated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(truncated))
+    assert len(truncated) > 0, "need dones from at least one environment"
+    assert len(terminated) == len(truncated), "terminated and truncated should have the same length"
 
-    flattend_dones = tuple(np.concatenate(dones))
+    # print("Flatte dones begin: ", terminated, truncated)
+
+    dones : List[bool] = []
+    for remote in range(len(terminated)):
+        remote_termnated = terminated[remote]
+        remote_truncated = truncated[remote]
+        assert len(remote_termnated) == len(remote_truncated), "terminated and truncated should have the same length"
+        for agent_index in range(len(remote_termnated)):
+            if remote_truncated[agent_index]:
+                dones.append(True)
+            else:
+                dones.append(remote_termnated[agent_index])
+
+    # print("Flatte dones middle: ", dones)
+
+    flattend_dones = tuple(dones)
 
     # print("Flatte dones end: ", flattend_dones)
 

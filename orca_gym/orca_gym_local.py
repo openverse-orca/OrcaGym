@@ -60,6 +60,10 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
 
+        size_model = mujoco.mj_sizeModel(self._mjModel)
+        print("size_model: ", size_model)
+
+
         # Update the timestep setting form the env parameter.
         self.set_opt_timestep(self._timestep)
 
@@ -522,7 +526,7 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.SetMocapPosAndQuat(request)
         return response.success
 
-    async def set_mocap_pos_and_quat(self, mocap_data):
+    async def set_mocap_pos_and_quat(self, mocap_data, send_remote = False):
         for name, data in mocap_data.items():
             body_id = self._mjModel.body(name).id
             mocap_id = self._mjModel.body_mocapid[body_id]
@@ -531,5 +535,6 @@ class OrcaGymLocal(OrcaGymBase):
                 # print("mocap_quat: ", self._mjData.mocap_quat[mocap_id])
                 self._mjData.mocap_pos[mocap_id] = data['pos'].copy()
                 self._mjData.mocap_quat[mocap_id] = data['quat'].copy()
-                
-        await self._remote_set_mocap_pos_and_quat(mocap_data)
+        
+        if send_remote:
+            await self._remote_set_mocap_pos_and_quat(mocap_data)
