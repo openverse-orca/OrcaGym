@@ -8,6 +8,41 @@ from envs.robot_env import MujocoRobotEnv
 from envs.gymloong.environ.base.legged_robot_config import LeggedRobotCfg
 from .Azure_Loong_config import Azure_Loong_config
 
+def random_sample(env_ids, low, high, device):
+        """
+        Generate random samples for each entry of env_ids
+        """
+        rand_pos = torch_rand_float(0, 1, (len(env_ids), len(low)),
+                                    device=device)
+        diff_pos = (high - low).repeat(len(env_ids),1)
+        random_dof_pos = rand_pos*diff_pos + low.repeat(len(env_ids), 1)
+        return random_dof_pos 
+
+@torch.jit.script
+def quat_from_euler_xyz(roll, pitch, yaw):
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    cr = torch.cos(roll * 0.5)
+    sr = torch.sin(roll * 0.5)
+    cp = torch.cos(pitch * 0.5)
+    sp = torch.sin(pitch * 0.5)
+
+    qw = cy * cr * cp + sy * sr * sp
+    qx = cy * sr * cp - sy * cr * sp
+    qy = cy * cr * sp + sy * sr * cp
+    qz = sy * cr * cp - cy * sr * sp
+
+    return torch.stack([qx, qy, qz, qw], dim=-1)
+
+def get_axis_params(value, axis_idx, x_value=0., dtype=np.float64, n_dims=3):
+    """construct arguments to `Vec` according to axis index.
+    """
+    zs = np.zeros((n_dims,))
+    assert axis_idx < n_dims, "the axis dim should be within the vector dimensions"
+    zs[axis_idx] = 1.
+    params = np.where(zs == 1., value, zs)
+    params[0] = x_value
+    return list(params.astype(dtype))
 
 def torch_rand_float(min_val, max_val, shape, device='cpu'):
     """
@@ -55,6 +90,23 @@ def quat_rotate_inverse(q, v):
             shape[0], 3, 1)).squeeze(-1) * 2.0
     return a - b + c
 
+def class_to_dict(obj) -> dict:
+    if not  hasattr(obj,"__dict__"):
+        return obj
+    result = {}
+    for key in dir(obj):
+        if key.startswith("_"):
+            continue
+        element = []
+        val = getattr(obj, key)
+        if isinstance(val, list):
+            for item in val:
+                element.append(class_to_dict(item))
+        else:
+            element = class_to_dict(val)
+        result[key] = element
+    return result
+
 class AzureLoongEnv(MujocoRobotEnv):
 
     def __init__(self,
@@ -96,6 +148,17 @@ class AzureLoongEnv(MujocoRobotEnv):
             **kwargs,
         )
 
+        self.dt = self.cfg.control.decimation * self.cfg.sim.dt
+        self.obs_scales = self.cfg.normalization.obs_scales
+        self.reward_scales = class_to_dict(self.cfg.rewards.scales)
+        self.command_ranges = class_to_dict(self.cfg.commands.ranges)
+        if self.cfg.terrain.mesh_type not in ['heightfield', 'trimesh']:
+            self.cfg.terrain.curriculum = False
+        self.max_episode_length_s = self.cfg.env.episode_length_s
+        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
+
+        self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)
+
         # allocate buffers
         self.obs_buf = torch.zeros(self.num_envs, self.num_obs, device=self.device, dtype=torch.float)
         self.rew_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
@@ -108,9 +171,9 @@ class AzureLoongEnv(MujocoRobotEnv):
             self.privileged_obs_buf = None
             # self.num_privileged_obs = self.num_obs
 
-        self._init_buffers()
-
         self._create_envs()
+
+        self._init_buffers()
 
         if hasattr(self, "_custom_init"):
             self._custom_init()
@@ -480,11 +543,11 @@ class AzureLoongEnv(MujocoRobotEnv):
             calls self._post_physics_step_callback() for common computations
             calls self._draw_debug_vis() if needed
         """
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
-        self.gym.refresh_jacobian_tensors(self.sim)
-        self.gym.refresh_mass_matrix_tensors(self.sim)
-        self.gym.refresh_force_sensor_tensor(self.sim)
+        # self.gym.refresh_actor_root_state_tensor(self.sim)
+        # self.gym.refresh_net_contact_force_tensor(self.sim)
+        # self.gym.refresh_jacobian_tensors(self.sim)
+        # self.gym.refresh_mass_matrix_tensors(self.sim)
+        # self.gym.refresh_force_sensor_tensor(self.sim)
 
         self.episode_length_buf += 1
         self.common_step_counter += 1
@@ -982,47 +1045,47 @@ class AzureLoongEnv(MujocoRobotEnv):
         """ Initialize torch tensors which will contain simulation states and processed quantities
         """
         # find ids for end effectors defined in env. specific config files
-        ee_ids = []
-        kp_ids = []
-        for body_name in self.cfg.asset.end_effectors:
-            ee_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], body_name)
-            ee_ids.append(ee_id)
-        for keypoint in self.cfg.asset.keypoints:
-            kp_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], keypoint)
-            kp_ids.append(kp_id)
-        self.end_eff_ids = to_torch(ee_ids, device=self.device, dtype=torch.long)
-        self.keypoint_ids = to_torch(kp_ids, device=self.device, dtype=torch.long)
+        # ee_ids = []
+        # kp_ids = []
+        # for body_name in self.cfg.asset.end_effectors:
+        #     ee_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], body_name)
+        #     ee_ids.append(ee_id)
+        # for keypoint in self.cfg.asset.keypoints:
+        #     kp_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], keypoint)
+        #     kp_ids.append(kp_id)
+        # self.end_eff_ids = to_torch(ee_ids, device=self.device, dtype=torch.long)
+        # self.keypoint_ids = to_torch(kp_ids, device=self.device, dtype=torch.long)
 
-        # get gym GPU state tensors
-        actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
-        dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
-        net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
-        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
-        jacobian_tensor = self.gym.acquire_jacobian_tensor(self.sim, "legged_robot")
-        mass_matrix_tensor = self.gym.acquire_mass_matrix_tensor(self.sim, "legged_robot")
+        # # get gym GPU state tensors
+        # actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
+        # dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+        # net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        # rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        # jacobian_tensor = self.gym.acquire_jacobian_tensor(self.sim, "legged_robot")
+        # mass_matrix_tensor = self.gym.acquire_mass_matrix_tensor(self.sim, "legged_robot")
 
-        self.gym.refresh_dof_state_tensor(self.sim)
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-        self.gym.refresh_jacobian_tensors(self.sim)
-        self.gym.refresh_mass_matrix_tensors(self.sim)
+        # self.gym.refresh_dof_state_tensor(self.sim)
+        # self.gym.refresh_actor_root_state_tensor(self.sim)
+        # self.gym.refresh_net_contact_force_tensor(self.sim)
+        # self.gym.refresh_rigid_body_state_tensor(self.sim)
+        # self.gym.refresh_jacobian_tensors(self.sim)
+        # self.gym.refresh_mass_matrix_tensors(self.sim)
 
-        # create some wrapper tensors for different slices
-        self.root_states = gymtorch.wrap_tensor(actor_root_state)
-        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
-        self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
-        self.jacobians = gymtorch.wrap_tensor(jacobian_tensor)
-        self.mass_matrices = gymtorch.wrap_tensor(mass_matrix_tensor)
+        # # create some wrapper tensors for different slices
+        # self.root_states = gymtorch.wrap_tensor(actor_root_state)
+        # self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        # self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
+        # self.jacobians = gymtorch.wrap_tensor(jacobian_tensor)
+        # self.mass_matrices = gymtorch.wrap_tensor(mass_matrix_tensor)
         
-        self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 0:3]
-        self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 7:10]
-        self._rigid_body_ang = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 10:13]
-        self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
-        self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        self.base_pos = self.root_states[:, 0:3]
-        self.base_quat = self.root_states[:, 3:7]
-        self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
+        # self._rigid_body_pos = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 0:3]
+        # self._rigid_body_vel = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 7:10]
+        # self._rigid_body_ang = self._rigid_body_state.view(self.num_envs, self.num_bodies, 13)[..., 10:13]
+        # self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
+        # self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
+        # self.base_pos = self.root_states[:, 0:3]
+        # self.base_quat = self.root_states[:, 3:7]
+        # self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
         #foot sensors
         # sensor_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
@@ -1034,6 +1097,7 @@ class AzureLoongEnv(MujocoRobotEnv):
         self.common_step_counter = 0
         self.extras = {}
         # self.noise_scale_vec = self._get_noise_scale_vec(self.cfg) # move to custom init
+        self.up_axis_idx = 2  # 2 for z, 1 for y -> adapt gravity accordingly
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx),
                                 device=self.device).repeat((self.num_envs, 1))
         self.forward_vec = to_torch([1., 0., 0.],
