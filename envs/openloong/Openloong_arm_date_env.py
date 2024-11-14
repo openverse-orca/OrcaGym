@@ -19,7 +19,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
     def __init__(
         self,
         frame_skip: int = 5,        
-        grpc_address: str = 'localhost:50051',
+        orcagym_addr: str = 'localhost:50051',
         agent_names: list = ['Agent0'],
         time_step: float = 0.00333333,
         control_freq: int = 20,
@@ -30,7 +30,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
 
         super().__init__(
             frame_skip = frame_skip,
-            grpc_address = grpc_address,
+            orcagym_addr = orcagym_addr,
             agent_names = agent_names,
             time_step = time_step,            
             **kwargs,

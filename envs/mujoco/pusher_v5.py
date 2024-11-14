@@ -170,7 +170,7 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
     def __init__(
         self,
         frame_skip: int = 5,
-        grpc_address = 'localhost:50051',
+        orcagym_addr = 'localhost:50051',
         agent_names = [''],
         time_step = 0.016,  # 0.016 is for 60 fps        
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
@@ -195,7 +195,7 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
         OrcaGymRemoteEnv.__init__(
             self,
             frame_skip,
-            grpc_address = grpc_address,
+            orcagym_addr = orcagym_addr,
             agent_names = agent_names,       
             time_step=time_step,                    
             **kwargs,

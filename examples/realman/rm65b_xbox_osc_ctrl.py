@@ -17,14 +17,15 @@ from datetime import datetime
 # 
 TIME_STEP = 0.005
 
-def register_env(grpc_address, control_freq=20):
-    print("register_env: ", grpc_address)
+def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
-        id=f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}",
+        id=env_id,
         entry_point="envs.realman.rm65b_joystick_env:RM65BJoystickEnv",
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
-                'grpc_address': grpc_address, 
+                'orcagym_addr': orcagym_addr, 
                 'agent_names': ['RM65B'], 
                 'time_step': TIME_STEP,
                 'control_freq': control_freq},
@@ -49,11 +50,13 @@ def continue_training(env):
 
 if __name__ == "__main__":
     try:
-        grpc_address = "localhost:50051"
-        print("simulation running... , grpc_address: ", grpc_address)
-        env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
+        orcagym_addr = "localhost:50051"
+        print("simulation running... , orcagym_addr: ", orcagym_addr)
 
-        register_env(grpc_address, 20)
+        env_name = "RM65BXboxControl-v0"
+        env_index = 0
+        env_id = register_env(orcagym_addr, env_name, env_index, 20)
+        print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)        
         print("Start Simulation!")

@@ -28,7 +28,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     def __init__(
         self,
         frame_skip: int,
-        grpc_address: str,
+        orcagym_addr: str,
         agent_names: list[str],
         time_step: float,
         **kwargs
@@ -37,7 +37,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
         Args:
             frame_skip: Number of MuJoCo simulation steps per gym `step()`.
-            grpc_address: The address of the gRPC server.
+            orcagym_addr: The address of the gRPC server.
             agent_names: The names of the agents in the environment.
             time_step: The time step of the simulation.
 
@@ -45,7 +45,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         """
 
         # 初始化GRPC通信管道，采用异步通信
-        self.grpc_address = grpc_address
+        self.orcagym_addr = orcagym_addr
         self.channel = None
         self.stub = None
         self.gym = None
@@ -207,6 +207,10 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     @property
     def dt(self) -> float:
         return self.gym.opt.timestep * self.frame_skip
+    
+    @property
+    def agent_num(self) -> int:
+        return len(self._agent_names)
 
     def do_simulation(self, ctrl, n_frames) -> None:
         """

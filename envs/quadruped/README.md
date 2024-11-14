@@ -85,7 +85,7 @@ robot = 'A01B'  # 'A01B' 'GO2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Lo
 In the `examples/quadruped` directory, run:
 
 ```bash
-python run_quadruped_ctrl.py --grpc_address localhost
+python run_quadruped_ctrl.py --orcagym_addr localhost
 ```
 
 ### Keyboard Controls

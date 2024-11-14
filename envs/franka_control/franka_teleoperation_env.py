@@ -22,7 +22,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     def __init__(
         self,
         frame_skip: int,        
-        grpc_address: str,
+        orcagym_addr: str,
         agent_names: list,
         time_step: float,
         control_type: ControlType,
@@ -37,7 +37,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         
         super().__init__(
             frame_skip = frame_skip,
-            grpc_address = grpc_address,
+            orcagym_addr = orcagym_addr,
             agent_names = agent_names,
             time_step = time_step,            
             **kwargs,

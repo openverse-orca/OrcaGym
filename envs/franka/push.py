@@ -1,5 +1,5 @@
 import os
-from .panda_env import FrankaEnv
+from .franka_env import FrankaEnv
 
 MODEL_XML_PATH = ""
 

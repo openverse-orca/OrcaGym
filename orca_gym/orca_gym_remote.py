@@ -300,12 +300,12 @@ class OrcaGymRemote(OrcaGymBase):
         request = mjc_message_pb2.LoadKeyFrameRequest(KeyFrameName=keyframe_name)
         response = await self.stub.LoadKeyFrame(request)
         return response.success
-
+    
     async def resume_simulation(self):
         request = mjc_message_pb2.SetSimulationStateRequest(state=mjc_message_pb2.RUNNING)
         response = await self.stub.SetSimulationState(request)
         return response
-
+    
     async def query_actuator_moment(self):
         request = mjc_message_pb2.QueryActuatorMomentRequest()
         response = await self.stub.QueryActuatorMoment(request)

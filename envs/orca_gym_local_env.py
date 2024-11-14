@@ -28,14 +28,14 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def __init__(
         self,
         frame_skip: int,
-        grpc_address: str,
+        orcagym_addr: str,
         agent_names: list[str],
         time_step: float,        
         **kwargs        
     ):
         super().__init__(
             frame_skip = frame_skip,
-            grpc_address = grpc_address,
+            orcagym_addr = orcagym_addr,
             agent_names = agent_names,
             time_step = time_step,            
             **kwargs
@@ -60,15 +60,22 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return
 
     def initialize_grpc(self):
-        self.channel = grpc.aio.insecure_channel(self.grpc_address)
+        self.channel = grpc.aio.insecure_channel(self.orcagym_addr)
         self.stub = GrpcServiceStub(self.channel)
         self.gym = OrcaGymLocal(self.stub)
-
+    
     def pause_simulation(self):
         self.loop.run_until_complete(self._pause_simulation())
 
     async def _pause_simulation(self):
         await self.gym.pause_simulation()
+
+    async def _close_grpc(self):
+        if self.channel:
+            await self.channel.close()
+
+    def close(self):
+        self.loop.run_until_complete(self._close_grpc())
 
     def do_simulation(self, ctrl, n_frames) -> None:
         """
@@ -89,12 +96,19 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return self._render_mode
         else:
             return "human"
+        
+    @property
+    def render_remote(self) -> bool:
+        if hasattr(self, "_render_remote"):
+            return self._render_remote
+        else:
+            return False
 
     def render(self):
         time_diff = time.perf_counter() - self._render_time_step
         if (time_diff > self._render_interval):
             self._render_time_step = time.perf_counter()
-            if self.render_mode == "human":
+            if self.render_mode == "human" or self.render_mode == "force":
                 self.loop.run_until_complete(self.gym.render())
             
 
@@ -103,6 +117,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def mj_step(self, nstep):
         self.gym.mj_step(nstep)
+
+    def mj_forward(self):
+        self.gym.mj_forward()
 
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         self.set_ctrl(ctrl)
@@ -156,3 +173,44 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def jnt_dofadr(self, joint_name):
         joint_dofadr = self.gym.jnt_dofadr(joint_name)
         return joint_dofadr
+        
+    def query_site_pos_and_mat(self, site_names):
+        query_dict = self.gym.query_site_pos_and_mat(site_names)
+        site_dict = {}
+        for site in query_dict:
+            site_dict[site] = {
+                'xpos': np.array(query_dict[site]['xpos']),
+                'xmat': np.array(query_dict[site]['xmat'])
+            }
+        return site_dict
+    
+    def query_site_pos_and_quat(self, site_names):
+        query_dict = self.gym.query_site_pos_and_mat(site_names)
+        site_dict = {}
+        for site in query_dict:
+            site_dict[site] = {
+                'xpos': np.array(query_dict[site]['xpos']),
+                'xquat': mat2quat(np.array(query_dict[site]['xmat']).reshape(3, 3))
+            }
+        return site_dict
+
+    def set_joint_qpos(self, joint_qpos):
+        self.gym.set_joint_qpos(joint_qpos)
+
+    
+    def query_site_xvalp_xvalr(self, site_names):
+        query_dict = self.gym.mj_jac_site(site_names)
+        xvalp_dict = {}
+        xvalr_dict = {}
+        for site in query_dict:
+            xvalp_dict[site] = np.array(query_dict[site]['jacp']).reshape(3, -1) @ self.data.qvel
+            xvalr_dict[site] = np.array(query_dict[site]['jacr']).reshape(3, -1) @ self.data.qvel
+
+        return xvalp_dict, xvalr_dict        
+    
+    def update_equality_constraints(self, eq_list):
+        self.gym.update_equality_constraints(eq_list)
+
+    def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
+        send_remote = self.render_mode == "human" and self.render_remote
+        self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))

@@ -36,10 +36,10 @@ def run_openloong_wbc_multi_agents(ip_addr, agent_name, agent_num, individual_co
             # port = 50051
             # render_mode = "human" if i == 0 else "none"
 
-            grpc_address = f"{ip_addr}:{port}"
+            orcagym_addr = f"{ip_addr}:{port}"
             # 构建每个代理的命令
             command = base_command + [
-                "--grpc_address", grpc_address,
+                "--orcagym_addr", orcagym_addr,
                 "--agent_name", agent_name,
                 "--individual_control", individual_control,
                 "--render_mode", render_mode
@@ -79,15 +79,15 @@ if __name__ == '__main__':
     The startup script for the openloong walking wbc control using joystick.
     """
     parser = argparse.ArgumentParser(description='Simulation Configuration')
-    parser.add_argument('--grpc_address', type=str, default="localhost", help='The gRPC address for the simulation')
+    parser.add_argument('--orcagym_addr', type=str, default="localhost", help='The gRPC address for the simulation')
     parser.add_argument('--agent_name', type=str, default="AzureLoong", help='The agent name for the simulation')
     parser.add_argument('--agent_num', type=int, default=10, help='The number of agents for the simulation')
     parser.add_argument('--individual_control', type=str, default="False", help='Control the robots individually')
     args = parser.parse_args()
 
-    grpc_address = f"{args.grpc_address}"
+    orcagym_addr = f"{args.orcagym_addr}"
     agent_name = f"{args.agent_name}"
     agent_num = args.agent_num
     individual_control = f"{args.individual_control}"
 
-    run_openloong_wbc_multi_agents(grpc_address, agent_name, agent_num, individual_control, enable_cpu_affinity=False)
+    run_openloong_wbc_multi_agents(orcagym_addr, agent_name, agent_num, individual_control, enable_cpu_affinity=False)
