@@ -147,17 +147,24 @@ class FrankaRobot:
 
         noise = np_random.uniform(self._goal_range_low, self._goal_range_high)
 
+        # pick and place task 保证goal在物体上方
+        if self._has_object:
+            noise[2] = abs(noise[2])
+
         # 避免与obj过度接近的情况
-        for i in range(2):
+        for i in range(3):
             if noise[i] < self._distance_threshold + 0.01 and noise[i] > 0:
                 noise[i] = self._distance_threshold + 0.01
             if noise[i] > -self._distance_threshold - 0.01 and noise[i] < 0:
                 noise[i] = -self._distance_threshold - 0.01
 
         # for the pick and place task
-        if not self._block_gripper and self._goal_z_range > 0.0:
+        if self._has_object and self._goal_z_range > 0.0:
             if np_random.random() < 0.3:
-                noise[2] = 0.0
+                # 置于目标位置的上方
+                noise[0] = 0.0
+                noise[1] = 0.0
+
         
         goal += noise
         goal[2] = max(0.02, goal[2])  # 确保在地面以上，考虑方块的高度，最低为0.02
@@ -170,8 +177,8 @@ class FrankaRobot:
         ee_position = site_pos_quat[self.ee_name]['xpos'].copy()
         ee_velocity = site_xvalp[self.obj_site_name].copy() * dt
 
-        if not self._block_gripper:
-            fingers_qpos = np.array(self._get_fingers_qpos(joint_qpos)).flatten()
+
+        fingers_qpos = np.array(self._get_fingers_qpos(joint_qpos)).flatten()
 
         # object
         # object cartesian position: 3
@@ -193,28 +200,17 @@ class FrankaRobot:
             achieved_goal = object_position.copy()
             desired_goal = self.goal.copy()    
 
-        if not self._block_gripper:
-            obs = np.concatenate(
-                    [
-                        ee_position,
-                        ee_velocity,
-                        fingers_qpos,
-                        object_position,
-                        object_rotation,
-                        object_velp,
-                        object_velr,
-                    ]).copy()            
-        else:
-            obs = np.concatenate(
-                    [
-                        ee_position,
-                        ee_velocity,
-                        object_position,
-                        object_rotation,
-                        object_velp,
-                        object_velr,
-                    ]).copy()
-
+        obs = np.concatenate(
+                [
+                    ee_position,
+                    ee_velocity,
+                    fingers_qpos,
+                    object_position,
+                    object_rotation,
+                    object_velp,
+                    object_velr,
+                ]).copy()     
+               
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
@@ -230,13 +226,11 @@ class FrankaRobot:
 
     def set_action(self, action, ee_pos) -> None:
         # for the pick and place task
-        if not self._block_gripper:
-            pos_ctrl, gripper_ctrl = action[:3].copy(), action[3].copy()
-            gripper_ctrl = np.clip(gripper_ctrl, self._gripper_ctrl_range[0][0], self._gripper_ctrl_range[0][1])
-            fingers_half_width = gripper_ctrl / 2
-        else:
-            pos_ctrl = action.copy()
-            fingers_half_width = 0
+
+        pos_ctrl, gripper_ctrl = action[:3].copy(), action[3].copy()
+        gripper_ctrl = np.clip(gripper_ctrl, self._gripper_ctrl_range[0][0], self._gripper_ctrl_range[0][1])
+        fingers_half_width = gripper_ctrl / 2
+
 
         # control the gripper
         self._ctrl[-2:] = fingers_half_width
@@ -381,14 +375,14 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
-        self._set_action_space(block_gripper)
+        self._set_action_space()
 
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs([self._agents[0]]))
         # print("Observation space: ", self.observation_space)
 
-    def _set_action_space(self, block_gripper : bool):
-        action_size = 3 if block_gripper else 4
+    def _set_action_space(self):
+        action_size = 4
         self.action_space = spaces.Box(
             low=np.array([-1.0] * action_size),
             high=np.array([1.0] * action_size),
