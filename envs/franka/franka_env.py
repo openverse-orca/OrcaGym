@@ -9,10 +9,8 @@ from gymnasium import spaces
 class FrankaRobot:
     def __init__(self, 
                  agent_name: str, 
-                 reward_type: str,
+                 task: str,
                  max_episode_steps: int,
-                 has_object: bool,
-                 block_gripper: bool,
                  distance_threshold: float,
                  goal_xy_range: float,
                  obj_xy_range: float,
@@ -20,10 +18,8 @@ class FrankaRobot:
                  goal_z_range: float):
         
         self._agent_name = agent_name
-        self._reward_type = reward_type
+        self._task = task
         self._max_episode_steps = max_episode_steps
-        self._has_object = has_object
-        self._block_gripper = block_gripper
         self._distance_threshold = distance_threshold
         self._goal_xy_range = goal_xy_range
         self._obj_xy_range = obj_xy_range
@@ -109,6 +105,12 @@ class FrankaRobot:
     def truncated(self) -> bool:
         return self._current_episode_step >= self._max_episode_steps
     
+    @property
+    def gripper_ctrl_range(self) -> tuple[float]:
+        a = self._gripper_ctrl_range[0][0]
+        b = self._gripper_ctrl_range[0][1]
+        return a, b
+
     def set_gripper_ctrl_range(self, actuator_dict) -> None:
         if not hasattr(self, "_gripper_ctrl_range"):
             self._gripper_ctrl_range = []
@@ -118,6 +120,7 @@ class FrankaRobot:
                 self._gripper_ctrl_range.append(item["CtrlRange"])
 
         # print("Gripper control range: ", self._gripper_ctrl_range)
+
 
     def set_init_obj_state(self, obj_qpos, obj_site_xpos) -> None:
         self._initial_object_qpos = obj_qpos.copy()
@@ -138,36 +141,41 @@ class FrankaRobot:
 
     def sample_goal(self, obj_sampled, np_random) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        if not self._has_object:
+        if self._task == "reach":
             ee_position = self.initial_grasp_site_xpos.copy()
             goal = ee_position.copy()
-        else:
+        elif self._task == "pick_and_place":
             goal = obj_sampled[self.obj_joint_name][0:3].copy()
-            # print("Sample goal: ", goal)
+        else:
+            raise ValueError("Unsupport task type: ", self._task)
 
         noise = np_random.uniform(self._goal_range_low, self._goal_range_high)
 
         # pick and place task 保证goal在物体上方
-        if self._has_object:
-            noise[2] = abs(noise[2])
+        if self._task == "pick_and_place":
+            # noise[2] = abs(noise[2])
+            noise[:] = 0.0
 
         # 避免与obj过度接近的情况
         for i in range(3):
-            if noise[i] < self._distance_threshold + 0.01 and noise[i] > 0:
+            if noise[i] < self._distance_threshold + 0.01 and noise[i] >= 0:
                 noise[i] = self._distance_threshold + 0.01
             if noise[i] > -self._distance_threshold - 0.01 and noise[i] < 0:
                 noise[i] = -self._distance_threshold - 0.01
 
         # for the pick and place task
-        if self._has_object and self._goal_z_range > 0.0:
-            if np_random.random() < 0.3:
+        if self._task == "pick_and_place" and self._goal_z_range > 0.0:
+            if np_random.random() < 0.9999:
                 # 置于目标位置的上方
-                noise[0] = 0.0
-                noise[1] = 0.0
+                # noise[0] = 0.0
+                # noise[1] = 0.0
+                # 置于目标附近的地面
+                noise[2] = 0.00
+
 
         
         goal += noise
-        goal[2] = max(0.02, goal[2])  # 确保在地面以上，考虑方块的高度，最低为0.02
+        goal[2] = max(0.00, goal[2])  # 确保在地面以上，考虑方块的高度，最低为0.02
         
         self._goal = goal.copy()
         return goal
@@ -193,12 +201,14 @@ class FrankaRobot:
         object_velp = site_xvalp[self.obj_site_name].copy() * dt
         object_velr = site_xvalr[self.obj_site_name].copy() * dt
 
-        if not self._has_object:
+        if self._task == "reach":
             achieved_goal = ee_position.copy()
             desired_goal = self.goal.copy()
+        elif self._task == "pick_and_place":
+            achieved_goal = np.concatenate([object_position, ee_position])
+            desired_goal = np.concatenate([ee_position, self.goal])
         else:
-            achieved_goal = object_position.copy()
-            desired_goal = self.goal.copy()    
+            raise ValueError("Unsupport task type: ", self._task)   
 
         obs = np.concatenate(
                 [
@@ -228,12 +238,15 @@ class FrankaRobot:
         # for the pick and place task
 
         pos_ctrl, gripper_ctrl = action[:3].copy(), action[3].copy()
-        gripper_ctrl = np.clip(gripper_ctrl, self._gripper_ctrl_range[0][0], self._gripper_ctrl_range[0][1])
-        fingers_half_width = gripper_ctrl / 2
+
+        a, b = self.gripper_ctrl_range
+        scaled_gripper_ctrl = a + (b - a) * (gripper_ctrl + 1) / 2
+        # gripper_ctrl = np.clip(gripper_ctrl, self._gripper_ctrl_range[0][0], self._gripper_ctrl_range[0][1])
+        # fingers_half_width = gripper_ctrl / 2
 
 
         # control the gripper
-        self._ctrl[-2:] = fingers_half_width
+        self._ctrl[-2:] = scaled_gripper_ctrl
 
         # control the end-effector with mocap body
         pos_offset = pos_ctrl * 0.05    # the maximum distance the end-effector can move in one step (5cm)
@@ -278,7 +291,15 @@ class FrankaRobot:
 
     def _goal_distance(self, goal_a, goal_b) -> SupportsFloat:
         assert goal_a.shape == goal_b.shape
-        return np.linalg.norm(goal_a - goal_b, axis=-1)
+        if goal_a.ndim == 1:
+            diff = goal_a[:3] - goal_b[:3]
+        elif goal_a.ndim == 2:
+            diff = goal_a[:, :3] - goal_b[:, :3]
+        else:
+            raise ValueError("Unsupport goal shape: ", goal_a.shape)
+        
+        return np.linalg.norm(diff, axis=-1 if goal_a.ndim == 2 else None)
+            
 
     def is_success(self, achieved_goal, desired_goal, env_id) -> np.float32:
         d = self._goal_distance(achieved_goal, desired_goal)
@@ -286,13 +307,77 @@ class FrankaRobot:
             print(f"{env_id} Agent {self.name} Task Sussecced: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
         return (d < self._distance_threshold).astype(np.float32)
 
-    def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
-        d = self._goal_distance(achieved_goal, desired_goal)
-        if self._reward_type == "sparse":
-            return -(d > self._distance_threshold).astype(np.float32)
-        else:
-            return -d
 
+    def _compute_reward_ndim1(self, achieved_goal, desired_goal) -> SupportsFloat:
+        d = self._goal_distance(achieved_goal, desired_goal)
+        if self._task == "reach":
+            if d < self._distance_threshold:
+                # is_success
+                reward = 1.0
+            else:
+                # sparse reward
+                reward = -1
+            return reward
+        elif self._task == "pick_and_place":
+            if d < self._distance_threshold:
+                # is_success
+                reward = 1.0
+            else:
+                reward = self._compute_pick_and_place_reward(achieved_goal, desired_goal)
+
+            return reward
+        else:
+            raise ValueError("Unsupport task type: ", self._task)
+        
+    def _compute_reward_ndim2(self, achieved_goal, desired_goal) -> SupportsFloat:
+        d = self._goal_distance(achieved_goal, desired_goal)
+        if self._task == "reach":
+            rewards = np.zeros(len(achieved_goal))
+            for i in range(len(achieved_goal)):
+                if d[i] < self._distance_threshold:
+                    # is_success
+                    rewards[i] = 1.0
+                else:
+                    rewards[i] = -1.0
+            return rewards
+        elif self._task == "pick_and_place":
+            rewards = np.zeros(len(achieved_goal))
+            for i in range(len(achieved_goal)):
+                if d[i] < self._distance_threshold:
+                    # is_success
+                    rewards[i] = 1.0
+                else:
+                    rewards[i] = self._compute_pick_and_place_reward(achieved_goal[i], desired_goal[i])
+
+            return rewards
+        else:
+            raise ValueError("Unsupport task type: ", self._task)
+        
+    def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
+        if achieved_goal.ndim == 1:
+            return self._compute_reward_ndim1(achieved_goal, desired_goal)
+        else:
+            return self._compute_reward_ndim2(achieved_goal, desired_goal)
+        
+
+    def _compute_pick_and_place_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
+        assert achieved_goal.shape == desired_goal.shape
+        ee_position = achieved_goal[:3]
+        object_position = achieved_goal[3:6]
+        goal_position = desired_goal[:3]
+
+        reward = 0
+
+        # 1. ee to object distance
+        ee_to_obj_distance = np.linalg.norm(ee_position - object_position)
+        reward += -ee_to_obj_distance
+
+        # 2. object to goal distance
+        obj_to_goal_distance = np.linalg.norm(object_position - goal_position)
+        reward += -obj_to_goal_distance
+
+        return reward
+        
 
 
 class FrankaEnv(OrcaGymLocalEnv):
@@ -308,9 +393,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         render_mode: str,
         render_remote: bool,
         env_id: str,
-        reward_type: str,
-        has_object: bool,
-        block_gripper: bool,
+        task: str,
         distance_threshold: float,
         goal_xy_range: float,
         obj_xy_range: float,
@@ -331,12 +414,12 @@ class FrankaEnv(OrcaGymLocalEnv):
             **kwargs,
         )
 
-        self._reward_type = reward_type
+        self._task = task
         self._distance_threshold = distance_threshold
 
         self._agents: list[FrankaRobot] = []
         for agent_name in agent_names:
-            agent = FrankaRobot(agent_name, reward_type, max_episode_steps, has_object, block_gripper, distance_threshold, 
+            agent = FrankaRobot(agent_name, task, max_episode_steps, distance_threshold, 
                                 goal_xy_range, obj_xy_range, goal_x_offset, goal_z_range)
             self._agents.append(agent)
 
@@ -449,10 +532,18 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         self._reset_agents(agents_to_reset)
 
+        # print("Reward: ", reward)
+        # print("Is success: ", info["is_success"])
+        # print("Terminated: ", terminated)
+        # print("Truncated: ", truncated)
+        # print("Obs: ", obs)
+        # print("Info: ", info)
+
         return obs, reward, terminated, truncated, info
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
+        # print("Compute reward : ", len(achieved_goal), len(desired_goal))
         return self._agents[0].compute_reward(achieved_goal, desired_goal)
 
     def _get_obs(self, agents : list[FrankaRobot]) -> list[dict]:
