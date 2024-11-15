@@ -23,7 +23,7 @@ The primary goal of OrcaGym is to enhance the capabilities of OpenAI Gym by inte
 To install OrcaGym, follow these steps:
 
 1. **Clone the Repository:**
-
+If you are a release version user, please skip the following steps. The release version will automatically configure the environment for you, and you won't need to manually download and configure dependencies.
 ```bash
 git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
