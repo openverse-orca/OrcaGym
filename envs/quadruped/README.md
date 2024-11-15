@@ -6,7 +6,7 @@ This is an example of a quadruped robot dog walking, using the MPC control algor
 * **Linux platform only**
 
 ## How To Install
-
+If you are an **installation version user**, please skip the following steps and directly run the simulation（Run the Example）.
 ### Install Dependencies
 
 This guide assumes that you have already installed the basic dependencies as described in the [Readme](https://github.com/openverse-orca/OrcaGym/blob/main/README.md) document. Next, we will install additional dependencies needed for the quadruped robot example:
