@@ -66,7 +66,7 @@ Using OrcaGym is straightforward. Here are the examples to get you started:
 * **Download Project Files**
 Run the following script in your terminal to download the latest project files:
 ```bash
-cd orca_gym
+cd orca_gym/tools
 python down_projects.py
 ```
 * **Move the Downloaded Files**

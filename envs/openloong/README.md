@@ -4,7 +4,7 @@
 * 本环境适配青龙机器人行运动控制功能，基于上海人形机器人创新中心“青龙”机器人模型，提供行走、跳跃、盲踩障碍物三种运动示例。参看[OpenLoong Dynamics Control](https://atomgit.com/openloong/openloong-dyn-control)项目获取更多信息。
 
 ## 如何安装
-
+如果您是 **安装版** 用户，请跳过以下步骤。直接运行仿真即可
 1. **获取青龙机器人仓库源代码**
     
     Clone 青龙机器人源码，并安装编译依赖库。
@@ -43,10 +43,10 @@
 
 ## 运行青龙机器人行走仿真
 
-    首先在OrcaStuido中加载并运行`OpenLoongWBC`关卡，然后在 `examples/openloong` 目录下，运行 `openloong_wbc_joystick.py`
+    首先在OrcaStuido中加载并运行`multy_robot`关卡，然后在 `examples/openloong` 目录下，运行 `openloong_wbc_joystick_multy_agents.py`
 
     ```bash
-    python openloong_wbc_joystick.py --grpc localhost:50051
+    python openloong_wbc_joystick_multy_agents.py
     ```
 
     **操作方式** 空格键：开始原地踏步、停止原地踏步； W/S 进入，退出前进模式； A/D 进入，退出转向模式； 注意，前进模式和转向模式可以同时进行。
