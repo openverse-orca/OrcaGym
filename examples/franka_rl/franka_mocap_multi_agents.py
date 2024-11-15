@@ -25,14 +25,14 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
 
-def register_env(orcagym_addr, env_name, env_index, agent_num, task, time_step, max_episode_steps, frame_skip, render_remote) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
-        entry_point=f"envs.franka.{task}",
+        entry_point=entry_point,
         kwargs={'frame_skip': frame_skip, 
-                'reward_type': "sparse",
+                'task': task,
                 'orcagym_addr': orcagym_addr, 
                 'agent_names': [f"Panda_{agent_id:02d}" for agent_id in range(agent_num)], 
                 'time_step': time_step,
@@ -46,10 +46,10 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, task, time_step, 
     return env_id
 
 
-def make_env(orcagym_addr, env_name, env_index, agent_num, task, time_step, max_episode_steps, frame_skip, render_remote):
+def make_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote):
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, task, time_step, max_episode_steps, frame_skip, render_remote)
+        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote)
         print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
@@ -81,7 +81,7 @@ def training_model(model, total_timesteps, model_file):
     print(f"-----------------Save Model-----------------")
     model.save(model_file)
         
-def continue_training_ppo(env, env_num, agent_num, total_timesteps, model_file):
+def continue_training_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 加载已有模型或初始化新模型
     if os.path.exists(f"{model_file}.zip"):
@@ -90,13 +90,22 @@ def continue_training_ppo(env, env_num, agent_num, total_timesteps, model_file):
         # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
-                pi=[128, 128, 128],  # 策略网络结构
-                vf=[128, 128, 128]   # 值函数网络结构
+                pi=[256, 256, 128],  # 策略网络结构
+                vf=[256, 256, 128]   # 值函数网络结构
             ),
             ortho_init=True,
             activation_fn=nn.ReLU
         )
-        model = PPO("MultiInputPolicy", env, verbose=1, learning_rate=0.0003, n_steps=2048, batch_size=128, gamma=0.95, clip_range=0.2, policy_kwargs=policy_kwargs, device=device)
+        model = PPO("MultiInputPolicy", 
+                    env, 
+                    verbose=1, 
+                    learning_rate=0.001, 
+                    n_steps=2048, 
+                    batch_size=256, 
+                    gamma=0.95, 
+                    clip_range=0.2, 
+                    policy_kwargs=policy_kwargs, 
+                    device=device)
         
     training_model(model, total_timesteps, model_file)
 
@@ -191,7 +200,7 @@ def continue_training_tqc(env, env_num, agent_num, total_timesteps, start_episod
         goal_selection_strategy = "future"  # 选择 'future' 策略
 
         policy_kwargs = dict(
-            net_arch=[512, 512, 512],  # 三层隐藏层，每层256个神经元
+            net_arch=[256, 256, 128],
             n_critics=2,
             n_quantiles=25,
             activation_fn=torch.nn.ReLU
@@ -199,7 +208,7 @@ def continue_training_tqc(env, env_num, agent_num, total_timesteps, start_episod
 
         replay_buffer_class = HerReplayBuffer
         replay_buffer_kwargs = dict(
-            n_sampled_goal = 4,    
+            n_sampled_goal = 10,    
             goal_selection_strategy=goal_selection_strategy
         )
 
@@ -284,7 +293,7 @@ def generate_env_list(orcagym_addresses, subenv_num):
     return orcagym_addr_list, env_index_list, render_remote_list
 
 
-def train_model(orcagym_addresses, subenv_num, agent_num, task, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file):
+def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -292,7 +301,7 @@ def train_model(orcagym_addresses, subenv_num, agent_num, task, time_step, max_e
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, subenv_num)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, task, time_step, max_episode_steps, frame_skip, render_remote) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         print("Start Simulation!")
@@ -310,13 +319,13 @@ def train_model(orcagym_addresses, subenv_num, agent_num, task, time_step, max_e
         print("退出仿真环境")
         env.close()
 
-def test_model(orcagym_addr, task, time_step, max_episode_steps, frame_skip, model_type, model_file):
+def test_model(orcagym_addr, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
 
         env_name = "PandaMocap-v0"
         render_mode = "human"
-        env_id = register_env(orcagym_addr, env_name, 0, 1, task, time_step, max_episode_steps, frame_skip, render_mode)
+        env_id = register_env(orcagym_addr, env_name, 0, 1, task, entry_point, time_step, max_episode_steps, frame_skip, render_mode)
         env = gym.make(env_id)
         seed = int(env_id[-3:])
         env.unwrapped.set_seed_value(seed)
@@ -361,27 +370,30 @@ if __name__ == "__main__":
 
     model_file = f"franka_{task}_{model_type}_{total_timesteps}_model"
 
+    # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
+    TIME_STEP = 0.005                 # 仿真步长200Hz
+    FRAME_SKIP_SHORT = 4              # 200Hz * 4 = 50Hz 推理步长
+    FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
+
+
     if task == 'reach':
-        task = 'reach:FrankaReachEnv'
+        entry_point = 'envs.franka.reach:FrankaReachEnv'
+        max_piosode_steps = 250
+        frame_skip = FRAME_SKIP_LONG
     elif task == 'pick_and_place':
-        task = 'pick_and_place:FrankaPickAndPlaceEnv'
-    elif task == 'push':
-        task = 'push:FrankaPushEnv'
-    elif task == 'slide':
-        task = 'slide:FrankaSlideEnv'
+        entry_point = 'envs.franka.pick_and_place:FrankaPickAndPlaceEnv'
+        max_piosode_steps = 500
+        frame_skip = FRAME_SKIP_SHORT
     else:
         raise ValueError("Invalid task")
 
-    # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
-    TIME_STEP = 0.005           # 仿真步长200Hz
-    FRAME_SKIP = 4              # 200Hz * 4 = 50Hz 推理步长
-    MAX_EPISODE_STEPS = 500    # 每个episode的推理次数
+
 
     if run_mode == "training":
-        train_model(orcagym_addresses, subenv_num, agent_num, task, TIME_STEP, MAX_EPISODE_STEPS, FRAME_SKIP, model_type, total_timesteps, start_episode, model_file)
-        test_model(orcagym_addresses[0], task, TIME_STEP, MAX_EPISODE_STEPS, FRAME_SKIP, model_type, model_file)
+        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_piosode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file)
+        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_piosode_steps, 1, model_type, model_file)
     elif run_mode == "testing":
-        test_model(orcagym_addresses[0], task, TIME_STEP, MAX_EPISODE_STEPS, FRAME_SKIP, model_type, model_file)    
+        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_piosode_steps, 1, model_type, model_file)    
     else:
         raise ValueError("Invalid run mode")
 
