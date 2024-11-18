@@ -6,7 +6,7 @@ from envs.quadruped.helpers.quadruped_utils import GaitType
 
 # These are used both for a real experiment and a simulation -----------
 # These are the only attributes needed per quadruped, the rest can be computed automatically ----------------------
-robot = 'A01B'  # 'A01B' 'GO2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
+robot = 'GO2'  # 'A01B' 'GO2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
 robot_leg_joints = dict(FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint',],  # TODO: Make configs per robot.
                         FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint',],
                         RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint',],
@@ -185,7 +185,7 @@ simulation_params = {
     "visual_foothold_adaptation":  'blind', #'blind', 'height', 'vfa'
 
     # this is the integration time used in the simulator
-    'dt':                          0.01,
+    'dt':                          0.005,  # 200 Hz
 
     'gait':                        'trot',  # 'trot', 'pace', 'crawl', 'bound', 'full_stance'
     'gait_params':                 {'trot': {'step_freq': 1.4, 'duty_factor': 0.65, 'type': GaitType.TROT.value},
