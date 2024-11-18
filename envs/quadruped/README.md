@@ -12,14 +12,14 @@ If you are an **installation version user**, please skip the following steps and
 This guide assumes that you have already installed the basic dependencies as described in the [Readme](https://github.com/openverse-orca/OrcaGym/blob/main/README.md) document. Next, we will install additional dependencies needed for the quadruped robot example:
 
 ```bash
-cd $(your-path-to-orcagym)/envs/quadruped
+cd $(your-path-to-orcagym)
+cd envs/quadruped
 conda activate orca_gym_test
 pip install -r requirements.txt
 
 # Install cuda+jax
 pip install --upgrade "jax[cuda12]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
-
 
 ### Compile and Install acados Library
 
@@ -32,54 +32,8 @@ cd 3rd_party/acados
 mkdir build
 cd build
 cmake ..
-make install -j4
+make install -j10
 pip install -e ./../interfaces/acados_template
 cp ./../../bins/t_renderer-v0.0.34-linux ./../bin/t_renderer
 chmod +x ./../bin/t_renderer
 ```
-### Set Environment Variables
-
-1. You can choose to add the paths to the bash environment variables:
-``` bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"${path_to_acados}/lib"
-export ACADOS_SOURCE_DIR="${path_to_acados}"
-```
-
-2. Alternatively, you can modify the environment variables in the example's Python file to fit your own installation path.
-
-* In the `examples/run_quadruped_ctrl.py` file, modify the following paths to match your acados installation path:
-
-``` python
-    os.environ['LD_LIBRARY_PATH'] = os.environ.get('LD_LIBRARY_PATH', '') + ":${path_to_acados}/lib"
-    os.environ['ACADOS_SOURCE_DIR'] = "${path_to_acados}"
-```
-
-### Run the Example
-
-#### Run OrcaStudio Level
-According to the instructions in the main Readme document, copy the levels and assets to the OrcaStudio project directory. For the quadruped robot example, Level name is:
-
-* **Unitree Go2:** Quadruped. 
-* **LINXAI A01B:** Quadruped_Linxai
-
-#### Run OrcaGym Program
-
-Modify the `envs/quadruped/config.py` file, find the following line, and change the robot model to correspond with the selected level:
-``` python
-robot = 'A01B'  # 'A01B' 'GO2', 'aliengo', 'hyqreal', 'mini_cheetah'  # TODO: Load from robot_descriptions.py
-```
-
-In the `examples/quadruped` directory, run:
-
-```bash
-python run_quadruped_ctrl.py --orcagym_addr localhost
-```
-
-### Keyboard Controls
-
-* W/S: Move forward/backward
-* A/D: Turn left/right
-* Space: Stop
-
-**Note:** When running the `run_quadruped_ctrl.py` script, a small window will appear in the top left corner of the screen. You need to focus on this window to capture keyboard inputs. Otherwise, the quadruped robot will not respond to the key presses.
-
