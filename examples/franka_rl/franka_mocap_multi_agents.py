@@ -60,28 +60,29 @@ def make_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, ti
 
 def training_model(model, total_timesteps, model_file):
     # 训练模型，每一千万步保存一次check point
-    CKP_LEN = 10000000
-    training_loop = []
-    if total_timesteps <= CKP_LEN:
-        training_loop.append(total_timesteps)
-    else:
-        if total_timesteps % CKP_LEN == 0:
-            training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
+    try:
+        CKP_LEN = 10000000
+        training_loop = []
+        if total_timesteps <= CKP_LEN:
+            training_loop.append(total_timesteps)
         else:
-            training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
-            training_loop.append(total_timesteps % CKP_LEN)
-    
-    for i, loop in enumerate(training_loop):
-        model.learn(loop)
-
-        if i < len(training_loop) - 1:
-            model.save(f"{model_file}_ckp{(i + 1) * loop}")
-            print(f"-----------------Save Model Checkpoint: {(i + 1) * loop}-----------------")
-
-    print(f"-----------------Save Model-----------------")
-    model.save(model_file)
+            if total_timesteps % CKP_LEN == 0:
+                training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
+            else:
+                training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
+                training_loop.append(total_timesteps % CKP_LEN)
         
-def continue_training_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+        for i, loop in enumerate(training_loop):
+            model.learn(loop)
+
+            if i < len(training_loop) - 1:
+                model.save(f"{model_file}_ckp{(i + 1) * loop}")
+                print(f"-----------------Save Model Checkpoint: {(i + 1) * loop}-----------------")
+    finally:
+        print(f"-----------------Save Model-----------------")
+        model.save(model_file)
+        
+def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 加载已有模型或初始化新模型
     if os.path.exists(f"{model_file}.zip"):
@@ -107,10 +108,10 @@ def continue_training_ppo(env, env_num, agent_num, total_timesteps, start_episod
                     policy_kwargs=policy_kwargs, 
                     device=device)
         
-    training_model(model, total_timesteps, model_file)
+    return model
 
 
-def continue_training_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if os.path.exists(f"{model_file}.zip"):
@@ -151,9 +152,9 @@ def continue_training_sac(env, env_num, agent_num, total_timesteps, start_episod
             device=device
         )
 
-    training_model(model, total_timesteps, model_file)
+    return model
 
-def continue_training_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if os.path.exists(f"{model_file}.zip"):
@@ -185,10 +186,10 @@ def continue_training_ddpg(env, env_num, agent_num, total_timesteps, start_episo
             policy_kwargs=dict(net_arch=[256, 256, 256]),
         )
 
-    training_model(model, total_timesteps, model_file)
+    return model
 
 
-def continue_training_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if os.path.exists(f"{model_file}.zip"):
@@ -229,9 +230,7 @@ def continue_training_tqc(env, env_num, agent_num, total_timesteps, start_episod
             device=device
         )
 
-        print("TQC Learning start at : ", model.learning_starts)
-
-    training_model(model, total_timesteps, model_file)
+    return model
 
 
 def testing_model(env, model, time_step):
@@ -306,17 +305,22 @@ def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, tim
 
         print("Start Simulation!")
         if model_type == "ppo":
-            continue_training_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
         elif model_type == "tqc":
-            continue_training_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
         elif model_type == "sac":
-            continue_training_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
         elif model_type == "ddpg":
-            continue_training_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
         else:
             raise ValueError("Invalid model type")
-    except KeyboardInterrupt:
+        
+        training_model(model, total_timesteps, model_file)
+
+    finally:
         print("退出仿真环境")
+        print(f"-----------------Save Model-----------------")
+        model.save(model_file)
         env.close()
 
 def test_model(orcagym_addr, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file):
@@ -352,12 +356,18 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
     parser.add_argument('--subenv_num', type=int, default=1, help='The number of subenvs for each gRPC address')
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
-    parser.add_argument('--task', type=str, default='reach', help='The task to run (reach or pick_and_place)')
-    parser.add_argument('--model_type', type=str, default='tqc', help='The model to use (ppo/tqc/sac/ddpg)')
-    parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
-    parser.add_argument('--total_timesteps', type=int, default=100000, help='The total timesteps to train the model')
-    parser.add_argument('--start_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
+    parser.add_argument('--task', type=str, help='The task to run (reach or pick_and_place)')
+    parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
+    parser.add_argument('--run_mode', type=str, help='The mode to run (training or testing)')
+    parser.add_argument('--training_episode', type=int, help='The number of training episodes for each agent')
+    parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     args = parser.parse_args()
+
+
+    # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
+    TIME_STEP = 0.005                 # 仿真步长200Hz
+    FRAME_SKIP_SHORT = 4              # 200Hz * 4 = 50Hz 推理步长
+    FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
 
     orcagym_addresses = args.orcagym_addresses
     subenv_num = args.subenv_num
@@ -365,35 +375,32 @@ if __name__ == "__main__":
     task = args.task
     model_type = args.model_type
     run_mode = args.run_mode
-    total_timesteps = args.total_timesteps
-    start_episode = args.start_episode
-
-    model_file = f"franka_{task}_{model_type}_{total_timesteps}_model"
-
-    # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
-    TIME_STEP = 0.005                 # 仿真步长200Hz
-    FRAME_SKIP_SHORT = 4              # 200Hz * 4 = 50Hz 推理步长
-    FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
-
+    training_episode = args.training_episode
+    start_her_episode = args.start_her_episode
 
     if task == 'reach':
         entry_point = 'envs.franka.reach:FrankaReachEnv'
-        max_piosode_steps = 250
+        max_episode_steps = 250
         frame_skip = FRAME_SKIP_LONG
     elif task == 'pick_and_place':
         entry_point = 'envs.franka.pick_and_place:FrankaPickAndPlaceEnv'
-        max_piosode_steps = 500
+        max_episode_steps = 500
         frame_skip = FRAME_SKIP_SHORT
     else:
         raise ValueError("Invalid task")
 
+    total_timesteps = training_episode * subenv_num * agent_num * max_episode_steps
+    model_file = f"franka_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model"
 
 
     if run_mode == "training":
-        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_piosode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file)
-        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_piosode_steps, 1, model_type, model_file)
+        print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num)
+        print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
+        print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
+        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file)
+        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)
     elif run_mode == "testing":
-        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_piosode_steps, 1, model_type, model_file)    
+        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)    
     else:
         raise ValueError("Invalid run mode")
 
