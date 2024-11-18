@@ -4,3 +4,6 @@
 [submodule "3rd_party/robomimic"]
 	path = 3rd_party/robomimic
 	url = https://github.com/openverse-orca/robomimic.git
+[submodule "3rd_party/acados"]
+	path = 3rd_party/acados
+	url = https://github.com/acados/acados.git
