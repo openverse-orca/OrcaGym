@@ -204,23 +204,27 @@ class FrankaRobot:
         if self._task == "reach":
             achieved_goal = ee_position.copy()
             desired_goal = self.goal.copy()
+            obs = np.concatenate(
+                    [
+                        ee_position,
+                        ee_velocity,
+                    ]).copy()   
         elif self._task == "pick_and_place":
             achieved_goal = np.concatenate([object_position, ee_position])
-            desired_goal = np.concatenate([ee_position, self.goal])
+            desired_goal = np.concatenate([self.goal, self.goal])
+            obs = np.concatenate(
+                    [
+                        ee_position,
+                        ee_velocity,
+                        fingers_qpos,
+                        object_position,
+                        object_rotation,
+                        object_velp,
+                        object_velr,
+                    ]).copy()                 
         else:
             raise ValueError("Unsupport task type: ", self._task)   
 
-        obs = np.concatenate(
-                [
-                    ee_position,
-                    ee_velocity,
-                    fingers_qpos,
-                    object_position,
-                    object_rotation,
-                    object_velp,
-                    object_velr,
-                ]).copy()     
-               
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
@@ -303,8 +307,8 @@ class FrankaRobot:
 
     def is_success(self, achieved_goal, desired_goal, env_id) -> np.float32:
         d = self._goal_distance(achieved_goal, desired_goal)
-        if d < self._distance_threshold:
-            print(f"{env_id} Agent {self.name} Task Sussecced: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
+        # if d < self._distance_threshold:
+        #     print(f"{env_id} Agent {self.name} Task Sussecced: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
         return (d < self._distance_threshold).astype(np.float32)
 
 
@@ -312,15 +316,13 @@ class FrankaRobot:
         d = self._goal_distance(achieved_goal, desired_goal)
         if self._task == "reach":
             if d < self._distance_threshold:
-                # is_success
-                reward = 1.0
+                reward = 1.0    # is_success
             else:
-                # sparse reward
-                reward = -1
+                # reward = -1   # sparse reward
+                reward = -d     # dense reward
             return reward
         elif self._task == "pick_and_place":
             if d < self._distance_threshold:
-                # is_success
                 reward = 1.0
             else:
                 reward = self._compute_pick_and_place_reward(achieved_goal, desired_goal)
@@ -335,16 +337,15 @@ class FrankaRobot:
             rewards = np.zeros(len(achieved_goal))
             for i in range(len(achieved_goal)):
                 if d[i] < self._distance_threshold:
-                    # is_success
                     rewards[i] = 1.0
                 else:
-                    rewards[i] = -1.0
+                    # rewards[i] = -1.0
+                    rewards[i] = -d[i]
             return rewards
         elif self._task == "pick_and_place":
             rewards = np.zeros(len(achieved_goal))
             for i in range(len(achieved_goal)):
                 if d[i] < self._distance_threshold:
-                    # is_success
                     rewards[i] = 1.0
                 else:
                     rewards[i] = self._compute_pick_and_place_reward(achieved_goal[i], desired_goal[i])
