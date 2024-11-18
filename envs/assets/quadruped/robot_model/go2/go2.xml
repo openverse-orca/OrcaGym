@@ -42,6 +42,38 @@
     <material name="white" rgba="1 1 1 1"/>
     <material name="gray" rgba="0.671705 0.692426 0.774270 1"/>
 
+    <texture type="2d" name="Metal009_color"      file="../../../textures/Metal009_2K-PNG/Metal009_2K-PNG_Color.png"/>
+    <texture type="2d" name="Metal009_roughness"  file="../../../textures/Metal009_2K-PNG/Metal009_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Metal009_metalic"  file="../../../textures/Metal009_2K-PNG/Metal009_2K-PNG_Metalness.png"/>
+    <texture type="2d" name="Metal009_normal"     file="../../../textures/Metal009_2K-PNG/Metal009_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_metal_gray" metallic ="0.0" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Metal009_color"/>
+      <normal     texture="Metal009_normal"/>
+      <roughness  texture="Metal009_roughness"/>
+      <metallic  texture="Metal009_metalic"/>
+    </material>
+
+    <texture type="2d" name="Plastic006_color"      file="../../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
+    <texture type="2d" name="Plastic006_roughness"  file="../../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Plastic006_normal"     file="../../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_plastic_black" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Plastic006_color"/>
+      <normal     texture="Plastic006_normal"/>
+      <roughness  texture="Plastic006_roughness"/>
+    </material>
+
+    <texture type="2d" name="Plastic013A_color"      file="../../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Color.png"/>
+    <texture type="2d" name="Plastic013A_roughness"  file="../../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Plastic013A_normal"     file="../../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_plastic_white" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Plastic013A_color"/>
+      <normal     texture="Plastic013A_normal"/>
+      <roughness  texture="Plastic013A_roughness"/>
+    </material>
+
     <mesh file="base_0.obj"/>
     <mesh file="base_1.obj"/>
     <mesh file="base_2.obj"/>
@@ -65,11 +97,11 @@
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719" mass="6.921"
         diaginertia="0.107027 0.0980771 0.0244531"/>
       <freejoint name="base"/>
-      <geom mesh="base_0" material="black" class="visual"/>
-      <geom mesh="base_1" material="black" class="visual"/>
-      <geom mesh="base_2" material="black" class="visual"/>
-      <geom mesh="base_3" material="white" class="visual"/>
-      <geom mesh="base_4" material="gray" class="visual"/>
+      <geom mesh="base_0" material="pbr_plastic_black" class="visual"/>
+      <geom mesh="base_1" material="pbr_plastic_black" class="visual"/>
+      <geom mesh="base_2" material="pbr_plastic_black" class="visual"/>
+      <geom mesh="base_3" material="pbr_plastic_white" class="visual"/>
+      <geom mesh="base_4" material="pbr_plastic_white" class="visual"/>
       <geom size="0.1881 0.04675 0.057" type="box" class="collision"/>
       <geom size="0.05 0.045" pos="0.285 0 0.01" type="cylinder" class="collision"/>
       <geom size="0.047" pos="0.293 0 -0.06" class="collision"/>
@@ -78,25 +110,25 @@
         <inertial pos="-0.0054 0.00194 -0.000105" quat="0.497014 0.499245 0.505462 0.498237" mass="0.678"
           diaginertia="0.00088403 0.000596003 0.000479967"/>
         <joint name="FL_hip_joint" class="abduction"/>
-        <geom mesh="hip_0" material="metal" class="visual"/>
-        <geom mesh="hip_1" material="gray" class="visual"/>
+        <geom mesh="hip_0" material="pbr_metal_gray" class="visual"/>
+        <geom mesh="hip_1" material="pbr_plastic_white" class="visual"/>
         <geom size="0.046 0.02" pos="0 0.08 0" quat="1 1 0 0" type="cylinder" class="collision"/>
         <body name="FL_thigh" pos="0 0.0955 0">
           <inertial pos="-0.00374 -0.0223 -0.0327" quat="0.829533 0.0847635 -0.0200632 0.551623" mass="1.152"
             diaginertia="0.00594973 0.00584149 0.000878787"/>
           <joint name="FL_thigh_joint" class="front_hip"/>
-          <geom mesh="thigh_0" material="metal" class="visual"/>
-          <geom mesh="thigh_1" material="gray" class="visual"/>
+          <geom mesh="thigh_0" material="pbr_metal_gray" class="visual"/>
+          <geom mesh="thigh_1" material="pbr_plastic_white" class="visual"/>
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0" type="box" class="collision"/>
           <body name="FL_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 -0.000622121 -0.141417" quat="0.710672 0.00154099 -0.00450087 0.703508"
               mass="0.241352" diaginertia="0.0014901 0.00146356 5.31397e-05"/>
             <joint name="FL_calf_joint" class="knee"/>
-            <geom mesh="calf_0" material="gray" class="visual"/>
-            <geom mesh="calf_1" material="black" class="visual"/>
+            <geom mesh="calf_0" material="pbr_plastic_white" class="visual"/>
+            <geom mesh="calf_1" material="pbr_plastic_black" class="visual"/>
             <geom size="0.012 0.06" pos="0.008 0 -0.06" quat="0.994493 0 -0.104807 0" type="cylinder" class="collision"/>
             <geom size="0.011 0.0325" pos="0.02 0 -0.148" quat="0.999688 0 0.0249974 0" type="cylinder" class="collision"/>
-            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
+            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="pbr_plastic_black"/>
             <geom name="FL" class="foot"/>
           </body>
         </body>
@@ -105,25 +137,25 @@
         <inertial pos="-0.0054 -0.00194 -0.000105" quat="0.498237 0.505462 0.499245 0.497014" mass="0.678"
           diaginertia="0.00088403 0.000596003 0.000479967"/>
         <joint name="FR_hip_joint" class="abduction"/>
-        <geom mesh="hip_0" material="metal" class="visual" quat="4.63268e-05 1 0 0"/>
-        <geom mesh="hip_1" material="gray" class="visual" quat="4.63268e-05 1 0 0"/>
+        <geom mesh="hip_0" material="pbr_metal_gray" class="visual" quat="4.63268e-05 1 0 0"/>
+        <geom mesh="hip_1" material="pbr_plastic_white" class="visual" quat="4.63268e-05 1 0 0"/>
         <geom size="0.046 0.02" pos="0 -0.08 0" quat="0.707107 0.707107 0 0" type="cylinder" class="collision"/>
         <body name="FR_thigh" pos="0 -0.0955 0">
           <inertial pos="-0.00374 0.0223 -0.0327" quat="0.551623 -0.0200632 0.0847635 0.829533" mass="1.152"
             diaginertia="0.00594973 0.00584149 0.000878787"/>
           <joint name="FR_thigh_joint" class="front_hip"/>
-          <geom mesh="thigh_mirror_0" material="metal" class="visual"/>
-          <geom mesh="thigh_mirror_1" material="gray" class="visual"/>
+          <geom mesh="thigh_mirror_0" material="pbr_metal_gray" class="visual"/>
+          <geom mesh="thigh_mirror_1" material="pbr_plastic_white" class="visual"/>
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0" type="box" class="collision"/>
           <body name="FR_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 0.000622121 -0.141417" quat="0.703508 -0.00450087 0.00154099 0.710672"
               mass="0.241352" diaginertia="0.0014901 0.00146356 5.31397e-05"/>
             <joint name="FR_calf_joint" class="knee"/>
-            <geom mesh="calf_mirror_0" material="gray" class="visual"/>
-            <geom mesh="calf_mirror_1" material="black" class="visual"/>
+            <geom mesh="calf_mirror_0" material="pbr_plastic_white" class="visual"/>
+            <geom mesh="calf_mirror_1" material="pbr_plastic_black" class="visual"/>
             <geom size="0.013 0.06" pos="0.01 0 -0.06" quat="0.995004 0 -0.0998334 0" type="cylinder" class="collision"/>
             <geom size="0.011 0.0325" pos="0.02 0 -0.148" quat="0.999688 0 0.0249974 0" type="cylinder" class="collision"/>
-            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
+            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="pbr_plastic_black"/>
             <geom name="FR" class="foot"/>
           </body>
         </body>
@@ -132,25 +164,25 @@
         <inertial pos="0.0054 0.00194 -0.000105" quat="0.505462 0.498237 0.497014 0.499245" mass="0.678"
           diaginertia="0.00088403 0.000596003 0.000479967"/>
         <joint name="RL_hip_joint" class="abduction"/>
-        <geom mesh="hip_0" material="metal" class="visual" quat="4.63268e-05 0 1 0"/>
-        <geom mesh="hip_1" material="gray" class="visual" quat="4.63268e-05 0 1 0"/>
+        <geom mesh="hip_0" material="pbr_metal_gray" class="visual" quat="4.63268e-05 0 1 0"/>
+        <geom mesh="hip_1" material="pbr_plastic_white" class="visual" quat="4.63268e-05 0 1 0"/>
         <geom size="0.046 0.02" pos="0 0.08 0" quat="0.707107 0.707107 0 0" type="cylinder" class="collision"/>
         <body name="RL_thigh" pos="0 0.0955 0">
           <inertial pos="-0.00374 -0.0223 -0.0327" quat="0.829533 0.0847635 -0.0200632 0.551623" mass="1.152"
             diaginertia="0.00594973 0.00584149 0.000878787"/>
           <joint name="RL_thigh_joint" class="back_hip"/>
-          <geom mesh="thigh_0" material="metal" class="visual"/>
-          <geom mesh="thigh_1" material="gray" class="visual"/>
+          <geom mesh="thigh_0" material="pbr_metal_gray" class="visual"/>
+          <geom mesh="thigh_1" material="pbr_plastic_white" class="visual"/>
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0" type="box" class="collision"/>
           <body name="RL_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 -0.000622121 -0.141417" quat="0.710672 0.00154099 -0.00450087 0.703508"
               mass="0.241352" diaginertia="0.0014901 0.00146356 5.31397e-05"/>
             <joint name="RL_calf_joint" class="knee"/>
-            <geom mesh="calf_0" material="gray" class="visual"/>
-            <geom mesh="calf_1" material="black" class="visual"/>
+            <geom mesh="calf_0" material="pbr_plastic_white" class="visual"/>
+            <geom mesh="calf_1" material="pbr_plastic_black" class="visual"/>
             <geom size="0.013 0.06" pos="0.01 0 -0.06" quat="0.995004 0 -0.0998334 0" type="cylinder" class="collision"/>
             <geom size="0.011 0.0325" pos="0.02 0 -0.148" quat="0.999688 0 0.0249974 0" type="cylinder" class="collision"/>
-            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
+            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="pbr_plastic_black"/>
             <geom name="RL" class="foot"/>
           </body>
         </body>
@@ -159,25 +191,25 @@
         <inertial pos="0.0054 -0.00194 -0.000105" quat="0.499245 0.497014 0.498237 0.505462" mass="0.678"
           diaginertia="0.00088403 0.000596003 0.000479967"/>
         <joint name="RR_hip_joint" class="abduction"/>
-        <geom mesh="hip_0" material="metal" class="visual" quat="2.14617e-09 4.63268e-05 4.63268e-05 -1"/>
-        <geom mesh="hip_1" material="gray" class="visual" quat="2.14617e-09 4.63268e-05 4.63268e-05 -1"/>
+        <geom mesh="hip_0" material="pbr_metal_gray" class="visual" quat="2.14617e-09 4.63268e-05 4.63268e-05 -1"/>
+        <geom mesh="hip_1" material="pbr_plastic_white" class="visual" quat="2.14617e-09 4.63268e-05 4.63268e-05 -1"/>
         <geom size="0.046 0.02" pos="0 -0.08 0" quat="0.707107 0.707107 0 0" type="cylinder" class="collision"/>
         <body name="RR_thigh" pos="0 -0.0955 0">
           <inertial pos="-0.00374 0.0223 -0.0327" quat="0.551623 -0.0200632 0.0847635 0.829533" mass="1.152"
             diaginertia="0.00594973 0.00584149 0.000878787"/>
           <joint name="RR_thigh_joint" class="back_hip"/>
-          <geom mesh="thigh_mirror_0" material="metal" class="visual"/>
-          <geom mesh="thigh_mirror_1" material="gray" class="visual"/>
+          <geom mesh="thigh_mirror_0" material="pbr_metal_gray" class="visual"/>
+          <geom mesh="thigh_mirror_1" material="pbr_plastic_white" class="visual"/>
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0" type="box" class="collision"/>
           <body name="RR_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 0.000622121 -0.141417" quat="0.703508 -0.00450087 0.00154099 0.710672"
               mass="0.241352" diaginertia="0.0014901 0.00146356 5.31397e-05"/>
             <joint name="RR_calf_joint" class="knee"/>
-            <geom mesh="calf_mirror_0" material="gray" class="visual"/>
-            <geom mesh="calf_mirror_1" material="black" class="visual"/>
+            <geom mesh="calf_mirror_0" material="pbr_plastic_white" class="visual"/>
+            <geom mesh="calf_mirror_1" material="pbr_plastic_black" class="visual"/>
             <geom size="0.013 0.06" pos="0.01 0 -0.06" quat="0.995004 0 -0.0998334 0" type="cylinder" class="collision"/>
             <geom size="0.011 0.0325" pos="0.02 0 -0.148" quat="0.999688 0 0.0249974 0" type="cylinder" class="collision"/>
-            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
+            <geom pos="0 0 -0.213" mesh="foot" class="visual" material="pbr_plastic_black"/>
             <geom name="RR" class="foot"/>
           </body>
         </body>
@@ -200,8 +232,8 @@
     <motor class="knee" name="RL_calf" joint="RL_calf_joint"/>
   </actuator>
 
-  <keyframe>
+  <!-- <keyframe>
     <key name="home" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
       ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"/>
-  </keyframe>
+  </keyframe> -->
 </mujoco>
