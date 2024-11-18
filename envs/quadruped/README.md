@@ -26,10 +26,9 @@ pip install --upgrade "jax[cuda12]" -f https://storage.googleapis.com/jax-releas
 acados is a library for solving nonlinear optimization problems quickly, particularly suited for Nonlinear Model Predictive Control (NMPC) and nonlinear optimization problems. It is based on highly optimized numerical algorithms such as Interior Point Method and Sequential Quadratic Programming, designed to provide efficient and reliable solutions.
 
 ``` bash
-cd $(your-workspace)
-git clone https://github.com/acados/acados.git
-cd acados
+cd $(your-path-to-orcagym)
 git submodule update --init --recursive
+cd 3rd_party/acados
 mkdir build
 cd build
 cmake ..
