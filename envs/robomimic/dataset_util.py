@@ -4,6 +4,7 @@ import h5py
 import numpy as np
 import json
 import os
+from envs.openloong.camera_wrapper import *
 
 class DatasetWriter:
     def __init__(self, file_path, env_name, env_version, env_kwargs=None):
@@ -38,7 +39,7 @@ class DatasetWriter:
 
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
 
-    def add_demo(self, demo_data, model_file=None):
+    def add_demo(self, demo_data, save_camera, camera_name_list, ts_list, model_file=None):
         """
         添加一个新的演示（trajectory）。
 
@@ -80,6 +81,19 @@ class DatasetWriter:
             obs_group = demo_group.create_group('obs')
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data)
+
+            if save_camera:
+                print("Saving camera data")
+                for camera_name in camera_name_list:
+                    camera_group = demo_group.create_group("camera")
+                    for camera_name in camera_name_list:
+                        frames = []
+                        for ts in ts_list:
+                            parser = CameraDataParser(camera_name)
+                            index, frame = parser.get_closed_frame(ts)
+                            frames.append(frame)
+                        camera_group.create_dataset(camera_name, data=np.array(frames))
+                print("Camera data saved")
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
