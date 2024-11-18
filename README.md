@@ -70,24 +70,21 @@ cd orca_gym/tools
 python down_projects.py
 ```
 * **Move the Downloaded Files**
-After downloading and extracting the project files, move the folder to your OrcaStudio installation directory.Copy the files (levels, assets) from the `orca-studio-projects/{your-orca-studio-version}` directory to your OrcaStudio installation directory. Assuming your installation directory is `$MyWorkSpace/OrcaStudio`, then copy the files to `$MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
+After downloading and extracting the project files, move the folder to your OrcaStudio installation directory.Copy the files (levels, assets, ...) from the `orca-studio-projects` directory to your OrcaStudio installation directory. Assuming your installation directory is `~/MyWorkSpace/OrcaStudio`, then copy the files into `~/MyWorkSpace/OrcaStudio/Projects/OrcaProject` directory.
 
 
-* **Validate OrcaGym Environment:**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
+* **Reinforcement Learning Training Example**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `FrankaPanda_RL` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
+    * **Follow the Guide**: Follow the instructions in `tutorial/Basic-RL-Example.ipynb` to learn how to use multi-agent reinforcement learning training.
+
+* **Teleoperation Example**
+    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
+    * **Follow the Guide**: Follow the instructions in `tutorial/Teleoperation.ipynbb` to learn how to control the Franka Panda robot arm using the controller, and implement operation recording and replay.
 
 * **OrcaGym's Mujoco Interface**
     * **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
     * **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
 
-* **Control the Franka Panda Robot Arm with an Xbox Controller**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/Xbox-Joystick-Control.ipynb` to learn how to control the Franka Panda robot arm using the controller, and implement operation recording and replay.
-
-* **Reinforcement Learning Training Example**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `FrankaPanda_RL` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/FrankaPanda-RL/FrankaPanda-RL.md` to learn how to use multi-agent reinforcement learning training.
 
 
 ## Important Considerations
