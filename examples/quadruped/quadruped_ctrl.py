@@ -272,7 +272,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------
     RENDER_FREQ = 30  # Hz
     N_EPISODES = 500
-    N_STEPS_PER_EPISODE = 2000 if env.base_vel_command_type != "human" else 20000
+    N_STEPS_PER_EPISODE = 2000 if env.base_vel_command_type != "human" else sys.maxsize
     last_render_time = time.time()
 
     state_obs_history, ctrl_state_history = [], []

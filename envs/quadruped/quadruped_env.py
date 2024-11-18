@@ -1117,8 +1117,8 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
     def _key_callback(self):
         # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
 
-        move_speed_rate = 0.25 * 0.1
-        turn_speed_rate = 0.1
+        move_speed_rate = self.dt
+        turn_speed_rate = self.dt
 
         self._keyboard_controller.update()
 
