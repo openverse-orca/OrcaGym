@@ -148,3 +148,128 @@ class DatasetWriter:
         由于每次操作都已保存并关闭文件，因此此方法可为空或用于其他清理操作。
         """
         pass  # 在此示例中，无需执行任何操作
+
+
+class DatasetReader:
+    def __init__(self, file_path):
+        """
+        初始化 DatasetReader。
+
+        参数：
+        - file_path: 数据集的 HDF5 文件路径。
+        """
+        self.file_path = file_path
+        self.env_args = None
+
+        # 打开文件并读取环境信息
+        with h5py.File(self.file_path, 'r') as f:
+            if 'data' not in f:
+                raise ValueError("HDF5 文件中不存在 'data' 组")
+            data_group = f['data']
+            if 'env_args' in data_group.attrs:
+                self.env_args = json.loads(data_group.attrs['env_args'])
+
+    def get_demo_names(self):
+        """
+        获取所有演示的名称。
+
+        返回：
+        - demo_names: 包含演示名称的列表。
+        """
+        with h5py.File(self.file_path, 'r') as f:
+            return list(f['data'].keys())
+
+    def load_demo(self, demo_name):
+        """
+        加载指定的演示数据。
+
+        参数：
+        - demo_name: 要加载的演示名称。
+
+        返回：
+        - demo_data: 包含演示数据的字典。
+        """
+        with h5py.File(self.file_path, 'r') as f:
+            data_group = f['data']
+            if demo_name not in data_group:
+                raise ValueError(f"演示 '{demo_name}' 不存在")
+
+            demo_group = data_group[demo_name]
+            demo_data = {
+                "states": demo_group['states'][:],
+                "actions": demo_group['actions'][:],
+                "rewards": demo_group['rewards'][:],
+                "dones": demo_group['dones'][:],
+                "obs": {},
+                "next_obs": {}
+            }
+
+            # 加载 obs
+            obs_group = demo_group['obs']
+            for obs_key in obs_group.keys():
+                demo_data["obs"][obs_key] = obs_group[obs_key][:]
+
+            # 加载 next_obs
+            if 'next_obs' in demo_group:
+                next_obs_group = demo_group['next_obs']
+                for obs_key in next_obs_group.keys():
+                    demo_data["next_obs"][obs_key] = next_obs_group[obs_key][:]
+            else:
+                # 如果没有 next_obs，可以选择生成
+                demo_data["next_obs"] = self._generate_next_obs(demo_data["obs"])
+
+            # 加载摄像机数据（如果存在）
+            if 'camera' in demo_group:
+                camera_group = demo_group['camera']
+                demo_data['camera'] = {
+                    camera_name: camera_group[camera_name][:]
+                    for camera_name in camera_group.keys()
+                }
+
+            return demo_data
+
+    def load_filtered_demos(self, filter_key_name):
+        """
+        加载指定过滤器键的演示。
+
+        参数：
+        - filter_key_name: 过滤器键的名称。
+
+        返回：
+        - demos: 包含过滤后的演示数据字典。
+        """
+        with h5py.File(self.file_path, 'r') as f:
+            mask_group = f['mask']
+            if filter_key_name not in mask_group:
+                raise ValueError(f"过滤器键 '{filter_key_name}' 不存在")
+
+            demo_names = mask_group[filter_key_name][:]
+            demo_names = [name.decode('utf-8') for name in demo_names]
+
+        # 加载演示
+        return {demo_name: self.load_demo(demo_name) for demo_name in demo_names}
+
+    def _generate_next_obs(self, obs):
+        """
+        从 obs 自动生成 next_obs。
+
+        参数：
+        - obs: 观测数据字典。
+
+        返回：
+        - next_obs: 下一个观测数据字典，结构与 obs 相同。
+        """
+        next_obs = {obs_key: [] for obs_key in obs.keys()}
+        for obs_key, obs_data in obs.items():
+            next_obs[obs_key] = np.concatenate([obs_data[1:], obs_data[-1:]], axis=0)
+        return next_obs
+
+    def get_env_args(self):
+        """
+        获取环境参数。
+
+        返回：
+        - env_args: 环境参数字典。
+        """
+        return self.env_args
+

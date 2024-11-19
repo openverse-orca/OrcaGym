@@ -172,9 +172,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         desired_goal = self._get_desired_goal()
 
         # normalize the action space for recording
-        normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
+        # normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
 
-        info = {"state": self.get_state(), "action": normalized_action}
+        info = {"state": self.get_state(), "action": ctrl}
         terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
