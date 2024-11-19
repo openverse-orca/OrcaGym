@@ -42,13 +42,13 @@ class LeggedGymEnv(OrcaGymLocalEnv):
 
         self._agents: list[LeggedRobot] = []
         for agent_name in agent_names:
-            agent = LeggedRobot(agent_name, task, max_episode_steps)
+            agent = Go2Robot(agent_name, task, max_episode_steps)
             self._agents.append(agent)
 
-        self._agent_joint_names = [agent.joint_names for agent in self._agents]
-        self._agent_actuator_names = [agent.actuator_names for agent in self._agents]
-        self._agent_site_names = [agent.site_names for agent in self._agents]
-        self._agent_sensor_names = [agent.sensor_names for agent in self._agents]
+        self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]
+        self._agent_actuator_names = [actuator_name for agent in self._agents for actuator_name in agent.actuator_names]
+        self._agent_site_names = [site_name for agent in self._agents for site_name in agent.site_names]
+        self._agent_sensor_names = [sensor_name for agent in self._agents for sensor_name in agent.sensor_names]
 
         self.nu = self.model.nu
         self.nq = self.model.nq
@@ -56,10 +56,12 @@ class LeggedGymEnv(OrcaGymLocalEnv):
 
         # control range
         all_actuator = self.model.get_actuator_dict()
-        [agent.set_acutator_ctrl_range(all_actuator) for agent in self._agents]
+        [agent.set_ctrl_info(all_actuator) for agent in self._agents]
 
         self.ctrl = np.zeros(self.nu)
 
+        init_joint_qpos = self.query_joint_qpos(self._agent_joint_names)
+        [agent.set_init_state(init_joint_qpos) for agent in self._agents]
 
         self._reset_agents(self._agents)
 
@@ -93,7 +95,7 @@ class LeggedGymEnv(OrcaGymLocalEnv):
         for i in range(len(self._agents)):
             agent = self._agents[i]
             act = action[i]
-            self.ctrl[i : i + len(act)] = agent.step(act)
+            self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent.step(act)
 
         self.do_simulation(self.ctrl, self.frame_skip)
 
@@ -114,8 +116,8 @@ class LeggedGymEnv(OrcaGymLocalEnv):
             desired_goal = obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape]
             info["is_success"][i] = agent.is_success(achieved_goal, desired_goal, self._env_id)
             reward[i] = agent.compute_reward(achieved_goal, desired_goal)
-            terminated[i] = agent.is_terminated(achieved_goal, desired_goal)
-            truncated[i] = agent.truncated
+            terminated[i] = bool(info["is_success"][i] == 1.0)
+            truncated[i] = agent.is_truncated(achieved_goal, desired_goal) or agent.truncated
 
             if (terminated[i] or truncated[i]):
                 # print(f"{self._env_id} Reset agent {agent.name} terminated: {terminated[i]}, truncated: {truncated[i]}")
@@ -147,8 +149,13 @@ class LeggedGymEnv(OrcaGymLocalEnv):
             raise ValueError("Unsupported achieved_goal shape")
 
     def _get_obs(self, agents : list[LeggedRobot]) -> list[dict]:
+        # print("query joint qpos: ", self._agent_joint_names)
+
         joint_qpos = self.query_joint_qpos(self._agent_joint_names)
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
+
+        # print("Sensor data: ", sensor_data)
+        # print("Joint qpos: ", joint_qpos)
 
         # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成 m x n 份
         obs = agents[0].get_obs(sensor_data, joint_qpos, self.dt)
@@ -166,6 +173,8 @@ class LeggedGymEnv(OrcaGymLocalEnv):
         for agent in agents:
             agent_joint_qpos = agent.reset(self.np_random)
             joint_qpos.update(agent_joint_qpos)
+
+        # print("Reset joint qpos: ", joint_qpos)
 
         self.set_joint_qpos(joint_qpos)
         self.mj_forward()

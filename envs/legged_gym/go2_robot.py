@@ -21,10 +21,11 @@ class Go2Robot(LeggedRobot):
         self._base_joint_name = self.name_space("base")
         self._joint_names = [self._base_joint_name] + self._leg_joint_names
         
-        self._neutral_joint_angles = {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.2,
-                                      "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.2,
-                                      "RL_hip_joint": 0.0, "RL_thigh_joint": 0.8, "RL_calf_joint": -1.2,
-                                      "RR_hip_joint": 0.0, "RR_thigh_joint": 0.8, "RR_calf_joint": -1.2}
+        self._neutral_joint_angles = {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.6,
+                                      "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.6,
+                                      "RL_hip_joint": 0.0, "RL_thigh_joint": 0.8, "RL_calf_joint": -1.6,
+                                      "RR_hip_joint": 0.0, "RR_thigh_joint": 0.8, "RR_calf_joint": -1.6}
+        self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
         
         self._actuator_names = self.name_space_list(["FR_hip", "FR_thigh", "FR_calf",
                                                     "FL_hip", "FL_thigh", "FL_calf",
@@ -55,12 +56,15 @@ class Go2Robot(LeggedRobot):
     def get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
         contact_force = np.zeros(len(self._touch_sensor_names))
         for i, sensor_name in enumerate(self._touch_sensor_names):
-            contact_force[i] = sensor_data[sensor_name]
+            contact_force[i] = sensor_data[sensor_name]['values'][0]
         return contact_force.flatten()
     
     def get_imu_data(self, sensor_data: dict) -> np.ndarray:
-        quat = np.array([sensor_data[self._sensor_imu_quat_name]])
-        omega = np.array([sensor_data[self._sensor_imu_omega_name]])
-        acc = np.array([sensor_data[self._sensor_imu_acc_name]])
-        imu_data = np.concatenate([quat, omega, acc], axis=1)
+        quat = np.array(sensor_data[self._sensor_imu_quat_name]['values'])
+        omega = np.array(sensor_data[self._sensor_imu_omega_name]['values'])
+        acc = np.array(sensor_data[self._sensor_imu_acc_name]['values'])
+        # print("Quat: ", quat)
+        # print("Omega: ", omega)
+        # print("Acc: ", acc)
+        imu_data = np.concatenate((quat, omega, acc))
         return imu_data.flatten()
