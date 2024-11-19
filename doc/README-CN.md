@@ -55,14 +55,6 @@ pip install torch --extra-index-url https://download.pytorch.org/whl/cu12x
 ## 使用
 使用 OrcaGym 非常简单。以下是一些入门示例：
 
-* **下载项目文件** 
-运行以下脚本以下载最新的项目文件：
-```bash
-cd orca_gym/tools
-python down_projects.py
-```
-移动下载的文件 下载并解压项目文件后，将文件夹移动到您的 OrcaStudio 安装目录。将 orca-studio-projects/{your-orca-studio-version} 目录中的文件（如级别、资产）复制到您的 OrcaStudio 安装目录中。假设您的安装目录为 $MyWorkSpace/OrcaStudio，则将文件复制到 $MyWorkSpace/OrcaStudio/Projects/OrcaProject 目录。
-
 * **验证 OrcaGym 环境：**
 
 * **启动 OrcaStudio**：启动 OrcaStudio 并加载相应的关卡，例如 Ant_Multiagent。点击 "Start" 按钮（Ctrl-G）进入游戏模式。
