@@ -91,9 +91,6 @@ class LeggedRobot(OrcaGymAgent):
 
         return result
 
-    def get_action_size(self) -> int:
-        return self._nu
-
     def set_init_state(self, joint_qpos: dict):
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
@@ -156,11 +153,5 @@ class LeggedRobot(OrcaGymAgent):
         return contact_force.flatten()
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
-        quat = np.array(sensor_data[self._sensor_imu_quat_name]['values'])
-        omega = np.array(sensor_data[self._sensor_imu_omega_name]['values'])
-        acc = np.array(sensor_data[self._sensor_imu_acc_name]['values'])
-        # print("Quat: ", quat)
-        # print("Omega: ", omega)
-        # print("Acc: ", acc)
-        imu_data = np.concatenate((quat, omega, acc))
+        imu_data = np.concatenate([sensor_data[imu_sensor_name]['values'] for imu_sensor_name in self._imu_sensor_names])
         return imu_data.flatten()

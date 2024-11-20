@@ -141,3 +141,11 @@ class OrcaGymAgent:
         
     def set_init_state(self, joint_qpos: dict):
         raise NotImplementedError
+    
+    def get_action_size(self) -> int:
+        """
+        Action size can be overridden in the subclass.
+        In most of cases, this is the number of actuators in the robot.
+        But in some cases, the action size may be different.
+        """        
+        return self._nu

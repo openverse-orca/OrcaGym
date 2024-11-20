@@ -79,16 +79,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
     def set_obs_space(self):
         self.observation_space = self.generate_observation_space(self.get_obs([self._agents[0]]))
 
-    def get_action_size(self) -> int:
-        """
-        Action size is defined in the subclass.
-        In most cases, this is the number of actuators in the robot.
-        But in some cases, the action size may be different.
-        """
-        raise NotImplementedError
-
     def set_action_space(self) -> None:
-        action_size = self.get_action_size()
+        action_size = self._agents[0].get_action_size()
         self.action_space = spaces.Box(
             low=np.array([-1.0] * action_size),
             high=np.array([1.0] * action_size),
@@ -97,7 +89,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         [agent.set_action_space(self.action_space) for agent in self._agents]        
 
     def initialize_agents(self, entry, *args, **kwargs):
-        module_name, class_name = entry.rsplit(".", 1)
+        module_name, class_name = entry.rsplit(":", 1)
         module = importlib.import_module(module_name)
         class_type = getattr(module, class_name)
         for agent_name in self._agent_names:

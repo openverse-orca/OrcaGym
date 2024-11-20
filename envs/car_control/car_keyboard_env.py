@@ -1,7 +1,7 @@
 # car_keyboard_env.py
 
 from orca_gym.utils import rotations
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces

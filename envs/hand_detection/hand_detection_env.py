@@ -9,7 +9,7 @@ from orca_gym.devices.hand_joytstick import HandJoystick
 from scipy.spatial.transform import Rotation as R
 import os
 from envs.openloong.camera_wrapper import CameraWrapper
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 import time
 
 class HandDetectionEnv(OrcaGymRemoteEnv):
