@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, U
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-from envs import OrcaGymBaseEnv
+from orca_gym.environment import OrcaGymBaseEnv
 
 from stable_baselines3.common.vec_env.base_vec_env import (
     CloudpickleWrapper,

@@ -90,4 +90,3 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         self.set_joint_qpos(joint_qpos)
         self.mj_forward()
-

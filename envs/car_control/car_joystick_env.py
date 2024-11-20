@@ -1,6 +1,6 @@
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick, XboxJoystickManager  # 引入 XboxJoystick 和 XboxJoystickManager
 import numpy as np
