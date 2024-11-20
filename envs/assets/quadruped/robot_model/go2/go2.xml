@@ -137,11 +137,11 @@
       <geom mesh="base_3" material="pbr_plastic_white" class="visual"/>
       <geom mesh="base_4" material="pbr_plastic_gray" class="visual"/>
       <geom size="0.1881 0.04675 0.057" type="box" class="collision"/>
-      <site name="base_contact_box" size = "0.1881 0.04675 0.057" type="box"/>
+      <site name="base_contact_box" size = "0.1881 0.04675 0.057" type="box" group="3"/>
       <geom size="0.05 0.045" pos="0.285 0 0.01" type="cylinder" class="collision"/>
-      <site name="base_contact_cylinder" size = "0.05 0.045" pos="0.285 0 0.01" type="cylinder"/>
+      <site name="base_contact_cylinder" size = "0.05 0.045" pos="0.285 0 0.01" type="cylinder" group="3"/>
       <geom size="0.047" pos="0.293 0 -0.06" class="collision"/>
-      <site name="base_contact_sphere" size = "0.047" pos="0.293 0 -0.06" type="sphere"/>
+      <site name="base_contact_sphere" size = "0.047" pos="0.293 0 -0.06" type="sphere" group="3"/>
       <site name="imu" pos="-0.02557 0 0.04232"/>
       <body name="FL_hip" pos="0.1934 0.0465 0">
         <inertial pos="-0.0054 0.00194 -0.000105" quat="0.497014 0.499245 0.505462 0.498237" mass="0.678"

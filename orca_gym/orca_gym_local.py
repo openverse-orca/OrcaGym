@@ -89,6 +89,8 @@ class OrcaGymLocal(OrcaGymBase):
         self.model.init_geom_dict(geom_dict)
         site_dict = self.query_all_sites()
         self.model.init_site_dict(site_dict)
+        sensor_dict = self.query_all_sensors()
+        self.model.init_sensor_dict(sensor_dict)
 
         self.data = OrcaGymData(self.model)
         self.update_data()
@@ -359,6 +361,22 @@ class OrcaGymLocal(OrcaGymBase):
 
         return site_dict 
     
+    def query_all_sensors(self):
+        model = self._mjModel
+        sensor_dict = {}
+        for i in range(model.nsensor):
+            sensor = model.sensor(i)
+            sensor_dict[sensor.name] = {
+                "ID": sensor.id,
+                "Type": sensor.type[0],
+                "ObjID": sensor.objid[0],
+                "Dim": sensor.dim[0],
+                "Adr": sensor.adr[0],
+                "Noise": sensor.noise[0]
+            }
+
+        return sensor_dict
+    
     def update_data(self):
         qpos, qvel, qacc = self.query_all_qpos_qvel_qacc()
         qfrc_bias = self.query_qfrc_bias()
@@ -411,29 +429,10 @@ class OrcaGymLocal(OrcaGymBase):
     def query_sensor_data(self, sensor_names):
         sensor_data_dict = {}
         for sensor_name in sensor_names:
-            sensor_id = self._mjModel.sensor(sensor_name).id
-            sensor_dim = self._mjModel.sensor_dim[sensor_id]
-            sensor_type = self._mjModel.sensor_type[sensor_id]
-
-            if sensor_type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
-                sensor_type_str = "accelerometer"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_GYRO:
-                sensor_type_str = "gyro"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_TOUCH:
-                sensor_type_str = "touch"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_VELOCIMETER:
-                sensor_type_str = "velocimeter"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
-                sensor_type_str = "framequat"
-            else:
-                sensor_type_str = "unknown"
-
-            sensor_values = np.copy(self._mjData.sensordata[sensor_id:sensor_id + sensor_dim])
-
-            sensor_data_dict[sensor_name] = {
-                "type": sensor_type_str,
-                "values": sensor_values,
-            }
+            sensor_info = self.model.get_sensor(sensor_name)
+            # print("Sensor Info: ", sensor_info, sensor_name)
+            sensor_values = np.copy(self._mjData.sensordata[sensor_info['Adr']:sensor_info['Adr'] + sensor_info['Dim']])
+            sensor_data_dict[sensor_name] = sensor_values
 
         # print("Sensor Data Dict: ", sensor_data_dict)
 
