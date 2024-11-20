@@ -16,11 +16,12 @@ def get_legged_robot_name(agent_name: str) -> str:
 
 class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
+                 env_id: str,                 
                  agent_name: str, 
                  task: str,
                  max_episode_steps: int):
         
-        super().__init__(agent_name, task, max_episode_steps)
+        super().__init__(env_id, agent_name, task, max_episode_steps)
 
         robot_config = LeggedRobotConfig[get_legged_robot_name(agent_name)]
 
@@ -64,9 +65,6 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def _get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
-        return NotImplementedError
-    
     def _get_imu_data(self, sensor_data : dict) -> np.ndarray:
         return NotImplementedError
 
@@ -74,6 +72,9 @@ class LeggedRobot(OrcaGymAgent):
         leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
         imu_data = self._get_imu_data(sensor_data)
         achieved_goal = self._get_body_contact_force(sensor_data)
+
+        # print("Agent: ", self.name, "contact force: ", achieved_goal)
+
         desired_goal = self.body_contact_force_threshold
         obs = np.concatenate(
                 [
@@ -124,34 +125,33 @@ class LeggedRobot(OrcaGymAgent):
         joint_neutral_qpos.update(self._init_base_joint_qpos)
         return joint_neutral_qpos
 
-    def is_truncated(self, achieved_goal, desired_goal) -> bool:
+    def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
         return any(achieved_goal > desired_goal)
 
-    def is_success(self, achieved_goal, desired_goal, env_id) -> np.float32:
-        if self.is_truncated(achieved_goal, desired_goal):
+    def is_success(self, achieved_goal, desired_goal) -> np.float32:
+        if self.is_terminated(achieved_goal, desired_goal):
             # print(f"{env_id} Agent {self.name} Task Failed: achieved goal: ", achieved_goal, "desired goal: ", desired_goal, "steps: ", self._current_episode_step)
             return 0.0
-        elif self._current_episode_step >= self._max_episode_steps:
-            print(f"{env_id} Agent {self.name} Task Successed!")
+        elif self.truncated:
             return 1.0
         else:
             return 0.0
 
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
-        if self.is_truncated(achieved_goal, desired_goal):
-            return -1.0
+        if self.is_success(achieved_goal, desired_goal) > 0:
+            return 10.0
         else:
-            return self._current_episode_step * 0.1
+            return 0.0
         
 
     def _get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
         contact_force = np.zeros(len(self._touch_sensor_names))
         for i, sensor_name in enumerate(self._touch_sensor_names):
-            contact_force[i] = sensor_data[sensor_name]['values'][0]
+            contact_force[i] = sensor_data[sensor_name]
         return contact_force.flatten()
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
-        imu_data = np.concatenate([sensor_data[imu_sensor_name]['values'] for imu_sensor_name in self._imu_sensor_names])
+        imu_data = np.concatenate([sensor_data[imu_sensor_name] for imu_sensor_name in self._imu_sensor_names])
         return imu_data.flatten()

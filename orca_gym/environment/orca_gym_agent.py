@@ -7,10 +7,12 @@ from gymnasium import spaces
 
 class OrcaGymAgent:
     def __init__(self, 
+                 env_id: str,
                  agent_name: str, 
                  task: str,
                  max_episode_steps: int):
         
+        self._env_id = env_id
         self._agent_name = agent_name
         self._task = task
         self._max_episode_steps = max_episode_steps
@@ -132,9 +134,11 @@ class OrcaGymAgent:
         return reset_info
 
 
-    def is_success(self, achieved_goal, desired_goal, env_id) -> np.float32:
+    def is_success(self, achieved_goal, desired_goal) -> np.float32:
         raise NotImplementedError
 
+    def is_terminated(self, achieved_goal, desired_goal) -> bool:
+        raise NotImplementedError
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         raise NotImplementedError

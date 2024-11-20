@@ -82,10 +82,10 @@ def training_model(model, total_timesteps, model_file):
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
         
-def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 加载已有模型或初始化新模型
-    if os.path.exists(f"{model_file}.zip"):
+    if os.path.exists(f"{model_file}.zip") and load_existing_model:
         model = PPO.load(model_file, env=env, device=device)
     else:
         # 定义自定义策略网络
@@ -111,10 +111,10 @@ def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max
     return model
 
 
-def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if os.path.exists(f"{model_file}.zip"):
+    if os.path.exists(f"{model_file}.zip") and load_existing_model:
         model = SAC.load(model_file, env=env, device=device)
     else:        
         # https://arxiv.org/html/2312.13788v2
@@ -154,10 +154,10 @@ def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max
 
     return model
 
-def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if os.path.exists(f"{model_file}.zip"):
+    if os.path.exists(f"{model_file}.zip") and load_existing_model:
         model = DDPG.load(model_file, env=env, device=device)
     else:        
         # https://arxiv.org/html/2312.13788v2
@@ -189,10 +189,10 @@ def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, ma
     return model
 
 
-def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file):
+def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if os.path.exists(f"{model_file}.zip"):
+    if os.path.exists(f"{model_file}.zip") and load_existing_model:
         model = TQC.load(model_file, env=env, device=device)
     else:        
         # https://arxiv.org/html/2312.13788v2
@@ -292,7 +292,7 @@ def generate_env_list(orcagym_addresses, subenv_num):
     return orcagym_addr_list, env_index_list, render_remote_list
 
 
-def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file):
+def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file, load_existing_model):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -305,13 +305,13 @@ def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, tim
 
         print("Start Simulation!")
         if model_type == "ppo":
-            model = setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
         elif model_type == "tqc":
-            model = setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
         elif model_type == "sac":
-            model = setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
         elif model_type == "ddpg":
-            model = setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file)
+            model = setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
         else:
             raise ValueError("Invalid model type")
         
@@ -359,6 +359,7 @@ if __name__ == "__main__":
     parser.add_argument('--task', type=str, help='The task to run (reach or pick_and_place)')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, help='The mode to run (training or testing)')
+    parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
     parser.add_argument('--training_episode', type=int, help='The number of training episodes for each agent')
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     args = parser.parse_args()
@@ -375,6 +376,7 @@ if __name__ == "__main__":
     task = args.task
     model_type = args.model_type
     run_mode = args.run_mode
+    load_existing_model = args.load_existing_model
     training_episode = args.training_episode
     start_her_episode = args.start_her_episode
 
@@ -397,7 +399,7 @@ if __name__ == "__main__":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num)
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file)
+        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, load_existing_model)
         test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)
     elif run_mode == "testing":
         test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)    

@@ -56,7 +56,14 @@ def _worker(
                 #     else:
                 #         dones.append(info["is_success"][i] != 0)
 
-                remote.send((observation, reward, terminated, truncated))
+                # print("Worker step, obs: ", observation, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "info: ", info)
+
+                reward = info["reward"]
+                terminated = info["terminated"]
+                truncated = info["truncated"]
+                is_success = info["is_success"]
+
+                remote.send((observation, reward, terminated, truncated, is_success))
             elif cmd == "reset":
                 maybe_options = {"options": data[1]} if data[1] else {}
                 observation, reset_info = env.reset(seed=data[0], **maybe_options)
@@ -154,8 +161,13 @@ class SubprocVecEnvMA(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, rewords, terminated, truncated = zip(*results)  # type: ignore[assignment]
-        return _flatten_obs(obs, self.observation_space, self.agent_num), _flatten_reward(rewords), _flatten_dones(terminated, truncated), _flatten_info(obs, terminated, truncated)  # type: ignore[return-value]
+        obs, reward, terminated, truncated, is_success = zip(*results)  # type: ignore[assignment]
+        # print("Subproc step wait, obs: " , obs, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "is_success: ", is_success)
+        flatten_obs = _flatten_obs(obs, self.observation_space, self.agent_num)
+        flatten_rewards = _flatten_reward(reward)
+        flatten_dones = _flatten_dones(terminated, truncated)
+        flatten_info = _flatten_info(obs, is_success, truncated)
+        return flatten_obs, flatten_rewards, flatten_dones, flatten_info  # type: ignore[return-value]
 
     def reset(self) -> VecEnvObs:
         for env_idx, remote in enumerate(self.remotes):
@@ -316,7 +328,7 @@ def _slice_multi_agent_obs(obs: VecEnvObs, agent_num, agent_index) -> VecEnvObs:
 
 
 
-def _flatten_info(obs, terminated, truncated) -> Dict[str, List[Any]]:
+def _flatten_info(obs, is_success, truncated) -> Dict[str, List[Any]]:
     """
     Flatten infos, depending on the info space.
 
@@ -327,47 +339,33 @@ def _flatten_info(obs, terminated, truncated) -> Dict[str, List[Any]]:
             A dict of lists.
             Each list has the environment index as its first axis.
     """
-    assert isinstance(terminated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(terminated))
-    assert len(terminated) > 0, "need dones from at least one environment"
+    assert isinstance(is_success, (tuple, list)), "expected list or tuple of is_success per environment, got {}".format(type(is_success))
+    assert len(is_success) > 0, "need is_success from at least one environment"
 
     assert isinstance(truncated, (tuple, list)), "expected list or tuple of dones per environment, got {}".format(type(truncated))
     assert len(truncated) > 0, "need dones from at least one environment"
-    assert len(terminated) == len(truncated), "terminated and truncated should have the same length"
+    assert len(is_success) == len(truncated), "is_success and truncated should have the same length"
 
     # 将 remote_num 个 info 中，每个 nd.array 切成 agent_num 份，最后返回 agent_num * remote_num 个 info
     # is_success 原为每个 remote 有  agent_num 个值，现在切成 agent_num * remote_num 份
     # TimeLimit.truncated 原为 remote_num 个值，现在切成 agent_num * remote_num 份
     # terminal_observation 结构与 obs 相同，切分为 agent_num * remote_num 份
 
-    # print("Flatte info begin: ", obs, terminated, truncated)
+    # print("Flatte info begin: ", obs, is_success, truncated)
 
     flattened_infos = []
-    for remote in range(len(terminated)):
-        remote_terminated = terminated[remote]
+    for remote in range(len(is_success)):
+        remote_is_success = is_success[remote]
         remote_truncated = truncated[remote]
         remote_obs = obs[remote]
-        assert len(remote_terminated) == len(remote_truncated), "terminated and truncated should have the same length"
-        agent_num = len(remote_terminated)
+        assert len(remote_is_success) == len(remote_truncated), "is_success and truncated should have the same length"
+        agent_num = len(remote_is_success)
         for agent_index in range(agent_num):
             info = {}
-            info["is_success"] = 1.0 if remote_terminated[agent_index] else 0.0
+            info["is_success"] = remote_is_success[agent_index]
             info["TimeLimit.truncated"] = remote_truncated[agent_index]
             info["terminal_observation"] = _slice_multi_agent_obs(remote_obs, agent_num, agent_index)
             flattened_infos.append(info)
-
-    # for info in infos:
-    #     for i in range(agent_num):
-    #         flattened_infos.append({})
-    #         for key, value in info.items():
-    #             if key == "is_success":
-    #                 assert len(value) >= agent_num, "Number of agents in info is_success is less than agent_num"
-    #                 flattened_infos[-1][key] = value[i]
-    #             elif key == "TimeLimit.truncated":
-    #                 flattened_infos[-1][key] = value
-    #             elif key == "terminal_observation":
-    #                 flattened_infos[-1][key] = _slice_multi_agent_obs(obs, agent_num, i)
-    #             else:
-    #                 flattened_infos[-1][key] = value
             
     flattened_infos = tuple(flattened_infos)
 
