@@ -1,110 +1,80 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs import OrcaGymLocalEnv, OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymAgent
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 
+from .legged_robot_config import LeggedRobotConfig
 
 
-class LeggedRobot:
+def get_legged_robot_name(agent_name: str) -> str:
+    if agent_name.startswith("go2"):
+        return "Go2"
+    else:
+        raise ValueError(f"Unsupported agent name: {agent_name}")
+
+class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
                  agent_name: str, 
                  task: str,
                  max_episode_steps: int):
         
-        self._agent_name = agent_name
-        self._task = task
-        self._max_episode_steps = max_episode_steps
-        self._current_episode_step = 0
+        super().__init__(agent_name, task, max_episode_steps)
 
-        self._joint_names = None
-        self._leg_joint_names = None
-        self._base_joint_name = None
-        self._actuator_names = None
-        self._site_names = None
-        self._sensor_names = None
+        robot_config = LeggedRobotConfig[get_legged_robot_name(agent_name)]
 
-        self._neutral_joint_values = None
-        self._contact_force_threshold = None
-
-        self._ctrl = None
-        self._nu = None
-        self._nq = None
-        self._nv = None
+        self._leg_joint_names = self.name_space_list(robot_config["leg_joint_names"])
+        self._base_joint_name = self.name_space(robot_config["base_joint_name"])
+        self._joint_names = [self._base_joint_name] + self._leg_joint_names
+        
+        self._neutral_joint_angles = robot_config["neutral_joint_angles"]
+        self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
+        
+        self._actuator_names = self.name_space_list(robot_config["actuator_names"])
+        
+        self._imu_site_name = self.name_space(robot_config["imu_site_name"])
+        self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
+        self._site_names = [self._imu_site_name] + self._contact_site_names
 
 
-    @property
-    def name(self) -> str:
-        return self._agent_name
+        self._imu_sensor_names = self.name_space_list(robot_config["sensor_imu_names"])
+        self._touch_sensor_names = self.name_space_list(robot_config["sensor_base_touch_names"])
+        self._sensor_names = self._imu_sensor_names + self._touch_sensor_names
 
-    def name_space(self, name : str) -> str:
-        return f"{self._agent_name}_{name}"
-    
-    def name_space_list(self, names : list[str]) -> list[str]:
-        return [self.name_space(name) for name in names]
-    
-    @property
-    def joint_names(self) -> list[str]:
-        return self._joint_names
-    
-    @property
-    def actuator_names(self) -> list[str]:
-        return self._actuator_names
-    
-    @property
-    def site_names(self) -> list[str]:
-        return self._site_names
-    
-    @property
-    def sensor_names(self) -> list[str]:
-        return self._sensor_names
+        self._body_contact_force_threshold = np.array(robot_config["body_contact_force_threshold"]).flatten()
+        
+        self._ctrl = np.zeros(len(self._actuator_names))
+        self._nu = len(self._actuator_names)
+        self._nq = len(self._leg_joint_names) + (7 * len(self._base_joint_name))
+        self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
+
 
     @property
     def neutral_joint_values(self) -> np.ndarray:
         return self._neutral_joint_values
     
     @property
-    def nu(self) -> int:
-        return self._nu
+    def body_contact_force_threshold(self) -> float:
+        return self._body_contact_force_threshold
     
-    @property
-    def nq(self) -> int:
-        return self._nq
-    
-    @property
-    def nv(self) -> int:
-        return self._nv
-
-    @property
-    def truncated(self) -> bool:
-        return self._current_episode_step >= self._max_episode_steps
-
-    @property
-    def contact_force_threshold(self) -> float:
-        return self._contact_force_threshold
-    
-    @property
-    def ctrl_start(self) -> int:
-        return self._ctrl_start
-
     def get_joint_neutral(self) -> dict[str, np.ndarray]:
         joint_qpos = {}
         for name, value in zip(self._leg_joint_names, self.neutral_joint_values):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
+    def _get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
         return NotImplementedError
     
-    def get_imu_data(self, sensor_data : dict) -> np.ndarray:
+    def _get_imu_data(self, sensor_data : dict) -> np.ndarray:
         return NotImplementedError
 
     def get_obs(self, sensor_data : dict, joint_qpos : dict, dt : float) -> dict:
         leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
-        imu_data = self.get_imu_data(sensor_data)
-        achieved_goal = self.get_body_contact_force(sensor_data)
-        desired_goal = self.contact_force_threshold
+        imu_data = self._get_imu_data(sensor_data)
+        achieved_goal = self._get_body_contact_force(sensor_data)
+        desired_goal = self.body_contact_force_threshold
         obs = np.concatenate(
                 [
                     leg_joint_qpos,
@@ -121,17 +91,8 @@ class LeggedRobot:
 
         return result
 
-    def set_ctrl_info(self, actuator_dict) -> None:
-        if not hasattr(self, "_ctrl_range"):
-            self._ctrl_range = []
-        if not hasattr(self, "_ctrl_offset"):
-            self._ctrl_start = 0
-            
-        for i, actuator_name in enumerate(self._actuator_names):
-            # matain the order of actuators
-            self._ctrl_range.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
-            if i == 0:
-                self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
+    def get_action_size(self) -> int:
+        return self._nu
 
     def set_init_state(self, joint_qpos: dict):
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
@@ -187,3 +148,19 @@ class LeggedRobot:
         else:
             return self._current_episode_step * 0.1
         
+
+    def _get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
+        contact_force = np.zeros(len(self._touch_sensor_names))
+        for i, sensor_name in enumerate(self._touch_sensor_names):
+            contact_force[i] = sensor_data[sensor_name]['values'][0]
+        return contact_force.flatten()
+    
+    def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
+        quat = np.array(sensor_data[self._sensor_imu_quat_name]['values'])
+        omega = np.array(sensor_data[self._sensor_imu_omega_name]['values'])
+        acc = np.array(sensor_data[self._sensor_imu_acc_name]['values'])
+        # print("Quat: ", quat)
+        # print("Omega: ", omega)
+        # print("Acc: ", acc)
+        imu_data = np.concatenate((quat, omega, acc))
+        return imu_data.flatten()
