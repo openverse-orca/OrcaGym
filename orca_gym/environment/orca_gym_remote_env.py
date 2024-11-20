@@ -11,13 +11,13 @@ from gymnasium.spaces import Space
 import asyncio
 import sys
 from orca_gym import orca_gym
-from orca_gym import OrcaGymRemote, OrcaGymLocal
+from orca_gym import OrcaGymRemote
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
-from envs import OrcaGymBaseEnv, RewardType
+from . import OrcaGymBaseEnv
 
 import grpc
 

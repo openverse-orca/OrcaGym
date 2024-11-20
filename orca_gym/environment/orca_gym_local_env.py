@@ -1,5 +1,5 @@
 from os import path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,20 +7,20 @@ from numpy.typing import NDArray
 import gymnasium as gym
 from gymnasium import error, spaces
 from gymnasium.spaces import Space
+from gymnasium.core import ObsType
 
 import asyncio
 import sys
-from orca_gym import OrcaGymRemote, OrcaGymLocal
+from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
-from envs import OrcaGymBaseEnv, RewardType
+from . import OrcaGymBaseEnv
 
 import grpc
 
-import mujoco
 from datetime import datetime
 import time
 
@@ -214,3 +214,4 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
         send_remote = self.render_mode == "human" and self.render_remote
         self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))
+
