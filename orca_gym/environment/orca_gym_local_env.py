@@ -215,3 +215,5 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         send_remote = self.render_mode == "human" and self.render_remote
         self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))
 
+    def query_contact_simple(self):
+        return self.gym.query_contact_simple()
