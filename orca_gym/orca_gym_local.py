@@ -169,6 +169,7 @@ class OrcaGymLocal(OrcaGymBase):
             'nuser_tendon': self._mjModel.nuser_tendon,
             'nuser_actuator': self._mjModel.nuser_actuator,
             'nuser_sensor': self._mjModel.nuser_sensor,
+            'nconmax': self._mjModel.nconmax,
         }
         return model_info
     
@@ -537,3 +538,17 @@ class OrcaGymLocal(OrcaGymBase):
         
         if send_remote:
             await self._remote_set_mocap_pos_and_quat(mocap_data)
+
+    def query_contact_simple(self):
+        contact = self._mjData.contact
+        contacts = []
+        for i in range(self._mjData.ncon):
+            contact_info = {
+                "ID": i,
+                "Dim": contact.dim[i],
+                "Geom1": contact.geom1[i],
+                "Geom2": contact.geom2[i],
+            }
+            contacts.append(contact_info)
+        
+        return contacts            

@@ -11,6 +11,8 @@ from .legged_robot_config import LeggedRobotConfig
 def get_legged_robot_name(agent_name: str) -> str:
     if agent_name.startswith("go2"):
         return "Go2"
+    elif agent_name.startswith("A01B"):
+        return "A01B"
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
 
@@ -38,26 +40,34 @@ class LeggedRobot(OrcaGymAgent):
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
         self._site_names = [self._imu_site_name] + self._contact_site_names
 
+        self._imu_sensor_framequat_name = self.name_space(robot_config["sensor_imu_framequat_name"])
+        self._imu_sensor_gyro_name = self.name_space(robot_config["sensor_imu_gyro_name"])
+        self._imu_sensor_accelerometer_name = self.name_space(robot_config["sensor_imu_accelerometer_name"])
+        self._imu_sensor_names = [self._imu_sensor_framequat_name, self._imu_sensor_gyro_name, self._imu_sensor_accelerometer_name]
 
-        self._imu_sensor_names = self.name_space_list(robot_config["sensor_imu_names"])
-        self._touch_sensor_names = self.name_space_list(robot_config["sensor_base_touch_names"])
-        self._sensor_names = self._imu_sensor_names + self._touch_sensor_names
+        self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
 
-        self._body_contact_force_threshold = np.array(robot_config["body_contact_force_threshold"]).flatten()
+        self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
+
+        self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
+        self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
+        self._contact_body_names = self._base_contact_body_names + self._leg_contact_body_names
         
         self._ctrl = np.zeros(len(self._actuator_names))
         self._nu = len(self._actuator_names)
         self._nq = len(self._leg_joint_names) + (7 * len(self._base_joint_name))
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
 
+        self._is_obs_updated = False
+
 
     @property
     def neutral_joint_values(self) -> np.ndarray:
         return self._neutral_joint_values
     
-    @property
-    def body_contact_force_threshold(self) -> float:
-        return self._body_contact_force_threshold
+    # @property
+    # def body_contact_force_threshold(self) -> float:
+    #     return self._body_contact_force_threshold
     
     def get_joint_neutral(self) -> dict[str, np.ndarray]:
         joint_qpos = {}
@@ -65,28 +75,30 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def _get_imu_data(self, sensor_data : dict) -> np.ndarray:
-        return NotImplementedError
+    def get_obs(self, sensor_data : dict, joint_qpos : dict, contact_set : set, dt : float) -> dict:
+        self._leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
+        self._imu_data = self._get_imu_data(sensor_data)
+        self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # penality if the foot touch force is too strong
+        self._leg_contact = self._get_leg_contact(contact_set)            # penality if the leg is in contact with the ground
 
-    def get_obs(self, sensor_data : dict, joint_qpos : dict, dt : float) -> dict:
-        leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
-        imu_data = self._get_imu_data(sensor_data)
-        achieved_goal = self._get_body_contact_force(sensor_data)
+        self._achieved_goal = self._get_base_contact(contact_set)         # task failed if the base is in contact with the ground
+        self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
-        # print("Agent: ", self.name, "contact force: ", achieved_goal)
-
-        desired_goal = self.body_contact_force_threshold
         obs = np.concatenate(
                 [
-                    leg_joint_qpos,
-                    imu_data
-                ]).copy()                 
+                    self._leg_joint_qpos.copy(),
+                    self._imu_data.copy(),
+                    self._foot_touch_force.copy(),
+                    self._leg_contact.copy(),
+                ])          
 
         result = {
             "observation": obs,
-            "achieved_goal": achieved_goal,
-            "desired_goal": desired_goal,
+            "achieved_goal": self._achieved_goal.copy(),
+            "desired_goal": self._desired_goal.copy(),
         }
+
+        self._is_obs_updated = True
 
         # print("Agent Obs: ", result)
 
@@ -127,31 +139,79 @@ class LeggedRobot(OrcaGymAgent):
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
-        return any(achieved_goal > desired_goal)
+        return any(achieved_goal != desired_goal)
 
     def is_success(self, achieved_goal, desired_goal) -> np.float32:
-        if self.is_terminated(achieved_goal, desired_goal):
-            # print(f"{env_id} Agent {self.name} Task Failed: achieved goal: ", achieved_goal, "desired goal: ", desired_goal, "steps: ", self._current_episode_step)
-            return 0.0
-        elif self.truncated:
+        if self.truncated and self.is_terminated(achieved_goal, desired_goal):
             return 1.0
         else:
             return 0.0
 
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
-        if self.is_success(achieved_goal, desired_goal) > 0:
-            return 10.0
-        else:
-            return 0.0
-        
+        if self._is_obs_updated:
+            total_reward = 0.0
 
-    def _get_body_contact_force(self, sensor_data : dict) -> np.ndarray:
-        contact_force = np.zeros(len(self._touch_sensor_names))
-        for i, sensor_name in enumerate(self._touch_sensor_names):
-            contact_force[i] = sensor_data[sensor_name]
-        return contact_force.flatten()
+            # reward for task success
+            if self.is_success(achieved_goal, desired_goal) > 0:
+                total_reward += 10.0
+
+            # penality for task failure
+            if self.is_terminated(achieved_goal, desired_goal):
+                total_reward -= 10.0
+
+            # penality for leg contact with the ground
+            total_reward -= 0.1 * np.sum(self._leg_contact)
+
+            # penality for foot touch force
+            variance = np.var(abs(self._foot_touch_force))
+            total_reward -= 0.1 * variance
+
+            # penality for torques too close to the limits
+            for i, torque in enumerate(self._ctrl):
+                if abs(torque) > 0.9 * abs(self._ctrl_range[i][0]) and (abs(torque) > 0.9 * abs(self._ctrl_range[i][1])):
+                    total_reward -= 0.1
+
+            # penalty for base gyro and accelerometer
+            gyro_penalty = np.linalg.norm(self._imu_data_gyro)
+            accel_penalty = np.linalg.norm(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81]))
+            total_reward -= 0.1 * gyro_penalty + 0.1 * accel_penalty
+
+            self._is_obs_updated = False
+            return total_reward
+        else:
+            raise ValueError("Observation must be updated before computing reward")
+
+    def _get_base_contact(self, contact_set : set) -> np.ndarray:
+        """
+        Check if the base is in contact with the ground
+        """
+        contact_result = False
+        for contact_body_name in self._base_contact_body_names:
+            if contact_body_name in contact_set:
+                contact_result = True
+                break
+        return np.array([1.0 if contact_result else 0.0])
+    
+    def _get_leg_contact(self, contact_set : set) -> np.ndarray:
+        """
+        Check if each of the legs is in contact with the ground
+        """
+        contact_result = np.zeros(len(self._leg_contact_body_names))
+        for i, contact_body_name in enumerate(self._leg_contact_body_names):
+            if contact_body_name in contact_set:
+                contact_result[i] = 1.0
+        return contact_result
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
-        imu_data = np.concatenate([sensor_data[imu_sensor_name] for imu_sensor_name in self._imu_sensor_names])
+        self._imu_data_framequat = sensor_data[self._imu_sensor_framequat_name]
+        self._imu_data_gyro = sensor_data[self._imu_sensor_gyro_name]
+        self._imu_data_accelerometer = sensor_data[self._imu_sensor_accelerometer_name]
+        imu_data = np.concatenate([self._imu_data_framequat, self._imu_data_gyro, self._imu_data_accelerometer])
         return imu_data.flatten()
+    
+    def _get_foot_touch_force(self, sensor_data: dict) -> np.ndarray:
+        contact_force = np.zeros(len(self._foot_touch_sensor_names))
+        for i, touch_sensor_name in enumerate(self._foot_touch_sensor_names):
+            contact_force[i] = sensor_data[touch_sensor_name]
+        return contact_force

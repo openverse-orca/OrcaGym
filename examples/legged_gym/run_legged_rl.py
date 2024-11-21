@@ -25,7 +25,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
 
-def register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
@@ -34,7 +34,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point
         kwargs={'frame_skip': frame_skip, 
                 'task': task,
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': [f"go2_{agent_id:02d}" for agent_id in range(agent_num)], 
+                'agent_names': [f"{agent_name}_{agent_id:02d}" for agent_id in range(agent_num)], 
                 'time_step': time_step,
                 'max_episode_steps': max_episode_steps, # 环境永不停止，agent有最大步数
                 'render_mode': "human",
@@ -46,10 +46,10 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point
     return env_id
 
 
-def make_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote):
+def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote):
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote)
+        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote)
         print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
@@ -91,8 +91,8 @@ def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max
         # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
-                pi=[256, 256, 128],  # 策略网络结构
-                vf=[256, 256, 128]   # 值函数网络结构
+                pi=[512, 256, 128],  # 策略网络结构
+                vf=[512, 256, 128]   # 值函数网络结构
             ),
             ortho_init=True,
             activation_fn=nn.ReLU
@@ -101,8 +101,8 @@ def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max
                     env, 
                     verbose=1, 
                     learning_rate=0.001, 
-                    n_steps=2048, 
-                    batch_size=256, 
+                    n_steps=512, 
+                    batch_size=512, 
                     gamma=0.95, 
                     clip_range=0.2, 
                     policy_kwargs=policy_kwargs, 
@@ -292,7 +292,7 @@ def generate_env_list(orcagym_addresses, subenv_num):
     return orcagym_addr_list, env_index_list, render_remote_list
 
 
-def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file, load_existing_model):
+def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file, load_existing_model):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -300,7 +300,7 @@ def train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, tim
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, subenv_num)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         print("Start Simulation!")
@@ -356,6 +356,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
     parser.add_argument('--subenv_num', type=int, default=1, help='The number of subenvs for each gRPC address')
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
+    parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
     parser.add_argument('--task', type=str, help='The task to run (reach or pick_and_place)')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, help='The mode to run (training or testing)')
@@ -373,6 +374,7 @@ if __name__ == "__main__":
     orcagym_addresses = args.orcagym_addresses
     subenv_num = args.subenv_num
     agent_num = args.agent_num
+    agent_name = args.agent_name
     task = args.task
     model_type = args.model_type
     run_mode = args.run_mode
@@ -396,10 +398,10 @@ if __name__ == "__main__":
 
 
     if run_mode == "training":
-        print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num)
+        print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        train_model(orcagym_addresses, subenv_num, agent_num, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, load_existing_model)
+        train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, load_existing_model)
         test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)
     elif run_mode == "testing":
         test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)    
