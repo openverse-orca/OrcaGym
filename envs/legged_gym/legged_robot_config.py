@@ -35,16 +35,20 @@ LeggedRobotConfig = {
         
         "base_joint_name" :     "trunk",
         
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.6,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.6,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.8, "RL_calf_joint": -1.6,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.8, "RR_calf_joint": -1.6},
+        
+        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": -0.8, "FL_calf_joint": 1.8,
+                                "FR_hip_joint": 0.0, "FR_thigh_joint": -0.8, "FR_calf_joint": 1.8,
+                                "RL_hip_joint": 0.0, "RL_thigh_joint": -0.8, "RL_calf_joint": 1.8,
+                                "RR_hip_joint": 0.0, "RR_thigh_joint": -0.8, "RR_calf_joint": 1.8},
+
+        "base_neutral_height_offset" : 0.25,    # the offset from max height to standing natural height
         
 
-        "actuator_names" :      ["fr_tau0", "fr_tau1", "fr_tau2",
-                                "fl_tau0", "fl_tau1", "fl_tau2",
-                                "hr_tau0", "hr_tau1", "hr_tau2",
-                                "hl_tau0", "hl_tau1", "hl_tau2"],
+        "actuator_names" :      ["fr_abad_actuator", "fr_thigh_actuator", "fr_calf_actuator",
+                                "fl_abad_actuator", "fl_thigh_actuator", "fl_calf_actuator",
+                                "hr_abad_actuator", "hr_thigh_actuator", "hr_calf_actuator",
+                                "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
+                                 
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["fr_site", "fl_site", "hr_site", "hl_site"],
@@ -54,7 +58,13 @@ LeggedRobotConfig = {
         "sensor_imu_accelerometer_name" :       "imu_acc",
         "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],
 
+        "ground_contact_body_names" : ["Floor_Floor"],
         "base_contact_body_names" : ["trunk_link"],
         "leg_contact_body_names" : ["fr_thigh", "fr_calf", "fl_thigh", "fl_calf", "hr_thigh", "hr_calf", "hl_thigh", "hl_calf"],
+
+        # 机器狗的自重： 约 61.44 kg。
+        # 静止时每只脚的受力： 约 150.7 N。
+        # 以 1 m/s 速度行走时，每只脚在触地时的受力： 约 301.4 N。        
+        "foot_touch_force_threshold" : 350.0,
     }
 }

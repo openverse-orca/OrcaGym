@@ -66,15 +66,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         joint_qpos = self.query_joint_qpos(self._agent_joint_names)
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
-        contact_set = self._generate_contact_set()
+        contact_dict = self._generate_contact_dict()
 
         # print("Sensor data: ", sensor_data)
         # print("Joint qpos: ", joint_qpos)
 
         # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成 m x n 份
-        obs = agents[0].get_obs(sensor_data, joint_qpos, contact_set, self.dt)
+        obs = agents[0].get_obs(sensor_data, joint_qpos, contact_dict, self.dt)
         for i in range(1, len(agents)):
-            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, contact_set, self.dt)
+            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, contact_dict, self.dt)
             obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
         
         return obs
@@ -93,13 +93,19 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.set_joint_qpos(joint_qpos)
         self.mj_forward()
 
-    def _generate_contact_set(self):
+    def _generate_contact_dict(self) -> dict[str, list[str]]:
         contacts = self.query_contact_simple()
         # print("Contacts: ", contacts)
-        contact_set = set()
+        contact_dict : dict[str, list[str]] = {}
         for contact in contacts:
-            contact_set.add(self.model.get_geom_body_name(contact["Geom1"]))
-            contact_set.add(self.model.get_geom_body_name(contact["Geom2"]))
+            body_name1 = self.model.get_geom_body_name(contact["Geom1"])
+            body_name2 = self.model.get_geom_body_name(contact["Geom2"])
+            if body_name1 not in contact_dict:
+                contact_dict[body_name1] = []
+            if body_name2 not in contact_dict:
+                contact_dict[body_name2] = []
+            contact_dict[body_name1].append(body_name2)
+            contact_dict[body_name2].append(body_name1)
 
-        return contact_set
+        return contact_dict
 
