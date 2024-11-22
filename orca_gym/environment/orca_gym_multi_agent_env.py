@@ -61,7 +61,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         # control info, this is about the actuators, not about the actoins. 
         # in some cases, agent may not use all actuators for actions.
         all_actuator = self.model.get_actuator_dict()
-        [agent.set_ctrl_info(all_actuator) for agent in self._agents]
+        [agent.init_ctrl_info(all_actuator) for agent in self._agents]
         self.ctrl = np.zeros(self.nu)
 
         # Initialize the joints' state before the simulation starts.

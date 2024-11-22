@@ -78,7 +78,7 @@ class OrcaGymAgent:
     def get_obs(self, **kwargs):
         raise NotImplementedError
 
-    def set_ctrl_info(self, actuator_dict) -> None:
+    def init_ctrl_info(self, actuator_dict) -> None:
         if not hasattr(self, "_ctrl_range"):
             self._ctrl_range = []
         if not hasattr(self, "_ctrl_offset"):
@@ -90,8 +90,12 @@ class OrcaGymAgent:
             if i == 0:
                 self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
 
-    def set_action(self, action):
+        self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
+        self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
+
+    def set_action(self, action : np.ndarray) -> None:
         assert len(action) == len(self._ctrl_range)
+        self._action = action.copy()
 
         for i in range(len(action)):
             # 线性变换到 ctrl range 空间

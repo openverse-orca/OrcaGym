@@ -34,7 +34,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task,
         kwargs={'frame_skip': frame_skip, 
                 'task': task,
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': [f"{agent_name}_{agent_id:02d}" for agent_id in range(agent_num)], 
+                'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)], 
                 'time_step': time_step,
                 'max_episode_steps': max_episode_steps, # 环境永不停止，agent有最大步数
                 'render_mode': "human",
