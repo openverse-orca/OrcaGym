@@ -65,6 +65,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # print("query joint qpos: ", self._agent_joint_names)
 
         joint_qpos = self.query_joint_qpos(self._agent_joint_names)
+        joint_qacc = self.query_joint_qacc(self._agent_joint_names)
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
         contact_dict = self._generate_contact_dict()
 
@@ -72,9 +73,9 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # print("Joint qpos: ", joint_qpos)
 
         # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成 m x n 份
-        obs = agents[0].get_obs(sensor_data, joint_qpos, contact_dict, self.dt)
+        obs = agents[0].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, self.dt)
         for i in range(1, len(agents)):
-            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, contact_dict, self.dt)
+            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, self.dt)
             obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
         
         return obs

@@ -35,11 +35,12 @@ LeggedRobotConfig = {
         
         "base_joint_name" :     "trunk",
         
-        
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": -0.8, "FL_calf_joint": 1.8,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": -0.8, "FR_calf_joint": 1.8,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": -0.8, "RL_calf_joint": 1.8,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": -0.8, "RR_calf_joint": 1.8},
+        # Init the robot in a standing position. 
+        # Maintain the order of the joints same as the joint_names for reset basic pos or computing the reward easily.
+        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.8, "fr_joint2": 1.8,
+                                "fl_joint0": 0.0, "fl_joint1": -0.8, "fl_joint2": 1.8,
+                                "hr_joint0": 0.0, "hr_joint1": -0.8, "hr_joint2": 1.8,
+                                "hl_joint0": 0.0, "hl_joint1": -0.8, "hl_joint2": 1.8},
 
         "base_neutral_height_offset" : 0.25,    # the offset from max height to standing natural height
         
@@ -48,6 +49,8 @@ LeggedRobotConfig = {
                                 "fl_abad_actuator", "fl_thigh_actuator", "fl_calf_actuator",
                                 "hr_abad_actuator", "hr_thigh_actuator", "hr_calf_actuator",
                                 "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
+
+        "actuator_type" :        "position",  # "torque" or "position"
                                  
         
         "imu_site_name" :       "imu",

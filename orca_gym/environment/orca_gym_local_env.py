@@ -166,6 +166,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         joint_qvel_dict = self.gym.query_joint_qvel(joint_names)
         return joint_qvel_dict
     
+    def query_joint_qacc(self, joint_names):
+        joint_qacc_dict = self.gym.query_joint_qacc(joint_names)
+        return joint_qacc_dict
+    
     def jnt_qposadr(self, joint_name):
         joint_qposadr = self.gym.jnt_qposadr(joint_name)
         return joint_qposadr
