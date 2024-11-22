@@ -1,4 +1,6 @@
 import numpy as np
+from datetime import datetime
+import math
 from gymnasium.core import ObsType
 from orca_gym.environment import OrcaGymAgent
 from orca_gym.utils import rotations
@@ -8,6 +10,31 @@ import copy
 
 from .legged_robot_config import LeggedRobotConfig
 
+PRINT_REWARD = True
+PRINT_REWARD_INTERVAL = 1
+
+def print_reward(message : str, reward : Optional[float] = None):
+    if PRINT_REWARD:
+        if print_reward.print:
+            if reward is None:
+                print(message)
+            else:
+                print(message, reward)
+
+def print_reward_begin():
+    if PRINT_REWARD:
+        if not hasattr(print_reward, "last_time"):
+            print_reward.last_time = datetime.now()
+            print("Current time: ", print_reward.last_time)
+            print_reward.print = True
+
+        if (datetime.now() - print_reward.last_time).seconds > PRINT_REWARD_INTERVAL:
+            print_reward.print = True
+            print_reward.last_time = datetime.now()
+        
+def print_reward_end():
+    if PRINT_REWARD:
+        print_reward.print = False
 
 def get_legged_robot_name(agent_name: str) -> str:
     if agent_name.startswith("go2"):
@@ -60,6 +87,7 @@ class LeggedRobot(OrcaGymAgent):
         self._contact_body_names = self._base_contact_body_names + self._leg_contact_body_names
         
         self._ctrl = np.zeros(len(self._actuator_names))
+        self._action = np.zeros(len(self._actuator_names))
         self._nu = len(self._actuator_names)
         self._nq = len(self._leg_joint_names) + (7 * len(self._base_joint_name))
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
@@ -98,6 +126,7 @@ class LeggedRobot(OrcaGymAgent):
                     self._imu_data.copy(),
                     self._foot_touch_force.copy(),
                     self._leg_contact.copy(),
+                    self._action.copy(),
                 ])          
 
         result = {
@@ -119,7 +148,7 @@ class LeggedRobot(OrcaGymAgent):
     def set_action(self, action):
         assert len(action) == len(self._ctrl_range)
 
-        print("Agent: ", self.name, "Orignal action: ", action)
+        # print("Agent: ", self.name, "Orignal action: ", action)
 
         for i in range(len(action)):
             # 线性变换到 ctrl range 空间
@@ -146,7 +175,11 @@ class LeggedRobot(OrcaGymAgent):
         if self._actuator_type == "position":
             assert self._ctrl.shape == self._neutral_joint_values.shape
             self._ctrl = self._neutral_joint_values.copy()
-        # print("Neutral joint values: ", self._ctrl)
+            # print("Neutral joint values: ", self._ctrl)
+        elif self._actuator_type == "torque":
+            self._ctrl = np.zeros(self._nu)
+        else:
+            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
 
         joint_neutral_qpos = self.get_joint_neutral()
 
@@ -168,82 +201,100 @@ class LeggedRobot(OrcaGymAgent):
             return 0.0
 
 
-    def _compute_reward_success(self, achieved_goal, desired_goal) -> SupportsFloat:
-        return 1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0
+    def _compute_reward_success(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
+        reward = (1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0) * coeff
+        print_reward("Success reward: ", reward)
+        return reward
         
-    def _compute_reward_failure(self, achieved_goal, desired_goal) -> SupportsFloat:
-        return -1.0 if self.is_terminated(achieved_goal, desired_goal) else 0.0
+    def _compute_reward_failure(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
+        reward = (-1.0 if self.is_terminated(achieved_goal, desired_goal) else 0.0) * coeff
+        print_reward("Failure reward: ", reward)
+        return reward
         
-    def _compute_reward_contact(self) -> SupportsFloat:
-        return -np.sum(self._leg_contact)
+    def _compute_reward_contact(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(self._leg_contact)) * coeff
+        print_reward("Contact reward: ", reward)
+        return reward
     
-    def _compute_reward_foot_touch(self) -> SupportsFloat:
+    def _compute_reward_foot_touch(self, coeff) -> SupportsFloat:
         threshold = self._foot_touch_force_threshold
-        return -np.sum([(force - threshold) if force > threshold else 0 for force in self._foot_touch_force])
+        reward = (-np.sum([(force - threshold) if force > threshold else 0 for force in self._foot_touch_force])) * coeff
+        print_reward("Foot touch reward: ", reward)
+        return reward
     
-    def _compute_reward_joint_angles(self) -> SupportsFloat:
-        return -np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))   
+    def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff
+        print_reward("Joint angles reward: ", reward)
+        return reward
     
-    def _compute_reward_joint_accelerations(self) -> SupportsFloat:
-        return -np.sum(np.abs(self._leg_joint_qacc))
+    def _compute_reward_joint_accelerations(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(np.abs(self._leg_joint_qacc))) * coeff
+        print_reward("Joint accelerations reward: ", reward)
+        return reward
     
-    def _compute_reward_torques(self) -> SupportsFloat:
-        total_reward = 0.0
-        limit_threshold = 0.8
-        if self._actuator_type == "torque":
-            for i, torque in enumerate(self._ctrl):
-                if abs(torque) > limit_threshold * abs(self._ctrl_range[i][0]) or (abs(torque) > limit_threshold * abs(self._ctrl_range[i][1])):
-                    total_reward -= abs(torque)
-
-        return total_reward
+    def _compute_reward_limit(self, coeff) -> SupportsFloat:
+        limit_threshold = 0.95
+        limit_over_threshold_low = np.sum(self._ctrl < (limit_threshold * self._ctrl_range_low))
+        limit_over_threshold_high = np.sum(self._ctrl > (limit_threshold * self._ctrl_range_high))
+        reward = (-pow(limit_over_threshold_low + limit_over_threshold_high, 2)) * coeff
+        print_reward("Limit over threshold reward: ", reward)
+        return reward
     
-    def _compute_reward_base_gyro(self) -> SupportsFloat:
-        return -np.sum(np.abs(self._imu_data_gyro))
+    def _compute_reward_base_gyro(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(np.abs(self._imu_data_gyro))) * coeff
+        print_reward("Base gyro reward: ", reward)
+        return reward
     
-    def _compute_reward_base_accelerometer(self) -> SupportsFloat:
-        return -np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))
+    def _compute_reward_base_accelerometer(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))) * coeff
+        print_reward("Base accelerometer reward: ", reward)
+        return reward
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
             total_reward = 0.0
 
-            reward_success_coefficient = 10.0
-            reward_failure_coefficient = 10.0
-            reward_contact_coefficient = 0.1
-            reward_foot_touch_coefficient = 0.01
-            reward_joint_angles_coefficient = 0.01
-            reward_joint_accelerations_coefficient = 0.1
-            reward_torques_coefficient = 0.01
-            reward_base_gyro_coefficient = 0.1
-            reward_base_accelerometer_coefficient = 0.1
+            reward_success_coeff = 10.0
+            reward_failure_coeff = 10.0
+            reward_contact_coeff = 0.1
+            reward_foot_touch_coeff = 0.01
+            reward_joint_angles_coeff = 0.01
+            reward_joint_accelerations_coeff = 0.001
+            reward_limit_coeff = 1
+            reward_base_gyro_coeff = 0.1
+            reward_base_accelerometer_coeff = 0.1
+
+            print_reward_begin()
 
             # *** Reward for task success
-            total_reward += reward_success_coefficient * self._compute_reward_success(achieved_goal, desired_goal)
+            total_reward += self._compute_reward_success(achieved_goal, desired_goal, reward_success_coeff)
 
             # *** Penalty for task failure
-            total_reward += reward_failure_coefficient * self._compute_reward_failure(achieved_goal, desired_goal)
+            total_reward += self._compute_reward_failure(achieved_goal, desired_goal, reward_failure_coeff)
 
             # *** Penalty for leg contact with other bodies
-            total_reward += reward_contact_coefficient * self._compute_reward_contact()
+            total_reward +=  self._compute_reward_contact(reward_contact_coeff)
 
             # *** Penality for foot touch force too strong
-            total_reward += reward_foot_touch_coefficient * self._compute_reward_foot_touch()
-
-            # *** Penalty for torques too close to the limits
-            total_reward += reward_torques_coefficient * self._compute_reward_torques()
+            total_reward +=  self._compute_reward_foot_touch(reward_foot_touch_coeff)
 
             # *** Penalty for joint angles too far from the neutral position
-            total_reward += reward_joint_angles_coefficient * self._compute_reward_joint_angles()
+            total_reward +=  self._compute_reward_joint_angles(reward_joint_angles_coeff)
 
             # *** Penalty for joint accelerations
-            total_reward += reward_joint_accelerations_coefficient * self._compute_reward_joint_accelerations()
+            total_reward +=  self._compute_reward_joint_accelerations(reward_joint_accelerations_coeff)
+
+            # *** Penalty for torques or angels too close to the limits
+            total_reward +=  self._compute_reward_limit(reward_limit_coeff)
 
             # *** Penalty for base gyro and accelerometer
-            total_reward += reward_base_gyro_coefficient * self._compute_reward_base_gyro()
-            total_reward += reward_base_accelerometer_coefficient * self._compute_reward_base_accelerometer()
+            total_reward +=  self._compute_reward_base_gyro(reward_base_gyro_coeff)
+            total_reward +=  self._compute_reward_base_accelerometer(reward_base_accelerometer_coeff)
 
             self._is_obs_updated = False
-            # print("Reward: ", total_reward)
+            print_reward("Total Reward: ", total_reward)
+            print_reward("-----------------------------")
+            print_reward_end()
             return total_reward
         else:
             raise ValueError("Observation must be updated before computing reward")

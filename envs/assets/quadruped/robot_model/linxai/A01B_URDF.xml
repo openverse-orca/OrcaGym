@@ -228,24 +228,22 @@
   </body>
   </worldbody>
 
-<!-- <actuator>
-<motor name="fr_tau0" joint="fr_joint0" ctrlrange="-100 100"/>
-<motor name="fr_tau1" joint="fr_joint1" ctrlrange="-100 100"/>
-<motor name="fr_tau2" joint="fr_joint2" ctrlrange="-100 100"/>
-<motor name="fl_tau0" joint="fl_joint0" ctrlrange="-100 100"/>
-<motor name="fl_tau1" joint="fl_joint1" ctrlrange="-100 100"/>
-<motor name="fl_tau2" joint="fl_joint2" ctrlrange="-100 100"/>
-<motor name="hr_tau0" joint="hr_joint0" ctrlrange="-100 100"/>
-<motor name="hr_tau1" joint="hr_joint1" ctrlrange="-100 100"/>
-<motor name="hr_tau2" joint="hr_joint2" ctrlrange="-100 100"/>
-<motor name="hl_tau0" joint="hl_joint0" ctrlrange="-100 100"/>
-<motor name="hl_tau1" joint="hl_joint1" ctrlrange="-100 100"/>
-<motor name="hl_tau2" joint="hl_joint2" ctrlrange="-100 100"/>
-</actuator> -->
-
-  <!-- 电机驱动器定义 -->
   <actuator>
-    <!-- 前右腿电机 -->
+    <motor name="fr_abad_actuator" joint="fr_joint0" ctrlrange="-50 50"/>
+    <motor name="fr_thigh_actuator" joint="fr_joint1" ctrlrange="-150 150"/>
+    <motor name="fr_calf_actuator" joint="fr_joint2" ctrlrange="-100 100"/>
+    <motor name="fl_abad_actuator" joint="fl_joint0" ctrlrange="-50 50"/>
+    <motor name="fl_thigh_actuator" joint="fl_joint1" ctrlrange="-150 150"/>
+    <motor name="fl_calf_actuator" joint="fl_joint2" ctrlrange="-100 100"/>
+    <motor name="hr_abad_actuator" joint="hr_joint0" ctrlrange="-50 50"/>
+    <motor name="hr_thigh_actuator" joint="hr_joint1" ctrlrange="-150 150"/>
+    <motor name="hr_calf_actuator" joint="hr_joint2" ctrlrange="-100 100"/>
+    <motor name="hl_abad_actuator" joint="hl_joint0" ctrlrange="-50 50"/>
+    <motor name="hl_thigh_actuator" joint="hl_joint1" ctrlrange="-150 150"/>
+    <motor name="hl_calf_actuator" joint="hl_joint2" ctrlrange="-100 100"/>
+  </actuator>
+
+  <!-- <actuator>
     <general name="fr_abad_actuator" joint="fr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
              gainprm="500" biasprm="0 -500 -5"/>
     <general name="fr_thigh_actuator" joint="fr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
@@ -253,7 +251,6 @@
     <general name="fr_calf_actuator" joint="fr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
              gainprm="800" biasprm="0 -800 -8"/>
     
-    <!-- 前左腿电机 -->
     <general name="fl_abad_actuator" joint="fl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
              gainprm="500" biasprm="0 -500 -5"/>
     <general name="fl_thigh_actuator" joint="fl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
@@ -261,7 +258,6 @@
     <general name="fl_calf_actuator" joint="fl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
              gainprm="800" biasprm="0 -800 -8"/>
     
-    <!-- 后右腿电机 -->
     <general name="hr_abad_actuator" joint="hr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
              gainprm="500" biasprm="0 -500 -5"/>
     <general name="hr_thigh_actuator" joint="hr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
@@ -269,14 +265,13 @@
     <general name="hr_calf_actuator" joint="hr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
              gainprm="800" biasprm="0 -800 -8"/>
     
-    <!-- 后左腿电机 -->
     <general name="hl_abad_actuator" joint="hl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
              gainprm="500" biasprm="0 -500 -5"/>
     <general name="hl_thigh_actuator" joint="hl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
              gainprm="1000" biasprm="0 -1000 -10"/>
     <general name="hl_calf_actuator" joint="hl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
              gainprm="800" biasprm="0 -800 -8"/>
-  </actuator>
+  </actuator> -->
 
 
 <sensor>
