@@ -9,6 +9,7 @@
 
   <default>
     <default class="quadruped">
+      <general dyntype="none" biastype="affine"/>
       <geom friction="0.8" margin="0.001" material="robot_color"/>
       <default class="collision">
         <geom group="4" contype="1" conaffinity="1" mass="0"/>
@@ -162,12 +163,12 @@
     </body>
     <body name="fl_abad" pos="0.42386 0.081557 -0.044479">
       <inertial pos="-0.014896 -0.015941 0.000233" quat="0.546522 0.546463 0.44111 0.456195" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="fl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
+      <joint name="fl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
       <geom type="mesh" rgba="1 1 1 1" mesh="fl_abad" class="visual" material="pbr_metal_silver_rough"/>
       <geom  class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
       <body name="fl_thigh" pos="0 0.1343 0">
         <inertial pos="-0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="fl_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
+        <joint name="fl_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
         <geom type="mesh" rgba="1 1 1 1" mesh="fl_thigh" class="visual" material="pbr_metal_silver_rough"/>
         <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
         <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
@@ -183,12 +184,12 @@
     </body>
     <body name="hr_abad" pos="-0.31564 -0.11844 -0.044478">
       <inertial pos="0.014896 0.015941 0.000233" quat="0.546463 0.546522 0.456195 0.44111" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="hr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
+      <joint name="hr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
       <geom type="mesh" rgba="1 1 1 1" mesh="hr_abad" class="visual" material="pbr_metal_silver_rough"/>
       <geom class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
       <body name="hr_thigh" pos="0 -0.1343 0">
         <inertial pos="0.00344 0.057962 -0.023227" quat="0.987524 -0.130746 -0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="hr_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
+        <joint name="hr_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
         <geom type="mesh" rgba="1 1 1 1" mesh="hr_thigh" class="visual" material="pbr_metal_silver_rough"/>
         <geom class="collision_thigh_1" pos="0 0.04 0" contype="0" conaffinity="0"/>
         <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
@@ -204,12 +205,12 @@
     </body>
     <body name="hl_abad" pos="-0.31564 0.081559 -0.044478">
       <inertial pos="0.014896 -0.015941 0.000233" quat="0.44111 0.456195 0.546522 0.546463" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="hl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
+      <joint name="hl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
       <geom type="mesh" rgba="1 1 1 1" mesh="hl_abad" class="visual" material="pbr_metal_silver_rough"/>
       <geom class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
       <body name="hl_thigh" pos="0 0.13425 0">
         <inertial pos="0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 -0.029794 -0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="hl_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
+        <joint name="hl_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
         <geom type="mesh" rgba="1 1 1 1" mesh="hl_thigh" class="visual" material="pbr_metal_silver_rough"/>
         <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
         <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
@@ -227,7 +228,7 @@
   </body>
   </worldbody>
 
-<actuator>
+<!-- <actuator>
 <motor name="fr_tau0" joint="fr_joint0" ctrlrange="-100 100"/>
 <motor name="fr_tau1" joint="fr_joint1" ctrlrange="-100 100"/>
 <motor name="fr_tau2" joint="fr_joint2" ctrlrange="-100 100"/>
@@ -240,7 +241,44 @@
 <motor name="hl_tau0" joint="hl_joint0" ctrlrange="-100 100"/>
 <motor name="hl_tau1" joint="hl_joint1" ctrlrange="-100 100"/>
 <motor name="hl_tau2" joint="hl_joint2" ctrlrange="-100 100"/>
-</actuator>
+</actuator> -->
+
+  <!-- 电机驱动器定义 -->
+  <actuator>
+    <!-- 前右腿电机 -->
+    <general name="fr_abad_actuator" joint="fr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-60 60"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="fr_thigh_actuator" joint="fr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-200 200"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="fr_calf_actuator" joint="fr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-150 150"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <!-- 前左腿电机 -->
+    <general name="fl_abad_actuator" joint="fl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-60 60"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="fl_thigh_actuator" joint="fl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-200 200"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="fl_calf_actuator" joint="fl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-150 150"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <!-- 后右腿电机 -->
+    <general name="hr_abad_actuator" joint="hr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-60 60"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="hr_thigh_actuator" joint="hr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-200 200"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="hr_calf_actuator" joint="hr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-150 150"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <!-- 后左腿电机 -->
+    <general name="hl_abad_actuator" joint="hl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-60 60"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="hl_thigh_actuator" joint="hl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-200 200"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="hl_calf_actuator" joint="hl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-150 150"
+             gainprm="800" biasprm="0 -800 -8"/>
+  </actuator>
+
+
 <sensor>
 <framequat name="imu_quat" objtype="site" objname="imu"/>
 <gyro name="imu_omega" site="imu" noise="5e-4" cutoff="34.9"/>

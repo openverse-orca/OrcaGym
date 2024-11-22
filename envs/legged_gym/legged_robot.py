@@ -4,6 +4,7 @@ from orca_gym.environment import OrcaGymAgent
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
+import copy
 
 from .legged_robot_config import LeggedRobotConfig
 
@@ -30,6 +31,8 @@ class LeggedRobot(OrcaGymAgent):
         self._leg_joint_names = self.name_space_list(robot_config["leg_joint_names"])
         self._base_joint_name = self.name_space(robot_config["base_joint_name"])
         self._joint_names = [self._base_joint_name] + self._leg_joint_names
+
+        self._base_neutral_height_offset = robot_config["base_neutral_height_offset"]
         
         self._neutral_joint_angles = robot_config["neutral_joint_angles"]
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
@@ -49,6 +52,7 @@ class LeggedRobot(OrcaGymAgent):
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
+        self._ground_contact_body_names = robot_config["ground_contact_body_names"]  # gound body is not included in the agent's namespace
         self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
         self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
         self._contact_body_names = self._base_contact_body_names + self._leg_contact_body_names
@@ -75,13 +79,13 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, joint_qpos : dict, contact_set : set, dt : float) -> dict:
+    def get_obs(self, sensor_data : dict, joint_qpos : dict, contact_dict : dict, dt : float) -> dict:
         self._leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
         self._imu_data = self._get_imu_data(sensor_data)
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # penality if the foot touch force is too strong
-        self._leg_contact = self._get_leg_contact(contact_set)            # penality if the leg is in contact with the ground
+        self._leg_contact = self._get_leg_contact(contact_dict)            # penality if the leg is in contact with the ground
 
-        self._achieved_goal = self._get_base_contact(contact_set)         # task failed if the base is in contact with the ground
+        self._achieved_goal = self._get_base_contact(contact_dict)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
         obs = np.concatenate(
@@ -133,8 +137,14 @@ class LeggedRobot(OrcaGymAgent):
 
     def reset(self, np_random) -> dict[str, np.ndarray]:
         self._current_episode_step = 0
+
         joint_neutral_qpos = self.get_joint_neutral()
-        joint_neutral_qpos.update(self._init_base_joint_qpos)
+
+        base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
+        base_neutral_qpos[self._base_joint_name][2] -= self._base_neutral_height_offset
+        # print("Base neutral qpos: ", base_neutral_qpos)
+        joint_neutral_qpos.update(base_neutral_qpos)
+
         return joint_neutral_qpos
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
@@ -152,54 +162,62 @@ class LeggedRobot(OrcaGymAgent):
         if self._is_obs_updated:
             total_reward = 0.0
 
-            # reward for task success
+            # 1. reward for task success
             if self.is_success(achieved_goal, desired_goal) > 0:
                 total_reward += 10.0
 
-            # penality for task failure
+            # 2. penality for task failure
             if self.is_terminated(achieved_goal, desired_goal):
+                # print("Task failed at step: ", self._current_episode_step)
                 total_reward -= 10.0
 
-            # penality for leg contact with the ground
+            # 3. penality for leg contact with other bodies
             total_reward -= 0.1 * np.sum(self._leg_contact)
 
-            # penality for foot touch force
-            variance = np.var(abs(self._foot_touch_force))
-            total_reward -= 0.1 * variance
+            # 4. penality for foot touch force
+            strong_touchs = np.sum(self._foot_touch_force > 1000.0)
+            # print("Foot touch force: ", self._foot_touch_force, "variance: ", strong_touchs)
+            total_reward -= 1 * strong_touchs
 
-            # penality for torques too close to the limits
+            # 5. penality for torques too close to the limits
             for i, torque in enumerate(self._ctrl):
-                if abs(torque) > 0.9 * abs(self._ctrl_range[i][0]) and (abs(torque) > 0.9 * abs(self._ctrl_range[i][1])):
+                if abs(torque) > 0.5 * abs(self._ctrl_range[i][0]) and (abs(torque) > 0.5 * abs(self._ctrl_range[i][1])):
                     total_reward -= 0.1
 
-            # penalty for base gyro and accelerometer
-            gyro_penalty = np.linalg.norm(self._imu_data_gyro)
-            accel_penalty = np.linalg.norm(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81]))
+            # 6. penalty for base gyro and accelerometer
+            gyro_penalty = np.sum(abs(self._imu_data_gyro))
+            # print("imu_data_gyro : ", self._imu_data_gyro)
+            accel_penalty = np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))
+            # print("imu_data_accelerometer : ", self._imu_data_accelerometer)
             total_reward -= 0.1 * gyro_penalty + 0.1 * accel_penalty
 
             self._is_obs_updated = False
+            # print("Reward: ", total_reward)
             return total_reward
         else:
             raise ValueError("Observation must be updated before computing reward")
 
-    def _get_base_contact(self, contact_set : set) -> np.ndarray:
+    def _get_base_contact(self, contact_dict : dict) -> np.ndarray:
         """
         Check if the base is in contact with the ground
         """
         contact_result = False
         for contact_body_name in self._base_contact_body_names:
-            if contact_body_name in contact_set:
-                contact_result = True
-                break
+            if contact_body_name in contact_dict:
+                # print("Base contact with: ", contact_dict[contact_body_name])
+                for ground_contact_body_name in self._ground_contact_body_names:
+                    if ground_contact_body_name in contact_dict[contact_body_name]:
+                        contact_result = True
+                        break
         return np.array([1.0 if contact_result else 0.0])
     
-    def _get_leg_contact(self, contact_set : set) -> np.ndarray:
+    def _get_leg_contact(self, contact_dict : dict) -> np.ndarray:
         """
-        Check if each of the legs is in contact with the ground
+        Check if each of the legs is in contact with the any other body
         """
         contact_result = np.zeros(len(self._leg_contact_body_names))
         for i, contact_body_name in enumerate(self._leg_contact_body_names):
-            if contact_body_name in contact_set:
+            if contact_body_name in contact_dict:
                 contact_result[i] = 1.0
         return contact_result
     
@@ -214,4 +232,6 @@ class LeggedRobot(OrcaGymAgent):
         contact_force = np.zeros(len(self._foot_touch_sensor_names))
         for i, touch_sensor_name in enumerate(self._foot_touch_sensor_names):
             contact_force[i] = sensor_data[touch_sensor_name]
+
+        # print("Foot touch force: ", contact_force)
         return contact_force

@@ -368,8 +368,14 @@ if __name__ == "__main__":
 
     # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
     TIME_STEP = 0.005                 # 仿真步长200Hz
-    FRAME_SKIP_SHORT = 4              # 200Hz * 4 = 50Hz 推理步长
+
+    FRAME_SKIP_REALTIME = 1           # 200Hz 推理步长
+    FRAME_SKIP_SHORT = 2              # 200Hz * 2 = 100Hz 推理步长
     FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
+
+    EPISODE_TIME_VERY_SHORT = 2       # 每个episode的时间长度
+    EPISODE_TIME_SHORT = 10           
+    EPISODE_TIME_LONG = 60
 
     orcagym_addresses = args.orcagym_addresses
     subenv_num = args.subenv_num
@@ -385,8 +391,8 @@ if __name__ == "__main__":
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
     if task == 'stand':    
-        max_episode_steps = 250
-        frame_skip = FRAME_SKIP_SHORT
+        frame_skip = FRAME_SKIP_REALTIME
+        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_VERY_SHORT)
     elif task == 'move_forward':
         max_episode_steps = 500
         frame_skip = FRAME_SKIP_SHORT

@@ -1,6 +1,7 @@
 
 import importlib
 from os import path
+import time
 from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 
 import numpy as np
@@ -148,8 +149,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             info["terminated"][i] = agent.is_terminated(achieved_goal, desired_goal)
             info["truncated"][i] = agent.truncated
 
-            # if info["is_success"][i] > 0.0:
-            #     print("Env: ", self._env_id, "Agent: ", agent.name, "Task Success: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
+            if info["is_success"][i] > 0.0:
+                print("Env: ", self._env_id, "Agent: ", agent.name, "Task Success: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
             # elif info["terminated"][i]:
             #     print("Env: ", self._env_id, "Agent: ", agent.name, "Task Failed: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
 
