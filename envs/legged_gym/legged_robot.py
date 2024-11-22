@@ -119,6 +119,8 @@ class LeggedRobot(OrcaGymAgent):
     def set_action(self, action):
         assert len(action) == len(self._ctrl_range)
 
+        print("Agent: ", self.name, "Orignal action: ", action)
+
         for i in range(len(action)):
             # 线性变换到 ctrl range 空间
             # print("action: ", action[i])
@@ -182,6 +184,9 @@ class LeggedRobot(OrcaGymAgent):
     def _compute_reward_joint_angles(self) -> SupportsFloat:
         return -np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))   
     
+    def _compute_reward_joint_accelerations(self) -> SupportsFloat:
+        return -np.sum(np.abs(self._leg_joint_qacc))
+    
     def _compute_reward_torques(self) -> SupportsFloat:
         total_reward = 0.0
         limit_threshold = 0.8
@@ -207,6 +212,7 @@ class LeggedRobot(OrcaGymAgent):
             reward_contact_coefficient = 0.1
             reward_foot_touch_coefficient = 0.01
             reward_joint_angles_coefficient = 0.01
+            reward_joint_accelerations_coefficient = 0.1
             reward_torques_coefficient = 0.01
             reward_base_gyro_coefficient = 0.1
             reward_base_accelerometer_coefficient = 0.1
@@ -228,6 +234,9 @@ class LeggedRobot(OrcaGymAgent):
 
             # *** Penalty for joint angles too far from the neutral position
             total_reward += reward_joint_angles_coefficient * self._compute_reward_joint_angles()
+
+            # *** Penalty for joint accelerations
+            total_reward += reward_joint_accelerations_coefficient * self._compute_reward_joint_accelerations()
 
             # *** Penalty for base gyro and accelerometer
             total_reward += reward_base_gyro_coefficient * self._compute_reward_base_gyro()
