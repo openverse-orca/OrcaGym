@@ -38,6 +38,7 @@ class LeggedRobot(OrcaGymAgent):
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
         
         self._actuator_names = self.name_space_list(robot_config["actuator_names"])
+        self._actuator_type = robot_config["actuator_type"]
         
         self._imu_site_name = self.name_space(robot_config["imu_site_name"])
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
@@ -49,6 +50,7 @@ class LeggedRobot(OrcaGymAgent):
         self._imu_sensor_names = [self._imu_sensor_framequat_name, self._imu_sensor_gyro_name, self._imu_sensor_accelerometer_name]
 
         self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
+        self._foot_touch_force_threshold = robot_config["foot_touch_force_threshold"]
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
@@ -79,11 +81,12 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, joint_qpos : dict, contact_dict : dict, dt : float) -> dict:
+    def get_obs(self, sensor_data : dict, joint_qpos : dict, joint_qacc : dict, contact_dict : dict, dt : float) -> dict:
         self._leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
+        self._leg_joint_qacc = np.array([joint_qacc[joint_name] for joint_name in self._leg_joint_names]).flatten()
         self._imu_data = self._get_imu_data(sensor_data)
-        self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # penality if the foot touch force is too strong
-        self._leg_contact = self._get_leg_contact(contact_dict)            # penality if the leg is in contact with the ground
+        self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
+        self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
 
         self._achieved_goal = self._get_base_contact(contact_dict)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
@@ -91,6 +94,7 @@ class LeggedRobot(OrcaGymAgent):
         obs = np.concatenate(
                 [
                     self._leg_joint_qpos.copy(),
+                    self._leg_joint_qacc.copy(),
                     self._imu_data.copy(),
                     self._foot_touch_force.copy(),
                     self._leg_contact.copy(),
@@ -135,8 +139,12 @@ class LeggedRobot(OrcaGymAgent):
         self.set_action(action)
         return self._ctrl
 
-    def reset(self, np_random) -> dict[str, np.ndarray]:
-        self._current_episode_step = 0
+    def on_reset(self, np_random) -> dict[str, np.ndarray]:
+
+        if self._actuator_type == "position":
+            assert self._ctrl.shape == self._neutral_joint_values.shape
+            self._ctrl = self._neutral_joint_values.copy()
+        # print("Neutral joint values: ", self._ctrl)
 
         joint_neutral_qpos = self.get_joint_neutral()
 
@@ -157,39 +165,73 @@ class LeggedRobot(OrcaGymAgent):
         else:
             return 0.0
 
+
+    def _compute_reward_success(self, achieved_goal, desired_goal) -> SupportsFloat:
+        return 1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0
+        
+    def _compute_reward_failure(self, achieved_goal, desired_goal) -> SupportsFloat:
+        return -1.0 if self.is_terminated(achieved_goal, desired_goal) else 0.0
+        
+    def _compute_reward_contact(self) -> SupportsFloat:
+        return -np.sum(self._leg_contact)
+    
+    def _compute_reward_foot_touch(self) -> SupportsFloat:
+        threshold = self._foot_touch_force_threshold
+        return -np.sum([(force - threshold) if force > threshold else 0 for force in self._foot_touch_force])
+    
+    def _compute_reward_joint_angles(self) -> SupportsFloat:
+        return -np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))   
+    
+    def _compute_reward_torques(self) -> SupportsFloat:
+        total_reward = 0.0
+        limit_threshold = 0.8
+        if self._actuator_type == "torque":
+            for i, torque in enumerate(self._ctrl):
+                if abs(torque) > limit_threshold * abs(self._ctrl_range[i][0]) or (abs(torque) > limit_threshold * abs(self._ctrl_range[i][1])):
+                    total_reward -= abs(torque)
+
+        return total_reward
+    
+    def _compute_reward_base_gyro(self) -> SupportsFloat:
+        return -np.sum(np.abs(self._imu_data_gyro))
+    
+    def _compute_reward_base_accelerometer(self) -> SupportsFloat:
+        return -np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
             total_reward = 0.0
 
-            # 1. reward for task success
-            if self.is_success(achieved_goal, desired_goal) > 0:
-                total_reward += 10.0
+            reward_success_coefficient = 10.0
+            reward_failure_coefficient = 10.0
+            reward_contact_coefficient = 0.1
+            reward_foot_touch_coefficient = 0.01
+            reward_joint_angles_coefficient = 0.01
+            reward_torques_coefficient = 0.01
+            reward_base_gyro_coefficient = 0.1
+            reward_base_accelerometer_coefficient = 0.1
 
-            # 2. penality for task failure
-            if self.is_terminated(achieved_goal, desired_goal):
-                # print("Task failed at step: ", self._current_episode_step)
-                total_reward -= 10.0
+            # *** Reward for task success
+            total_reward += reward_success_coefficient * self._compute_reward_success(achieved_goal, desired_goal)
 
-            # 3. penality for leg contact with other bodies
-            total_reward -= 0.1 * np.sum(self._leg_contact)
+            # *** Penalty for task failure
+            total_reward += reward_failure_coefficient * self._compute_reward_failure(achieved_goal, desired_goal)
 
-            # 4. penality for foot touch force
-            strong_touchs = np.sum(self._foot_touch_force > 1000.0)
-            # print("Foot touch force: ", self._foot_touch_force, "variance: ", strong_touchs)
-            total_reward -= 1 * strong_touchs
+            # *** Penalty for leg contact with other bodies
+            total_reward += reward_contact_coefficient * self._compute_reward_contact()
 
-            # 5. penality for torques too close to the limits
-            for i, torque in enumerate(self._ctrl):
-                if abs(torque) > 0.5 * abs(self._ctrl_range[i][0]) and (abs(torque) > 0.5 * abs(self._ctrl_range[i][1])):
-                    total_reward -= 0.1
+            # *** Penality for foot touch force too strong
+            total_reward += reward_foot_touch_coefficient * self._compute_reward_foot_touch()
 
-            # 6. penalty for base gyro and accelerometer
-            gyro_penalty = np.sum(abs(self._imu_data_gyro))
-            # print("imu_data_gyro : ", self._imu_data_gyro)
-            accel_penalty = np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))
-            # print("imu_data_accelerometer : ", self._imu_data_accelerometer)
-            total_reward -= 0.1 * gyro_penalty + 0.1 * accel_penalty
+            # *** Penalty for torques too close to the limits
+            total_reward += reward_torques_coefficient * self._compute_reward_torques()
+
+            # *** Penalty for joint angles too far from the neutral position
+            total_reward += reward_joint_angles_coefficient * self._compute_reward_joint_angles()
+
+            # *** Penalty for base gyro and accelerometer
+            total_reward += reward_base_gyro_coefficient * self._compute_reward_base_gyro()
+            total_reward += reward_base_accelerometer_coefficient * self._compute_reward_base_accelerometer()
 
             self._is_obs_updated = False
             # print("Reward: ", total_reward)
