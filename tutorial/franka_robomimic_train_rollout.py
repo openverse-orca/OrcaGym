@@ -25,6 +25,7 @@ import psutil
 import sys
 import socket
 import traceback
+import gymnasium as gym
 
 from collections import OrderedDict
 
@@ -40,6 +41,15 @@ import robomimic.utils.file_utils as FileUtils
 from robomimic.config import config_factory
 from robomimic.algo import algo_factory, RolloutPolicy
 from robomimic.utils.log_utils import PrintLogger, DataLogger, flush_warnings
+
+current_file_path = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(current_file_path))
+
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+TIME_STEP = 0.01
+MAX_EPISODE_STEPS = 10 / TIME_STEP # 10 seconds in normal speed.
 
 
 def train(config, device):
@@ -85,6 +95,8 @@ def train(config, device):
         env_meta["env_name"] = config.experiment.env
         print("=" * 30 + "\n" + "Replacing Env to {}\n".format(env_meta["env_name"]) + "=" * 30)
 
+    env_meta["env_kwargs"]["control_type"] = "policy"
+
     # create environment
     envs = OrderedDict()
     if config.experiment.rollout.enabled:
@@ -94,8 +106,15 @@ def train(config, device):
         if config.experiment.additional_envs is not None:
             for name in config.experiment.additional_envs:
                 env_names.append(name)
-
         for env_name in env_names:
+            gym.register(
+                id=env_name,
+                entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
+                kwargs=env_meta["env_kwargs"],
+                max_episode_steps= MAX_EPISODE_STEPS,  # 10 seconds
+                reward_threshold=0.0,
+            )
+
             env = EnvUtils.create_env_from_metadata(
                 env_meta=env_meta,
                 env_name=env_name, 

@@ -155,7 +155,10 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         success_threshold = 0.02
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
-
+    def check_success(self) -> dict:
+        achieved_goal = self._get_achieved_goal()
+        desired_goal = self._get_desired_goal()
+        return {"task": self._is_success(achieved_goal, desired_goal)}
     
     def step(self, action) -> tuple:
         if self.control_type == ControlType.TELEOPERATION or self.control_type == ControlType.KEYBOARD:
@@ -172,9 +175,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         desired_goal = self._get_desired_goal()
 
         # normalize the action space for recording
-        # normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
+        normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
 
-        info = {"state": self.get_state(), "action": ctrl}
+        info = {"state": self.get_state(), "action": normalized_action}
         terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
