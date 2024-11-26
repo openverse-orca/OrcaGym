@@ -1,3 +1,4 @@
+from datetime import datetime
 import numpy as np
 from gymnasium.core import ObsType
 from envs.robomimic.dataset_util import DatasetWriter
@@ -36,7 +37,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             **kwargs,
         )
 
-        formatted_now = time.now().strftime("%Y-%m-%d_%H-%M-%S")
+        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
       
         # Three auxiliary variables to understand the component of the xml document but will not be used
