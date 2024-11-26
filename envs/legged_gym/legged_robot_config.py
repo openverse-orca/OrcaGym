@@ -50,7 +50,7 @@ LeggedRobotConfig = {
                                 "hr_abad_actuator", "hr_thigh_actuator", "hr_calf_actuator",
                                 "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
 
-        "actuator_type" :        "torque",  # "torque" or "position"
+        "actuator_type" :        "position",  # "torque" or "position"
                                  
         
         "imu_site_name" :       "imu",

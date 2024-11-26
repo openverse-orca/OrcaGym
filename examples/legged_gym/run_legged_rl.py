@@ -356,12 +356,12 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
     parser.add_argument('--subenv_num', type=int, default=1, help='The number of subenvs for each gRPC address')
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
-    parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
-    parser.add_argument('--task', type=str, help='The task to run (reach or pick_and_place)')
+    parser.add_argument('--agent_name', type=str, default='A01B', help='The name of the agent')
+    parser.add_argument('--task', type=str, default='stand', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
-    parser.add_argument('--run_mode', type=str, help='The mode to run (training or testing)')
+    parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
     parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
-    parser.add_argument('--training_episode', type=int, help='The number of training episodes for each agent')
+    parser.add_argument('--training_episode', type=int, default=100, help='The number of training episodes for each agent')
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     args = parser.parse_args()
 
@@ -374,7 +374,7 @@ if __name__ == "__main__":
     FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
 
     EPISODE_TIME_VERY_SHORT = 2       # 每个episode的时间长度
-    EPISODE_TIME_SHORT = 10           
+    EPISODE_TIME_SHORT = 20           
     EPISODE_TIME_LONG = 60
 
     orcagym_addresses = args.orcagym_addresses
@@ -392,7 +392,7 @@ if __name__ == "__main__":
 
     if task == 'stand':    
         frame_skip = FRAME_SKIP_REALTIME
-        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_VERY_SHORT)
+        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_SHORT)
     elif task == 'move_forward':
         max_episode_steps = 500
         frame_skip = FRAME_SKIP_SHORT
@@ -400,7 +400,8 @@ if __name__ == "__main__":
         raise ValueError("Invalid task")
 
     total_timesteps = training_episode * subenv_num * agent_num * max_episode_steps
-    model_file = f"legged_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model"
+    formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    model_file = f"legged_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model_{formatted_now}"
 
 
     if run_mode == "training":
