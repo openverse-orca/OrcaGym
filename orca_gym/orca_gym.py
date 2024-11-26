@@ -46,8 +46,7 @@ class OrcaGymBase:
               f"nbody:{model_info['nbody']}",
               f"njnt:{model_info['njnt']}",
               f"ngeom:{model_info['ngeom']}",
-              f"nsite:{model_info['nsite']}",
-              f"nconmax:{model_info['nconmax']}",)
+              f"nsite:{model_info['nsite']}",)
 
     async def set_qpos(self, qpos):
         request = mjc_message_pb2.SetQposRequest(qpos=qpos)

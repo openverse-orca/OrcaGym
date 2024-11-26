@@ -85,13 +85,16 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             return
 
         joint_qpos = {}
+        mocaps = {}
         for agent in agents:
-            agent_joint_qpos = agent.reset(self.np_random)
+            agent_joint_qpos, agent_mocaps = agent.reset(self.np_random)
             joint_qpos.update(agent_joint_qpos)
+            mocaps.update(agent_mocaps)
 
         # print("Reset joint qpos: ", joint_qpos)
 
         self.set_joint_qpos(joint_qpos)
+        self.set_mocap_pos_and_quat(mocaps)
         self.mj_forward()
 
     def _generate_contact_dict(self) -> dict[str, list[str]]:
