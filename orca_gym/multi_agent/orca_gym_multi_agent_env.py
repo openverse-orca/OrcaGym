@@ -12,7 +12,8 @@ from gymnasium import error, spaces
 from gymnasium.spaces import Space
 from gymnasium.core import ObsType
 
-from . import OrcaGymAgent, OrcaGymLocalEnv
+from orca_gym.environment import OrcaGymLocalEnv
+from .orca_gym_agent import OrcaGymAgent
 
 class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
     def __init__(
