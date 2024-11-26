@@ -94,23 +94,16 @@ class OrcaGymAgent:
         self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
 
     def set_action(self, action : np.ndarray) -> None:
-        assert len(action) == len(self._ctrl_range)
-        self._action = action.copy()
-
-        for i in range(len(action)):
-            # 线性变换到 ctrl range 空间
-            # print("action: ", action[i])
-            # print("action_space_range: ", self._action_space_range)
-            # print("ctrl_range: ", self._ctrl_range[i])
-            self._ctrl[i] = np.interp(action[i], self._action_space_range, self._ctrl_range[i])
-
-        # print("Agent: ", self.name, "Ctrl: ", self._ctrl)
-
-        return
+        """
+        Action is specific to the agent and is defined in the subclass.
+        """
+        raise NotImplementedError
     
     def set_action_space(self, action_space : spaces) -> None:
-        self._action_space = action_space
-        self._action_space_range = [action_space.low[0], action_space.high[0]]
+        """
+        Action space is specific to the agent and is defined in the subclass.
+        """
+        raise NotImplementedError
     
     def on_step(self):
         """
@@ -147,7 +140,7 @@ class OrcaGymAgent:
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         raise NotImplementedError
         
-    def set_init_state(self, joint_qpos: dict):
+    def set_init_state(self, joint_qpos: dict, init_site_pos_quat: dict) -> None:
         raise NotImplementedError
     
     def get_action_size(self) -> int:

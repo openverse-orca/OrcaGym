@@ -71,6 +71,8 @@ class LeggedRobot(OrcaGymAgent):
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
         self._site_names = [self._imu_site_name] + self._contact_site_names
 
+        self._imu_mocap_name = self.name_space(robot_config["imu_mocap_name"])
+
         self._imu_sensor_framequat_name = self.name_space(robot_config["sensor_imu_framequat_name"])
         self._imu_sensor_gyro_name = self.name_space(robot_config["sensor_imu_gyro_name"])
         self._imu_sensor_accelerometer_name = self.name_space(robot_config["sensor_imu_accelerometer_name"])
@@ -88,6 +90,7 @@ class LeggedRobot(OrcaGymAgent):
         
         self._ctrl = np.zeros(len(self._actuator_names))
         self._action = np.zeros(len(self._actuator_names))
+        self._last_action = np.zeros(len(self._actuator_names))
         self._nu = len(self._actuator_names)
         self._nq = len(self._leg_joint_names) + (7 * len(self._base_joint_name))
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
@@ -141,12 +144,15 @@ class LeggedRobot(OrcaGymAgent):
 
         return result
 
-    def set_init_state(self, joint_qpos: dict):
+    def set_init_state(self, joint_qpos: dict, set_init_state: dict) -> None:
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
+        self._init_imu_site_pos_quat = set_init_state[self._imu_site_name].copy()
 
     def set_action(self, action):
         assert len(action) == len(self._ctrl_range)
+        self._last_action = self._action.copy()
+        self._action = action.copy()
 
         # print("Agent: ", self.name, "Orignal action: ", action)
 
@@ -188,7 +194,11 @@ class LeggedRobot(OrcaGymAgent):
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(base_neutral_qpos)
 
-        return joint_neutral_qpos
+        imu_mocap_pos_quat = {self._imu_mocap_name: {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
+                                                     "quat": self._init_imu_site_pos_quat["xquat"].copy()}}
+        # imu_mocap_pos_quat[self._imu_mocap_name]["pos"][2] -= self._base_neutral_height_offset
+
+        return joint_neutral_qpos, imu_mocap_pos_quat
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
@@ -200,6 +210,10 @@ class LeggedRobot(OrcaGymAgent):
         else:
             return 0.0
 
+    def _compute_reward_alive(self, coeff) -> SupportsFloat:
+        reward = 1.0 * coeff
+        print_reward("Alive reward: ", reward)
+        return reward
 
     def _compute_reward_success(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
         reward = (1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0) * coeff
@@ -236,8 +250,13 @@ class LeggedRobot(OrcaGymAgent):
         limit_threshold = 0.95
         limit_over_threshold_low = np.sum(self._ctrl < (limit_threshold * self._ctrl_range_low))
         limit_over_threshold_high = np.sum(self._ctrl > (limit_threshold * self._ctrl_range_high))
-        reward = (-pow(limit_over_threshold_low + limit_over_threshold_high, 2)) * coeff
+        reward = (-abs(limit_over_threshold_low + limit_over_threshold_high)) * coeff
         print_reward("Limit over threshold reward: ", reward)
+        return reward
+    
+    def _compute_reward_action_rate(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(np.abs(self._action - self._last_action))) * coeff
+        print_reward("Action rate reward: ", reward)
         return reward
     
     def _compute_reward_base_gyro(self, coeff) -> SupportsFloat:
@@ -254,17 +273,22 @@ class LeggedRobot(OrcaGymAgent):
         if self._is_obs_updated:
             total_reward = 0.0
 
-            reward_success_coeff = 10.0
-            reward_failure_coeff = 10.0
+            reward_alive_coeff = 0
+            reward_success_coeff = 20.0
+            reward_failure_coeff = 20.0
             reward_contact_coeff = 0.1
             reward_foot_touch_coeff = 0.01
-            reward_joint_angles_coeff = 0.01
+            reward_joint_angles_coeff = 0.1
             reward_joint_accelerations_coeff = 0.001
-            reward_limit_coeff = 1
+            reward_limit_coeff = 0.1
+            reward_action_rate_coeff = 0.1
             reward_base_gyro_coeff = 0.1
             reward_base_accelerometer_coeff = 0.1
 
             print_reward_begin()
+
+            # *** Reward for staying alive
+            total_reward += self._compute_reward_alive(reward_alive_coeff)
 
             # *** Reward for task success
             total_reward += self._compute_reward_success(achieved_goal, desired_goal, reward_success_coeff)
@@ -286,6 +310,9 @@ class LeggedRobot(OrcaGymAgent):
 
             # *** Penalty for torques or angels too close to the limits
             total_reward +=  self._compute_reward_limit(reward_limit_coeff)
+
+            # *** Penalty for action rate
+            total_reward +=  self._compute_reward_action_rate(reward_action_rate_coeff)
 
             # *** Penalty for base gyro and accelerometer
             total_reward +=  self._compute_reward_base_gyro(reward_base_gyro_coeff)

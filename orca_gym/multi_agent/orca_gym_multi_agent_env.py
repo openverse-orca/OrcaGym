@@ -67,7 +67,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
         # Initialize the joints' state before the simulation starts.
         init_joint_qpos = self.query_joint_qpos(self._agent_joint_names)
-        [agent.set_init_state(init_joint_qpos) for agent in self._agents]
+        init_site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
+        [agent.set_init_state(init_joint_qpos, init_site_pos_quat) for agent in self._agents]
 
         self.reset_agents(self._agents)
 

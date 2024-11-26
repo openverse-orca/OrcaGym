@@ -56,6 +56,8 @@ LeggedRobotConfig = {
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["fr_site", "fl_site", "hr_site", "hl_site"],
 
+        "imu_mocap_name":       "imu_mocap",
+
         "sensor_imu_framequat_name" :           "imu_quat",
         "sensor_imu_gyro_name" :                "imu_omega",
         "sensor_imu_accelerometer_name" :       "imu_acc",
