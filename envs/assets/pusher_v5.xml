@@ -1,65 +1,85 @@
-<!--
-Pusher model for `Pusher-v5`, based on openai/gym/Pusher
-modified by @Kallinteris-Andreas
-	- reduced body.object cylinder density 0.00001 -> 0.01
-	- disabled body.object sphere
--->
 <mujoco model="arm3d">
   <compiler inertiafromgeom="true" angle="radian" coordinate="local"/>
   <option timestep="0.01" gravity="0 0 0" iterations="20" integrator="Euler" />
 
+  <asset>
+    <texture type="2d" name="metal007_color" file="textures/Metal007_2K-PNG/Metal007_2K-PNG_Color.png"/>
+    <texture type="2d" name="oak_color" file="textures/oak_veneer_01_2k/textures/oak_veneer_01_diff_2k.png"/>
+    <texture type="2d" name="wood_table_color" file="textures/wood_table_worn_2k/textures/wood_table_worn_diff_2k.png"/>
+
+    <material name="metal007_material">
+      <rgb texture="metal007_color"/>
+    </material>
+    <material name="oak_wood_material">
+      <rgb texture="oak_color"/>
+    </material>
+    <material name="wood_table_worn_material">
+      <rgb texture="wood_table_color"/>
+    </material>
+  </asset>
+
   <default>
-    <joint armature='0.04' damping="1" limited="true"/>
+    <joint armature="0.04" damping="1" limited="true"/>
     <geom friction=".8 .1 .1" density="300" margin="0.002" condim="1" contype="0" conaffinity="0"/>
   </default>
 
   <worldbody>
     <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
-    <geom name="table" type="plane" pos="0 0.5 -0.325" size="1 1 0.1" contype="1" conaffinity="1"/>
+    <geom name="table" type="box" pos="0 0.5 -0.325" size="1 1 0.001" contype="1" conaffinity="1" material="wood_table_worn_material"/>
 
     <body name="r_shoulder_pan_link" pos="0 -0.6 0">
-      <geom name="e1" type="sphere" rgba="0.6 0.6 0.6 1" pos="-0.06 0.05 0.2" size="0.05" />
-      <geom name="e2" type="sphere" rgba="0.6 0.6 0.6 1" pos=" 0.06 0.05 0.2" size="0.05" />
-      <geom name="e1p" type="sphere" rgba="0.1 0.1 0.1 1" pos="-0.06 0.09 0.2" size="0.03" />
-      <geom name="e2p" type="sphere" rgba="0.1 0.1 0.1 1" pos=" 0.06 0.09 0.2" size="0.03" />
-      <geom name="sp" type="capsule" fromto="0 0 -0.4 0 0 0.2" size="0.1" />
-      <joint name="r_shoulder_pan_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.2854 1.714602" damping="1.0" />
+
+      <!-- 添加一个隐形的几何体来增加质量 -->
+      <geom name="balance_mass" type="sphere" pos="0 0 0" size="0.1" density="500" rgba="0 0 0 0"/>
+
+      <geom name="e1" type="sphere" pos="-0.06 0.05 0.2" size="0.05" material="wood_table_worn_material"/>
+      <geom name="e2" type="sphere" pos="0.06 0.05 0.2" size="0.05" material="wood_table_worn_material"/>
+      <geom name="e1p" type="sphere" pos="-0.06 0.09 0.2" size="0.03" material="metal007_material"/>
+      <geom name="e2p" type="sphere" pos="0.06 0.09 0.2" size="0.03" material="metal007_material"/>
+      <geom name="sp" type="capsule" fromto="0 0 -0.4 0 0 0.2" size="0.1" material="oak_wood_material"/>
+      <joint name="r_shoulder_pan_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.2854 1.714602" damping="1.0"/>
 
       <body name="r_shoulder_lift_link" pos="0.1 0 0">
-        <geom name="sl" type="capsule" fromto="0 -0.1 0 0 0.1 0" size="0.1" />
-        <joint name="r_shoulder_lift_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.5236 1.3963" damping="1.0" />
+
+
+        <geom name="sl" type="capsule" fromto="0 -0.1 0 0 0.1 0" size="0.1" material="oak_wood_material"/>
+        <joint name="r_shoulder_lift_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-0.5236 1.3963" damping="1.0"/>
 
         <body name="r_upper_arm_roll_link" pos="0 0 0">
-          <geom name="uar" type="capsule" fromto="-0.1 0 0 0.1 0 0" size="0.02" />
-          <joint name="r_upper_arm_roll_joint" type="hinge" pos="0 0 0" axis="1 0 0" range="-1.5 1.7" damping="0.1" />
+
+          <geom name="uar" type="capsule" fromto="-0.1 0 0 0.1 0 0" size="0.02" material="metal007_material"/>
+          <joint name="r_upper_arm_roll_joint" type="hinge" pos="0 0 0" axis="1 0 0" range="-1.5 1.7" damping="0.1"/>
 
           <body name="r_upper_arm_link" pos="0 0 0">
-            <geom name="ua" type="capsule" fromto="0 0 0 0.4 0 0" size="0.06" />
+            <geom name="ua" type="capsule" fromto="0 0 0 0.4 0 0" size="0.06" material="oak_wood_material"/>
 
             <body name="r_elbow_flex_link" pos="0.4 0 0">
-              <geom name="ef" type="capsule" fromto="0 -0.02 0 0.0 0.02 0" size="0.06" />
-              <joint name="r_elbow_flex_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.3213 0" damping="0.1" />
+        
+              <geom name="ef" type="capsule" fromto="0 -0.02 0 0.0 0.02 0" size="0.06" material="oak_wood_material"/>
+              <joint name="r_elbow_flex_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.3213 0" damping="0.1"/>
 
               <body name="r_forearm_roll_link" pos="0 0 0">
-                <geom name="fr" type="capsule" fromto="-0.1 0 0 0.1 0 0" size="0.02" />
+
+                <geom name="fr" type="capsule" fromto="-0.1 0 0 0.1 0 0" size="0.02" material="oak_wood_material"/>
                 <joint name="r_forearm_roll_joint" type="hinge" limited="true" pos="0 0 0" axis="1 0 0" damping=".1" range="-1.5 1.5"/>
 
                 <body name="r_forearm_link" pos="0 0 0">
-                  <geom name="fa" type="capsule" fromto="0 0 0 0.291 0 0" size="0.05" />
+                  <geom name="fa" type="capsule" fromto="0 0 0 0.291 0 0" size="0.05" material="oak_wood_material"/>
 
                   <body name="r_wrist_flex_link" pos="0.321 0 0">
-                    <geom name="wf" type="capsule" fromto="0 -0.02 0 0 0.02 0" size="0.01" />
-                    <joint name="r_wrist_flex_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-1.094 0" damping=".1" />
+                    <geom name="wf" type="capsule" fromto="0 -0.02 0 0 0.02 0" size="0.01" material="metal007_material"/>
+                    <joint name="r_wrist_flex_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-1.094 0" damping=".1"/>
 
                     <body name="r_wrist_roll_link" pos="0 0 0">
                       <joint name="r_wrist_roll_joint" type="hinge" pos="0 0 0" limited="true" axis="1 0 0" damping="0.1" range="-1.5 1.5"/>
                       <body name="tips_arm" pos="0 0 0">
-                        <geom name="tip_arml" type="sphere" pos="0.1 -0.1 0." size="0.01" />
-                        <geom name="tip_armr" type="sphere" pos="0.1 0.1 0." size="0.01" />
+                        <geom name="tip_arml" type="sphere" pos="0.1 -0.1 0." size="0.01" material="metal007_material"/>
+                        <geom name="tip_armr" type="sphere" pos="0.1 0.1 0." size="0.01" material="metal007_material"/>
                       </body>
-                      <geom type="capsule" fromto="0 -0.1 0. 0.0 +0.1 0" size="0.02" contype="1" conaffinity="1" />
-                      <geom type="capsule" fromto="0 -0.1 0. 0.1 -0.1 0" size="0.02" contype="1" conaffinity="1" />
-                      <geom type="capsule" fromto="0 +0.1 0. 0.1 +0.1 0." size="0.02" contype="1" conaffinity="1" />
+                      <geom name="_geom_0" type="capsule" fromto="0 -0.1 0 0.0 +0.1 0" size="0.02" contype="1" conaffinity="1" material="oak_wood_material"/>
+                      <geom name="_geom_1" type="capsule" fromto="0 -0.1 0 0.1 -0.1 0" size="0.02" contype="1" conaffinity="1" material="oak_wood_material"/>
+                      <geom name="_geom_2" type="capsule" fromto="0 +0.1 0 0.1 +0.1 0" size="0.02" contype="1" conaffinity="1" material="oak_wood_material"/>
+                      <geom name="_geom_3" type="capsule" fromto="0 0 0 0 0 0.01" size="0.02" material="metal007_material"/>
                     </body>
                   </body>
                 </body>
@@ -69,22 +89,18 @@ modified by @Kallinteris-Andreas
         </body>
       </body>
     </body>
-
-    <!--<body name="object" pos="0.55 -0.3 -0.275" >-->
-    <body name="object" pos="0.45 -0.05 -0.275" >
-      <!-- <geom rgba="1 1 1 0" type="sphere" size="0.05 0.05 0.05" density="0.001" conaffinity="0"/> -->
-      <geom rgba="1 1 1 1" type="cylinder" size="0.05 0.05 0.05" density="0.01" contype="1" conaffinity="0"/>
+    <body name="object" pos="0.45 -0.05 -0.22">
+      <geom rgba="1 1 1 1" type="cylinder" size="0.05 0.05 0.05" density="0.01" contype="1" conaffinity="0" material="oak_wood_material"/>
       <joint name="obj_slidey" type="slide" pos="0 0 0" axis="0 1 0" range="-10.3213 10.3" damping="0.5"/>
       <joint name="obj_slidex" type="slide" pos="0 0 0" axis="1 0 0" range="-10.3213 10.3" damping="0.5"/>
     </body>
 
-    <body name="goal" pos="0.45 -0.05 -0.3230">
-      <geom rgba="1 0 0 1" type="cylinder" size="0.08 0.001 0.1" density='0.00001' contype="0" conaffinity="0"/>
+    <body name="goal" pos="0.45 -0.05 -0.3">
+      <geom rgba="1 0 0 1" type="cylinder" size="0.08 0.001 0.1" density="0.00001" contype="0" conaffinity="0" material="oak_wood_material"/>
       <joint name="goal_slidey" type="slide" pos="0 0 0" axis="0 1 0" range="-10.3213 10.3" damping="0.5"/>
       <joint name="goal_slidex" type="slide" pos="0 0 0" axis="1 0 0" range="-10.3213 10.3" damping="0.5"/>
     </body>
   </worldbody>
-
   <actuator>
     <motor joint="r_shoulder_pan_joint" ctrlrange="-2.0 2.0" ctrllimited="true" />
     <motor joint="r_shoulder_lift_joint" ctrlrange="-2.0 2.0" ctrllimited="true" />
