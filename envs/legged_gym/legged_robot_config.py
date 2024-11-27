@@ -1,6 +1,6 @@
 
 LeggedRobotConfig = {
-    "Go2": {
+    "go2": {
         "leg_joint_names" :     ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint", 
                                 "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
                                 "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
@@ -13,19 +13,37 @@ LeggedRobotConfig = {
                                 "RL_hip_joint": 0.0, "RL_thigh_joint": 0.8, "RL_calf_joint": -1.6,
                                 "RR_hip_joint": 0.0, "RR_thigh_joint": 0.8, "RR_calf_joint": -1.6},
         
+        "base_neutral_height_offset" : 0.10,    # the offset from max height to standing natural height
 
-        "actuator_names" :      ["FR_hip", "FR_thigh", "FR_calf",
-                                "FL_hip", "FL_thigh", "FL_calf",
-                                "RR_hip", "RR_thigh", "RR_calf",
-                                "RL_hip", "RL_thigh", "RL_calf"],
+        "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
+                                "FR_hip_actuator", "FR_thigh_actuator", "FR_calf_actuator",
+                                "RL_hip_actuator", "RL_thigh_actuator", "RL_calf_actuator",
+                                "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
+
+        "actuator_type" :        "position",  # "torque" or "position"
         
         "imu_site_name" :       "imu",
-        "contact_site_names" :  ["base_contact_box", "base_contact_cylinder", "base_contact_sphere"],
+        "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
 
-        "sensor_imu_names" :    ["imu_quat", "imu_omega", "imu_acc"],
-        "sensor_base_touch_names" : ["base_touch_box", "base_touch_cylinder", "base_touch_sphere"],
+        "imu_mocap_name":       "imu_mocap",
 
-        "body_contact_force_threshold" : [0.5, 0.5, 0.5]
+        "sensor_imu_framequat_name" :           "imu_quat",
+        "sensor_imu_gyro_name" :                "imu_omega",
+        "sensor_imu_accelerometer_name" :       "imu_acc",
+        "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
+
+        "ground_contact_body_names" : ["Floor_Floor"],
+        "base_contact_body_names" : ["base"],
+        "leg_contact_body_names" : ["FR_hip", "FL_thigh", "FL_calf", 
+                                    "FR_hip", "FR_thigh", "FR_calf", 
+                                    "RL_hip", "RL_thigh", "RL_calf", 
+                                    "RR_hip", "RR_thigh", "RR_calf"],
+
+        # Robot's Self-Weight: Approximately 149.2 Newtons.
+        # Static Foot Forces: Front feet ~44.8 N each; rear feet ~29.8 N each.
+        # Dynamic Foot Forces (Walking at 1 m/s): Approximately 89.5 Newtons per foot during ground contact.
+        # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
+        "foot_touch_force_threshold" : 100.0,
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
@@ -50,7 +68,7 @@ LeggedRobotConfig = {
                                 "hr_abad_actuator", "hr_thigh_actuator", "hr_calf_actuator",
                                 "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
 
-        "actuator_type" :        "position",  # "torque" or "position"
+        "actuator_type" :        "torque",  # "torque" or "position"
                                  
         
         "imu_site_name" :       "imu",

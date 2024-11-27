@@ -105,29 +105,30 @@ class OrcaGymAgent:
         """
         raise NotImplementedError
     
-    def on_step(self):
+    def on_step(self, action):
         """
         Called after each step in the environment.
         Implement this method in the subclass to perform additional operations.
         """
-        pass
+        raise NotImplementedError
 
-    def step(self, action) -> np.ndarray:
+    def step(self, action):
         self._current_episode_step += 1
         self.set_action(action)
-        self.on_step()
-        return self._ctrl
+        step_info = self.on_step(action)
+        return self._ctrl, step_info
 
-    def on_reset(self, np_random : np.random.Generator):
+    def on_reset(self):
         """
         Called after each reset in the environment.
         Implement this method in the subclass to perform additional operations.
         """
-        pass
+        raise NotImplementedError
 
     def reset(self, np_random : np.random.Generator):
         self._current_episode_step = 0
-        reset_info = self.on_reset(np_random)
+        self._np_random = np_random
+        reset_info = self.on_reset()
         return reset_info
 
 

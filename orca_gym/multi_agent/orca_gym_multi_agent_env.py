@@ -65,9 +65,15 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         [agent.init_ctrl_info(all_actuator) for agent in self._agents]
         self.ctrl = np.zeros(self.nu)
 
+        # TODO: mujoco bugs? 
+        # Do mj_forward to apply site xpos and quat to the init status.
+        # Otherwise, the site pos and quat will be zero in the first step.
+        self.mj_forward()
+
         # Initialize the joints' state before the simulation starts.
         init_joint_qpos = self.query_joint_qpos(self._agent_joint_names)
         init_site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
+        # print("all inti site pos quat: ", init_site_pos_quat)
         [agent.set_init_state(init_joint_qpos, init_site_pos_quat) for agent in self._agents]
 
         self.reset_agents(self._agents)
@@ -114,7 +120,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         raise NotImplementedError
     
 
-    def do_step(self, action: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray) -> None:
         """
         Do specific operations each step in the environment. It is defined in the subclass.
         """
@@ -127,7 +133,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         
         # 切分action 给每个 agent
         action = np.array(action).reshape(len(self._agents), -1)
-        self.do_step(action)
+        self.step_agents(action)
         self.do_simulation(self.ctrl, self.frame_skip)
 
         if self.render_mode == "human" and self._render_remote:
