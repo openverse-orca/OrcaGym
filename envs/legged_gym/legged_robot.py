@@ -38,7 +38,7 @@ def print_reward_end():
 
 def get_legged_robot_name(agent_name: str) -> str:
     if agent_name.startswith("go2"):
-        return "Go2"
+        return "go2"
     elif agent_name.startswith("A01B"):
         return "A01B"
     else:
@@ -112,12 +112,15 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, joint_qpos : dict, joint_qacc : dict, contact_dict : dict, dt : float) -> dict:
+    def get_obs(self, sensor_data : dict, joint_qpos : dict, joint_qacc : dict, contact_dict : dict, site_pos_quat : dict, dt : float) -> dict:
         self._leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
         self._leg_joint_qacc = np.array([joint_qacc[joint_name] for joint_name in self._leg_joint_names]).flatten()
         self._imu_data = self._get_imu_data(sensor_data)
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
+        self._imu_site_pos_quat = site_pos_quat[self._imu_site_name].copy()
+        imu_site_pos_quat = np.concatenate([self._imu_site_pos_quat["xpos"], self._imu_site_pos_quat["xquat"]]).flatten()
+        imu_mocap_pos_quat = np.concatenate([self._imu_mocap_pos_quat["pos"], self._imu_mocap_pos_quat["quat"]]).flatten()
 
         self._achieved_goal = self._get_base_contact(contact_dict)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
@@ -130,6 +133,8 @@ class LeggedRobot(OrcaGymAgent):
                     self._foot_touch_force.copy(),
                     self._leg_contact.copy(),
                     self._action.copy(),
+                    imu_site_pos_quat,
+                    imu_mocap_pos_quat,
                 ])          
 
         result = {
@@ -144,13 +149,14 @@ class LeggedRobot(OrcaGymAgent):
 
         return result
 
-    def set_init_state(self, joint_qpos: dict, set_init_state: dict) -> None:
+    def set_init_state(self, joint_qpos: dict, init_site_pos_quat: dict) -> None:
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
-        self._init_imu_site_pos_quat = set_init_state[self._imu_site_name].copy()
+        self._init_imu_site_pos_quat = init_site_pos_quat[self._imu_site_name].copy()
 
     def set_action(self, action):
         assert len(action) == len(self._ctrl_range)
+
         self._last_action = self._action.copy()
         self._action = action.copy()
 
@@ -171,12 +177,14 @@ class LeggedRobot(OrcaGymAgent):
         self._action_space = action_space
         self._action_space_range = [action_space.low[0], action_space.high[0]]
     
-    def step(self, action):
-        self._current_episode_step += 1
-        self.set_action(action)
-        return self._ctrl
+    def on_step(self, action):
+        """
+        Update the imu mocap position and quaternion
+        """
+        # Do mocap update here.
+        return {self._imu_mocap_name: self._imu_mocap_pos_quat}
 
-    def on_reset(self, np_random) -> dict[str, np.ndarray]:
+    def on_reset(self) -> dict[str, np.ndarray]:
 
         if self._actuator_type == "position":
             assert self._ctrl.shape == self._neutral_joint_values.shape
@@ -194,11 +202,11 @@ class LeggedRobot(OrcaGymAgent):
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(base_neutral_qpos)
 
-        imu_mocap_pos_quat = {self._imu_mocap_name: {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
-                                                     "quat": self._init_imu_site_pos_quat["xquat"].copy()}}
-        # imu_mocap_pos_quat[self._imu_mocap_name]["pos"][2] -= self._base_neutral_height_offset
+        self._imu_mocap_pos_quat = {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
+                                    "quat": self._init_imu_site_pos_quat["xquat"].copy()}
+        self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
 
-        return joint_neutral_qpos, imu_mocap_pos_quat
+        return joint_neutral_qpos, {self._imu_mocap_name: self._imu_mocap_pos_quat}
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
@@ -237,7 +245,8 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
-        reward = (-np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff
+        base_reward = 1 * len(self._leg_joint_qpos)
+        reward = (base_reward - np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff
         print_reward("Joint angles reward: ", reward)
         return reward
     
@@ -255,7 +264,8 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_action_rate(self, coeff) -> SupportsFloat:
-        reward = (-np.sum(np.abs(self._action - self._last_action))) * coeff
+        base_reward = 1 * len(self._action)
+        reward = (base_reward - np.sum(np.abs(self._action - self._last_action))) * coeff
         print_reward("Action rate reward: ", reward)
         return reward
     
@@ -268,22 +278,32 @@ class LeggedRobot(OrcaGymAgent):
         reward = (-np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))) * coeff
         print_reward("Base accelerometer reward: ", reward)
         return reward
+    
+    def _compute_reward_follow_command(self, coeff) -> SupportsFloat:
+        base_reward_distance = 1.0
+        base_reward_angle = np.pi
+        imu_site_mocap_distance = np.linalg.norm(self._imu_mocap_pos_quat["pos"] - self._imu_site_pos_quat["xpos"])
+        imu_site_mocap_angle = math.acos(np.clip(np.dot(self._imu_mocap_pos_quat["quat"], self._imu_site_pos_quat["xquat"]), -1, 1))
+        reward = ((base_reward_angle - imu_site_mocap_angle) + (base_reward_distance - imu_site_mocap_distance)) * coeff
+        print_reward("Follow command reward: ", reward)
+        return reward
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
             total_reward = 0.0
 
             reward_alive_coeff = 0
-            reward_success_coeff = 20.0
-            reward_failure_coeff = 20.0
+            reward_success_coeff = 1
+            reward_failure_coeff = 1
             reward_contact_coeff = 0.1
             reward_foot_touch_coeff = 0.01
             reward_joint_angles_coeff = 0.1
-            reward_joint_accelerations_coeff = 0.001
+            reward_joint_accelerations_coeff = 0.0001
             reward_limit_coeff = 0.1
             reward_action_rate_coeff = 0.1
             reward_base_gyro_coeff = 0.1
-            reward_base_accelerometer_coeff = 0.1
+            reward_base_accelerometer_coeff = 0.01
+            reward_follow_command_coeff = 0.1
 
             print_reward_begin()
 
@@ -317,6 +337,9 @@ class LeggedRobot(OrcaGymAgent):
             # *** Penalty for base gyro and accelerometer
             total_reward +=  self._compute_reward_base_gyro(reward_base_gyro_coeff)
             total_reward +=  self._compute_reward_base_accelerometer(reward_base_accelerometer_coeff)
+
+            # *** Reward for following the command
+            total_reward +=  self._compute_reward_follow_command(reward_follow_command_coeff)
 
             self._is_obs_updated = False
             print_reward("Total Reward: ", total_reward)

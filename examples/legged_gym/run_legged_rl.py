@@ -356,7 +356,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
     parser.add_argument('--subenv_num', type=int, default=1, help='The number of subenvs for each gRPC address')
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
-    parser.add_argument('--agent_name', type=str, default='A01B', help='The name of the agent')
+    parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
     parser.add_argument('--task', type=str, default='stand', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')

@@ -39,13 +39,21 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         )
 
 
-    def do_step(self, action: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray) -> None:
+        mocaps = {}
         for i in range(len(self._agents)):
             agent = self._agents[i]
             act = action[i]
 
             # 将每个agent的ctrl拼接在一起，然后传递给仿真环境
-            self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent.step(act)
+            agent_ctrl, agent_mocap = agent.step(act)
+            self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+            mocaps.update(agent_mocap)
+
+        # print("env ctrl: ", self.ctrl)
+
+        self.set_mocap_pos_and_quat(mocaps)
+
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
@@ -68,14 +76,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         joint_qacc = self.query_joint_qacc(self._agent_joint_names)
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
         contact_dict = self._generate_contact_dict()
+        site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
 
         # print("Sensor data: ", sensor_data)
         # print("Joint qpos: ", joint_qpos)
 
         # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成 m x n 份
-        obs = agents[0].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, self.dt)
+        obs = agents[0].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, site_pos_quat, self.dt)
         for i in range(1, len(agents)):
-            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, self.dt)
+            agent_obs = agents[i].get_obs(sensor_data, joint_qpos, joint_qacc, contact_dict, site_pos_quat, self.dt)
             obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
         
         return obs
