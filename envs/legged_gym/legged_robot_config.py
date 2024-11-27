@@ -51,7 +51,7 @@ LeggedRobotConfig = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 1.0,
-        "foot_touch_air_time_threshold" : 0.1,  # second
+        "foot_touch_air_time_threshold" : 0.25,  # second
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
