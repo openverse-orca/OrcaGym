@@ -8,12 +8,12 @@ LeggedRobotConfig = {
         
         "base_joint_name" :     "base",
         
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.6,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.6,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.8, "RL_calf_joint": -1.6,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.8, "RR_calf_joint": -1.6},
+        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.9, "FL_calf_joint": -1.8,
+                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.9, "FR_calf_joint": -1.8,
+                                "RL_hip_joint": 0.0, "RL_thigh_joint": 1.1, "RL_calf_joint": -1.8,
+                                "RR_hip_joint": 0.0, "RR_thigh_joint": 1.1, "RR_calf_joint": -1.8},
         
-        "base_neutral_height_offset" : 0.10,    # the offset from max height to standing natural height
+        "base_neutral_height_offset" : 0.17,    # the offset from max height to standing natural height
 
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
                                 "FR_hip_actuator", "FR_thigh_actuator", "FR_calf_actuator",
@@ -21,6 +21,7 @@ LeggedRobotConfig = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
+        "action_scale" :         0.5,
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
@@ -69,6 +70,7 @@ LeggedRobotConfig = {
                                 "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
 
         "actuator_type" :        "torque",  # "torque" or "position"
+        "action_scale" :         0.5,
                                  
         
         "imu_site_name" :       "imu",

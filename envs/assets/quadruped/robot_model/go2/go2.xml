@@ -146,7 +146,7 @@
       <geom mesh="base_2" material="pbr_plastic_black" class="visual"/>
       <geom mesh="base_3" material="pbr_plastic_white" class="visual"/>
       <geom mesh="base_4" material="pbr_plastic_gray" class="visual"/>
-      <geom size="0.1881 0.04675 0.057" type="box" class="collision"/>
+      <geom size="0.1881 0.04675 0.06" type="box" class="collision"/>
       <geom size="0.05 0.045" pos="0.285 0 0.01" type="cylinder" class="collision"/>
       <geom size="0.047" pos="0.293 0 -0.06" class="collision"/>
       <site name="imu" pos="-0.02557 0 0.04232"/>

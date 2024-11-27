@@ -95,16 +95,20 @@ def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max
                 vf=[512, 256, 128]   # 值函数网络结构
             ),
             ortho_init=True,
-            activation_fn=nn.ReLU
+            # activation_fn=nn.ReLU,
+            activation_fn=nn.ELU,
+            # log_std_init=2,  # 设置log_std的初始值
         )
         model = PPO("MultiInputPolicy", 
                     env, 
                     verbose=1, 
-                    learning_rate=0.001, 
-                    n_steps=512, 
-                    batch_size=512, 
-                    gamma=0.95, 
+                    learning_rate=0.0003, 
+                    n_steps=2048, 
+                    batch_size=64, 
+                    gamma=0.99, 
                     clip_range=0.2, 
+                    ent_coef=0.01,
+                    target_kl=0.05,
                     policy_kwargs=policy_kwargs, 
                     device=device)
         
@@ -392,7 +396,7 @@ if __name__ == "__main__":
 
     if task == 'stand':    
         frame_skip = FRAME_SKIP_REALTIME
-        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_SHORT)
+        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_VERY_SHORT)
     elif task == 'move_forward':
         max_episode_steps = 500
         frame_skip = FRAME_SKIP_SHORT
