@@ -48,7 +48,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
         self.initialize_agents(entry=agent_engry, 
                                task=task, 
-                               max_episode_steps=max_episode_steps)
+                               max_episode_steps=max_episode_steps,
+                               dt=self.dt * self.frame_skip)
 
         self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]
         self._agent_actuator_names = [actuator_name for agent in self._agents for actuator_name in agent.actuator_names]
@@ -157,13 +158,13 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             info["terminated"][i] = agent.is_terminated(achieved_goal, desired_goal)
             info["truncated"][i] = agent.truncated
 
-            if info["is_success"][i] > 0.0:
-                print("Env: ", self._env_id, "Agent: ", agent.name, "Task Success: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
+            # if info["is_success"][i] > 0.0:
+            #     print("Env: ", self._env_id, "Agent: ", agent.name, "Task Success: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
             # elif info["terminated"][i]:
             #     print("Env: ", self._env_id, "Agent: ", agent.name, "Task Failed: achieved goal: ", achieved_goal, "desired goal: ", desired_goal)
 
             if (info["terminated"][i] or info["truncated"][i]):
-                # print(f"{self._env_id} Reset agent {agent.name} terminated: {terminated[i]}, truncated: {truncated[i]}")
+                # print(f"{self._env_id} Reset agent {agent.name} terminated: {info['terminated'][i]}, truncated: {info['truncated'][i]}, achieved goal: {achieved_goal}, desired goal: {desired_goal}")
                 agents_to_reset.append(agent)
 
         self.reset_agents(agents_to_reset)

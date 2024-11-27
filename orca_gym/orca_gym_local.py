@@ -464,7 +464,8 @@ class OrcaGymLocal(OrcaGymBase):
         joint_qvel_dict = {}
         for joint_name in joint_names:
             joint_id = self._mjModel.joint(joint_name).id
-            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]]
+            joint_type = self._mjModel.jnt_type[joint_id]
+            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_qvel_size(joint_type)]
         return joint_qvel_dict
     
     def query_joint_qacc(self, joint_names):
