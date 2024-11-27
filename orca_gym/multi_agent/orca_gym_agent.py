@@ -83,10 +83,14 @@ class OrcaGymAgent:
             self._ctrl_range = []
         if not hasattr(self, "_ctrl_offset"):
             self._ctrl_start = 0
+        if not hasattr(self, "_ctrl_delta_range"):
+            self._ctrl_delta_range = []
             
         for i, actuator_name in enumerate(self._actuator_names):
             # matain the order of actuators
             self._ctrl_range.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
+            ctrl_range_width = self._ctrl_range[-1][1] - self._ctrl_range[-1][0]
+            self._ctrl_delta_range.append([-ctrl_range_width/2, ctrl_range_width/2])
             if i == 0:
                 self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
 
