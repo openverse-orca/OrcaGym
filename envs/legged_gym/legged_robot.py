@@ -377,7 +377,7 @@ class LeggedRobot(OrcaGymAgent):
             reward_height_coeff = 1
             reward_body_lin_vel_coeff = 0.1
             reward_body_ang_vel_coeff = 0.1
-            reward_feet_air_time_coeff = 0.1
+            reward_feet_air_time_coeff = 1
 
             print_reward_begin()
 
