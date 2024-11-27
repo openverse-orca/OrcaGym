@@ -1,3 +1,4 @@
+import numpy as np
 
 LeggedRobotConfig = {
     "go2": {
@@ -8,12 +9,16 @@ LeggedRobotConfig = {
         
         "base_joint_name" :     "base",
         
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.9, "FL_calf_joint": -1.8,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.9, "FR_calf_joint": -1.8,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": 1.1, "RL_calf_joint": -1.8,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": 1.1, "RR_calf_joint": -1.8},
+        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.3,
+                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.3,
+                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.9, "RL_calf_joint": -1.5,
+                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.9, "RR_calf_joint": -1.5},
         
-        "base_neutral_height_offset" : 0.17,    # the offset from max height to standing natural height
+        "base_neutral_height_offset" : 0.15,    # the offset from max height to standing natural height
+
+        "command_lin_vel_range" : 0.1,
+        "command_ang_vel_range" : np.pi / 2,
+        "command_forward_speed" : 0.2,
 
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
                                 "FR_hip_actuator", "FR_thigh_actuator", "FR_calf_actuator",
@@ -45,6 +50,8 @@ LeggedRobotConfig = {
         # Dynamic Foot Forces (Walking at 1 m/s): Approximately 89.5 Newtons per foot during ground contact.
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
+        "foot_touch_force_air_threshold" : 1.0,
+        "foot_touch_air_time_threshold" : 0.1,  # second
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 

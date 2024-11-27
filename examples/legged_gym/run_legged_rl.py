@@ -104,11 +104,11 @@ def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max
                     verbose=1, 
                     learning_rate=0.0003, 
                     n_steps=2048, 
-                    batch_size=64, 
+                    batch_size=2048, 
                     gamma=0.99, 
                     clip_range=0.2, 
                     ent_coef=0.01,
-                    target_kl=0.05,
+                    # target_kl=0.01,
                     policy_kwargs=policy_kwargs, 
                     device=device)
         
@@ -378,8 +378,8 @@ if __name__ == "__main__":
     FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
 
     EPISODE_TIME_VERY_SHORT = 2       # 每个episode的时间长度
-    EPISODE_TIME_SHORT = 20           
-    EPISODE_TIME_LONG = 60
+    EPISODE_TIME_SHORT = 5           
+    EPISODE_TIME_LONG = 20
 
     orcagym_addresses = args.orcagym_addresses
     subenv_num = args.subenv_num
@@ -396,10 +396,10 @@ if __name__ == "__main__":
 
     if task == 'stand':    
         frame_skip = FRAME_SKIP_REALTIME
-        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_VERY_SHORT)
+        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_SHORT)
     elif task == 'move_forward':
-        max_episode_steps = 500
-        frame_skip = FRAME_SKIP_SHORT
+        frame_skip = FRAME_SKIP_REALTIME
+        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_LONG)
     else:
         raise ValueError("Invalid task")
 

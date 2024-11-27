@@ -10,13 +10,16 @@ class OrcaGymAgent:
                  env_id: str,
                  agent_name: str, 
                  task: str,
-                 max_episode_steps: int):
+                 max_episode_steps: int,
+                 dt: float,
+                 **kwargs):
         
         self._env_id = env_id
         self._agent_name = agent_name
         self._task = task
         self._max_episode_steps = max_episode_steps
         self._current_episode_step = 0
+        self._dt = dt
 
         self._joint_names = None
         self._actuator_names = None
@@ -28,6 +31,9 @@ class OrcaGymAgent:
         self._nq = None
         self._nv = None
 
+    @property
+    def dt(self) -> float:
+        return self._dt
 
     @property
     def name(self) -> str:
