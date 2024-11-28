@@ -29,11 +29,11 @@
       <default class="collision">
         <geom group="3"/>
         <default class="foot">
-          <geom size="0.033" pos="-0.002 0 -0.202" priority="1" solimp="0.015 1 0.022" condim="6"
-            friction="0.8 0.02 0.01"/>
+          <geom size="0.023" pos="-0.002 0 -0.213" priority="1" solimp="0.015 1 0.022" condim="6"
+            friction="1.5 0.02 0.01"/>
         </default>
         <default class="foot_site">
-          <site size="0.025" pos="-0.002 0 -0.213" group="3"/>
+          <site size="0.05" pos="-0.002 0 -0.213" group="3"/>
         </default>
       </default>
     </default>

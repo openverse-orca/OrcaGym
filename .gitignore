@@ -114,5 +114,3 @@ venv.bak/
 
 /orca_gym/orca-studio-projects/
 
-# model files
-*.zip

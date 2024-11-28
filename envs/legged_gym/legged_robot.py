@@ -62,6 +62,7 @@ class LeggedRobot(OrcaGymAgent):
         self._joint_names = [self._base_joint_name] + self._leg_joint_names
 
         self._base_neutral_height_offset = robot_config["base_neutral_height_offset"]
+        self._base_born_height_offset = robot_config["base_born_height_offset"]
         self._command_lin_vel_range = robot_config["command_lin_vel_range"]
         self._command_ang_vel_range = robot_config["command_ang_vel_range"]
         self._command_forward_speed = robot_config["command_forward_speed"]
@@ -219,7 +220,7 @@ class LeggedRobot(OrcaGymAgent):
 
         base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
         self._base_height_target = base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
-        base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + 0.05
+        base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
         
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(base_neutral_qpos)
@@ -313,22 +314,35 @@ class LeggedRobot(OrcaGymAgent):
         print_reward("Base accelerometer reward: ", reward)
         return reward
     
-    def _compute_reward_follow_command(self, coeff) -> SupportsFloat:
-        # base_reward_distance = 0.1
-        # base_reward_angle = np.pi / 8
-        # imu_site_mocap_distance = np.linalg.norm(self._imu_mocap_pos_quat["pos"] - self._imu_site_pos_quat["xpos"])
-        # imu_site_mocap_angle = math.acos(np.clip(np.dot(self._imu_mocap_pos_quat["quat"], self._imu_site_pos_quat["xquat"]), -1, 1))
-        # reward = ((base_reward_angle - imu_site_mocap_angle) + (base_reward_distance - imu_site_mocap_distance)) * coeff
-
+    def _compute_reward_follow_command_linvel(self, coeff) -> SupportsFloat:
         # print("Command: ", self._command, "Body vel: ", self._body_joint_qvel)
 
-        base_reward_lin_vel = 0.1
-        base_reward_ang_vel = 0.1
+        # base_reward_lin_vel = 0.1
+        # base_reward_ang_vel = 0.1
+        # body_lin_vel = np.array([self._body_joint_qvel[:3]]).flatten()
+        # body_ang_vel = self._body_joint_qvel[5]
+        # reward = (base_reward_lin_vel - np.linalg.norm(self._command["lin_vel"] - body_lin_vel) + 
+        #           base_reward_ang_vel - abs(self._command["ang_vel"] - body_ang_vel)) * coeff
+
+        tracking_sigma = 0.25  # 奖励的衰减因子
         body_lin_vel = np.array([self._body_joint_qvel[:3]]).flatten()
+        # 计算误差 (x 和 y 方向)
+        lin_vel_error = np.sum(np.square(self._command["lin_vel"] - body_lin_vel))
+        # 计算指数衰减奖励
+        reward = np.exp(-lin_vel_error / tracking_sigma) * coeff
+
+        print("---reward: ", reward)
+
+        print_reward("Follow command linvel reward: ", reward)
+        return reward
+    
+    def _compute_reward_follow_command_angvel(self, coeff) -> SupportsFloat:
+        tracking_sigma = 0.25  # 奖励的衰减因子
         body_ang_vel = self._body_joint_qvel[5]
-        reward = (base_reward_lin_vel - np.linalg.norm(self._command["lin_vel"] - body_lin_vel) + 
-                  base_reward_ang_vel - abs(self._command["ang_vel"] - body_ang_vel)) * coeff
-        print_reward("Follow command reward: ", reward)
+        ang_vel_error = pow(self._command["lin_vel"] - body_ang_vel, 2)
+        reward = np.exp(-ang_vel_error / tracking_sigma) * coeff
+        print_reward("Follow command angvel reward: ", reward)
+        print("---reward: ", reward)
         return reward
     
     def _compute_reward_height(self, coeff) -> SupportsFloat:
@@ -340,12 +354,12 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_body_lin_vel(self, coeff) -> SupportsFloat:
-        reward = -abs(self._body_joint_qvel[2]) * coeff
+        reward = -pow(self._body_joint_qvel[2], 2) * coeff
         print_reward("Body linear velocity reward: ", reward)
         return reward
     
     def _compute_reward_body_ang_vel(self, coeff) -> SupportsFloat:
-        reward = -np.linalg.norm(self._body_joint_qvel[3:5]) * coeff
+        reward = -np.sum((self._body_joint_qvel[3:5]) ** 2) * coeff
         print_reward("Body angular velocity reward: ", reward)
         return reward
     
@@ -373,10 +387,11 @@ class LeggedRobot(OrcaGymAgent):
             reward_action_rate_coeff = 0.01
             reward_base_gyro_coeff = 0.01
             reward_base_accelerometer_coeff = 0.001
-            reward_follow_command_coeff = 2
+            reward_follow_command_linvel_coeff = 1
+            reward_follow_command_angvel_coeff = 0.5
             reward_height_coeff = 1
-            reward_body_lin_vel_coeff = 0.1
-            reward_body_ang_vel_coeff = 0.1
+            reward_body_lin_vel_coeff = 2
+            reward_body_ang_vel_coeff = 0.05
             reward_feet_air_time_coeff = 0.1
 
             print_reward_begin()
@@ -413,7 +428,10 @@ class LeggedRobot(OrcaGymAgent):
             total_reward +=  self._compute_reward_base_accelerometer(reward_base_accelerometer_coeff)
 
             # *** Reward for following the command
-            total_reward +=  self._compute_reward_follow_command(reward_follow_command_coeff)
+            total_reward +=  self._compute_reward_follow_command_linvel(reward_follow_command_linvel_coeff)
+
+            # *** Reward for following the command
+            total_reward +=  self._compute_reward_follow_command_angvel(reward_follow_command_angvel_coeff)
 
             # *** Reward for maintaining the height
             total_reward +=  self._compute_reward_height(reward_height_coeff)
@@ -480,8 +498,12 @@ class LeggedRobot(OrcaGymAgent):
         """
         if not hasattr(self, "_foot_touch_air_time"):
             self._foot_touch_air_time = np.zeros(len(foot_touch_force))
-            return self._foot_touch_air_time
-        
+
+        # If the robot is in the air, reset the air time   
+        if all(foot_touch_force < self._foot_touch_force_air_threshold):
+            self._foot_touch_air_time = np.zeros(len(foot_touch_force))
+            return
+
         for i in range(len(foot_touch_force)):
             if foot_touch_force[i] > self._foot_touch_force_air_threshold:
                 self._foot_touch_air_time[i] = 0
