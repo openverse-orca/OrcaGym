@@ -363,9 +363,9 @@ class LeggedRobot(OrcaGymAgent):
             total_reward = 0.0
 
             reward_alive_coeff = 0
-            reward_success_coeff = 1
-            reward_failure_coeff = 1
-            reward_contact_coeff = 0.5
+            reward_success_coeff = 10
+            reward_failure_coeff = 10
+            reward_contact_coeff = 1
             reward_foot_touch_coeff = 0.01
             reward_joint_angles_coeff = 0.1
             reward_joint_accelerations_coeff = 0.00001
@@ -377,7 +377,7 @@ class LeggedRobot(OrcaGymAgent):
             reward_height_coeff = 1
             reward_body_lin_vel_coeff = 0.1
             reward_body_ang_vel_coeff = 0.1
-            reward_feet_air_time_coeff = 1
+            reward_feet_air_time_coeff = 0.1
 
             print_reward_begin()
 
@@ -489,7 +489,7 @@ class LeggedRobot(OrcaGymAgent):
                 self._foot_touch_air_time[i] += self.dt
 
     def _genarate_command(self) -> dict:
-        if self._np_random.uniform() < 0.99:
+        if self._np_random.uniform() < 0.8:
             lin_vel = np.array([self._np_random.uniform(-self._command_lin_vel_range, self._command_lin_vel_range) + self._command_forward_speed, 
                                 self._np_random.uniform(-self._command_lin_vel_range, self._command_lin_vel_range), 
                                 0.0])
