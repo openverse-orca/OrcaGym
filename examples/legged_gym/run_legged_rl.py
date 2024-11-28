@@ -237,50 +237,6 @@ def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max
     return model
 
 
-def testing_model(env, model, time_step):
-    # 测试模型
-    observation, info = env.reset()
-    print("Start Testing!")
-    for test in range(10):
-        total_reward = 0
-        for _ in range(1000):
-            start_time = datetime.now()
-
-            # predict_start = datetime.now()
-            action, _states = model.predict(observation, deterministic=True)
-            # predict_time = datetime.now() - predict_start
-            # print("Predict Time: ", predict_time.total_seconds(), flush=True)
-
-            # setp_start = datetime.now()
-            observation, reward, terminated, truncated, info = env.step(action)
-
-            # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
-
-            env.render()
-            # step_time = datetime.now() - setp_start
-            # print("Step Time: ", step_time.total_seconds(), flush=True)
-
-            total_reward += reward
-
-            # 
-            elapsed_time = datetime.now() - start_time
-            if elapsed_time.total_seconds() < time_step:
-                time.sleep(time_step - elapsed_time.total_seconds())
-
-            if isinstance(terminated, list):
-                terminated = terminated[0]
-            if isinstance(truncated, list):
-                truncated = truncated[0]
-            if terminated or truncated:
-                print(f"----------------Test: {test}----------------")
-                print("Successed: ", terminated)
-                print("Total Reward: ", total_reward)
-                print("---------------------------------------")
-                observation, info = env.reset()
-                total_reward = 0
-                break
-
-    env.close()
 
 def generate_env_list(orcagym_addresses, subenv_num):
     orcagym_addr_list = []
@@ -327,16 +283,16 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         model.save(model_file)
         env.close()
 
-def test_model(orcagym_addr, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file):
+def test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file):
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
         env_name = "LeggedGym-v0"
-        render_mode = "human"
-        env_id = register_env(orcagym_addr, env_name, 0, 1, task, entry_point, time_step, max_episode_steps, frame_skip, render_mode)
-        env = gym.make(env_id)
-        seed = int(env_id[-3:])
-        env.unwrapped.set_seed_value(seed)
+        orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, 1)
+        env_num = len(orcagym_addr_list)
+        print("env num: ", env_num)
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env = SubprocVecEnvMA(env_fns, agent_num)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if model_type == "ppo":
@@ -350,8 +306,76 @@ def test_model(orcagym_addr, task, entry_point, time_step, max_episode_steps, fr
         else:
             raise ValueError("Invalid model type")
 
-        testing_model(env, model, time_step)
+        testing_model(env, agent_num, model, time_step, max_episode_steps)
     except KeyboardInterrupt:
+        print("退出仿真环境")
+        env.close()
+
+def _segment_observation(observation, agent_num):
+    # 将观测数据分割成多个agent的数据
+    obs_list = []
+    for i in range(agent_num):
+        agent_obs = {}
+        for key, value in observation.items():
+            agent_value_len = len(value) // agent_num
+            agent_obs[key] = value[i * agent_value_len : (i + 1) * agent_value_len]
+        obs_list.append(agent_obs)
+    return obs_list
+
+def _output_test_info(test, total_rewards, rewards, dones, infos):
+    print(f"----------------Test: {test}----------------")
+    print("Total Reward: ", total_rewards)
+    print("Reward: ", rewards)
+    print("Done: ", dones)
+    print("is_success: ", [agent_info["is_success"] for agent_info in infos])
+    print("---------------------------------------")
+
+def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episode_steps):
+    # 测试模型
+    observations = env.reset()
+    test = 0
+    total_rewards = np.zeros(agent_num)
+    step = 0
+    print("Start Testing!")
+    try:
+        while True:
+            step += 1
+            start_time = datetime.now()
+
+            obs_list = _segment_observation(observations, agent_num)
+            action_list = []
+            for agent_obs in obs_list:
+                # predict_start = datetime.now()
+                action, _states = model.predict(agent_obs, deterministic=True)
+                action_list.append(action)
+                # predict_time = datetime.now() - predict_start
+                # print("Predict Time: ", predict_time.total_seconds(), flush=True)
+
+            action = np.concatenate(action_list).flatten()
+            # print("action: ", action)
+            # setp_start = datetime.now()
+            observations, rewards, dones, infos = env.step(action)
+
+            # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
+
+            env.render()
+            # step_time = datetime.now() - setp_start
+            # print("Step Time: ", step_time.total_seconds(), flush=True)
+
+            total_rewards += rewards
+
+            # 
+            elapsed_time = datetime.now() - start_time
+            if elapsed_time.total_seconds() < time_step:
+                time.sleep(time_step - elapsed_time.total_seconds())
+
+            if step == max_episode_steps:
+                _output_test_info(test, total_rewards, rewards, dones, infos)
+                step = 0
+                test += 1
+                total_rewards = np.zeros(agent_num)
+            
+    finally:
         print("退出仿真环境")
         env.close()
 
@@ -364,6 +388,7 @@ if __name__ == "__main__":
     parser.add_argument('--task', type=str, default='stand', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
+    parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
     parser.add_argument('--training_episode', type=int, default=100, help='The number of training episodes for each agent')
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
@@ -404,8 +429,14 @@ if __name__ == "__main__":
         raise ValueError("Invalid task")
 
     total_timesteps = training_episode * subenv_num * agent_num * max_episode_steps
-    formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    model_file = f"legged_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model_{formatted_now}"
+
+    if args.model_file is not None:
+        model_file = args.model_file
+    elif run_mode == "training" and not load_existing_model:
+        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        model_file = f"legged_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model_{formatted_now}"
+    else:
+        raise ValueError("Invalid model file! Please provide a model file for testing, or set `load_existing_model` to False for training")
 
 
     if run_mode == "training":
@@ -413,9 +444,8 @@ if __name__ == "__main__":
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
         train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, load_existing_model)
-        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)
     elif run_mode == "testing":
-        test_model(orcagym_addresses[0], task, entry_point, TIME_STEP, max_episode_steps, 1, model_type, model_file)    
+        test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file)    
     else:
         raise ValueError("Invalid run mode")
 
