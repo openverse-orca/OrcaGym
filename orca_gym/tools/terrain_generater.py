@@ -1,6 +1,9 @@
 import random
+import os
+import sys
+import argparse
 
-def generate_box_terrain(num_x, num_y, box_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
+def generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
     terrain = []
     heights = [[0 for _ in range(num_y)] for _ in range(num_x)]
     prev_color = random.uniform(0.1, 0.5)  # 初始化第一个box的颜色，取值范围在0.1到0.5之间
@@ -32,7 +35,7 @@ def generate_box_terrain(num_x, num_y, box_size, max_tilt, min_step, max_step, m
             
             pos_x = i * spacing_x
             pos_y = j * spacing_y
-            pos_z = heights[i][j] + box_size / 10  # 让box稍微浮出地面一点
+            pos_z = heights[i][j] + geom_size / 10  # 让box稍微浮出地面一点
 
             # 随机生成灰度颜色，确保相邻块色差大于 0.2，灰度范围在0.1到0.5之间
             while True:
@@ -44,13 +47,13 @@ def generate_box_terrain(num_x, num_y, box_size, max_tilt, min_step, max_step, m
             rgba = f"{gray_value} {gray_value} {gray_value} 1"
 
             # 构建地形的box geom定义
-            terrain.append(f'<geom type="box" pos="{pos_x} {pos_y} {pos_z}" size="{box_size/2} {box_size/2} {box_size/10}" euler="{tilt_x} {tilt_y} {rotation_z}" rgba="{rgba}"/>')
+            terrain.append(f'<geom type="{geom_type}" pos="{pos_x} {pos_y} {pos_z}" size="{geom_size/2} {geom_size/2} {geom_size/10}" euler="{tilt_x} {tilt_y} {rotation_z}" rgba="{rgba}"/>')
 
     return terrain
 
-def generate_mujoco_xml(num_x, num_y, box_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
-    # 生成地形的所有box块
-    terrain_boxes = generate_box_terrain(num_x, num_y, box_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max)
+def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file):
+    # 生成地形的所有geom块
+    terrain_boxes = generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max)
     
     # 定义MuJoCo XML的头部和尾部
     header = '''<mujoco model="random_box_terrain">
@@ -74,22 +77,57 @@ def generate_mujoco_xml(num_x, num_y, box_size, max_tilt, min_step, max_step, ma
     xml_content = header + "\n".join(terrain_boxes) + footer
 
     # 将XML内容写入文件
-    with open("terrain.xml", "w") as f:
+    with open(f"{out_file}", "w") as f:
         f.write(xml_content)
 
-    print("XML文件已生成为 terrain.xml")
+    print(f"XML文件已生成为 {out_file}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
+    parser.add_argument('--num_x', type=int, default=10, help='Number of boxes in x direction')
+    parser.add_argument('--num_y', type=int, default=10, help='Number of boxes in y direction')
+    parser.add_argument('--geom_type', type=str, default='box', help='Type of geom to use for terrain generation')    
+    parser.add_argument('--geom_size', type=float, default=1, help='Size of each geom')
+    parser.add_argument('--max_tilt', type=float, default=3, help='Max tilt of each geom')
+    parser.add_argument('--min_step', type=float, default=-0.05, help='Min step between geoms')
+    parser.add_argument('--max_step', type=float, default=0.05, help='Max step between geoms')
+    parser.add_argument('--max_total_height', type=float, default=1, help='Max total height of terrain')
+    parser.add_argument('--min_spacing', type=float, default=0.75, help='Min spacing between geoms')
+    parser.add_argument('--max_spacing', type=float, default=1, help='Max spacing between geoms')
+    parser.add_argument('--rotation_z_min', type=float, default=0, help='Min rotation around z axis')
+    parser.add_argument('--rotation_z_max', type=float, default=360, help='Max rotation around z axis')
+    parser.add_argument('--output', type=str, default='terrain.xml', help='Output file name')
+    args = parser.parse_args()
 
 
-generate_mujoco_xml(
-    20,   # num_x: x方向的box数量
-    20,   # num_y: y方向的box数量
-    1,    # box_size: 每个box的边长 (2米 x 2米)
-    3,    # max_tilt: box相对于水平面的最大倾斜角 (3度)
-    -0.05,  # min_step: 相邻box之间的最小高度差 (0.1米)
-    0.05,  # max_step: 相邻box之间的最大高度差 (0.2米)
-    1,    # max_total_height: 场景的总高差最大为1米
-    1.5,  # min_spacing: box之间的最小中心间距 (0.5米)
-    2,    # max_spacing: box之间的最大中心间距 (1米)
-    0,    # rotation_z_min: box相对于垂直方向的最小旋转角度
-    360   # rotation_z_max: box相对于垂直方向的最大旋转角度
-)
+    num_x = args.num_x
+    num_y = args.num_y
+    geom_type = args.geom_type
+    geom_size = args.geom_size
+    max_tilt = args.max_tilt
+    min_step = args.min_step
+    max_step = args.max_step
+    max_total_height = args.max_total_height
+    min_spacing = args.min_spacing
+    max_spacing = args.max_spacing
+    rotation_z_min = args.rotation_z_min
+    rotation_z_max = args.rotation_z_max
+    out_file = args.output
+
+    generate_mujoco_xml(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, 
+                        max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file)
+
+    # generate_mujoco_xml(
+    #     10,   # num_x: x方向的box数量
+    #     10,   # num_y: y方向的box数量
+    #     "ellipsoid",  # geom_type: box的类型
+    #     1,    # box_size: 每个box的边长 (2米 x 2米)
+    #     3,    # max_tilt: box相对于水平面的最大倾斜角 (3度)
+    #     -0.05,  # min_step: 相邻box之间的最小高度差 (0.1米)
+    #     0.05,  # max_step: 相邻box之间的最大高度差 (0.2米)
+    #     1,    # max_total_height: 场景的总高差最大为1米
+    #     0.75,  # min_spacing: box之间的最小中心间距 (0.25米)
+    #     1,    # max_spacing: box之间的最大中心间距 (0.5米)
+    #     0,    # rotation_z_min: box相对于垂直方向的最小旋转角度
+    #     360   # rotation_z_max: box相对于垂直方向的最大旋转角度
+    # )

@@ -112,5 +112,3 @@ venv.bak/
 *.h5
 *.hdf5
 
-# model files
-*.zip

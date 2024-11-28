@@ -15,6 +15,7 @@ LeggedRobotConfig = {
                                 "RR_hip_joint": 0.0, "RR_thigh_joint": 0.9, "RR_calf_joint": -1.5},
         
         "base_neutral_height_offset" : 0.15,    # the offset from max height to standing natural height
+        "base_born_height_offset" : 0.05,       # the offset from max height to standing natural height
 
         "command_lin_vel_range" : 0.1,
         "command_ang_vel_range" : np.pi / 2,
@@ -38,7 +39,7 @@ LeggedRobotConfig = {
         "sensor_imu_accelerometer_name" :       "imu_acc",
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
 
-        "ground_contact_body_names" : ["Floor_Floor"],
+        "ground_contact_body_names" : ["Floor_Floor", "Floor_terrain"],
         "base_contact_body_names" : ["base"],
         "leg_contact_body_names" : ["FR_hip", "FL_thigh", "FL_calf", 
                                     "FR_hip", "FR_thigh", "FR_calf", 
@@ -51,7 +52,7 @@ LeggedRobotConfig = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_air_time_threshold" : 0.5,  # second
+        "foot_touch_air_time_threshold" : 0.25,  # second
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
@@ -90,7 +91,7 @@ LeggedRobotConfig = {
         "sensor_imu_accelerometer_name" :       "imu_acc",
         "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],
 
-        "ground_contact_body_names" : ["Floor_Floor"],
+        "ground_contact_body_names" : ["Floor_Floor", "Floor_terrain"],
         "base_contact_body_names" : ["trunk_link"],
         "leg_contact_body_names" : ["fr_thigh", "fr_calf", "fl_thigh", "fl_calf", "hr_thigh", "hr_calf", "hl_thigh", "hl_calf"],
 
