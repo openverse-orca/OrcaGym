@@ -3,7 +3,7 @@ import sys
 import time
 
 current_file_path = os.path.abspath(__file__)
-project_root = os.path.dirname(os.path.dirname(current_file_path))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
 
 if project_root not in sys.path:
     sys.path.append(project_root)
@@ -83,6 +83,7 @@ def user_comfirm_save_record(task_result):
             print("Invalid input! Please input 'y' or 'n'.")
 
 def do_teleoperation(env, dataset_writer):
+    count = 0
     while True:
         save_camera = False
         camera_name_list = ["main_camera"]
@@ -100,6 +101,8 @@ def do_teleoperation(env, dataset_writer):
         task_result = "Success" if done_list[-1] == 1 else "Failed"
         save_record = user_comfirm_save_record(task_result)
         if save_record:
+            count += 1
+            print(f"Save record {count} to dataset.")
             if save_camera:
                 for camera in camera_list:
                     camera.stop()

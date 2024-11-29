@@ -143,13 +143,90 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
-    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
-        if self.reward_type == RewardType.SPARSE:
-            return 1 if self._is_success(achieved_goal, desired_goal) else 0
-        elif self.reward_type == RewardType.DENSE:
-            return -np.linalg.norm(achieved_goal - desired_goal)
-        else:
-            raise ValueError("Invalid reward type")
+    def compute_reward(self, ee_position, ee_orientation, gripper_qpos, object_position, object_orientation, 
+                   initial_object_position, target_position, is_gripper_closed):
+        """
+        计算抓取任务的奖励函数
+
+        参数:
+        - ee_position: numpy.ndarray, 机械臂末端的当前位置 (x, y, z)
+        - ee_orientation: numpy.ndarray, 机械臂末端的当前方向 (四元数或矩阵)
+        - gripper_qpos: numpy.ndarray, 夹爪的开合状态
+        - object_position: numpy.ndarray, 物体的当前位置 (x, y, z)
+        - object_orientation: numpy.ndarray, 物体的当前方向 (四元数或矩阵)
+        - initial_object_position: numpy.ndarray, 物体的初始位置 (x, y, z)
+        - target_position: numpy.ndarray, 目标位置 (x, y, z)
+        - is_gripper_closed: bool, 表示夹爪是否处于闭合状态
+
+        返回:
+        - reward: float, 当前时刻的奖励值
+        """
+        # 1. 接近物体的奖励
+        proximity_threshold = 0.05  # 距离阈值，越近奖励越高
+        distance_to_object = np.linalg.norm(ee_position - object_position)
+        reward_proximity = -distance_to_object
+        if distance_to_object < proximity_threshold:
+            reward_proximity += 0.5  # 靠近物体的额外奖励
+
+        # 2. 对准物体的奖励（可选，用于旋转敏感任务）
+        # alignment = np.dot(ee_orientation, object_orientation)
+        # reward_alignment = alignment  # 方向越接近，奖励越高
+
+        # 3. 抓取成功的奖励
+        # gripper_closed_threshold = 0.02  # 夹爪开合阈值
+        # object_grasped = is_gripper_closed and (distance_to_object < proximity_threshold)
+        # reward_grasp = 1.0 if object_grasped else 0.0
+
+        # 4. 提升物体的奖励
+        lift_threshold = 0.1  # 提升高度阈值
+        object_is_lifted = object_position[2] > initial_object_position[2] + lift_threshold
+        reward_lift = 1.0 if object_is_lifted else 0.0
+
+        # 5. 目标位置的奖励
+        distance_to_target = np.linalg.norm(object_position - target_position)
+        reward_target = -distance_to_target
+        if distance_to_target < proximity_threshold:
+            reward_target += 2.0  # 达到目标位置的额外奖励
+
+        # 6. 综合奖励
+        reward = (
+            1.0 * reward_proximity   # 接近物体
+            # + 0.2 * reward_alignment # 对准物体
+            # + 1.0 * reward_grasp     # 抓取成功
+            + 1.5 * reward_lift      # 提升物体
+            + 2.0 * reward_target    # 到达目标位置
+        )
+
+        return reward
+
+
+    def _compute_reward(self, achieved_goal, desired_goal, info):
+        site_dict = self.query_site_pos_and_quat([self.EE_NAME])
+        if self.EE_NAME not in site_dict:
+            raise KeyError(f"Site '{self.EE_NAME}' not found in the queried site dictionary.")
+        
+        ee_position = site_dict[self.EE_NAME]["xpos"]
+        ee_orientation = site_dict[self.EE_NAME]["xquat"]
+        
+        obj_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
+        if self.OBJ_NAME not in obj_dict:
+            raise KeyError(f"Object '{self.OBJ_NAME}' not found in the queried site dictionary.")
+        
+        object_position = obj_dict[self.OBJ_NAME]["xpos"]
+        object_orientation = obj_dict[self.OBJ_NAME]["xquat"]
+        
+        return self.compute_reward(
+            ee_position=ee_position,
+            ee_orientation=ee_orientation,
+            gripper_qpos=self.get_gripper_qpos(),
+            object_position=object_position,
+            object_orientation=object_orientation,
+            initial_object_position=self._initial_obj_site_xpos,
+            target_position=self.goal,
+            is_gripper_closed=(self.ctrl[7] > 0.8)
+        )
+
+
     
     def _is_success(self, achieved_goal, desired_goal) -> bool:
         success_threshold = 0.02
@@ -166,7 +243,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         elif self.control_type == ControlType.POLICY:
             ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
         else:
-            ctrl = action.copy()
+            ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
             
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
