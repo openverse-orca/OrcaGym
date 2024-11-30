@@ -24,6 +24,8 @@ from stable_baselines3.her import GoalSelectionStrategy, HerReplayBuffer
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
+from envs.legged_gym.legged_robot_config import LeggedEnvConfig
+
 
 def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
@@ -385,7 +387,7 @@ if __name__ == "__main__":
     parser.add_argument('--subenv_num', type=int, default=1, help='The number of subenvs for each gRPC address')
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
     parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
-    parser.add_argument('--task', type=str, default='stand', help='The task to run')
+    parser.add_argument('--task', type=str, default='follow_command', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
@@ -394,17 +396,15 @@ if __name__ == "__main__":
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     args = parser.parse_args()
 
+    TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 
-    # 训练需要skip跨度大一点，可以快一点，测试skip跨度小一点，流畅一些
-    TIME_STEP = 0.005                 # 仿真步长200Hz
+    FRAME_SKIP_REALTIME = LeggedEnvConfig["FRAME_SKIP_REALTIME"]
+    FRAME_SKIP_SHORT = LeggedEnvConfig["FRAME_SKIP_SHORT"]
+    FRAME_SKIP_LONG = LeggedEnvConfig["FRAME_SKIP_LONG"]
 
-    FRAME_SKIP_REALTIME = 1           # 200Hz 推理步长
-    FRAME_SKIP_SHORT = 2              # 200Hz * 2 = 100Hz 推理步长
-    FRAME_SKIP_LONG = 10              # 200Hz * 10 = 20Hz 训练步长
-
-    EPISODE_TIME_VERY_SHORT = 2       # 每个episode的时间长度
-    EPISODE_TIME_SHORT = 5           
-    EPISODE_TIME_LONG = 20
+    EPISODE_TIME_VERY_SHORT = LeggedEnvConfig["EPISODE_TIME_VERY_SHORT"]
+    EPISODE_TIME_SHORT = LeggedEnvConfig["EPISODE_TIME_SHORT"]
+    EPISODE_TIME_LONG = LeggedEnvConfig["EPISODE_TIME_LONG"]
 
     orcagym_addresses = args.orcagym_addresses
     subenv_num = args.subenv_num
@@ -419,11 +419,8 @@ if __name__ == "__main__":
 
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
-    if task == 'stand':    
-        frame_skip = FRAME_SKIP_REALTIME
-        max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_SHORT)
-    elif task == 'move_forward':
-        frame_skip = FRAME_SKIP_REALTIME
+    if task == 'stand' or task == 'move_forward' or task == 'no_action' or task == 'follow_command':
+        frame_skip = FRAME_SKIP_SHORT # FRAME_SKIP_REALTIME
         max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_LONG)
     else:
         raise ValueError("Invalid task")
