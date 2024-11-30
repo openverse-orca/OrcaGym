@@ -1,5 +1,19 @@
 import numpy as np
 
+LeggedEnvConfig = {
+    "TIME_STEP" : 0.005,                 # 仿真步长200Hz
+
+    "FRAME_SKIP_REALTIME" : 1,           # 200Hz 推理步长
+    "FRAME_SKIP_SHORT" : 4,              # 200Hz * 4 = 50Hz 推理步长
+    "FRAME_SKIP_LONG" : 10,              # 200Hz * 10 = 20Hz 训练步长
+
+    "EPISODE_TIME_VERY_SHORT" : 2,       # 每个episode的时间长度
+    "EPISODE_TIME_SHORT" : 5,           
+    "EPISODE_TIME_LONG" : 20,
+}
+
+
+
 LeggedRobotConfig = {
     "go2": {
         "leg_joint_names" :     ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint", 
@@ -17,9 +31,10 @@ LeggedRobotConfig = {
         "base_neutral_height_offset" : 0.15,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.05,       # the offset from max height to standing natural height
 
-        "command_lin_vel_range" : 0.1,
+        "command_lin_vel_range_x" : 0.1,   # x direction for forward
+        "command_lin_vel_range_y" : 0.0,   # y direction for left/right
         "command_ang_vel_range" : np.pi / 2,
-        "command_forward_speed" : 0.2,
+        "command_ang_rate"      : 0.2,
 
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
                                 "FR_hip_actuator", "FR_thigh_actuator", "FR_calf_actuator",
@@ -53,6 +68,10 @@ LeggedRobotConfig = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_air_time_threshold" : 0.25,  # second
+
+        # Config for logging
+        "log_env_ids" :     [0],
+        "log_agent_names" : ["go2_000"]
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
