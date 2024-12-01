@@ -3,13 +3,15 @@ from typing import Optional, Any, SupportsFloat
 import numpy as np
 
 
+
 class RewardPrinter:
     PRINT_REWARD_INTERVAL = 10
+    PRINT_DETAIL = False
 
     def __init__(self):
         self._timer = datetime.now()
         self._reward_data : dict[str, np.ndarray] = {}
-                                 
+
     def print_reward(self, message : str, reward : Optional[float] = None):
         if self._reward_data.get(message) is None:
             self._reward_data[message] = np.array([reward])
@@ -19,8 +21,10 @@ class RewardPrinter:
         if (datetime.now() - self._timer).seconds > self.PRINT_REWARD_INTERVAL:
             self._timer = datetime.now()
             for key, value in self._reward_data.items():
-                # print(key, f"{value.mean()}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|")
-                print(key, value.mean())
+                if self.PRINT_DETAIL:
+                    print(key, f"{value.mean():.10f}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|")
+                else:
+                    print(key, f"{value.mean():.10f}")
                 self._reward_data[key] = np.array([])
             print("-----------------------------------")
             self._reward_data = {key: np.zeros(0) for key in self._reward_data.keys()}

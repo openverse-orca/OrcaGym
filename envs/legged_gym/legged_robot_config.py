@@ -23,17 +23,17 @@ LeggedRobotConfig = {
         
         "base_joint_name" :     "base",
         
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.3,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.3,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.9, "RL_calf_joint": -1.5,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.9, "RR_calf_joint": -1.5},
+        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.7, "FL_calf_joint": -1.5,
+                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.7, "FR_calf_joint": -1.5,
+                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.7, "RL_calf_joint": -1.5,
+                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.7, "RR_calf_joint": -1.5},
         
-        "base_neutral_height_offset" : 0.15,    # the offset from max height to standing natural height
-        "base_born_height_offset" : 0.05,       # the offset from max height to standing natural height
+        "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
+        "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
         "command_lin_vel_range_x" : 0.1,   # x direction for forward
         "command_lin_vel_range_y" : 0.0,   # y direction for left/right
-        "command_ang_vel_range" : np.pi / 2,
+        "command_ang_vel_range" : np.pi / 32,
         "command_ang_rate"      : 0.2,
 
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
@@ -55,11 +55,11 @@ LeggedRobotConfig = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
 
         "ground_contact_body_names" : ["Floor_Floor", "Floor_terrain"],
-        "base_contact_body_names" : ["base"],
-        "leg_contact_body_names" : ["FR_hip", "FL_thigh", "FL_calf", 
-                                    "FR_hip", "FR_thigh", "FR_calf", 
-                                    "RL_hip", "RL_thigh", "RL_calf", 
-                                    "RR_hip", "RR_thigh", "RR_calf"],
+        "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
+        "leg_contact_body_names" : ["FL_thigh", "FL_calf", 
+                                    "FR_thigh", "FR_calf", 
+                                    "RL_thigh", "RL_calf", 
+                                    "RR_thigh", "RR_calf"],
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
         # Static Foot Forces: Front feet ~44.8 N each; rear feet ~29.8 N each.
@@ -67,7 +67,7 @@ LeggedRobotConfig = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_air_time_threshold" : 0.25,  # second
+        "foot_touch_air_time_threshold" : 0.5,  # second
 
         # Config for logging
         "log_env_ids" :     [0],
