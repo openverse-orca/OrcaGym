@@ -20,7 +20,7 @@ def get_legged_robot_name(agent_name: str) -> str:
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
 
-def local2global(q_global_to_local, v_local, q_omega_local) -> tuple[np.ndarray, np.ndarray]:
+def local2global(q_global_to_local, v_local, v_omega_local) -> tuple[np.ndarray, np.ndarray]:
     # Vg = QVlQ*
 
     # 将速度向量从局部坐标系转换到全局坐标系
@@ -29,11 +29,13 @@ def local2global(q_global_to_local, v_local, q_omega_local) -> tuple[np.ndarray,
     v_global = np.array(q_v_global[1:])  # 提取虚部作为全局坐标系下的线速度
 
     # 将角速度从局部坐标系转换到全局坐标系
+    q_omega_local = np.array([0, v_omega_local[0], v_omega_local[1], v_omega_local[2]])  # 局部坐标系下的角速度向量表示为四元数
     q_omega_global = rotations.quat_mul(q_global_to_local, rotations.quat_mul(q_omega_local, rotations.quat_conjugate(q_global_to_local)))
+    v_omega_local = np.array(q_omega_global[1:])  # 提取虚部作为全局坐标系下的角速度
 
     return v_global, q_omega_global
 
-def global2local(q_global_to_local, v_global, q_omega_global) -> tuple[np.ndarray, np.ndarray]:
+def global2local(q_global_to_local, v_global, v_omega_global) -> tuple[np.ndarray, np.ndarray]:
     # Vl = Q*VgQ
 
     # 将速度向量从全局坐标系转换到局部坐标系
@@ -42,9 +44,12 @@ def global2local(q_global_to_local, v_global, q_omega_global) -> tuple[np.ndarra
     v_local = np.array(q_v_local[1:])  # 提取虚部作为局部坐标系下的线速度
 
     # 将角速度从全局坐标系转换到局部坐标系
+    # print("q_omega_global: ", v_omega_global, "q_global_to_local: ", q_global_to_local)
+    q_omega_global = np.array([0, v_omega_global[0], v_omega_global[1], v_omega_global[2]])  # 角速度向量表示为四元数
     q_omega_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_omega_global, q_global_to_local))
+    v_omega_local = np.array(q_omega_local[1:])  # 提取虚部作为局部坐标系下的角速度
 
-    return v_local, q_omega_local
+    return v_local, v_omega_local
 
 class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
@@ -156,12 +161,11 @@ class LeggedRobot(OrcaGymAgent):
                     self._body_lin_vel.copy(),
                     self._body_ang_vel.copy(),
                     self._body_orientation.copy(),
-                    self._leg_joint_qpos.copy(),
+                    self._command_values.copy(),
+                    (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel.copy(),
                     self._action.copy(),
-                    self._ctrl.copy(),
-                    self._command_values.copy(),
-                ])          
+                ]).flatten()
 
         result = {
             "observation": obs,
@@ -183,6 +187,8 @@ class LeggedRobot(OrcaGymAgent):
     def set_action(self, action):
         assert len(action) == len(self._ctrl_range)
 
+        # print("agnet ", self._agent_name, " Action: ", action)
+
         if self._task == "no_action":
             return
 
@@ -197,8 +203,8 @@ class LeggedRobot(OrcaGymAgent):
             # print("action_space_range: ", self._action_space_range)
             # print("ctrl_range: ", self._ctrl_range[i])
             if (self._actuator_type == "position"):
-                noise = 0 # np.random.normal(0, 0.01, 1)
-                ctrl_delta = np.interp((action[i] + noise) * self._action_scale, self._action_space_range, self._ctrl_delta_range[i])
+                # ctrl_delta = action[i] * self._action_scale # Use the action to control the joint position directly
+                ctrl_delta = np.interp(action[i] * self._action_scale, self._action_space_range, self._ctrl_delta_range[i])
                 # print("ctrl delta : ", ctrl_delta, "action scale: ", self._action_scale, "action: ", action[i], "action space range: ", self._action_space_range, "ctrl delta range: ", self._ctrl_delta_range[i])
                 self._ctrl[i] = self._neutral_joint_values[i] + ctrl_delta
             elif (self._actuator_type == "torque"):
@@ -219,7 +225,7 @@ class LeggedRobot(OrcaGymAgent):
         # Do mocap update here.
         # print("imu mocap: ", self._imu_mocap_pos_quat)
         self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
-        global_lin_vel = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([1,0,0,0]))
+        global_lin_vel, _ = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
         self._imu_mocap_pos_quat["pos"] += global_lin_vel * self.dt
         
         return {self._imu_mocap_name: self._imu_mocap_pos_quat}
@@ -235,20 +241,33 @@ class LeggedRobot(OrcaGymAgent):
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
 
-        joint_neutral_qpos = self.get_joint_neutral()
+        # Rotate the base body around the Z axis
+        z_rotation_quat = rotations.euler2quat([0, 0, np.random.uniform(-np.pi, np.pi)])
 
+        # Get cached default joint values
+        joint_neutral_qpos = self.get_joint_neutral()
         base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
+
+        # Move along the Z axis to the born height
         self._base_height_target = base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
         base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
-        
+
+        # Use the rotate quate
+        base_rotate_quat = base_neutral_qpos[self._base_joint_name][3:]
+        base_neutral_qpos[self._base_joint_name][3:] = rotations.quat_mul(base_rotate_quat, z_rotation_quat)
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(base_neutral_qpos)
 
+        # Get cached default imu mocap position and quaternion
         self._imu_mocap_pos_quat = {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
                                     "quat": self._init_imu_site_pos_quat["xquat"].copy()}
+        # Move along the Z axis to the born height
         self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
 
+        # Use the rotate quate
+        self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], z_rotation_quat)
         
+
         self._command = self._genarate_command()
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
         # print("Command: ", self._command)
@@ -398,13 +417,13 @@ class LeggedRobot(OrcaGymAgent):
 
             reward_alive_coeff = 0
             reward_success_coeff = 0
-            reward_failure_coeff = 10
+            reward_failure_coeff = 100
             reward_contact_coeff = 1
             reward_foot_touch_coeff = 0.01
             reward_joint_angles_coeff = 0.1
             reward_joint_accelerations_coeff = 0.00001
             reward_limit_coeff = 0
-            reward_action_rate_coeff = 0.01
+            reward_action_rate_coeff = 0.001
             reward_base_gyro_coeff = 0.01
             reward_base_accelerometer_coeff = 0.001
             reward_follow_command_linvel_coeff = 1
@@ -491,6 +510,7 @@ class LeggedRobot(OrcaGymAgent):
         """
         Check if each of the legs is in contact with the any other body
         """
+        # print("Contact dict: ", contact_dict)
         contact_result = np.zeros(len(self._leg_contact_body_names))
         for i, contact_body_name in enumerate(self._leg_contact_body_names):
             if contact_body_name in contact_dict:
@@ -535,7 +555,7 @@ class LeggedRobot(OrcaGymAgent):
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
 
-        lin_vel = np.array([self._np_random.uniform(-self._command_lin_vel_range_x, self._command_lin_vel_range_x), 
+        lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x), 
                             self._np_random.uniform(-self._command_lin_vel_range_y, self._command_lin_vel_range_y),
                             0])
         if self._np_random.uniform() < self._command_ang_rate:
@@ -549,8 +569,6 @@ class LeggedRobot(OrcaGymAgent):
         if self._reward_printer is not None:
             self._reward_printer.print_reward(message, reward)
 
-
-    
     def _get_body_local(self, joint_qpos, joint_qvel) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Robots have a local coordinate system that is defined by the orientation of the base.
@@ -562,10 +580,10 @@ class LeggedRobot(OrcaGymAgent):
         body_height = body_joint_qpos[2]  # 局部坐标高度就是全局坐标高度
         body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
         body_lin_vel_vec_global = body_joint_qvel[:3].copy()    # 全局坐标系下的线速度
-        body_ang_vel_quat_global = body_joint_qvel[3:7].copy()  # 全局坐标系下的角速度四元数
+        body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度四元数
+        # print("body_ang_vel_quat_global: ", body_ang_vel_vec_global, "body_joint_qvel: ", body_joint_qvel)
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
-        body_lin_vel, body_ang_vel_quat = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_quat_global)
-        body_ang_vel = rotations.quat2euler(body_ang_vel_quat)
+        body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
         body_orientation = rotations.quat2euler(body_orientation_quat)
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
