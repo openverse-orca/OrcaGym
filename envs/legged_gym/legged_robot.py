@@ -9,7 +9,7 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import copy
 
-from .legged_robot_config import LeggedRobotConfig
+from .legged_robot_config import LeggedRobotConfig, LeggedObsConfig
 
 
 def get_legged_robot_name(agent_name: str) -> str:
@@ -113,6 +113,13 @@ class LeggedRobot(OrcaGymAgent):
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
 
         self._gravity_quat = rotations.euler2quat([0.0, 0.0, -9.81000042])
+        self._obs_scale_lin_vel = LeggedObsConfig["scale"]["lin_vel"]
+        self._obs_scale_ang_vel = LeggedObsConfig["scale"]["ang_vel"]
+        self._obs_scale_command = np.array([self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_ang_vel])
+        self._obs_scale_qpos = LeggedObsConfig["scale"]["qpos"]
+        self._obs_scale_qvel = LeggedObsConfig["scale"]["qvel"]
+        self._obs_scale_height = LeggedObsConfig["scale"]["height"]
+        self._noise_scale_vec = self._get_noise_scale_vec()
 
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -158,14 +165,19 @@ class LeggedRobot(OrcaGymAgent):
 
         obs = np.concatenate(
                 [
-                    self._body_lin_vel.copy(),
-                    self._body_ang_vel.copy(),
+                    self._body_lin_vel * self._obs_scale_lin_vel,
+                    self._body_ang_vel * self._obs_scale_ang_vel,
                     self._body_orientation.copy(),
-                    self._command_values.copy(),
-                    (self._leg_joint_qpos - self._neutral_joint_values),
-                    self._leg_joint_qvel.copy(),
+                    self._command_values * self._obs_scale_command,
+                    (self._leg_joint_qpos - self._neutral_joint_values) * self._obs_scale_qpos,
+                    self._leg_joint_qvel * self._obs_scale_qvel,
                     self._action.copy(),
+                    np.array([self._body_height]) * self._obs_scale_height,
                 ]).flatten()
+        
+        noise_vec = ((self._np_random.random(len(self._noise_scale_vec)) * 2) - 1) * self._noise_scale_vec
+        # print("obs: ", obs, "Noise vec: ", noise_vec)
+        obs += noise_vec
 
         result = {
             "observation": obs,
@@ -587,3 +599,36 @@ class LeggedRobot(OrcaGymAgent):
         body_orientation = rotations.quat2euler(body_orientation_quat)
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
+    
+    def _get_noise_scale_vec(self):
+        """ Sets a vector used to scale the noise added to the observations.
+            [NOTE]: Must be adapted when changing the observations structure
+
+        Args:
+            cfg (Dict): Environment config file
+
+        Returns:
+            [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
+        """
+        noise_level = LeggedObsConfig["noise"]["noise_level"]
+        noise_lin_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["lin_vel"] * self._obs_scale_lin_vel
+        noise_ang_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["ang_vel"] * self._obs_scale_ang_vel
+        noise_orientation = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["orientation"]
+        noise_command = np.zeros(4)  # No noise on the command
+        noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * self._obs_scale_qpos
+        noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * self._obs_scale_qvel
+        noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
+        noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * self._obs_scale_height
+
+        noise_vec = np.concatenate([noise_lin_vel, 
+                                    noise_ang_vel, 
+                                    noise_orientation, 
+                                    noise_command, 
+                                    noise_leg_joint_qpos, 
+                                    noise_leg_joint_qvel, 
+                                    noise_action, 
+                                    noise_height]).flatten()
+        
+        # print("noise vec: ", noise_vec)
+
+        return noise_vec

@@ -13,6 +13,29 @@ LeggedEnvConfig = {
 }
 
 
+LeggedObsConfig = {
+    # 对观测数据进行缩放实现归一化，以便神经网络更好的训练
+    # 噪声也按同等比例缩放归一化，然后再乘以噪声系数以便对不同的部分模拟不同的噪声水平
+    "scale" : {
+        "lin_vel" : 2.0,
+        "ang_vel" : 0.25,
+        "qpos" : 1.0,
+        "qvel" : 0.05,
+        "height" : 5.0
+    },
+
+    "noise" : {
+        "noise_level" : 1.0,
+        "qpos" : 0.01,
+        "qvel" : 1.5,
+        "lin_vel" : 0.1,
+        "ang_vel" : 0.2,
+        "orientation" : 0.05,
+        "height" : 0.1
+    }
+}
+
+
 
 LeggedRobotConfig = {
     "go2": {
