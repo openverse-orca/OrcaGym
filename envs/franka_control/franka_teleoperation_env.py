@@ -161,41 +161,51 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         返回:
         - reward: float, 当前时刻的奖励值
         """
-        # 1. 接近物体的奖励
-        proximity_threshold = 0.05  # 距离阈值，越近奖励越高
-        distance_to_object = np.linalg.norm(ee_position - object_position)
-        reward_proximity = -distance_to_object
-        if distance_to_object < proximity_threshold:
-            reward_proximity += 0.5  # 靠近物体的额外奖励
 
-        # 2. 对准物体的奖励（可选，用于旋转敏感任务）
-        # alignment = np.dot(ee_orientation, object_orientation)
-        # reward_alignment = alignment  # 方向越接近，奖励越高
+        reward = 0.0
 
-        # 3. 抓取成功的奖励
-        # gripper_closed_threshold = 0.02  # 夹爪开合阈值
-        # object_grasped = is_gripper_closed and (distance_to_object < proximity_threshold)
-        # reward_grasp = 1.0 if object_grasped else 0.0
-
-        # 4. 提升物体的奖励
-        lift_threshold = 0.1  # 提升高度阈值
+        lift_threshold = 0.05  # 提升高度阈值
         object_is_lifted = object_position[2] > initial_object_position[2] + lift_threshold
-        reward_lift = 1.0 if object_is_lifted else 0.0
+        if object_is_lifted:
+            reward = 2.25
+        else:
+            # 1. 接近物体的奖励
+            distance_to_object = np.linalg.norm(ee_position - object_position)
+            reaching_reward = 1 - np.tanh(10.0 * distance_to_object)
+            reward += reaching_reward
 
-        # 5. 目标位置的奖励
-        distance_to_target = np.linalg.norm(object_position - target_position)
-        reward_target = -distance_to_target
-        if distance_to_target < proximity_threshold:
-            reward_target += 2.0  # 达到目标位置的额外奖励
+            # 2. 夹取物体的奖励
+            grasp = False
+            left_contact = False
+            right_contact = False
+            left_index = ["71", "72", "73", "74", "75", "76"]
+            right_index = ["79", "80", "81", "82", "83", "84"]
+            contacts = self.query_contact()
+            for contact in contacts:
+                geom1 = self.model.geom_id2name(contact["Geom1"])
+                geom2 = self.model.geom_id2name(contact["Geom2"])
 
-        # 6. 综合奖励
-        reward = (
-            1.0 * reward_proximity   # 接近物体
-            # + 0.2 * reward_alignment # 对准物体
-            # + 1.0 * reward_grasp     # 抓取成功
-            + 1.5 * reward_lift      # 提升物体
-            + 2.0 * reward_target    # 到达目标位置
-        )
+                gripper = None
+                box = None
+                if geom1.startswith("Toys_Box1_"):
+                    if geom2.startswith("Panda__geom_"):
+                        box = geom1
+                        gripper = geom2
+                if geom2.startswith("Toys_Box1_"):
+                    if geom1.startswith("Panda__geom_"):
+                        box = geom2
+                        gripper = geom1
+                
+                if gripper is not None and box is not None:
+                    for i in range(6):
+                        if gripper.startswith(f"Panda__geom_{left_index[i]}"):
+                            left_contact = True
+                        if gripper.startswith(f"Panda__geom_{right_index[i]}"):
+                            right_contact = True
+            if left_contact and right_contact:
+                grasp = True
+            if grasp:
+                reward += 0.25
 
         return reward
 
