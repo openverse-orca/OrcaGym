@@ -308,7 +308,7 @@ def test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, time
         else:
             raise ValueError("Invalid model type")
 
-        testing_model(env, agent_num, model, time_step, max_episode_steps)
+        testing_model(env, agent_num, model, time_step, max_episode_steps, frame_skip)
     except KeyboardInterrupt:
         print("退出仿真环境")
         env.close()
@@ -332,12 +332,13 @@ def _output_test_info(test, total_rewards, rewards, dones, infos):
     print("is_success: ", [agent_info["is_success"] for agent_info in infos])
     print("---------------------------------------")
 
-def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episode_steps):
+def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episode_steps, frame_skip):
     # 测试模型
     observations = env.reset()
     test = 0
     total_rewards = np.zeros(agent_num)
     step = 0
+    dt = time_step * frame_skip
     print("Start Testing!")
     try:
         while True:
@@ -368,8 +369,8 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
 
             # 
             elapsed_time = datetime.now() - start_time
-            if elapsed_time.total_seconds() < time_step:
-                time.sleep(time_step - elapsed_time.total_seconds())
+            if elapsed_time.total_seconds() < dt:
+                time.sleep(dt - elapsed_time.total_seconds())
 
             if step == max_episode_steps:
                 _output_test_info(test, total_rewards, rewards, dones, infos)
