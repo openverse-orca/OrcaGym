@@ -1,5 +1,7 @@
+from datetime import datetime
 import numpy as np
 from gymnasium.core import ObsType
+from envs.robomimic.dataset_util import DatasetWriter
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -10,7 +12,7 @@ import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment import OrcaGymRemoteEnv
 from scipy.spatial.transform import Rotation as R
-
+import time
 class OpenloongArmEnv(OrcaGymRemoteEnv):
     """
     控制青龙机器人机械臂
@@ -35,7 +37,9 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             **kwargs,
         )
 
-
+        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
+      
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
         self.nu = self.model.nu
@@ -285,7 +289,53 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
-    
+    def record_data(self, obs_list, action_list, reward_list, done_list, info_list):
+        """
+        This function collects data for a single episode and stores it in the .h5 file.
+        """
+        demo_data = {
+            'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
+            'actions': np.array(action_list),
+            'rewards': np.array(reward_list),
+            'dones': np.array(done_list),
+            'obs': obs_list
+        }
+        self.dataset_writer.add_demo(demo_data)
+
+    def run_episode(self):
+        """
+        Run a single episode and collect the data.
+        """
+        obs_list, reward_list, done_list, info_list = [], [], [], []
+        action_list = []
+        
+        obs, info = self.reset()  # Reset the environment at the start
+        terminated_times = 0
+
+        while True:
+            action = self.action_space.sample()  # Sample a random action
+            obs, reward, terminated, truncated, info = self.step(action)
+
+            # Collect data for saving
+            obs_list.append(obs)
+            reward_list.append(reward)
+            done_list.append(1 if terminated else 0)
+            info_list.append(info)
+            action_list.append(action)
+
+            if terminated or truncated:
+                # Once episode is done, record the collected data
+                self.record_data(obs_list, action_list, reward_list, done_list, info_list)
+                break
+
+        return obs_list, reward_list, done_list, info_list
+
+    def close(self):
+        """
+        Finalize the dataset and close the environment.
+        """
+        self.dataset_writer.finalize()  # Ensure all data is saved
+        super().close()
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()
         contact_force_query_ids = []

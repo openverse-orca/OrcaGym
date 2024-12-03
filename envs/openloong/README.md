@@ -11,9 +11,10 @@
     
     **注意** 青龙机器人源码托管在[OPENATOM社区](https://atomgit.com/OpenAtomFoundation/)，您需要首先注册该平台账户（免费），并**添加 SSH 公钥**，才能顺利clone代码。[点击查看如何生成 SSH KEY](https://docs.atomgit.com/user/sshkey/)
 
+
     ```bash
     cd openloong/external
-    git submodule update --init --recursive
+    git clone git@atomgit.com:openloong/openloong-dyn-control.git
     sudo apt-get update
     sudo apt install git cmake gcc-11 g++-11
     sudo apt install libglu1-mesa-dev freeglut3-dev    
