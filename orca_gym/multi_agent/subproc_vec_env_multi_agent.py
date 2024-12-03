@@ -295,7 +295,7 @@ def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Sp
     assert len(obs) > 0, "need observations from at least one environment"
 
     if isinstance(space, spaces.Dict):
-        assert isinstance(space.spaces, OrderedDict), "Dict space must have ordered subspaces"
+        # assert isinstance(space.spaces, OrderedDict), "Dict space must have ordered subspaces"
         assert isinstance(obs[0], dict), "non-dict observation for environment with Dict observation space"
         obs = _split_multi_agent_obs_list(obs, agent_num)
         return OrderedDict([(k, np.stack([o[k] for o in obs])) for k in space.spaces.keys()])
