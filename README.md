@@ -29,7 +29,7 @@ git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
 git lfs install
 git lfs pull
-git submodule update
+git submodule update --init --recursive
 ```
 
 2. **Install Dependencies:**
