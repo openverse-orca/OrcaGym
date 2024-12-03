@@ -61,9 +61,9 @@ def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, ent
     return _init
 
 def training_model(model, total_timesteps, model_file):
-    # 训练模型，每一千万步保存一次check point
+    # 训练模型，每10亿步保存一次check point
     try:
-        CKP_LEN = 10000000
+        CKP_LEN = 1000000000
         training_loop = []
         if total_timesteps <= CKP_LEN:
             training_loop.append(total_timesteps)
@@ -84,38 +84,107 @@ def training_model(model, total_timesteps, model_file):
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
         
-def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
+# def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     # 加载已有模型或初始化新模型
+#     if os.path.exists(f"{model_file}.zip") and load_existing_model:
+#         model = PPO.load(model_file, env=env, device=device)
+#     else:
+#         # 定义自定义策略网络
+#         policy_kwargs = dict(
+#             net_arch=dict(
+#                 pi=[512, 256, 128],  # 策略网络结构
+#                 vf=[512, 256, 128]   # 值函数网络结构
+#             ),
+#             ortho_init=True,
+#             # activation_fn=nn.ReLU,
+#             activation_fn=nn.ELU,
+#             # log_std_init=2,  # 设置log_std的初始值
+#         )
+#         model = PPO("MultiInputPolicy", 
+#                     env, 
+#                     verbose=1, 
+#                     learning_rate=0.0003, 
+#                     n_steps=2048, 
+#                     batch_size=2048, 
+#                     gamma=0.99, 
+#                     clip_range=0.2, 
+#                     ent_coef=0.01,
+#                     # target_kl=0.01,
+#                     policy_kwargs=policy_kwargs, 
+#                     device=device)
+        
+#     return model
+
+
+def setup_model_ppo(env, 
+                    env_num, 
+                    agent_num, 
+                    total_timesteps, 
+                    start_episode, 
+                    max_episode_steps, 
+                    model_file, 
+                    load_existing_model):
+    """
+    设置或加载 PPO 模型。
+
+    参数:
+    - env: 训练环境
+    - env_num: 环境数量
+    - agent_num: 每个环境中的智能体数量
+    - total_timesteps: 总时间步数
+    - start_episode: 开始的回合数
+    - max_episode_steps: 每回合最大步数
+    - model_file: 模型文件路径
+    - load_existing_model: 是否加载现有模型标志
+
+    返回:
+    - model: 初始化的或加载的 PPO 模型
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # 加载已有模型或初始化新模型
+
+    # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}.zip") and load_existing_model:
+        print(f"加载现有模型：{model_file}")
         model = PPO.load(model_file, env=env, device=device)
     else:
         # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
-                pi=[512, 256, 128],  # 策略网络结构
-                vf=[512, 256, 128]   # 值函数网络结构
+                pi=[1024, 512, 256],  # 策略网络结构
+                vf=[1024, 512, 256]   # 值函数网络结构
             ),
-            ortho_init=True,
-            # activation_fn=nn.ReLU,
-            activation_fn=nn.ELU,
-            # log_std_init=2,  # 设置log_std的初始值
+            ortho_init=True,       # 正交初始化
+            activation_fn=nn.ELU,  # 激活函数
         )
-        model = PPO("MultiInputPolicy", 
-                    env, 
-                    verbose=1, 
-                    learning_rate=0.0003, 
-                    n_steps=2048, 
-                    batch_size=2048, 
-                    gamma=0.99, 
-                    clip_range=0.2, 
-                    ent_coef=0.01,
-                    # target_kl=0.01,
-                    policy_kwargs=policy_kwargs, 
-                    device=device)
-        
-    return model
 
+        # 根据环境数量和智能体数量计算批次大小和采样步数
+        total_envs = env_num * agent_num
+        n_steps = 256  # 每个环境采样步数
+        batch_size = 65536  # 批次大小
+
+        # 确保 batch_size 是 total_envs * n_steps 的因数
+        assert (total_envs * n_steps) % batch_size == 0, \
+            f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。"
+
+        model = PPO(
+            policy="MultiInputPolicy",  # 多输入策略
+            env=env, 
+            verbose=1, 
+            learning_rate=3e-4, 
+            n_steps=n_steps, 
+            batch_size=batch_size, 
+            gamma=0.99, 
+            clip_range=0.2, 
+            ent_coef=0.01, 
+            policy_kwargs=policy_kwargs, 
+            device=device
+        )
+
+    # 打印模型摘要
+    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+
+    return model
 
 def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
