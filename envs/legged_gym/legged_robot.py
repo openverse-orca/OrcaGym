@@ -297,15 +297,11 @@ class LeggedRobot(OrcaGymAgent):
             return 0.0
 
     def _compute_reward_alive(self, coeff) -> SupportsFloat:
-        return 0.0
-    
         reward = 1.0 * coeff * self.dt
         self._print_reward("Alive reward: ", reward)
         return reward
 
     def _compute_reward_success(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
-        return 0.0
-    
         reward = (1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0) * coeff * self.dt
         self._print_reward("Success reward: ", reward)
         return reward
@@ -327,8 +323,6 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
-        return 0.0
-    
         base_reward = 1 * len(self._leg_joint_qpos)
         reward = (base_reward - np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff * self.dt
         self._print_reward("Joint angles reward: ", reward)
@@ -339,18 +333,7 @@ class LeggedRobot(OrcaGymAgent):
         self._print_reward("Joint accelerations reward: ", reward)
         return reward
     
-    def _compute_reward_limit(self, coeff) -> SupportsFloat:
-        return 0.0
-        # limit_threshold = 0.8
-        # reward = 0.0
-
-        # for i in range(len(self._ctrl)):
-        #     ctrl = max(self._ctrl_range_low[i] + 0.01, min(self._ctrl[i], self._ctrl_range_high[i] - 0.01))
-        #     if ctrl < self._ctrl_range_low[i] * limit_threshold:
-        #         reward -= 1 / abs(self._ctrl_range_low[i] - ctrl)
-        #     elif ctrl > self._ctrl_range_high[i] * limit_threshold:
-        #         reward -= 1 / abs(self._ctrl_range_high[i] - ctrl)
-                
+    def _compute_reward_limit(self, coeff) -> SupportsFloat:     
         reward = -(np.sum(self._action == self._action_space_range[0]) + np.sum(self._action == self._action_space_range[1])) * coeff * self.dt
         self._print_reward("Limit over threshold reward: ", reward)
         return reward
@@ -361,15 +344,11 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_base_gyro(self, coeff) -> SupportsFloat:
-        return 0.0
-    
         reward = (-np.sum(np.abs(self._imu_data_gyro))) * coeff * self.dt
         self._print_reward("Base gyro reward: ", reward)
         return reward
     
     def _compute_reward_base_accelerometer(self, coeff) -> SupportsFloat:
-        return 0.0
-    
         reward = (-np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))) * coeff * self.dt
         self._print_reward("Base accelerometer reward: ", reward)
         return reward
@@ -427,76 +406,35 @@ class LeggedRobot(OrcaGymAgent):
         if self._is_obs_updated:
             total_reward = 0.0
 
-            reward_alive_coeff = 0
-            reward_success_coeff = 0
-            reward_failure_coeff = 100
-            reward_contact_coeff = 1
-            reward_foot_touch_coeff = 0.01
-            reward_joint_angles_coeff = 0.1
-            reward_joint_accelerations_coeff = 0.00001
-            reward_limit_coeff = 0
-            reward_action_rate_coeff = 0.001
-            reward_base_gyro_coeff = 0.01
-            reward_base_accelerometer_coeff = 0.001
-            reward_follow_command_linvel_coeff = 1
-            reward_follow_command_angvel_coeff = 0.5
-            reward_height_coeff = 1
-            reward_body_lin_vel_coeff = 2
-            reward_body_ang_vel_coeff = 0.05
-            reward_body_orientation_coeff = 5
-            reward_feet_air_time_coeff = 0.1
 
-            # *** Reward for staying alive
-            total_reward += self._compute_reward_alive(reward_alive_coeff)
+            reward_functions = [
+                {"function": self._compute_reward_alive, "coeff": 0},
+                {"function": (self._compute_reward_success, {"achieved_goal": achieved_goal, "desired_goal": desired_goal, "coeff": 0}), "coeff": 0},
+                {"function": (self._compute_reward_failure, {"achieved_goal": achieved_goal, "desired_goal": desired_goal, "coeff": 1}), "coeff": 1},
+                {"function": self._compute_reward_contact, "coeff": 1},
+                {"function": self._compute_reward_foot_touch, "coeff": 0.001},
+                {"function": self._compute_reward_joint_angles, "coeff": 0},
+                {"function": self._compute_reward_joint_accelerations, "coeff": 0.00001},
+                {"function": self._compute_reward_limit, "coeff": 0},
+                {"function": self._compute_reward_action_rate, "coeff": 0.001},
+                {"function": self._compute_reward_base_gyro, "coeff": 0},
+                {"function": self._compute_reward_base_accelerometer, "coeff": 0},
+                {"function": self._compute_reward_follow_command_linvel, "coeff": 1},
+                {"function": self._compute_reward_follow_command_angvel, "coeff": 0.5},
+                {"function": self._compute_reward_height, "coeff": 1},
+                {"function": self._compute_reward_body_lin_vel, "coeff": 2},
+                {"function": self._compute_reward_body_ang_vel, "coeff": 0.05},
+                {"function": self._compute_reward_body_orientation, "coeff": 5},
+                {"function": self._compute_feet_air_time, "coeff": 0.1},
+            ]
 
-            # *** Reward for task success
-            total_reward += self._compute_reward_success(achieved_goal, desired_goal, reward_success_coeff)
-
-            # *** Penalty for task failure
-            total_reward += self._compute_reward_failure(achieved_goal, desired_goal, reward_failure_coeff)
-
-            # *** Penalty for leg contact with other bodies
-            total_reward +=  self._compute_reward_contact(reward_contact_coeff)
-
-            # *** Penality for foot touch force too strong
-            total_reward +=  self._compute_reward_foot_touch(reward_foot_touch_coeff)
-
-            # *** Penalty for joint angles too far from the neutral position
-            total_reward +=  self._compute_reward_joint_angles(reward_joint_angles_coeff)
-
-            # *** Penalty for joint accelerations
-            total_reward +=  self._compute_reward_joint_accelerations(reward_joint_accelerations_coeff)
-
-            # *** Penalty for torques or angels too close to the limits
-            total_reward +=  self._compute_reward_limit(reward_limit_coeff)
-
-            # *** Penalty for action rate
-            total_reward +=  self._compute_reward_action_rate(reward_action_rate_coeff)
-
-            # *** Penalty for base gyro and accelerometer
-            total_reward +=  self._compute_reward_base_gyro(reward_base_gyro_coeff)
-            total_reward +=  self._compute_reward_base_accelerometer(reward_base_accelerometer_coeff)
-
-            # *** Reward for following the command
-            total_reward +=  self._compute_reward_follow_command_linvel(reward_follow_command_linvel_coeff)
-
-            # *** Reward for following the command
-            total_reward +=  self._compute_reward_follow_command_angvel(reward_follow_command_angvel_coeff)
-
-            # *** Reward for maintaining the height
-            total_reward +=  self._compute_reward_height(reward_height_coeff)
-
-            # *** Penalty for body linear velocity in Z alxis
-            total_reward +=  self._compute_reward_body_lin_vel(reward_body_lin_vel_coeff)
-
-            # *** Penalty for body angular velocity in XY alxis (Yaw)
-            total_reward +=  self._compute_reward_body_ang_vel(reward_body_ang_vel_coeff)
-
-            # *** Penalty for body orientation in XY alxis (Yaw)
-            total_reward +=  self._compute_reward_body_orientation(reward_body_orientation_coeff)
-
-            # *** Reward for air time of the feet
-            total_reward +=  self._compute_feet_air_time(reward_feet_air_time_coeff)
+            for reward_function in reward_functions:
+                if reward_function["coeff"] == 0:
+                    continue
+                if isinstance(reward_function["function"], tuple):
+                    total_reward += reward_function["function"][0](**reward_function["function"][1])
+                else:    
+                    total_reward += reward_function["function"](reward_function["coeff"])
 
             self._print_reward("Total reward: ", total_reward)
             self._is_obs_updated = False
@@ -550,17 +488,20 @@ class LeggedRobot(OrcaGymAgent):
         """
         if not hasattr(self, "_foot_touch_air_time"):
             self._foot_touch_air_time = np.zeros(len(foot_touch_force))
+            self._foot_in_air_time = np.zeros(len(foot_touch_force))
 
         # If the robot is in the air, reset the air time   
-        if all(foot_touch_force < self._foot_touch_force_air_threshold):
-            self._foot_touch_air_time = np.zeros(len(foot_touch_force))
-            return
+        # if all(foot_touch_force < self._foot_touch_force_air_threshold):
+        #     self._foot_touch_air_time = np.zeros(len(foot_touch_force))
+        #     return
 
         for i in range(len(foot_touch_force)):
             if foot_touch_force[i] > self._foot_touch_force_air_threshold:
-                self._foot_touch_air_time[i] = 0
+                self._foot_touch_air_time[i] = self._foot_in_air_time[i]
+                self._foot_in_air_time[i] = 0
             else:
-                self._foot_touch_air_time[i] += self.dt
+                self._foot_in_air_time[i] += self.dt
+                self._foot_touch_air_time[i] = 0
 
     def _genarate_command(self) -> dict:
         """
