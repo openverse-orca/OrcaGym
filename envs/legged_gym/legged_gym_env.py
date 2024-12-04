@@ -4,6 +4,7 @@ from orca_gym.multi_agent import OrcaGymMultiAgentEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
+import datetime
 
 from .legged_robot import LeggedRobot
 
@@ -41,21 +42,26 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def step_agents(self, action: np.ndarray) -> None:
         # print("Step agents: ", action)
+        # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
+        if self.render_mode == "human":
+            mocaps = {}
+            for i in range(len(self._agents)):
+                agent = self._agents[i]
+                act = action[i]
 
-        mocaps = {}
-        for i in range(len(self._agents)):
-            agent = self._agents[i]
-            act = action[i]
+                # 将每个agent的ctrl拼接在一起，然后传递给仿真环境
+                agent_ctrl, agent_mocap = agent.step(act, update_mocap=True)
+                self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+                mocaps.update(agent_mocap)
 
-            # 将每个agent的ctrl拼接在一起，然后传递给仿真环境
-            agent_ctrl, agent_mocap = agent.step(act)
-            self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
-            mocaps.update(agent_mocap)
-
-        # print("env ctrl: ", self.ctrl)
-
-        self.set_mocap_pos_and_quat(mocaps)
-
+            
+            self.set_mocap_pos_and_quat(mocaps)
+        else:
+            for i in range(len(self._agents)):
+                agent = self._agents[i]
+                act = action[i]
+                agent_ctrl, _ = agent.step(act, update_mocap=False)
+                self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
@@ -72,14 +78,27 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             raise ValueError("Unsupported achieved_goal shape")
 
     def get_obs(self, agents : list[LeggedRobot]) -> dict[str, np.ndarray]:
+        # get_obs_start = datetime.datetime.now()
         # print("query joint qpos: ", self._agent_joint_names)
 
-        joint_qpos = self.query_joint_qpos(self._agent_joint_names)
-        joint_qacc = self.query_joint_qacc(self._agent_joint_names)
-        joint_qvel = self.query_joint_qvel(self._agent_joint_names)
+        joint_qpos = self.joint_qpos_buffer
+        # get_obs_qpos = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
+        joint_qacc = self.joint_qacc_buffer
+        # get_obs_qacc = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
+        joint_qvel = self.joint_qvel_buffer
+        # get_obs_qvel = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
+        # get_obs_sensor = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
         contact_dict = self._generate_contact_dict()
-        site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
+        # get_obs_contact = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
+        site_pos_quat = None #self.query_site_pos_and_quat(self._agent_site_names)
+        # get_obs_site = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
 
         # print("Sensor data: ", sensor_data)
         # print("Joint qpos: ", joint_qpos)
@@ -90,6 +109,17 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             agent_obs = agents[i].get_obs(sensor_data, joint_qpos, joint_qacc, joint_qvel, contact_dict, site_pos_quat, self.dt)
             obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
         
+        # get_obs_end = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
+
+        # print("Get obs time, qpos: ", get_obs_qpos,
+        #       "\nqacc: ", get_obs_qacc - get_obs_qpos,
+        #       "\nqvel: ", get_obs_qvel - get_obs_qacc,
+        #         "\nsensor: ", get_obs_sensor - get_obs_qvel,
+        #         "\ncontact: ", get_obs_contact - get_obs_sensor,
+        #         "\nsite: ", get_obs_site - get_obs_contact,
+        #         "\ntotal: ", get_obs_end)
+        
+
         return obs
         
     def reset_agents(self, agents : list[LeggedRobot]) -> None:
