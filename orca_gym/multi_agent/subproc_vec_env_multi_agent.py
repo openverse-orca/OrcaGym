@@ -35,27 +35,6 @@ def _worker(
             if cmd == "step":
                 observation, reward, terminated, truncated, info = env.step(data)
 
-                # 返回的 terminated 和 truncated 为每个 agent 的状态
-                # 在 env 中已经单独 reset 过 agent，因此这里不需要reset环境
-                # info 在后面展开，这里不需要处理
-
-                # convert to SB3 VecEnv api
-                # done = terminated or truncated
-                # info["TimeLimit.truncated"] = truncated and not terminated
-                # if done:
-                #     # save final observation where user can get it, then reset
-                #     info["terminal_observation"] = observation
-                #     observation, reset_info = env.reset()
-
-                # 根据每个 agent 的 is_success 信息，从新填充 dones 列表
-                # dones : List[bool] = []
-                # for i in range(len(info["is_success"])):
-                #     if truncated:
-                #         # 如果达到终止条件，每个agent都返回done
-                #         dones.append(True)
-                #     else:
-                #         dones.append(info["is_success"][i] != 0)
-
                 # print("Worker step, obs: ", observation, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "info: ", info)
 
                 reward = info["reward"]

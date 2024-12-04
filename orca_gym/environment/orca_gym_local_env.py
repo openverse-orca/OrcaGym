@@ -142,6 +142,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         qpos_offsets, qvel_offsets, qacc_offsets = self.gym.query_joint_offsets(joint_names)
         return qpos_offsets, qvel_offsets, qacc_offsets
     
+    def query_joint_lengths(self, joint_names):
+        qpos_lengths, qvel_lengths, qacc_lengths = self.gym.query_joint_lengths(joint_names)
+        return qpos_lengths, qvel_lengths, qacc_lengths
     
     def get_body_xpos_xmat_xquat(self, body_name_list):
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)

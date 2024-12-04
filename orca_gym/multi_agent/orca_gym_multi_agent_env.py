@@ -3,6 +3,7 @@ import importlib
 from os import path
 import time
 from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
+import datetime
 
 import numpy as np
 from numpy.typing import NDArray
@@ -79,6 +80,10 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
         self.reset_agents(self._agents)
 
+        # For performance issue, we use the qpos, qvel, qacc buffer, and update them in each step.(will be done in the OrcaGymData class)
+        # Directly query the qpos, qvel, qacc will read data cross the c++ and python boundary, which is slow.
+        self._build_joint_qpos_qvel_qacc_buffer()
+
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self.set_obs_space()
 
@@ -128,6 +133,11 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         raise NotImplementedError
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
+        PRINT_STEP_TIME = False
+
+        if PRINT_STEP_TIME:
+            step_start = datetime.datetime.now()
+
         # print("Step action: ", action)
         if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
@@ -135,14 +145,28 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         # 切分action 给每个 agent
         action = np.array(action).reshape(len(self._agents), -1)
         self.step_agents(action)
+
+        if PRINT_STEP_TIME:
+            step_action = (datetime.datetime.now() - step_start).total_seconds() * 1000
+
         self.do_simulation(self.ctrl, self.frame_skip)
+
+        if PRINT_STEP_TIME:
+            step_sim = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
         if self.render_mode == "human" and self._render_remote:
             self.render()
 
+        if PRINT_STEP_TIME:
+            step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
+
+        self._update_joint_qpos_qvel_qacc_buffer()
         obs = self.get_obs(self._agents).copy()
         achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
         desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
+
+        if PRINT_STEP_TIME:
+            step_obs = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
         info = {"is_success": np.zeros(len(self._agents)),
                 "reward" : np.zeros(len(self._agents)),
@@ -176,6 +200,10 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         # print("Obs: ", obs)
         # print("Info: ", info)
 
+        if PRINT_STEP_TIME:
+            step_total = (datetime.datetime.now() - step_start).total_seconds() * 1000
+            print("Step time, action: ", step_action, " sim: ", step_sim - step_action, " render: ", step_render - step_sim, " obs: ", step_obs - step_render, " total: ", step_total)
+
         # 兼容 stable-baselines3 标准接口
         return obs, 0.0, False, False, info
 
@@ -194,3 +222,34 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             return obs
         else:
             return self.get_obs(self._agents).copy()
+        
+    def _build_joint_qpos_qvel_qacc_buffer(self):
+        self._qpos_offset, self._qvel_offset, self._qacc_offset = self.query_joint_offsets(self._agent_joint_names)
+        self._qpos_length, self._qvel_length, self._qacc_length = self.query_joint_lengths(self._agent_joint_names)
+
+        # Initialize the qpos, qvel, qacc buffer
+        self._joint_qpos_buffer = {}
+        self._joint_qvel_buffer = {}
+        self._joint_qacc_buffer = {}
+        for i, joint_name in enumerate(self._agent_joint_names):
+            self._joint_qpos_buffer[joint_name] = np.zeros(self._qpos_length[i])
+            self._joint_qvel_buffer[joint_name] = np.zeros(self._qvel_length[i])
+            self._joint_qacc_buffer[joint_name] = np.zeros(self._qacc_length[i])
+
+    def _update_joint_qpos_qvel_qacc_buffer(self):
+        for i, joint_name in enumerate(self._agent_joint_names):
+            self._joint_qpos_buffer[joint_name][:] = self.data.qpos[self._qpos_offset[i] : self._qpos_offset[i] + self._qpos_length[i]]
+            self._joint_qvel_buffer[joint_name][:] = self.data.qvel[self._qvel_offset[i] : self._qvel_offset[i] + self._qvel_length[i]]
+            self._joint_qacc_buffer[joint_name][:] = self.data.qacc[self._qacc_offset[i] : self._qacc_offset[i] + self._qacc_length[i]]
+
+    @property
+    def joint_qpos_buffer(self):
+        return self._joint_qpos_buffer
+    
+    @property
+    def joint_qvel_buffer(self):
+        return self._joint_qvel_buffer
+    
+    @property
+    def joint_qacc_buffer(self):
+        return self._joint_qacc_buffer

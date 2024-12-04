@@ -31,7 +31,7 @@ def get_qpos_size(joint_type):
     else:
         return 0
 
-def get_qvel_size(joint_type):
+def get_dof_size(joint_type):
     if joint_type == mujoco.mjtJoint.mjJNT_FREE:
         return 6
     elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
@@ -93,6 +93,9 @@ class OrcaGymLocal(OrcaGymBase):
         self.model.init_sensor_dict(sensor_dict)
 
         self.data = OrcaGymData(self.model)
+        self._qpos_cache = np.array(self._mjData.qpos, copy=True)
+        self._qvel_cache = np.array(self._mjData.qvel, copy=True)
+        self._qacc_cache = np.array(self._mjData.qacc, copy=True)
         self.update_data()
 
     async def render(self):
@@ -379,18 +382,18 @@ class OrcaGymLocal(OrcaGymBase):
         return sensor_dict
     
     def update_data(self):
-        qpos, qvel, qacc = self.query_all_qpos_qvel_qacc()
+        self._qpos_cache[:] = self._mjData.qpos
+        self._qvel_cache[:] = self._mjData.qvel
+        self._qacc_cache[:] = self._mjData.qacc
+        # print("qpos_cache: ", len(self._qpos_cache))
+        # print("qvel_cache: ", len(self._qvel_cache))
+        # print("qacc_cache: ", len(self._qacc_cache))
+
         qfrc_bias = self.query_qfrc_bias()
         
-        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)        
+        self.data.update_qpos_qvel_qacc(self._qpos_cache, self._qvel_cache, self._qacc_cache)        
         self.data.update_qfrc_bias(qfrc_bias)
 
-    def query_all_qpos_qvel_qacc(self):
-        qpos = self._mjData.qpos
-        qvel = self._mjData.qvel
-        qacc = self._mjData.qacc
-
-        return qpos, qvel, qacc
     
     def query_qfrc_bias(self):
         qfrc_bias = self._mjData.qfrc_bias
@@ -410,9 +413,22 @@ class OrcaGymLocal(OrcaGymBase):
             joint_id = self._mjModel.joint(joint_name).id
             qpos_offsets.append(self._mjModel.jnt_qposadr[joint_id])
             qvel_offsets.append(self._mjModel.jnt_dofadr[joint_id])
-            qacc_offsets.append(self._mjModel.jnt_dofadr[joint_id] + self._mjModel.njnt)
+            qacc_offsets.append(self._mjModel.jnt_dofadr[joint_id])
 
         return qpos_offsets, qvel_offsets, qacc_offsets    
+    
+    def query_joint_lengths(self, joint_names):
+        qpos_lengths = []
+        qvel_lengths = []
+        qacc_lengths = []
+
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            qpos_lengths.append(get_qpos_size(self._mjModel.jnt_type[joint_id]))
+            qvel_lengths.append(get_dof_size(self._mjModel.jnt_type[joint_id]))
+            qacc_lengths.append(get_dof_size(self._mjModel.jnt_type[joint_id]))
+
+        return qpos_lengths, qvel_lengths, qacc_lengths
     
     def query_body_xpos_xmat_xquat(self, body_name_list):
         body_pos_mat_quat_list = {}
@@ -465,14 +481,15 @@ class OrcaGymLocal(OrcaGymBase):
         for joint_name in joint_names:
             joint_id = self._mjModel.joint(joint_name).id
             joint_type = self._mjModel.jnt_type[joint_id]
-            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_qvel_size(joint_type)]
+            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_dof_size(joint_type)]
         return joint_qvel_dict
     
     def query_joint_qacc(self, joint_names):
         joint_qacc_dict = {}
         for joint_name in joint_names:
             joint_id = self._mjModel.joint(joint_name).id
-            joint_qacc_dict[joint_name] = self._mjData.qacc[self._mjModel.jnt_dofadr[joint_id]]
+            joint_type = self._mjModel.jnt_type[joint_id]
+            joint_qacc_dict[joint_name] = self._mjData.qacc[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_dof_size(joint_type)]
         return joint_qacc_dict
     
     def jnt_qposadr(self, joint_name):

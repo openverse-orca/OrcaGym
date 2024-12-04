@@ -2,7 +2,7 @@ import numpy as np
 from gymnasium.core import ObsType
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-
+import datetime
 
 
 class OrcaGymAgent:
@@ -85,27 +85,8 @@ class OrcaGymAgent:
         raise NotImplementedError
 
     def init_ctrl_info(self, actuator_dict) -> None:
-        if not hasattr(self, "_ctrl_range"):
-            self._ctrl_range = []
-        if not hasattr(self, "_ctrl_offset"):
-            self._ctrl_start = 0
-        if not hasattr(self, "_ctrl_delta_range"):
-            self._ctrl_delta_range = []
-            
-        for i, actuator_name in enumerate(self._actuator_names):
-            # matain the order of actuators
-            self._ctrl_range.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
-            ctrl_range_width = self._ctrl_range[-1][1] - self._ctrl_range[-1][0]
-            self._ctrl_delta_range.append([-ctrl_range_width/2, ctrl_range_width/2])
-            if i == 0:
-                self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
-
-        self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
-        self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
-
-    def set_action(self, action : np.ndarray) -> None:
         """
-        Action is specific to the agent and is defined in the subclass.
+        Each robot has it's own control method.
         """
         raise NotImplementedError
     
@@ -115,17 +96,16 @@ class OrcaGymAgent:
         """
         raise NotImplementedError
     
-    def on_step(self, action):
+    def on_step(self, action, **kwargs):
         """
         Called after each step in the environment.
         Implement this method in the subclass to perform additional operations.
         """
         raise NotImplementedError
 
-    def step(self, action):
+    def step(self, action, **kwargs):
         self._current_episode_step += 1
-        self.set_action(action)
-        step_info = self.on_step(action)
+        step_info = self.on_step(action, **kwargs)
         return self._ctrl, step_info
 
     def on_reset(self):
