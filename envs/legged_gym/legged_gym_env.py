@@ -42,16 +42,31 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def step_agents(self, action: np.ndarray) -> None:
         # print("Step agents: ", action)
-        # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
+
+        # 将 action 线性变换到 actuator 的控制范围空间
+        actuator_ctrl = self._action2ctrl(action)
+
+        # 性能优化：在Env中批量更新所有agent的控制量
+        if self._task != "no_action":
+            if len(self.ctrl) == len(actuator_ctrl):
+                self.ctrl = actuator_ctrl
+            else:
+                assert len(self.ctrl) > len(actuator_ctrl)
+                actuator_ctrl = np.array(actuator_ctrl).reshape(len(self._agents), -1)
+                for i in range(len(actuator_ctrl)):
+                    self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
+
+        # 切分action 给每个 agent
+        action = np.array(action).reshape(len(self._agents), -1)
         if self.render_mode == "human":
+            # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
             mocaps = {}
             for i in range(len(self._agents)):
                 agent = self._agents[i]
                 act = action[i]
 
-                # 将每个agent的ctrl拼接在一起，然后传递给仿真环境
                 agent_ctrl, agent_mocap = agent.step(act, update_mocap=True)
-                self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+                # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
                 mocaps.update(agent_mocap)
 
             
@@ -59,9 +74,9 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         else:
             for i in range(len(self._agents)):
                 agent = self._agents[i]
-                act = action[i]
+                act = actuator_ctrl[i]
                 agent_ctrl, _ = agent.step(act, update_mocap=False)
-                self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+                # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
@@ -139,6 +154,27 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.set_mocap_pos_and_quat(mocaps)
         self.mj_forward()
 
+    def reorder_agents(self):
+        ctrl_info = {}
+        for agent in self._agents:
+            ctrl_info[agent.name] = agent.get_ctrl_info()
+
+        # 按照 ctrl_start 排序
+        ctrl_info = {k: v for k, v in sorted(ctrl_info.items(), key=lambda item: item[1]["ctrl_start"])}
+
+        reordered_agents = []
+        for agent_name in ctrl_info.keys():
+            for agent in self._agents:
+                if agent.name == agent_name:
+                    reordered_agents.append(agent)
+                    break
+
+        assert len(reordered_agents) == len(self._agents)
+
+        self._generate_action_scale_array(ctrl_info)
+
+        return reordered_agents
+
     def _generate_contact_dict(self) -> dict[str, list[str]]:
         contacts = self.query_contact_simple()
         # print("Contacts: ", contacts)
@@ -155,3 +191,43 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         return contact_dict
 
+    def _generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
+        self._actuator_type = next(iter(ctrl_info.values()))["actuator_type"]           # shape = (1)
+        self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
+        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
+
+        self._ctrl_start = np.array([ctrl["ctrl_start"] for key, ctrl in ctrl_info.items()]) # shape = (agent_num)
+        self._ctrl_end = np.array([ctrl["ctrl_end"] for key, ctrl in ctrl_info.items()])     # shape = (agent_num)
+        self._ctrl_range = np.array([ctrl["ctrl_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)   # shape = (agent_num x actor_num, 2) 
+        self._ctrl_delta_range = np.array([ctrl["ctrl_delta_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)  # shape = (agent_num x actor_num, 2)
+        self._neutral_joint_values = np.array([ctrl["neutral_joint_values"] for key, ctrl in ctrl_info.items()]).reshape(-1) # shape = (agent_num x actor_num)
+        
+
+    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
+        # 缩放后的 action
+        scaled_action = action * self._action_scale
+
+        # 限制 scaled_action 在有效范围内
+        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+
+        # 批量计算插值
+        if (self._actuator_type == "position"):
+            ctrl_delta = (
+                self._ctrl_delta_range[:, 0] +  # fp1
+                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
+                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            )
+
+            actuator_ctrl = self._neutral_joint_values + ctrl_delta
+        elif (self._actuator_type == "torque"):
+            actuator_ctrl = (
+                self._ctrl_range[:, 0] +  # fp1
+                (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
+                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            )
+        else:
+            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+        
+        return actuator_ctrl

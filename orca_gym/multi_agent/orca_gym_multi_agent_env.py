@@ -90,6 +90,12 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         # Run set_action_space after initialization to ensure that the action size is defined.
         self.set_action_space()
 
+        # Reorder the agents if necessary
+        # print("Agent before reorder: ", [agent.name for agent in self._agents])
+        self._agents = self.reorder_agents()
+        # print("Agent after reorder: ", [agent.name for agent in self._agents])
+
+
 
     def set_obs_space(self):
         self.observation_space = self.generate_observation_space(self.get_obs([self._agents[0]]))
@@ -133,7 +139,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         raise NotImplementedError
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        PRINT_STEP_TIME = False
+        PRINT_STEP_TIME = True
 
         if PRINT_STEP_TIME:
             step_start = datetime.datetime.now()
@@ -142,8 +148,6 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
         
-        # 切分action 给每个 agent
-        action = np.array(action).reshape(len(self._agents), -1)
         self.step_agents(action)
 
         if PRINT_STEP_TIME:
@@ -241,6 +245,13 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             self._joint_qpos_buffer[joint_name][:] = self.data.qpos[self._qpos_offset[i] : self._qpos_offset[i] + self._qpos_length[i]]
             self._joint_qvel_buffer[joint_name][:] = self.data.qvel[self._qvel_offset[i] : self._qvel_offset[i] + self._qvel_length[i]]
             self._joint_qacc_buffer[joint_name][:] = self.data.qacc[self._qacc_offset[i] : self._qacc_offset[i] + self._qacc_length[i]]
+
+    def reorder_agents(self):
+        """
+        In some environments, the order of the agents is important.
+        Subclass can override this method to reorder the agents.
+        """
+        return self._agents
 
     @property
     def joint_qpos_buffer(self):
