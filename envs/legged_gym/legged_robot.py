@@ -124,7 +124,7 @@ class LeggedRobot(OrcaGymAgent):
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
         self._reward_printer = None
-        if env_idx in robot_config["log_env_ids"] and self._agent_name in robot_config["log_agent_names"]:
+        if env_idx in robot_config["log_env_ids"] and self.name in robot_config["log_agent_names"]:
             self._reward_printer = RewardPrinter()
 
         self._is_obs_updated = False
@@ -213,7 +213,21 @@ class LeggedRobot(OrcaGymAgent):
         self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
         self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
 
-    def _set_action(self, action):
+    def get_ctrl_info(self) -> dict:
+        return {
+            "actuator_type": self._actuator_type,
+            "action_scale": self._action_scale,
+            "action_space_range": self._action_space_range,
+            "ctrl_range": self._ctrl_range,
+            "ctrl_delta_range": self._ctrl_delta_range,
+            "ctrl_range_low": self._ctrl_range_low,
+            "ctrl_range_high": self._ctrl_range_high,
+            "ctrl_start": self._ctrl_start,
+            "ctrl_end": self._ctrl_start + len(self._actuator_names),
+            "neutral_joint_values": self._neutral_joint_values,
+        }
+
+    def _set_action(self, action) -> None:
         assert len(action) == len(self._ctrl_range)
 
         # print("agnet ", self._agent_name, " Action: ", action)
@@ -241,32 +255,32 @@ class LeggedRobot(OrcaGymAgent):
 
         # print("Agent: ", self.name, "Ctrl: ", self._ctrl)
 
-        # 缩放后的 action
-        scaled_action = action * self._action_scale
+        # # 缩放后的 action
+        # scaled_action = action * self._action_scale
 
-        # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+        # # 限制 scaled_action 在有效范围内
+        # clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
 
-        # 批量计算插值
-        if (self._actuator_type == "position"):
-            ctrl_delta = (
-                self._ctrl_delta_range[:, 0] +  # fp1
-                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
-                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-            )
+        # # 批量计算插值
+        # if (self._actuator_type == "position"):
+        #     ctrl_delta = (
+        #         self._ctrl_delta_range[:, 0] +  # fp1
+        #         (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
+        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+        #     )
 
-            self._ctrl = self._neutral_joint_values + ctrl_delta
-        elif (self._actuator_type == "torque"):
-            self._ctrl = (
-                self._ctrl_range[:, 0] +  # fp1
-                (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
-                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-            )
-        else:
-            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
-
+        #     self._ctrl = self._neutral_joint_values + ctrl_delta
+        # elif (self._actuator_type == "torque"):
+        #     self._ctrl = (
+        #         self._ctrl_range[:, 0] +  # fp1
+        #         (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
+        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+        #     )
+        # else:
+        #     raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+        
         return
     
     def set_action_space(self, action_space : spaces) -> None:

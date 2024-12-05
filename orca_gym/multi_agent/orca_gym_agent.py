@@ -90,6 +90,12 @@ class OrcaGymAgent:
         """
         raise NotImplementedError
     
+    def get_ctrl_info(self, **kwargs) -> dict:
+        """
+        Each robot has it's own control method.
+        """
+        raise NotImplementedError
+    
     def set_action_space(self, action_space : spaces) -> None:
         """
         Action space is specific to the agent and is defined in the subclass.
