@@ -196,92 +196,9 @@ class LeggedRobot(OrcaGymAgent):
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
         self._init_imu_site_pos_quat = init_site_pos_quat[self._imu_site_name].copy()
 
-    def init_ctrl_info(self, actuator_dict) -> None:
-        ctrl_range_list = []
-        ctrl_delta_range_list = []
-        for i, actuator_name in enumerate(self._actuator_names):
-            # matain the order of actuators
-            ctrl_range_list.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
-            ctrl_range_width = ctrl_range_list[-1][1] - ctrl_range_list[-1][0]
-            ctrl_delta_range_list.append([-ctrl_range_width/2, ctrl_range_width/2])
-            if i == 0:
-                self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
-
-        self._ctrl_range = np.array(ctrl_range_list)
-        self._ctrl_delta_range = np.array(ctrl_delta_range_list)
-
-        self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
-        self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
-
-    def get_ctrl_info(self) -> dict:
-        return {
-            "actuator_type": self._actuator_type,
-            "action_scale": self._action_scale,
-            "action_space_range": self._action_space_range,
-            "ctrl_range": self._ctrl_range,
-            "ctrl_delta_range": self._ctrl_delta_range,
-            "ctrl_range_low": self._ctrl_range_low,
-            "ctrl_range_high": self._ctrl_range_high,
-            "ctrl_start": self._ctrl_start,
-            "ctrl_end": self._ctrl_start + len(self._actuator_names),
-            "neutral_joint_values": self._neutral_joint_values,
-        }
-
     def _set_action(self, action) -> None:
-        assert len(action) == len(self._ctrl_range)
-
-        # print("agnet ", self._agent_name, " Action: ", action)
-
-        if self._task == "no_action":
-            return
-
         self._last_action = self._action.copy()
         self._action = action.copy()
-
-        # print("Agent: ", self.name, "Orignal action: ", action)
-
-        # for i in range(len(action)):
-        #     # 线性变换到 ctrl range 空间
-        #     # print("action: ", action[i])
-        #     # print("action_space_range: ", self._action_space_range)
-        #     # print("ctrl_range: ", self._ctrl_range[i])
-        #     if (self._actuator_type == "position"):
-        #         # ctrl_delta = action[i] * self._action_scale # Use the action to control the joint position directly
-        #         ctrl_delta = np.interp(action[i] * self._action_scale, self._action_space_range, self._ctrl_delta_range[i])
-        #         # print("ctrl delta : ", ctrl_delta, "action scale: ", self._action_scale, "action: ", action[i], "action space range: ", self._action_space_range, "ctrl delta range: ", self._ctrl_delta_range[i])
-        #         self._ctrl[i] = self._neutral_joint_values[i] + ctrl_delta
-        #     elif (self._actuator_type == "torque"):
-        #         self._ctrl[i] = np.interp(action[i], self._action_space_range, self._ctrl_range[i])
-
-        # print("Agent: ", self.name, "Ctrl: ", self._ctrl)
-
-        # # 缩放后的 action
-        # scaled_action = action * self._action_scale
-
-        # # 限制 scaled_action 在有效范围内
-        # clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
-
-        # # 批量计算插值
-        # if (self._actuator_type == "position"):
-        #     ctrl_delta = (
-        #         self._ctrl_delta_range[:, 0] +  # fp1
-        #         (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
-        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-        #     )
-
-        #     self._ctrl = self._neutral_joint_values + ctrl_delta
-        # elif (self._actuator_type == "torque"):
-        #     self._ctrl = (
-        #         self._ctrl_range[:, 0] +  # fp1
-        #         (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
-        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-        #     )
-        # else:
-        #     raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
-        
-        return
     
     def set_action_space(self, action_space : spaces) -> None:
         self._action_space = action_space

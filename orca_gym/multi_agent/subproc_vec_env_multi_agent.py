@@ -2,6 +2,7 @@ import multiprocessing as mp
 import warnings
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union, Iterable
+import torch
 
 import gymnasium as gym
 import numpy as np
@@ -64,6 +65,8 @@ def _worker(
                 remote.send(setattr(env, data[0], data[1]))  # type: ignore[func-returns-value]
             elif cmd == "is_wrapped":
                 remote.send(is_wrapped(env, data))
+            elif cmd == "get_action_scale_array":
+                remote.send(env.get_action_scale_array())
             else:
                 raise NotImplementedError(f"`{cmd}` is not implemented in the worker")
         except EOFError:
@@ -125,16 +128,29 @@ class SubprocVecEnvMA(VecEnv):
         self.remotes[0].send(("get_spaces", None))
         observation_space, action_space = self.remotes[0].recv()
 
+        self.remotes[0].send(("get_action_scale_array", None))
+        action_scale_array = self.remotes[0].recv()
+        self._build_action_scale_array(action_scale_array)
+
         super().__init__(len(env_fns) * agent_num, observation_space, action_space)
 
     def step_async(self, actions: np.ndarray) -> None:
         # print("actions before : ", actions)
         # 拼接 actions，将 remote_num * agent_num 个动作拼接成 remote_num 个动作
+        if self._action2ctrl_use_tensor:
+            flattend_actions = actions.reshape(-1)
+            remote_actuator_ctrls = self._action2ctrl_tensor(flattend_actions)
+        else:
+            flattend_actions = actions.reshape(-1)
+            remote_actuator_ctrls = self._action2ctrl(actions)
+
         remote_actions = np.reshape(actions, (len(self.remotes), -1))
-            
+        remote_actuator_ctrls = np.reshape(remote_actuator_ctrls, (len(self.remotes), -1))
+        
         # print("actions end : ", remote_actions)
-        for remote, action in zip(self.remotes, remote_actions):
-            remote.send(("step", action))
+        for remote, action, actuator_ctrl in zip(self.remotes, remote_actions, remote_actuator_ctrls):
+            data = np.concatenate([action, actuator_ctrl]).reshape(-1)
+            remote.send(("step", data))
         self.waiting = True
 
     def step_wait(self) -> VecEnvStepReturn:
@@ -235,6 +251,113 @@ class SubprocVecEnvMA(VecEnv):
             if any(i >= remote_num for i in indices):
                 raise ValueError("Out of range indices")
         return indices
+    
+    def _build_action_scale_array(self, action_scale_array: dict) -> np.ndarray:
+        """
+        Build the action scale array for the multi-agent environment.
+        """
+        remote_num = len(self.remotes)
+
+        # print("Build action scale array: ", action_scale_array, "remote_num: ", remote_num)
+        # print("Ctrl range before: ", len(action_scale_array["ctrl_range"]))
+        
+        self._actuator_type = action_scale_array["actuator_type"]
+        self._action_scale = action_scale_array["action_scale"]
+        self._action_space_range = np.concatenate([action_scale_array["action_space_range"]] * remote_num, axis=0)
+        self._ctrl_start = np.concatenate([action_scale_array["ctrl_start"]] * remote_num, axis=0)
+        self._ctrl_end = np.concatenate([action_scale_array["ctrl_end"]] * remote_num, axis=0)
+        self._ctrl_range = np.concatenate([action_scale_array["ctrl_range"]] * remote_num, axis=0)
+        self._ctrl_delta_range = np.concatenate([action_scale_array["ctrl_delta_range"]] * remote_num, axis=0)
+        self._neutral_joint_values = np.concatenate([action_scale_array["neutral_joint_values"]] * remote_num, axis=0)
+
+        # print("Ctrl range after: ", len(self._ctrl_range))
+
+        if remote_num > 4:
+            self._action2ctrl_use_tensor = True
+        else:
+            self._action2ctrl_use_tensor = False
+
+        if not self._action2ctrl_use_tensor:
+            return
+
+        # 初始化阶段，将不变数据移动到 GPU
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # device = torch.device("cpu")
+        self._action_tensor = torch.zeros(len(self._ctrl_range), device=device)  # 每个 action 的 tensor
+        self._action_scale_tensor = torch.ones(len(self._ctrl_range), device=device) * self._action_scale  # 每个 action 的缩放因子
+        self._scaled_action_tensor = torch.zeros(len(self._ctrl_range), device=device)  # 缩放后的 action
+        self._action_space_range_tensor = torch.tensor(self._action_space_range, device=device)
+        self._clipped_action_tensor = torch.zeros(len(self._ctrl_range), device=device)  # 限制在有效范围内的 action
+
+        self._ctrl_range_tensor = torch.tensor(self._ctrl_range, device=device)
+        self._ctrl_delta_range_tensor = torch.tensor(self._ctrl_delta_range, device=device)
+        self._neutral_joint_values_tensor = torch.tensor(self._neutral_joint_values, device=device)
+        self._ctrl_delta_tensor = torch.zeros(len(self._ctrl_range), device=device)  # 插值后的控制量
+        self._actuator_ctrl_tensor = torch.zeros(len(self._ctrl_range), device=device)  # actuator 控制量
+
+
+    def _action2ctrl_tensor(self, action: np.ndarray) -> np.ndarray:
+        # 将 action 传输到 GPU
+        self._action_tensor[:] = torch.from_numpy(action).to(self._action_tensor.device)
+
+        # 缩放后的 action
+        self._scaled_action_tensor = self._action_tensor * self._action_scale_tensor
+
+        # 限制 scaled_action 在有效范围内
+        self._clipped_action_tensor = torch.clamp(self._scaled_action_tensor, self._action_space_range_tensor[0], self._action_space_range_tensor[1])
+
+        # 批量计算插值
+        if (self._actuator_type == "position"):
+            self._ctrl_delta_tensor = (
+                self._ctrl_delta_range_tensor[:, 0] +  # fp1
+                (self._ctrl_delta_range_tensor[:, 1] - self._ctrl_delta_range_tensor[:, 0]) *  # (fp2 - fp1)
+                (self._clipped_action_tensor - self._action_space_range_tensor[0]) /  # (x - xp1)
+                (self._action_space_range_tensor[1] - self._action_space_range_tensor[0])  # (xp2 - xp1)
+            )
+
+            self._actuator_ctrl_tensor = self._ctrl_delta_tensor + self._neutral_joint_values_tensor
+        elif (self._actuator_type == "torque"):
+            self._actuator_ctrl_tensor = (
+                self._ctrl_range_tensor[:, 0] +  # fp1
+                (self._ctrl_range_tensor[:, 1] - self._ctrl_range_tensor[:, 0]) *  # (fp2 - fp1)
+                (self._clipped_action_tensor - self._action_space_range_tensor[0]) /  # (x - xp1)
+                (self._action_space_range_tensor[1] - self._action_space_range_tensor[0])  # (xp2 - xp1)
+            )
+        else:
+            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+    
+        return self._actuator_ctrl_tensor.cpu().numpy()
+        
+
+    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
+        # 缩放后的 action
+        scaled_action = action * self._action_scale
+
+        # 限制 scaled_action 在有效范围内
+        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+
+        # 批量计算插值
+        if (self._actuator_type == "position"):
+            ctrl_delta = (
+                self._ctrl_delta_range[:, 0] +  # fp1
+                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
+                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            )
+
+            actuator_ctrl = self._neutral_joint_values + ctrl_delta
+        elif (self._actuator_type == "torque"):
+            actuator_ctrl = (
+                self._ctrl_range[:, 0] +  # fp1
+                (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
+                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            )
+        else:
+            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+        
+        return actuator_ctrl
+
 
 def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvObs]:
     """

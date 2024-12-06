@@ -26,6 +26,16 @@ class OrcaGymAgent:
         self._site_names = None
         self._sensor_names = None
 
+        self._actuator_type = None
+        self._action_scale = None
+        self._action_space_range = None
+        self._ctrl_range = None
+        self._ctrl_delta_range = None
+        self._ctrl_range_low = None
+        self._ctrl_range_high = None
+        self._ctrl_start = None
+        self._neutral_joint_values = None
+
         self._ctrl = None
         self._nu = None
         self._nq = None
@@ -85,16 +95,35 @@ class OrcaGymAgent:
         raise NotImplementedError
 
     def init_ctrl_info(self, actuator_dict) -> None:
-        """
-        Each robot has it's own control method.
-        """
-        raise NotImplementedError
-    
-    def get_ctrl_info(self, **kwargs) -> dict:
-        """
-        Each robot has it's own control method.
-        """
-        raise NotImplementedError
+        ctrl_range_list = []
+        ctrl_delta_range_list = []
+        for i, actuator_name in enumerate(self._actuator_names):
+            # matain the order of actuators
+            ctrl_range_list.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
+            ctrl_range_width = ctrl_range_list[-1][1] - ctrl_range_list[-1][0]
+            ctrl_delta_range_list.append([-ctrl_range_width/2, ctrl_range_width/2])
+            if i == 0:
+                self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
+
+        self._ctrl_range = np.array(ctrl_range_list)
+        self._ctrl_delta_range = np.array(ctrl_delta_range_list)
+
+        self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
+        self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])
+
+    def get_ctrl_info(self) -> dict:
+        return {
+            "actuator_type": self._actuator_type,
+            "action_scale": self._action_scale,
+            "action_space_range": self._action_space_range,
+            "ctrl_range": self._ctrl_range,
+            "ctrl_delta_range": self._ctrl_delta_range,
+            "ctrl_range_low": self._ctrl_range_low,
+            "ctrl_range_high": self._ctrl_range_high,
+            "ctrl_start": self._ctrl_start,
+            "ctrl_end": self._ctrl_start + len(self._actuator_names),
+            "neutral_joint_values": self._neutral_joint_values,
+        }
     
     def set_action_space(self, action_space : spaces) -> None:
         """
