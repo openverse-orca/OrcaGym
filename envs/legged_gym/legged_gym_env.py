@@ -55,8 +55,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                     self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
 
         # 切分action 给每个 agent
-        action = np.array(action).reshape(len(self._agents), -1)
-        if self.render_mode == "human":
+        action = action.reshape(len(self._agents), -1)
+        if self.render_mode == "human" and self.render_remote:
             # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
             mocaps = {}
             for i in range(len(self._agents)):
@@ -72,7 +72,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         else:
             for i in range(len(self._agents)):
                 agent = self._agents[i]
-                act = actuator_ctrl[i]
+                act = action[i]
                 agent_ctrl, _ = agent.step(act, update_mocap=False)
                 # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
 

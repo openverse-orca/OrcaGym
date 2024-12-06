@@ -197,8 +197,8 @@ class LeggedRobot(OrcaGymAgent):
         self._init_imu_site_pos_quat = init_site_pos_quat[self._imu_site_name].copy()
 
     def _set_action(self, action) -> None:
-        self._last_action = self._action.copy()
-        self._action = action.copy()
+        self._last_action[:] = self._action
+        self._action[:] = action
     
     def set_action_space(self, action_space : spaces) -> None:
         self._action_space = action_space

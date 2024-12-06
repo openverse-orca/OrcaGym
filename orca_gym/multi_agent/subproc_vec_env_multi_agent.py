@@ -66,7 +66,7 @@ def _worker(
             elif cmd == "is_wrapped":
                 remote.send(is_wrapped(env, data))
             elif cmd == "get_action_scale_array":
-                remote.send(env.get_action_scale_array())
+                remote.send(env.unwrapped.get_action_scale_array())
             else:
                 raise NotImplementedError(f"`{cmd}` is not implemented in the worker")
         except EOFError:
