@@ -4,6 +4,7 @@ from os import path
 import time
 from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 import datetime
+import torch
 
 import numpy as np
 from numpy.typing import NDArray
@@ -132,7 +133,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         raise NotImplementedError
     
 
-    def step_agents(self, action: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
         """
         Do specific operations each step in the environment. It is defined in the subclass.
         """
@@ -141,6 +142,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         PRINT_STEP_TIME = True
 
+        action, actuator_ctrl = np.split(action, 2)
+
         if PRINT_STEP_TIME:
             step_start = datetime.datetime.now()
 
@@ -148,7 +151,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
         
-        self.step_agents(action)
+        self.step_agents(action, actuator_ctrl)
 
         if PRINT_STEP_TIME:
             step_action = (datetime.datetime.now() - step_start).total_seconds() * 1000
@@ -247,11 +250,51 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             self._joint_qacc_buffer[joint_name][:] = self.data.qacc[self._qacc_offset[i] : self._qacc_offset[i] + self._qacc_length[i]]
 
     def reorder_agents(self):
-        """
-        In some environments, the order of the agents is important.
-        Subclass can override this method to reorder the agents.
-        """
-        return self._agents
+        ctrl_info = {}
+        for agent in self._agents:
+            ctrl_info[agent.name] = agent.get_ctrl_info()
+
+        # 按照 ctrl_start 排序
+        ctrl_info = {k: v for k, v in sorted(ctrl_info.items(), key=lambda item: item[1]["ctrl_start"])}
+
+        reordered_agents = []
+        for agent_name in ctrl_info.keys():
+            for agent in self._agents:
+                if agent.name == agent_name:
+                    reordered_agents.append(agent)
+                    break
+
+        assert len(reordered_agents) == len(self._agents)
+
+        self._generate_action_scale_array(ctrl_info)
+
+        return reordered_agents
+    
+    def get_action_scale_array(self):
+        action_scale_array = {
+            "actuator_type": self._actuator_type,
+            "action_scale": self._action_scale,
+            "action_space_range": self._action_space_range,
+            "ctrl_start": self._ctrl_start,
+            "ctrl_end": self._ctrl_end,
+            "ctrl_range": self._ctrl_range,
+            "ctrl_delta_range": self._ctrl_delta_range,
+            "neutral_joint_values": self._neutral_joint_values,
+        }
+        return action_scale_array
+
+    def _generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
+        self._actuator_type = next(iter(ctrl_info.values()))["actuator_type"]           # shape = (1)
+        self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
+        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
+
+        self._ctrl_start = np.array([ctrl["ctrl_start"] for key, ctrl in ctrl_info.items()]) # shape = (agent_num)
+        self._ctrl_end = np.array([ctrl["ctrl_end"] for key, ctrl in ctrl_info.items()])     # shape = (agent_num)
+        self._ctrl_range = np.array([ctrl["ctrl_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)   # shape = (agent_num x actor_num, 2) 
+        self._ctrl_delta_range = np.array([ctrl["ctrl_delta_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)  # shape = (agent_num x actor_num, 2)
+        self._neutral_joint_values = np.array([ctrl["neutral_joint_values"] for key, ctrl in ctrl_info.items()]).reshape(-1) # shape = (agent_num x actor_num)
+
+
 
     @property
     def joint_qpos_buffer(self):
