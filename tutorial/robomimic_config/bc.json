@@ -164,15 +164,17 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "ee_pos", 
-                    "ee_quat", 
-                    "ee_vel_angular", 
-                    "ee_vel_linear",
-                    "gripper_qpos",
-                    "gripper_qvel",
-                    "joint_qpos",
-                    "joint_vel",
-                    "object"
+                "object",
+                "robot0_eef_pos",
+                "robot0_eef_quat",
+                "robot0_eef_vel_lin",
+                "robot0_eef_vel_ang",
+                "robot0_joint_pos",
+                "robot0_joint_pos_sin",
+                "robot0_joint_pos_cos",
+                "robot0_joint_vel",
+                "robot0_gripper_qpos",
+                "robot0_gripper_qvel"
                 ],
                 "rgb": [],
                 "depth": [],

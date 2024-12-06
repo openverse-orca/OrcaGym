@@ -91,11 +91,13 @@ def train(config, device):
         verbose=True
     )
 
+    kwargs = "{\"env_name\": \"Franka-Teleoperation-v0-OrcaGym-localhost-50051-000\", \"type\": 4, \"env_version\": \"1.0.0\", \"env_kwargs\": {\"frame_skip\": 1, \"reward_type\": \"dense\", \"agent_names\": [], \"orcagym_addr\": \"localhost:50051\", \"time_step\": 0.01, \"control_type\": \"policy\", \"control_freq\": 20}}"
+
+    env_meta = json.loads(kwargs)
+
     if config.experiment.env is not None:
         env_meta["env_name"] = config.experiment.env
         print("=" * 30 + "\n" + "Replacing Env to {}\n".format(env_meta["env_name"]) + "=" * 30)
-
-    env_meta["env_kwargs"]["control_type"] = "policy"
 
     # create environment
     envs = OrderedDict()
@@ -109,7 +111,7 @@ def train(config, device):
         for env_name in env_names:
             gym.register(
                 id=env_name,
-                entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
+                entry_point="envs.franka_control.franka_origin_env:FrankaTeleoperationEnv",
                 kwargs=env_meta["env_kwargs"],
                 max_episode_steps= MAX_EPISODE_STEPS,  # 10 seconds
                 reward_threshold=0.0,
