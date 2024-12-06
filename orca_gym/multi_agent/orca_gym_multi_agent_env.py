@@ -168,6 +168,10 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
         self._update_joint_qpos_qvel_qacc_buffer()
+
+        if PRINT_STEP_TIME:
+            step_update_buffer = (datetime.datetime.now() - step_start).total_seconds() * 1000
+
         obs = self.get_obs(self._agents).copy()
         achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
         desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
@@ -209,7 +213,12 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
         if PRINT_STEP_TIME:
             step_total = (datetime.datetime.now() - step_start).total_seconds() * 1000
-            print("Step time, action: ", step_action, " sim: ", step_sim - step_action, " render: ", step_render - step_sim, " obs: ", step_obs - step_render, " total: ", step_total)
+            print("Step time, action: ", step_action, 
+                  " sim: ", step_sim - step_action, 
+                  " render: ", step_render - step_sim, 
+                  " update_buffer: ", step_update_buffer - step_render, 
+                  " obs: ", step_obs - step_update_buffer, 
+                  " total: ", step_total)
 
         # 兼容 stable-baselines3 标准接口
         return obs, 0.0, False, False, info
