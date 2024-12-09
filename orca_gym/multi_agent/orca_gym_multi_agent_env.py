@@ -99,7 +99,10 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
 
     def set_obs_space(self):
-        self.observation_space = self.generate_observation_space(self.get_obs([self._agents[0]]))
+        obs, _, _, _ = self.get_obs()
+        agent_0_obs = {k: v[0] for k, v in obs.items()}
+        # print("Agent 0 obs: ", agent_0_obs, "obs :", obs)
+        self.observation_space = self.generate_observation_space(agent_0_obs)
 
     def set_action_space(self) -> None:
         action_size = self._agents[0].get_action_size()
@@ -120,7 +123,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         return
     
     
-    def get_obs(self, agents : list[OrcaGymAgent]) -> dict[str, np.ndarray]:
+    def get_obs(self) -> tuple[dict[str, np.ndarray], list[dict[str, np.ndarray]], np.ndarray, np.ndarray]:
         """
         Observation is environment specific and is defined in the subclass.
         """
@@ -171,22 +174,26 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         if PRINT_STEP_TIME:
             step_update_buffer = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
-        obs = self.get_obs(self._agents)
-        achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
-        desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
+        env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
+        # achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
+        # desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
 
         if PRINT_STEP_TIME:
             step_obs = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
-        info = {"is_success": np.zeros(len(self._agents)),
+        info = {"env_obs": env_obs,
+                "agent_obs": agent_obs,
+                "is_success": np.zeros(len(self._agents)),
                 "reward" : np.zeros(len(self._agents)),
                 "terminated" : [False for _ in range(len(self._agents))],
                 "truncated" : [False for _ in range(len(self._agents))]}
 
         agents_to_reset : list[OrcaGymAgent] = []
         for i, agent in enumerate(self._agents):
-            achieved_goal = obs["achieved_goal"][i * achieved_goal_shape : (i + 1) * achieved_goal_shape]
-            desired_goal = obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape]
+            # achieved_goal = obs["achieved_goal"][i * achieved_goal_shape : (i + 1) * achieved_goal_shape]
+            # desired_goal = obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape]
+            achieved_goal = achieved_goals[i]
+            desired_goal = desired_goals[i]
             info["is_success"][i] = agent.is_success(achieved_goal, desired_goal)
             info["reward"][i] = agent.compute_reward(achieved_goal, desired_goal)
             info["terminated"][i] = agent.is_terminated(achieved_goal, desired_goal)
@@ -219,24 +226,30 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
                   " obs: ", step_obs - step_update_buffer, 
                   " total: ", step_total)
 
-        # 兼容 stable-baselines3 标准接口
-        return obs, 0.0, False, False, info
+        # 兼容 stable-baselines3 标准接口，obs 只取第一个 agent 的观测数据，实际所有 agent 的观测数据在 info 中
+        # subproc_vec_env 不需要从新拼接，在这里就按照agent打好包作为dict发过去
+        agent_0_obs = {k: v[0] for k, v in env_obs.items()}
+        return agent_0_obs, 0.0, False, False, info
 
 
-    def reset_model(self) -> list[dict]:
+    def reset_model(self) -> tuple[ObsType, dict[str, np.ndarray]]:
         print("Reset model")
 
         # 依次 reset 每个agent
         self.reset_agents(self._agents)
-        obs = self.get_obs(self._agents).copy()
-        return obs
+        env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
+        reset_info = {
+            "env_obs": env_obs
+        }
+        agent_0_obs = {k: v[0] for k, v in env_obs.items()}
+        return agent_0_obs, reset_info
 
 
     def get_observation(self, obs=None):
         if obs is not None:
             return obs
         else:
-            return self.get_obs(self._agents).copy()
+            return self.get_obs()
         
     def _build_joint_qpos_qvel_qacc_buffer(self):
         self._qpos_offset, self._qvel_offset, self._qacc_offset = self.query_joint_offsets(self._agent_joint_names)

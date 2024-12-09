@@ -114,4 +114,4 @@ class CarEnv(OrcaGymRemoteEnv):
     def reset_model(self):
         self._set_init_state()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}

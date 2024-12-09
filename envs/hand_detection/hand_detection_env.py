@@ -102,7 +102,7 @@ class HandDetectionEnv(OrcaGymRemoteEnv):
     def reset_model(self):
         self._set_init_state()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     def set_joint_neutral(self) -> None:
         return

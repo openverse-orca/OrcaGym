@@ -340,7 +340,7 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

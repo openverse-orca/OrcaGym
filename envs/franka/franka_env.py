@@ -583,7 +583,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         self._set_init_state()
         self._reset_agents(self._agents)
         obs = self._get_obs(self._agents).copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

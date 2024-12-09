@@ -346,7 +346,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

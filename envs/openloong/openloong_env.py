@@ -223,7 +223,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
 
     def reset_model(self):
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     def get_observation(self, obs=None):
         if obs is not None:

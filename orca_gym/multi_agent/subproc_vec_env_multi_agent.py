@@ -38,17 +38,19 @@ def _worker(
                 observation, reward, terminated, truncated, info = env.step(data)
 
                 # print("Worker step, obs: ", observation, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "info: ", info)
-
+                env_obs = info["env_obs"]
+                agent_obs = info["agent_obs"]
                 reward = info["reward"]
                 terminated = info["terminated"]
                 truncated = info["truncated"]
                 is_success = info["is_success"]
 
-                remote.send((observation, reward, terminated, truncated, is_success))
+                remote.send((env_obs, agent_obs, reward, terminated, truncated, is_success))
             elif cmd == "reset":
                 maybe_options = {"options": data[1]} if data[1] else {}
                 observation, reset_info = env.reset(seed=data[0], **maybe_options)
-                remote.send((observation, reset_info))
+                env_obs = reset_info["env_obs"]
+                remote.send((env_obs, reset_info))
             elif cmd == "render":
                 remote.send(env.render())
             elif cmd == "close":
@@ -156,12 +158,12 @@ class SubprocVecEnvMA(VecEnv):
         print("Subproc step wait time: ", (self._time_step_wait_end - self._time_step_wait_begin).total_seconds() * 1000, "ms")
 
         self.waiting = False
-        obs, reward, terminated, truncated, is_success = zip(*results)  # type: ignore[assignment]
-        # print("Subproc step wait, obs: " , obs, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "is_success: ", is_success)
-        flatten_obs = _flatten_obs(obs, self.observation_space, self.agent_num)
+        env_obs, agent_obs, reward, terminated, truncated, is_success = zip(*results)  # type: ignore[assignment]
+        # print("Subproc step wait, env_obs: " , env_obs, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "is_success: ", is_success)
+        flatten_obs = _flatten_obs(env_obs, self.observation_space, self.agent_num)
         flatten_rewards = _flatten_reward(reward)
         flatten_dones = _flatten_dones(terminated, truncated)
-        flatten_info = _flatten_info(obs, is_success, truncated)
+        flatten_info = _flatten_info(agent_obs, is_success, truncated)
 
         self._time_process_step_end = datetime.datetime.now()
         print("Subproc step process time: ", (self._time_process_step_end - self._time_step_wait_end).total_seconds() * 1000, "ms")
@@ -174,12 +176,12 @@ class SubprocVecEnvMA(VecEnv):
         for env_idx, remote in enumerate(self.remotes):
             remote.send(("reset", (self._seeds[env_idx], self._options[env_idx])))
         results = [remote.recv() for remote in self.remotes]
-        obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
-        # print("subproc reset, obs: ", obs)
+        env_obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
+        # print("subproc reset, obs: ", env_obs, "reset_infos: ", self.reset_infos)
         # Seeds and options are only used once
         self._reset_seeds()
         self._reset_options()
-        return _flatten_obs(obs, self.observation_space, self.agent_num)
+        return _flatten_obs(env_obs, self.observation_space, self.agent_num)
 
     def close(self) -> None:
         if self.closed:
@@ -281,31 +283,40 @@ def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvO
     return splited_obs
 
 
-def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space, agent_num) -> VecEnvObs:
+def _flatten_obs(env_obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space, agent_num) -> VecEnvObs:
     """
     Flatten observations, depending on the observation space.
 
-    :param obs: observations.
+    :param env_obs: observations.
                 A list or tuple of observations, one per environment.
                 Each environment observation may be a NumPy array, or a dict or tuple of NumPy arrays.
     :return: flattened observations.
             A flattened NumPy array or an OrderedDict or tuple of flattened numpy arrays.
             Each NumPy array has the environment index as its first axis.
     """
-    assert isinstance(obs, (list, tuple)), "expected list or tuple of observations per environment"
-    assert len(obs) > 0, "need observations from at least one environment"
+    assert isinstance(env_obs, (list, tuple)), "expected list or tuple of observations per environment"
+    assert len(env_obs) > 0, "need observations from at least one environment"
+
+    # print("_flatten_obs begin, env_obs: ", env_obs)
 
     if isinstance(space, spaces.Dict):
         # assert isinstance(space.spaces, OrderedDict), "Dict space must have ordered subspaces"
-        assert isinstance(obs[0], dict), "non-dict observation for environment with Dict observation space"
-        obs = _split_multi_agent_obs_list(obs, agent_num)
-        return OrderedDict([(k, np.stack([o[k] for o in obs])) for k in space.spaces.keys()])
+        assert isinstance(env_obs[0], dict), "non-dict observation for environment with Dict observation space"
+
+        # 使用 OrderedDict 保持键的顺序
+        flattend_obs = OrderedDict([
+            (k, np.concatenate([o[k] for o in env_obs], axis=0))
+            for k in space.spaces.keys()
+        ])
+            
+        # print("_flatten_obs end, flattend_obs: ", flattend_obs)
+        return flattend_obs
     elif isinstance(space, spaces.Tuple):
-        assert isinstance(obs[0], tuple), "non-tuple observation for environment with Tuple observation space"
+        assert isinstance(env_obs[0], tuple), "non-tuple observation for environment with Tuple observation space"
         obs_len = len(space.spaces) * agent_num
-        return tuple(np.stack([o[i] for o in obs]) for i in range(obs_len))  # type: ignore[index]
+        return tuple(np.stack([o[i] for o in env_obs]) for i in range(obs_len))  # type: ignore[index]
     else:
-        return np.stack(obs)  # type: ignore[arg-type]
+        return np.stack(env_obs)  # type: ignore[arg-type]
 
 def _slice_multi_agent_obs(obs: VecEnvObs, agent_num, agent_index) -> VecEnvObs:
     """
@@ -329,7 +340,7 @@ def _slice_multi_agent_obs(obs: VecEnvObs, agent_num, agent_index) -> VecEnvObs:
 
 
 
-def _flatten_info(obs, is_success, truncated) -> Dict[str, List[Any]]:
+def _flatten_info(agent_obs, is_success, truncated) -> Dict[str, List[Any]]:
     """
     Flatten infos, depending on the info space.
 
@@ -358,14 +369,14 @@ def _flatten_info(obs, is_success, truncated) -> Dict[str, List[Any]]:
     for remote in range(len(is_success)):
         remote_is_success = is_success[remote]
         remote_truncated = truncated[remote]
-        remote_obs = obs[remote]
         assert len(remote_is_success) == len(remote_truncated), "is_success and truncated should have the same length"
         agent_num = len(remote_is_success)
         for agent_index in range(agent_num):
             info = {}
             info["is_success"] = remote_is_success[agent_index]
             info["TimeLimit.truncated"] = remote_truncated[agent_index]
-            info["terminal_observation"] = _slice_multi_agent_obs(remote_obs, agent_num, agent_index)
+            # info["terminal_observation"] = _slice_multi_agent_obs(flattend_obs[obs_index], agent_num, agent_index)
+            info["terminal_observation"] = agent_obs[remote][agent_index]
             flattened_infos.append(info)
             
     flattened_infos = tuple(flattened_infos)

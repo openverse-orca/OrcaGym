@@ -141,11 +141,10 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         # mujoco.mj_resetData(self.model, self.data)
         self.reset_simulation()
 
-        ob = self.reset_model()
-        info = self._get_reset_info()
+        obs, info = self.reset_model()
 
         self.render()
-        return ob, info
+        return obs, info
 
     def set_seed_value(self, seed=None):
         self.seed_value = seed
