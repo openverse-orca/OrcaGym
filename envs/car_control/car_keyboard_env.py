@@ -162,7 +162,7 @@ class CarKeyboardEnv(OrcaGymRemoteEnv):
     def reset_model(self):
         self._set_init_state()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     def get_observation(self, obs=None):
         if obs is not None:

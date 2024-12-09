@@ -610,7 +610,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self._reset_neck_mocap()
         self.mj_forward()      
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

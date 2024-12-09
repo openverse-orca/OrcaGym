@@ -274,7 +274,7 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
         )
         qvel[-4:] = 0
         self.set_qpos_qvel(qpos, qvel)
-        return self._get_obs()
+        return self._get_obs(), {}
 
     def _get_obs(self):
         xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])

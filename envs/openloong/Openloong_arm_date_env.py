@@ -365,7 +365,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------
