@@ -127,6 +127,11 @@ class LeggedRobot(OrcaGymAgent):
         if env_idx in robot_config["log_env_ids"] and self.name in robot_config["log_agent_names"]:
             self._reward_printer = RewardPrinter()
 
+        if self.name in robot_config["visualize_command_agent_names"]:
+            self._visualize_command = True
+        else:
+            self._visualize_command = False
+
         self._is_obs_updated = False
 
 
@@ -210,16 +215,16 @@ class LeggedRobot(OrcaGymAgent):
         """
         self._set_action(action)
 
-        if not update_mocap:
-            return {}
+        visualized_command = {}
+        if update_mocap and self._visualize_command:        
+            # Do mocap update here.
+            # print("imu mocap: ", self._imu_mocap_pos_quat)
+            self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
+            global_lin_vel, _ = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
+            self._imu_mocap_pos_quat["pos"] += global_lin_vel * self.dt
+            visualized_command = {self._imu_mocap_name: self._imu_mocap_pos_quat}
         
-        # Do mocap update here.
-        # print("imu mocap: ", self._imu_mocap_pos_quat)
-        self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
-        global_lin_vel, _ = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
-        self._imu_mocap_pos_quat["pos"] += global_lin_vel * self.dt
-        
-        return {self._imu_mocap_name: self._imu_mocap_pos_quat}
+        return visualized_command
 
 
     def on_reset(self) -> dict[str, np.ndarray]:
@@ -253,7 +258,10 @@ class LeggedRobot(OrcaGymAgent):
         self._imu_mocap_pos_quat = {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
                                     "quat": self._init_imu_site_pos_quat["xquat"].copy()}
         # Move along the Z axis to the born height
-        self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
+        if self._visualize_command:
+            self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
+        else:
+            self._imu_mocap_pos_quat["pos"][2] -= 1000.0  # Move the mocap to a far away place
 
         # Use the rotate quate
         self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], z_rotation_quat)
