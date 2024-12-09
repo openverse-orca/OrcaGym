@@ -106,7 +106,8 @@ LeggedRobotConfig = {
 
         # Config for logging
         "log_env_ids" :     [0],
-        "log_agent_names" : ["go2_000"]
+        "log_agent_names" : ["go2_000"],
+        "visualize_command_agent_names" : ["go2_000"]
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
