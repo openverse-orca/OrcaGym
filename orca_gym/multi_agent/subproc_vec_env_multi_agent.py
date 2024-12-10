@@ -160,13 +160,22 @@ class SubprocVecEnvMA(VecEnv):
         self.waiting = False
         env_obs, agent_obs, reward, terminated, truncated, is_success = zip(*results)  # type: ignore[assignment]
         # print("Subproc step wait, env_obs: " , env_obs, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "is_success: ", is_success)
+        self._time_process_step_1 = datetime.datetime.now()
         flatten_obs = _flatten_obs(env_obs, self.observation_space, self.agent_num)
+        self._time_process_step_2 = datetime.datetime.now()
         flatten_rewards = _flatten_reward(reward)
+        self._time_process_step_3 = datetime.datetime.now()
         flatten_dones = _flatten_dones(terminated, truncated)
+        self._time_process_step_4 = datetime.datetime.now()
         flatten_info = _flatten_info(agent_obs, is_success, truncated)
 
         self._time_process_step_end = datetime.datetime.now()
         print("Subproc step process time: ", (self._time_process_step_end - self._time_step_wait_end).total_seconds() * 1000, "ms")
+        print("\t\tSubproc step process time zip: ", (self._time_process_step_1 - self._time_step_wait_end).total_seconds() * 1000, "ms")
+        print("\t\tSubproc step process time obs: ", (self._time_process_step_2 - self._time_process_step_1).total_seconds() * 1000, "ms")
+        print("\t\tSubproc step process time reward: ", (self._time_process_step_3 - self._time_process_step_2).total_seconds() * 1000, "ms")
+        print("\t\tSubproc step process time dones: ", (self._time_process_step_4 - self._time_process_step_3).total_seconds() * 1000, "ms")
+        print("\t\tSubproc step process time info: ", (self._time_process_step_end - self._time_process_step_4).total_seconds() * 1000, "ms")
         print("Total step time: ", (self._time_process_step_end - self._time_step_async_begin).total_seconds() * 1000, "ms")
 
 
@@ -358,28 +367,18 @@ def _flatten_info(agent_obs, is_success, truncated) -> Dict[str, List[Any]]:
     assert len(truncated) > 0, "need dones from at least one environment"
     assert len(is_success) == len(truncated), "is_success and truncated should have the same length"
 
-    # 将 remote_num 个 info 中，每个 nd.array 切成 agent_num 份，最后返回 agent_num * remote_num 个 info
-    # is_success 原为每个 remote 有  agent_num 个值，现在切成 agent_num * remote_num 份
-    # TimeLimit.truncated 原为 remote_num 个值，现在切成 agent_num * remote_num 份
-    # terminal_observation 结构与 obs 相同，切分为 agent_num * remote_num 份
-
     # print("Flatte info begin: ", obs, is_success, truncated)
 
-    flattened_infos = []
-    for remote in range(len(is_success)):
-        remote_is_success = is_success[remote]
-        remote_truncated = truncated[remote]
-        assert len(remote_is_success) == len(remote_truncated), "is_success and truncated should have the same length"
-        agent_num = len(remote_is_success)
-        for agent_index in range(agent_num):
-            info = {}
-            info["is_success"] = remote_is_success[agent_index]
-            info["TimeLimit.truncated"] = remote_truncated[agent_index]
-            # info["terminal_observation"] = _slice_multi_agent_obs(flattend_obs[obs_index], agent_num, agent_index)
-            info["terminal_observation"] = agent_obs[remote][agent_index]
-            flattened_infos.append(info)
-            
-    flattened_infos = tuple(flattened_infos)
+    # 使用列表推导式进行扁平化
+    flattened_infos = [
+        {
+            "is_success": s,
+            "TimeLimit.truncated": t,
+            "terminal_observation": obs
+        }
+        for env_s, env_t, env_obs in zip(is_success, truncated, agent_obs)
+        for s, t, obs in zip(env_s, env_t, env_obs)
+    ]
 
     # print("Flatte info end: ", flattened_infos)
 
@@ -399,13 +398,12 @@ def _flatten_reward(rewards: Union[tuple, list]) -> np.ndarray:
     assert isinstance(rewards, (tuple, list)), "expected list or tuple of rewards per environment, got {}".format(type(rewards))
     assert len(rewards) > 0, "need rewards from at least one environment"
 
-    # print("Flatte reward begin: ", rewards)
+    # 如果 rewards 中的元素是标量，直接转换为 NumPy 数组
+    if isinstance(rewards[0], (int, float)):
+        return np.array(rewards)
 
-    flattened_rewards = tuple(np.concatenate(rewards))
-
-    # print("Flatte reward end: ", flattened_rewards)
-
-    return np.stack(flattened_rewards)  # type: ignore[arg-type]
+    # 确保所有元素都是 NumPy 数组，并具有相同的形状（除了第一个轴）
+    return np.concatenate(rewards, axis=0)
 
 def _flatten_dones(terminated, truncated) -> np.ndarray:
     """
@@ -424,23 +422,18 @@ def _flatten_dones(terminated, truncated) -> np.ndarray:
     assert len(truncated) > 0, "need dones from at least one environment"
     assert len(terminated) == len(truncated), "terminated and truncated should have the same length"
 
-    # print("Flatte dones begin: ", terminated, truncated)
+    # 将 terminated 和 truncated 转换为 NumPy 数组
+    terminated_np = np.array(terminated, dtype=bool)
+    truncated_np = np.array(truncated, dtype=bool)
 
-    dones : List[bool] = []
-    for remote in range(len(terminated)):
-        remote_termnated = terminated[remote]
-        remote_truncated = truncated[remote]
-        assert len(remote_termnated) == len(remote_truncated), "terminated and truncated should have the same length"
-        for agent_index in range(len(remote_termnated)):
-            if remote_truncated[agent_index]:
-                dones.append(True)
-            else:
-                dones.append(remote_termnated[agent_index])
+    # 确保 terminated 和 truncated 形状相同
+    if terminated_np.shape != truncated_np.shape:
+        raise ValueError("terminated and truncated should have the same shape per environment and agent")
 
-    # print("Flatte dones middle: ", dones)
+    # 进行逻辑或操作：done = truncated OR terminated
+    dones_np = np.logical_or(truncated_np, terminated_np)
 
-    flattend_dones = tuple(dones)
+    # 扁平化为一维数组
+    dones_flat = dones_np.reshape(-1)
 
-    # print("Flatte dones end: ", flattend_dones)
-
-    return np.stack(flattend_dones)  # type: ignore[arg-type]
+    return dones_flat
