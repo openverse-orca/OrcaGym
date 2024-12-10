@@ -218,6 +218,11 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
 
     def _compute_reward(self, achieved_goal, desired_goal, info):
+        if self._is_success(achieved_goal, desired_goal):
+            return 1.0
+        else:
+            return 0.0
+
         site_dict = self.query_site_pos_and_quat([self.EE_NAME])
         if self.EE_NAME not in site_dict:
             raise KeyError(f"Site '{self.EE_NAME}' not found in the queried site dictionary.")
@@ -255,14 +260,18 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return {"task": self._is_success(achieved_goal, desired_goal)}
     
     def step(self, action) -> tuple:
-        action = np.concatenate([np.array([0.0]), action, np.array([0.0])])
         if self.control_type == ControlType.TELEOPERATION or self.control_type == ControlType.KEYBOARD:
             ctrl = self._teleoperation_action()
         else:
+            # print("controller action: ", action)
             self._controller.set_goal(action[0:6])
             ctrl = self._controller.run_controller()
+            # print("controller action: ", ctrl)
+            ctrl = np.clip(ctrl, self._ctrl_range_min[0:7], self._ctrl_range_max[0:7])
             gripper_action = action[6]
+
             if gripper_action > 0.0:
+                # print("gripper action: ", gripper_action)
                 ctrl = np.concatenate([ctrl, np.array([self._ctrl_range_min[7], self._ctrl_range_max[8]])])
             else:
                 ctrl =np.concatenate([ctrl, np.array([self._ctrl_range_max[7], self._ctrl_range_min[8]])])
@@ -391,7 +400,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             [np.cos(roll), -np.sin(roll), 0],
             [np.sin(roll), np.cos(roll), 0],
             [0, 0, 1]
-        ])
+        ]) 
 
         new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
         return new_xmat
@@ -407,9 +416,18 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         joint_values_cos = np.cos(joint_values)
         joint_velocities = self.get_arm_joint_velocities()
 
+        obj_xquat = np.array([obj_xquat[1], 
+                            obj_xquat[2], 
+                            obj_xquat[3], 
+                            obj_xquat[0]])
+        ee_position["xquat"] = np.array([ee_position["xquat"][1], 
+                                        ee_position["xquat"][2], 
+                                        ee_position["xquat"][3], 
+                                        ee_position["xquat"][0]])
+
         obs = {
             "object": np.concatenate([obj_xpos, obj_xquat, ee_position["xpos"] - obj_xpos]),
-            "robot0_eef_pos": ee_position["xpos"],
+            "robot0_eef_pos": ee_position["xpos"], 
             "robot0_eef_quat": ee_position["xquat"],
             "robot0_eef_vel_lin": ee_xvalp[self.EE_NAME],
             "robot0_eef_vel_ang": ee_xvalr[self.EE_NAME],

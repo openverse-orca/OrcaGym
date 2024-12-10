@@ -32,7 +32,7 @@ def register_env(env_name, env_index, **kwargs) -> str:
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
-        entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
+        entry_point="envs.franka_control.franka_origin_env:FrankaTeleoperationEnv",
         kwargs=kwargs,
         max_episode_steps= MAX_EPISODE_STEPS,  # 10 seconds
         reward_threshold=0.0,

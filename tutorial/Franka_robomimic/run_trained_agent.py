@@ -215,11 +215,11 @@ def run_trained_agent(args):
         config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
         rollout_horizon = config.experiment.rollout.horizon
 
-    env_kwargs = json.loads("{\"frame_skip\": 1, \"reward_type\": \"dense\", \"orcagym_addr\": \"localhost:50051\", \"agent_names\": [\"Panda\"], \"time_step\": 0.01, \"control_type\": \"teleoperation\", \"control_freq\": 20}")
+    env_kwargs = json.loads("{\"frame_skip\": 1, \"reward_type\": \"dense\", \"orcagym_addr\": \"localhost:50051\", \"agent_names\": [], \"time_step\": 0.01, \"control_type\": \"teleoperation\", \"control_freq\": 20}")
 
     gym.register(
         id=args.env,
-        entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
+        entry_point="envs.franka_control.franka_origin_env:FrankaTeleoperationEnv",
         kwargs=env_kwargs,
         max_episode_steps= MAX_EPISODE_STEPS,  # 10 seconds
         reward_threshold=0.0,
@@ -307,7 +307,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="D:/CodeSpace/OrcaGym/3rd_party/robomimic/bc_trained_models/test/20241127193707/models/model_epoch_2000.pth",
+        default="D:/CodeSpace/OrcaGym/3rd_party/robomimic/bc_trained_models/test/20241209203954/models/model_epoch_2000.pth",
+        # default="C:/Users/tt171/Desktop/model_epoch_2000.pth",
         help="path to saved checkpoint pth file",
     )
 
