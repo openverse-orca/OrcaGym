@@ -137,46 +137,46 @@ class SubprocVecEnvMA(VecEnv):
         # 拼接 actions，将 remote_num * agent_num 个动作拼接成 remote_num 个动作
         remote_actions = np.reshape(actions, (len(self.remotes), -1))
         
-        self._time_step_async_begin = datetime.datetime.now()
+        # self._time_step_async_begin = datetime.datetime.now()
         
         
         for remote, action in zip(self.remotes, remote_actions):
             remote.send(("step", action))
         
-        self._time_step_async_end = datetime.datetime.now()
-        print("Subproc step async time: ", (self._time_step_async_end - self._time_step_async_begin).total_seconds() * 1000, "ms")
+        # self._time_step_async_end = datetime.datetime.now()
+        # print("Subproc step async time: ", (self._time_step_async_end - self._time_step_async_begin).total_seconds() * 1000, "ms")
 
         self.waiting = True
 
     def step_wait(self) -> VecEnvStepReturn:
 
-        self._time_step_wait_begin = datetime.datetime.now()
+        # self._time_step_wait_begin = datetime.datetime.now()
 
         results = [remote.recv() for remote in self.remotes]
 
-        self._time_step_wait_end = datetime.datetime.now()
-        print("Subproc step wait time: ", (self._time_step_wait_end - self._time_step_wait_begin).total_seconds() * 1000, "ms")
+        # self._time_step_wait_end = datetime.datetime.now()
+        # print("Subproc step wait time: ", (self._time_step_wait_end - self._time_step_wait_begin).total_seconds() * 1000, "ms")
 
         self.waiting = False
         env_obs, agent_obs, reward, terminated, truncated, is_success = zip(*results)  # type: ignore[assignment]
         # print("Subproc step wait, env_obs: " , env_obs, "reward: ", reward, "terminated: ", terminated, "truncated: ", truncated, "is_success: ", is_success)
-        self._time_process_step_1 = datetime.datetime.now()
+        # self._time_process_step_1 = datetime.datetime.now()
         flatten_obs = _flatten_obs(env_obs, self.observation_space, self.agent_num)
-        self._time_process_step_2 = datetime.datetime.now()
+        # self._time_process_step_2 = datetime.datetime.now()
         flatten_rewards = _flatten_reward(reward)
-        self._time_process_step_3 = datetime.datetime.now()
+        # self._time_process_step_3 = datetime.datetime.now()
         flatten_dones = _flatten_dones(terminated, truncated)
-        self._time_process_step_4 = datetime.datetime.now()
+        # self._time_process_step_4 = datetime.datetime.now()
         flatten_info = _flatten_info(agent_obs, is_success, truncated)
 
-        self._time_process_step_end = datetime.datetime.now()
-        print("Subproc step process time: ", (self._time_process_step_end - self._time_step_wait_end).total_seconds() * 1000, "ms")
-        print("\t\tSubproc step process time zip: ", (self._time_process_step_1 - self._time_step_wait_end).total_seconds() * 1000, "ms")
-        print("\t\tSubproc step process time obs: ", (self._time_process_step_2 - self._time_process_step_1).total_seconds() * 1000, "ms")
-        print("\t\tSubproc step process time reward: ", (self._time_process_step_3 - self._time_process_step_2).total_seconds() * 1000, "ms")
-        print("\t\tSubproc step process time dones: ", (self._time_process_step_4 - self._time_process_step_3).total_seconds() * 1000, "ms")
-        print("\t\tSubproc step process time info: ", (self._time_process_step_end - self._time_process_step_4).total_seconds() * 1000, "ms")
-        print("Total step time: ", (self._time_process_step_end - self._time_step_async_begin).total_seconds() * 1000, "ms")
+        # self._time_process_step_end = datetime.datetime.now()
+        # print("Subproc step process time: ", (self._time_process_step_end - self._time_step_wait_end).total_seconds() * 1000, "ms")
+        # print("\tSubproc step process time zip: ", (self._time_process_step_1 - self._time_step_wait_end).total_seconds() * 1000, "ms")
+        # print("\tSubproc step process time obs: ", (self._time_process_step_2 - self._time_process_step_1).total_seconds() * 1000, "ms")
+        # print("\tSubproc step process time reward: ", (self._time_process_step_3 - self._time_process_step_2).total_seconds() * 1000, "ms")
+        # print("\tSubproc step process time dones: ", (self._time_process_step_4 - self._time_process_step_3).total_seconds() * 1000, "ms")
+        # print("\tSubproc step process time info: ", (self._time_process_step_end - self._time_process_step_4).total_seconds() * 1000, "ms")
+        # print("Total step time: ", (self._time_process_step_end - self._time_step_async_begin).total_seconds() * 1000, "ms")
 
 
         return flatten_obs, flatten_rewards, flatten_dones, flatten_info  # type: ignore[return-value]

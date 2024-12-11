@@ -94,41 +94,23 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # get_obs_start = datetime.datetime.now()
         # print("query joint qpos: ", self._agent_joint_names)
 
-        joint_qpos = self.joint_qpos_buffer
-        # get_obs_qpos = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
-        joint_qacc = self.joint_qacc_buffer
-        # get_obs_qacc = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
-        joint_qvel = self.joint_qvel_buffer
-        # get_obs_qvel = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
         sensor_data = self.query_sensor_data(self._agent_sensor_names)
         # get_obs_sensor = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
         contact_dict = self._generate_contact_dict()
         # get_obs_contact = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
         site_pos_quat = None #self.query_site_pos_and_quat(self._agent_site_names)
         # get_obs_site = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-
 
         # print("Sensor data: ", sensor_data)
         # print("Joint qpos: ", joint_qpos)
 
-        # 这里，每个process将多个agent的obs拼接在一起，在 subproc_vec_env 再展开成 m x n 份
-        # obs = agents[0].get_obs(sensor_data, joint_qpos, joint_qacc, joint_qvel, contact_dict, site_pos_quat, self.dt)
-        # for i in range(1, len(agents)):
-        #     agent_obs = agents[i].get_obs(sensor_data, joint_qpos, joint_qacc, joint_qvel, contact_dict, site_pos_quat, self.dt)
-        #     obs = {key: np.concatenate([obs[key], agent_obs[key]]) for key in obs.keys()}
-        
         # obs 形状： {key: np.ndarray(agent_num, agent_obs_len)}
         env_obs_list : list[dict[str, np.ndarray]] = []
         agent_obs : list[dict[str, np.ndarray]] = []
         achieved_goals = []
         desired_goals = []
         for agent in self._agents:
-            obs = agent.get_obs(sensor_data, joint_qpos, joint_qacc, joint_qvel, contact_dict, site_pos_quat, self.dt)
+            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict)
             achieved_goals.append(obs["achieved_goal"])
             desired_goals.append(obs["desired_goal"])
             env_obs_list.append(obs["observation"])
@@ -141,15 +123,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         env_obs["achieved_goal"] = achieved_goals
         env_obs["desired_goal"] = desired_goals
 
+        # get_obs_process = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
         # get_obs_end = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
 
-        # print("Get obs time, qpos: ", get_obs_qpos,
-        #       "\nqacc: ", get_obs_qacc - get_obs_qpos,
-        #       "\nqvel: ", get_obs_qvel - get_obs_qacc,
-        #         "\nsensor: ", get_obs_sensor - get_obs_qvel,
-        #         "\ncontact: ", get_obs_contact - get_obs_sensor,
-        #         "\nsite: ", get_obs_site - get_obs_contact,
-        #         "\ntotal: ", get_obs_end)
+        # print("\tGet obs time, ",
+        #         "\n\t\tsensor: ", get_obs_sensor,
+        #         "\n\t\tcontact: ", get_obs_contact - get_obs_sensor,
+        #         "\n\t\tsite: ", get_obs_site - get_obs_contact,
+        #         "\n\t\tprocess: ", get_obs_process - get_obs_site,
+        #         "\n\ttotal: ", get_obs_end)
         
         # print("Env obs: ", env_obs, "Agent obs: ", agent_obs, "Achieved goals: ", achieved_goals, "Desired goals: ", desired_goals)
         return env_obs, agent_obs, achieved_goals, desired_goals
