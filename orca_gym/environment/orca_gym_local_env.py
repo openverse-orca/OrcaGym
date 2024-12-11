@@ -41,7 +41,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             **kwargs
         )
 
-        render_fps = 30
+        render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
 
