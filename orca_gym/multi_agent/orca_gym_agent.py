@@ -125,6 +125,12 @@ class OrcaGymAgent:
             "neutral_joint_values": self._neutral_joint_values,
         }
     
+    def init_joint_index(self, qpos_offset, qvel_offset, qacc_offset, qpos_length, qvel_length, qacc_length):
+        """
+        Joint index is specific to the agent and is defined in the subclass.
+        """
+        raise NotImplementedError
+    
     def set_action_space(self, action_space : spaces) -> None:
         """
         Action space is specific to the agent and is defined in the subclass.

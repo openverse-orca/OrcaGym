@@ -39,13 +39,16 @@ LeggedObsConfig = {
 
 LeggedRobotConfig = {
     "go2": {
+        
+        # The order of the joints should be the same as they have been defined in the xml file.
+        "base_joint_name" :     "base",
         "leg_joint_names" :     ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint", 
                                 "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
                                 "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
                                 "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint"],
         
-        "base_joint_name" :     "base",
-        
+        # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
+        # for reset basic pos or computing the reward easily.
         "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.7, "FL_calf_joint": -1.5,
                                 "FR_hip_joint": 0.0, "FR_thigh_joint": 0.7, "FR_calf_joint": -1.5,
                                 "RL_hip_joint": 0.0, "RL_thigh_joint": 0.7, "RL_calf_joint": -1.5,
@@ -59,6 +62,7 @@ LeggedRobotConfig = {
         "command_ang_vel_range" : np.pi / 32,
         "command_ang_rate"      : 0.2,
 
+        # The order of the actuators should be the same as they have been defined in the xml file.
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
                                 "FR_hip_actuator", "FR_thigh_actuator", "FR_calf_actuator",
                                 "RL_hip_actuator", "RL_thigh_actuator", "RL_calf_actuator",

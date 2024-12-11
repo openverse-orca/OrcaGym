@@ -64,8 +64,8 @@ class LeggedRobot(OrcaGymAgent):
 
         robot_config = LeggedRobotConfig[get_legged_robot_name(agent_name)]
 
-        self._leg_joint_names = self.name_space_list(robot_config["leg_joint_names"])
         self._base_joint_name = self.name_space(robot_config["base_joint_name"])
+        self._leg_joint_names = self.name_space_list(robot_config["leg_joint_names"])
         self._joint_names = [self._base_joint_name] + self._leg_joint_names
 
         self._base_neutral_height_offset = robot_config["base_neutral_height_offset"]
@@ -113,13 +113,15 @@ class LeggedRobot(OrcaGymAgent):
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
 
         self._gravity_quat = rotations.euler2quat([0.0, 0.0, -9.81000042])
-        self._obs_scale_lin_vel = LeggedObsConfig["scale"]["lin_vel"]
-        self._obs_scale_ang_vel = LeggedObsConfig["scale"]["ang_vel"]
-        self._obs_scale_command = np.array([self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_ang_vel])
-        self._obs_scale_qpos = LeggedObsConfig["scale"]["qpos"]
-        self._obs_scale_qvel = LeggedObsConfig["scale"]["qvel"]
-        self._obs_scale_height = LeggedObsConfig["scale"]["height"]
+        # self._obs_scale_lin_vel = LeggedObsConfig["scale"]["lin_vel"]
+        # self._obs_scale_ang_vel = LeggedObsConfig["scale"]["ang_vel"]
+        # self._obs_scale_command = np.array([self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_ang_vel])
+        # self._obs_scale_qpos = LeggedObsConfig["scale"]["qpos"]
+        # self._obs_scale_qvel = LeggedObsConfig["scale"]["qvel"]
+        # self._obs_scale_height = LeggedObsConfig["scale"]["height"]
+        self._obs_scale_vec = self._get_obs_scale_vec()
         self._noise_scale_vec = self._get_noise_scale_vec()
+        assert self._obs_scale_vec.shape == self._noise_scale_vec.shape, "obs_scale_vec and noise_scale_vec should have the same shape"
 
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -149,45 +151,43 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, joint_qpos : dict, joint_qacc : dict, joint_qvel : dict, contact_dict : dict, site_pos_quat : dict, dt : float) -> dict:
-        self._leg_joint_qpos = np.array([joint_qpos[joint_name] for joint_name in self._leg_joint_names]).flatten()
-        self._leg_joint_qacc = np.array([joint_qacc[joint_name] for joint_name in self._leg_joint_names]).flatten()
-        self._leg_joint_qvel = np.array([joint_qvel[joint_name] for joint_name in self._leg_joint_names]).flatten()
+    def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict) -> dict:
+        self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
+        self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
+        self._leg_joint_qacc[:] = qacc_buffer[self._qacc_index["leg_start"] : self._qacc_index["leg_start"] + self._qacc_index["leg_length"]]
 
         self._body_height, self._body_lin_vel, self._body_ang_vel, \
-            self._body_orientation = self._get_body_local(joint_qpos, joint_qvel)
+            self._body_orientation = self._get_body_local(qpos_buffer, qvel_buffer)
 
-        # self._imu_data = self._get_imu_data(sensor_data)
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
-        # self._imu_site_pos_quat = site_pos_quat[self._imu_site_name].copy()
-        # imu_site_pos_quat = np.concatenate([self._imu_site_pos_quat["xpos"], self._imu_site_pos_quat["xquat"]]).flatten()
-        # imu_mocap_pos_quat = np.concatenate([self._imu_mocap_pos_quat["pos"], self._imu_mocap_pos_quat["quat"]]).flatten()
 
         self._achieved_goal = self._get_base_contact(contact_dict)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
         obs = np.concatenate(
                 [
-                    self._body_lin_vel * self._obs_scale_lin_vel,
-                    self._body_ang_vel * self._obs_scale_ang_vel,
-                    self._body_orientation.copy(),
-                    self._command_values * self._obs_scale_command,
-                    (self._leg_joint_qpos - self._neutral_joint_values) * self._obs_scale_qpos,
-                    self._leg_joint_qvel * self._obs_scale_qvel,
-                    self._action.copy(),
-                    np.array([self._body_height]) * self._obs_scale_height,
-                ]).flatten()
+                    self._body_lin_vel,
+                    self._body_ang_vel,
+                    self._body_orientation,
+                    self._command_values,
+                    (self._leg_joint_qpos - self._neutral_joint_values),
+                    self._leg_joint_qvel,
+                    self._action,
+                    np.array([self._body_height]),
+                ]).reshape(-1)
         
+        obs *= self._obs_scale_vec
+
         noise_vec = ((self._np_random.random(len(self._noise_scale_vec)) * 2) - 1) * self._noise_scale_vec
         # print("obs: ", obs, "Noise vec: ", noise_vec)
         obs += noise_vec
 
         result = {
             "observation": obs,
-            "achieved_goal": self._achieved_goal.copy(),
-            "desired_goal": self._desired_goal.copy(),
+            "achieved_goal": self._achieved_goal,
+            "desired_goal": self._desired_goal,
         }
 
         self._is_obs_updated = True
@@ -208,6 +208,22 @@ class LeggedRobot(OrcaGymAgent):
     def set_action_space(self, action_space : spaces) -> None:
         self._action_space = action_space
         self._action_space_range = np.array([action_space.low[0], action_space.high[0]]) 
+        
+    def init_joint_index(self, qpos_offset, qvel_offset, qacc_offset, qpos_length, qvel_length, qacc_length) -> None:
+        self._qpos_index = {joint_name: {"offset": qpos_offset[i], "len": qpos_length[i]} for i, joint_name in enumerate(self.joint_names)}
+        assert "leg_start" not in self._qpos_index and "leg_length" not in self._qpos_index, "qpos_index: joint_name 'leg_start' or 'leg_length' already exists"
+        self._qpos_index["leg_start"], self._qpos_index["leg_length"] = self._calc_agent_leg_buffer_index(self._qpos_index)
+        self._leg_joint_qpos = np.zeros(self._qpos_index["leg_length"])
+
+        self._qvel_index = {joint_name: {"offset": qvel_offset[i], "len": qvel_length[i]} for i, joint_name in enumerate(self.joint_names)}
+        assert "leg_start" not in self._qvel_index and "leg_length" not in self._qvel_index, "qvel_index: joint_name 'leg_start' or 'leg_length' already exists"
+        self._qvel_index["leg_start"], self._qvel_index["leg_length"] = self._calc_agent_leg_buffer_index(self._qvel_index)
+        self._leg_joint_qvel = np.zeros(self._qvel_index["leg_length"])
+
+        self._qacc_index = {joint_name: {"offset": qacc_offset[i], "len": qacc_length[i]} for i, joint_name in enumerate(self.joint_names)}
+        assert "leg_start" not in self._qacc_index and "leg_length" not in self._qacc_index, "qacc_index: joint_name 'leg_start' or 'leg_length' already exists"
+        self._qacc_index["leg_start"], self._qacc_index["leg_length"] = self._calc_agent_leg_buffer_index(self._qacc_index)   
+        self._leg_joint_qacc = np.zeros(self._qacc_index["leg_length"])
     
     def on_step(self, action, update_mocap: bool = False) -> dict:
         """
@@ -509,13 +525,15 @@ class LeggedRobot(OrcaGymAgent):
         if self._reward_printer is not None:
             self._reward_printer.print_reward(message, reward)
 
-    def _get_body_local(self, joint_qpos, joint_qvel) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _get_body_local(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Robots have a local coordinate system that is defined by the orientation of the base.
         Observations and rewards are given in the local coordinate system. 
         """
-        body_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
-        body_joint_qvel = np.array(joint_qvel[self._base_joint_name]).flatten()
+        body_qpos_index = self._qpos_index[self._base_joint_name]
+        body_joint_qpos = qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
+        body_qvel_index = self._qvel_index[self._base_joint_name]
+        body_joint_qvel = qvel_buffer[body_qvel_index["offset"] : body_qvel_index["offset"] + body_qvel_index["len"]]
 
         body_height = body_joint_qpos[2]  # 局部坐标高度就是全局坐标高度
         body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
@@ -528,6 +546,36 @@ class LeggedRobot(OrcaGymAgent):
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
     
+    def _get_obs_scale_vec(self):
+        """ Sets a vector used to scale the observations.
+            [NOTE]: Must be adapted when changing the observations structure
+
+        Args:
+            cfg (Dict): Environment config file
+
+        Returns:
+            [torch.Tensor]: Vector of scales used to normalize the observations
+        """
+        scale_lin_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["lin_vel"]
+        scale_ang_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["ang_vel"]
+        scale_orientation = np.array([1, 1, 1])  # No scaling on the orientation
+        scale_command = np.array([LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["ang_vel"]])
+        scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
+        scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
+        scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
+        scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
+
+        scale_vec = np.concatenate([scale_lin_vel, 
+                                    scale_ang_vel, 
+                                    scale_orientation, 
+                                    scale_command, 
+                                    scale_leg_joint_qpos, 
+                                    scale_leg_joint_qvel, 
+                                    scale_action, 
+                                    scale_height]).flatten()
+        
+        return scale_vec
+
     def _get_noise_scale_vec(self):
         """ Sets a vector used to scale the noise added to the observations.
             [NOTE]: Must be adapted when changing the observations structure
@@ -539,14 +587,14 @@ class LeggedRobot(OrcaGymAgent):
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
         noise_level = LeggedObsConfig["noise"]["noise_level"]
-        noise_lin_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["lin_vel"] * self._obs_scale_lin_vel
-        noise_ang_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["ang_vel"] * self._obs_scale_ang_vel
+        noise_lin_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["lin_vel"] * LeggedObsConfig["scale"]["lin_vel"]
+        noise_ang_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["ang_vel"] * LeggedObsConfig["scale"]["ang_vel"]
         noise_orientation = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["orientation"]
         noise_command = np.zeros(4)  # No noise on the command
-        noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * self._obs_scale_qpos
-        noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * self._obs_scale_qvel
+        noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * LeggedObsConfig["scale"]["qpos"]
+        noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * LeggedObsConfig["scale"]["qvel"]
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
-        noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * self._obs_scale_height
+        noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
 
         noise_vec = np.concatenate([noise_lin_vel, 
                                     noise_ang_vel, 
@@ -560,3 +608,28 @@ class LeggedRobot(OrcaGymAgent):
         # print("noise vec: ", noise_vec)
 
         return noise_vec
+    
+    
+    def _calc_agent_leg_buffer_index(self, joint_index: dict) -> np.ndarray:
+        """
+        Calculate the start index and length of the agent buffer.
+        The order of the joint names (defined in the config file) should be the same as they have been defined in the xml file.
+        If the joint index overlap or gap, check the config file for details.
+        """
+        # for joint_name in self._leg_joint_names:
+        #     if joint_name not in joint_index:
+        #         raise ValueError(f"Joint name {joint_name} not found in the joint index")
+        #     index = joint_index[joint_name]
+        #     print("Joint index: ", joint_name, index)
+        #     print("Joint index offset: ", index["offset"], "Joint index len: ", index["len"])
+            
+        index_array = np.array([np.array([joint_index[joint_name]["offset"], joint_index[joint_name]["len"]]) for joint_name in self._leg_joint_names])
+        for i in range(len(index_array) - 1):
+            if index_array[i, 0] + index_array[i, 1] > index_array[i + 1, 0]:
+                raise ValueError("Joint index overlap")
+            elif index_array[i, 0] + index_array[i, 1] < index_array[i + 1, 0]:
+                raise ValueError("Joint index gap")
+            
+        index_start = index_array[0, 0]
+        index_len = index_array[-1, 0] + index_array[-1, 1] - index_start
+        return index_start, index_len    
