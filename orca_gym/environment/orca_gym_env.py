@@ -106,19 +106,33 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         action_space = spaces.Box(low=low, high=high, dtype=np.float32)
         return action_space
 
-    def generate_observation_space(self, obs : Dict[str, Any] = None) -> Space:
+    def generate_observation_space(self, obs: Dict[str, Any] = None) -> spaces.Space:
         """
         Generate the observation space for the environment.
         """
+        if obs is None:
+            raise ValueError("obs dictionary is None")
+            
         obs_space_dict = {}
         for obs_key, obs_data in obs.items():
             if isinstance(obs_data, np.ndarray):
+                # print("obs key: ", obs_key, "dtype : ", obs_data.dtype)
+                
+                # 创建与 obs_data 形状相同的 low 和 high，并确保它们是 float32
+                # 使用 float32 的有限边界值
+                finite_max = np.finfo(np.float32).max
+                low = np.full(obs_data.shape, -finite_max, dtype=np.float32)
+                high = np.full(obs_data.shape, finite_max, dtype=np.float32)
+                # print(f"low.dtype: {low.dtype}, high.dtype: {high.dtype}")  # 调试信息
+                
                 obs_space_dict[obs_key] = spaces.Box(
-                    -np.inf, np.inf, shape=obs_data.shape, dtype=obs_data.dtype
+                    low=low,
+                    high=high,
+                    dtype=obs_data.dtype
                 )
             else:
                 raise ValueError(f"Unsupported observation type: {type(obs_data)}")
-            
+                
         observation_space = spaces.Dict(obs_space_dict)
         return observation_space
 

@@ -163,8 +163,8 @@ class LeggedRobot(OrcaGymAgent):
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
 
-        self._achieved_goal = self._get_base_contact(contact_dict)         # task failed if the base is in contact with the ground
-        self._desired_goal = np.zeros(1)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
+        self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
+        self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
         obs = np.concatenate(
                 [
@@ -176,7 +176,7 @@ class LeggedRobot(OrcaGymAgent):
                     self._leg_joint_qvel,
                     self._action,
                     np.array([self._body_height]),
-                ]).reshape(-1)
+                ]).reshape(-1).astype(np.float32)
         
         obs *= self._obs_scale_vec
 
@@ -574,7 +574,7 @@ class LeggedRobot(OrcaGymAgent):
                                     scale_action, 
                                     scale_height]).flatten()
         
-        return scale_vec
+        return scale_vec.astype(np.float32)
 
     def _get_noise_scale_vec(self):
         """ Sets a vector used to scale the noise added to the observations.
@@ -607,7 +607,7 @@ class LeggedRobot(OrcaGymAgent):
         
         # print("noise vec: ", noise_vec)
 
-        return noise_vec
+        return noise_vec.astype(np.float32)
     
     
     def _calc_agent_leg_buffer_index(self, joint_index: dict) -> np.ndarray:

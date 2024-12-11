@@ -9,7 +9,7 @@ import datetime
 from .legged_robot import LeggedRobot
 
 class LeggedGymEnv(OrcaGymMultiAgentEnv):
-    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1'}
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
 
     def __init__(
         self,
