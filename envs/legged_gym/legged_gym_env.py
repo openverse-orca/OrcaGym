@@ -39,6 +39,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             **kwargs,
         )
 
+        self._randomize_agent_foot_friction()
+
 
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
         # print("Step agents: ", action)
@@ -59,16 +61,21 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self.render_mode == "human" and self.render_remote:
             # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
             mocaps = {}
+            joint_qvels = {}
             for i in range(len(self._agents)):
-                agent = self._agents[i]
+                agent : LeggedRobot = self._agents[i]
                 act = action[i]
 
+                agent.update_command(self.data.qpos)
                 agent_ctrl, agent_mocap = agent.step(act, update_mocap=True)
+                joint_qvel_dict = agent.push_robot(self.data.qvel)
                 # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
                 mocaps.update(agent_mocap)
+                joint_qvels.update(joint_qvel_dict)
 
             
             self.set_mocap_pos_and_quat(mocaps)
+            self.set_joint_qvel(joint_qvels)
         else:
             for i in range(len(self._agents)):
                 agent = self._agents[i]
@@ -153,8 +160,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.set_mocap_pos_and_quat(mocaps)
         self.mj_forward()
 
-
-
     def _generate_contact_dict(self) -> dict[str, list[str]]:
         contacts = self.query_contact_simple()
         # print("Contacts: ", contacts)
@@ -171,3 +176,17 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         return contact_dict
 
+    def _randomize_agent_foot_friction(self) -> None:
+        # if self._render_mode == "human" and self._render_remote:
+        #     print("Skip randomize foot friction in human render mode")
+        #     return
+        
+        random_friction = self.np_random.uniform(0, 1.0)
+        geom_friction_dict = {}
+        for i in range(len(self._agents)):
+            agent : LeggedRobot = self._agents[i]
+            agent_geom_friction_dict = agent.randomize_foot_friction(random_friction, self.model.get_geom_dict())
+            geom_friction_dict.update(agent_geom_friction_dict)
+
+        # print("Set geom friction: ", geom_friction_dict)
+        self.set_geom_friction(geom_friction_dict)

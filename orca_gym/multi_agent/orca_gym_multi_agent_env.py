@@ -51,7 +51,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         self.initialize_agents(entry=agent_engry, 
                                task=task, 
                                max_episode_steps=max_episode_steps,
-                               dt=self.dt * self.frame_skip)
+                               dt=self.dt)
 
         self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]
         self._agent_actuator_names = [actuator_name for agent in self._agents for actuator_name in agent.actuator_names]

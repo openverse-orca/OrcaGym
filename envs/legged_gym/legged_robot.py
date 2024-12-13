@@ -73,7 +73,7 @@ class LeggedRobot(OrcaGymAgent):
         self._command_lin_vel_range_x = robot_config["command_lin_vel_range_x"]
         self._command_lin_vel_range_y = robot_config["command_lin_vel_range_y"]
         self._command_ang_vel_range = robot_config["command_ang_vel_range"]
-        self._command_ang_rate = robot_config["command_ang_rate"]
+        self._command_resample_interval = robot_config["command_resample_interval"]
 
         self._neutral_joint_angles = robot_config["neutral_joint_angles"]
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
@@ -93,6 +93,7 @@ class LeggedRobot(OrcaGymAgent):
         self._imu_sensor_accelerometer_name = self.name_space(robot_config["sensor_imu_accelerometer_name"])
         self._imu_sensor_names = [self._imu_sensor_framequat_name, self._imu_sensor_gyro_name, self._imu_sensor_accelerometer_name]
 
+        self._foot_body_names = self.name_space_list(robot_config["foot_body_names"])
         self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
         self._foot_touch_force_threshold = robot_config["foot_touch_force_threshold"]
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
@@ -104,7 +105,8 @@ class LeggedRobot(OrcaGymAgent):
         self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
         self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
         self._contact_body_names = self._base_contact_body_names + self._leg_contact_body_names
-        
+
+
         self._ctrl = np.zeros(len(self._actuator_names))
         self._action = np.zeros(len(self._actuator_names))
         self._last_action = np.zeros(len(self._actuator_names))
@@ -112,16 +114,20 @@ class LeggedRobot(OrcaGymAgent):
         self._nq = len(self._leg_joint_names) + (7 * len(self._base_joint_name))
         self._nv = len(self._leg_joint_names) + (6 * len(self._base_joint_name))
 
+        # Scale the observation and noise
         self._gravity_quat = rotations.euler2quat([0.0, 0.0, -9.81000042])
-        # self._obs_scale_lin_vel = LeggedObsConfig["scale"]["lin_vel"]
-        # self._obs_scale_ang_vel = LeggedObsConfig["scale"]["ang_vel"]
-        # self._obs_scale_command = np.array([self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_lin_vel, self._obs_scale_ang_vel])
-        # self._obs_scale_qpos = LeggedObsConfig["scale"]["qpos"]
-        # self._obs_scale_qvel = LeggedObsConfig["scale"]["qvel"]
-        # self._obs_scale_height = LeggedObsConfig["scale"]["height"]
         self._obs_scale_vec = self._get_obs_scale_vec()
         self._noise_scale_vec = self._get_noise_scale_vec()
         assert self._obs_scale_vec.shape == self._noise_scale_vec.shape, "obs_scale_vec and noise_scale_vec should have the same shape"
+
+        # Domain randomization
+        self._push_robots = robot_config["push_robots"]
+        self._push_interval_s = robot_config["push_interval_s"]
+        self._max_push_vel_xy = robot_config["max_push_vel_xy"]
+        self._last_push_duration = 0.0
+
+        self._randomize_friction = robot_config["randomize_friction"]
+        self._friction_range = robot_config["friction_range"]
 
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -135,12 +141,12 @@ class LeggedRobot(OrcaGymAgent):
             self._visualize_command = False
 
         self._is_obs_updated = False
-
+        self._setup_reward_functions()
 
     @property
     def neutral_joint_values(self) -> np.ndarray:
         return self._neutral_joint_values
-    
+
     # @property
     # def body_contact_force_threshold(self) -> float:
     #     return self._body_contact_force_threshold
@@ -235,7 +241,8 @@ class LeggedRobot(OrcaGymAgent):
         if update_mocap and self._visualize_command:        
             # Do mocap update here.
             # print("imu mocap: ", self._imu_mocap_pos_quat)
-            self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
+            
+            # self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
             global_lin_vel, _ = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
             self._imu_mocap_pos_quat["pos"] += global_lin_vel * self.dt
             visualized_command = {self._imu_mocap_name: self._imu_mocap_pos_quat}
@@ -254,7 +261,8 @@ class LeggedRobot(OrcaGymAgent):
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
 
         # Rotate the base body around the Z axis
-        z_rotation_quat = rotations.euler2quat([0, 0, np.random.uniform(-np.pi, np.pi)])
+        z_rotation_angle = self._np_random.uniform(-np.pi, np.pi)
+        z_rotation_quat = rotations.euler2quat([0, 0, z_rotation_angle])
 
         # Get cached default joint values
         joint_neutral_qpos = self.get_joint_neutral()
@@ -283,8 +291,9 @@ class LeggedRobot(OrcaGymAgent):
         self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], z_rotation_quat)
         
 
-        self._command = self._genarate_command()
+        self._command = self._genarate_command(z_rotation_angle)
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
+        self._command_resample_duration = 0
         # print("Command: ", self._command)
 
         return joint_neutral_qpos, {self._imu_mocap_name: self._imu_mocap_pos_quat}
@@ -298,19 +307,56 @@ class LeggedRobot(OrcaGymAgent):
             return 1.0
         else:
             return 0.0
+        
+    def push_robot(self, qvel_buffer : np.ndarray) -> dict[str, np.ndarray]:
+        if not self._push_robots:
+            return {}
+
+        if self._last_push_duration > self._push_interval_s:
+            self._last_push_duration = 0.0
+            push_vel = self._np_random.uniform(-self._max_push_vel_xy, self._max_push_vel_xy, 2)
+            push_vel = np.concatenate([push_vel, [0.0, 0, 0, 0]])
+            
+            offset = self._qvel_index[self._base_joint_name]["offset"]
+            len = self._qvel_index[self._base_joint_name]["len"]
+            current_base_qvel = qvel_buffer[offset : offset + len]
+
+            return {self._base_joint_name: current_base_qvel + push_vel}
+        else:
+            self._last_push_duration += self.dt
+            return {}
+        
+    def randomize_foot_friction(self, random_friction : float, geom_dict : dict) -> dict:
+        if not self._randomize_friction:
+            return {}
+        
+        # 缩放到指定范围
+        min_friction, max_friction = self._friction_range
+        assert min_friction < max_friction, "min_friction should be less than max_friction"
+        random_friction = max(min(random_friction, 1.0), 0.0)
+        scaled_random_friction = min_friction + random_friction * (max_friction - min_friction)
+
+        geom_friction_dict : dict[str, np.ndarray] = {}
+        for name, geom in geom_dict.items():
+            if geom["BodyName"] in self._foot_body_names:
+                friction = geom["Friction"]
+                friction[0] = scaled_random_friction
+                geom_friction_dict[name] = friction
+
+        return geom_friction_dict
 
     def _compute_reward_alive(self, coeff) -> SupportsFloat:
         reward = 1.0 * coeff * self.dt
         self._print_reward("Alive reward: ", reward)
         return reward
 
-    def _compute_reward_success(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
-        reward = (1.0 if (self.is_success(achieved_goal, desired_goal) > 0) else 0.0) * coeff * self.dt
+    def _compute_reward_success(self, coeff) -> SupportsFloat:
+        reward = (1.0 if (self.is_success(self._achieved_goal, self._desired_goal) > 0) else 0.0) * coeff * self.dt
         self._print_reward("Success reward: ", reward)
         return reward
         
-    def _compute_reward_failure(self, achieved_goal, desired_goal, coeff) -> SupportsFloat:
-        reward = (-1.0 if self.is_terminated(achieved_goal, desired_goal) else 0.0) * coeff * self.dt
+    def _compute_reward_failure(self, coeff) -> SupportsFloat:
+        reward = (-1.0 if self.is_terminated(self._achieved_goal, self._desired_goal) else 0.0) * coeff * self.dt
         self._print_reward("Failure reward: ", reward)
         return reward
         
@@ -370,6 +416,7 @@ class LeggedRobot(OrcaGymAgent):
         ang_vel_error = pow(self._command["ang_vel"] - self._body_ang_vel[2], 2)  # 只考虑 Z 轴的角速度
         reward = np.exp(-ang_vel_error / tracking_sigma) * coeff * self.dt
         self._print_reward("Follow command angvel reward: ", reward)
+        # print("command ang vel: ", self._command["ang_vel"], "body ang vel: ", self._body_ang_vel[2])        
         return reward
     
     def _compute_reward_height(self, coeff) -> SupportsFloat:
@@ -408,34 +455,12 @@ class LeggedRobot(OrcaGymAgent):
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
             total_reward = 0.0
+            self._achieved_goal = achieved_goal
+            self._desired_goal = desired_goal
 
-
-            reward_functions = [
-                {"function": self._compute_reward_alive, "coeff": 0},
-                {"function": (self._compute_reward_success, {"achieved_goal": achieved_goal, "desired_goal": desired_goal, "coeff": 0}), "coeff": 0},
-                {"function": (self._compute_reward_failure, {"achieved_goal": achieved_goal, "desired_goal": desired_goal, "coeff": 1}), "coeff": 1},
-                {"function": self._compute_reward_contact, "coeff": 1},
-                {"function": self._compute_reward_foot_touch, "coeff": 0.001},
-                {"function": self._compute_reward_joint_angles, "coeff": 0},
-                {"function": self._compute_reward_joint_accelerations, "coeff": 0.00001},
-                {"function": self._compute_reward_limit, "coeff": 0},
-                {"function": self._compute_reward_action_rate, "coeff": 0.001},
-                {"function": self._compute_reward_base_gyro, "coeff": 0},
-                {"function": self._compute_reward_base_accelerometer, "coeff": 0},
-                {"function": self._compute_reward_follow_command_linvel, "coeff": 1},
-                {"function": self._compute_reward_follow_command_angvel, "coeff": 0.5},
-                {"function": self._compute_reward_height, "coeff": 1},
-                {"function": self._compute_reward_body_lin_vel, "coeff": 2},
-                {"function": self._compute_reward_body_ang_vel, "coeff": 0.05},
-                {"function": self._compute_reward_body_orientation, "coeff": 5},
-                {"function": self._compute_feet_air_time, "coeff": 0.1},
-            ]
-
-            for reward_function in reward_functions:
+            for reward_function in self._reward_functions:
                 if reward_function["coeff"] == 0:
                     continue
-                if isinstance(reward_function["function"], tuple):
-                    total_reward += reward_function["function"][0](**reward_function["function"][1])
                 else:    
                     total_reward += reward_function["function"](reward_function["coeff"])
 
@@ -506,20 +531,41 @@ class LeggedRobot(OrcaGymAgent):
                 self._foot_in_air_time[i] += self.dt
                 self._foot_touch_air_time[i] = 0
 
-    def _genarate_command(self) -> dict:
+    def _genarate_command(self, heading_angle : float) -> dict:
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-
         lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x), 
                             self._np_random.uniform(-self._command_lin_vel_range_y, self._command_lin_vel_range_y),
                             0])
-        if self._np_random.uniform() < self._command_ang_rate:
-            ang_vel = self._np_random.uniform(-self._command_ang_vel_range, self._command_ang_vel_range)
-        else:
-            ang_vel = 0
+        return {"lin_vel": lin_vel, "ang_vel": 0, "heading_angle": heading_angle}
+    
+    def update_command(self, qpos_buffer : np.ndarray) -> None:
+        """
+        Update the z ang_vel by heading 
+        """
+        self._resample_command()
 
-        return {"lin_vel": lin_vel, "ang_vel": ang_vel}
+        # Get the body heading quaternion in global coordinate system
+        body_qpos_index = self._qpos_index[self._base_joint_name]
+        body_joint_qpos = qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
+        body_orientation_quat = body_joint_qpos[3:7].copy()
+        body_heading_angle = rotations.quat2euler(body_orientation_quat)[2]
+        angle_error = self._command["heading_angle"] - body_heading_angle
+        angle_error = (angle_error + np.pi) % (2 * np.pi) - np.pi
+        self._command["ang_vel"] = min(max(angle_error, -self._command_ang_vel_range), self._command_ang_vel_range)
+
+
+    def _resample_command(self) -> None:
+        self._command_resample_duration += self.dt
+        if self._command_resample_duration > self._command_resample_interval:
+            self._command_resample_duration = 0
+            turn_angle = self._np_random.uniform(-self._command_ang_vel_range, self._command_ang_vel_range)
+            self._command = self._genarate_command(self._command["heading_angle"] + turn_angle)
+            self._command_values[:3] = self._command["lin_vel"]
+            
+            turn_quat = rotations.euler2quat([0, 0, turn_angle])
+            self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], turn_quat)
     
     def _print_reward(self, message : str, reward : Optional[float] = None):
         if self._reward_printer is not None:
@@ -633,3 +679,25 @@ class LeggedRobot(OrcaGymAgent):
         index_start = index_array[0, 0]
         index_len = index_array[-1, 0] + index_array[-1, 1] - index_start
         return index_start, index_len    
+    
+    def _setup_reward_functions(self):
+        self._reward_functions = [
+            {"function": self._compute_reward_alive, "coeff": 0},
+            {"function": self._compute_reward_success, "coeff": 0},
+            {"function": self._compute_reward_failure, "coeff": 0},
+            {"function": self._compute_reward_contact, "coeff": 1},
+            {"function": self._compute_reward_foot_touch, "coeff": 0},
+            {"function": self._compute_reward_joint_angles, "coeff": 0},
+            {"function": self._compute_reward_joint_accelerations, "coeff": 2.5e-7},
+            {"function": self._compute_reward_limit, "coeff": 0},
+            {"function": self._compute_reward_action_rate, "coeff": 0.01},
+            {"function": self._compute_reward_base_gyro, "coeff": 0},
+            {"function": self._compute_reward_base_accelerometer, "coeff": 0},
+            {"function": self._compute_reward_follow_command_linvel, "coeff": 1},
+            {"function": self._compute_reward_follow_command_angvel, "coeff": 0.5},
+            {"function": self._compute_reward_height, "coeff": 1},
+            {"function": self._compute_reward_body_lin_vel, "coeff": 2},
+            {"function": self._compute_reward_body_ang_vel, "coeff": 0.05},
+            {"function": self._compute_reward_body_orientation, "coeff": 0},
+            {"function": self._compute_feet_air_time, "coeff": 1},
+        ]
