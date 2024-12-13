@@ -57,10 +57,10 @@ LeggedRobotConfig = {
         "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
-        "command_lin_vel_range_x" : 0.1,   # x direction for forward
-        "command_lin_vel_range_y" : 0.0,   # y direction for left/right
-        "command_ang_vel_range" : np.pi / 32,
-        "command_ang_rate"      : 0.2,
+        "command_lin_vel_range_x" : 1,        # x direction for forward
+        "command_lin_vel_range_y" : 0.2,        # y direction for left/right
+        "command_ang_vel_range" : 1.0,    # max turning rate
+        "command_resample_interval" : 7,        # second
 
         # The order of the actuators should be the same as they have been defined in the xml file.
         "actuator_names" :      ["FL_hip_actuator", "FL_thigh_actuator", "FL_calf_actuator",
@@ -99,6 +99,7 @@ LeggedRobotConfig = {
                                     "FR_thigh", "FR_calf", 
                                     "RL_thigh", "RL_calf", 
                                     "RR_thigh", "RR_calf"],
+        "foot_body_names" : ["FL_foot", "FR_foot", "RL_foot", "RR_foot"],
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
         # Static Foot Forces: Front feet ~44.8 N each; rear feet ~29.8 N each.
@@ -107,6 +108,15 @@ LeggedRobotConfig = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_air_time_threshold" : 0.5,  # second
+
+        # Config for randomization
+        "randomize_friction" :      True,
+        "friction_range" :          [0.5, 1.25],
+        "randomize_base_mass" :     False,
+        "added_mass_range" :        [-1., 1.],
+        "push_robots" :             True,
+        "push_interval_s" :         15,
+        "max_push_vel_xy" :         1.0,
 
         # Config for logging
         "log_env_ids" :     [0],

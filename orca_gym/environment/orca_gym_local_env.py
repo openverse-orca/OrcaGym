@@ -204,6 +204,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_joint_qpos(self, joint_qpos):
         self.gym.set_joint_qpos(joint_qpos)
 
+    def set_joint_qvel(self, joint_qvel):
+        self.gym.set_joint_qvel(joint_qvel)
     
     def query_site_xvalp_xvalr(self, site_names):
         query_dict = self.gym.mj_jac_site(site_names)
@@ -224,3 +226,6 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def query_contact_simple(self):
         return self.gym.query_contact_simple()
+    
+    def set_geom_friction(self, geom_friction_dict):
+        self.gym.set_geom_friction(geom_friction_dict)

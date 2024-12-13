@@ -514,6 +514,12 @@ class OrcaGymLocal(OrcaGymBase):
             qpos_size = get_qpos_size(self._mjModel.jnt_type[joint_id])
             self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]:self._mjModel.jnt_qposadr[joint_id] + qpos_size] = qpos.copy()
 
+    def set_joint_qvel(self, joint_qvel):
+        for joint_name, qvel in joint_qvel.items():
+            joint_id = self._mjModel.joint(joint_name).id
+            dof_size = get_dof_size(self._mjModel.jnt_type[joint_id])
+            self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + dof_size] = qvel.copy()
+
     def mj_jac_site(self, site_names: list[str]):
         site_jacs_dict = {}
         for site_name in site_names:
@@ -576,3 +582,9 @@ class OrcaGymLocal(OrcaGymBase):
             contacts.append(contact_info)
         
         return contacts            
+    
+    def set_geom_friction(self, geom_friction_dict):
+        model = self._mjModel
+        for name, friction in geom_friction_dict.items():
+            geom = model.geom(name)
+            geom.friction = friction.copy()

@@ -439,6 +439,7 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
             # 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:
+                # print("Sleep for ", dt - elapsed_time.total_seconds())
                 time.sleep(dt - elapsed_time.total_seconds())
 
             if step == max_episode_steps:

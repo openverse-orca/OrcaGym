@@ -3,7 +3,7 @@ import os
 import sys
 import argparse
 
-def generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
+def generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
     terrain = []
     heights = [[0 for _ in range(num_y)] for _ in range(num_x)]
     prev_color = random.uniform(0.1, 0.5)  # 初始化第一个box的颜色，取值范围在0.1到0.5之间
@@ -30,12 +30,12 @@ def generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step
             rotation_z = random.uniform(rotation_z_min, rotation_z_max)  # 旋转角度范围参数化
 
             # 生成中心间距的随机值
-            spacing_x = random.uniform(min_spacing, max_spacing)
-            spacing_y = random.uniform(min_spacing, max_spacing)
+            spacing_x = random.uniform(min_spacing * geom_size[0], max_spacing * geom_size[0])
+            spacing_y = random.uniform(min_spacing * geom_size[0], max_spacing * geom_size[0])
             
             pos_x = i * spacing_x
             pos_y = j * spacing_y
-            pos_z = heights[i][j] + geom_size / 10  # 让box稍微浮出地面一点
+            pos_z = heights[i][j] + geom_size[2]  # 让box稍微浮出地面一点
 
             # 随机生成灰度颜色，确保相邻块色差大于 0.2，灰度范围在0.1到0.5之间
             while True:
@@ -47,13 +47,16 @@ def generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step
             rgba = f"{gray_value} {gray_value} {gray_value} 1"
 
             # 构建地形的box geom定义
-            terrain.append(f'<geom type="{geom_type}" pos="{pos_x} {pos_y} {pos_z}" size="{geom_size/2} {geom_size/2} {geom_size/10}" euler="{tilt_x} {tilt_y} {rotation_z}" rgba="{rgba}"/>')
+            size_x = (geom_size[0] + geom_size[0] * random.uniform(-geom_size_cale_range, geom_size_cale_range)) / 2
+            size_y = (geom_size[1] + geom_size[1] * random.uniform(-geom_size_cale_range, geom_size_cale_range)) / 2
+            size_z = (geom_size[2] + geom_size[2] * random.uniform(-geom_size_cale_range, geom_size_cale_range)) / 2
+            terrain.append(f'<geom type="{geom_type}" pos="{pos_x} {pos_y} {pos_z}" size="{size_x} {size_y} {size_z}" euler="{tilt_x} {tilt_y} {rotation_z}" rgba="{rgba}"/>')
 
     return terrain
 
-def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file):
+def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file):
     # 生成地形的所有geom块
-    terrain_boxes = generate_geom_terrain(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max)
+    terrain_boxes = generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max)
     
     # 定义MuJoCo XML的头部和尾部
     header = '''<mujoco model="random_box_terrain">
@@ -82,12 +85,24 @@ def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, max_tilt, min_step, 
 
     print(f"XML文件已生成为 {out_file}")
 
+def parse_geom_size(s):
+    try:
+        # 移除括号并分割字符串
+        s = s.strip('()')
+        parts = s.split(',')
+        if len(parts) != 3:
+            raise ValueError
+        return tuple(float(part) for part in parts)
+    except:
+        raise argparse.ArgumentTypeError("geom_size must be a tuple of three floats, e.g., (0.5,0.3,0.2)")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--num_x', type=int, default=10, help='Number of boxes in x direction')
     parser.add_argument('--num_y', type=int, default=10, help='Number of boxes in y direction')
-    parser.add_argument('--geom_type', type=str, default='box', help='Type of geom to use for terrain generation')    
-    parser.add_argument('--geom_size', type=float, default=1, help='Size of each geom')
+    parser.add_argument('--geom_type', type=str, default='box', help='Type of geom to use for terrain generation (sphere, ellipsoid, box, cylinder, capsule)')    
+    parser.add_argument('--geom_size', type=parse_geom_size, default="(1, 1, 0.1)", help='Size (x, y, z) of each geom')
+    parser.add_argument('--geom_size_cale_range', type=float, default=0.5, help="The random range of geom size")
     parser.add_argument('--max_tilt', type=float, default=3, help='Max tilt of each geom')
     parser.add_argument('--min_step', type=float, default=-0.05, help='Min step between geoms')
     parser.add_argument('--max_step', type=float, default=0.05, help='Max step between geoms')
@@ -104,6 +119,7 @@ if __name__ == "__main__":
     num_y = args.num_y
     geom_type = args.geom_type
     geom_size = args.geom_size
+    geom_size_cale_range = args.geom_size_cale_range
     max_tilt = args.max_tilt
     min_step = args.min_step
     max_step = args.max_step
@@ -114,7 +130,7 @@ if __name__ == "__main__":
     rotation_z_max = args.rotation_z_max
     out_file = args.output
 
-    generate_mujoco_xml(num_x, num_y, geom_type, geom_size, max_tilt, min_step, max_step, 
+    generate_mujoco_xml(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, 
                         max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file)
 
     # generate_mujoco_xml(
