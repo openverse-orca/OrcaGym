@@ -13,7 +13,7 @@ from openloong_dyn_ctrl import OpenLoongWBC, OrcaGym_Interface, ButtonState
 import numpy as np
 from gymnasium.core import ObsType
 from orca_gym.utils import rotations
-from envs import OrcaGymRemoteEnv, OrcaGymLocalEnv
+from orca_gym.environment import OrcaGymRemoteEnv, OrcaGymLocalEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
@@ -223,7 +223,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
 
     def reset_model(self):
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     def get_observation(self, obs=None):
         if obs is not None:

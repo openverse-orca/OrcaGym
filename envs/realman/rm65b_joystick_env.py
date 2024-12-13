@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -340,7 +340,7 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

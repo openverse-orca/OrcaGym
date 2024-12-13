@@ -1,7 +1,7 @@
 # car_keyboard_env.py
 
 from orca_gym.utils import rotations
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -162,7 +162,7 @@ class CarKeyboardEnv(OrcaGymRemoteEnv):
     def reset_model(self):
         self._set_init_state()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     def get_observation(self, obs=None):
         if obs is not None:

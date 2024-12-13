@@ -5,7 +5,7 @@ from typing import Dict, Union
 import numpy as np
 
 from gymnasium import utils
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from gymnasium.spaces import Box
 
 
@@ -274,7 +274,7 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
         )
         qvel[-4:] = 0
         self.set_qpos_qvel(qpos, qvel)
-        return self._get_obs()
+        return self._get_obs(), {}
 
     def _get_obs(self):
         xpos, _ = self.get_body_com_xpos_xmat([self.body("tips_arm"), self.body("object"), self.body("goal")])

@@ -1,5 +1,5 @@
 from os import path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,20 +7,20 @@ from numpy.typing import NDArray
 import gymnasium as gym
 from gymnasium import error, spaces
 from gymnasium.spaces import Space
+from gymnasium.core import ObsType
 
 import asyncio
 import sys
-from orca_gym import OrcaGymRemote, OrcaGymLocal
+from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
-from envs import OrcaGymBaseEnv, RewardType
+from . import OrcaGymBaseEnv
 
 import grpc
 
-import mujoco
 from datetime import datetime
 import time
 
@@ -41,7 +41,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             **kwargs
         )
 
-        render_fps = 30
+        render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
 
@@ -142,6 +142,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         qpos_offsets, qvel_offsets, qacc_offsets = self.gym.query_joint_offsets(joint_names)
         return qpos_offsets, qvel_offsets, qacc_offsets
     
+    def query_joint_lengths(self, joint_names):
+        qpos_lengths, qvel_lengths, qacc_lengths = self.gym.query_joint_lengths(joint_names)
+        return qpos_lengths, qvel_lengths, qacc_lengths
     
     def get_body_xpos_xmat_xquat(self, body_name_list):
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)
@@ -165,6 +168,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_joint_qvel(self, joint_names):
         joint_qvel_dict = self.gym.query_joint_qvel(joint_names)
         return joint_qvel_dict
+    
+    def query_joint_qacc(self, joint_names):
+        joint_qacc_dict = self.gym.query_joint_qacc(joint_names)
+        return joint_qacc_dict
     
     def jnt_qposadr(self, joint_name):
         joint_qposadr = self.gym.jnt_qposadr(joint_name)
@@ -197,6 +204,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_joint_qpos(self, joint_qpos):
         self.gym.set_joint_qpos(joint_qpos)
 
+    def set_joint_qvel(self, joint_qvel):
+        self.gym.set_joint_qvel(joint_qvel)
     
     def query_site_xvalp_xvalr(self, site_names):
         query_dict = self.gym.mj_jac_site(site_names)
@@ -214,3 +223,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
         send_remote = self.render_mode == "human" and self.render_remote
         self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))
+
+    def query_contact_simple(self):
+        return self.gym.query_contact_simple()
+    
+    def set_geom_friction(self, geom_friction_dict):
+        self.gym.set_geom_friction(geom_friction_dict)

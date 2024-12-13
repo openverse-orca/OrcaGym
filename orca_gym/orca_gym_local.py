@@ -31,7 +31,7 @@ def get_qpos_size(joint_type):
     else:
         return 0
 
-def get_qvel_size(joint_type):
+def get_dof_size(joint_type):
     if joint_type == mujoco.mjtJoint.mjJNT_FREE:
         return 6
     elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
@@ -89,8 +89,13 @@ class OrcaGymLocal(OrcaGymBase):
         self.model.init_geom_dict(geom_dict)
         site_dict = self.query_all_sites()
         self.model.init_site_dict(site_dict)
+        sensor_dict = self.query_all_sensors()
+        self.model.init_sensor_dict(sensor_dict)
 
         self.data = OrcaGymData(self.model)
+        self._qpos_cache = np.array(self._mjData.qpos, copy=True)
+        self._qvel_cache = np.array(self._mjData.qvel, copy=True)
+        self._qacc_cache = np.array(self._mjData.qacc, copy=True)
         self.update_data()
 
     async def render(self):
@@ -167,6 +172,7 @@ class OrcaGymLocal(OrcaGymBase):
             'nuser_tendon': self._mjModel.nuser_tendon,
             'nuser_actuator': self._mjModel.nuser_actuator,
             'nuser_sensor': self._mjModel.nuser_sensor,
+            'nconmax': self._mjModel.nconmax,
         }
         return model_info
     
@@ -359,19 +365,35 @@ class OrcaGymLocal(OrcaGymBase):
 
         return site_dict 
     
+    def query_all_sensors(self):
+        model = self._mjModel
+        sensor_dict = {}
+        for i in range(model.nsensor):
+            sensor = model.sensor(i)
+            sensor_dict[sensor.name] = {
+                "ID": sensor.id,
+                "Type": sensor.type[0],
+                "ObjID": sensor.objid[0],
+                "Dim": sensor.dim[0],
+                "Adr": sensor.adr[0],
+                "Noise": sensor.noise[0]
+            }
+
+        return sensor_dict
+    
     def update_data(self):
-        qpos, qvel, qacc = self.query_all_qpos_qvel_qacc()
+        self._qpos_cache[:] = self._mjData.qpos
+        self._qvel_cache[:] = self._mjData.qvel
+        self._qacc_cache[:] = self._mjData.qacc
+        # print("qpos_cache: ", len(self._qpos_cache))
+        # print("qvel_cache: ", len(self._qvel_cache))
+        # print("qacc_cache: ", len(self._qacc_cache))
+
         qfrc_bias = self.query_qfrc_bias()
         
-        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)        
+        self.data.update_qpos_qvel_qacc(self._qpos_cache, self._qvel_cache, self._qacc_cache)        
         self.data.update_qfrc_bias(qfrc_bias)
 
-    def query_all_qpos_qvel_qacc(self):
-        qpos = self._mjData.qpos
-        qvel = self._mjData.qvel
-        qacc = self._mjData.qacc
-
-        return qpos, qvel, qacc
     
     def query_qfrc_bias(self):
         qfrc_bias = self._mjData.qfrc_bias
@@ -391,9 +413,22 @@ class OrcaGymLocal(OrcaGymBase):
             joint_id = self._mjModel.joint(joint_name).id
             qpos_offsets.append(self._mjModel.jnt_qposadr[joint_id])
             qvel_offsets.append(self._mjModel.jnt_dofadr[joint_id])
-            qacc_offsets.append(self._mjModel.jnt_dofadr[joint_id] + self._mjModel.njnt)
+            qacc_offsets.append(self._mjModel.jnt_dofadr[joint_id])
 
         return qpos_offsets, qvel_offsets, qacc_offsets    
+    
+    def query_joint_lengths(self, joint_names):
+        qpos_lengths = []
+        qvel_lengths = []
+        qacc_lengths = []
+
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            qpos_lengths.append(get_qpos_size(self._mjModel.jnt_type[joint_id]))
+            qvel_lengths.append(get_dof_size(self._mjModel.jnt_type[joint_id]))
+            qacc_lengths.append(get_dof_size(self._mjModel.jnt_type[joint_id]))
+
+        return qpos_lengths, qvel_lengths, qacc_lengths
     
     def query_body_xpos_xmat_xquat(self, body_name_list):
         body_pos_mat_quat_list = {}
@@ -411,29 +446,10 @@ class OrcaGymLocal(OrcaGymBase):
     def query_sensor_data(self, sensor_names):
         sensor_data_dict = {}
         for sensor_name in sensor_names:
-            sensor_id = self._mjModel.sensor(sensor_name).id
-            sensor_dim = self._mjModel.sensor_dim[sensor_id]
-            sensor_type = self._mjModel.sensor_type[sensor_id]
-
-            if sensor_type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
-                sensor_type_str = "accelerometer"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_GYRO:
-                sensor_type_str = "gyro"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_TOUCH:
-                sensor_type_str = "touch"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_VELOCIMETER:
-                sensor_type_str = "velocimeter"
-            elif sensor_type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
-                sensor_type_str = "framequat"
-            else:
-                sensor_type_str = "unknown"
-
-            sensor_values = np.copy(self._mjData.sensordata[sensor_id:sensor_id + sensor_dim])
-
-            sensor_data_dict[sensor_name] = {
-                "type": sensor_type_str,
-                "values": sensor_values,
-            }
+            sensor_info = self.model.get_sensor(sensor_name)
+            # print("Sensor Info: ", sensor_info, sensor_name)
+            sensor_values = np.copy(self._mjData.sensordata[sensor_info['Adr']:sensor_info['Adr'] + sensor_info['Dim']])
+            sensor_data_dict[sensor_name] = sensor_values
 
         # print("Sensor Data Dict: ", sensor_data_dict)
 
@@ -464,8 +480,17 @@ class OrcaGymLocal(OrcaGymBase):
         joint_qvel_dict = {}
         for joint_name in joint_names:
             joint_id = self._mjModel.joint(joint_name).id
-            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]]
+            joint_type = self._mjModel.jnt_type[joint_id]
+            joint_qvel_dict[joint_name] = self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_dof_size(joint_type)]
         return joint_qvel_dict
+    
+    def query_joint_qacc(self, joint_names):
+        joint_qacc_dict = {}
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            joint_type = self._mjModel.jnt_type[joint_id]
+            joint_qacc_dict[joint_name] = self._mjData.qacc[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + get_dof_size(joint_type)]
+        return joint_qacc_dict
     
     def jnt_qposadr(self, joint_name):
         joint_id = self._mjModel.joint(joint_name).id
@@ -478,10 +503,9 @@ class OrcaGymLocal(OrcaGymBase):
     def query_site_pos_and_mat(self, site_names: list[str]):
         site_pos_and_mat = {}
         for site_name in site_names:
-            site_id = self._mjModel.site(site_name).id
-            site = self._mjData.site_xpos[site_id]
-            site_mat = self._mjData.site_xmat[site_id]
-            site_pos_and_mat[site_name] = {"xpos": site, "xmat": site_mat}
+            xpos = self._mjData.site(site_name).xpos
+            xmat = self._mjData.site(site_name).xmat
+            site_pos_and_mat[site_name] = {"xpos": xpos, "xmat": xmat}
         return site_pos_and_mat
     
     def set_joint_qpos(self, joint_qpos):
@@ -489,6 +513,12 @@ class OrcaGymLocal(OrcaGymBase):
             joint_id = self._mjModel.joint(joint_name).id
             qpos_size = get_qpos_size(self._mjModel.jnt_type[joint_id])
             self._mjData.qpos[self._mjModel.jnt_qposadr[joint_id]:self._mjModel.jnt_qposadr[joint_id] + qpos_size] = qpos.copy()
+
+    def set_joint_qvel(self, joint_qvel):
+        for joint_name, qvel in joint_qvel.items():
+            joint_id = self._mjModel.joint(joint_name).id
+            dof_size = get_dof_size(self._mjModel.jnt_type[joint_id])
+            self._mjData.qvel[self._mjModel.jnt_dofadr[joint_id]:self._mjModel.jnt_dofadr[joint_id] + dof_size] = qvel.copy()
 
     def mj_jac_site(self, site_names: list[str]):
         site_jacs_dict = {}
@@ -538,3 +568,23 @@ class OrcaGymLocal(OrcaGymBase):
         
         if send_remote:
             await self._remote_set_mocap_pos_and_quat(mocap_data)
+
+    def query_contact_simple(self):
+        contact = self._mjData.contact
+        contacts = []
+        for i in range(self._mjData.ncon):
+            contact_info = {
+                "ID": i,
+                "Dim": contact.dim[i],
+                "Geom1": contact.geom1[i],
+                "Geom2": contact.geom2[i],
+            }
+            contacts.append(contact_info)
+        
+        return contacts            
+    
+    def set_geom_friction(self, geom_friction_dict):
+        model = self._mjModel
+        for name, friction in geom_friction_dict.items():
+            geom = model.geom(name)
+            geom.friction = friction.copy()

@@ -20,7 +20,7 @@ from envs.quadruped.utils.math_utils import homogenous_transform
 from envs.quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from orca_gym.devices.keyboard import KeyboardInput
 
 BASE_OBS = ['base_pos',
@@ -758,8 +758,8 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
         contact_list = self._contact_list
         for contact_id, contact in enumerate(contact_list):
             # Get body IDs from geom IDs
-            body1_id = self.model.get_geom_bodyid(contact['Geom1'])
-            body2_id = self.model.get_geom_bodyid(contact['Geom2'])
+            body1_id = self.model.get_geom_body_id(contact['Geom1'])
+            body2_id = self.model.get_geom_body_id(contact['Geom2'])
 
             if 0 in [body1_id, body2_id]:  # World body ID is 0
                 second_id = body2_id if body1_id == 0 else body1_id
@@ -1019,9 +1019,9 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
         invalid_contact_detected = False
         contact_list = self._contact_list
         for contact in contact_list:
-            body1_name = self.model.get_geom(contact['Geom1'])['BodyName']
+            body1_name = self.model.get_geom_body_name(contact['Geom1'])
             body1_id = self.model.body_name2id(body1_name)
-            body2_name = self.model.get_geom(contact['Geom2'])['BodyName']
+            body2_name = self.model.get_geom_body_name(contact['Geom2'])
             body2_id = self.model.body_name2id(body2_name)
 
         # for contact in self.mjData.contact:

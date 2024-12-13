@@ -1,5 +1,5 @@
 <mujoco model="A01B_URDF">
-  <compiler angle="radian" assetdir="meshes" texturedir="meshes" discardvisual="false" autolimits="true" eulerseq="zyx"/>
+  <compiler angle="radian" assetdir="meshes" discardvisual="false" autolimits="true" eulerseq="zyx"/>
   <option timestep="0.002"  tolerance="0.0000000001" impratio="200" noslip_iterations="100000"/>
 
   <visual >
@@ -9,6 +9,7 @@
 
   <default>
     <default class="quadruped">
+      <general dyntype="none" biastype="affine"/>
       <geom friction="0.8" margin="0.001" material="robot_color"/>
       <default class="collision">
         <geom group="4" contype="1" conaffinity="1" mass="0"/>
@@ -80,6 +81,30 @@
       <roughness  texture="Plastic006_roughness"/>
     </material>
 
+    <texture type="2d" name="Metal044A_color"      file="../../../../textures/Metal044A_2K-PNG/Metal044A_2K-PNG_Color.png"/>
+    <texture type="2d" name="Metal044A_roughness"  file="../../../../textures/Metal044A_2K-PNG/Metal044A_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Metal044A_metalic"  file="../../../../textures/Metal044A_2K-PNG/Metal044A_2K-PNG_Metalness.png"/>
+    <texture type="2d" name="Metal044A_normal"     file="../../../../textures/Metal044A_2K-PNG/Metal044A_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_metal_silver_smooth" metallic ="0.0" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Metal044A_color"/>
+      <normal     texture="Metal044A_normal"/>
+      <roughness  texture="Metal044A_roughness"/>
+      <metallic  texture="Metal044A_metalic"/>
+    </material>
+
+    <texture type="2d" name="Metal044B_color"      file="../../../../textures/Metal044B_2K-PNG/Metal044B_2K-PNG_Color.png"/>
+    <texture type="2d" name="Metal044B_roughness"  file="../../../../textures/Metal044B_2K-PNG/Metal044B_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Metal044B_metalic"  file="../../../../textures/Metal044B_2K-PNG/Metal044B_2K-PNG_Metalness.png"/>
+    <texture type="2d" name="Metal044B_normal"     file="../../../../textures/Metal044B_2K-PNG/Metal044B_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_metal_silver_rough" metallic ="0.0" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Metal044B_color"/>
+      <normal     texture="Metal044B_normal"/>
+      <roughness  texture="Metal044B_roughness"/>
+      <metallic  texture="Metal044B_metalic"/>
+    </material>    
+
 
     <mesh name="base_link" file="base_link.STL"/>
     <mesh name="fl_abad" file="fl_abad.STL"/>
@@ -97,126 +122,166 @@
   </asset>
   
   <worldbody>
-  <light name="spotlight" mode="targetbodycom" target="trunk_link" pos="0 -1 2"/>
-  <body name="trunk_link" pos="0 0 0.8">
-    <geom type="mesh" rgba="1 1 1 1" mesh="base_link" class="visual" material="pbr_metal_gray"/>
-    <inertial mass="30.0746" pos="0.007942 -0.005670 0.007308" fullinertia="0.3194 1.180 1.35 0.006817 -0.048847 -0.001017 "/>
-    <geom class="collision" type="box" pos="0 0 -0.04" size="0.35 0.13 0.08" contype="0" conaffinity="1"/>
-    <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 -0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
-    <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
-    <!-- 机身底座支架的碰撞点 -->
-    <geom name="fr_base_bracket" class="base_bracket"  pos="0.285 -0.108 -0.145"   contype="1" conaffinity="1"/>
-    <geom name="fl_base_bracket" class="base_bracket"  pos="0.285 0.072 -0.145"   contype="1" conaffinity="1"/>
-    <geom name="hr_base_bracket" class="base_bracket"  pos="-0.177 -0.108 -0.145"   contype="1" conaffinity="1"/>
-    <geom name="hl_base_bracket" class="base_bracket"  pos="-0.177 0.072 -0.145"   contype="1" conaffinity="1"/>
-    <geom name="top_radar" class="radar"  pos="0.44 -0.02 0.1"   contype="1" conaffinity="1"/>
-    <geom name="front_face" class="face"  pos="0.51 -0.02 0.03" quat="0 0 1 1"  contype="1" conaffinity="1"/>
-    <geom name="back_face" class="face"  pos="-0.4 -0.02 0.03" quat="0 0 1 1"  contype="1" conaffinity="1"/>
-    <site name="imu" size="0.01" pos="0 0 0"/>
-    
-    <freejoint/>
-    <body name="fr_abad" pos="0.42386 -0.11844 -0.044478">
-      <inertial pos="-0.022282 0.016137 0.000446" quat="0.456334 0.441042 0.546683 0.54624" mass="2.4" diaginertia="0.00830465 0.00689115 0.0036792"/>
-      <joint name="fr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
-      <geom type="mesh" rgba="1 1 1 1" mesh="fr_abad" class="visual" material="pbr_metal_gray"/>
-      <geom  class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
-      <body name="fr_thigh" pos="0 -0.13425 0">
-        <inertial pos="-0.00344 0.057962 -0.023227" quat="0.987524 -0.130746 0.029794 -0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="fr_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
-        <geom type="mesh" rgba="1 1 1 1" mesh="fr_thigh" class="visual" material="pbr_metal_gray"/>
-        <geom class="collision_thigh_1" pos="0 0.04 0" contype="0" conaffinity="0"/>
-        <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
-        <body name="fr_calf" pos="0 0 -0.35">
-          <inertial pos="0.0167506 0.000104828 -0.179424" quat="0.721314 -0.0175889 -0.0176363 0.69216" mass="0.61" diaginertia="0.0158521 0.0155591 0.000377821"/>
-          <joint name="fr_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
-          <geom type="mesh" rgba="1 1 1 1" mesh="fr_calf" class="visual" material="pbr_plastic_black"/>
-          <geom  class="collision_calf" contype="1" conaffinity="0"/>
-          <geom  class="foot" contype="1" conaffinity="1" name="fr"/>
-          <site name="fr_site" class="foot_site" />
+  <!-- <light name="spotlight" mode="targetbodycom" target="trunk_link" pos="0 -1 2"/> -->
+
+    <body name="imu_mocap" pos="0 0 0" mocap="true">
+      <!-- 修改 group="1" 来显示坐标轴，3为不显示 -->
+      <geom conaffinity="0" contype="0" pos="0.3 0 0" rgba="0.7 0 0 0.5" size="0.3 0.005 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0.3 0" rgba="0 0.7 0 0.5" size="0.005 0.3 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.3" type="box" group="1"></geom>
+    </body>
+
+    <body name="trunk_link" pos="0 0 0.8">
+      <geom type="mesh" rgba="1 1 1 1" pos="0.0608046 -0.0181483 -0.0448853" mesh="base_link" class="visual" material="pbr_metal_silver_rough"/>
+      <inertial mass="30.0746" pos="0.007942 -0.005670 0.007308" fullinertia="0.3194 1.180 1.35 0.006817 -0.048847 -0.001017 "/>
+      <geom class="collision" type="box" pos="0 0 -0.04" size="0.35 0.13 0.08" contype="0" conaffinity="1"/>
+      <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 -0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
+      <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
+      <!-- 机身底座支架的碰撞点 -->
+      <geom name="fr_base_bracket" class="base_bracket"  pos="0.285 -0.108 -0.145"   contype="1" conaffinity="1"/>
+      <geom name="fl_base_bracket" class="base_bracket"  pos="0.285 0.072 -0.145"   contype="1" conaffinity="1"/>
+      <geom name="hr_base_bracket" class="base_bracket"  pos="-0.177 -0.108 -0.145"   contype="1" conaffinity="1"/>
+      <geom name="hl_base_bracket" class="base_bracket"  pos="-0.177 0.072 -0.145"   contype="1" conaffinity="1"/>
+      <geom name="top_radar" class="radar"  pos="0.44 -0.02 0.1"   contype="1" conaffinity="1"/>
+      <geom name="front_face" class="face"  pos="0.51 -0.02 0.03" quat="0 0 1 1"  contype="1" conaffinity="1"/>
+      <geom name="back_face" class="face"  pos="-0.4 -0.02 0.03" quat="0 0 1 1"  contype="1" conaffinity="1"/>
+      <site name="imu" size="0.01" pos="0 0 0"/>
+      
+      <freejoint name="trunk"/>
+      <body name="fr_abad" pos="0.42386 -0.11844 -0.044478">
+        <inertial pos="-0.022282 0.016137 0.000446" quat="0.456334 0.441042 0.546683 0.54624" mass="2.4" diaginertia="0.00830465 0.00689115 0.0036792"/>
+        <joint name="fr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
+        <geom type="mesh" rgba="1 1 1 1" mesh="fr_abad" class="visual" material="pbr_metal_silver_rough"/>
+        <geom  class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
+        <body name="fr_thigh" pos="0 -0.13425 0">
+          <inertial pos="-0.00344 0.057962 -0.023227" quat="0.987524 -0.130746 0.029794 -0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
+          <joint name="fr_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
+          <geom type="mesh" rgba="1 1 1 1" mesh="fr_thigh" class="visual" material="pbr_metal_silver_rough"/>
+          <geom class="collision_thigh_1" pos="0 0.04 0" contype="0" conaffinity="0"/>
+          <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
+          <body name="fr_calf" pos="0 0 -0.35">
+            <inertial pos="0.0167506 0.000104828 -0.179424" quat="0.721314 -0.0175889 -0.0176363 0.69216" mass="0.61" diaginertia="0.0158521 0.0155591 0.000377821"/>
+            <joint name="fr_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
+            <geom type="mesh" rgba="1 1 1 1" mesh="fr_calf" class="visual" material="pbr_plastic_black"/>
+            <geom  class="collision_calf" contype="1" conaffinity="0"/>
+            <geom  class="foot" contype="1" conaffinity="1" name="fr"/>
+            <site name="fr_site" class="foot_site" />
+          </body>
         </body>
       </body>
-    </body>
-    <body name="fl_abad" pos="0.42386 0.081557 -0.044479">
-      <inertial pos="-0.014896 -0.015941 0.000233" quat="0.546522 0.546463 0.44111 0.456195" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="fl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
-      <geom type="mesh" rgba="1 1 1 1" mesh="fl_abad" class="visual" material="pbr_metal_gray"/>
-      <geom  class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
-      <body name="fl_thigh" pos="0 0.1343 0">
-        <inertial pos="-0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="fl_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
-        <geom type="mesh" rgba="1 1 1 1" mesh="fl_thigh" class="visual" material="pbr_metal_gray"/>
-        <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
-        <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
-        <body name="fl_calf" pos="0 0 -0.35">
-          <inertial pos="0.01656 -0.000105 -0.179108" quat="0.706202 -0.0170205 -0.0176403 0.707586" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
-          <joint name="fl_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
-          <geom type="mesh" rgba="1 1 1 1" mesh="fl_calf" class="visual" material="pbr_plastic_black"/>
-          <geom class="collision_calf" contype="1" conaffinity="0"/>
-          <geom class="foot" contype="1" conaffinity="1" name="fl"/>
-          <site name="fl_site" class="foot_site"/>
+      <body name="fl_abad" pos="0.42386 0.081557 -0.044479">
+        <inertial pos="-0.014896 -0.015941 0.000233" quat="0.546522 0.546463 0.44111 0.456195" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
+        <joint name="fl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
+        <geom type="mesh" rgba="1 1 1 1" mesh="fl_abad" class="visual" material="pbr_metal_silver_rough"/>
+        <geom  class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
+        <body name="fl_thigh" pos="0 0.1343 0">
+          <inertial pos="-0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
+          <joint name="fl_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
+          <geom type="mesh" rgba="1 1 1 1" mesh="fl_thigh" class="visual" material="pbr_metal_silver_rough"/>
+          <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
+          <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
+          <body name="fl_calf" pos="0 0 -0.35">
+            <inertial pos="0.01656 -0.000105 -0.179108" quat="0.706202 -0.0170205 -0.0176403 0.707586" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
+            <joint name="fl_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
+            <geom type="mesh" rgba="1 1 1 1" mesh="fl_calf" class="visual" material="pbr_plastic_black"/>
+            <geom class="collision_calf" contype="1" conaffinity="0"/>
+            <geom class="foot" contype="1" conaffinity="1" name="fl"/>
+            <site name="fl_site" class="foot_site"/>
+          </body>
         </body>
       </body>
-    </body>
-    <body name="hr_abad" pos="-0.31564 -0.11844 -0.044478">
-      <inertial pos="0.014896 0.015941 0.000233" quat="0.546463 0.546522 0.456195 0.44111" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="hr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
-      <geom type="mesh" rgba="1 1 1 1" mesh="hr_abad" class="visual" material="pbr_metal_gray"/>
-      <geom class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
-      <body name="hr_thigh" pos="0 -0.1343 0">
-        <inertial pos="0.00344 0.057962 -0.023227" quat="0.987524 -0.130746 -0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="hr_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
-        <geom type="mesh" rgba="1 1 1 1" mesh="hr_thigh" class="visual" material="pbr_metal_gray"/>
-        <geom class="collision_thigh_1" pos="0 0.04 0" contype="0" conaffinity="0"/>
-        <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
-        <body name="hr_calf" pos="0.0067191 0 -0.34994">
-          <inertial pos="0.01656 0.000105 -0.179108" quat="0.707586 -0.0176403 -0.0170205 0.706202" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
-          <joint name="hr_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
-          <geom type="mesh" rgba="1 1 1 1" mesh="hr_calf" class="visual" material="pbr_plastic_black"/>
-          <geom class="collision_calf" contype="1" conaffinity="0"/>
-          <geom class="foot" contype="1" conaffinity="1" name="hr"/>
-          <site name="hr_site" class="foot_site"/>
+      <body name="hr_abad" pos="-0.31564 -0.11844 -0.044478">
+        <inertial pos="0.014896 0.015941 0.000233" quat="0.546463 0.546522 0.456195 0.44111" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
+        <joint name="hr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
+        <geom type="mesh" rgba="1 1 1 1" mesh="hr_abad" class="visual" material="pbr_metal_silver_rough"/>
+        <geom class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
+        <body name="hr_thigh" pos="0 -0.1343 0">
+          <inertial pos="0.00344 0.057962 -0.023227" quat="0.987524 -0.130746 -0.029794 0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
+          <joint name="hr_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
+          <geom type="mesh" rgba="1 1 1 1" mesh="hr_thigh" class="visual" material="pbr_metal_silver_rough"/>
+          <geom class="collision_thigh_1" pos="0 0.04 0" contype="0" conaffinity="0"/>
+          <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
+          <body name="hr_calf" pos="0.0067191 0 -0.34994">
+            <inertial pos="0.01656 0.000105 -0.179108" quat="0.707586 -0.0176403 -0.0170205 0.706202" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
+            <joint name="hr_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
+            <geom type="mesh" rgba="1 1 1 1" mesh="hr_calf" class="visual" material="pbr_plastic_black"/>
+            <geom class="collision_calf" contype="1" conaffinity="0"/>
+            <geom class="foot" contype="1" conaffinity="1" name="hr"/>
+            <site name="hr_site" class="foot_site"/>
+          </body>
         </body>
       </body>
-    </body>
-    <body name="hl_abad" pos="-0.31564 0.081559 -0.044478">
-      <inertial pos="0.014896 -0.015941 0.000233" quat="0.44111 0.456195 0.546522 0.546463" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
-      <joint name="hl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7812 0.7812" class="joint"/>
-      <geom type="mesh" rgba="1 1 1 1" mesh="hl_abad" class="visual" material="pbr_metal_gray"/>
-      <geom class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
-      <body name="hl_thigh" pos="0 0.13425 0">
-        <inertial pos="0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 -0.029794 -0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
-        <joint name="hl_joint1" pos="0 0 0" axis="0 -1 0" range="-2.6041 0" class="joint"/>
-        <geom type="mesh" rgba="1 1 1 1" mesh="hl_thigh" class="visual" material="pbr_metal_gray"/>
-        <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
-        <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
-        <body name="hl_calf" pos="0.0067191 0 -0.34994">
-          <inertial pos="0.01656 -0.000105 -0.179108" quat="0.709257 -0.0169468 -0.0177109 0.704523" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
-          <joint name="hl_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
-          <geom type="mesh" rgba="1 1 1 1" mesh="hl_calf" class="visual" material="pbr_plastic_black"/>
-          <geom class="collision_calf" contype="1" conaffinity="0"/>
-          <geom class="foot" contype="1" conaffinity="1" name="hl"/>
-          <site name="hl_site" class="foot_site"/>
+      <body name="hl_abad" pos="-0.31564 0.081559 -0.044478">
+        <inertial pos="0.014896 -0.015941 0.000233" quat="0.44111 0.456195 0.546522 0.546463" mass="2.4" diaginertia="0.00666332 0.00556161 0.00306241"/>
+        <joint name="hl_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
+        <geom type="mesh" rgba="1 1 1 1" mesh="hl_abad" class="visual" material="pbr_metal_silver_rough"/>
+        <geom class="collision_abad" pos="0 -0.02 0" contype="0" conaffinity="0"/>
+        <body name="hl_thigh" pos="0 0.13425 0">
+          <inertial pos="0.00344 -0.057962 -0.023227" quat="0.987524 0.130746 -0.029794 -0.0825434" mass="4.832" diaginertia="0.0345519 0.0324169 0.00515115"/>
+          <joint name="hl_joint1" pos="0 0 0" axis="0 -1 0" range="-3.1765 0" class="joint"/>
+          <geom type="mesh" rgba="1 1 1 1" mesh="hl_thigh" class="visual" material="pbr_metal_silver_rough"/>
+          <geom class="collision_thigh_1" pos="0 -0.04 0" contype="0" conaffinity="0"/>
+          <geom class="collision_thigh_2" pos="-0.03 0.0 -0.18" contype="0" conaffinity="0"/>
+          <body name="hl_calf" pos="0.0067191 0 -0.34994">
+            <inertial pos="0.01656 -0.000105 -0.179108" quat="0.709257 -0.0169468 -0.0177109 0.704523" mass="0.61" diaginertia="0.0158062 0.0155149 0.000377068"/>
+            <joint name="hl_joint2" pos="0 0 0" axis="0 -1 0" range="0.5208 2.5173" class="joint"/>
+            <geom type="mesh" rgba="1 1 1 1" mesh="hl_calf" class="visual" material="pbr_plastic_black"/>
+            <geom class="collision_calf" contype="1" conaffinity="0"/>
+            <geom class="foot" contype="1" conaffinity="1" name="hl"/>
+            <site name="hl_site" class="foot_site"/>
+          </body>
         </body>
       </body>
+      
     </body>
-    
-  </body>
   </worldbody>
 
-<actuator>
-<motor name="fr_tau0" joint="fr_joint0" ctrlrange="-100 100"/>
-<motor name="fr_tau1" joint="fr_joint1" ctrlrange="-100 100"/>
-<motor name="fr_tau2" joint="fr_joint2" ctrlrange="-100 100"/>
-<motor name="fl_tau0" joint="fl_joint0" ctrlrange="-100 100"/>
-<motor name="fl_tau1" joint="fl_joint1" ctrlrange="-100 100"/>
-<motor name="fl_tau2" joint="fl_joint2" ctrlrange="-100 100"/>
-<motor name="hr_tau0" joint="hr_joint0" ctrlrange="-100 100"/>
-<motor name="hr_tau1" joint="hr_joint1" ctrlrange="-100 100"/>
-<motor name="hr_tau2" joint="hr_joint2" ctrlrange="-100 100"/>
-<motor name="hl_tau0" joint="hl_joint0" ctrlrange="-100 100"/>
-<motor name="hl_tau1" joint="hl_joint1" ctrlrange="-100 100"/>
-<motor name="hl_tau2" joint="hl_joint2" ctrlrange="-100 100"/>
-</actuator>
+  <actuator>
+    <motor name="fr_abad_actuator" joint="fr_joint0" ctrlrange="-50 50"/>
+    <motor name="fr_thigh_actuator" joint="fr_joint1" ctrlrange="-150 150"/>
+    <motor name="fr_calf_actuator" joint="fr_joint2" ctrlrange="-100 100"/>
+    <motor name="fl_abad_actuator" joint="fl_joint0" ctrlrange="-50 50"/>
+    <motor name="fl_thigh_actuator" joint="fl_joint1" ctrlrange="-150 150"/>
+    <motor name="fl_calf_actuator" joint="fl_joint2" ctrlrange="-100 100"/>
+    <motor name="hr_abad_actuator" joint="hr_joint0" ctrlrange="-50 50"/>
+    <motor name="hr_thigh_actuator" joint="hr_joint1" ctrlrange="-150 150"/>
+    <motor name="hr_calf_actuator" joint="hr_joint2" ctrlrange="-100 100"/>
+    <motor name="hl_abad_actuator" joint="hl_joint0" ctrlrange="-50 50"/>
+    <motor name="hl_thigh_actuator" joint="hl_joint1" ctrlrange="-150 150"/>
+    <motor name="hl_calf_actuator" joint="hl_joint2" ctrlrange="-100 100"/>
+  </actuator>
+
+  <!-- <actuator>
+    <general name="fr_abad_actuator" joint="fr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="fr_thigh_actuator" joint="fr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="fr_calf_actuator" joint="fr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <general name="fl_abad_actuator" joint="fl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="fl_thigh_actuator" joint="fl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="fl_calf_actuator" joint="fl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <general name="hr_abad_actuator" joint="hr_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="hr_thigh_actuator" joint="hr_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="hr_calf_actuator" joint="hr_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
+             gainprm="800" biasprm="0 -800 -8"/>
+    
+    <general name="hl_abad_actuator" joint="hl_joint0" ctrllimited="true" ctrlrange="-0.7854 0.7854" forcerange="-50 50"
+             gainprm="500" biasprm="0 -500 -5"/>
+    <general name="hl_thigh_actuator" joint="hl_joint1" ctrllimited="true" ctrlrange="-3.1765 0" forcerange="-150 150"
+             gainprm="1000" biasprm="0 -1000 -10"/>
+    <general name="hl_calf_actuator" joint="hl_joint2" ctrllimited="true" ctrlrange="0.5208 2.5173" forcerange="-100 100"
+             gainprm="800" biasprm="0 -800 -8"/>
+  </actuator> -->
+
+
 <sensor>
 <framequat name="imu_quat" objtype="site" objname="imu"/>
 <gyro name="imu_omega" site="imu" noise="5e-4" cutoff="34.9"/>

@@ -1,7 +1,7 @@
 import numpy as np
 from gymnasium.core import ObsType
 from orca_gym.utils import rotations
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
@@ -359,7 +359,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------

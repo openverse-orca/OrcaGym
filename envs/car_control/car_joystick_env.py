@@ -1,6 +1,6 @@
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
-from envs import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymRemoteEnv
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystick, XboxJoystickManager  # 引入 XboxJoystick 和 XboxJoystickManager
 import numpy as np
@@ -114,4 +114,4 @@ class CarEnv(OrcaGymRemoteEnv):
     def reset_model(self):
         self._set_init_state()
         obs = self._get_obs().copy()
-        return obs
+        return obs, {}

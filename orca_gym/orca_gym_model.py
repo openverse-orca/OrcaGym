@@ -4,6 +4,8 @@ import grpc
 import numpy as np
 import json
 from datetime import datetime
+import mujoco
+from typing import Union
 
 
 class OrcaGymModel:
@@ -67,8 +69,10 @@ class OrcaGymModel:
         self.nmocap = len(mocap_dict)
 
     def init_actuator_dict(self, actuator_dict):
+        self._actuaton_id2name_map = {}
         for i, (actuator_name, actuator) in enumerate(actuator_dict.items()):
             actuator["ActuatorId"] = i
+            self._actuaton_id2name_map[i] = actuator_name
         self._actuator_dict = actuator_dict.copy()
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
@@ -80,27 +84,24 @@ class OrcaGymModel:
     def get_actuator_dict(self):
         return self._actuator_dict
     
-    def get_actuator(self, actuator_name:str):
+    def get_actuator_byid(self, id : int):
+        actuator_name = self._actuaton_id2name_map[id]
         return self._actuator_dict[actuator_name]
     
-    def get_actuator(self, actuator_id:int):
-        actuator_name = self.actuator_id2name(actuator_id)
-        if actuator_name is not None:
-            return self._actuator_dict[actuator_name]
-        return None
+    def get_actuator_byname(self, name : str):
+        return self._actuator_dict[name]
     
     def actuator_name2id(self, actuator_name):
         return self._actuator_dict[actuator_name]["ActuatorId"]
     
     def actuator_id2name(self, actuator_id):
-        for actuator_name, actuator in self._actuator_dict.items():
-            if actuator["ActuatorId"] == actuator_id:
-                return actuator_name
-        return None
-
+        return self._actuaton_id2name_map[actuator_id]
+    
     def init_body_dict(self, body_dict):
+        self._body_id2name_map = {}
         for i, (body_name, body) in enumerate(body_dict.items()):
             body["BodyId"] = i
+            self._body_id2name_map[i] = body_name
         self._body_dict = body_dict.copy()
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
@@ -112,27 +113,24 @@ class OrcaGymModel:
     def get_body_dict(self):
         return self._body_dict
     
-    def get_body(self, body_name:str):
+    def get_body_byid(self, id : int):
+        body_name = self._body_id2name_map[id]
         return self._body_dict[body_name]
     
-    def get_body(self, body_id:int):
-        body_name = self.body_id2name(body_id)
-        if body_name is not None:
-            return self._body_dict[body_name]
-        return None
+    def get_body_byname(self, name : str):
+        return self._body_dict[name]
     
     def body_name2id(self, body_name):
         return self._body_dict[body_name]["BodyId"]
     
     def body_id2name(self, body_id):
-        for body_name, body in self._body_dict.items():
-            if body["BodyId"] == body_id:
-                return body_name
-        return None
+        return self._body_id2name_map[body_id]
 
     def init_joint_dict(self, joint_dict):
+        self._joint_id2name_map = {}
         for i, (joint_name, joint) in enumerate(joint_dict.items()):
             joint["JointId"] = i
+            self._joint_id2name_map[i] = joint_name
         self._joint_dict = joint_dict.copy()
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
@@ -144,27 +142,24 @@ class OrcaGymModel:
     def get_joint_dict(self):
         return self._joint_dict
     
-    def get_joint(self, joint_name:str):
+    def get_joint_byid(self, id : int):
+        joint_name = self._joint_id2name_map[id]
         return self._joint_dict[joint_name]
     
-    def get_joint(self, joint_id:int):
-        joint_name = self.joint_id2name(joint_id)
-        if joint_name is not None:
-            return self._joint_dict[joint_name]
-        return None
+    def get_joint_byname(self, name : str):
+        return self._joint_dict[name]
     
     def joint_name2id(self, joint_name):
         return self._joint_dict[joint_name]["JointId"]
     
     def joint_id2name(self, joint_id):
-        for joint_name, joint in self._joint_dict.items():
-            if joint["JointId"] == joint_id:
-                return joint_name
-        return None
+        return self._joint_id2name_map[joint_id]
 
     def init_geom_dict(self, geom_dict):
+        self._geom_id2name_map = {}
         for i, (geom_name, geom) in enumerate(geom_dict.items()):
             geom["GeomId"] = i
+            self._geom_id2name_map[i] = geom_name
         self._geom_dict = geom_dict.copy()
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
@@ -176,33 +171,28 @@ class OrcaGymModel:
     def get_geom_dict(self):
         return self._geom_dict
     
-    def get_geom(self, geom_name:str):
+    def get_geom_byid(self, id : int):
+        geom_name = self._geom_id2name_map[id]
         return self._geom_dict[geom_name]
     
-    def get_geom(self, geom_id:int):
-        geom_name = self.geom_id2name(geom_id)
-        if geom_name is not None:
-            return self._geom_dict[geom_name]
-        return None
+    def get_geom_byname(self, name : str):
+        return self._geom_dict[name]
     
     def geom_name2id(self, geom_name):
         return self._geom_dict[geom_name]["GeomId"]
     
     def geom_id2name(self, geom_id):
-        for geom_name, geom in self._geom_dict.items():
-            if geom["GeomId"] == geom_id:
-                return geom_name
-        return None
+        return self._geom_id2name_map[geom_id]
 
     def get_body_names(self):
         return self._body_dict.keys()
     
-    def get_geom_bodyname(self, geom_name):
+    def get_geom_body_name(self, geom_id):
+        geom_name = self.geom_id2name(geom_id)
         return self._geom_dict[geom_name]["BodyName"]
     
-    def get_geom_bodyid(self, geom_id):
-        geom_name = self.geom_id2name(geom_id)
-        body_name = self.get_geom_bodyname(geom_name)
+    def get_geom_body_id(self, geom_id):
+        body_name = self.get_geom_body_name(geom_id)
         return self.body_name2id(body_name)
     
     def get_actuator_ctrlrange(self):
@@ -226,13 +216,15 @@ class OrcaGymModel:
     def get_site_dict(self):
         return self._site_dict
     
-    def get_site(self, site_name:str):
-        return self._site_dict[site_name]
-    
-    def get_site(self, site_id:int):
-        site_name = self.site_id2name(site_id)
-        if site_name is not None:
+    def get_site(self, name_or_id: Union[str, int]):
+        if isinstance(name_or_id, str):
+            site_name = name_or_id
             return self._site_dict[site_name]
+        elif isinstance(name_or_id, int):
+            site_id = name_or_id
+            site_name = self.site_id2name(site_id)
+            if site_name is not None:
+                return self._site_dict[site_name]
         return None
     
     def site_name2id(self, site_name):
@@ -244,6 +236,55 @@ class OrcaGymModel:
                 return site_name
         return None
         
+
+    def init_sensor_dict(self, sensor_dict):
+        for i, (sensor_name, sensor) in enumerate(sensor_dict.items()):
+            sensor["SensorId"] = i
+            sensor_type = sensor["Type"]
+            if sensor_type == mujoco.mjtSensor.mjSENS_ACCELEROMETER:
+                sensor_type_str = "accelerometer"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_GYRO:
+                sensor_type_str = "gyro"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_TOUCH:
+                sensor_type_str = "touch"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_VELOCIMETER:
+                sensor_type_str = "velocimeter"
+            elif sensor_type == mujoco.mjtSensor.mjSENS_FRAMEQUAT:
+                sensor_type_str = "framequat"
+            else:
+                sensor_type_str = "unknown"
+            sensor["SensorTypeStr"] = sensor_type_str
+
+        self._sensor_dict = sensor_dict.copy()
+        if self.PRINT_INIT_INFO:
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(sensor_dict, indent=4)
+                print("Sensor dict: ", formatted_dict)
+            else:
+                print("Sensor dict: ", sensor_dict)
+
+    def gen_sensor_dict(self):
+        return self._sensor_dict
+    
+    def get_sensor(self, name_or_id: Union[str, int]):
+        if isinstance(name_or_id, str):
+            sensor_name = name_or_id
+            return self._sensor_dict[sensor_name]
+        elif isinstance(name_or_id, int):
+            sensor_id = name_or_id
+            sensor_name = self.sensor_id2name(sensor_id)
+            if sensor_name is not None:
+                return self._sensor_dict[sensor_name]
+        return None
+    
+    def sensor_name2id(self, sensor_name):
+        return self._sensor_dict[sensor_name]["SensorId"]
+    
+    def sensor_id2name(self, sensor_id):
+        for sensor_name, sensor in self._sensor_dict.items():
+            if sensor["SensorId"] == sensor_id:
+                return sensor_name
+        return None
 
     # def stip_agent_name(self, org_name):
     #     for agent in self.agent_names:

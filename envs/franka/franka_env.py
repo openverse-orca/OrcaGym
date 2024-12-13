@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium.core import ObsType
-from envs import OrcaGymLocalEnv, OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymLocalEnv, OrcaGymRemoteEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -583,7 +583,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         self._set_init_state()
         self._reset_agents(self._agents)
         obs = self._get_obs(self._agents).copy()
-        return obs
+        return obs, {}
 
     # custom methods
     # -----------------------------
