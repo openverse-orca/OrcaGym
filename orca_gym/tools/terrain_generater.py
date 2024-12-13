@@ -21,7 +21,10 @@ def generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_ran
                 else:
                     height = heights[i][j-1]
 
-                delta_h = random.uniform(min_step, max_step)  # 限制高度差在0.1到0.2米之间
+                if random.uniform(0, 1) < 0.5:
+                    delta_h = random.uniform(-min_step * geom_size[2], -max_step * geom_size[2])  # 限制高度差在几何体高度的 min_step 到 max_step 之间
+                else:
+                    delta_h = random.uniform(min_step * geom_size[2], max_step * geom_size[2])  # 限制高度差在几何体高度的 min_step 到 max_step 之间
                 heights[i][j] = max(0, min(max_total_height, height + delta_h))
 
             # 随机生成倾斜角度和旋转
@@ -104,8 +107,8 @@ if __name__ == "__main__":
     parser.add_argument('--geom_size', type=parse_geom_size, default="(1, 1, 0.1)", help='Size (x, y, z) of each geom')
     parser.add_argument('--geom_size_cale_range', type=float, default=0.5, help="The random range of geom size")
     parser.add_argument('--max_tilt', type=float, default=3, help='Max tilt of each geom')
-    parser.add_argument('--min_step', type=float, default=-0.05, help='Min step between geoms')
-    parser.add_argument('--max_step', type=float, default=0.05, help='Max step between geoms')
+    parser.add_argument('--min_step', type=float, default=0.2, help='Min step between geoms')
+    parser.add_argument('--max_step', type=float, default=0.5, help='Max step between geoms')
     parser.add_argument('--max_total_height', type=float, default=1, help='Max total height of terrain')
     parser.add_argument('--min_spacing', type=float, default=0.75, help='Min spacing between geoms')
     parser.add_argument('--max_spacing', type=float, default=1, help='Max spacing between geoms')
