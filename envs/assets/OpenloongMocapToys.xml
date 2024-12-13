@@ -1,0 +1,64 @@
+<mujoco model="toys_scene">
+  <compiler angle="radian" coordinate="local" />
+  <option timestep="0.01" gravity="0 0 -9.81" />
+  
+  <asset>
+    <texture type="2d" name="metal007_color" file="textures/Metal009_2K-PNG/Metal009_2K-PNG_Color.png"/>
+    <texture type="2d" name="wood_texture" file="textures/wood_table_worn_2k/textures/wood_table_worn_diff_2k.png"/>
+    <texture type="2d" name="oak_veneer" file="textures/oak_veneer_01_2k/textures/oak_veneer_01_diff_2k.png" />
+    <material name="metal007_material">
+      <rgb texture="metal007_color"/>
+    </material>
+    <material name="oak_wood_material">
+      <rgb texture="oak_veneer"/>
+    </material>
+    <material name="wood_table_worn_material">
+      <rgb texture="wood_texture"/>
+    </material>
+  </asset>
+  
+  <worldbody>
+    <light name="spotlight" mode="targetbodycom" target="toys" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
+    <body name="toys" pos="0 0 1.522">
+      <light name="top" pos="0 0 2" mode="trackcom"/>
+      <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
+      <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
+
+      <body name="Box1" pos="-0.477 -0.312 0.026">
+        <geom name="box1_geom" type="box" size="0.08 0.08 0.08" material="wood_table_worn_material" density="1000" condim="3" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Box1_small" pos="-0.328 -0.312 -0.026">
+        <geom name="box1_small_geom" type="box" size="0.03 0.03 0.03" material="wood_table_worn_material" density="1000" condim="3" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Box2" pos="-0.328 0 -0.081">
+        <geom name="box2_geom" type="box" size="2.5 0.5 0.025" material="wood_table_worn_material" density="1000" condim="3" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Sphere1" pos="-0.258 -0.256 0.024">
+        <geom name="Sphere1_geom" type="sphere" size="0.05" material="metal007_material" density="500" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Sphere1_small" pos="-0.397 -0.217 0.021">
+        <geom name="Sphere1_small_geom" type="sphere" size="0.025" material="metal007_material" density="500" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Sphere1_small_small" pos="-0.334 -0.278 0.207">
+        <geom name="Sphere1_small_small_geom" type="sphere" size="0.01" material="metal007_material" density="500" contype="1" conaffinity="1" />
+      </body>
+      
+      <body name="Card1" pos="-0.5 -0.133 0.195">
+        <geom name="Card1" type="box" size="0.2 0.1 0.02" material="oak_wood_material" density="500" contype="1" conaffinity="1" quat="0 0.707 0 0.707"/>
+      </body>
+      
+      <body name="Card2" pos="-0.3 -0.133 0.195">
+        <geom name="Card2" type="box" size="0.2 0.1 0.02" material="oak_wood_material" density="500" contype="1" conaffinity="1" quat="0 0.707 0 0.707"/>
+      </body>
+      
+      <body name="Card3" pos="-0.1 -0.133 0.195">
+        <geom name="Card3" type="box" size="0.2 0.1 0.02" material="oak_wood_material" density="500" contype="1" conaffinity="1" quat="0 0.707 0 0.707"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>
