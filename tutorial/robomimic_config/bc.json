@@ -164,10 +164,10 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                "object",
                 "robot0_eef_pos",
                 "robot0_eef_quat",
-                "robot0_gripper_qpos"
+                "robot0_gripper_qpos",
+                "object"
                 ],
                 "rgb": [],
                 "depth": [],

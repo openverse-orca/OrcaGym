@@ -49,7 +49,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 TIME_STEP = 0.01
-MAX_EPISODE_STEPS = 10 / TIME_STEP # 10 seconds in normal speed.
+MAX_EPISODE_STEPS = int(10 / TIME_STEP) # 10 seconds in normal speed.
 
 
 def train(config, device):

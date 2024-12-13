@@ -105,20 +105,20 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         # Add to the controller dict additional relevant params:
         #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
         #   policy (control) freq, and ndim (# joints)
-        self._controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot0"
+        self._controller_config["robot_name"] = ""
         self._controller_config["sim"] = self.gym
         self._controller_config["eef_name"] = self.EE_NAME
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+        self._controller_config["eef_rot_offset"] = np.array([0.0, 0.0, -0.92418885, 0.3825449])
         qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._arm_joint_names)
         self._controller_config["joint_indexes"] = {
-            "joints": self._arm_joint_names,
+            "joints": [0, 1, 2, 3, 4, 5, 6],
             "qpos": qpos_offsets,
             "qvel": qvel_offsets,
         }
-        self._controller_config["actuator_range"] = self._ctrl_range
+        self._controller_config["actuator_range"] = np.array([self._ctrl_range_min[0:7], self._ctrl_range_max[0:7]])
         self._controller_config["policy_freq"] = self.control_freq
         self._controller_config["ndim"] = len(self._arm_joint_names)
-        self._controller_config["control_delta"] = False
+        self._controller_config["control_delta"] = True
 
 
         self._controller = controller_factory(self._controller_config["type"], self._controller_config)
@@ -266,7 +266,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             # print("controller action: ", action)
             self._controller.set_goal(action[0:6])
             ctrl = self._controller.run_controller()
-            # print("controller action: ", ctrl)
+            # print("ctrl: ", ctrl)
             ctrl = np.clip(ctrl, self._ctrl_range_min[0:7], self._ctrl_range_max[0:7])
             gripper_action = action[6]
 
@@ -426,7 +426,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
                                         ee_position["xquat"][0]])
 
         obs = {
-            "object": np.concatenate([obj_xpos, obj_xquat, ee_position["xpos"] - obj_xpos]),
+            "object": np.concatenate([obj_xpos, obj_xquat, obj_xpos - ee_position["xpos"]]),
             "robot0_eef_pos": ee_position["xpos"], 
             "robot0_eef_quat": ee_position["xquat"],
             "robot0_eef_vel_lin": ee_xvalp[self.EE_NAME],
