@@ -695,7 +695,7 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_base_accelerometer, "coeff": 0},
             {"function": self._compute_reward_follow_command_linvel, "coeff": 1},
             {"function": self._compute_reward_follow_command_angvel, "coeff": 0.5},
-            {"function": self._compute_reward_height, "coeff": 1},
+            {"function": self._compute_reward_height, "coeff": 0},
             {"function": self._compute_reward_body_lin_vel, "coeff": 2},
             {"function": self._compute_reward_body_ang_vel, "coeff": 0.05},
             {"function": self._compute_reward_body_orientation, "coeff": 0},
