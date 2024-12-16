@@ -49,7 +49,14 @@ pip install -e .
 
 2. **Install PyTorch:**
 
-Using a combination of PyTorch and CUDA can effectively speed up reinforcement learning training. Install the corresponding CUDA package based on your GPU device. Here is an example:
+Using a combination of PyTorch and CUDA can effectively speed up reinforcement learning training. 
+
+* First, check if the CUDA version of PyTorch is installed on your system.
+
+  - Open `tutorial/Basic-RL-Example.ipynb`
+  - Run the first code cell, and if the output contains **"CUDA available: True"**, you can skip the following steps.
+
+* Install the corresponding CUDA package based on your GPU device. Here is an example:
 ```bash
 pip install torch --extra-index-url https://download.pytorch.org/whl/cu12x
 ```
