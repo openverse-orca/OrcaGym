@@ -129,10 +129,16 @@ class LeggedRobot(OrcaGymAgent):
         self._randomize_friction = robot_config["randomize_friction"]
         self._friction_range = robot_config["friction_range"]
         
+        # Curriculum learning
         self._curriculum_learning = robot_config["curriculum_learning"]
-        self._curriculut_levels = robot_config["curriculut_levels"]
+        self._curriculum_levels = robot_config["curriculum_levels"]
         self._agent_pos_offset = robot_config["agent_pos_offset"]
-
+        if self._curriculum_learning:
+            self._curriculum_reward_buffer_size = robot_config["curriculum_reward_buffer_size"]
+            self._curriculum_reward_buffer = np.zeros(self._curriculum_reward_buffer_size)
+            self._curriculum_reward_buffer_index = 0
+            self._curriculum_current_level = 0
+        
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
         self._reward_printer = None
@@ -265,9 +271,7 @@ class LeggedRobot(OrcaGymAgent):
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
         
         if self._curriculum_learning:
-            rng = np.random.default_rng()
-            level_id = rng.integers(0, len(self._curriculut_levels), 1)[0]  
-            curriculum_level = self._curriculut_levels[level_id]
+            curriculum_level = self._curriculum_levels[self._curriculum_current_level]
             # print("Curriculum level: ", curriculum_level)
             pos_offset = np.array([self._agent_pos_offset[curriculum_level][self.name]]).flatten()
         else:
@@ -431,6 +435,23 @@ class LeggedRobot(OrcaGymAgent):
         # 计算指数衰减奖励
         reward = np.exp(-lin_vel_error / tracking_sigma) * coeff * self.dt
         self._print_reward("Follow command linvel reward: ", reward)
+        
+        # Curiiculum learning
+        if self._curriculum_learning:
+            self._curriculum_reward_buffer[self._curriculum_reward_buffer_index] = reward
+            self._curriculum_reward_buffer_index += 1
+            if self._curriculum_reward_buffer_index >= self._curriculum_reward_buffer_size:
+                mean_reward = np.mean(self._curriculum_reward_buffer) / (coeff * self.dt)
+                # 达到奖励阈值，升级。低于奖励阈值，降级
+                if mean_reward > 0.8:
+                    self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
+                    print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena reward: ", mean_reward)
+                elif mean_reward < 0.6:
+                    self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
+                    print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena reward: ", mean_reward)
+                self._curriculum_reward_buffer_index = 0
+            # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
+            
         return reward
     
     def _compute_reward_follow_command_angvel(self, coeff) -> SupportsFloat:

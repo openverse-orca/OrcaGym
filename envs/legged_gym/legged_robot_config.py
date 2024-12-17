@@ -123,7 +123,8 @@ LeggedRobotConfig = {
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculut_levels" :       ["default", "terrain_stairs_low", "terrain_rocks", "terrain_stairs_mid", "terrain_stairs_high"],
+        "curriculum_reward_buffer_size" : 1000,
+        "curriculum_levels" :       ["default", "terrain_stairs_low", "terrain_rocks", "terrain_stairs_mid", "terrain_stairs_high"],
         "agent_pos_offset" :       {
             "default" : {
                 "go2_000" : [0, 0, 0], "go2_001" : [0, 0, 0], "go2_002" : [0, 0, 0], "go2_003" : [0, 0, 0],
