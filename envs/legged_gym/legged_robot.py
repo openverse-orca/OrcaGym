@@ -128,6 +128,10 @@ class LeggedRobot(OrcaGymAgent):
 
         self._randomize_friction = robot_config["randomize_friction"]
         self._friction_range = robot_config["friction_range"]
+        
+        self._curriculum_learning = robot_config["curriculum_learning"]
+        self._curriculut_levels = robot_config["curriculut_levels"]
+        self._agent_pos_offset = robot_config["agent_pos_offset"]
 
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -259,6 +263,15 @@ class LeggedRobot(OrcaGymAgent):
             self._ctrl = np.zeros(self._nu)
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+        
+        if self._curriculum_learning:
+            rng = np.random.default_rng()
+            level_id = rng.integers(0, len(self._curriculut_levels), 1)[0]  
+            curriculum_level = self._curriculut_levels[level_id]
+            # print("Curriculum level: ", curriculum_level)
+            pos_offset = np.array([self._agent_pos_offset[curriculum_level][self.name]]).flatten()
+        else:
+            pos_offset = np.zeros(3)
 
         # Rotate the base body around the Z axis
         z_rotation_angle = self._np_random.uniform(-np.pi, np.pi)
@@ -267,10 +280,15 @@ class LeggedRobot(OrcaGymAgent):
         # Get cached default joint values
         joint_neutral_qpos = self.get_joint_neutral()
         base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
+        
+        # Use curriculum learning to set the initial position
+        base_neutral_qpos[self._base_joint_name][:3] += pos_offset
 
         # Move along the Z axis to the born height
         self._base_height_target = base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
         base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
+        
+        
 
         # Use the rotate quate
         base_rotate_quat = base_neutral_qpos[self._base_joint_name][3:]
@@ -281,6 +299,10 @@ class LeggedRobot(OrcaGymAgent):
         # Get cached default imu mocap position and quaternion
         self._imu_mocap_pos_quat = {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
                                     "quat": self._init_imu_site_pos_quat["xquat"].copy()}
+
+        # Use curriculum learning to set the initial position
+        self._imu_mocap_pos_quat["pos"][:3] += pos_offset        
+        
         # Move along the Z axis to the born height
         if self._visualize_command:
             self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
