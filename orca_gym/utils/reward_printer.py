@@ -7,31 +7,35 @@ import numpy as np
 class RewardPrinter:
     PRINT_DETAIL = False
 
-    def __init__(self, buffer_size : int = 1000):
+    def __init__(self, buffer_size : int = 100):
         self._reward_data : dict[str, np.ndarray] = {}
+        self._buffer_index : dict[str, int] = {}
         self._buffer_size = buffer_size
-        self._buffer_index = 0
 
     def print_reward(self, message : str, reward : Optional[float] = None):
         if self._reward_data.get(message) is None:
             self._reward_data[message] = np.zeros(self._buffer_size)
-            self._buffer_index = 0
-            self._reward_data[message][self._buffer_index] = reward
-            self._buffer_index += 1
+            self._buffer_index[message] = 0
+            self._reward_data[message][self._buffer_index[message]] = reward
+            self._buffer_index[message] += 1
         else:
-            if self._buffer_index < self._buffer_size:
-                self._reward_data[message][self._buffer_index] = reward
-                self._buffer_index += 1
-            else:
+            if self._buffer_index[message] < self._buffer_size:
+                self._reward_data[message][self._buffer_index[message]] = reward
+                self._buffer_index[message] += 1
+            elif self._all_buffer_full(): 
                 for key, value in self._reward_data.items():
                     if self.PRINT_DETAIL:
                         print(key, f"{value.mean():.10f}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|")
                     else:
                         print(key, f"{value.mean():.10f}")
-                    self._reward_data[key] = np.array([])
                 print("-----------------------------------")
-                self._reward_data = {key: np.zeros(self._buffer_size) for key in self._reward_data.keys()}
-                self._buffer_index = 0
+                self._buffer_index = {key: 0 for key in self._buffer_index.keys()}
+                
+    def _all_buffer_full(self):
+        for key, value in self._buffer_index.items():
+            if value < self._buffer_size:
+                return False
+        return True
 
 # def print_reward(message : str, agent_id : str, reward : Optional[float] = None):
 #     if PRINT_REWARD and print_reward.agent_id == agent_id:
