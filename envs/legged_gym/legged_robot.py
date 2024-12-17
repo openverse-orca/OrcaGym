@@ -445,10 +445,13 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_feet_air_time(self, coeff) -> SupportsFloat:
         reward = 0.0
-        # print("feet air time: ", self._foot_touch_air_time)
-        for i in range(len(self._foot_touch_air_time)):
-            if self._foot_touch_air_time[i] > self._foot_touch_air_time_threshold:
-                reward += self._foot_touch_air_time[i] * coeff * self.dt
+        # no reward if the command is not to move
+        if np.linalg.norm(self._command["lin_vel"]) > 0.1:
+            # print("feet air time: ", self._foot_touch_air_time)
+            for i in range(len(self._foot_touch_air_time)):
+                if self._foot_touch_air_time[i] > 0:
+                    reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_threshold)  * coeff * self.dt
+                    
         self._print_reward("Feet air time reward: ", reward)
         return reward
         

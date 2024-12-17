@@ -38,7 +38,7 @@ def generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_ran
             
             pos_x = i * spacing_x
             pos_y = j * spacing_y
-            pos_z = heights[i][j] + geom_size[2]  # 让box稍微浮出地面一点
+            pos_z = heights[i][j] # + geom_size[2]  # 让box稍微浮出地面一点
 
             # 随机生成灰度颜色，确保相邻块色差大于 0.2，灰度范围在0.1到0.5之间
             while True:
