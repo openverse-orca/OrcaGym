@@ -1,0 +1,63 @@
+<mujoco model="random_box_terrain">
+    <compiler angle="degree" coordinate="local"/>
+    <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
+
+    <asset>
+        <texture type="2d" name="Plastic006_color"      file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic006_roughness"  file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic006_normal"     file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_black" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic006_color"/>
+        <normal     texture="Plastic006_normal"/>
+        <roughness  texture="Plastic006_roughness"/>
+        </material>
+
+        <texture type="2d" name="Plastic013A_color"      file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic013A_roughness"  file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic013A_normal"     file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_white" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic013A_color"/>
+        <normal     texture="Plastic013A_normal"/>
+        <roughness  texture="Plastic013A_roughness"/>
+        </material>
+
+        <texture type="2d" name="Plastic010_color"      file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic010_roughness"  file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic010_normal"     file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic010_color"/>
+        <normal     texture="Plastic010_normal"/>
+        <roughness  texture="Plastic010_roughness"/>      
+        </material>
+    </asset>
+    <worldbody>
+        <body name="stairs" pos="0.0 0.0 0.0">
+            <geom type="box" pos="0.0 0.0 0.0" size="4.0 4.0 0.1"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="3.8 3.8 0.2"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="3.6 3.6 0.3"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="3.4 3.4 0.4"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="3.2 3.2 0.5"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="3.0 3.0 0.6"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="2.8 2.8 0.7"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="2.6 2.6 0.8"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="2.4 2.4 0.9"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="2.2 2.2 1.0"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="2.0 2.0 1.1"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="1.8 1.8 1.2"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="1.6 1.6 1.3"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="1.4 1.4 1.4"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="1.2 1.2 1.5"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="1.0 1.0 1.6"  material="pbr_plastic_white"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="0.8 0.8 1.7"  material="pbr_plastic_gray"/>
+            <geom type="box" pos="0.0 0.0 0.0" size="0.6 0.6 1.8"  material="pbr_plastic_white"/>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <!-- 在这里你可以定义一些控制器 -->
+    </actuator>
+
+</mujoco>
