@@ -134,6 +134,7 @@ class LeggedRobot(OrcaGymAgent):
         # Curriculum learning
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_levels = robot_config["curriculum_levels"]
+        self._curriculum_levelup_distance = robot_config["curriculum_levelup_distance"]
         self.curriculum_level_offset = robot_config["curriculum_level_offset"]
         if self._curriculum_learning:
             buffer_size = self._max_episode_steps
@@ -286,7 +287,6 @@ class LeggedRobot(OrcaGymAgent):
         
         # Use curriculum learning to set the initial position
         if self._curriculum_learning:
-            self._update_curriculum_level()
             curriculum_level = self._curriculum_levels[self._curriculum_current_level]
             # print("Curriculum level: ", curriculum_level)
             level_offset = np.array([self.curriculum_level_offset[curriculum_level]]).flatten()
@@ -304,20 +304,20 @@ class LeggedRobot(OrcaGymAgent):
 
         # Get cached default joint values
         joint_neutral_qpos = self.get_joint_neutral()
-        base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
+        self._base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
         
         # Use curriculum learning to set the initial position
-        base_neutral_qpos[self._base_joint_name][:3] += pos_offset
+        self._base_neutral_qpos[self._base_joint_name][:3] += pos_offset
 
         # Move along the Z axis to the born height
-        self._base_height_target = base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
-        base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
+        self._base_height_target = self._base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
+        self._base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
         
         # Use the rotate quate
-        base_rotate_quat = base_neutral_qpos[self._base_joint_name][3:]
-        base_neutral_qpos[self._base_joint_name][3:] = rotations.quat_mul(base_rotate_quat, z_rotation_quat)
+        base_rotate_quat = self._base_neutral_qpos[self._base_joint_name][3:]
+        self._base_neutral_qpos[self._base_joint_name][3:] = rotations.quat_mul(base_rotate_quat, z_rotation_quat)
         # print("Base neutral qpos: ", base_neutral_qpos)
-        joint_neutral_qpos.update(base_neutral_qpos)
+        joint_neutral_qpos.update(self._base_neutral_qpos)
 
         self._command = self._genarate_command(z_rotation_angle)
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
@@ -778,7 +778,7 @@ class LeggedRobot(OrcaGymAgent):
         
     def _setup_curriculum_functions(self):
         self._curriculum_functions = [
-            {"function": self._rating_curriculum_follow_command_linvel, "coeff": 2},
+            {"function": self._rating_curriculum_follow_command_linvel, "coeff": 1},
             {"function": self._rating_curriculum_follow_command_angvel, "coeff": 0.5},
         ]
         
@@ -793,26 +793,33 @@ class LeggedRobot(OrcaGymAgent):
         rating = np.mean(self._curriculum_reward_buffer["ang_vel"]["buffer"][:buffer_index+1]) / (coeff * self.dt)
         return rating
     
-    def _update_curriculum_level(self):        
+    def update_curriculum_level(self, qpos_buffer : np.ndarray) -> None:        
         ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
         mean_rating = np.mean(ratings)
         
-        # 达到奖励阈值，升级。低于奖励阈值，降级
+        # 低于奖励阈值，降级
+        # 高于奖励阈值，并达到行走距离，升级
         rating_threshold = 0.5
-        if mean_rating > rating_threshold:
-            self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
-            # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
-            
-            if self._curriculum_current_level == len(self._curriculum_levels) - 1:
-                self._curriculum_clear_times += 1
-                if self._curriculum_clear_times > 3:
-                    self._curriculum_current_level = 0
-                    self._curriculum_clear_times = 0
-                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0")
-        else:
+        if mean_rating < rating_threshold:
             self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
             self._curriculum_clear_times = 0
             # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
+        elif hasattr(self, "_base_neutral_qpos"):
+            start_pos = self._base_neutral_qpos[self._base_joint_name][:3]
+            current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
+            move_distance = np.linalg.norm(start_pos - current_pos)
+            # print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
+            if move_distance > self._curriculum_levelup_distance:
+                self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
+                print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
+                
+                if self._curriculum_current_level == len(self._curriculum_levels) - 1:
+                    self._curriculum_clear_times += 1
+                    if self._curriculum_clear_times > 3:
+                        self._curriculum_current_level = 0
+                        self._curriculum_clear_times = 0
+                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0")
+
         
         for buffer in self._curriculum_reward_buffer.values():
             buffer["index"] = 0

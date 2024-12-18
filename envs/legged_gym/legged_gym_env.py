@@ -146,6 +146,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def reset_agents(self, agents : list[LeggedRobot]) -> None:
         if len(agents) == 0:
             return
+        self._update_curriculum_level(agents)
         self._reset_agent_joint_qpos(agents)
         self._put_agent_on_ground(agents)
         self._reset_command_indicators(agents)
@@ -220,3 +221,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             mocap_dict.update(agent_cmd_mocap)
             
         self.set_mocap_pos_and_quat(mocap_dict)
+        
+    def _update_curriculum_level(self, agents: list[LeggedRobot]) -> None:
+        for agent in agents:
+            agent.update_curriculum_level(self.data.qpos)
