@@ -129,6 +129,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.set_time_step(time_step)
         return
 
+    def update_data(self):
+        self.gym.update_data()
+        return
+
     def reset_simulation(self):
         self.gym.load_initial_frame()
         self.gym.update_data()

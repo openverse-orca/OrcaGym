@@ -86,7 +86,7 @@ class LeggedRobot(OrcaGymAgent):
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
         self._site_names = [self._imu_site_name] + self._contact_site_names
 
-        self._imu_mocap_name = self.name_space(robot_config["imu_mocap_name"])
+        self._command_indicator_name = self.name_space(robot_config["command_indicator_name"])
 
         self._imu_sensor_framequat_name = self.name_space(robot_config["sensor_imu_framequat_name"])
         self._imu_sensor_gyro_name = self.name_space(robot_config["sensor_imu_gyro_name"])
@@ -104,7 +104,7 @@ class LeggedRobot(OrcaGymAgent):
         self._ground_contact_body_names = robot_config["ground_contact_body_names"]  # gound body is not included in the agent's namespace
         self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
         self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
-        self._contact_body_names = self._base_contact_body_names + self._leg_contact_body_names
+        self._all_contact_body_names = self._base_contact_body_names + self._leg_contact_body_names + self._foot_body_names
 
 
         self._ctrl = np.zeros(len(self._actuator_names))
@@ -129,15 +129,28 @@ class LeggedRobot(OrcaGymAgent):
         self._randomize_friction = robot_config["randomize_friction"]
         self._friction_range = robot_config["friction_range"]
         
+        self._pos_random_range = robot_config["pos_random_range"]
+        
         # Curriculum learning
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_levels = robot_config["curriculum_levels"]
-        self._agent_pos_offset = robot_config["agent_pos_offset"]
+        self.curriculum_level_offset = robot_config["curriculum_level_offset"]
         if self._curriculum_learning:
-            self._curriculum_reward_buffer_size = robot_config["curriculum_reward_buffer_size"]
-            self._curriculum_reward_buffer = np.zeros(self._curriculum_reward_buffer_size)
-            self._curriculum_reward_buffer_index = 0
+            buffer_size = self._max_episode_steps
+            self._curriculum_reward_buffer = {
+                "lin_vel" : {
+                    "buffer_size": buffer_size,
+                    "buffer": np.zeros(buffer_size),
+                    "index": 0,
+                },
+                "ang_vel" : {
+                    "buffer_size": buffer_size,
+                    "buffer": np.zeros(buffer_size),
+                    "index": 0,
+                },
+            } 
             self._curriculum_current_level = 0
+            self._curriculum_clear_times = 0
         
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -152,6 +165,7 @@ class LeggedRobot(OrcaGymAgent):
 
         self._is_obs_updated = False
         self._setup_reward_functions()
+        self._setup_curriculum_functions()
 
     @property
     def neutral_joint_values(self) -> np.ndarray:
@@ -215,7 +229,6 @@ class LeggedRobot(OrcaGymAgent):
     def set_init_state(self, joint_qpos: dict, init_site_pos_quat: dict) -> None:
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
-        self._init_imu_site_pos_quat = init_site_pos_quat[self._imu_site_name].copy()
 
     def _set_action(self, action) -> None:
         self._last_action[:] = self._action
@@ -250,17 +263,18 @@ class LeggedRobot(OrcaGymAgent):
         visualized_command = {}
         if update_mocap and self._visualize_command:        
             # Do mocap update here.
-            # print("imu mocap: ", self._imu_mocap_pos_quat)
+            # print("Agent: ", self.name, "command indicator mocap: ", self._cmd_mocap_pos_quat, "command: ", self._command)
             
-            # self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._imu_mocap_pos_quat["quat"])
-            global_lin_vel, _ = local2global(self._imu_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
-            self._imu_mocap_pos_quat["pos"] += global_lin_vel * self.dt
-            visualized_command = {self._imu_mocap_name: self._imu_mocap_pos_quat}
+            # self._cmd_mocap_pos_quat["quat"] = rotations.quat_mul(rotations.euler2quat([0, 0, self._command["ang_vel"] * self.dt]), self._cmd_mocap_pos_quat["quat"])
+            global_lin_vel, _ = local2global(self._cmd_mocap_pos_quat["quat"], self._command["lin_vel"], np.array([0,0,0]))
+            self._cmd_mocap_pos_quat["pos"] += global_lin_vel * self.dt
+            visualized_command = {self._command_indicator_name: self._cmd_mocap_pos_quat}
         
         return visualized_command
 
 
     def on_reset(self) -> dict[str, np.ndarray]:
+        # Reset ctrl to default values.
         if self._actuator_type == "position":
             assert self._ctrl.shape == self._neutral_joint_values.shape
             self._ctrl = self._neutral_joint_values.copy()
@@ -270,12 +284,19 @@ class LeggedRobot(OrcaGymAgent):
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
         
+        # Use curriculum learning to set the initial position
         if self._curriculum_learning:
+            self._update_curriculum_level()
             curriculum_level = self._curriculum_levels[self._curriculum_current_level]
             # print("Curriculum level: ", curriculum_level)
-            pos_offset = np.array([self._agent_pos_offset[curriculum_level][self.name]]).flatten()
+            level_offset = np.array([self.curriculum_level_offset[curriculum_level]]).flatten()
         else:
-            pos_offset = np.zeros(3)
+            level_offset = np.zeros(3)
+            
+        # Randomize the initial position x,y offset
+        pos_noise = self._np_random.uniform(-self._pos_random_range, self._pos_random_range, 3)
+        pos_noise[2] = 0.0
+        pos_offset = pos_noise + level_offset
 
         # Rotate the base body around the Z axis
         z_rotation_angle = self._np_random.uniform(-np.pi, np.pi)
@@ -292,37 +313,45 @@ class LeggedRobot(OrcaGymAgent):
         self._base_height_target = base_neutral_qpos[self._base_joint_name][2] - self._base_neutral_height_offset
         base_neutral_qpos[self._base_joint_name][2] = self._base_height_target + self._base_born_height_offset
         
-        
-
         # Use the rotate quate
         base_rotate_quat = base_neutral_qpos[self._base_joint_name][3:]
         base_neutral_qpos[self._base_joint_name][3:] = rotations.quat_mul(base_rotate_quat, z_rotation_quat)
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(base_neutral_qpos)
 
-        # Get cached default imu mocap position and quaternion
-        self._imu_mocap_pos_quat = {"pos": self._init_imu_site_pos_quat["xpos"].copy(), 
-                                    "quat": self._init_imu_site_pos_quat["xquat"].copy()}
-
-        # Use curriculum learning to set the initial position
-        self._imu_mocap_pos_quat["pos"][:3] += pos_offset        
-        
-        # Move along the Z axis to the born height
-        if self._visualize_command:
-            self._imu_mocap_pos_quat["pos"][2] -= self._base_neutral_height_offset
-        else:
-            self._imu_mocap_pos_quat["pos"][2] -= 1000.0  # Move the mocap to a far away place
-
-        # Use the rotate quate
-        self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], z_rotation_quat)
-        
-
         self._command = self._genarate_command(z_rotation_angle)
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
         self._command_resample_duration = 0
         # print("Command: ", self._command)
 
-        return joint_neutral_qpos, {self._imu_mocap_name: self._imu_mocap_pos_quat}
+        return joint_neutral_qpos
+    
+    def put_on_ground(self, qpos_buffer : np.ndarray, contact_dict : dict, lift_height : float) -> dict[str, np.ndarray]:
+        """
+        Check if the agent is in contact with the ground.
+        If contact is detected, lift the agent up to the desired height.
+        """
+        if any([contact_body_name in contact_dict for contact_body_name in self._all_contact_body_names]):
+            # print("Agent: ", self.name, "is in contact with the ground. Lift up!")
+            base_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
+            base_qpos[2] += lift_height
+            return {self._base_joint_name: base_qpos}
+        
+        return {}
+    
+    def reset_command_indicator(self, qpos_buffer : np.ndarray) -> dict[str, np.ndarray]:
+        if not hasattr(self, "_cmd_mocap_pos_quat"):
+            self._cmd_mocap_pos_quat = {
+                "pos": np.array([0.0, 0.0, -10000.0]),  # Move the indicator to a far away place
+                "quat": np.array([1.0, 0.0, 0.0, 0.0]),
+            }
+            
+        if self._visualize_command:
+            # print("Agent: ", self.name, "reset command indicator")
+            base_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
+            self._cmd_mocap_pos_quat["pos"] = base_qpos[:3].copy()
+            self._cmd_mocap_pos_quat["quat"] = base_qpos[3:].copy()
+        return {self._command_indicator_name: self._cmd_mocap_pos_quat}
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
@@ -438,20 +467,11 @@ class LeggedRobot(OrcaGymAgent):
         
         # Curiiculum learning
         if self._curriculum_learning:
-            self._curriculum_reward_buffer[self._curriculum_reward_buffer_index] = reward
-            self._curriculum_reward_buffer_index += 1
-            if self._curriculum_reward_buffer_index >= self._curriculum_reward_buffer_size:
-                mean_reward = np.mean(self._curriculum_reward_buffer) / (coeff * self.dt)
-                # 达到奖励阈值，升级。低于奖励阈值，降级
-                if mean_reward > 0.8:
-                    self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
-                    print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena reward: ", mean_reward)
-                elif mean_reward < 0.6:
-                    self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
-                    print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena reward: ", mean_reward)
-                self._curriculum_reward_buffer_index = 0
-            # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
-            
+            buffer = self._curriculum_reward_buffer["lin_vel"]
+            if buffer["index"] < buffer["buffer_size"]:
+                buffer["buffer"][buffer["index"]] = reward
+                buffer["index"] += 1
+
         return reward
     
     def _compute_reward_follow_command_angvel(self, coeff) -> SupportsFloat:
@@ -459,7 +479,15 @@ class LeggedRobot(OrcaGymAgent):
         ang_vel_error = pow(self._command["ang_vel"] - self._body_ang_vel[2], 2)  # 只考虑 Z 轴的角速度
         reward = np.exp(-ang_vel_error / tracking_sigma) * coeff * self.dt
         self._print_reward("Follow command angvel reward: ", reward)
-        # print("command ang vel: ", self._command["ang_vel"], "body ang vel: ", self._body_ang_vel[2])        
+        # print("command ang vel: ", self._command["ang_vel"], "body ang vel: ", self._body_ang_vel[2])    
+        
+        # Curiiculum learning
+        if self._curriculum_learning:
+            buffer = self._curriculum_reward_buffer["ang_vel"]
+            if buffer["index"] < buffer["buffer_size"]:
+                buffer["buffer"][buffer["index"]] = reward
+                buffer["index"] += 1
+            
         return reward
     
     def _compute_reward_height(self, coeff) -> SupportsFloat:
@@ -611,7 +639,7 @@ class LeggedRobot(OrcaGymAgent):
             self._command_values[:3] = self._command["lin_vel"]
             
             turn_quat = rotations.euler2quat([0, 0, turn_angle])
-            self._imu_mocap_pos_quat["quat"] = rotations.quat_mul(self._imu_mocap_pos_quat["quat"], turn_quat)
+            self._cmd_mocap_pos_quat["quat"] = rotations.quat_mul(self._cmd_mocap_pos_quat["quat"], turn_quat)
     
     def _print_reward(self, message : str, reward : Optional[float] = None):
         if self._reward_printer is not None:
@@ -747,3 +775,46 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_body_orientation, "coeff": 0},
             {"function": self._compute_feet_air_time, "coeff": 1},
         ]
+        
+    def _setup_curriculum_functions(self):
+        self._curriculum_functions = [
+            {"function": self._rating_curriculum_follow_command_linvel, "coeff": 2},
+            {"function": self._rating_curriculum_follow_command_angvel, "coeff": 0.5},
+        ]
+        
+    def _rating_curriculum_follow_command_linvel(self, coeff) -> float:
+        buffer_index = self._curriculum_reward_buffer["lin_vel"]["index"]
+        rating = np.mean(self._curriculum_reward_buffer["lin_vel"]["buffer"][:buffer_index+1]) / (coeff * self.dt)
+        return rating
+    
+    
+    def _rating_curriculum_follow_command_angvel(self, coeff) -> float:
+        buffer_index = self._curriculum_reward_buffer["ang_vel"]["index"]
+        rating = np.mean(self._curriculum_reward_buffer["ang_vel"]["buffer"][:buffer_index+1]) / (coeff * self.dt)
+        return rating
+    
+    def _update_curriculum_level(self):        
+        ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
+        mean_rating = np.mean(ratings)
+        
+        # 达到奖励阈值，升级。低于奖励阈值，降级
+        rating_threshold = 0.5
+        if mean_rating > rating_threshold:
+            self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
+            # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
+            
+            if self._curriculum_current_level == len(self._curriculum_levels) - 1:
+                self._curriculum_clear_times += 1
+                if self._curriculum_clear_times > 3:
+                    self._curriculum_current_level = 0
+                    self._curriculum_clear_times = 0
+                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0")
+        else:
+            self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
+            self._curriculum_clear_times = 0
+            # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
+        
+        for buffer in self._curriculum_reward_buffer.values():
+            buffer["index"] = 0
+        # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
+                    

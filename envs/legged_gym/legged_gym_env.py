@@ -146,19 +146,9 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def reset_agents(self, agents : list[LeggedRobot]) -> None:
         if len(agents) == 0:
             return
-
-        joint_qpos = {}
-        mocaps = {}
-        for agent in agents:
-            agent_joint_qpos, agent_mocaps = agent.reset(self.np_random)
-            joint_qpos.update(agent_joint_qpos)
-            mocaps.update(agent_mocaps)
-
-        # print("Reset joint qpos: ", joint_qpos)
-
-        self.set_joint_qpos(joint_qpos)
-        self.set_mocap_pos_and_quat(mocaps)
-        self.mj_forward()
+        self._reset_agent_joint_qpos(agents)
+        self._put_agent_on_ground(agents)
+        self._reset_command_indicators(agents)
 
     def _generate_contact_dict(self) -> dict[str, list[str]]:
         contacts = self.query_contact_simple()
@@ -190,3 +180,43 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         # print("Set geom friction: ", geom_friction_dict)
         self.set_geom_friction(geom_friction_dict)
+
+    def _reset_agent_joint_qpos(self, agents: list[LeggedRobot]) -> None:
+        joint_qpos = {}
+        for agent in agents:
+            agent_joint_qpos = agent.reset(self.np_random)
+            joint_qpos.update(agent_joint_qpos)
+
+        # print("Reset joint qpos: ", joint_qpos)
+        self.set_joint_qpos(joint_qpos)
+        
+    def _put_agent_on_ground(self, agents: list[LeggedRobot]) -> None:
+        self.mj_forward()
+        self.update_data()
+        # If the agent is contact with the terrain, move it up 0.1m. 
+        # Loop until all the agents are not in contact with the terrain.
+        contact_dict = self._generate_contact_dict()
+        all_on_ground = False
+        while not all_on_ground:
+            # print("Contact dict: ", contact_dict)
+            joint_qpos = {}
+            for agent in agents:
+                agent_joint_qpos = agent.put_on_ground(self.data.qpos, contact_dict, 0.1)
+                joint_qpos.update(agent_joint_qpos)
+                
+            if len(joint_qpos) == 0:
+                all_on_ground = True
+                break
+            
+            self.set_joint_qpos(joint_qpos)
+            self.mj_forward()
+            self.update_data()
+            contact_dict = self._generate_contact_dict()
+
+    def _reset_command_indicators(self, agents: list[LeggedRobot]) -> None:
+        mocap_dict = {}
+        for agent in agents:
+            agent_cmd_mocap = agent.reset_command_indicator(self.data.qpos)
+            mocap_dict.update(agent_cmd_mocap)
+            
+        self.set_mocap_pos_and_quat(mocap_dict)

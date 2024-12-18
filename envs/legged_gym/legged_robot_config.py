@@ -73,9 +73,7 @@ LeggedRobotConfig = {
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
-
-        "imu_mocap_name":       "imu_mocap",
-
+        
         "sensor_imu_framequat_name" :           "imu_quat",
         "sensor_imu_gyro_name" :                "imu_omega",
         "sensor_imu_accelerometer_name" :       "imu_acc",
@@ -120,48 +118,29 @@ LeggedRobotConfig = {
         "push_robots" :             True,
         "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,
+        "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculum_reward_buffer_size" : 1000,
-        "curriculum_levels" :       ["default", "terrain_stairs_low", "terrain_rocks", "terrain_stairs_mid", "terrain_stairs_high"],
-        "agent_pos_offset" :       {
-            "default" : {
-                "go2_000" : [0, 0, 0], "go2_001" : [0, 0, 0], "go2_002" : [0, 0, 0], "go2_003" : [0, 0, 0],
-                "go2_004" : [0, 0, 0], "go2_005" : [0, 0, 0], "go2_006" : [0, 0, 0], "go2_007" : [0, 0, 0],
-                "go2_008" : [0, 0, 0], "go2_009" : [0, 0, 0], "go2_010" : [0, 0, 0], "go2_011" : [0, 0, 0],
-                "go2_012" : [0, 0, 0], "go2_013" : [0, 0, 0], "go2_014" : [0, 0, 0], "go2_015" : [0, 0, 0],
-            },            
-            "terrain_rocks" : {
-                "go2_000" : [30, 0, 0], "go2_001" : [30, 0, 0], "go2_002" : [30, 0, 0], "go2_003" : [30, 0, 0],
-                "go2_004" : [30, 0, 0], "go2_005" : [30, 0, 0], "go2_006" : [30, 0, 0], "go2_007" : [30, 0, 0],
-                "go2_008" : [30, 0, 0], "go2_009" : [30, 0, 0], "go2_010" : [30, 0, 0], "go2_011" : [30, 0, 0],
-                "go2_012" : [30, 0, 0], "go2_013" : [30, 0, 0], "go2_014" : [30, 0, 0], "go2_015" : [30, 0, 0],
-            },
-            "terrain_stairs_low" : {
-                "go2_000" : [0, 30, 0.36], "go2_001" : [0, 30, 0], "go2_002" : [0, 30, 0], "go2_003" : [0, 30, 0],
-                "go2_004" : [0, 30, 0], "go2_005" : [0, 30, 0], "go2_006" : [0, 30, 0], "go2_007" : [0, 30, 0],
-                "go2_008" : [0, 30, 0], "go2_009" : [0, 30, 0], "go2_010" : [0, 30, 0.36], "go2_011" : [0, 30, 0],
-                "go2_012" : [0, 30, 0.36], "go2_013" : [0, 30, 0], "go2_014" : [0, 30, 0.36], "go2_015" : [0, 30, 0],           
-            },
-            "terrain_stairs_mid" : {
-                "go2_000" : [0, -30, 0.9], "go2_001" : [0, -30, 0], "go2_002" : [0, -30, 0], "go2_003" : [0, -30, 0],
-                "go2_004" : [0, -30, 0], "go2_005" : [0, -30, 0], "go2_006" : [0, -30, 0], "go2_007" : [0, -30, 0],
-                "go2_008" : [0, -30, 0], "go2_009" : [0, -30, 0], "go2_010" : [0, -30, 0.9], "go2_011" : [0, -30, 0],
-                "go2_012" : [0, -30, 0.9], "go2_013" : [0, -30, 0], "go2_014" : [0, -30, 0.9], "go2_015" : [0, -30, 0],                 
-            },
-            "terrain_stairs_high" : {
-                "go2_000" : [-35, 0, 0], "go2_001" : [-35, 0, 1.8], "go2_002" : [-35, 0, 0], "go2_003" : [-35, 0, 0],
-                "go2_004" : [-35, 0, 0], "go2_005" : [-35, 0, 1.8], "go2_006" : [-35, 0, 0], "go2_007" : [-35, 0, 0],
-                "go2_008" : [-35, 0, 0], "go2_009" : [-35, 0, 0], "go2_010" : [-35, 0, 0], "go2_011" : [-35, 0, 0],
-                "go2_012" : [-35, 0, 0], "go2_013" : [-35, 0, 1.8], "go2_014" : [-35, 0, 0], "go2_015" : [-35, 0, 1.8],           
-            },
+        "curriculum_levels" :       ["default", "terrain_brics", "terrain_stairs_low", "terrain_slope", "terrain_rocks", "terrain_stairs_mid", "terrain_stairs_high", ],
+        "curriculum_level_offset" : {     
+            "default" : [0, 0, 0], 
+            "terrain_slope" : [30, -30, 0],
+            "terrain_brics" : [30, 30, 0],
+            "terrain_rocks" : [30, 0, 0],
+            "terrain_stairs_low" : [0, 30, 0],
+            "terrain_stairs_mid" : [0, -30, 0],
+            "terrain_stairs_high" : [-30, 0, 0],
         },
 
         # Config for logging
         "log_env_ids" :     [0],
         "log_agent_names" : ["go2_000"],
-        "visualize_command_agent_names" : ["go2_000"]
+        
+        # Config for visualization
+        "visualize_command_agent_names" : ["go2_000"],
+        "command_indicator_name" : "command_indicator_mocap",
+
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
@@ -206,6 +185,7 @@ LeggedRobotConfig = {
                                         "terrain_014_terrain", "terrain_015_terrain"],
         "base_contact_body_names" : ["trunk_link"],
         "leg_contact_body_names" : ["fr_thigh", "fr_calf", "fl_thigh", "fl_calf", "hr_thigh", "hr_calf", "hl_thigh", "hl_calf"],
+        "foot_contact_body_names" : ["fr_foot", "fl_foot", "hr_foot", "hl_foot"],
 
         # 机器狗的自重： 约 61.44 kg。
         # 静止时每只脚的受力： 约 150.7 N。

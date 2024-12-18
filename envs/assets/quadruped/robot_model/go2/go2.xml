@@ -132,11 +132,10 @@
   </asset>
 
   <worldbody>
-    <body name="imu_mocap" pos="0 0 0" mocap="true">
-      <!-- 修改 group="1" 来显示坐标轴，3为不显示 -->
-      <geom conaffinity="0" contype="0" pos="0.3 0 0" rgba="0.7 0 0 0.5" size="0.3 0.005 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0.3 0" rgba="0 0.7 0 0.5" size="0.005 0.3 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.3" type="box" group="1"></geom>
+    <body name="command_indicator_mocap" pos="0 0 0" mocap="true">
+      <geom conaffinity="0" contype="0" pos="0.3 0 0" rgba="0.7 0 0 0.5" size="0.4 0.005 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0.3 0" rgba="0 0.7 0 0.5" size="0.005 0.4 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.4" type="box" group="1"></geom>
     </body>
 
     <body name="base" pos="0 0 0.445" childclass="go2">
