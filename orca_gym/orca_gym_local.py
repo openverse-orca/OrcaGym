@@ -118,6 +118,38 @@ class OrcaGymLocal(OrcaGymBase):
     def set_opt_timestep(self, timestep):
         if self._mjModel is not None:
             self._mjModel.opt.timestep = timestep
+            
+    def set_opt_config(self):
+        self._mjModel.opt.timestep = self.opt.timestep
+        self._mjModel.opt.apirate = self.opt.apirate
+        self._mjModel.opt.impratio = self.opt.impratio
+        self._mjModel.opt.tolerance = self.opt.tolerance
+        self._mjModel.opt.ls_tolerance = self.opt.ls_tolerance
+        self._mjModel.opt.noslip_tolerance = self.opt.noslip_tolerance
+        self._mjModel.opt.mpr_tolerance = self.opt.mpr_tolerance
+        self._mjModel.opt.gravity = self.opt.gravity
+        self._mjModel.opt.wind = self.opt.wind
+        self._mjModel.opt.magnetic = self.opt.magnetic
+        self._mjModel.opt.density = self.opt.density
+        self._mjModel.opt.viscosity = self.opt.viscosity
+        self._mjModel.opt.o_margin = self.opt.o_margin
+        self._mjModel.opt.o_solref = self.opt.o_solref
+        self._mjModel.opt.o_solimp = self.opt.o_solimp
+        self._mjModel.opt.o_friction = self.opt.o_friction
+        self._mjModel.opt.integrator = self.opt.integrator
+        self._mjModel.opt.cone = self.opt.cone
+        self._mjModel.opt.jacobian = self.opt.jacobian
+        self._mjModel.opt.solver = self.opt.solver
+        self._mjModel.opt.iterations = self.opt.iterations
+        self._mjModel.opt.ls_iterations = self.opt.ls_iterations
+        self._mjModel.opt.noslip_iterations = self.opt.noslip_iterations
+        self._mjModel.opt.mpr_iterations = self.opt.mpr_iterations
+        self._mjModel.opt.disableflags = self.opt.disableflags
+        self._mjModel.opt.enableflags = self.opt.enableflags
+        self._mjModel.opt.disableactuator = self.opt.disableactuator
+        self._mjModel.opt.sdf_initpoints = self.opt.sdf_initpoints
+        self._mjModel.opt.sdf_iterations = self.opt.sdf_iterations
+        
 
     def query_opt_config(self):
         opt_config = {
