@@ -96,7 +96,8 @@ LeggedRobotConfig = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_air_time_threshold" : 0.5,  # second
+        "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        
 
         # Config for randomization
         "randomize_friction" :      True,
@@ -110,8 +111,8 @@ LeggedRobotConfig = {
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculum_levels" :       ["default", "terrain_brics", "terrain_stairs_low", "terrain_slope", "terrain_rocks", "terrain_stairs_mid", "terrain_stairs_high", ],
-        "curriculum_levelup_distance" : 5.0, # meters
+        "curriculum_levels" :       ["default", "terrain_stairs_low", "terrain_brics", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", "terrain_rocks", ],
+        "curriculum_levelup_distance" : 10.0, # meters
         "curriculum_level_offset" : {     
             "default" : [0, 0, 0], 
             "terrain_slope" : [30, -30, 0],

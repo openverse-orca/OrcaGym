@@ -97,7 +97,7 @@ class LeggedRobot(OrcaGymAgent):
         self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
         self._foot_touch_force_threshold = robot_config["foot_touch_force_threshold"]
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
-        self._foot_touch_air_time_threshold = robot_config["foot_touch_air_time_threshold"]
+        self._foot_touch_air_time_ideal = robot_config["foot_touch_air_time_ideal"]
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
@@ -516,12 +516,15 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_feet_air_time(self, coeff) -> SupportsFloat:
         reward = 0.0
-        # no reward if the command is not to move
-        if np.linalg.norm(self._command["lin_vel"]) > 0.1:
-            # print("feet air time: ", self._foot_touch_air_time)
-            for i in range(len(self._foot_touch_air_time)):
-                if self._foot_touch_air_time[i] > 0:
-                    reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_threshold)  * coeff * self.dt
+        # Penalty if the feet touch the ground too fast.
+        # If air time is longer than the ideal air time, reward is still 0. 
+        # The agent need to put it's feet on the ground to get the reward. 
+        # So the agent will learn to keep the feet in the air for the ideal air time, go get the maximum reward in one episode.
+        
+        # print("feet air time: ", self._foot_touch_air_time)
+        for i in range(len(self._foot_touch_air_time)):
+            if self._foot_touch_air_time[i] > 0:
+                reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
                     
         self._print_reward("Feet air time reward: ", reward)
         return reward
@@ -799,7 +802,7 @@ class LeggedRobot(OrcaGymAgent):
         
         # 低于奖励阈值，降级
         # 高于奖励阈值，并达到行走距离，升级
-        rating_threshold = 0.5
+        rating_threshold = 0.8
         if mean_rating < rating_threshold:
             self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
             self._curriculum_clear_times = 0
