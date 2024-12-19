@@ -9,12 +9,14 @@ class RewardPrinter:
 
     def __init__(self, buffer_size : int = 100):
         self._reward_data : dict[str, np.ndarray] = {}
+        self._reward_coeff : dict[str, float] = {}
         self._buffer_index : dict[str, int] = {}
         self._buffer_size = buffer_size
 
-    def print_reward(self, message : str, reward : Optional[float] = None):
+    def print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1.0):
         if self._reward_data.get(message) is None:
             self._reward_data[message] = np.zeros(self._buffer_size)
+            self._reward_coeff[message] = coeff
             self._buffer_index[message] = 0
             self._reward_data[message][self._buffer_index[message]] = reward
             self._buffer_index[message] += 1
@@ -25,9 +27,10 @@ class RewardPrinter:
             elif self._all_buffer_full(): 
                 for key, value in self._reward_data.items():
                     if self.PRINT_DETAIL:
-                        print(key, f"{value.mean():.10f}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|")
+                        print(key, f"{value.mean():.10f}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|{self._reward_coeff[key]:.4e}")
                     else:
-                        print(key, f"{value.mean():.10f}")
+                        mean_value = value.mean()
+                        print(key, f"{mean_value:.10f} | {(mean_value / self._reward_coeff[key]):.10f}")
                 print("-----------------------------------")
                 self._buffer_index = {key: 0 for key in self._buffer_index.keys()}
                 

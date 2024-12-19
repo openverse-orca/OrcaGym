@@ -402,59 +402,59 @@ class LeggedRobot(OrcaGymAgent):
 
     def _compute_reward_alive(self, coeff) -> SupportsFloat:
         reward = 1.0 * coeff * self.dt
-        self._print_reward("Alive reward: ", reward)
+        self._print_reward("Alive reward: ", reward, coeff * self.dt)
         return reward
 
     def _compute_reward_success(self, coeff) -> SupportsFloat:
         reward = (1.0 if (self.is_success(self._achieved_goal, self._desired_goal) > 0) else 0.0) * coeff * self.dt
-        self._print_reward("Success reward: ", reward)
+        self._print_reward("Success reward: ", reward, coeff * self.dt)
         return reward
         
     def _compute_reward_failure(self, coeff) -> SupportsFloat:
         reward = (-1.0 if self.is_terminated(self._achieved_goal, self._desired_goal) else 0.0) * coeff * self.dt
-        self._print_reward("Failure reward: ", reward)
+        self._print_reward("Failure reward: ", reward, coeff * self.dt)
         return reward
         
     def _compute_reward_contact(self, coeff) -> SupportsFloat:
         reward = (-np.sum(self._leg_contact)) * coeff * self.dt
-        self._print_reward("Contact reward: ", reward)
+        self._print_reward("Contact reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_foot_touch(self, coeff) -> SupportsFloat:
         threshold = self._foot_touch_force_threshold
         reward = (-np.sum([(force - threshold) if force > threshold else 0 for force in self._foot_touch_force])) * coeff * self.dt
-        self._print_reward("Foot touch reward: ", reward)
+        self._print_reward("Foot touch reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
         base_reward = 1 * len(self._leg_joint_qpos)
         reward = (base_reward - np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff * self.dt
-        self._print_reward("Joint angles reward: ", reward)
+        self._print_reward("Joint angles reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_joint_accelerations(self, coeff) -> SupportsFloat:
         reward = (-np.sum(np.abs(self._leg_joint_qacc))) * coeff * self.dt
-        self._print_reward("Joint accelerations reward: ", reward)
+        self._print_reward("Joint accelerations reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_limit(self, coeff) -> SupportsFloat:     
         reward = -(np.sum(self._action == self._action_space_range[0]) + np.sum(self._action == self._action_space_range[1])) * coeff * self.dt
-        self._print_reward("Limit over threshold reward: ", reward)
+        self._print_reward("Limit over threshold reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_action_rate(self, coeff) -> SupportsFloat:
         reward = -np.sum(np.square(self._last_action - self._action)) * coeff * self.dt
-        self._print_reward("Action rate reward: ", reward)
+        self._print_reward("Action rate reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_base_gyro(self, coeff) -> SupportsFloat:
         reward = (-np.sum(np.abs(self._imu_data_gyro))) * coeff * self.dt
-        self._print_reward("Base gyro reward: ", reward)
+        self._print_reward("Base gyro reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_base_accelerometer(self, coeff) -> SupportsFloat:
         reward = (-np.sum(abs(self._imu_data_accelerometer - np.array([0.0, 0.0, -9.81])))) * coeff * self.dt
-        self._print_reward("Base accelerometer reward: ", reward)
+        self._print_reward("Base accelerometer reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_follow_command_linvel(self, coeff) -> SupportsFloat:
@@ -463,7 +463,7 @@ class LeggedRobot(OrcaGymAgent):
         lin_vel_error = np.sum(np.square(self._command["lin_vel"][:2] - self._body_lin_vel[:2]))
         # 计算指数衰减奖励
         reward = np.exp(-lin_vel_error / tracking_sigma) * coeff * self.dt
-        self._print_reward("Follow command linvel reward: ", reward)
+        self._print_reward("Follow command linvel reward: ", reward, coeff * self.dt)
         
         # Curiiculum learning
         if self._curriculum_learning:
@@ -478,7 +478,7 @@ class LeggedRobot(OrcaGymAgent):
         tracking_sigma = 0.25  # 奖励的衰减因子
         ang_vel_error = pow(self._command["ang_vel"] - self._body_ang_vel[2], 2)  # 只考虑 Z 轴的角速度
         reward = np.exp(-ang_vel_error / tracking_sigma) * coeff * self.dt
-        self._print_reward("Follow command angvel reward: ", reward)
+        self._print_reward("Follow command angvel reward: ", reward, coeff * self.dt)
         # print("command ang vel: ", self._command["ang_vel"], "body ang vel: ", self._body_ang_vel[2])    
         
         # Curiiculum learning
@@ -493,25 +493,25 @@ class LeggedRobot(OrcaGymAgent):
     def _compute_reward_height(self, coeff) -> SupportsFloat:
         base_reward = 0.1
         reward = (base_reward - abs(self._body_height - self._base_height_target)) * coeff * self.dt
-        self._print_reward("Height reward: ", reward)
+        self._print_reward("Height reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_body_lin_vel(self, coeff) -> SupportsFloat:
         # Penalty if the body linear velocity in Z axis is too high
         reward = -pow(self._body_lin_vel[2], 2) * coeff * self.dt   
-        self._print_reward("Body linear velocity reward: ", reward)
+        self._print_reward("Body linear velocity reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_body_ang_vel(self, coeff) -> SupportsFloat:
         # Penalty if the body angular velocity in XY axis (Yaw) is too high
         reward = -np.sum((self._body_ang_vel[:2]) ** 2) * coeff * self.dt
-        self._print_reward("Body angular velocity reward: ", reward)
+        self._print_reward("Body angular velocity reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_body_orientation(self, coeff) -> SupportsFloat:
         # Penalty if the body orientation in XY axis (Yaw) is too high
         reward = -np.sum(np.square(self._body_orientation[:2])) * coeff * self.dt
-        self._print_reward("Body orientation reward: ", reward)
+        self._print_reward("Body orientation reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_feet_air_time(self, coeff) -> SupportsFloat:
@@ -526,7 +526,7 @@ class LeggedRobot(OrcaGymAgent):
             if self._foot_touch_air_time[i] > 0:
                 reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
                     
-        self._print_reward("Feet air time reward: ", reward)
+        self._print_reward("Feet air time reward: ", reward, coeff * self.dt)
         return reward
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
@@ -644,9 +644,9 @@ class LeggedRobot(OrcaGymAgent):
             turn_quat = rotations.euler2quat([0, 0, turn_angle])
             self._cmd_mocap_pos_quat["quat"] = rotations.quat_mul(self._cmd_mocap_pos_quat["quat"], turn_quat)
     
-    def _print_reward(self, message : str, reward : Optional[float] = None):
+    def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
         if self._reward_printer is not None:
-            self._reward_printer.print_reward(message, reward)
+            self._reward_printer.print_reward(message, reward, coeff)
 
     def _get_body_local(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
