@@ -135,9 +135,6 @@ class LeggedRobot(OrcaGymAgent):
         # Curriculum learning
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_levels = robot_config["curriculum_levels"]
-        self._curriculum_levelup_distance = robot_config["curriculum_levelup_distance"]
-        self._curriculum_levelup_rating = robot_config["curriculum_levelup_rating"]
-        self.curriculum_level_offset = robot_config["curriculum_level_offset"]
         if self._curriculum_learning:
             buffer_size = self._max_episode_steps
             self._curriculum_reward_buffer = {
@@ -152,7 +149,7 @@ class LeggedRobot(OrcaGymAgent):
                     "index": 0,
                 },
             } 
-            self._curriculum_current_level = 0
+            self._current_level = 0
             self._curriculum_clear_times = 0
         
         env_idx = int(self._env_id.split("-")[-1])
@@ -289,9 +286,8 @@ class LeggedRobot(OrcaGymAgent):
         
         # Use curriculum learning to set the initial position
         if self._curriculum_learning:
-            curriculum_level = self._curriculum_levels[self._curriculum_current_level]
             # print("Curriculum level: ", curriculum_level)
-            level_offset = np.array([self.curriculum_level_offset[curriculum_level]]).flatten()
+            level_offset = np.array([self._curriculum_levels[self._current_level]["offset"]]).flatten()
         else:
             level_offset = np.zeros(3)
             
@@ -808,8 +804,8 @@ class LeggedRobot(OrcaGymAgent):
         
         # 低于奖励阈值，降级
         # 高于奖励阈值，并达到行走距离，升级
-        if mean_rating < self._curriculum_levelup_rating:
-            self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
+        if mean_rating < self._curriculum_levels[self._current_level]["rating"]:
+            self._current_level = max(self._current_level - 1, 0)
             self._curriculum_clear_times = 0
             # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
         elif hasattr(self, "_base_neutral_qpos"):
@@ -817,16 +813,16 @@ class LeggedRobot(OrcaGymAgent):
             current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
             move_distance = np.linalg.norm(start_pos - current_pos)
             # print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
-            if move_distance > self._curriculum_levelup_distance:
-                self._curriculum_current_level = min(self._curriculum_current_level + 1, len(self._curriculum_levels) - 1)
-                print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
+            if move_distance > self._curriculum_levels[self._current_level]["distance"]:
+                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
+                # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
                 
-                if self._curriculum_current_level == len(self._curriculum_levels) - 1:
+                if self._current_level == len(self._curriculum_levels) - 1:
                     self._curriculum_clear_times += 1
                     if self._curriculum_clear_times > 3:
-                        self._curriculum_current_level = 0
+                        self._current_level = 0
                         self._curriculum_clear_times = 0
-                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0")
+                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0!, mean rating: ", mean_rating, "Move distance: ", move_distance)
 
         
         for buffer in self._curriculum_reward_buffer.values():
