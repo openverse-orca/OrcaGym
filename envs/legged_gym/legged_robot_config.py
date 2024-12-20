@@ -80,7 +80,9 @@ LeggedRobotConfig = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
 
         "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_brics_terrain", "terrain_rocks_terrain", "terrain_slope_terrain", "terrain_stair_low_terrain", "terrain_stair_mid_terrain", "terrain_stair_high_terrain"
+                                        "terrain_brics_terrain", "terrain_rocks_terrain", "terrain_slope_terrain", 
+                                        "terrain_stair_low_terrain", "terrain_stair_mid_terrain", "terrain_stair_high_terrain",
+                                        "terrain_perlin_terrain",
                                         ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
@@ -111,13 +113,14 @@ LeggedRobotConfig = {
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculum_levels" :       ["default", "terrain_stairs_low", "terrain_brics", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", "terrain_rocks", ],
+        "curriculum_levels" :       ["default", "terrain_perlin", "terrain_stairs_low", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", ],
         "curriculum_levelup_distance" : 7.0, # meters
         "curriculum_level_offset" : {     
             "default" : [0, 0, 0], 
             "terrain_slope" : [40, -35, 0],
-            "terrain_brics" : [30, 30, 0],
-            "terrain_rocks" : [30, 0, 0],
+            "terrain_perlin": [30, 0, 0],
+            # "terrain_brics" : [30, 30, 0],
+            # "terrain_rocks" : [30, 0, 0],
             "terrain_stairs_low" : [0, 30, 0],
             "terrain_stairs_mid" : [0, -30, 0],
             "terrain_stairs_high" : [-30, 0, 0],
