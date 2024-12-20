@@ -72,6 +72,7 @@ class LeggedRobot(OrcaGymAgent):
         self._base_born_height_offset = robot_config["base_born_height_offset"]
         self._command_lin_vel_range_x = robot_config["command_lin_vel_range_x"]
         self._command_lin_vel_range_y = robot_config["command_lin_vel_range_y"]
+        self._command_lin_vel_threshold = robot_config["command_lin_vel_threshold"]
         self._command_ang_vel_range = robot_config["command_ang_vel_range"]
         self._command_resample_interval = robot_config["command_resample_interval"]
 
@@ -135,6 +136,7 @@ class LeggedRobot(OrcaGymAgent):
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_levels = robot_config["curriculum_levels"]
         self._curriculum_levelup_distance = robot_config["curriculum_levelup_distance"]
+        self._curriculum_levelup_rating = robot_config["curriculum_levelup_rating"]
         self.curriculum_level_offset = robot_config["curriculum_level_offset"]
         if self._curriculum_learning:
             buffer_size = self._max_episode_steps
@@ -614,6 +616,11 @@ class LeggedRobot(OrcaGymAgent):
         lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x), 
                             self._np_random.uniform(-self._command_lin_vel_range_y, self._command_lin_vel_range_y),
                             0])
+        
+        # Avoiding the robot to move tremble when the linear velocity is too small
+        if lin_vel[0] < self._command_lin_vel_threshold:
+            lin_vel = np.array([0, 0, 0])
+
         return {"lin_vel": lin_vel, "ang_vel": 0, "heading_angle": heading_angle}
     
     def update_command(self, qpos_buffer : np.ndarray) -> None:
@@ -801,8 +808,7 @@ class LeggedRobot(OrcaGymAgent):
         
         # 低于奖励阈值，降级
         # 高于奖励阈值，并达到行走距离，升级
-        rating_threshold = 0.5
-        if mean_rating < rating_threshold:
+        if mean_rating < self._curriculum_levelup_rating:
             self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
             self._curriculum_clear_times = 0
             # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)

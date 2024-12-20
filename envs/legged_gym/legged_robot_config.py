@@ -57,8 +57,9 @@ LeggedRobotConfig = {
         "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
-        "command_lin_vel_range_x" : 1,        # x direction for forward
+        "command_lin_vel_range_x" : 1.2,        # x direction for forward
         "command_lin_vel_range_y" : 0.2,        # y direction for left/right
+        "command_lin_vel_threshold" : 0.2,    # min linear velocity to trigger moving
         "command_ang_vel_range" : 1.0,    # max turning rate
         "command_resample_interval" : 7,        # second
 
@@ -114,7 +115,8 @@ LeggedRobotConfig = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" :       ["default", "terrain_perlin", "terrain_stairs_low", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", ],
-        "curriculum_levelup_distance" : 7.0, # meters
+        "curriculum_levelup_distance" : 10.0, # meters
+        "curriculum_levelup_rating" : 0.7,
         "curriculum_level_offset" : {     
             "default" : [0, 0, 0], 
             "terrain_slope" : [40, -35, 0],
