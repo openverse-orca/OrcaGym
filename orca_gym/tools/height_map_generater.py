@@ -70,11 +70,13 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self._unit_height_map[:, :] = height_range[0]
         self._height_map_border = np.array([[-self._height_map_size[0] / 2, self._height_map_size[0] / 2], [-self._height_map_size[1] / 2, self._height_map_size[1] / 2]])
         print("Height border: ", self._height_map_border)
-        print("Height map: ", self._height_map)
+        # print("Height map: ", self._height_map)
         
         self._helper_qpos = np.array([self._height_map_border[0][0], self._height_map_border[1][0], height_range[1], 1, 0, 0, 0], dtype=float)
-        self._helper_name = "height_map_helper_height_map_helper"
+        self._helper_body_names = ["height_map_helper_row_0", "height_map_helper_row_1", "height_map_helper_row_2", "height_map_helper_row_3", "height_map_helper_row_4", "height_map_helper_row_5", "height_map_helper_row_6", "height_map_helper_row_7", "height_map_helper_row_8", "height_map_helper_row_9"]
         self._helper_joint_name = "height_map_helper_root"
+        
+        self._build_geom_trainslation_map()
         
         # raise NotImplementedError("Please implement the rest of the class")
 
@@ -84,6 +86,17 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
+    def _build_geom_trainslation_map(self):
+        self.mj_forward()
+        
+        geom_dict = self.model.get_geom_dict()
+        self._geom_translation_map = {}
+        for geom_id, geom in geom_dict.items():
+            if geom["BodyName"] in self._helper_body_names:
+                self._geom_translation_map[geom["GeomId"]] = geom["Pos"]
+                print("Body name: ", geom["BodyName"], "Geom id: ", geom["GeomId"], "Pos: ", geom["Pos"])
+
 
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
@@ -240,7 +253,7 @@ if __name__ == "__main__":
             for x in range(height_map_size[0]):
                 for z in range(height_range[0], height_range[1]):
                     obs, reward, terminated, truncated, info = env.step(action)
-                    print("decetion: ", x, y, height_range[1] - z - 1)
+                    # print("decetion: ", x, y, height_range[1] - z - 1)
                     if render_mode == "human":
                         env.render()
                     # time.sleep(0.001)
