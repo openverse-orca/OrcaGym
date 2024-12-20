@@ -427,8 +427,7 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
-        base_reward = 1 * len(self._leg_joint_qpos)
-        reward = (base_reward - np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values))) * coeff * self.dt
+        reward = -np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values)) * coeff * self.dt
         self._print_reward("Joint angles reward: ", reward, coeff * self.dt)
         return reward
     
@@ -764,7 +763,7 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_failure, "coeff": 0},
             {"function": self._compute_reward_contact, "coeff": 1},
             {"function": self._compute_reward_foot_touch, "coeff": 0},
-            {"function": self._compute_reward_joint_angles, "coeff": 0},
+            {"function": self._compute_reward_joint_angles, "coeff": 0.1},
             {"function": self._compute_reward_joint_accelerations, "coeff": 2.5e-7},
             {"function": self._compute_reward_limit, "coeff": 0},
             {"function": self._compute_reward_action_rate, "coeff": 0.01},
@@ -802,7 +801,7 @@ class LeggedRobot(OrcaGymAgent):
         
         # 低于奖励阈值，降级
         # 高于奖励阈值，并达到行走距离，升级
-        rating_threshold = 0.8
+        rating_threshold = 0.5
         if mean_rating < rating_threshold:
             self._curriculum_current_level = max(self._curriculum_current_level - 1, 0)
             self._curriculum_clear_times = 0

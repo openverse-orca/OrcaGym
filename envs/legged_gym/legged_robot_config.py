@@ -112,7 +112,7 @@ LeggedRobotConfig = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" :       ["default", "terrain_stairs_low", "terrain_brics", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", "terrain_rocks", ],
-        "curriculum_levelup_distance" : 10.0, # meters
+        "curriculum_levelup_distance" : 7.0, # meters
         "curriculum_level_offset" : {     
             "default" : [0, 0, 0], 
             "terrain_slope" : [30, -30, 0],
