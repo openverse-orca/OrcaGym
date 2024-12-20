@@ -114,19 +114,16 @@ LeggedRobotConfig = {
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculum_levels" :       ["default", "terrain_perlin", "terrain_stairs_low", "terrain_slope", "terrain_stairs_mid", "terrain_stairs_high", ],
-        "curriculum_levelup_distance" : 10.0, # meters
-        "curriculum_levelup_rating" : 0.7,
-        "curriculum_level_offset" : {     
-            "default" : [0, 0, 0], 
-            "terrain_slope" : [40, -35, 0],
-            "terrain_perlin": [30, 0, 0],
-            # "terrain_brics" : [30, 30, 0],
-            # "terrain_rocks" : [30, 0, 0],
-            "terrain_stairs_low" : [0, 30, 0],
-            "terrain_stairs_mid" : [0, -30, 0],
-            "terrain_stairs_high" : [-30, 0, 0],
-        },
+        "curriculum_levels" : [
+            {"name" : "default" ,               "offset" : [0, 0, 0], "distance": 10.0, "rating": 0.5},
+            {"name" : "terrain_perlin" ,        "offset" : [30, 0, 0], "distance": 8.0, "rating": 0.6},
+            {"name" : "terrain_stairs_low" ,    "offset" : [0, 30, 0], "distance": 8.0, "rating": 0.6},
+            {"name" : "terrain_slope" ,         "offset" : [40, -35, 0], "distance": 8.0, "rating": 0.5},
+            # {"name" : "terrain_brics" ,       "offset" : [30, 30, 0], "distance": 8.0, "rating": 0.6},
+            # {"name" : "terrain_rocks" ,       "offset" : [30, 0, 0], "distance": 8.0, "rating": 0.6},
+            {"name" : "terrain_stairs_mid" ,    "offset" : [0, -30, 0], "distance": 8.0, "rating": 0.6},
+            {"name" : "terrain_stairs_high" ,   "offset" : [-30, 0, 0], "distance": 8.0, "rating": 0.6},
+        ],
 
         # Config for logging
         "log_env_ids" :     [0],
