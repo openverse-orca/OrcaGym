@@ -15,8 +15,8 @@
     </asset>
 
     <worldbody>
-        <body name="terrain" pos="2.5 2.5 -48" >
-<geom type="sphere" pos="0.0 0.0 0" size="50.0 0 0" euler="0 0 0"   material="pbr_plastic_gray"/>
+        <body name="terrain" pos="0 0 0" >
+        <geom type="ellipsoid" pos="0.0 0.0 0" size="20.0 20. 4.0" euler="0 0 0"   material="pbr_plastic_gray"/>
 
         </body>
     </worldbody>
