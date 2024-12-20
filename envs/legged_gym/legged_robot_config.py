@@ -115,7 +115,7 @@ LeggedRobotConfig = {
         "curriculum_levelup_distance" : 7.0, # meters
         "curriculum_level_offset" : {     
             "default" : [0, 0, 0], 
-            "terrain_slope" : [30, -30, 0],
+            "terrain_slope" : [40, -35, 0],
             "terrain_brics" : [30, 30, 0],
             "terrain_rocks" : [30, 0, 0],
             "terrain_stairs_low" : [0, 30, 0],
