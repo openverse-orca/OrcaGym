@@ -73,11 +73,9 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         # print("Height map: ", self._height_map)
         
         self._helper_qpos = np.array([self._height_map_border[0][0], self._height_map_border[1][0], height_range[1], 1, 0, 0, 0], dtype=float)
-        self._helper_body_names = ["height_map_helper_row_0", "height_map_helper_row_1", "height_map_helper_row_2", "height_map_helper_row_3", "height_map_helper_row_4", "height_map_helper_row_5", "height_map_helper_row_6", "height_map_helper_row_7", "height_map_helper_row_8", "height_map_helper_row_9"]
         self._helper_joint_name = "height_map_helper_root"
-        
-        self._build_geom_trainslation_map()
-        
+        self._build_helper_geom_offsets()
+
         # raise NotImplementedError("Please implement the rest of the class")
 
         # 定义初始位置和其他状态信息
@@ -87,16 +85,30 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self._set_obs_space()
         self._set_action_space()
 
-    def _build_geom_trainslation_map(self):
-        self.mj_forward()
+    def _build_helper_geom_offsets(self):
+        name_2_offset = [
+            "height_map_helper_geom_00", "height_map_helper_geom_01", "height_map_helper_geom_02", "height_map_helper_geom_03", "height_map_helper_geom_04", "height_map_helper_geom_05", "height_map_helper_geom_06", "height_map_helper_geom_07", "height_map_helper_geom_08", "height_map_helper_geom_09",
+            "height_map_helper_geom_10", "height_map_helper_geom_11", "height_map_helper_geom_12", "height_map_helper_geom_13", "height_map_helper_geom_14", "height_map_helper_geom_15", "height_map_helper_geom_16", "height_map_helper_geom_17", "height_map_helper_geom_18", "height_map_helper_geom_19",
+            "height_map_helper_geom_20", "height_map_helper_geom_21", "height_map_helper_geom_22", "height_map_helper_geom_23", "height_map_helper_geom_24", "height_map_helper_geom_25", "height_map_helper_geom_26", "height_map_helper_geom_27", "height_map_helper_geom_28", "height_map_helper_geom_29",
+            "height_map_helper_geom_30", "height_map_helper_geom_31", "height_map_helper_geom_32", "height_map_helper_geom_33", "height_map_helper_geom_34", "height_map_helper_geom_35", "height_map_helper_geom_36", "height_map_helper_geom_37", "height_map_helper_geom_38", "height_map_helper_geom_39",
+            "height_map_helper_geom_40", "height_map_helper_geom_41", "height_map_helper_geom_42", "height_map_helper_geom_43", "height_map_helper_geom_44", "height_map_helper_geom_45", "height_map_helper_geom_46", "height_map_helper_geom_47", "height_map_helper_geom_48", "height_map_helper_geom_49",
+            "height_map_helper_geom_50", "height_map_helper_geom_51", "height_map_helper_geom_52", "height_map_helper_geom_53", "height_map_helper_geom_54", "height_map_helper_geom_55", "height_map_helper_geom_56", "height_map_helper_geom_57", "height_map_helper_geom_58", "height_map_helper_geom_59",
+            "height_map_helper_geom_60", "height_map_helper_geom_61", "height_map_helper_geom_62", "height_map_helper_geom_63", "height_map_helper_geom_64", "height_map_helper_geom_65", "height_map_helper_geom_66", "height_map_helper_geom_67", "height_map_helper_geom_68", "height_map_helper_geom_69",
+            "height_map_helper_geom_70", "height_map_helper_geom_71", "height_map_helper_geom_72", "height_map_helper_geom_73", "height_map_helper_geom_74", "height_map_helper_geom_75", "height_map_helper_geom_76", "height_map_helper_geom_77", "height_map_helper_geom_78", "height_map_helper_geom_79",
+            "height_map_helper_geom_80", "height_map_helper_geom_81", "height_map_helper_geom_82", "height_map_helper_geom_83", "height_map_helper_geom_84", "height_map_helper_geom_85", "height_map_helper_geom_86", "height_map_helper_geom_87", "height_map_helper_geom_88", "height_map_helper_geom_89",
+            "height_map_helper_geom_90", "height_map_helper_geom_91", "height_map_helper_geom_92", "height_map_helper_geom_93", "height_map_helper_geom_94", "height_map_helper_geom_95", "height_map_helper_geom_96", "height_map_helper_geom_97", "height_map_helper_geom_98", "height_map_helper_geom_99",
+        ]
+        self._helper_geom_offsets = {}
         
         geom_dict = self.model.get_geom_dict()
-        self._geom_translation_map = {}
-        for geom_id, geom in geom_dict.items():
-            if geom["BodyName"] in self._helper_body_names:
-                self._geom_translation_map[geom["GeomId"]] = geom["Pos"]
-                print("Body name: ", geom["BodyName"], "Geom id: ", geom["GeomId"], "Pos: ", geom["Pos"])
-
+        for name in geom_dict:
+            for i in range(len(name_2_offset)):
+                if name_2_offset[i] in name:
+                    self._helper_geom_offsets[self.model.geom_name2id(name)] = i * 0.1
+                    print("Geom : ", name, " offset: ", i * 0.1)
+                    break
+                
+        print("Helper geom offsets: ", self._helper_geom_offsets)
 
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
@@ -121,55 +133,63 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self.mj_forward()
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        done = self._process_detection()
+        collision = self._process_detection()
         
         if self.render_mode == "human":
             self.do_simulation(action, self.frame_skip)
         
         obs = self._get_obs().copy()
-        info = {"height_map": self._height_map, "done": done}
+        info = {"height_map": self._height_map, "collision": collision}
         terminated = False
         truncated = False
         reward = 0
 
         return obs, reward, terminated, truncated, info
 
-    def _process_detection(self):        
-        joint_qpos = {self._helper_joint_name: self._helper_qpos}
-        self.set_joint_qpos(joint_qpos)
-        self.mj_forward()
-        contact_dict = self.query_contact_simple()
-        done = False
-        if self._update_height_map(contact_dict):
-            self._helper_qpos[2] = self._height_range[0]
-            print("Update height map completed! helper qpos: ", self._helper_qpos)
-            done = True
-        else:
-            self._helper_qpos[2] -= 1
+    def _process_detection(self): 
+        self._helper_qpos[2] = self._height_range[1]
+        while self._helper_qpos[2] >= self._height_range[0]:
+            # print("Helper qpos: ", self._helper_qpos)
+            joint_qpos = {self._helper_joint_name: self._helper_qpos}
+            self.set_joint_qpos(joint_qpos)
+            self.mj_forward()
+            contact_dict = self.query_contact_simple()            
+            collision = self._update_height_map(contact_dict)
             
-        if self._helper_qpos[2] <= self._height_range[0]:
-            self._helper_qpos[2] = self._height_range[1]
-            self._helper_qpos[0] += 1
-            if self._helper_qpos[0] >= self._height_map_border[0][1]:
-                self._helper_qpos[0] = self._height_map_border[0][0]
-                self._helper_qpos[1] += 1
-                if self._helper_qpos[1] >= self._height_map_border[1][1]:
-                    print("Height map generation completed! helper qpos: ", self._helper_qpos)
-                    return True
+            if collision:
+                break
+            
+            self._helper_qpos[2] -= 10
+
+        self._helper_qpos[0] += 0.1
+        if self._helper_qpos[0] >= self._height_map_border[0][1]:
+            self._helper_qpos[0] = self._height_map_border[0][0]
+            self._helper_qpos[1] += 0.1
+            if self._helper_qpos[1] >= self._height_map_border[1][1]:
+                print("Height map generation completed! helper qpos: ", self._helper_qpos)
         
-        return done
+        return collision
     
-    def _update_height_map(self, contact_dict):
-        """
-        对应1平方米的高程信息，如果都更新完了，返回True，如果还有未更新的，返回False
-        """
-        qpos_x = (self._helper_qpos[0] * 10).astype(int)
-        qpos_y = (self._helper_qpos[1] * 10).astype(int)
-        if self._height_map[qpos_x : 10, qpos_y : 10].all() > self._unit_height_map.all():
-            return True
-        
+    def _update_height_map(self, contact_dict):        
         if len(contact_dict) > 0:
-            print("Contact dict len: ", len(contact_dict))
+            # print("Contact dict len: ", len(contact_dict))
+            # print("Pos: ", self._helper_qpos[0], self._helper_qpos[1], self._helper_qpos[2])
+            z = 0
+            for contact in contact_dict:
+                if contact["Geom1"] in self._helper_geom_offsets:
+                    offset = self._helper_geom_offsets[contact["Geom1"]]
+                elif contact["Geom2"] in self._helper_geom_offsets:
+                    offset = self._helper_geom_offsets[contact["Geom2"]]
+                else:
+                    continue
+                
+                z = max(z, offset)
+                
+            x = int(self._helper_qpos[0] * 10)
+            y = int(self._helper_qpos[1] * 10)
+            self._height_map[x, y] = self._helper_qpos[2] + z
+            # print("Update height map: ", x, y, self._height_map[x, y])
+            
             return True
         
         return False
@@ -217,8 +237,8 @@ def register_env(orcagym_addr, env_name, env_index, height_map_size, height_rang
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--height_map_size', type=int, nargs=2, default=[100, 100], help='The size of the height map in meters')
-    parser.add_argument('--height_range', type=int, nargs=2, default=[-10, 10], help='The height range of the height map in meters')
+    parser.add_argument('--height_map_size', type=int, nargs=2, default=[160, 160], help='The size of the height map in meters')
+    parser.add_argument('--height_range', type=int, nargs=2, default=[0, 20], help='The height range of the height map in meters')
     parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human or none). Set to none for faster processing')
     parser.add_argument('--output_file', type=str, default='height_map.npy', help='The output file to save the height map')
     args = parser.parse_args()
@@ -230,6 +250,7 @@ if __name__ == "__main__":
     output_file = args.output_file
     
     assert height_map_size[0] > 0 and height_map_size[1] > 0 and height_range[1] > height_range[0], "Invalid height map size or height range"
+    assert height_range[0] % 10 == 0 and height_range[1] % 10 == 0, "Height range should be multiple of 10"
     
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
@@ -245,23 +266,19 @@ if __name__ == "__main__":
         
         # raise NotImplementedError("Please implement the rest of the script")
         
-        iteration = height_map_size[0] * height_map_size[1] * (height_range[1] - height_range[0])    # 一次检测1立方米范围
-        print("Iteration: ", iteration)
         info = {}
         action = np.zeros(0)
-        for y in range(height_map_size[1]):
-            for x in range(height_map_size[0]):
-                for z in range(height_range[0], height_range[1]):
-                    obs, reward, terminated, truncated, info = env.step(action)
-                    # print("decetion: ", x, y, height_range[1] - z - 1)
-                    if render_mode == "human":
-                        env.render()
-                    # time.sleep(0.001)
-                    
-                    done = info.get("done")
-                    if done:
-                        break
+        for y in range(height_map_size[1] * 10):
+            for x in range(height_map_size[0] * 10):
+                obs, reward, terminated, truncated, info = env.step(action)
+                # print("decetion: ", x, y)
+                if render_mode == "human":
+                    env.render()
+                # time.sleep(0.001)
+                                    
+            print("Height map generation: ", y, " / ", height_map_size[1] * 10)
             
+        print("Height map generation completed!")
         height_map = info["height_map"]
         # output to the npy file
         np.save(output_file, height_map)
