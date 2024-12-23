@@ -13,18 +13,15 @@
         <roughness  texture="Plastic010_roughness"/>      
         </material>
 
-        <hfield name="perlin_hfield" size="6.0 6.0 0.6 0.1" file="height_field.png"/>
-        <hfield name="perlin_hfield_xflip" size="6.0 6.0 0.6 0.1" file="height_field_xflip.png"/>
-        <hfield name="perlin_hfield_yflip" size="6.0 6.0 0.6 0.1" file="height_field_yflip.png"/>
-        <hfield name="perlin_hfield_xyflip" size="6.0 6.0 0.6 0.1" file="height_field_xyflip.png"/>
+        <hfield name="perlin_hfield" size="12.8 12.8 0.5 0.1" file="height_field_rough.png"/>
     </asset>
 
     <worldbody>
-        <body name="terrain" pos="0 0 0" >
-        <geom type="hfield" hfield="perlin_hfield" pos="0.0 0.0 0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield_xflip" pos="12.0 0.0 0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield_yflip" pos="0.0 12.0 0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield_xyflip" pos="12.0 12.0 0.0" material="pbr_plastic_gray"/>
+        <body name="terrain" pos="-12.8 -12.8 0" >
+        <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="25.6  0.0   0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="0.0   25.6  0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="25.6  25.6  0.0" material="pbr_plastic_gray"/>
         </body>
     </worldbody>
 

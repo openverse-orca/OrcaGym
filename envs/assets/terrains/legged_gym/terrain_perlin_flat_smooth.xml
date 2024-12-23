@@ -1,0 +1,32 @@
+<mujoco model="random_box_terrain">
+    <compiler angle="degree" coordinate="local"/>
+    <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
+
+    <asset>
+        <texture type="2d" name="Plastic010_color"      file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic010_roughness"  file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic010_normal"     file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic010_color"/>
+        <normal     texture="Plastic010_normal"/>
+        <roughness  texture="Plastic010_roughness"/>      
+        </material>
+
+        <hfield name="perlin_hfield" size="12.8 12.8 0.5 0.1" file="height_field.png"/>
+    </asset>
+
+    <worldbody>
+        <body name="terrain" pos="-12.8 -12.8 0" >
+        <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="25.6  0.0   0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="0.0   25.6  0.0" material="pbr_plastic_gray"/>
+        <geom type="hfield" hfield="perlin_hfield" pos="25.6  25.6  0.0" material="pbr_plastic_gray"/>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <!-- 在这里你可以定义一些控制器 -->
+    </actuator>
+
+</mujoco>
