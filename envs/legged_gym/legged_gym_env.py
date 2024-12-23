@@ -25,7 +25,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         task: str,
         **kwargs,
     ):
-
+        self._init_height_map(height_map_file)
+        
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -40,7 +41,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             **kwargs,
         )
 
-        self._init_height_map(height_map_file)
+        
         self._randomize_agent_foot_friction()
 
 
@@ -150,7 +151,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             return
         self._update_curriculum_level(agents)
         self._reset_agent_joint_qpos(agents)
-        self._put_agent_on_ground(agents)
         self._reset_command_indicators(agents)
 
     def _generate_contact_dict(self) -> dict[str, list[str]]:
@@ -187,41 +187,23 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def _init_height_map(self, height_map_file: str) -> None:
         if height_map_file is not None:
             self._height_map = np.load(height_map_file)
-            print("Height map :", self._height_map)
+            # for i in range(self._height_map.shape[0]):
+            #     for j in range(self._height_map.shape[1]):
+            #         if self._height_map[i, j] != 0:
+            #             print("Height map: ", i, j, self._height_map[i, j])
         else:
             raise ValueError("Height map file is not provided")
 
     def _reset_agent_joint_qpos(self, agents: list[LeggedRobot]) -> None:
         joint_qpos = {}
         for agent in agents:
-            agent_joint_qpos = agent.reset(self.np_random)
+            agent_joint_qpos = agent.reset(self.np_random, height_map=self._height_map)
             joint_qpos.update(agent_joint_qpos)
 
         # print("Reset joint qpos: ", joint_qpos)
         self.set_joint_qpos(joint_qpos)
-        
-    def _put_agent_on_ground(self, agents: list[LeggedRobot]) -> None:
         self.mj_forward()
-        self.update_data()
-        # If the agent is contact with the terrain, move it up 0.1m. 
-        # Loop until all the agents are not in contact with the terrain.
-        contact_dict = self._generate_contact_dict()
-        all_on_ground = False
-        while not all_on_ground:
-            # print("Contact dict: ", contact_dict)
-            joint_qpos = {}
-            for agent in agents:
-                agent_joint_qpos = agent.put_on_ground(self.data.qpos, contact_dict, 0.1)
-                joint_qpos.update(agent_joint_qpos)
-                
-            if len(joint_qpos) == 0:
-                all_on_ground = True
-                break
-            
-            self.set_joint_qpos(joint_qpos)
-            self.mj_forward()
-            self.update_data()
-            contact_dict = self._generate_contact_dict()
+        self.update_data()        
 
     def _reset_command_indicators(self, agents: list[LeggedRobot]) -> None:
         mocap_dict = {}

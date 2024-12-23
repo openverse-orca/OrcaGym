@@ -122,8 +122,8 @@ LeggedRobotConfig = {
             {"name" : "flat_rough" ,            "offset" : [-51.2, 0, 0],   "distance": 8.0, "rating": 0.5},
             {"name" : "flat_smooth_slope" ,     "offset" : [0, 51.2, 0],    "distance": 6.0, "rating": 0.5},
             {"name" : "clif_smooth" ,           "offset" : [51.2, 0, 0],    "distance": 6.0, "rating": 0.5},
-            {"name" : "terrain_stairs_mid" ,    "offset" : [0, -60, 0],     "distance": 6.0, "rating": 0.5},
-            {"name" : "terrain_stairs_high" ,   "offset" : [-50, -60, 0],   "distance": 6.0, "rating": 0.5},
+            {"name" : "terrain_stairs_low" ,    "offset" : [-50, -50, 0],   "distance": 6.0, "rating": 0.5},
+            {"name" : "terrain_stairs_high" ,   "offset" : [50, -50, 0],    "distance": 6.0, "rating": 0.5},
         ],
 
         # Config for logging

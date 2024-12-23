@@ -273,7 +273,7 @@ class LeggedRobot(OrcaGymAgent):
         return visualized_command
 
 
-    def on_reset(self) -> dict[str, np.ndarray]:
+    def on_reset(self, height_map : np.ndarray) -> dict[str, np.ndarray]:
         # Reset ctrl to default values.
         if self._actuator_type == "position":
             assert self._ctrl.shape == self._neutral_joint_values.shape
@@ -304,6 +304,7 @@ class LeggedRobot(OrcaGymAgent):
         joint_neutral_qpos = self.get_joint_neutral()
         self._base_neutral_qpos = copy.deepcopy(self._init_base_joint_qpos)
         
+        
         # Use curriculum learning to set the initial position
         self._base_neutral_qpos[self._base_joint_name][:3] += pos_offset
 
@@ -314,6 +315,10 @@ class LeggedRobot(OrcaGymAgent):
         # Use the rotate quate
         base_rotate_quat = self._base_neutral_qpos[self._base_joint_name][3:]
         self._base_neutral_qpos[self._base_joint_name][3:] = rotations.quat_mul(base_rotate_quat, z_rotation_quat)
+        
+        # Update the height of the base body
+        self._base_neutral_qpos[self._base_joint_name][2] += self._compute_base_height(height_map)
+        
         # print("Base neutral qpos: ", base_neutral_qpos)
         joint_neutral_qpos.update(self._base_neutral_qpos)
 
@@ -323,20 +328,21 @@ class LeggedRobot(OrcaGymAgent):
         # print("Command: ", self._command)
 
         return joint_neutral_qpos
-    
-    def put_on_ground(self, qpos_buffer : np.ndarray, contact_dict : dict, lift_height : float) -> dict[str, np.ndarray]:
-        """
-        Check if the agent is in contact with the ground.
-        If contact is detected, lift the agent up to the desired height.
-        """
-        if any([contact_body_name in contact_dict for contact_body_name in self._all_contact_body_names]):
-            # print("Agent: ", self.name, "is in contact with the ground. Lift up!")
-            base_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
-            base_qpos[2] += lift_height
-            return {self._base_joint_name: base_qpos}
+
+    def _compute_base_height(self, height_map : np.ndarray) -> float:
+        height_map_x = int(self._base_neutral_qpos[self._base_joint_name][0] * 10 + height_map.shape[0] / 2)
+        height_map_y = int(self._base_neutral_qpos[self._base_joint_name][1] * 10 + height_map.shape[1] / 2)
         
-        return {}
-    
+        height_map_x_start = max(0, int(height_map_x - 5))
+        height_map_x_end = min(height_map.shape[0], int(height_map_x + 5))
+        height_map_y_start = max(0, int(height_map_y - 5))
+        height_map_y_end = min(height_map.shape[1], int(height_map_y + 5))
+        
+        height_map_cliped = height_map[height_map_x_start:height_map_x_end, height_map_y_start:height_map_y_end]
+        height = height_map_cliped.max()
+        print("Move up : ", height, "Height map: ", height_map_x, height_map_y)
+        return height
+        
     def reset_command_indicator(self, qpos_buffer : np.ndarray) -> dict[str, np.ndarray]:
         if not hasattr(self, "_cmd_mocap_pos_quat"):
             self._cmd_mocap_pos_quat = {
