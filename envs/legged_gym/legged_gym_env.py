@@ -20,6 +20,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         max_episode_steps: int,
         render_mode: str,
         render_remote: bool,
+        height_map_file: str,
         env_id: str,
         task: str,
         **kwargs,
@@ -39,6 +40,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             **kwargs,
         )
 
+        self._init_height_map(height_map_file)
         self._randomize_agent_foot_friction()
 
 
@@ -181,6 +183,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         # print("Set geom friction: ", geom_friction_dict)
         self.set_geom_friction(geom_friction_dict)
+        
+    def _init_height_map(self, height_map_file: str) -> None:
+        if height_map_file is not None:
+            self._height_map = np.load(height_map_file)
+            print("Height map :", self._height_map)
+        else:
+            raise ValueError("Height map file is not provided")
 
     def _reset_agent_joint_qpos(self, agents: list[LeggedRobot]) -> None:
         joint_qpos = {}
