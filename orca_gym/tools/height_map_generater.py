@@ -185,10 +185,11 @@ class HeightMapGenerater(OrcaGymLocalEnv):
                 
                 z = max(z, offset)
                 
-            x = int(self._helper_qpos[0] * 10)
-            y = int(self._helper_qpos[1] * 10)
+            x = int((self._helper_qpos[0] + self._height_map_size[0] / 2) * 10)
+            y = int((self._helper_qpos[1] + self._height_map_size[0] / 2) * 10)
             self._height_map[x, y] = self._helper_qpos[2] + z
-            # print("Update height map: ", x, y, self._height_map[x, y])
+            if self._height_map[x, y] > 0:
+                print("Update height map: ", x, y, self._height_map[x, y])
             
             return True
         

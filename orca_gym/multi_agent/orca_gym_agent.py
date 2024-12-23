@@ -149,17 +149,17 @@ class OrcaGymAgent:
         step_info = self.on_step(action, **kwargs)
         return self._ctrl, step_info
 
-    def on_reset(self):
+    def on_reset(self, **kwargs):
         """
         Called after each reset in the environment.
         Implement this method in the subclass to perform additional operations.
         """
         raise NotImplementedError
 
-    def reset(self, np_random : np.random.Generator):
+    def reset(self, np_random : np.random.Generator, **kwargs):
         self._current_episode_step = 0
         self._np_random = np_random
-        reset_info = self.on_reset()
+        reset_info = self.on_reset(**kwargs)
         return reset_info
 
 
