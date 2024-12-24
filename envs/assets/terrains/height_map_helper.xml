@@ -3,117 +3,23 @@
     <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
 
     <worldbody>
-        <body name="height_map_helper">
-            <freejoint name="root"/>
-            <geom type="box" name="geom_9" pos="0.0 0.0 0.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_8" pos="0.0 0.0 0.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_7" pos="0.0 0.0 0.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_6" pos="0.0 0.0 0.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_5" pos="0.0 0.0 0.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_4" pos="0.0 0.0 0.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_3" pos="0.0 0.0 0.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_2" pos="0.0 0.0 0.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_1" pos="0.0 0.0 0.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_0" pos="0.0 0.0 0.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
+        <body name="ruler" pos="0 0 0">
+            <freejoint name="ruler"/>
+            <geom type="box" name="geom_9" pos="0.0 0.0 0.95" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
+            <geom type="box" name="geom_8" pos="0.0 0.0 0.85" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
+            <geom type="box" name="geom_7" pos="0.0 0.0 0.75" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
+            <geom type="box" name="geom_6" pos="0.0 0.0 0.65" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
+            <geom type="box" name="geom_5" pos="0.0 0.0 0.55" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
+            <geom type="box" name="geom_4" pos="0.0 0.0 0.45" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
+            <geom type="box" name="geom_3" pos="0.0 0.0 0.35" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
+            <geom type="box" name="geom_2" pos="0.0 0.0 0.25" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
+            <geom type="box" name="geom_1" pos="0.0 0.0 0.15" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
+            <geom type="box" name="geom_0" pos="0.0 0.0 0.05" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>    
+        </body>
 
-            <geom type="box" name="geom_19" pos="0.0 0.0 1.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_18" pos="0.0 0.0 1.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_17" pos="0.0 0.0 1.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_16" pos="0.0 0.0 1.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_15" pos="0.0 0.0 1.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_14" pos="0.0 0.0 1.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_13" pos="0.0 0.0 1.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_12" pos="0.0 0.0 1.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_11" pos="0.0 0.0 1.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_10" pos="0.0 0.0 1.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_29" pos="0.0 0.0 2.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_28" pos="0.0 0.0 2.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_27" pos="0.0 0.0 2.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_26" pos="0.0 0.0 2.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_25" pos="0.0 0.0 2.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_24" pos="0.0 0.0 2.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_23" pos="0.0 0.0 2.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_22" pos="0.0 0.0 2.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_21" pos="0.0 0.0 2.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_20" pos="0.0 0.0 2.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_39" pos="0.0 0.0 3.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_38" pos="0.0 0.0 3.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_37" pos="0.0 0.0 3.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_36" pos="0.0 0.0 3.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_35" pos="0.0 0.0 3.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_34" pos="0.0 0.0 3.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_33" pos="0.0 0.0 3.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_32" pos="0.0 0.0 3.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_31" pos="0.0 0.0 3.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_30" pos="0.0 0.0 3.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_49" pos="0.0 0.0 4.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_48" pos="0.0 0.0 4.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_47" pos="0.0 0.0 4.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_46" pos="0.0 0.0 4.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_45" pos="0.0 0.0 4.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_44" pos="0.0 0.0 4.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_43" pos="0.0 0.0 4.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_42" pos="0.0 0.0 4.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_41" pos="0.0 0.0 4.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_40" pos="0.0 0.0 4.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_59" pos="0.0 0.0 5.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_58" pos="0.0 0.0 5.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_57" pos="0.0 0.0 5.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_56" pos="0.0 0.0 5.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_55" pos="0.0 0.0 5.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_54" pos="0.0 0.0 5.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_53" pos="0.0 0.0 5.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_52" pos="0.0 0.0 5.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_51" pos="0.0 0.0 5.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_50" pos="0.0 0.0 5.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_69" pos="0.0 0.0 6.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_68" pos="0.0 0.0 6.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_67" pos="0.0 0.0 6.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_66" pos="0.0 0.0 6.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_65" pos="0.0 0.0 6.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_64" pos="0.0 0.0 6.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_63" pos="0.0 0.0 6.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_62" pos="0.0 0.0 6.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_61" pos="0.0 0.0 6.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_60" pos="0.0 0.0 6.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_79" pos="0.0 0.0 7.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_78" pos="0.0 0.0 7.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_77" pos="0.0 0.0 7.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_76" pos="0.0 0.0 7.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_75" pos="0.0 0.0 7.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_74" pos="0.0 0.0 7.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_73" pos="0.0 0.0 7.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_72" pos="0.0 0.0 7.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_71" pos="0.0 0.0 7.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_70" pos="0.0 0.0 7.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_89" pos="0.0 0.0 8.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_88" pos="0.0 0.0 8.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_87" pos="0.0 0.0 8.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_86" pos="0.0 0.0 8.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_85" pos="0.0 0.0 8.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_84" pos="0.0 0.0 8.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_83" pos="0.0 0.0 8.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_82" pos="0.0 0.0 8.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_81" pos="0.0 0.0 8.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_80" pos="0.0 0.0 8.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>
-
-            <geom type="box" name="geom_99" pos="0.0 0.0 9.9" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.0 1"/>
-            <geom type="box" name="geom_98" pos="0.0 0.0 9.8" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.6666666666666666 0.0 1"/>
-            <geom type="box" name="geom_97" pos="0.0 0.0 9.7" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.6666666666666667 1 0.0 1"/>
-            <geom type="box" name="geom_96" pos="0.0 0.0 9.6" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.0 1"/>
-            <geom type="box" name="geom_95" pos="0.0 0.0 9.5" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 1 0.6666666666666666 1"/>
-            <geom type="box" name="geom_94" pos="0.0 0.0 9.4" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.6666666666666665 1 1"/>
-            <geom type="box" name="geom_93" pos="0.0 0.0 9.3" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.0 0.0 1 1"/>
-            <geom type="box" name="geom_92" pos="0.0 0.0 9.2" size="0.05 0.05 0.05" euler="0 0 0" rgba="0.666666666666667 0.0 1 1"/>
-            <geom type="box" name="geom_91" pos="0.0 0.0 9.1" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 0.6666666666666672 1"/>
-            <geom type="box" name="geom_90" pos="0.0 0.0 9.0" size="0.05 0.05 0.05" euler="0 0 0" rgba="1 0.0 2.220446049250313e-16 1"/>            
+        <body name="big_box" pos="0 2 0.5" euler="0 0 0">
+            <freejoint name="big_box"/>
+            <geom type="box" size="0.5 0.5 0.5" rgba="1 0.0 0.0 1"/>
         </body>
     </worldbody>
 
