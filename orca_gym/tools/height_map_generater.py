@@ -92,18 +92,19 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             },
         }
         # 先设置为最低高度
-        self._height_map["map"]["data"][:, :] = height_range[0] - 1.0
-        self._height_map["mini_map"]["data"][:, :] = height_range[0]
+        self._height_map["map"]["data"][:, :] = height_range[0]
+        self._height_map["mini_map"]["data"][:, :] = height_range[0] - 1.0
         
         print("Height map size: ", self._height_map["map"]["width"], self._height_map["map"]["height"])
         print("Height range: ", self._height_map["height_range"])        
+        # print("Mini map data: ", self._height_map["mini_map"]["data"])
         
         # 默认qpos高度为最高高度
         self._ruler = {
             "x_range": resolution,
             "y_range": resolution,
             "z_range": ruler_length,
-            "joint_name": "height_map_helper_ruler",
+            "joint_name": "height_map_helper_usda_ruler",
             "init_qpos": np.array([self._height_map["left_up_corner"][0] + resolution / 2, 
                                     self._height_map["left_up_corner"][1] + resolution / 2,
                                     height_range[1], 1, 0, 0, 0], dtype=float).flatten(),
@@ -114,7 +115,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             "x_range": 1.0,
             "y_range": 1.0,
             "z_range": 1.0,
-            "joint_name": "height_map_helper_big_box",
+            "joint_name": "height_map_helper_usda_big_box",
             "init_qpos": np.array([self._height_map["left_up_corner"][0] + 0.5, 
                                     self._height_map["left_up_corner"][1] + 0.5, 
                                     height_range[1], 1, 0, 0, 0], dtype=float).flatten(),
@@ -135,8 +136,8 @@ class HeightMapGenerater(OrcaGymLocalEnv):
 
     def _build_ruler_geom_offsets(self):
         name_2_offset = [
-            "height_map_helper_geom_0", "height_map_helper_geom_1", "height_map_helper_geom_2", "height_map_helper_geom_3", "height_map_helper_geom_4", 
-            "height_map_helper_geom_5", "height_map_helper_geom_6", "height_map_helper_geom_7", "height_map_helper_geom_8", "height_map_helper_geom_9",
+            "height_map_helper_usda_geom_0", "height_map_helper_usda_geom_1", "height_map_helper_usda_geom_2", "height_map_helper_usda_geom_3", "height_map_helper_usda_geom_4", 
+            "height_map_helper_usda_geom_5", "height_map_helper_usda_geom_6", "height_map_helper_usda_geom_7", "height_map_helper_usda_geom_8", "height_map_helper_usda_geom_9",
         ]
         self._ruler["geom_offsets"] = {}
         
@@ -185,7 +186,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self._generate_mini_map(action)
         self._generate_height_map(action)
         obs = self._get_obs().copy()
-        info = {"height_map": self._height_map}
+        info = {"height_map": self._height_map["map"]["data"]}
         terminated = False
         truncated = False
         reward = 0
@@ -194,9 +195,10 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         
     def _generate_height_map(self, action):
         for x in range(self._height_map["mini_map"]["width"]):
+            print("Generate Height map: ", x, "/", self._height_map["mini_map"]["width"])
             for y in range(self._height_map["mini_map"]["height"]):
                 if self._height_map["mini_map"]["data"][x, y] < self._height_map["height_range"][0]:
-                    print("Height map ", x, y, " is already the lowest height")
+                    # print("Height map ", x, y, " is already the lowest height")
                     continue
                 self._generate_unit_height_map(action, x * 10, y * 10, self._height_map["mini_map"]["data"][x, y])
                 
@@ -232,7 +234,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             
         self._height_map["map"]["data"][x, y] = z + offset
         
-        print("Update height map: ", x, y, self._height_map["map"]["data"][x, y])
+        # print("Update height map: ", x, y, self._height_map["map"]["data"][x, y])
 
     
     def _generate_mini_map(self, action):
@@ -253,7 +255,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
                     
                     if len(contact_dict) > 0:
                         self._height_map["mini_map"]["data"][x, y] = z
-                        print("Mini map: ", x, y, z)
+                        # print("Mini map: ", x, y, z)
                         break
                     
                     z -= self._height_map["mini_map"]["resolution"]
@@ -314,7 +316,7 @@ def register_env(orcagym_addr, env_name, env_index, height_map_border, height_ra
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--height_map_border', type=int, nargs=2, default=[-80, -80, 80, 80], help='The left-up and right-down corner coordinates of the height map in meters')
+    parser.add_argument('--height_map_border', type=int, nargs=4, default=[-80, -80, 80, 80], help='The left-up and right-down corner coordinates of the height map in meters')
     parser.add_argument('--height_range', type=int, nargs=2, default=[0, 20], help='The height range of the height map in meters')
     parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human or none). Set to none for faster processing')
     parser.add_argument('--output_file', type=str, default='height_map.npy', help='The output file to save the height map')
