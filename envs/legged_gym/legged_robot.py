@@ -340,7 +340,7 @@ class LeggedRobot(OrcaGymAgent):
         
         height_map_cliped = height_map[height_map_x_start:height_map_x_end, height_map_y_start:height_map_y_end]
         height = height_map_cliped.max()
-        print("Move up : ", height, "Height map: ", height_map_x, height_map_y)
+        # print("Move up : ", height, "Height map: ", height_map_x, height_map_y)
         return height
         
     def reset_command_indicator(self, qpos_buffer : np.ndarray) -> dict[str, np.ndarray]:

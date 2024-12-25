@@ -17,11 +17,13 @@
     </asset>
 
     <worldbody>
-        <body name="terrain" pos="-12.8 -12.8 0" >
-        <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield" pos="25.6  0.0   0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield" pos="0.0   25.6  0.0" material="pbr_plastic_gray"/>
-        <geom type="hfield" hfield="perlin_hfield" pos="25.6  25.6  0.0" material="pbr_plastic_gray"/>
+        <body name="offset" pos="0 -51.2 0">
+            <body name="terrain" pos="-12.8 -12.8 0" >
+                <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield" pos="25.6  0.0   0.0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield" pos="0.0   25.6  0.0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield" pos="25.6  25.6  0.0" material="pbr_plastic_gray"/>
+            </body>
         </body>
     </worldbody>
 

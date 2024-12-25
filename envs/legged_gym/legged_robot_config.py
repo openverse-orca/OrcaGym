@@ -81,11 +81,11 @@ LeggedRobotConfig = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
 
         "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_stair_low_terrain", "terrain_stair_high_terrain",
-                                        "terrain_perlin_flat_smooth_terrain",
-                                        "terrain_perlin_flat_rough_terrain",
-                                        "terrain_perlin_clif_smooth_terrain",
-                                        "terrain_perlin_flat_smooth_slope_terrain",
+                                        "terrain_stair_low_usda_terrain", "terrain_stair_high_usda_terrain",
+                                        "terrain_perlin_flat_smooth_usda_terrain",
+                                        "terrain_perlin_flat_rough_usda_terrain",
+                                        "terrain_perlin_clif_smooth_usda_terrain",
+                                        "terrain_perlin_flat_smooth_slope_usda_terrain",
                                         ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
