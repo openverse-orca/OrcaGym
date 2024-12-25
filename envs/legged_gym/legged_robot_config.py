@@ -81,9 +81,11 @@ LeggedRobotConfig = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
 
         "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_brics_terrain", "terrain_rocks_terrain", "terrain_slope_terrain", 
-                                        "terrain_stair_low_terrain", "terrain_stair_mid_terrain", "terrain_stair_high_terrain",
-                                        "terrain_perlin_terrain",
+                                        "terrain_stair_low_terrain", "terrain_stair_high_terrain",
+                                        "terrain_perlin_flat_smooth_terrain",
+                                        "terrain_perlin_flat_rough_terrain",
+                                        "terrain_perlin_clif_smooth_terrain",
+                                        "terrain_perlin_flat_smooth_slope_terrain",
                                         ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
@@ -115,14 +117,13 @@ LeggedRobotConfig = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
-            {"name" : "default" ,               "offset" : [0, 0, 0], "distance": 10.0, "rating": 0.5},
-            {"name" : "terrain_perlin" ,        "offset" : [30, 0, 0], "distance": 8.0, "rating": 0.6},
-            {"name" : "terrain_stairs_low" ,    "offset" : [0, 30, 0], "distance": 8.0, "rating": 0.6},
-            {"name" : "terrain_slope" ,         "offset" : [40, -35, 0], "distance": 8.0, "rating": 0.5},
-            # {"name" : "terrain_brics" ,       "offset" : [30, 30, 0], "distance": 8.0, "rating": 0.6},
-            # {"name" : "terrain_rocks" ,       "offset" : [30, 0, 0], "distance": 8.0, "rating": 0.6},
-            {"name" : "terrain_stairs_mid" ,    "offset" : [0, -30, 0], "distance": 8.0, "rating": 0.6},
-            {"name" : "terrain_stairs_high" ,   "offset" : [-30, 0, 0], "distance": 8.0, "rating": 0.6},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 8.0, "rating": 0.5},
+            {"name" : "flat_smooth" ,           "offset" : [0, -51.2, 0],   "distance": 8.0, "rating": 0.5},
+            {"name" : "flat_rough" ,            "offset" : [-51.2, 0, 0],   "distance": 8.0, "rating": 0.5},
+            {"name" : "flat_smooth_slope" ,     "offset" : [0, 51.2, 0],    "distance": 6.0, "rating": 0.5},
+            {"name" : "clif_smooth" ,           "offset" : [51.2, 0, 0],    "distance": 6.0, "rating": 0.5},
+            {"name" : "terrain_stairs_low" ,    "offset" : [-50, -50, 0],   "distance": 6.0, "rating": 0.5},
+            {"name" : "terrain_stairs_high" ,   "offset" : [50, -50, 0],    "distance": 6.0, "rating": 0.5},
         ],
 
         # Config for logging
