@@ -849,7 +849,7 @@ class LeggedRobot(OrcaGymAgent):
         self._max_episode_steps = sys.maxsize
         
     def update_playable(self, lin_vel : np.ndarray, turn_angle : float, rebone : bool = False):
-        print("Agent: ", self.name, "Update playable: ", lin_vel, turn_angle, rebone)
+        # print("Agent: ", self.name, "Update playable: ", lin_vel, turn_angle, rebone)
         
         self._command["lin_vel"] = lin_vel
         self._command["heading_angle"] += turn_angle

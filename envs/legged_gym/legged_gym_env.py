@@ -77,7 +77,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             act = action[i]
 
             agent.update_command(self.data.qpos)
-            agent_ctrl, agent_mocap = agent.step(act, update_mocap=(self.render_mode == "human" and self.render_remote))
+            agent_ctrl, agent_mocap = agent.step(act, update_mocap=(self.render_mode == "human" and self.render_remote and self._run_mode != "play"))
             joint_qvel_dict = agent.push_robot(self.data.qvel)
             # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
             mocaps.update(agent_mocap)
@@ -225,7 +225,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             return
         
         self._keyboard_controller = KeyboardInput()
-        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0}   
+        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
         
         for agent in self.agents:
             if agent.playable:
@@ -239,6 +239,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
         lin_vel, turn_angel, reborn = self._update_keyboard_control()
         self._player_agent.update_playable(lin_vel, turn_angel)
+        agent_cmd_mocap = self._player_agent.reset_command_indicator(self.data.qpos)
+        self.set_mocap_pos_and_quat(agent_cmd_mocap)      
+        
+        if reborn:
+            self.reset_agents([self._player_agent])
     
     def _update_keyboard_control(self) -> tuple[np.ndarray, float, bool]:
         self._keyboard_controller.update()
@@ -248,13 +253,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         reborn = False
         
         if key_status["W"] == 1:
-            lin_vel[0] = 1.0
+            lin_vel[0] = 0.5
         if key_status["A"] == 1:
-            turn_angel += -np.pi / 4 * self.dt
+            turn_angel += np.pi / 2 * self.dt
         if key_status["D"] == 1:
-            turn_angel += np.pi / 4 * self.dt
+            turn_angel += -np.pi / 2 * self.dt
         if self._key_status["Space"] == 0 and key_status["Space"] == 1:
             reborn = True
+        if key_status["LShift"] == 1:
+            lin_vel[0] *= 2
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
