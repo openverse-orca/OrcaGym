@@ -132,7 +132,6 @@ class SubprocVecEnvMA(VecEnv):
         super().__init__(len(env_fns) * agent_num, observation_space, action_space)
 
 
-
     def step_async(self, actions: np.ndarray) -> None:
         # 拼接 actions，将 remote_num * agent_num 个动作拼接成 remote_num 个动作
         remote_actions = np.reshape(actions, (len(self.remotes), -1))

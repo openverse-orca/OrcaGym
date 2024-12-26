@@ -8,6 +8,7 @@ from orca_gym.utils.reward_printer import RewardPrinter
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import copy
+import sys
 
 from .legged_robot_config import LeggedRobotConfig, LeggedObsConfig
 
@@ -162,6 +163,11 @@ class LeggedRobot(OrcaGymAgent):
             self._visualize_command = True
         else:
             self._visualize_command = False
+            
+        if self.name == robot_config["playable_agent_name"]:
+            self._is_playable = True
+        else:
+            self._is_playable = False
 
         self._is_obs_updated = False
         self._setup_reward_functions()
@@ -170,6 +176,10 @@ class LeggedRobot(OrcaGymAgent):
     @property
     def neutral_joint_values(self) -> np.ndarray:
         return self._neutral_joint_values
+    
+    @property
+    def playable(self) -> bool:
+        return self._is_playable
 
     # @property
     # def body_contact_force_threshold(self) -> float:
@@ -639,6 +649,7 @@ class LeggedRobot(OrcaGymAgent):
         angle_error = self._command["heading_angle"] - body_heading_angle
         angle_error = (angle_error + np.pi) % (2 * np.pi) - np.pi
         self._command["ang_vel"] = min(max(angle_error, -self._command_ang_vel_range), self._command_ang_vel_range)
+        self._command_values[3] = self._command["ang_vel"]
 
 
     def _resample_command(self) -> None:
@@ -832,3 +843,18 @@ class LeggedRobot(OrcaGymAgent):
             buffer["index"] = 0
         # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
                     
+                    
+    def init_playable(self):
+        self._command_resample_interval = sys.maxsize
+        self._max_episode_steps = sys.maxsize
+        
+    def update_playable(self, lin_vel : np.ndarray, turn_angle : float, rebone : bool = False):
+        print("Agent: ", self.name, "Update playable: ", lin_vel, turn_angle, rebone)
+        
+        self._command["lin_vel"] = lin_vel
+        self._command["heading_angle"] += turn_angle
+        self._command_values[:3] = self._command["lin_vel"]
+        if rebone:
+            self._max_episode_steps = self._current_episode_step  # 在下一步重新出生
+        else:
+            self._max_episode_steps = sys.maxsize
