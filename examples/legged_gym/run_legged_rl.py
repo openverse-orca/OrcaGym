@@ -187,46 +187,74 @@ def setup_model_ppo(env,
 
     return model
 
-def setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
+def setup_model_sac(env, 
+                    env_num: int, 
+                    agent_num: int, 
+                    total_timesteps: int, 
+                    start_episode: int, 
+                    max_episode_steps: int, 
+                    model_file: str, 
+                    load_existing_model: bool) -> SAC:
+    """
+    设置或加载 SAC 模型。
+
+    参数:
+    - env: 训练环境（应为 VecEnv 类型，支持并行环境）
+    - env_num: 环境数量
+    - agent_num: 每个环境中的智能体数量
+    - total_timesteps: 总时间步数
+    - start_episode: 开始的回合数
+    - max_episode_steps: 每回合最大步数
+    - model_file: 模型文件路径
+    - load_existing_model: 是否加载现有模型标志
+
+    返回:
+    - model: 初始化的或加载的 SAC 模型
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}.zip") and load_existing_model:
+        print(f"加载现有模型：{model_file}")
         model = SAC.load(model_file, env=env, device=device)
-    else:        
-        # https://arxiv.org/html/2312.13788v2
-        # Open-Source Reinforcement Learning Environments Implemented in MuJoCo with Franka Manipulator。        
-        # Training phase: Use HER
-        goal_selection_strategy = "future"  # 选择 'future' 策略
-
+    else:
+        # 定义自定义策略网络
         policy_kwargs = dict(
-            net_arch=[256, 256, 256],  # 三层隐藏层，每层256个神经元
-            n_critics=2,
-            # n_quantiles=25,
-            # activation_fn=nn.ReLU
+            net_arch=dict(
+                pi=[1024, 512, 256],  # 策略网络结构
+                qf=[1024, 512, 256]   # Q 函数网络结构
+            ),
+            activation_fn=nn.ELU,  # 激活函数
         )
 
-        replay_buffer_class = HerReplayBuffer
-        replay_buffer_kwargs = dict(
-            n_sampled_goal=4,
-            goal_selection_strategy=goal_selection_strategy
-        )
+        # 计算总环境数量
+        total_envs = env_num * agent_num
 
-        # Initialize the model
+
+        # SAC 参数设置
+        buffer_size = 1000000  # 经验回放缓冲区大小
+        batch_size = 256  # 从缓冲区中采样的批次大小
+
         model = SAC(
-            "MultiInputPolicy", 
-            env, 
-            replay_buffer_class=replay_buffer_class,
-            replay_buffer_kwargs=replay_buffer_kwargs,
+            policy="MultiInputPolicy",  # 多输入策略，适用于多智能体环境
+            env=env, 
             verbose=1, 
-            learning_rate=0.001,  # 学习率
-            buffer_size=1000000,  # 重播缓冲区大小
-            batch_size=512,  # 批量大小
-            tau=0.005, 
-            gamma=0.99,  # 折扣因子
+            learning_rate=3e-4, 
+            buffer_size=buffer_size, 
             learning_starts= max_episode_steps * env_num * agent_num * start_episode,
+            batch_size=batch_size, 
+            gamma=0.99, 
+            tau=0.005, 
+            ent_coef="auto",  # 自动调整熵系数
+            target_update_interval=1,  # 目标网络更新间隔
+            train_freq=(1, "step"),  # 每步训练一次
+            gradient_steps=1,  # 每步进行一次梯度更新
             policy_kwargs=policy_kwargs, 
             device=device
         )
+
+    # 打印模型摘要
+    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- Buffer Size: {model.replay_buffer.buffer_size}")
 
     return model
 
