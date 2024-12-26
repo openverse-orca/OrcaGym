@@ -48,7 +48,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
         # print("Step agents: ", action)
 
-
         # 性能优化：在Env中批量更新所有agent的控制量
         if self._task != "no_action":
             if len(self.ctrl) == len(actuator_ctrl):
@@ -61,30 +60,25 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         # 切分action 给每个 agent
         action = action.reshape(len(self._agents), -1)
-        if self.render_mode == "human" and self.render_remote:
-            # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
-            mocaps = {}
-            joint_qvels = {}
-            for i in range(len(self._agents)):
-                agent : LeggedRobot = self._agents[i]
-                act = action[i]
 
-                agent.update_command(self.data.qpos)
-                agent_ctrl, agent_mocap = agent.step(act, update_mocap=True)
-                joint_qvel_dict = agent.push_robot(self.data.qvel)
-                # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
-                mocaps.update(agent_mocap)
-                joint_qvels.update(joint_qvel_dict)
+        # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
+        mocaps = {}
+        joint_qvels = {}
+        for i in range(len(self._agents)):
+            agent : LeggedRobot = self._agents[i]
+            act = action[i]
 
-            
-            self.set_mocap_pos_and_quat(mocaps)
-            self.set_joint_qvel(joint_qvels)
-        else:
-            for i in range(len(self._agents)):
-                agent = self._agents[i]
-                act = action[i]
-                agent_ctrl, _ = agent.step(act, update_mocap=False)
-                # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+            agent.update_command(self.data.qpos)
+            agent_ctrl, agent_mocap = agent.step(act, update_mocap=(self.render_mode == "human" and self.render_remote))
+            joint_qvel_dict = agent.push_robot(self.data.qvel)
+            # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
+            mocaps.update(agent_mocap)
+            joint_qvels.update(joint_qvel_dict)
+
+        
+        self.set_mocap_pos_and_quat(mocaps)
+        self.set_joint_qvel(joint_qvels)
+
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
