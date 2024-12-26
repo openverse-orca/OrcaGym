@@ -489,7 +489,7 @@ if __name__ == "__main__":
     parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
     parser.add_argument('--task', type=str, default='follow_command', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
-    parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training or testing)')
+    parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training / testing / play)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
     parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
@@ -543,7 +543,7 @@ if __name__ == "__main__":
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
         train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, height_map_file, load_existing_model)
-    elif run_mode == "testing":
+    elif run_mode == "testing" or run_mode == "play":
         test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file, height_map_file)    
     else:
         raise ValueError("Invalid run mode")
