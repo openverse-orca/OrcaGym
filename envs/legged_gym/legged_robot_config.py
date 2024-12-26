@@ -117,13 +117,13 @@ LeggedRobotConfig = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 8.0, "rating": 0.5},
-            {"name" : "flat_smooth" ,           "offset" : [0, -50, 0],   "distance": 8.0, "rating": 0.5},
-            {"name" : "flat_rough" ,            "offset" : [-50, 0, 0],   "distance": 8.0, "rating": 0.5},
-            {"name" : "flat_smooth_slope" ,     "offset" : [0, 50, 0],    "distance": 6.0, "rating": 0.5},
-            {"name" : "clif_smooth" ,           "offset" : [50, 0, 0],    "distance": 6.0, "rating": 0.5},
-            {"name" : "terrain_stairs_low" ,    "offset" : [-50, -50, 0],   "distance": 6.0, "rating": 0.5},
-            {"name" : "terrain_stairs_high" ,   "offset" : [50, -50, 0],    "distance": 6.0, "rating": 0.5},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5},
+            {"name" : "flat_smooth" ,           "offset" : [0, -50, 0],   "distance": 5.0, "rating": 0.5},
+            {"name" : "flat_rough" ,            "offset" : [-50, 0, 0],   "distance": 5.0, "rating": 0.5},
+            {"name" : "flat_smooth_slope" ,     "offset" : [0, 50, 0],    "distance": 3.0, "rating": 0.5},
+            {"name" : "clif_smooth" ,           "offset" : [50, 0, 0],    "distance": 3.0, "rating": 0.5},
+            {"name" : "terrain_stairs_low" ,    "offset" : [-50, -50, 0],   "distance": 3.0, "rating": 0.5},
+            {"name" : "terrain_stairs_high" ,   "offset" : [50, -50, 0],    "distance": 3.0, "rating": 0.5},
         ],
 
         # Config for logging

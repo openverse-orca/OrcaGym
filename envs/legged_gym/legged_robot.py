@@ -808,27 +808,24 @@ class LeggedRobot(OrcaGymAgent):
         ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
         mean_rating = np.mean(ratings)
         
-        # 低于奖励阈值，降级
+        # 低于奖励阈值，或者摔倒，降级
         # 高于奖励阈值，并达到行走距离，升级
-        if mean_rating < self._curriculum_levels[self._current_level]["rating"]:
+        if mean_rating < self._curriculum_levels[self._current_level]["rating"] + self._curriculum_clear_times * 0.01 or self.is_terminated(self._achieved_goal, self._desired_goal):
             self._current_level = max(self._current_level - 1, 0)
-            self._curriculum_clear_times = 0
             # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
         elif hasattr(self, "_base_neutral_qpos"):
             start_pos = self._base_neutral_qpos[self._base_joint_name][:3]
             current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
             move_distance = np.linalg.norm(start_pos - current_pos)
             # print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
-            if move_distance > self._curriculum_levels[self._current_level]["distance"]:
+            if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
                 self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
                 # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
                 
                 if self._current_level == len(self._curriculum_levels) - 1:
                     self._curriculum_clear_times += 1
-                    if self._curriculum_clear_times > 3:
-                        self._current_level = 0
-                        self._curriculum_clear_times = 0
-                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! Drop to level 0!, mean rating: ", mean_rating, "Move distance: ", move_distance)
+                    self._current_level = 0
+                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times)
 
         
         for buffer in self._curriculum_reward_buffer.values():
