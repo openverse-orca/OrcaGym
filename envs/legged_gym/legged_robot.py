@@ -821,10 +821,10 @@ class LeggedRobot(OrcaGymAgent):
         
         # 低于奖励阈值，或者摔倒，降级
         # 高于奖励阈值，并达到行走距离，升级
-        if mean_rating < self._curriculum_levels[self._current_level]["rating"] + self._curriculum_clear_times * 0.01 or self.is_terminated(self._achieved_goal, self._desired_goal):
+        if mean_rating < self._curriculum_levels[self._current_level]["rating"] + self._curriculum_clear_times * 0.01:
             self._current_level = max(self._current_level - 1, 0)
             # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
-        elif hasattr(self, "_base_neutral_qpos"):
+        elif hasattr(self, "_base_neutral_qpos") and not self.is_terminated(self._achieved_goal, self._desired_goal):
             start_pos = self._base_neutral_qpos[self._base_joint_name][:3]
             current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
             move_distance = np.linalg.norm(start_pos - current_pos)
