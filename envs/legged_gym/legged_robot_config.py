@@ -135,6 +135,8 @@ LeggedRobotConfig = {
         "visualize_command_agent_names" : ["go2_000"],
         "command_indicator_name" : "command_indicator_mocap",
 
+        # Config for playable agent
+        "playable_agent_name" : "go2_000",
     },
     "A01B": {
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 

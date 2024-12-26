@@ -5,6 +5,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import datetime
+from orca_gym.devices.keyboard import KeyboardInput
 
 from .legged_robot import LeggedRobot
 
@@ -21,11 +22,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         render_mode: str,
         render_remote: bool,
         height_map_file: str,
+        run_mode: str,
         env_id: str,
         task: str,
         **kwargs,
     ):
         self._init_height_map(height_map_file)
+        self._run_mode = run_mode       
         
         super().__init__(
             frame_skip = frame_skip,
@@ -43,10 +46,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         
         self._randomize_agent_foot_friction()
-
+        self._init_playable()
+     
+    @property
+    def agents(self) -> list[LeggedRobot]:
+        return self._agents
 
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
         # print("Step agents: ", action)
+        self._update_playable()
 
         # 性能优化：在Env中批量更新所有agent的控制量
         if self._task != "no_action":
@@ -54,18 +62,18 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 self.ctrl = actuator_ctrl
             else:
                 assert len(self.ctrl) > len(actuator_ctrl)
-                actuator_ctrl = np.array(actuator_ctrl).reshape(len(self._agents), -1)
+                actuator_ctrl = np.array(actuator_ctrl).reshape(len(self.agents), -1)
                 for i in range(len(actuator_ctrl)):
                     self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
 
         # 切分action 给每个 agent
-        action = action.reshape(len(self._agents), -1)
+        action = action.reshape(len(self.agents), -1)
 
         # mocap 的作用是用来显示目标位置，不影响仿真，这里处理一下提升性能
         mocaps = {}
         joint_qvels = {}
-        for i in range(len(self._agents)):
-            agent : LeggedRobot = self._agents[i]
+        for i in range(len(self.agents)):
+            agent : LeggedRobot = self.agents[i]
             act = action[i]
 
             agent.update_command(self.data.qpos)
@@ -84,12 +92,12 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
         assert achieved_goal.shape == desired_goal.shape
         if achieved_goal.ndim == 1:
-            return self._agents[0].compute_reward(achieved_goal, desired_goal)
+            return self.agents[0].compute_reward(achieved_goal, desired_goal)
         elif achieved_goal.ndim == 2:
-            agent_num = len(self._agents)
+            agent_num = len(self.agents)
             rewards = np.zeros(agent_num)
             for i in range(len(achieved_goal)):
-                rewards[i] = self._agents[i % agent_num].compute_reward(achieved_goal[i], desired_goal[i])
+                rewards[i] = self.agents[i % agent_num].compute_reward(achieved_goal[i], desired_goal[i])
             return rewards
         else:
             raise ValueError("Unsupported achieved_goal shape")
@@ -113,7 +121,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         agent_obs : list[dict[str, np.ndarray]] = []
         achieved_goals = []
         desired_goals = []
-        for agent in self._agents:
+        for agent in self.agents:
             obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict)
             achieved_goals.append(obs["achieved_goal"])
             desired_goals.append(obs["desired_goal"])
@@ -164,14 +172,14 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         return contact_dict
 
     def _randomize_agent_foot_friction(self) -> None:
-        # if self._render_mode == "human" and self._render_remote:
-        #     print("Skip randomize foot friction in human render mode")
-        #     return
+        if self._run_mode == "testing" or self._run_mode == "play":
+            print("Skip randomize foot friction in testing or play mode")
+            return
         
         random_friction = self.np_random.uniform(0, 1.0)
         geom_friction_dict = {}
-        for i in range(len(self._agents)):
-            agent : LeggedRobot = self._agents[i]
+        for i in range(len(self.agents)):
+            agent : LeggedRobot = self.agents[i]
             agent_geom_friction_dict = agent.randomize_foot_friction(random_friction, self.model.get_geom_dict())
             geom_friction_dict.update(agent_geom_friction_dict)
 
@@ -210,3 +218,47 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def _update_curriculum_level(self, agents: list[LeggedRobot]) -> None:
         for agent in agents:
             agent.update_curriculum_level(self.data.qpos)
+            
+    
+    def _init_playable(self) -> None:
+        if self._run_mode != "play":
+            return
+        
+        self._keyboard_controller = KeyboardInput()
+        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0}   
+        
+        for agent in self.agents:
+            if agent.playable:
+                self._player_agent = agent
+                agent.init_playable()
+                break
+    
+    def _update_playable(self) -> None:
+        if self._run_mode != "play":
+            return
+        
+        lin_vel, turn_angel, reborn = self._update_keyboard_control()
+        self._player_agent.update_playable(lin_vel, turn_angel)
+    
+    def _update_keyboard_control(self) -> tuple[np.ndarray, float, bool]:
+        self._keyboard_controller.update()
+        key_status = self._keyboard_controller.get_state()
+        lin_vel = np.zeros(3)
+        turn_angel = 0.0
+        reborn = False
+        
+        if key_status["W"] == 1:
+            lin_vel[0] = 1.0
+        if key_status["A"] == 1:
+            turn_angel += -np.pi / 4 * self.dt
+        if key_status["D"] == 1:
+            turn_angel += np.pi / 4 * self.dt
+        if self._key_status["Space"] == 0 and key_status["Space"] == 1:
+            reborn = True
+
+        self._key_status = key_status.copy()
+        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
+        
+        return lin_vel, turn_angel, reborn
+
+    

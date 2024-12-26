@@ -27,7 +27,7 @@ import numpy as np
 from envs.legged_gym.legged_robot_config import LeggedEnvConfig
 
 
-def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
@@ -42,6 +42,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task,
                 'render_mode': "human",
                 'render_remote': render_remote,
                 'height_map_file': height_map_file,
+                'run_mode': run_mode,
                 'env_id': env_id},
         max_episode_steps=sys.maxsize,      # 环境永不停止，agent有最大步数
         reward_threshold=0.0,
@@ -49,10 +50,10 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task,
     return env_id
 
 
-def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file):
+def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file):
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file)
+        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file)
         print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
@@ -360,7 +361,7 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, subenv_num)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, "training", entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         print("Start Simulation!")
@@ -383,7 +384,7 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         model.save(model_file)
         env.close()
 
-def test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file, height_map_file):
+def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file, height_map_file):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
@@ -391,7 +392,7 @@ def test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, time
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, 1)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) for orcagym_addr, env_index, render_remote in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -458,6 +459,7 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
             observations, rewards, dones, infos = env.step(action)
 
             # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
+
 
             env.render()
             # step_time = datetime.now() - setp_start
@@ -544,7 +546,7 @@ if __name__ == "__main__":
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
         train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, height_map_file, load_existing_model)
     elif run_mode == "testing" or run_mode == "play":
-        test_model(orcagym_addresses, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file, height_map_file)    
+        test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file, height_map_file)    
     else:
         raise ValueError("Invalid run mode")
 
