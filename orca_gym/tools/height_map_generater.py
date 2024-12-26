@@ -318,7 +318,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
     parser.add_argument('--height_map_border', type=int, nargs=4, default=[-80, -80, 80, 80], help='The left-up and right-down corner coordinates of the height map in meters')
     parser.add_argument('--height_range', type=int, nargs=2, default=[0, 20], help='The height range of the height map in meters')
-    parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human or none). Set to none for faster processing')
+    parser.add_argument('--render_mode', type=str, default='none', help='The render mode (human or none). Set to none for faster processing')
     parser.add_argument('--output_file', type=str, default='height_map.npy', help='The output file to save the height map')
     args = parser.parse_args()
     
