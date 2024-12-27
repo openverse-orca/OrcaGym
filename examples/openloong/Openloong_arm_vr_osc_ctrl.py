@@ -6,7 +6,7 @@ import numpy as np
 
 
 
-current_file_path = os.path.abspath('./../../')
+current_file_path = os.path.abspath('./')
 
 if current_file_path not in sys.path:
     print("add path: ", current_file_path)
@@ -29,7 +29,7 @@ def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': ['AzureLoong'], 
+                'agent_names': [], 
                 'time_step': TIME_STEP,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,
@@ -56,13 +56,13 @@ def continue_training(env):
         info_list = [info]  # Collect additional info (like state)
 
         # Save data to .h5 using DatasetWriter
-        dataset_writer.add_demo({
-            'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-            'actions': np.array(action_list),
-            'rewards': np.array(reward_list),
-            'dones': np.array(done_list),
-            'obs': obs_list
-        })
+        # dataset_writer.add_demo({
+        #     'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
+        #     'actions': np.array(action_list),
+        #     'rewards': np.array(reward_list),
+        #     'dones': np.array(done_list),
+        #     'obs': obs_list
+        # })
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < TIME_STEP:
             time.sleep(TIME_STEP - elapsed_time.total_seconds())
@@ -83,10 +83,10 @@ if __name__ == "__main__":
         print("Registering environment with id: ", env_id)
         # Create a new DatasetWriter instance to save the data
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5",
-                                       env_name=env_name,
-                                       env_version="v1",
-                                       env_kwargs={'orcagym_addr': orcagym_addr})
+        # dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5",
+        #                                env_name=env_name,
+        #                                env_version="v1",
+        #                                env_kwargs={'orcagym_addr': orcagym_addr})
         env = gym.make(env_id)        
         print("Starting simulation...")
 
