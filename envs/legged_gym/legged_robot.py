@@ -830,13 +830,13 @@ class LeggedRobot(OrcaGymAgent):
             move_distance = np.linalg.norm(start_pos - current_pos)
             # print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
             if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
-                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
                 # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
-                
                 if self._current_level == len(self._curriculum_levels) - 1:
                     self._curriculum_clear_times += 1
                     self._current_level = 0
                     print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times)
+
+                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
 
         
         for buffer in self._curriculum_reward_buffer.values():
