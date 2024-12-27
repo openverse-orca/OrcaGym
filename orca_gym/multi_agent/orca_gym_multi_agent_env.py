@@ -112,8 +112,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
     def set_action_space(self) -> None:
         action_size = self._agents[0].get_action_size()
         self.action_space = spaces.Box(
-            low=np.array([-1.0] * action_size),
-            high=np.array([1.0] * action_size),
+            low=np.array([-1.0] * action_size, dtype=np.float32),
+            high=np.array([1.0] * action_size, dtype=np.float32),
             dtype=np.float32,
         )
         [agent.set_action_space(self.action_space) for agent in self._agents]        
