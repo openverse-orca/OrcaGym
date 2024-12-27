@@ -146,10 +146,11 @@ def setup_model_ppo(env,
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 如果存在模型文件且指定加载现有模型，则加载模型
-    if os.path.exists(f"{model_file}.zip") and load_existing_model:
+    if os.path.exists(f"{model_file}") and load_existing_model:
         print(f"加载现有模型：{model_file}")
         model = PPO.load(model_file, env=env, device=device)
     else:
+        print("初始化新模型")
         # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
