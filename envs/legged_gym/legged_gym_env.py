@@ -262,7 +262,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self._key_status["Space"] == 0 and key_status["Space"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
-            lin_vel[0] *= 2
+            lin_vel[0] *= 3
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)

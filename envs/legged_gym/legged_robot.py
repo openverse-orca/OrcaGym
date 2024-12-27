@@ -836,8 +836,8 @@ class LeggedRobot(OrcaGymAgent):
                     self._curriculum_clear_times += 1
                     self._current_level = 0
                     print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times)
-
-                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
+                else:
+                    self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
 
         
         for buffer in self._curriculum_reward_buffer.values():
