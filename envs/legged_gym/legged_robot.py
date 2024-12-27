@@ -71,11 +71,6 @@ class LeggedRobot(OrcaGymAgent):
 
         self._base_neutral_height_offset = robot_config["base_neutral_height_offset"]
         self._base_born_height_offset = robot_config["base_born_height_offset"]
-        self._command_lin_vel_range_x = robot_config["command_lin_vel_range_x"]
-        self._command_lin_vel_range_y = robot_config["command_lin_vel_range_y"]
-        self._command_lin_vel_threshold = robot_config["command_lin_vel_threshold"]
-        self._command_ang_vel_range = robot_config["command_ang_vel_range"]
-        self._command_resample_interval = robot_config["command_resample_interval"]
 
         self._neutral_joint_angles = robot_config["neutral_joint_angles"]
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
@@ -136,6 +131,7 @@ class LeggedRobot(OrcaGymAgent):
         # Curriculum learning
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_levels = robot_config["curriculum_levels"]
+        self._curriculum_commands = robot_config["curriculum_commands"]
         if self._curriculum_learning:
             buffer_size = self._max_episode_steps
             self._curriculum_reward_buffer = {
@@ -153,6 +149,8 @@ class LeggedRobot(OrcaGymAgent):
             self._current_level = 0
             self._curriculum_clear_times = 0
         
+        self._set_commands_config(0)
+   
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
         self._reward_printer = None
@@ -815,7 +813,10 @@ class LeggedRobot(OrcaGymAgent):
         rating = np.mean(self._curriculum_reward_buffer["ang_vel"]["buffer"][:buffer_index+1]) / (coeff * self.dt)
         return rating
     
-    def update_curriculum_level(self, qpos_buffer : np.ndarray) -> None:        
+    def update_curriculum_level(self, qpos_buffer : np.ndarray) -> None:    
+        if not self._curriculum_learning:
+            return
+            
         ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
         mean_rating = np.mean(ratings)
         
@@ -842,7 +843,9 @@ class LeggedRobot(OrcaGymAgent):
         for buffer in self._curriculum_reward_buffer.values():
             buffer["index"] = 0
         # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
-                    
+        
+        # Update the command config for different levels
+        self._set_commands_config(self._current_level)
                     
     def init_playable(self):
         self._command_resample_interval = sys.maxsize
@@ -858,3 +861,11 @@ class LeggedRobot(OrcaGymAgent):
             self._max_episode_steps = self._current_episode_step  # 在下一步重新出生
         else:
             self._max_episode_steps = sys.maxsize
+            
+    def _set_commands_config(self, current_level : int) -> None:
+        command_type = self._curriculum_levels[current_level]["command_type"]
+        self._command_lin_vel_range_x = self._curriculum_commands[command_type]["command_lin_vel_range_x"]
+        self._command_lin_vel_range_y = self._curriculum_commands[command_type]["command_lin_vel_range_y"]
+        self._command_lin_vel_threshold = self._curriculum_commands[command_type]["command_lin_vel_threshold"]
+        self._command_ang_vel_range = self._curriculum_commands[command_type]["command_ang_vel_range"]
+        self._command_resample_interval = self._curriculum_commands[command_type]["command_resample_interval"]             
