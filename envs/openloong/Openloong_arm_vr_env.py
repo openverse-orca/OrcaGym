@@ -38,7 +38,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         )
 
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
+        # self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
       
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -170,7 +170,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         # Add to the controller dict additional relevant params:
         #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
         #   policy (control) freq, and ndim (# joints)
-        self._neck_controller_config["robot_name"] = agent_names[0]
+        self._neck_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
         self._neck_controller_config["sim"] = self.gym
         self._neck_controller_config["eef_name"] = NECK_NAME
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
@@ -197,7 +197,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         # Add to the controller dict additional relevant params:
         #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
         #   policy (control) freq, and ndim (# joints)
-        self._r_controller_config["robot_name"] = agent_names[0]
+        self._r_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
         self._r_controller_config["sim"] = self.gym
         self._r_controller_config["eef_name"] = EE_NAME_R
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
@@ -227,7 +227,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         # Add to the controller dict additional relevant params:
         #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
         #   policy (control) freq, and ndim (# joints)
-        self._l_controller_config["robot_name"] = agent_names[0]
+        self._l_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
         self._l_controller_config["sim"] = self.gym
         self._l_controller_config["eef_name"] = EE_NAME
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
@@ -300,7 +300,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             'dones': np.array(done_list),
             'obs': obs_list
         }
-        self.dataset_writer.add_demo(demo_data)
+        # self.dataset_writer.add_demo(demo_data)
 
     def run_episode(self):
         """
@@ -334,7 +334,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         """
         Finalize the dataset and close the environment.
         """
-        self.dataset_writer.finalize()  # Ensure all data is saved
+        # self.dataset_writer.finalize()  # Ensure all data is saved
         super().close()
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()
