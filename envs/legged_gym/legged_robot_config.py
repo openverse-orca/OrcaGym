@@ -142,7 +142,7 @@ LeggedRobotConfig = {
             "stairs" : {
                 "command_lin_vel_range_x" : 0.5, # x direction for forward
                 "command_lin_vel_range_y" : 0.1, # y direction for left/right
-                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : 0.0, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
