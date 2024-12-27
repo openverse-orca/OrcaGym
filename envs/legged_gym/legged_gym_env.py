@@ -6,6 +6,7 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import datetime
 from orca_gym.devices.keyboard import KeyboardInput
+import gymnasium as gym
 
 from .legged_robot import LeggedRobot
 
@@ -188,11 +189,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
     def _init_height_map(self, height_map_file: str) -> None:
         if height_map_file is not None:
-            self._height_map = np.load(height_map_file)
-            # for i in range(self._height_map.shape[0]):
-            #     for j in range(self._height_map.shape[1]):
-            #         if self._height_map[i, j] != 0:
-            #             print("Height map: ", i, j, self._height_map[i, j])
+            try:
+                self._height_map = np.load(height_map_file)
+            except:
+                gym.logger.warn("Height map file loading failed!, use default height map 200m x 200m")
+                self._height_map = np.zeros((2000, 2000))  # default height map, 200m x 200m
         else:
             raise ValueError("Height map file is not provided")
 
