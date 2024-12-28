@@ -148,6 +148,7 @@ class LeggedRobot(OrcaGymAgent):
             } 
             self._current_level = 0
             self._curriculum_clear_times = 0
+            self._max_level_times = 0
         
         self._set_commands_config(0)
    
@@ -835,7 +836,10 @@ class LeggedRobot(OrcaGymAgent):
                 if self._current_level == len(self._curriculum_levels) - 1:
                     self._curriculum_clear_times += 1
                     self._current_level = 0
-                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times)
+                    if self._curriculum_clear_times > 10:
+                        self._curriculum_clear_times = 0
+                        self._max_level_times += 1
+                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times, "Max level times: ", self._max_level_times)
                 else:
                     self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
 
