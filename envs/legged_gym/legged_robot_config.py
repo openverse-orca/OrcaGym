@@ -120,7 +120,7 @@ LeggedRobotConfig = {
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
             {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
