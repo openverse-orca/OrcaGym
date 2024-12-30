@@ -175,53 +175,125 @@ LeggedRobotConfig = {
         "playable_agent_name" : "go2_000",
     },
     "A01B": {
+        # The order of the joints should be the same as they have been defined in the xml file.
+        "base_joint_name" :     "trunk",
         "leg_joint_names" :     ["fr_joint0", "fr_joint1", "fr_joint2", 
                                 "fl_joint0", "fl_joint1", "fl_joint2",
                                 "hr_joint0", "hr_joint1", "hr_joint2",
                                 "hl_joint0", "hl_joint1", "hl_joint2"],
         
-        "base_joint_name" :     "trunk",
         
-        # Init the robot in a standing position. 
-        # Maintain the order of the joints same as the joint_names for reset basic pos or computing the reward easily.
-        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.8, "fr_joint2": 1.8,
-                                "fl_joint0": 0.0, "fl_joint1": -0.8, "fl_joint2": 1.8,
-                                "hr_joint0": 0.0, "hr_joint1": -0.8, "hr_joint2": 1.8,
-                                "hl_joint0": 0.0, "hl_joint1": -0.8, "hl_joint2": 1.8},
-
-        "base_neutral_height_offset" : 0.25,    # the offset from max height to standing natural height
+        # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
+        # for reset basic pos or computing the reward easily.
+        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.7, "fr_joint2": 1.5,
+                                "fl_joint0": 0.0, "fl_joint1": -0.7, "fl_joint2": 1.5,
+                                "hr_joint0": 0.0, "hr_joint1": -0.7, "hr_joint2": 1.5,
+                                "hl_joint0": 0.0, "hl_joint1": -0.7, "hl_joint2": 1.5},
         
+        "base_neutral_height_offset" : 0.20,    # the offset from max height to standing natural height
+        "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
+
+        # The order of the actuators should be the same as they have been defined in the xml file.
         "actuator_names" :      ["fr_abad_actuator", "fr_thigh_actuator", "fr_calf_actuator",
                                 "fl_abad_actuator", "fl_thigh_actuator", "fl_calf_actuator",
                                 "hr_abad_actuator", "hr_thigh_actuator", "hr_calf_actuator",
                                 "hl_abad_actuator", "hl_thigh_actuator", "hl_calf_actuator"],
 
-        "actuator_type" :        "torque",  # "torque" or "position"
+        "actuator_type" :        "position",  # "torque" or "position"
         "action_scale" :         0.5,
-                                 
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["fr_site", "fl_site", "hr_site", "hl_site"],
-
-        "imu_mocap_name":       "imu_mocap",
-
+        
         "sensor_imu_framequat_name" :           "imu_quat",
         "sensor_imu_gyro_name" :                "imu_omega",
         "sensor_imu_accelerometer_name" :       "imu_acc",
         "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],
 
-        "ground_contact_body_names" : ["Floor_Floor", "terrain_000_terrain", "terrain_001_terrain", "terrain_002_terrain", "terrain_003_terrain",
-                                        "terrain_004_terrain", "terrain_005_terrain", "terrain_006_terrain", "terrain_007_terrain", "terrain_008_terrain",
-                                        "terrain_009_terrain", "terrain_010_terrain", "terrain_011_terrain", "terrain_012_terrain", "terrain_013_terrain",
-                                        "terrain_014_terrain", "terrain_015_terrain"],
-        "base_contact_body_names" : ["trunk_link"],
-        "leg_contact_body_names" : ["fr_thigh", "fr_calf", "fl_thigh", "fl_calf", "hr_thigh", "hr_calf", "hl_thigh", "hl_calf"],
-        "foot_contact_body_names" : ["fr_foot", "fl_foot", "hr_foot", "hl_foot"],
+        "ground_contact_body_names" : ["Floor_Floor", 
+                                        "terrain_perlin_smooth_usda_terrain",
+                                        "terrain_perlin_rough_usda_terrain",
+                                        "terrain_perlin_smooth_slope_usda_terrain",
+                                        "terrain_perlin_rough_slope_usda_terrain",
+                                        "terrain_stair_low_usda_terrain", 
+                                        "terrain_stair_high_usda_terrain",                                        
+                                        ],
+        
+        "base_contact_body_names" : ["trunk_link", "fl_abad", "fr_abad", "hl_abad", "hr_abad"],
+
+        "leg_contact_body_names" : ["fl_thigh", "fl_calf", 
+                                    "fr_thigh", "fr_calf", 
+                                    "hl_thigh", "hl_calf", 
+                                    "hr_thigh", "hr_calf"],
+        
+        "foot_body_names" : ["fl_foot", "fr_foot", "hl_foot", "hr_foot"],
+
 
         # 机器狗的自重： 约 61.44 kg。
         # 静止时每只脚的受力： 约 150.7 N。
         # 以 1 m/s 速度行走时，每只脚在触地时的受力： 约 301.4 N。        
         "foot_touch_force_threshold" : 350.0,
+        "foot_touch_force_air_threshold" : 0.01,
+        "foot_touch_air_time_ideal" : 0.5,  
+        
+
+        # Config for randomization
+        "randomize_friction" :      True,
+        "friction_range" :          [0.5, 1.25],
+        "randomize_base_mass" :     False,
+        "added_mass_range" :        [-1., 1.],
+        "push_robots" :             True,
+        "push_interval_s" :         15,
+        "max_push_vel_xy" :         2.0,
+        "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
+        
+        # Config for ccurriculum learning
+        "curriculum_learning" :     True,
+        "curriculum_levels" : [
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 10.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 10.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 10.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 6.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 6.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 6.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 4.0, "rating": 0.5, "command_type": "stairs", },
+        ],
+        "curriculum_commands" : {
+            "flat_plane" : {
+                "command_lin_vel_range_x" : 3.0, # x direction for forward max speed
+                "command_lin_vel_range_y" : 0.6, # y direction for left/right max speed
+                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_ang_vel_range" : 1.0,  # max turning rate
+                "command_resample_interval" : 7, # second to resample the command
+            },
+            
+            "slope" : {
+                "command_lin_vel_range_x" : 2.0, # x direction for forward
+                "command_lin_vel_range_y" : 0.4, # y direction for left/right
+                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_ang_vel_range" : 1.0,  # max turning rate
+                "command_resample_interval" : 7, # second to resample the command
+            },
+            
+            "stairs" : {
+                "command_lin_vel_range_x" : 1.0, # x direction for forward
+                "command_lin_vel_range_y" : 0.2, # y direction for left/right
+                "command_lin_vel_threshold" : 0.0, # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_resample_interval" : 20, # second to resample the command
+            },
+        },
+
+        # Config for logging
+        "log_env_ids" :     [0],
+        "log_agent_names" : ["A01B_000"],
+        
+        # Config for visualization
+        "visualize_command_agent_names" : ["A01B_000"],
+        "command_indicator_name" : "command_indicator_mocap",
+
+        # Config for playable agent
+        "playable_agent_name" : "A01B_000",        
     }
 }
