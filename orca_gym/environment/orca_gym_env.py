@@ -166,13 +166,13 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         return [seed]
 
     def _name_with_agent0(self, name: str) -> str:
-        if len(self._agent_names[0]) > 0:
+        if len(self._agent_names) > 0:
             return f"{self._agent_names[0]}_{name}"
         else:
             return name
         
     def _name_with_agent(self, agent_id: int, name: str) -> str:
-        if len(self._agent_names[agent_id]) > 0:
+        if len(self._agent_names) > 0:
             return f"{self._agent_names[agent_id]}_{name}"
         else:
             return name

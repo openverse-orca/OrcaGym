@@ -133,7 +133,7 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
         # return self.data.body(body_name).xpos
         body_dict = self.loop.run_until_complete(self._get_body_xpos_xmat_xquat(body_name_list))
         if len(body_dict) != len(body_name_list):
-            print("Body Nmae List: ", body_name_list)
+            print("Body Name List: ", body_name_list)
             print("Body Dict: ", body_dict)
             raise ValueError("Some body names are not found in the simulation.")
         xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
