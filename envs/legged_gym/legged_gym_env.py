@@ -9,6 +9,7 @@ from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
 
 from .legged_robot import LeggedRobot
+from .legged_config import LeggedEnvConfig
 
 class LeggedGymEnv(OrcaGymMultiAgentEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -48,6 +49,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
         self._randomize_agent_foot_friction()
         self._init_playable()
+        self._reset_phy_config()
      
     @property
     def agents(self) -> list[LeggedRobot]:
@@ -269,4 +271,12 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
         return lin_vel, turn_angel, reborn
 
-    
+    def _reset_phy_config(self) -> None:
+        phy_config = LeggedEnvConfig["phy_config"]
+        self.gym.opt.iterations = LeggedEnvConfig[phy_config]["iterations"]
+        self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
+        self.gym.opt.mpr_iterations = LeggedEnvConfig[phy_config]["mpr_iterations"]
+        self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
+        self.gym.set_opt_config()
+
+        print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.mpr_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)

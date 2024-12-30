@@ -24,7 +24,7 @@ from stable_baselines3.her import GoalSelectionStrategy, HerReplayBuffer
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 
-from envs.legged_gym.legged_robot_config import LeggedEnvConfig
+from envs.legged_gym.legged_config import LeggedEnvConfig
 
 
 def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, render_remote, height_map_file) -> str:
@@ -496,7 +496,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
     parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
-    parser.add_argument('--training_episode', type=int, default=100, help='The number of training episodes for each agent')
+    parser.add_argument('--training_episode', type=int, default=200, help='The number of training episodes for each agent')
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     args = parser.parse_args()
 
