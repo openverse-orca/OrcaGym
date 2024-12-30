@@ -9,7 +9,7 @@ from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
 
 from .legged_robot import LeggedRobot
-from .legged_config import LeggedEnvConfig
+from .legged_config import LeggedEnvConfig, LeggedRobotConfig
 
 class LeggedGymEnv(OrcaGymMultiAgentEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -234,7 +234,16 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             if agent.playable:
                 self._player_agent = agent
                 agent.init_playable()
+                agent.player_control = True
                 break
+            
+        if "go2" in self._player_agent.name:
+            robot_config = LeggedRobotConfig["go2"]
+        elif "A01B" in self._player_agent.name:
+            robot_config = LeggedRobotConfig["A01B"]
+            
+        self._player_agent_lin_vel_x = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"] / 3
+        self._player_agent_lin_vel_y = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"] / 3
     
     def _update_playable(self) -> None:
         if self._run_mode != "play":
@@ -256,7 +265,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         reborn = False
         
         if key_status["W"] == 1:
-            lin_vel[0] = 0.5
+            lin_vel[0] = self._player_agent_lin_vel_x
+        if key_status["Q"] == 1:
+            lin_vel[1] = self._player_agent_lin_vel_y
+        if key_status["E"] == 1:
+            lin_vel[1] += -self._player_agent_lin_vel_y
         if key_status["A"] == 1:
             turn_angel += np.pi / 2 * self.dt
         if key_status["D"] == 1:
@@ -264,7 +277,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self._key_status["Space"] == 0 and key_status["Space"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
-            lin_vel[0] *= 3
+            lin_vel[:2] *= 3
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)

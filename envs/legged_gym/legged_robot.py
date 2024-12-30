@@ -150,7 +150,7 @@ class LeggedRobot(OrcaGymAgent):
             self._curriculum_clear_times = 0
             self._max_level_times = 0
         
-        self._set_commands_config(0)
+        self._init_commands_config()
    
         env_idx = int(self._env_id.split("-")[-1])
         # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
@@ -167,6 +167,7 @@ class LeggedRobot(OrcaGymAgent):
             self._is_playable = True
         else:
             self._is_playable = False
+        self._player_control = False
 
         self._is_obs_updated = False
         self._setup_reward_functions()
@@ -179,6 +180,14 @@ class LeggedRobot(OrcaGymAgent):
     @property
     def playable(self) -> bool:
         return self._is_playable
+    
+    @property
+    def player_control(self) -> bool:
+        return self._player_control
+    
+    @player_control.setter
+    def player_control(self, value: bool) -> None:
+        self._player_control = value
 
     # @property
     # def body_contact_force_threshold(self) -> float:
@@ -363,7 +372,10 @@ class LeggedRobot(OrcaGymAgent):
             # print("Agent: ", self.name, "reset command indicator")
             base_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
             self._cmd_mocap_pos_quat["pos"] = base_qpos[:3].copy()
-            self._cmd_mocap_pos_quat["quat"] = base_qpos[3:].copy()
+            
+            heading_angle = rotations.euler2quat([0, 0, self._command["heading_angle"]])
+            self._cmd_mocap_pos_quat["quat"] = rotations.quat_mul(np.array([1.0, 0.0, 0.0, 0.0]), heading_angle)
+            
         return {self._command_indicator_name: self._cmd_mocap_pos_quat}
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
@@ -571,6 +583,10 @@ class LeggedRobot(OrcaGymAgent):
                     if ground_contact_body_name in contact_dict[contact_body_name]:
                         contact_result = True
                         break
+                    
+        if self.player_control:
+            contact_result = False
+            
         return np.array([1.0 if contact_result else 0.0])
     
     def _get_leg_contact(self, contact_dict : dict) -> np.ndarray:
@@ -849,7 +865,7 @@ class LeggedRobot(OrcaGymAgent):
         # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
         
         # Update the command config for different levels
-        self._set_commands_config(self._current_level)
+        self._reset_commands_config(self._current_level)
                     
     def init_playable(self):
         self._command_resample_interval = sys.maxsize
@@ -866,10 +882,15 @@ class LeggedRobot(OrcaGymAgent):
         else:
             self._max_episode_steps = sys.maxsize
             
-    def _set_commands_config(self, current_level : int) -> None:
+    def _reset_commands_config(self, current_level : int) -> None:
         command_type = self._curriculum_levels[current_level]["command_type"]
         self._command_lin_vel_range_x = self._curriculum_commands[command_type]["command_lin_vel_range_x"]
         self._command_lin_vel_range_y = self._curriculum_commands[command_type]["command_lin_vel_range_y"]
         self._command_lin_vel_threshold = self._curriculum_commands[command_type]["command_lin_vel_threshold"]
         self._command_ang_vel_range = self._curriculum_commands[command_type]["command_ang_vel_range"]
-        self._command_resample_interval = self._curriculum_commands[command_type]["command_resample_interval"]             
+   
+        
+    def _init_commands_config(self) -> None:
+        self._reset_commands_config(0)
+        command_type = self._curriculum_levels[0]["command_type"]
+        self._command_resample_interval = self._curriculum_commands[command_type]["command_resample_interval"]              
