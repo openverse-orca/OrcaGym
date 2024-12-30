@@ -35,7 +35,7 @@
     </asset>
     <worldbody>
         <body name="offset" pos="-55 0 0">
-            <body name="terrain" pos="-5 5 0.0">
+            <body name="terrain" pos="-5 5 -0.05">
 
                 <!-- 3-1 -->
                 <geom type="box" pos="-5.0 -5.0 0.0"  size="4.0 4.0  0.1"   material="pbr_plastic_gray"/>

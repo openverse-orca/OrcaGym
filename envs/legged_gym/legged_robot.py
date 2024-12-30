@@ -10,7 +10,7 @@ from gymnasium import spaces
 import copy
 import sys
 
-from .legged_robot_config import LeggedRobotConfig, LeggedObsConfig
+from .legged_config import LeggedRobotConfig, LeggedObsConfig
 
 
 def get_legged_robot_name(agent_name: str) -> str:
