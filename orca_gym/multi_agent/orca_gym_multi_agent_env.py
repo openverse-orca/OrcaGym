@@ -164,6 +164,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         if self.render_mode == "human" and self._render_remote:
             self.render()
         # step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
+        
+        # raise error.Error("Test robot height!")
 
         env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
         # step_obs = (datetime.datetime.now() - step_start).total_seconds() * 1000

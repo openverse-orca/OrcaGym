@@ -536,7 +536,7 @@ if __name__ == "__main__":
         model_file = args.model_file
     elif run_mode == "training" and not load_existing_model:
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_file = f"legged_{task}_{model_type}_{subenv_num}_{agent_num}_{training_episode}_model_{formatted_now}"
+        model_file = f"{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
     else:
         raise ValueError("Invalid model file! Please provide a model file for testing, or set `load_existing_model` to False for training")
 

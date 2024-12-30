@@ -45,7 +45,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             task = task,
             **kwargs,
         )
-
         
         self._randomize_agent_foot_friction()
         self._init_playable()
@@ -56,18 +55,20 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         return self._agents
 
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
+        if self._task == "no_action":
+            return
+                    
         # print("Step agents: ", action)
         self._update_playable()
 
         # 性能优化：在Env中批量更新所有agent的控制量
-        if self._task != "no_action":
-            if len(self.ctrl) == len(actuator_ctrl):
-                self.ctrl = actuator_ctrl
-            else:
-                assert len(self.ctrl) > len(actuator_ctrl)
-                actuator_ctrl = np.array(actuator_ctrl).reshape(len(self.agents), -1)
-                for i in range(len(actuator_ctrl)):
-                    self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
+        if len(self.ctrl) == len(actuator_ctrl):
+            self.ctrl = actuator_ctrl
+        else:
+            assert len(self.ctrl) > len(actuator_ctrl)
+            actuator_ctrl = np.array(actuator_ctrl).reshape(len(self.agents), -1)
+            for i in range(len(actuator_ctrl)):
+                self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
 
         # 切分action 给每个 agent
         action = action.reshape(len(self.agents), -1)
