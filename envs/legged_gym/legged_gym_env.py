@@ -56,6 +56,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
         if self._task == "no_action":
+            self._update_no_action_ctrl()
             return
                     
         # print("Step agents: ", action)
@@ -90,7 +91,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
         self.set_mocap_pos_and_quat(mocaps)
         self.set_joint_qvel(joint_qvels)
-
 
 
     def compute_reward(self, achieved_goal, desired_goal, info) -> SupportsFloat:
@@ -294,3 +294,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.mpr_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)
+
+    def _update_no_action_ctrl(self) -> None:
+        ctrl = []
+        for agent in self.agents:
+            joint_neutral = agent.get_joint_neutral()
+            if joint_neutral is not None:
+                ctrl.extend(joint_neutral.values())
+
+        self.ctrl = np.array(ctrl).flatten()
+            

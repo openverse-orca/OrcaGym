@@ -185,12 +185,12 @@ LeggedRobotConfig = {
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
-        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.7, "fr_joint2": 1.5,
-                                "fl_joint0": 0.0, "fl_joint1": -0.7, "fl_joint2": 1.5,
-                                "hr_joint0": 0.0, "hr_joint1": -0.7, "hr_joint2": 1.5,
-                                "hl_joint0": 0.0, "hl_joint1": -0.7, "hl_joint2": 1.5},
+        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.75, "fr_joint2": 1.2,
+                                "fl_joint0": 0.0, "fl_joint1": -0.75, "fl_joint2": 1.2,
+                                "hr_joint0": 0.0, "hr_joint1": -0.8, "hr_joint2": 1.25,
+                                "hl_joint0": 0.0, "hl_joint1": -0.8, "hl_joint2": 1.25},
         
-        "base_neutral_height_offset" : 0.20,    # the offset from max height to standing natural height
+        "base_neutral_height_offset" : 0.14,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
 
