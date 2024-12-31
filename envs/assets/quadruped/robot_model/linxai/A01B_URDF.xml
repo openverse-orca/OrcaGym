@@ -23,7 +23,7 @@
           <geom type="box" size="0.036 0.022 0.16" mass="0.0"/>
         </default>
         <default class="collision_calf">
-          <geom type="capsule" size="0.04" fromto="0 0 -0.0 0.04 0 -0.36" mass="0.0"/>
+          <geom type="capsule" size="0.04" fromto="0 0 -0.0 0.04 0 -0.28" mass="0.0"/>
         </default>
         <default class="foot">
           <geom type="sphere" size="0.05" pos="0 0 -0.37" mass="0.05" priority="1" solimp="0.015 1 0.031"
@@ -148,7 +148,7 @@
       
       <freejoint name="trunk"/>
       <body name="fr_abad" pos="0.42386 -0.11844 -0.044478">
-        <inertial pos="-0.022282 0.016137 0.000446" quat="0.456334 0.441042 0.546683 0.54624" mass="2.4" diaginertia="0.00830465 0.00689115 0.0036792"/>
+        <inertial pos="-0.014896 0.015941 0.000002330446" quat="0.456334 0.441042 0.546683 0.54624" mass="2.4" diaginertia="0.00830465 0.00689115 0.0036792"/>
         <joint name="fr_joint0" pos="0 0 0" axis="1 0 0" range="-0.7854 0.7854" class="joint"/>
         <geom type="mesh" rgba="1 1 1 1" mesh="fr_abad" class="visual" material="pbr_metal_silver_rough"/>
         <geom  class="collision_abad" pos="0 0.02 0" contype="0" conaffinity="0"/>
@@ -262,46 +262,46 @@
       <!-- 前左腿 -->
       <position name="fl_abad_actuator" joint="fl_joint0" kp="200" kv="20"
                 ctrllimited="true" ctrlrange="-0.7854 0.7854"
-                forcelimited="true" forcerange="-50 50"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="fl_thigh_actuator" joint="fl_joint1" kp="400" kv="40"
                 ctrllimited="true" ctrlrange="-3.1765 0"
-                forcelimited="true" forcerange="-150 150"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="fl_calf_actuator" joint="fl_joint2" kp="300" kv="30"
                 ctrllimited="true" ctrlrange="0.5208 2.5173"
-                forcelimited="true" forcerange="-100 100"/>
+                forcelimited="true" forcerange="-200 200"/>
 
       <!-- 前右腿 -->
       <position name="fr_abad_actuator" joint="fr_joint0" kp="200" kv="20"
                 ctrllimited="true" ctrlrange="-0.7854 0.7854"
-                forcelimited="true" forcerange="-50 50"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="fr_thigh_actuator" joint="fr_joint1" kp="400" kv="40"
                 ctrllimited="true" ctrlrange="-3.1765 0"
-                forcelimited="true" forcerange="-150 150"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="fr_calf_actuator" joint="fr_joint2" kp="300" kv="30"
                 ctrllimited="true" ctrlrange="0.5208 2.5173"
-                forcelimited="true" forcerange="-100 100"/>
+                forcelimited="true" forcerange="-200 200"/>
 
       <!-- 后左腿 -->
       <position name="hl_abad_actuator" joint="hl_joint0" kp="200" kv="20"
                 ctrllimited="true" ctrlrange="-0.7854 0.7854"
-                forcelimited="true" forcerange="-50 50"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="hl_thigh_actuator" joint="hl_joint1" kp="400" kv="40"
                 ctrllimited="true" ctrlrange="-3.1765 0"
-                forcelimited="true" forcerange="-150 150"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="hl_calf_actuator" joint="hl_joint2" kp="300" kv="30"
                 ctrllimited="true" ctrlrange="0.5208 2.5173"
-                forcelimited="true" forcerange="-100 100"/>
+                forcelimited="true" forcerange="-200 200"/>
 
       <!-- 后右腿 -->
       <position name="hr_abad_actuator" joint="hr_joint0" kp="200" kv="20"
                 ctrllimited="true" ctrlrange="-0.7854 0.7854"
-                forcelimited="true" forcerange="-50 50"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="hr_thigh_actuator" joint="hr_joint1" kp="400" kv="40"
                 ctrllimited="true" ctrlrange="-3.1765 0"
-                forcelimited="true" forcerange="-150 150"/>
+                forcelimited="true" forcerange="-200 200"/>
       <position name="hr_calf_actuator" joint="hr_joint2" kp="300" kv="30"
                 ctrllimited="true" ctrlrange="0.5208 2.5173"
-                forcelimited="true" forcerange="-100 100"/>
+                forcelimited="true" forcerange="-200 200"/>
   </actuator>
 
 
