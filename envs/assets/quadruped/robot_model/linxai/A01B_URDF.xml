@@ -132,7 +132,8 @@
 
     <body name="trunk_link" pos="0 0 0.8">
       <geom type="mesh" rgba="1 1 1 1" pos="0.0608046 -0.0181483 -0.0448853" mesh="base_link" class="visual" material="pbr_metal_silver_rough"/>
-      <inertial mass="30.0746" pos="0.007942 -0.005670 0.007308" fullinertia="0.3194 1.180 1.35 0.006817 -0.048847 -0.001017 "/>
+      <inertial mass="30.0746" pos="0.007942 0 0.007308" fullinertia="0.3194 1.180 1.35 0 0 0"/>
+
       <geom class="collision" type="box" pos="0 0 -0.04" size="0.35 0.13 0.08" contype="0" conaffinity="1"/>
       <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 -0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
       <geom class="collision" type="cylinder" size="0.07 0.35" pos="0 0.13 -0.05" quat="1 0 1 0" contype="0" conaffinity="1"/>
