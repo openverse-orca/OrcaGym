@@ -185,10 +185,10 @@ LeggedRobotConfig = {
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
-        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.75, "fr_joint2": 1.2,
-                                "fl_joint0": 0.0, "fl_joint1": -0.75, "fl_joint2": 1.2,
-                                "hr_joint0": 0.0, "hr_joint1": -0.8, "hr_joint2": 1.25,
-                                "hl_joint0": 0.0, "hl_joint1": -0.8, "hl_joint2": 1.25},
+        "neutral_joint_angles" : {"fr_joint0": 0.0, "fr_joint1": -0.7, "fr_joint2": 1.3,
+                                "fl_joint0": 0.0, "fl_joint1": -0.7, "fl_joint2": 1.3,
+                                "hr_joint0": 0.0, "hr_joint1": -0.7, "hr_joint2": 1.3,
+                                "hl_joint0": 0.0, "hl_joint1": -0.7, "hl_joint2": 1.3},
         
         "base_neutral_height_offset" : 0.14,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -235,7 +235,7 @@ LeggedRobotConfig = {
         # 以 1 m/s 速度行走时，每只脚在触地时的受力： 约 301.4 N。        
         "foot_touch_force_threshold" : 350.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_air_time_ideal" : 0.5,  
+        "foot_touch_air_time_ideal" : 0.6,  
         
 
         # Config for randomization
