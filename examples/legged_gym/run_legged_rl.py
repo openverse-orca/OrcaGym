@@ -547,6 +547,9 @@ if __name__ == "__main__":
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
         train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, height_map_file, load_existing_model)
     elif run_mode == "testing" or run_mode == "play":
+        print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
+        print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
+        print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
         test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file, height_map_file)    
     else:
         raise ValueError("Invalid run mode")
