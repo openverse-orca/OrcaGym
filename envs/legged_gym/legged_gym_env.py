@@ -303,4 +303,5 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 ctrl.extend(joint_neutral.values())
 
         self.ctrl = np.array(ctrl).flatten()
+        # raise KeyError("Test no action mode")
             

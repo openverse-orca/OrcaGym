@@ -18,6 +18,8 @@ def get_legged_robot_name(agent_name: str) -> str:
         return "go2"
     elif agent_name.startswith("A01B"):
         return "A01B"
+    elif agent_name.startswith("AzureLoong"):
+        return "AzureLoong"
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
 
