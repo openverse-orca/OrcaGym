@@ -302,8 +302,14 @@ LeggedRobotConfig = {
         "leg_joint_names" :     [
                                 # "J_arm_r_01", # "J_arm_r_02", 
                                 # "J_arm_l_01", # "J_arm_l_02",
-                                 "J_hip_r_roll", "J_hip_r_yaw", "J_hip_r_pitch", "J_knee_r_pitch", # "J_ankle_r_pitch", "J_ankle_r_roll",
-                                 "J_hip_l_roll", "J_hip_l_yaw", "J_hip_l_pitch", "J_knee_l_pitch", # "J_ankle_l_pitch", "J_ankle_l_roll",
+                                 "J_hip_r_roll", 
+                                #  "J_hip_r_yaw", 
+                                 "J_hip_r_pitch", "J_knee_r_pitch", "J_ankle_r_pitch", 
+                                 # "J_ankle_r_roll",
+                                 "J_hip_l_roll", 
+                                #  "J_hip_l_yaw", 
+                                 "J_hip_l_pitch", "J_knee_l_pitch", "J_ankle_l_pitch", 
+                                 # "J_ankle_l_roll",
                                 ],
         
         
@@ -312,8 +318,14 @@ LeggedRobotConfig = {
         "neutral_joint_angles" : {
                                 #   "J_arm_r_01": 0.0, # "J_arm_r_02": 1.2,
                                 #   "J_arm_l_01": 0.0,  # "J_arm_l_02": -1.2,
-                                  "J_hip_r_roll": -0.1, "J_hip_r_yaw": -0.1, "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, #"J_ankle_r_pitch": 0.6, "J_ankle_r_roll": 0.1,
-                                  "J_hip_l_roll": 0.1, "J_hip_l_yaw": 0.1, "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, #"J_ankle_l_pitch": 0.6, "J_ankle_l_roll": -0.1,
+                                  "J_hip_r_roll": 0, 
+                                #   "J_hip_r_yaw": 0.2, 
+                                  "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, "J_ankle_r_pitch": 0.6, 
+                                #   "J_ankle_r_roll": 0.1,
+                                  "J_hip_l_roll": 0, 
+                                #   "J_hip_l_yaw": -0.2, 
+                                  "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, "J_ankle_l_pitch": 0.6, 
+                                #   "J_ankle_l_roll": -0.1,
                                   },
         
         "base_neutral_height_offset" : 0.12,    # the offset from max height tnpo standing natural height
@@ -324,8 +336,14 @@ LeggedRobotConfig = {
         "actuator_names" :      [
                                 #  "P_arm_r_01", # "P_arm_r_02",
                                 #  "P_arm_l_01", # "P_arm_l_02",
-                                 "P_hip_r_roll", "P_hip_r_yaw", "P_hip_r_pitch", "P_knee_r_pitch", #"P_ankle_r_pitch", "P_ankle_r_roll",
-                                 "P_hip_l_roll", "P_hip_l_yaw", "P_hip_l_pitch", "P_knee_l_pitch", #"P_ankle_l_pitch", "P_ankle_l_roll",
+                                 "P_hip_r_roll", 
+                                #  "P_hip_r_yaw", 
+                                 "P_hip_r_pitch", "P_knee_r_pitch", "P_ankle_r_pitch", 
+                                #  "P_ankle_r_roll",
+                                 "P_hip_l_roll", 
+                                #  "P_hip_l_yaw", 
+                                 "P_hip_l_pitch", "P_knee_l_pitch", "P_ankle_l_pitch", 
+                                #  "P_ankle_l_roll",
                                  ],
 
         "actuator_type" :        "position",  # "torque" or "position"
@@ -401,17 +419,17 @@ LeggedRobotConfig = {
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : 0.5, # x direction for forward
-                "command_lin_vel_range_y" : 0.1, # y direction for left/right
+                "command_lin_vel_range_x" : 1.0, # x direction for forward
+                "command_lin_vel_range_y" : 0.2, # y direction for left/right
                 "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : 0.2, # x direction for forward
+                "command_lin_vel_range_x" : 0.3, # x direction for forward
                 "command_lin_vel_range_y" : 0.0, # y direction for left/right
-                "command_lin_vel_threshold" : 0.0, # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : 0.1, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
