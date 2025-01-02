@@ -300,8 +300,8 @@ LeggedRobotConfig = {
         # The order of the joints should be the same as they have been defined in the xml file.
         "base_joint_name" :     "float_base",
         "leg_joint_names" :     [
-                                #  "J_arm_r_01", "J_arm_r_02", 
-                                #  "J_arm_l_01", "J_arm_l_02",
+                                # "J_arm_r_01", # "J_arm_r_02", 
+                                # "J_arm_l_01", # "J_arm_l_02",
                                  "J_hip_r_roll", "J_hip_r_yaw", "J_hip_r_pitch", "J_knee_r_pitch", # "J_ankle_r_pitch", "J_ankle_r_roll",
                                  "J_hip_l_roll", "J_hip_l_yaw", "J_hip_l_pitch", "J_knee_l_pitch", # "J_ankle_l_pitch", "J_ankle_l_roll",
                                 ],
@@ -310,20 +310,20 @@ LeggedRobotConfig = {
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
         "neutral_joint_angles" : {
-                                #   "J_arm_r_01": -3.14, "J_arm_r_02": 1.2,
-                                #   "J_arm_l_01": 3.14, "J_arm_l_02": -1.2,
+                                #   "J_arm_r_01": 0.0, # "J_arm_r_02": 1.2,
+                                #   "J_arm_l_01": 0.0,  # "J_arm_l_02": -1.2,
                                   "J_hip_r_roll": -0.1, "J_hip_r_yaw": -0.1, "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, #"J_ankle_r_pitch": 0.6, "J_ankle_r_roll": 0.1,
                                   "J_hip_l_roll": 0.1, "J_hip_l_yaw": 0.1, "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, #"J_ankle_l_pitch": 0.6, "J_ankle_l_roll": -0.1,
                                   },
         
-        "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
+        "base_neutral_height_offset" : 0.12,    # the offset from max height tnpo standing natural height
         "base_born_height_offset" : 0.01,       # the offset from max height to standing natural height
 
 
         # The order of the actuators should be the same as they have been defined in the xml file.
         "actuator_names" :      [
-                                #  "P_arm_r_01", "P_arm_r_02",
-                                #  "P_arm_l_01", "P_arm_l_02",
+                                #  "P_arm_r_01", # "P_arm_r_02",
+                                #  "P_arm_l_01", # "P_arm_l_02",
                                  "P_hip_r_roll", "P_hip_r_yaw", "P_hip_r_pitch", "P_knee_r_pitch", #"P_ankle_r_pitch", "P_ankle_r_roll",
                                  "P_hip_l_roll", "P_hip_l_yaw", "P_hip_l_pitch", "P_knee_l_pitch", #"P_ankle_l_pitch", "P_ankle_l_roll",
                                  ],
@@ -367,7 +367,7 @@ LeggedRobotConfig = {
         # 减速距离 (d<sub>landing</sub>)：如果实际的减速距离更大（例如，机器人脚掌有更好的缓冲机制），则减速度和受力将会降低。例如，若减速距离为 0.1 米，则减速度为 29.43 米/秒²，受力为 2,305 牛顿。
         "foot_touch_force_threshold" : 2500.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_air_time_ideal" : 0.3,  
+        "foot_touch_air_time_ideal" : 0.5,  
         
 
         # Config for randomization
