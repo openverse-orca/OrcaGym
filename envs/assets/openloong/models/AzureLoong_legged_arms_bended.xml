@@ -217,9 +217,9 @@
                   <joint name="J_knee_r_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-2.35619 0.08727"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_knee_r_pitch"/>
                   <geom type="mesh" group="3" mesh="Link_knee_r_pitch"/>
-                  <body name="Link_ankle_r_pitch" pos="0 0 -0.387"  euler="0 -0.65 0">
+                  <body name="Link_ankle_r_pitch" pos="0 0 -0.387">
                     <inertial pos="-6.1835e-12 -1.2655e-07 -2.4682e-08" quat="0.707107 0.707107 0 0" mass="0.10145" diaginertia="2.7175e-05 2.6565e-05 6.1118e-06"/>
-                    <!-- <joint name="J_ankle_r_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-0.43633 1.21087"/> -->
+                    <joint name="J_ankle_r_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-0.43633 1.21087"/>
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_ankle_r_pitch"/>
                     <geom type="mesh" group="3" mesh="Link_ankle_r_pitch"/>
                     <body name="Link_ankle_r_roll">
@@ -255,9 +255,9 @@
                   <joint name="J_knee_l_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-2.35619 0.08727"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_knee_l_pitch"/>
                   <geom type="mesh" group="3" mesh="Link_knee_l_pitch"/>
-                  <body name="Link_ankle_l_pitch" pos="0 0 -0.387"  euler="0 -0.65 0">
+                  <body name="Link_ankle_l_pitch" pos="0 0 -0.387">
                     <inertial pos="-6.1835e-12 1.2655e-07 6.7022e-08" quat="0.707107 0.707107 0 0" mass="0.10145" diaginertia="2.7175e-05 2.6565e-05 6.1118e-06"/>
-                    <!-- <joint name="J_ankle_l_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-0.43644 1.21087"/> -->
+                    <joint name="J_ankle_l_pitch" pos="0 0 0" axis="0 -1 0" limited="true" range="-0.43644 1.21087"/>
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_ankle_l_pitch"/>
                     <geom type="mesh" group="3" mesh="Link_ankle_l_pitch"/>
                     <body name="Link_ankle_l_roll">
@@ -466,10 +466,10 @@
               forcelimited="true" forcerange="-396 396" />
 
     <!-- ankle_r_pitch -->
-    <!-- <position name="P_ankle_r_pitch" joint="J_ankle_r_pitch"
+    <position name="P_ankle_r_pitch" joint="J_ankle_r_pitch"
               kp="500" kv="3"
               ctrllimited="true"  ctrlrange="-0.43633 1.21087"
-              forcelimited="true" forcerange="-58.5 58.5" /> -->
+              forcelimited="true" forcerange="-58.5 58.5" />
 
 
    <!--  Left leg   -->
@@ -493,10 +493,10 @@
               forcelimited="true" forcerange="-396 396" />
 
     <!-- ankle_l_pitch -->
-    <!-- <position name="P_ankle_l_pitch" joint="J_ankle_l_pitch"
+    <position name="P_ankle_l_pitch" joint="J_ankle_l_pitch"
               kp="500" kv="3"
               ctrllimited="true"  ctrlrange="-0.43644 1.21087"
-              forcelimited="true" forcerange="-58.5 58.5" /> -->
+              forcelimited="true" forcerange="-58.5 58.5" />
 
 
   </actuator>

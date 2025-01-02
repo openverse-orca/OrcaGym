@@ -305,12 +305,12 @@ LeggedRobotConfig = {
                                  "J_hip_r_roll", 
                                 #  "J_hip_r_yaw", 
                                  "J_hip_r_pitch", "J_knee_r_pitch", 
-                                #  "J_ankle_r_pitch", 
+                                 "J_ankle_r_pitch", 
                                  # "J_ankle_r_roll",
                                  "J_hip_l_roll", 
                                 #  "J_hip_l_yaw", 
                                  "J_hip_l_pitch", "J_knee_l_pitch", 
-                                #  "J_ankle_l_pitch", 
+                                 "J_ankle_l_pitch", 
                                  # "J_ankle_l_roll",
                                 ],
         
@@ -322,17 +322,17 @@ LeggedRobotConfig = {
                                 #   "J_arm_l_01": 0.0,  # "J_arm_l_02": -1.2,
                                   "J_hip_r_roll": -0.1, 
                                 #   "J_hip_r_yaw": 0.2, 
-                                  "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, 
-                                #   "J_ankle_r_pitch": 0.6, 
+                                  "J_hip_r_pitch": 0.3, "J_knee_r_pitch": -0.6, 
+                                  "J_ankle_r_pitch": 0.325, 
                                 #   "J_ankle_r_roll": 0.1,
                                   "J_hip_l_roll": 0.1, 
                                 #   "J_hip_l_yaw": -0.2, 
-                                  "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, 
-                                #   "J_ankle_l_pitch": 0.6, 
+                                  "J_hip_l_pitch": 0.3, "J_knee_l_pitch": -0.6, 
+                                  "J_ankle_l_pitch": 0.325, 
                                 #   "J_ankle_l_roll": -0.1,
                                   },
         
-        "base_neutral_height_offset" : 0.12,    # the offset from max height tnpo standing natural height
+        "base_neutral_height_offset" : 0.08,    # the offset from max height tnpo standing natural height
         "base_born_height_offset" : 0.01,       # the offset from max height to standing natural height
 
 
@@ -343,12 +343,12 @@ LeggedRobotConfig = {
                                  "P_hip_r_roll", 
                                 #  "P_hip_r_yaw", 
                                  "P_hip_r_pitch", "P_knee_r_pitch", 
-                                #  "P_ankle_r_pitch", 
+                                 "P_ankle_r_pitch", 
                                 #  "P_ankle_r_roll",
                                  "P_hip_l_roll", 
                                 #  "P_hip_l_yaw", 
                                  "P_hip_l_pitch", "P_knee_l_pitch", 
-                                #  "P_ankle_l_pitch", 
+                                 "P_ankle_l_pitch", 
                                 #  "P_ankle_l_roll",
                                  ],
 
@@ -417,7 +417,7 @@ LeggedRobotConfig = {
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : 1.0, # x direction for forward max speed
+                "command_lin_vel_range_x" : 0.8, # x direction for forward max speed
                 "command_lin_vel_range_y" : 0.2, # y direction for left/right max speed
                 "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
@@ -425,7 +425,7 @@ LeggedRobotConfig = {
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : 1.0, # x direction for forward
+                "command_lin_vel_range_x" : 0.8, # x direction for forward
                 "command_lin_vel_range_y" : 0.2, # y direction for left/right
                 "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
