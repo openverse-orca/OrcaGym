@@ -19,8 +19,7 @@ from gymnasium import spaces
 from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
 
 class OpenLoongEnv(OrcaGymLocalEnv):
-    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1'}
-
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
     """
     Control the walking of the OpenLoong robot.
 
@@ -180,34 +179,59 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         # print(f"key_w: {self._button_state.key_w}, key_a: {self._button_state.key_a}, key_s: {self._button_state.key_s}, key_d: {self._button_state.key_d}, key_space: {self._button_state.key_space}")
 
     time_counter = 0
+    # def _set_action(self) -> None:
+    #     # 调用青龙控制算法接口，获取控制数据
+    #     # start_time = time.perf_counter()
+
+    #     xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
+    #     sensor_dict = self.query_sensor_data(self._sensor_name_list)
+    #     print("sensor_dict:",sensor_dict)
+    #     self._orcagym_interface.updateSensorValues(self.data.qpos, 
+    #                                                self.data.qvel,
+    #                                                sensor_dict[self.sensor('baselink-quat')]['values'], 
+    #                                                sensor_dict[self.sensor('baselink-velocity')]['values'], 
+    #                                                sensor_dict[self.sensor('baselink-gyro')]['values'], 
+    #                                                sensor_dict[self.sensor('baselink-baseAcc')]['values'], 
+    #                                                xpos)
+        
+    #     self._update_keyboard_control()
+    #     sim_time = (datetime.now() - self._sim_init_time).total_seconds()
+    #     self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, sim_time)
+    #     ctrl = self._orcagym_interface.getMotorCtrl()
+
+    #     # end_time = time.perf_counter()
+    #     # OpenLoongEnv.time_counter += 1
+    #     # if (OpenLoongEnv.time_counter % 1000 == 0):
+    #     #     print("_set_action elapsed_time (ms): ", (end_time - start_time) * 1000)
+
+    #     for actuator_idmap in self._actuator_idmap:
+    #         for i, actuator_id in enumerate(actuator_idmap):
+    #             self.ctrl[actuator_id] = ctrl[i]
+
     def _set_action(self) -> None:
         # 调用青龙控制算法接口，获取控制数据
-        # start_time = time.perf_counter()
-
         xpos, _, _ = self.get_body_xpos_xmat_xquat([self.body("base_link")])
         sensor_dict = self.query_sensor_data(self._sensor_name_list)
-        self._orcagym_interface.updateSensorValues(self.data.qpos, 
-                                                   self.data.qvel,
-                                                   sensor_dict[self.sensor('baselink-quat')]['values'], 
-                                                   sensor_dict[self.sensor('baselink-velocity')]['values'], 
-                                                   sensor_dict[self.sensor('baselink-gyro')]['values'], 
-                                                   sensor_dict[self.sensor('baselink-baseAcc')]['values'], 
-                                                   xpos)
-        
+
+        # 直接访问传感器数据（不使用 ['values']）
+        self._orcagym_interface.updateSensorValues(
+            self.data.qpos, 
+            self.data.qvel,
+            sensor_dict[self.sensor('baselink-quat')],  # 直接使用数组
+            sensor_dict[self.sensor('baselink-velocity')],  # 直接使用数组
+            sensor_dict[self.sensor('baselink-gyro')],  # 直接使用数组
+            sensor_dict[self.sensor('baselink-baseAcc')],  # 直接使用数组
+            xpos
+        )
+
         self._update_keyboard_control()
         sim_time = (datetime.now() - self._sim_init_time).total_seconds()
         self._openloong_wbc.Runsimulation(self._button_state, self._orcagym_interface, sim_time)
         ctrl = self._orcagym_interface.getMotorCtrl()
 
-        # end_time = time.perf_counter()
-        # OpenLoongEnv.time_counter += 1
-        # if (OpenLoongEnv.time_counter % 1000 == 0):
-        #     print("_set_action elapsed_time (ms): ", (end_time - start_time) * 1000)
-
         for actuator_idmap in self._actuator_idmap:
             for i, actuator_id in enumerate(actuator_idmap):
                 self.ctrl[actuator_id] = ctrl[i]
-
 
     def _get_obs(self) -> dict:
         obs = np.concatenate(
