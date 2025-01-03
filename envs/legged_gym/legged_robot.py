@@ -585,7 +585,7 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_reward_feet_slip(self, coeff) -> SupportsFloat:
         reward = -np.sum(self._feet_velp_norm * self._feet_contact) * coeff * self.dt
-        reward += -np.sum(self._feet_velr_norm * self._feet_contact) * coeff * self.dt
+        reward += -np.sum(self._feet_velr_norm * self._feet_contact * 0.25) * coeff * self.dt
         self._print_reward("Foot slip reward: ", reward, coeff * self.dt)
         return reward
     
