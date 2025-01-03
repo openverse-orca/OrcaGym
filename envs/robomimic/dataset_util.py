@@ -81,6 +81,13 @@ class DatasetWriter:
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data)
 
+            if 'camera_frames' in demo_data:
+                camera_frames = demo_data['camera_frames']
+                if len(camera_frames) > 0:
+                    camera_group = demo_group.create_group('camera')
+                    for camera_name, camera_data in camera_frames.items():
+                        camera_group.create_dataset(camera_name, data=np.array([camera_data]))
+
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
                 next_obs_data = demo_data['next_obs']

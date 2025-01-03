@@ -12,6 +12,7 @@ if current_file_path not in sys.path:
     print("add path: ", current_file_path)
     sys.path.append(current_file_path)
 from envs.robomimic.dataset_util import DatasetWriter
+from envs.openloong.camera_wrapper import CameraWrapper
 
 import gymnasium as gym
 from gymnasium.envs.registration import register
@@ -43,6 +44,20 @@ def continue_training(env):
         To use VR controllers, please press left joystick to connect / disconnect to the simulator.
         And then press right joystick to reset the robot's hands to the initial position.
         """)  
+    save_camera = False
+    camera_name_list = {'cam_high': 7070, 'cam_left_wrist': 7071, 'cam_right_wrist': 7072}
+    camera_list = []
+    if save_camera:
+        for camera_name, port in camera_name_list:
+            camera = CameraWrapper(camera_name, port)
+            camera.start()
+            camera_list.append(camera)
+        for camera in camera_list:
+            print(f"Waiting for {camera.name} to receive first frame...")
+            while not camera.is_first_frame_received():
+                time.sleep(0.001)
+            print(f"{camera.name} received first frame.")
+
     while True:
         start_time = datetime.now()
 
@@ -55,13 +70,19 @@ def continue_training(env):
         done_list = [1 if terminated else 0]  # Collect done flags
         info_list = [info]  # Collect additional info (like state)
 
+        camera_frames = {}
+        if save_camera:
+            for camera in camera_list:
+                camera_frames[camera.name] = camera.get_frame()
+
         # Save data to .h5 using DatasetWriter
         dataset_writer.add_demo({
             'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
             'actions': np.array(action_list),
             'rewards': np.array(reward_list),
             'dones': np.array(done_list),
-            'obs': obs_list
+            'obs': obs_list,
+            'camera_frames': camera_frames
         })
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < TIME_STEP:
