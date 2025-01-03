@@ -54,6 +54,21 @@ def global2local(q_global_to_local, v_global, v_omega_global) -> tuple[np.ndarra
 
     return v_local, v_omega_local
 
+def quat_angular_velocity(q1, q2, dt):
+    # q1 = q1 / np.linalg.norm(q1)
+    # q2 = q2 / np.linalg.norm(q2)
+    # 计算四元数的角速度
+    q_diff = rotations.quat_mul(q2, rotations.quat_conjugate(q1))
+    # print("q_diff: ", q_diff)
+    
+    if np.allclose(q_diff, [1, 0, 0, 0]):
+        return 0.0
+    
+    angle = 2 * math.acos(q_diff[0])
+    if angle > math.pi:
+        angle = 2 * math.pi - angle
+    return angle / dt
+
 class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
                  env_id: str,                 
@@ -213,7 +228,7 @@ class LeggedRobot(OrcaGymAgent):
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
         self._feet_contact, self._feet_self_contact = self._get_feet_contact(contact_dict)  # Penalty if the foot is in contact with each other
-        self._feet_velp_norm = self._calc_feet_velp_norm(site_pos_quat)  # Penalty if the feet slip on the ground
+        self._feet_velp_norm, self._feet_velr_norm = self._calc_feet_vel_norm(site_pos_quat)  # Penalty if the feet slip on the ground
 
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
@@ -351,6 +366,7 @@ class LeggedRobot(OrcaGymAgent):
         
         self._last_push_duration = 0.0
         self._last_contact_site_xpos = None
+        self._last_contact_site_xquat = None
 
         return joint_neutral_qpos
 
@@ -569,6 +585,7 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_reward_feet_slip(self, coeff) -> SupportsFloat:
         reward = -np.sum(self._feet_velp_norm * self._feet_contact) * coeff * self.dt
+        reward += -np.sum(self._feet_velr_norm * self._feet_contact * 0.25) * coeff * self.dt
         self._print_reward("Foot slip reward: ", reward, coeff * self.dt)
         return reward
     
@@ -648,17 +665,22 @@ class LeggedRobot(OrcaGymAgent):
                     feet_self_contact_result[i] = 1.0
         return feet_contact_result, feet_self_contact_result
     
-    def _calc_feet_velp_norm(self, site_pos_quat : dict) -> np.ndarray:
-        feet_lin_vel = np.zeros(len(self._contact_site_names))
+    def _calc_feet_vel_norm(self, site_pos_quat : dict) -> tuple[np.ndarray, np.ndarray]:
+        feet_velp_norm = np.zeros(len(self._contact_site_names))
+        feet_velr_norm = np.zeros(len(self._contact_site_names))
         
         if self._last_contact_site_xpos is None:
-            self._last_contact_site_xpos = {contact_site_name: site_pos_quat[contact_site_name]["xpos"] for contact_site_name in self._contact_site_names}
+            self._last_contact_site_xpos = {contact_site_name: site_pos_quat[contact_site_name]["xpos"][:2] for contact_site_name in self._contact_site_names}
+        if self._last_contact_site_xquat is None:
+            self._last_contact_site_xquat = {contact_site_name: site_pos_quat[contact_site_name]["xquat"] for contact_site_name in self._contact_site_names}
 
         for i, contact_site_name in enumerate(self._contact_site_names):
-            feet_lin_vel[i] = np.linalg.norm(site_pos_quat[contact_site_name]["xpos"] - self._last_contact_site_xpos[contact_site_name]) / self.dt
-            self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"]
+            feet_velp_norm[i] = np.linalg.norm(site_pos_quat[contact_site_name]["xpos"][:2] - self._last_contact_site_xpos[contact_site_name]) / self.dt
+            self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"][:2]
+            feet_velr_norm[i] = abs(quat_angular_velocity(self._last_contact_site_xquat[contact_site_name], site_pos_quat[contact_site_name]["xquat"], self.dt))
+            self._last_contact_site_xquat[contact_site_name] = site_pos_quat[contact_site_name]["xquat"]
 
-        return feet_lin_vel
+        return feet_velp_norm, feet_velr_norm
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
         self._imu_data_framequat = sensor_data[self._imu_sensor_framequat_name]
