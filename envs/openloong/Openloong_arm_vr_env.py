@@ -38,7 +38,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         )
 
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
+        self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
       
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -300,7 +300,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             'dones': np.array(done_list),
             'obs': obs_list
         }
-        # self.dataset_writer.add_demo(demo_data)
+        self.dataset_writer.add_demo(demo_data)
 
     def run_episode(self):
         """
@@ -334,7 +334,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         """
         Finalize the dataset and close the environment.
         """
-        # self.dataset_writer.finalize()  # Ensure all data is saved
+        self.dataset_writer.finalize()  # Ensure all data is saved
         super().close()
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()
