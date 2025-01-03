@@ -457,7 +457,7 @@ LeggedRobotConfig = {
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
             "fly" : 1,
-            "stepping" : 1,
+            "stepping" : 10,
         },
 
         # Config from gymloong
