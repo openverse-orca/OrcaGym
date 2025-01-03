@@ -348,6 +348,9 @@ class LeggedRobot(OrcaGymAgent):
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
         self._command_resample_duration = 0
         # print("Command: ", self._command)
+        
+        self._last_push_duration = 0.0
+        self._last_contact_site_xpos = None
 
         return joint_neutral_qpos
 
@@ -395,7 +398,7 @@ class LeggedRobot(OrcaGymAgent):
     def push_robot(self, qvel_buffer : np.ndarray) -> dict[str, np.ndarray]:
         if not self._push_robots:
             return {}
-
+        
         if self._last_push_duration > self._push_interval_s:
             self._last_push_duration = 0.0
             push_vel = self._np_random.uniform(-self._max_push_vel_xy, self._max_push_vel_xy, 2)
@@ -404,7 +407,9 @@ class LeggedRobot(OrcaGymAgent):
             offset = self._qvel_index[self._base_joint_name]["offset"]
             len = self._qvel_index[self._base_joint_name]["len"]
             current_base_qvel = qvel_buffer[offset : offset + len]
-
+            
+            # print("Push robot: ", push_vel, "Current base qvel: ", current_base_qvel)
+                    
             return {self._base_joint_name: current_base_qvel + push_vel}
         else:
             self._last_push_duration += self.dt
@@ -631,13 +636,13 @@ class LeggedRobot(OrcaGymAgent):
     def _calc_feet_velp_norm(self, site_pos_quat : dict) -> np.ndarray:
         feet_lin_vel = np.zeros(len(self._contact_site_names))
         
-        if not hasattr(self, "_last_feet_site_xpos"):
-            self._last_contact_site_xpos = {contact_site_name: np.zeros(3) for contact_site_name in self._contact_site_names}
-        
+        if self._last_contact_site_xpos is None:
+            self._last_contact_site_xpos = {contact_site_name: site_pos_quat[contact_site_name]["xpos"] for contact_site_name in self._contact_site_names}
+
         for i, contact_site_name in enumerate(self._contact_site_names):
             feet_lin_vel[i] = np.linalg.norm(site_pos_quat[contact_site_name]["xpos"] - self._last_contact_site_xpos[contact_site_name]) / self.dt
             self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"]
-            
+
         return feet_lin_vel
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:

@@ -367,13 +367,13 @@ LeggedRobotConfig = {
                                 #   "J_arm_l_01": 0.0,  # "J_arm_l_02": -1.2,
                                   "J_hip_r_roll": -0.1, 
                                 #   "J_hip_r_yaw": 0.2, 
-                                  "J_hip_r_pitch": 0.3, "J_knee_r_pitch": -0.6, 
-                                  "J_ankle_r_pitch": 0.325, 
+                                  "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, 
+                                  "J_ankle_r_pitch": 0.7, 
                                 #   "J_ankle_r_roll": 0.1,
                                   "J_hip_l_roll": 0.1, 
                                 #   "J_hip_l_yaw": -0.2, 
-                                  "J_hip_l_pitch": 0.3, "J_knee_l_pitch": -0.6, 
-                                  "J_ankle_l_pitch": 0.325, 
+                                  "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, 
+                                  "J_ankle_l_pitch": 0.7, 
                                 #   "J_ankle_l_roll": -0.1,
                                   },
         
@@ -434,7 +434,7 @@ LeggedRobotConfig = {
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
-            "failure" : 10,
+            "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 0.1,
@@ -443,8 +443,8 @@ LeggedRobotConfig = {
             "action_rate" : 0.01,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 1,
-            "follow_command_angvel" : 0.5,
+            "follow_command_linvel" : 10, # From gymloong
+            "follow_command_angvel" : 5,  # From gymloong
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
