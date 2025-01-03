@@ -264,10 +264,6 @@
       </body>
     </worldbody>
 
-    <equality>
-      <weld body1="panda_mocap" body2="ee_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
-    </equality>
-
     <actuator>
       <motor class="panda" name="actuator1" joint="joint1" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
       <motor class="panda" name="actuator2" joint="joint2" gear="1" ctrllimited="true" ctrlrange="-80 80"/>

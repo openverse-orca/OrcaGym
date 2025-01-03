@@ -172,7 +172,7 @@ class LeggedRobot(OrcaGymAgent):
         self._player_control = False
 
         self._is_obs_updated = False
-        self._setup_reward_functions()
+        self._setup_reward_functions(robot_config)
         self._setup_curriculum_functions()
 
     @property
@@ -201,7 +201,7 @@ class LeggedRobot(OrcaGymAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict) -> dict:
+    def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict, site_pos_quat : dict) -> dict:
         self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
         self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
         self._leg_joint_qacc[:] = qacc_buffer[self._qacc_index["leg_start"] : self._qacc_index["leg_start"] + self._qacc_index["leg_length"]]
@@ -212,6 +212,8 @@ class LeggedRobot(OrcaGymAgent):
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
+        self._feet_contact, self._feet_self_contact = self._get_feet_contact(contact_dict)  # Penalty if the foot is in contact with each other
+        self._feet_velp_norm = self._calc_feet_velp_norm(site_pos_quat)  # Penalty if the feet slip on the ground
 
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
@@ -554,6 +556,16 @@ class LeggedRobot(OrcaGymAgent):
                     
         self._print_reward("Feet air time reward: ", reward, coeff * self.dt)
         return reward
+
+    def _compute_reward_feet_self_contact(self, coeff) -> SupportsFloat:
+        reward = (-np.sum(self._feet_self_contact)) * coeff * self.dt
+        self._print_reward("Foot self contact reward: ", reward, coeff * self.dt)
+        return reward
+    
+    def _compute_reward_feet_slip(self, coeff) -> SupportsFloat:
+        reward = -np.sum(self._feet_velp_norm * self._feet_contact) * coeff * self.dt
+        self._print_reward("Foot slip reward: ", reward, coeff * self.dt)
+        return reward
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
@@ -601,6 +613,32 @@ class LeggedRobot(OrcaGymAgent):
             if contact_body_name in contact_dict:
                 contact_result[i] = 1.0
         return contact_result
+    
+    def _get_feet_contact(self, contact_dict : dict) -> np.ndarray:
+        """
+        Check if the feet are in contact with each other
+        """
+        feet_contact_result = np.zeros(len(self._foot_body_names))
+        feet_self_contact_result = np.zeros(len(self._foot_body_names))
+        for i, foot_body_name in enumerate(self._foot_body_names):
+            if foot_body_name in contact_dict:
+                feet_contact_result[i] = 1.0
+                foot_contact_list = contact_dict[foot_body_name]
+                if any([contact_body_name in self._foot_body_names for contact_body_name in foot_contact_list]):
+                    feet_self_contact_result[i] = 1.0
+        return feet_contact_result, feet_self_contact_result
+    
+    def _calc_feet_velp_norm(self, site_pos_quat : dict) -> np.ndarray:
+        feet_lin_vel = np.zeros(len(self._contact_site_names))
+        
+        if not hasattr(self, "_last_feet_site_xpos"):
+            self._last_contact_site_xpos = {contact_site_name: np.zeros(3) for contact_site_name in self._contact_site_names}
+        
+        for i, contact_site_name in enumerate(self._contact_site_names):
+            feet_lin_vel[i] = np.linalg.norm(site_pos_quat[contact_site_name]["xpos"] - self._last_contact_site_xpos[contact_site_name]) / self.dt
+            self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"]
+            
+        return feet_lin_vel
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
         self._imu_data_framequat = sensor_data[self._imu_sensor_framequat_name]
@@ -793,26 +831,29 @@ class LeggedRobot(OrcaGymAgent):
         index_len = index_array[-1, 0] + index_array[-1, 1] - index_start
         return index_start, index_len    
     
-    def _setup_reward_functions(self):
+    def _setup_reward_functions(self, robot_config : dict) -> None:
+        reward_coeff = robot_config["reward_coeff"]
         self._reward_functions = [
-            {"function": self._compute_reward_alive, "coeff": 0},
-            {"function": self._compute_reward_success, "coeff": 0},
-            {"function": self._compute_reward_failure, "coeff": 0},
-            {"function": self._compute_reward_contact, "coeff": 1},
-            {"function": self._compute_reward_foot_touch, "coeff": 0},
-            {"function": self._compute_reward_joint_angles, "coeff": 0.1},
-            {"function": self._compute_reward_joint_accelerations, "coeff": 2.5e-7},
-            {"function": self._compute_reward_limit, "coeff": 0},
-            {"function": self._compute_reward_action_rate, "coeff": 0.01},
-            {"function": self._compute_reward_base_gyro, "coeff": 0},
-            {"function": self._compute_reward_base_accelerometer, "coeff": 0},
-            {"function": self._compute_reward_follow_command_linvel, "coeff": 1},
-            {"function": self._compute_reward_follow_command_angvel, "coeff": 0.5},
-            {"function": self._compute_reward_height, "coeff": 0},
-            {"function": self._compute_reward_body_lin_vel, "coeff": 2},
-            {"function": self._compute_reward_body_ang_vel, "coeff": 0.05},
-            {"function": self._compute_reward_body_orientation, "coeff": 0},
-            {"function": self._compute_feet_air_time, "coeff": 1},
+            {"function": self._compute_reward_alive, "coeff": reward_coeff["alive"]},
+            {"function": self._compute_reward_success, "coeff": reward_coeff["success"]},
+            {"function": self._compute_reward_failure, "coeff": reward_coeff["failure"]},
+            {"function": self._compute_reward_contact, "coeff": reward_coeff["contact"]},
+            {"function": self._compute_reward_foot_touch, "coeff": reward_coeff["foot_touch"]},
+            {"function": self._compute_reward_joint_angles, "coeff": reward_coeff["joint_angles"]},
+            {"function": self._compute_reward_joint_accelerations, "coeff": reward_coeff["joint_accelerations"]},
+            {"function": self._compute_reward_limit, "coeff": reward_coeff["limit"]},
+            {"function": self._compute_reward_action_rate, "coeff": reward_coeff["action_rate"]},
+            {"function": self._compute_reward_base_gyro, "coeff": reward_coeff["base_gyro"]},
+            {"function": self._compute_reward_base_accelerometer, "coeff": reward_coeff["base_accelerometer"]},
+            {"function": self._compute_reward_follow_command_linvel, "coeff": reward_coeff["follow_command_linvel"]},
+            {"function": self._compute_reward_follow_command_angvel, "coeff": reward_coeff["follow_command_angvel"]},
+            {"function": self._compute_reward_height, "coeff": reward_coeff["height"]},
+            {"function": self._compute_reward_body_lin_vel, "coeff": reward_coeff["body_lin_vel"]},
+            {"function": self._compute_reward_body_ang_vel, "coeff": reward_coeff["body_ang_vel"]},
+            {"function": self._compute_reward_body_orientation, "coeff": reward_coeff["body_orientation"]},
+            {"function": self._compute_feet_air_time, "coeff": reward_coeff["feet_air_time"]},
+            {"function": self._compute_reward_feet_self_contact, "coeff": reward_coeff["feet_self_contact"]},
+            {"function": self._compute_reward_feet_slip, "coeff": reward_coeff["feet_slip"]},
         ]
         
     def _setup_curriculum_functions(self):

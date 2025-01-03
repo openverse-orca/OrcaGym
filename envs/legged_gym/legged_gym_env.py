@@ -114,7 +114,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # get_obs_sensor = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
         contact_dict = self._generate_contact_dict()
         # get_obs_contact = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-        site_pos_quat = None #self.query_site_pos_and_quat(self._agent_site_names)
+        site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
         # get_obs_site = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
 
         # print("Sensor data: ", sensor_data)
@@ -126,7 +126,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         achieved_goals = []
         desired_goals = []
         for agent in self.agents:
-            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict)
+            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict, site_pos_quat)
             achieved_goals.append(obs["achieved_goal"])
             desired_goals.append(obs["desired_goal"])
             env_obs_list.append(obs["observation"])
@@ -242,8 +242,6 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             robot_config = LeggedRobotConfig["go2"]
         elif "A01B" in self._player_agent.name:
             robot_config = LeggedRobotConfig["A01B"]
-        elif "AzureLoong" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["AzureLoong"]
             
         self._player_agent_lin_vel_x = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"] / 3
         self._player_agent_lin_vel_y = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"] / 3

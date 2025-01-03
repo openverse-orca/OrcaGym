@@ -26,11 +26,12 @@
       <body name="box" pos="0 0 -0.06">
         <geom name="box_geom" type="box" size="1 1 0.1" material="oak_wood_material" density="1000" condim="3" contype="1" conaffinity="1" />
       </body>
-      <body name="item" pos="0.591 0.01 0.09">
-        <geom name="item_geom" type="box" size="0.025 0.025 0.025" material="wood_table_worn_material" density="500" contype="1" conaffinity="1" />
-        <site name="item_site" pos="0 0 -0.2" size="0.02" />
-      </body>
     </body>
+    <body name="item" pos="0.591 0.01 0.09">
+      <freejoint name="item_joint"/>
+      <geom name="item_geom" type="box" size="0.025 0.025 0.025" material="wood_table_worn_material" density="500" contype="1" conaffinity="1" />
+      <site name="item_site" pos="0 0 0" size="0.02" />
+    </body>    
   </worldbody>
 
 </mujoco>

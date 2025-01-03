@@ -107,6 +107,30 @@ LeggedRobotConfig = {
                                     "RR_thigh", "RR_calf"],
         "foot_body_names" : ["FL_foot", "FR_foot", "RL_foot", "RR_foot"],
 
+        # Config for reward
+        "reward_coeff" : {
+            "alive" : 0,
+            "success" : 0,
+            "failure" : 0,
+            "contact" : 1,
+            "foot_touch" : 0,
+            "joint_angles" : 0.1,
+            "joint_accelerations" : 2.5e-7,
+            "limit" : 0,
+            "action_rate" : 0.01,
+            "base_gyro" : 0,
+            "base_accelerometer" : 0,
+            "follow_command_linvel" : 1,
+            "follow_command_angvel" : 0.5,
+            "height" : 0,
+            "body_lin_vel" : 2,
+            "body_ang_vel" : 0.05,
+            "body_orientation" : 0,
+            "feet_air_time" : 1,
+            "feet_self_contact" : 1,
+            "feet_slip" : 1,
+        },
+
         # Robot's Self-Weight: Approximately 149.2 Newtons.
         # Static Foot Forces: Front feet ~44.8 N each; rear feet ~29.8 N each.
         # Dynamic Foot Forces (Walking at 1 m/s): Approximately 89.5 Newtons per foot during ground contact.
@@ -114,7 +138,6 @@ LeggedRobotConfig = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
-        
 
         # Config for randomization
         "randomize_friction" :      True,
@@ -229,6 +252,29 @@ LeggedRobotConfig = {
         
         "foot_body_names" : ["fl_foot", "fr_foot", "hl_foot", "hr_foot"],
 
+        # Config for reward
+        "reward_coeff" : {
+            "alive" : 0,
+            "success" : 0,
+            "failure" : 0,
+            "contact" : 1,
+            "foot_touch" : 0,
+            "joint_angles" : 0.1,
+            "joint_accelerations" : 2.5e-7,
+            "limit" : 0,
+            "action_rate" : 0.01,
+            "base_gyro" : 0,
+            "base_accelerometer" : 0,
+            "follow_command_linvel" : 1,
+            "follow_command_angvel" : 0.5,
+            "height" : 0,
+            "body_lin_vel" : 2,
+            "body_ang_vel" : 0.05,
+            "body_orientation" : 0,
+            "feet_air_time" : 1,
+            "feet_self_contact" : 1,
+            "feet_slip" : 1,
+        },
 
         # 机器狗的自重： 约 61.44 kg。
         # 静止时每只脚的受力： 约 150.7 N。
@@ -236,7 +282,6 @@ LeggedRobotConfig = {
         "foot_touch_force_threshold" : 350.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_air_time_ideal" : 0.6,  
-        
 
         # Config for randomization
         "randomize_friction" :      True,
@@ -382,14 +427,35 @@ LeggedRobotConfig = {
                                      "Link_hip_r_roll", "Link_hip_r_yaw", "Link_hip_r_pitch",
                                     "Link_knee_l_pitch", "Link_knee_r_pitch", ],
         
-        "foot_body_names" : ["Link_ankle_l_pitch", "Link_ankle_l_roll", 
-                             "Link_ankle_r_pitch", "Link_ankle_r_roll"],
+        "foot_body_names" : ["Link_ankle_l_roll", 
+                             "Link_ankle_r_roll"],
 
+        # Config for reward
+        "reward_coeff" : {
+            "alive" : 0,
+            "success" : 0,
+            "failure" : 10,
+            "contact" : 1,
+            "foot_touch" : 0,
+            "joint_angles" : 0.1,
+            "joint_accelerations" : 2.5e-7,
+            "limit" : 0,
+            "action_rate" : 0.01,
+            "base_gyro" : 0,
+            "base_accelerometer" : 0,
+            "follow_command_linvel" : 1,
+            "follow_command_angvel" : 0.5,
+            "height" : 0,
+            "body_lin_vel" : 2,
+            "body_ang_vel" : 0.05,
+            "body_orientation" : 0,
+            "feet_air_time" : 1,
+            "feet_self_contact" : 1,
+            "feet_slip" : 1,
+        },
 
-        # 机器人总质量 (M): 约 78.35 千克
-        # 垂直跳跃高度 (h)：假设机器人在单腿跳跃时的垂直跳跃高度与水平距离相同，即 0.3 米
-        # 减速距离 (d<sub>landing</sub>)：如果实际的减速距离更大（例如，机器人脚掌有更好的缓冲机制），则减速度和受力将会降低。例如，若减速距离为 0.1 米，则减速度为 29.43 米/秒²，受力为 2,305 牛顿。
-        "foot_touch_force_threshold" : 2500.0,
+        # Config from gymloong
+        "foot_touch_force_threshold" : 1500.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_air_time_ideal" : 0.5,  
         
@@ -400,24 +466,27 @@ LeggedRobotConfig = {
         "randomize_base_mass" :     False,
         "added_mass_range" :        [-1., 1.],
         "push_robots" :             True,
-        "push_interval_s" :         15,
-        "max_push_vel_xy" :         1.0,
+        "push_interval_s" :         2,
+        "max_push_vel_xy" :         0.5,
         "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 2.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 1.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : 0.8, # x direction for forward max speed
+                "command_lin_vel_range_x" : 1.0, # x direction for forward max speed
                 "command_lin_vel_range_y" : 0.2, # y direction for left/right max speed
                 "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
@@ -425,7 +494,7 @@ LeggedRobotConfig = {
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : 0.8, # x direction for forward
+                "command_lin_vel_range_x" : 1.0, # x direction for forward
                 "command_lin_vel_range_y" : 0.2, # y direction for left/right
                 "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
@@ -433,7 +502,7 @@ LeggedRobotConfig = {
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : 0.3, # x direction for forward
+                "command_lin_vel_range_x" : 0.5, # x direction for forward
                 "command_lin_vel_range_y" : 0.0, # y direction for left/right
                 "command_lin_vel_threshold" : 0.1, # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
