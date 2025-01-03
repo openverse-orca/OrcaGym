@@ -129,6 +129,8 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 1,
+            "fly" : 1,
+            "stepping" : 1,            
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -274,6 +276,8 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 1,
+            "fly" : 1,
+            "stepping" : 1,
         },
 
         # 机器狗的自重： 约 61.44 kg。
@@ -452,6 +456,8 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 1,
+            "fly" : 1,
+            "stepping" : 1,
         },
 
         # Config from gymloong

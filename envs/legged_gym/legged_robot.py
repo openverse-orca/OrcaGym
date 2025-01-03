@@ -571,6 +571,21 @@ class LeggedRobot(OrcaGymAgent):
         reward = -np.sum(self._feet_velp_norm * self._feet_contact) * coeff * self.dt
         self._print_reward("Foot slip reward: ", reward, coeff * self.dt)
         return reward
+    
+    def _compute_reward_fly(self, coeff) -> SupportsFloat:
+        reward = -1.0 * (np.sum(self._feet_contact) == 0) * coeff * self.dt
+        self._print_reward("Fly reward: ", reward, coeff * self.dt)
+        return reward
+    
+    def _compute_reward_stepping(self, coeff) -> SupportsFloat:
+        reward = 0.0
+        
+        if self._command["lin_vel"][0] == 0.0:
+            # Penalty if the robot is stepping when no command is given
+            reward = np.sum(self._feet_contact - np.ones(len(self._feet_contact))) * coeff * self.dt
+        
+        self._print_reward("Stepping reward: ", reward, coeff * self.dt)
+        return reward
         
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
@@ -859,6 +874,8 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_feet_air_time, "coeff": reward_coeff["feet_air_time"]},
             {"function": self._compute_reward_feet_self_contact, "coeff": reward_coeff["feet_self_contact"]},
             {"function": self._compute_reward_feet_slip, "coeff": reward_coeff["feet_slip"]},
+            {"function": self._compute_reward_fly, "coeff": reward_coeff["fly"]},
+            {"function": self._compute_reward_stepping, "coeff": reward_coeff["stepping"]},
         ]
         
     def _setup_curriculum_functions(self):
