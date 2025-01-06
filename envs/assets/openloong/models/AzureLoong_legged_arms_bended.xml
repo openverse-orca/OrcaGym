@@ -227,8 +227,10 @@
                       <!-- <joint name="J_ankle_r_roll" pos="0 0 0" axis="1 0 0" limited="true" range="-0.43633 0.43633"/> -->
                       <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" mesh="Link_ankle_r_roll"/>
                       <!--geom type="mesh" rgba="0.89804 0.91765 0 .92941 1" mesh="Link_ankle_r_roll"/-->
-                      <geom type="box" group="3" rgba="1 0 0 0" pos="0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" size="0.1225  0.0400  0.0435 "  />
-                      <site name="rf-tc" type="box" group="3" size="0.123  0.041   0.044" pos="0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
+                      <geom type="box" group="3" rgba="1 0 0 0" pos="0.10750461363863139 8.266688098764184e-05 -0.02654531035541249" size="0.0625  0.0400  0.0435 "  />
+                      <site name="rf-tc-front" type="box" group="3" size="0.063  0.041   0.044" pos="0.10750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
+                      <geom type="box" group="3" rgba="1 0 0 0" pos="-0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" size="0.0325  0.0400  0.0435 "  />
+                      <site name="rf-tc-back" type="box" group="3" size="0.033  0.041   0.044" pos="-0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
                     </body>
                   </body>
                 </body>
@@ -265,8 +267,10 @@
                       <!-- <joint name="J_ankle_l_roll" pos="0 0 0" axis="1 0 0" limited="true" range="-0.43633 0.43633"/> -->
                       <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" mesh="Link_ankle_l_roll"/>
                       <!--geom type="mesh" rgba="0.89804 0.91765 0.92941 1" mesh="Link_ankle_l_roll"/-->
-                      <geom type="box" group="3" pos="0.04749999940395355 0.0012208642475975968 -0.02722398766749333" rgba="1 0 0 0"  size="0.1225 0.0402  0.0442 "/>
-                      <site name="lf-tc" type="box" group="3" size="0.123 0.041  0.045"  pos="0.04749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
+                      <geom type="box" group="3" pos="0.10749999940395355 0.0012208642475975968 -0.02722398766749333" rgba="1 0 0 0"  size="0.0625 0.0402  0.0442 "/>
+                      <site name="lf-tc-front" type="box" group="3" size="0.063 0.041  0.045"  pos="0.10749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
+                      <geom type="box" group="3" pos="-0.04749999940395355 0.0012208642475975968 -0.02722398766749333" rgba="1 0 0 0"  size="0.0325 0.0402  0.0442 "/>
+                      <site name="lf-tc-back" type="box" group="3" size="0.033 0.041  0.045"  pos="-0.04749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
                     </body>
                   </body>
                 </body>
@@ -507,8 +511,10 @@
       <velocimeter name="baselink-velocity" site="imu" />
       <gyro name="baselink-gyro" site="imu" />
       <accelerometer name="baselink-baseAcc" site="imu" />
-      <touch name="lf-touch" site="lf-tc" />
-      <touch name="rf-touch" site="rf-tc" />
+      <touch name="lf-touch-front" site="lf-tc-front" />
+      <touch name="lf-touch-back" site="lf-tc-back" />
+      <touch name="rf-touch-front" site="rf-tc-front" />
+      <touch name="rf-touch-back" site="rf-tc-back" />
   </sensor>
 
 </mujoco>

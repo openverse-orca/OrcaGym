@@ -61,7 +61,7 @@ def quat_angular_velocity(q1, q2, dt):
     q_diff = rotations.quat_mul(q2, rotations.quat_conjugate(q1))
     # print("q_diff: ", q_diff)
     
-    if np.allclose(q_diff, [1, 0, 0, 0]):
+    if q_diff[0] > 1.0:
         return 0.0
     
     angle = 2 * math.acos(q_diff[0])
@@ -110,6 +110,7 @@ class LeggedRobot(OrcaGymAgent):
         self._use_imu_sensor = robot_config["use_imu_sensor"]
 
         self._foot_body_names = self.name_space_list(robot_config["foot_body_names"])
+        self._foot_fitted_ground_pairs = robot_config["foot_fitted_ground_pairs"]
         self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
         self._foot_touch_force_threshold = robot_config["foot_touch_force_threshold"]
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
@@ -601,6 +602,16 @@ class LeggedRobot(OrcaGymAgent):
         self._print_reward("Foot wringing reward: ", reward, coeff * self.dt)
         return reward
     
+    def _compute_reward_feet_fitted_ground(self, coeff) -> SupportsFloat:
+        reward = 0.0
+        for i in range(len(self._foot_fitted_ground_pairs)):
+            foot_front_index = self._foot_fitted_ground_pairs[i][0]
+            foot_back_index = self._foot_fitted_ground_pairs[i][1]
+            reward += -(1.0 if bool(self._feet_contact[foot_front_index]) ^ bool(self._feet_contact[foot_back_index]) else 0.0) * coeff * self.dt
+        self._print_reward("Foot fitted ground reward: ", reward, coeff * self.dt)
+        # print("Foot fitted ground reward: ", reward)
+        return reward
+    
     def _compute_reward_fly(self, coeff) -> SupportsFloat:
         reward = -1.0 * (np.sum(self._feet_contact) == 0) * coeff * self.dt
         self._print_reward("Fly reward: ", reward, coeff * self.dt)
@@ -741,9 +752,16 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        lin_vel = np.array([self._np_random.uniform(self._command_lin_vel_range_x[0], self._command_lin_vel_range_x[1]), 
-                            self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
-                            0])
+        if self._np_random.random() > 0.8:            
+            # Forward
+            lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
+                                self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
+                                0])
+        else:
+            # Backward
+            lin_vel = np.array([self._np_random.uniform(self._command_lin_vel_range_x[0], 0), 
+                                self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
+                                0])
         
         # Avoiding the robot to move tremble when the linear velocity is too small
         if lin_vel[0] < self._command_lin_vel_threshold[1] and lin_vel[0] > self._command_lin_vel_threshold[0]:
@@ -916,6 +934,7 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_feet_self_contact, "coeff": reward_coeff["feet_self_contact"]},
             {"function": self._compute_reward_feet_slip, "coeff": reward_coeff["feet_slip"]},
             {"function": self._compute_reward_feet_wringing, "coeff": reward_coeff["feet_wringing"]},
+            {"function": self._compute_reward_feet_fitted_ground, "coeff": reward_coeff["feet_fitted_ground"]},
             {"function": self._compute_reward_fly, "coeff": reward_coeff["fly"]},
             {"function": self._compute_reward_stepping, "coeff": reward_coeff["stepping"]},
         ]

@@ -107,6 +107,7 @@ LeggedRobotConfig = {
                                     "RL_thigh", "RL_calf", 
                                     "RR_thigh", "RR_calf"],
         "foot_body_names" : ["FL_foot", "FR_foot", "RL_foot", "RR_foot"],  # Maintain the same order as contact_site_names
+        "foot_fitted_ground_pairs" : [[0, 3], [1, 2]],                   # For the quadruped robot, the left front and right rear feet should touch the ground at the same time.
 
         # Config for reward
         "reward_coeff" : {
@@ -131,6 +132,7 @@ LeggedRobotConfig = {
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
             "feet_wringing" : 0.0,
+            "feet_fitted_ground" : 0.1,
             "fly" : 1,
             "stepping" : 1,            
         },
@@ -284,6 +286,7 @@ LeggedRobotConfig = {
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
             "feet_wringing" : 0.0,
+            "feet_fitted_ground" : 0.1,
             "fly" : 1,
             "stepping" : 1,
         },
@@ -390,7 +393,7 @@ LeggedRobotConfig = {
                                 #   "J_ankle_l_roll": -0.1,
                                   },
         
-        "base_neutral_height_offset" : 0.08,    # the offset from max height tnpo standing natural height
+        "base_neutral_height_offset" : 0.10,    # the offset from max height tnpo standing natural height
         "base_born_height_offset" : 0.01,       # the offset from max height to standing natural height
 
 
@@ -414,12 +417,12 @@ LeggedRobotConfig = {
         "action_scale" :         0.5,
         
         "imu_site_name" :       "imu",
-        "contact_site_names" :  ["lf-tc", "rf-tc",],
+        "contact_site_names" :  ["rf-tc-front", "rf-tc-back", "lf-tc-front", "lf-tc-back"],
         
         "sensor_imu_framequat_name" :           "baselink-quat",
         "sensor_imu_gyro_name" :                "baselink-gyro",
         "sensor_imu_accelerometer_name" :       "baselink-velocity",
-        "sensor_foot_touch_names" : ["lf-touch", "rf-touch"],  # Maintain the same order as contact_site_names
+        "sensor_foot_touch_names" : ["rf-touch-front", "rf-touch-back", "lf-touch-front", "lf-touch-back"],  # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
         "ground_contact_body_names" : ["Floor_Floor", 
@@ -441,8 +444,9 @@ LeggedRobotConfig = {
                                      "Link_hip_r_roll", "Link_hip_r_yaw", "Link_hip_r_pitch",
                                     "Link_knee_l_pitch", "Link_knee_r_pitch", ],
         
-        "foot_body_names" : ["Link_ankle_l_roll", 
-                             "Link_ankle_r_roll"],  # Maintain the same order as contact_site_names
+        "foot_body_names" : ["Link_ankle_r_roll", "Link_ankle_r_roll", 
+                             "Link_ankle_l_roll", "Link_ankle_l_roll"],  # Maintain the same order as contact_site_names
+        "foot_fitted_ground_pairs" : [[0, 1], [2, 3]],                   # For the humanoid robot, the feet's front and back should touch the ground at the same time.
 
         # Config for reward
         "reward_coeff" : {
@@ -467,8 +471,9 @@ LeggedRobotConfig = {
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
             "feet_wringing" : 0.0,
-            "fly" : 10,
-            "stepping" : 10,
+            "feet_fitted_ground" : 1.0,
+            "fly" : 5,
+            "stepping" : 5,
         },
 
         # Config from gymloong
