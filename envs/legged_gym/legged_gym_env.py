@@ -245,8 +245,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         elif "AzureLoong" in self._player_agent.name:
             robot_config = LeggedRobotConfig["AzureLoong"]
             
-        self._player_agent_lin_vel_x = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"] / 3
-        self._player_agent_lin_vel_y = robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"] / 3
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 3
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 3
     
     def _update_playable(self) -> None:
         if self._run_mode != "play":
@@ -268,11 +268,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         reborn = False
         
         if key_status["W"] == 1:
-            lin_vel[0] = self._player_agent_lin_vel_x
+            lin_vel[0] = self._player_agent_lin_vel_x[1]
+        if key_status["S"] == 1:
+            lin_vel[0] = self._player_agent_lin_vel_x[0]
         if key_status["Q"] == 1:
-            lin_vel[1] = self._player_agent_lin_vel_y
+            lin_vel[1] = self._player_agent_lin_vel_y[1]
         if key_status["E"] == 1:
-            lin_vel[1] += -self._player_agent_lin_vel_y
+            lin_vel[1] = self._player_agent_lin_vel_y[0]
         if key_status["A"] == 1:
             turn_angel += np.pi / 2 * self.dt
         if key_status["D"] == 1:

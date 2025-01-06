@@ -722,12 +722,12 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x), 
-                            self._np_random.uniform(-self._command_lin_vel_range_y, self._command_lin_vel_range_y),
+        lin_vel = np.array([self._np_random.uniform(self._command_lin_vel_range_x[0], self._command_lin_vel_range_x[1]), 
+                            self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
                             0])
         
         # Avoiding the robot to move tremble when the linear velocity is too small
-        if lin_vel[0] < self._command_lin_vel_threshold:
+        if lin_vel[0] < self._command_lin_vel_threshold[1] and lin_vel[0] > self._command_lin_vel_threshold[0]:
             lin_vel = np.array([0, 0, 0])
 
         return {"lin_vel": lin_vel, "ang_vel": 0, "heading_angle": heading_angle}

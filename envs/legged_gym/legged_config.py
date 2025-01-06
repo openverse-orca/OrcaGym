@@ -111,7 +111,7 @@ LeggedRobotConfig = {
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
-            "failure" : 0,
+            "failure" : 100,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 0.1,
@@ -158,31 +158,34 @@ LeggedRobotConfig = {
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : 1.5, # x direction for forward max speed
-                "command_lin_vel_range_y" : 0.3, # y direction for left/right max speed
-                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : 1.0, # x direction for forward
-                "command_lin_vel_range_y" : 0.2, # y direction for left/right
-                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
+                "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right
+                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : 0.5, # x direction for forward
-                "command_lin_vel_range_y" : 0.1, # y direction for left/right
-                "command_lin_vel_threshold" : 0.0, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [0, 0.5], # x direction for forward
+                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+                "command_lin_vel_threshold" : [0.0, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
@@ -456,7 +459,7 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
-            "fly" : 1,
+            "fly" : 10,
             "stepping" : 10,
         },
 
@@ -481,36 +484,38 @@ LeggedRobotConfig = {
         "curriculum_levels" : [
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : 1.0, # x direction for forward max speed
-                "command_lin_vel_range_y" : 0.2, # y direction for left/right max speed
-                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : 1.0, # x direction for forward
-                "command_lin_vel_range_y" : 0.2, # y direction for left/right
-                "command_lin_vel_threshold" : 0.2, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
+                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right
+                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : 0.5, # x direction for forward
-                "command_lin_vel_range_y" : 0.0, # y direction for left/right
-                "command_lin_vel_threshold" : 0.1, # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [0, 0.5], # x direction for forward
+                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+                "command_lin_vel_threshold" : [0, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
