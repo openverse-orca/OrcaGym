@@ -42,6 +42,7 @@ conda activate orca_gym_test
 
 Then install the dependencies in the newly created environment:
 ```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 pip install -r requirements.txt
 cd 3rd_party/robomimic
 pip install -e .
