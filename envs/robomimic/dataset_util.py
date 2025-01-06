@@ -117,7 +117,7 @@ class DatasetWriter:
         next_obs = {obs_key: [] for obs_key in obs.keys()}
         for obs_key, obs_data in obs.items():
             next_obs_data = obs_data[1:]
-            next_obs_data.append(obs_data[-1])
+            next_obs_data = next_obs_data + obs_data[-1]
             next_obs[obs_key].append(next_obs_data)
         return next_obs
 

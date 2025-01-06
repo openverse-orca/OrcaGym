@@ -38,7 +38,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         )
 
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
+        # self.dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5")
       
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -283,12 +283,23 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
         self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
-        info = {}
+        info = {"state": self.get_state(), "action": self.ctrl}
         terminated = False
         truncated = False
         reward = 0
 
         return obs, reward, terminated, truncated, info
+    
+    def get_state(self) -> dict:
+        state = {
+            "time": self.data.time,
+            "qpos": self.data.qpos.copy(),
+            "qvel": self.data.qvel.copy(),
+            "qacc": self.data.qacc.copy(),
+            "ctrl": self.ctrl.copy(),
+        }
+        return state
+    
     def record_data(self, obs_list, action_list, reward_list, done_list, info_list):
         """
         This function collects data for a single episode and stores it in the .h5 file.
@@ -300,7 +311,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             'dones': np.array(done_list),
             'obs': obs_list
         }
-        self.dataset_writer.add_demo(demo_data)
+        # self.dataset_writer.add_demo(demo_data)
 
     def run_episode(self):
         """
@@ -334,7 +345,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         """
         Finalize the dataset and close the environment.
         """
-        self.dataset_writer.finalize()  # Ensure all data is saved
+        # self.dataset_writer.finalize()  # Ensure all data is saved
         super().close()
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()

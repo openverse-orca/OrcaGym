@@ -30,7 +30,7 @@ def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': ['AzureLoong'], 
+                'agent_names': [], 
                 'time_step': TIME_STEP,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,
@@ -48,7 +48,7 @@ def continue_training(env):
     camera_name_list = {'cam_high': 7070, 'cam_left_wrist': 7071, 'cam_right_wrist': 7072}
     camera_list = []
     if save_camera:
-        for camera_name, port in camera_name_list:
+        for camera_name, port in camera_name_list.items():
             camera = CameraWrapper(camera_name, port)
             camera.start()
             camera_list.append(camera)
@@ -78,10 +78,8 @@ def continue_training(env):
         # Save data to .h5 using DatasetWriter
         dataset_writer.add_demo({
             'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-            'actions': np.array(action_list),
-            'rewards': np.array(reward_list),
-            'dones': np.array(done_list),
-            'obs': obs_list,
+            'actions': info["action"],
+            'obs': observation,
             'camera_frames': camera_frames
         })
         elapsed_time = datetime.now() - start_time
