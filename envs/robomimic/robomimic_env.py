@@ -8,7 +8,7 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple, Union
 
-from orca_gym.environment import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymLocalEnv
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
@@ -28,7 +28,9 @@ class ControlType:
     POLICY = "policy"
     DIRECT = "direct"
 
-class RobomimicEnv(OrcaGymRemoteEnv):
+class RobomimicEnv(OrcaGymLocalEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
+
     """
     Below we outline important methods that each EnvBase subclass needs to implement or override. 
     The implementation mostly follows the OpenAI-Gym convention.

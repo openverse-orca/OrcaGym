@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable
 
-from orca_gym import OrcaGymRemote
+from orca_gym import OrcaGymLocal
 import numpy as np
 
 import orca_gym.robosuite.macros as macros
@@ -31,14 +31,11 @@ class Controller(object, metaclass=abc.ABCMeta):
 
     def __init__(
         self,
-        sim: OrcaGymRemote,
+        gym: OrcaGymLocal,
         eef_name,
         joint_indexes,
         actuator_range,
     ):
-        # Initialize asyncio event loop
-        self.loop = asyncio.get_event_loop()
-
         # Actuator range
         self.actuator_min = actuator_range[0]
         self.actuator_max = actuator_range[1]
@@ -56,8 +53,8 @@ class Controller(object, metaclass=abc.ABCMeta):
         self.input_max = None
 
         # mujoco simulator state
-        self.sim = sim
-        self.model_timestep = sim.opt.timestep   #macros.SIMULATION_TIMESTEP
+        self.gym = gym
+        self.model_timestep = gym.opt.timestep   #macros.SIMULATION_TIMESTEP
         self.eef_name = eef_name
         self.joint_index = joint_indexes["joints"]
         self.qpos_index = joint_indexes["qpos"]
@@ -87,7 +84,7 @@ class Controller(object, metaclass=abc.ABCMeta):
         self.new_update = True
 
         # Move forward one timestep to propagate updates before taking first update
-        self.loop.run_until_complete(self.sim.mj_forward())
+        self.gym.mj_forward()
 
         # Initialize controller by updating internal state and setting the initial joint, pos, and ori
         self.update()
@@ -140,21 +137,11 @@ class Controller(object, metaclass=abc.ABCMeta):
         # Only run update if self.new_update or force flag is set
         if self.new_update or force:
 
-            # 组合下发多个异步请求
-            async def _combined_update():
-                # 在 Env 中，controller 是在 step 函数内调用的，已经完成了 foward，不用多做一次
-                # await self.sim.mj_forward()
-
-                # 信息可以并行查询
-                ee_pos_mat_dict, jac_site_dict, mass_matrix = await asyncio.gather(
-                    self.sim.query_site_pos_and_mat([self.eef_name]),
-                    self.sim.mj_jac_site([self.eef_name]),
-                    self.sim.calc_full_mass_matrix())
+            ee_pos_mat_dict = self.gym.query_site_pos_and_mat([self.eef_name])
+            jac_site_dict = self.gym.mj_jac_site([self.eef_name])
+            mass_matrix = self.gym.mj_fullM()
+            # print("mass_matrix: ", mass_matrix)
                 
-                return ee_pos_mat_dict, jac_site_dict, mass_matrix
-                
-            ee_pos_mat_dict, jac_site_dict, mass_matrix = self.loop.run_until_complete(_combined_update())
-
             self.ee_pos = np.array(ee_pos_mat_dict[self.eef_name]['xpos'])
             self.ee_ori_mat = np.array(ee_pos_mat_dict[self.eef_name]['xmat']).reshape((3, 3))
 
@@ -165,14 +152,14 @@ class Controller(object, metaclass=abc.ABCMeta):
 
             jacp = jac_site_dict[self.eef_name]['jacp'].reshape((3, -1))
             jacr = jac_site_dict[self.eef_name]['jacr'].reshape((3, -1))
-            self.ee_pos_vel = np.dot(jacp, self.sim.data.qvel)
-            self.ee_ori_vel = np.dot(jacr, self.sim.data.qvel)
+            self.ee_pos_vel = np.dot(jacp, self.gym.data.qvel)
+            self.ee_ori_vel = np.dot(jacr, self.gym.data.qvel)
 
             # self.ee_pos_vel = np.array(self.sim.data.get_site_xvelp(self.eef_name))
             # self.ee_ori_vel = np.array(self.sim.data.get_site_xvelr(self.eef_name))
 
-            self.joint_pos = np.array(self.sim.data.qpos[self.qpos_index])
-            self.joint_vel = np.array(self.sim.data.qvel[self.qvel_index])
+            self.joint_pos = np.array(self.gym.data.qpos[self.qpos_index])
+            self.joint_vel = np.array(self.gym.data.qvel[self.qvel_index])
 
             self.J_pos = np.array(jacp[:, self.qvel_index])
             self.J_ori = np.array(jacr[:, self.qvel_index])
@@ -265,7 +252,7 @@ class Controller(object, metaclass=abc.ABCMeta):
         Returns:
             np.array: torques
         """
-        return self.sim.data.qfrc_bias[self.qvel_index]
+        return self.gym.data.qfrc_bias[self.qvel_index]
 
     @property
     def actuator_limits(self):

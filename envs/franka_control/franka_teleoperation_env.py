@@ -10,7 +10,7 @@ import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from envs.robomimic.robomimic_env import RobomimicEnv
 from envs.robomimic.robomimic_env import ControlType
-from envs.orca_gym_env import RewardType
+from orca_gym.environment.orca_gym_env import RewardType
 
 
 class FrankaTeleoperationEnv(RobomimicEnv):
@@ -45,8 +45,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
         self.EE_NAME  = self.site("ee_center_site")
-        self.OBJ_NAME = "Toys_Object"
-        self.OBJ_JOINT_NAME = "Toys_Box1"
+        self.OBJ_NAME = self.body("item")
+        self.OBJ_SITE_NAME = self.site("item_site")
+        self.OBJ_JOINT_NAME = self.joint("item_joint")
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -73,9 +74,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._reset_grasp_mocap()
 
 
-        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
-        self._initial_obj_site_xpos = site_dict[self.OBJ_NAME]['xpos']
-        self._initial_obj_site_xquat = site_dict[self.OBJ_NAME]['xquat']
+        site_dict = self.query_site_pos_and_quat([self.OBJ_SITE_NAME])
+        self._initial_obj_site_xpos = site_dict[self.OBJ_SITE_NAME]['xpos']
+        self._initial_obj_site_xquat = site_dict[self.OBJ_SITE_NAME]['xquat']
         self._sample_object()
 
 
@@ -372,8 +373,8 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.set_joint_qpos(gripper_joint_qpos)
 
     def _query_obj_pos_and_quat(self) -> tuple:
-        site_dict = self.query_site_pos_and_quat([self.OBJ_NAME])
-        obj_xpos, obj_xquat = site_dict[self.OBJ_NAME]['xpos'], site_dict[self.OBJ_NAME]['xquat']
+        site_dict = self.query_site_pos_and_quat([self.OBJ_SITE_NAME])
+        obj_xpos, obj_xquat = site_dict[self.OBJ_SITE_NAME]['xpos'], site_dict[self.OBJ_SITE_NAME]['xquat']
         return obj_xpos, obj_xquat
 
     def _sample_goal(self, obj_xpos) -> np.ndarray:
