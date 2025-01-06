@@ -33,6 +33,7 @@ git submodule update
 2. **安装依赖：**
 为了方便快速安装，我们可以创建一个新的 Conda 环境：（如果您没有安装 Anaconda 或 Miniconda，请访问官方网页(https://www.anaconda.com/)进行安装）
 ```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 conda create --name orca_gym_test python=3.11
 conda activate orca_gym_test
 ```

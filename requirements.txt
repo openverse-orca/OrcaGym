@@ -13,3 +13,5 @@ numba
 termcolor
 mujoco==3.2.2
 tqdm
+av
+opencv-python
