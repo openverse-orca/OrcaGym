@@ -113,7 +113,7 @@ LeggedRobotConfig = {
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
-            "failure" : 100,
+            "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 0.1,
@@ -129,12 +129,12 @@ LeggedRobotConfig = {
             "body_ang_vel" : 0.05,
             "body_orientation" : 0,
             "feet_air_time" : 1,
-            "feet_self_contact" : 1,
-            "feet_slip" : 0.5,
+            "feet_self_contact" : 0,
+            "feet_slip" : 0.05,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.1,
-            "fly" : 1,
-            "stepping" : 1,            
+            "fly" : 0.1,
+            "stepping" : 0.1,            
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
