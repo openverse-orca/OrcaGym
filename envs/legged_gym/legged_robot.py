@@ -69,6 +69,7 @@ def quat_angular_velocity(q1, q2, dt):
         angle = 2 * math.pi - angle
     return angle / dt
 
+
 class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
                  env_id: str,                 
@@ -106,11 +107,13 @@ class LeggedRobot(OrcaGymAgent):
         self._imu_sensor_gyro_name = self.name_space(robot_config["sensor_imu_gyro_name"])
         self._imu_sensor_accelerometer_name = self.name_space(robot_config["sensor_imu_accelerometer_name"])
         self._imu_sensor_names = [self._imu_sensor_framequat_name, self._imu_sensor_gyro_name, self._imu_sensor_accelerometer_name]
+        self._use_imu_sensor = robot_config["use_imu_sensor"]
 
         self._foot_body_names = self.name_space_list(robot_config["foot_body_names"])
         self._foot_touch_sensor_names = self.name_space_list(robot_config["sensor_foot_touch_names"])
         self._foot_touch_force_threshold = robot_config["foot_touch_force_threshold"]
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
+        self._foot_touch_force_step_threshold = robot_config["foot_touch_force_step_threshold"]
         self._foot_touch_air_time_ideal = robot_config["foot_touch_air_time_ideal"]
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
@@ -228,7 +231,8 @@ class LeggedRobot(OrcaGymAgent):
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
         self._leg_contact = self._get_leg_contact(contact_dict)            # Penalty if the leg is in contact with the ground
         self._feet_contact, self._feet_self_contact = self._get_feet_contact(contact_dict)  # Penalty if the foot is in contact with each other
-        self._feet_velp_norm, self._feet_velr_norm = self._calc_feet_vel_norm(site_pos_quat)  # Penalty if the feet slip on the ground
+        self._feet_velp_norm = self._calc_feet_velp_norm(site_pos_quat)  # Penalty if the feet slip on the ground
+        self._feet_velr_norm = self._calc_feet_velr_norm(site_pos_quat)  # Penalty if the feet wringing on the ground
 
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
@@ -321,6 +325,7 @@ class LeggedRobot(OrcaGymAgent):
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
         
+        
         # Use curriculum learning to set the initial position
         if self._curriculum_learning:
             # print("Curriculum level: ", curriculum_level)
@@ -368,7 +373,10 @@ class LeggedRobot(OrcaGymAgent):
         self._last_contact_site_xpos = None
         self._last_contact_site_xquat = None
 
-        return joint_neutral_qpos
+        # Reset the velocity of the joints
+        joint_zero_qvel = {joint_name: np.zeros(self._qvel_index[joint_name]["len"]) for joint_name in self.joint_names}
+        
+        return joint_neutral_qpos, joint_zero_qvel
 
     def _compute_base_height(self, height_map : np.ndarray) -> float:
         height_map_x = int(self._base_neutral_qpos[self._base_joint_name][0] * 10 + height_map.shape[0] / 2)
@@ -585,8 +593,12 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_reward_feet_slip(self, coeff) -> SupportsFloat:
         reward = -np.sum(self._feet_velp_norm * self._feet_contact) * coeff * self.dt
-        reward += -np.sum(self._feet_velr_norm * self._feet_contact * 0.25) * coeff * self.dt
         self._print_reward("Foot slip reward: ", reward, coeff * self.dt)
+        return reward
+    
+    def _compute_reward_feet_wringing(self, coeff) -> SupportsFloat:
+        reward = -np.sum(self._feet_velr_norm * self._feet_contact) * coeff * self.dt
+        self._print_reward("Foot wringing reward: ", reward, coeff * self.dt)
         return reward
     
     def _compute_reward_fly(self, coeff) -> SupportsFloat:
@@ -658,29 +670,36 @@ class LeggedRobot(OrcaGymAgent):
         feet_contact_result = np.zeros(len(self._foot_body_names))
         feet_self_contact_result = np.zeros(len(self._foot_body_names))
         for i, foot_body_name in enumerate(self._foot_body_names):
-            if foot_body_name in contact_dict:
+            if self._foot_touch_force[i] > self._foot_touch_force_step_threshold and foot_body_name in contact_dict:
                 feet_contact_result[i] = 1.0
                 foot_contact_list = contact_dict[foot_body_name]
                 if any([contact_body_name in self._foot_body_names for contact_body_name in foot_contact_list]):
                     feet_self_contact_result[i] = 1.0
         return feet_contact_result, feet_self_contact_result
     
-    def _calc_feet_vel_norm(self, site_pos_quat : dict) -> tuple[np.ndarray, np.ndarray]:
+    def _calc_feet_velp_norm(self, site_pos_quat : dict) -> tuple[np.ndarray, np.ndarray]:
         feet_velp_norm = np.zeros(len(self._contact_site_names))
-        feet_velr_norm = np.zeros(len(self._contact_site_names))
         
         if self._last_contact_site_xpos is None:
-            self._last_contact_site_xpos = {contact_site_name: site_pos_quat[contact_site_name]["xpos"][:2] for contact_site_name in self._contact_site_names}
+            self._last_contact_site_xpos = {contact_site_name: site_pos_quat[contact_site_name]["xpos"] for contact_site_name in self._contact_site_names}
+            
+        for i, contact_site_name in enumerate(self._contact_site_names):
+            feet_velp_norm[i] = np.linalg.norm((site_pos_quat[contact_site_name]["xpos"] - self._last_contact_site_xpos[contact_site_name])[:2]) / self.dt
+            self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"]
+
+        return feet_velp_norm
+    
+    def _calc_feet_velr_norm(self, site_pos_quat : dict) -> tuple[np.ndarray, np.ndarray]:
+        feet_velr_norm = np.zeros(len(self._contact_site_names))
+        
         if self._last_contact_site_xquat is None:
             self._last_contact_site_xquat = {contact_site_name: site_pos_quat[contact_site_name]["xquat"] for contact_site_name in self._contact_site_names}
 
         for i, contact_site_name in enumerate(self._contact_site_names):
-            feet_velp_norm[i] = np.linalg.norm(site_pos_quat[contact_site_name]["xpos"][:2] - self._last_contact_site_xpos[contact_site_name]) / self.dt
-            self._last_contact_site_xpos[contact_site_name] = site_pos_quat[contact_site_name]["xpos"][:2]
             feet_velr_norm[i] = abs(quat_angular_velocity(self._last_contact_site_xquat[contact_site_name], site_pos_quat[contact_site_name]["xquat"], self.dt))
             self._last_contact_site_xquat[contact_site_name] = site_pos_quat[contact_site_name]["xquat"]
 
-        return feet_velp_norm, feet_velr_norm
+        return feet_velr_norm
     
     def _get_imu_data(self, sensor_data: dict) -> np.ndarray:
         self._imu_data_framequat = sensor_data[self._imu_sensor_framequat_name]
@@ -896,6 +915,7 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_feet_air_time, "coeff": reward_coeff["feet_air_time"]},
             {"function": self._compute_reward_feet_self_contact, "coeff": reward_coeff["feet_self_contact"]},
             {"function": self._compute_reward_feet_slip, "coeff": reward_coeff["feet_slip"]},
+            {"function": self._compute_reward_feet_wringing, "coeff": reward_coeff["feet_wringing"]},
             {"function": self._compute_reward_fly, "coeff": reward_coeff["fly"]},
             {"function": self._compute_reward_stepping, "coeff": reward_coeff["stepping"]},
         ]

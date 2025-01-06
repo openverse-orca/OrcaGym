@@ -89,7 +89,8 @@ LeggedRobotConfig = {
         "sensor_imu_framequat_name" :           "imu_quat",
         "sensor_imu_gyro_name" :                "imu_omega",
         "sensor_imu_accelerometer_name" :       "imu_acc",
-        "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],
+        "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],   # Maintain the same order as contact_site_names
+        "use_imu_sensor" : False,
 
         "ground_contact_body_names" : ["Floor_Floor", 
                                         "terrain_perlin_smooth_usda_terrain",
@@ -105,7 +106,7 @@ LeggedRobotConfig = {
                                     "FR_thigh", "FR_calf", 
                                     "RL_thigh", "RL_calf", 
                                     "RR_thigh", "RR_calf"],
-        "foot_body_names" : ["FL_foot", "FR_foot", "RL_foot", "RR_foot"],
+        "foot_body_names" : ["FL_foot", "FR_foot", "RL_foot", "RR_foot"],  # Maintain the same order as contact_site_names
 
         # Config for reward
         "reward_coeff" : {
@@ -129,6 +130,7 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
+            "feet_wringing" : 0.0,
             "fly" : 1,
             "stepping" : 1,            
         },
@@ -139,6 +141,7 @@ LeggedRobotConfig = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
+        "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
 
         # Config for randomization
@@ -237,7 +240,8 @@ LeggedRobotConfig = {
         "sensor_imu_framequat_name" :           "imu_quat",
         "sensor_imu_gyro_name" :                "imu_omega",
         "sensor_imu_accelerometer_name" :       "imu_acc",
-        "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],
+        "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],   # Maintain the same order as contact_site_names
+        "use_imu_sensor" : False,
 
         "ground_contact_body_names" : ["Floor_Floor", 
                                         "terrain_perlin_smooth_usda_terrain",
@@ -255,7 +259,7 @@ LeggedRobotConfig = {
                                     "hl_thigh", "hl_calf", 
                                     "hr_thigh", "hr_calf"],
         
-        "foot_body_names" : ["fl_foot", "fr_foot", "hl_foot", "hr_foot"],
+        "foot_body_names" : ["fl_foot", "fr_foot", "hl_foot", "hr_foot"],   # Maintain the same order as contact_site_names
 
         # Config for reward
         "reward_coeff" : {
@@ -279,6 +283,7 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
+            "feet_wringing" : 0.0,
             "fly" : 1,
             "stepping" : 1,
         },
@@ -288,6 +293,7 @@ LeggedRobotConfig = {
         # 以 1 m/s 速度行走时，每只脚在触地时的受力： 约 301.4 N。        
         "foot_touch_force_threshold" : 350.0,
         "foot_touch_force_air_threshold" : 0.01,
+        "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.6,  
 
         # Config for randomization
@@ -413,7 +419,8 @@ LeggedRobotConfig = {
         "sensor_imu_framequat_name" :           "baselink-quat",
         "sensor_imu_gyro_name" :                "baselink-gyro",
         "sensor_imu_accelerometer_name" :       "baselink-velocity",
-        "sensor_foot_touch_names" : ["lf-touch", "rf-touch"],
+        "sensor_foot_touch_names" : ["lf-touch", "rf-touch"],  # Maintain the same order as contact_site_names
+        "use_imu_sensor" : False,
 
         "ground_contact_body_names" : ["Floor_Floor", 
                                         "terrain_perlin_smooth_usda_terrain",
@@ -435,7 +442,7 @@ LeggedRobotConfig = {
                                     "Link_knee_l_pitch", "Link_knee_r_pitch", ],
         
         "foot_body_names" : ["Link_ankle_l_roll", 
-                             "Link_ankle_r_roll"],
+                             "Link_ankle_r_roll"],  # Maintain the same order as contact_site_names
 
         # Config for reward
         "reward_coeff" : {
@@ -459,6 +466,7 @@ LeggedRobotConfig = {
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
             "feet_slip" : 0.5,
+            "feet_wringing" : 0.0,
             "fly" : 10,
             "stepping" : 10,
         },
@@ -466,6 +474,7 @@ LeggedRobotConfig = {
         # Config from gymloong
         "foot_touch_force_threshold" : 1500.0,
         "foot_touch_force_air_threshold" : 0.01,
+        "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.5,  
         
 
@@ -484,15 +493,13 @@ LeggedRobotConfig = {
         "curriculum_levels" : [
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {

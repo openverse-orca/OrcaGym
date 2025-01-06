@@ -46,6 +46,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             **kwargs,
         )
         
+
         self._randomize_agent_foot_friction()
         self._init_playable()
         self._reset_phy_config()
@@ -110,11 +111,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # get_obs_start = datetime.datetime.now()
         # print("query joint qpos: ", self._agent_joint_names)
 
-        sensor_data = self.query_sensor_data(self._agent_sensor_names)
+        sensor_data = self._query_sensor_data()
         # get_obs_sensor = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
         contact_dict = self._generate_contact_dict()
         # get_obs_contact = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
-        site_pos_quat = self.query_site_pos_and_quat(self._agent_site_names)
+        site_pos_quat = self._query_site_pos_and_quat()
         # get_obs_site = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
 
         # print("Sensor data: ", sensor_data)
@@ -202,12 +203,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def _reset_agent_joint_qpos(self, agents: list[LeggedRobot]) -> None:
         joint_qpos = {}
+        joint_qvel = {}
         for agent in agents:
-            agent_joint_qpos = agent.reset(self.np_random, height_map=self._height_map)
+            agent_joint_qpos, agent_joint_qvel = agent.reset(self.np_random, height_map=self._height_map)
             joint_qpos.update(agent_joint_qpos)
+            joint_qvel.update(agent_joint_qvel)
 
         # print("Reset joint qpos: ", joint_qpos)
         self.set_joint_qpos(joint_qpos)
+        self.set_joint_qvel(joint_qvel)
         self.mj_forward()
         self.update_data()        
 
@@ -309,3 +313,20 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.ctrl = np.array(ctrl).flatten()
         # raise KeyError("Test no action mode")
             
+    def _query_sensor_data(self) -> dict[str, np.ndarray]:
+        if self.agents[0]._use_imu_sensor:
+            return self.query_sensor_data(self._agent_sensor_names)
+        else:
+            if not hasattr(self, "_agent_foot_touch_sensor_names"):
+                self._agent_foot_touch_sensor_names = [sensor_name for agent in self.agents for sensor_name in agent._foot_touch_sensor_names]
+        
+            return self.query_sensor_data(self._agent_foot_touch_sensor_names)
+        
+    def _query_site_pos_and_quat(self) -> dict[str, np.ndarray]:
+        if self.agents[0]._use_imu_sensor:
+            return self.query_site_pos_and_quat(self._agent_site_names)
+        else:
+            if not hasattr(self, "_agent_contact_site_names"):
+                self._agent_contact_site_names = [site_name for agent in self.agents for site_name in agent._contact_site_names]
+            
+            return self.query_site_pos_and_quat(self._agent_contact_site_names)
