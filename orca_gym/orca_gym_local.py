@@ -498,6 +498,12 @@ class OrcaGymLocal(OrcaGymBase):
 
     def mj_inverse(self):
         mujoco.mj_inverse(self._mjModel, self._mjData)
+        
+    def mj_fullM(self):
+        mass_matrix = np.ndarray(shape=(self._mjModel.nv, self._mjModel.nv), dtype=np.float64, order="C")
+        mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        mass_matrix = np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))        
+        return mass_matrix
 
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
@@ -620,3 +626,4 @@ class OrcaGymLocal(OrcaGymBase):
         for name, friction in geom_friction_dict.items():
             geom = model.geom(name)
             geom.friction = friction.copy()
+            
