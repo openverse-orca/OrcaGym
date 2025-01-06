@@ -283,12 +283,23 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
         self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
-        info = {}
+        info = {"state": self.get_state(), "action": self.ctrl}
         terminated = False
         truncated = False
         reward = 0
 
         return obs, reward, terminated, truncated, info
+    
+    def get_state(self) -> dict:
+        state = {
+            "time": self.data.time,
+            "qpos": self.data.qpos.copy(),
+            "qvel": self.data.qvel.copy(),
+            "qacc": self.data.qacc.copy(),
+            "ctrl": self.ctrl.copy(),
+        }
+        return state
+    
     def record_data(self, obs_list, action_list, reward_list, done_list, info_list):
         """
         This function collects data for a single episode and stores it in the .h5 file.
