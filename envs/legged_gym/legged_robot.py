@@ -752,7 +752,7 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        if self._np_random.random() > 0.8:            
+        if self._np_random.random() < 0.8:            
             # Forward
             lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
                                 self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
