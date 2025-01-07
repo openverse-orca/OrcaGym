@@ -1,0 +1,111 @@
+<mujoco model="random_box_terrain">
+    <compiler angle="degree" coordinate="local"/>
+    <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
+
+    <asset>
+        <texture type="2d" name="Plastic006_color"      file="../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic006_roughness"  file="../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic006_normal"     file="../../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_black" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic006_color"/>
+        <normal     texture="Plastic006_normal"/>
+        <roughness  texture="Plastic006_roughness"/>
+        </material>
+
+        <texture type="2d" name="Plastic013A_color"      file="../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic013A_roughness"  file="../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic013A_normal"     file="../../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_white" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic013A_color"/>
+        <normal     texture="Plastic013A_normal"/>
+        <roughness  texture="Plastic013A_roughness"/>
+        </material>
+
+        <texture type="2d" name="Plastic010_color"      file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Color.png"/>
+        <texture type="2d" name="Plastic010_roughness"  file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Roughness.png"/>
+        <texture type="2d" name="Plastic010_normal"     file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
+
+        <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+        <rgb        texture="Plastic010_color"/>
+        <normal     texture="Plastic010_normal"/>
+        <roughness  texture="Plastic010_roughness"/>      
+        </material>
+
+
+        <hfield name="perlin_hfield" size="6.4 6.4 0.2 0.5" file="height_field.png"/>
+        <hfield name="perlin_hfield_rough" size="6.4 6.4 0.2 0.5" file="height_field_rough.png"/>
+    </asset>
+    <worldbody>
+        <body name="offset" pos="0 0 0">
+            <body name="stairs" pos="0 0 -0.05">
+
+                <!-- 3-1 -->
+                <geom type="box" pos="-5.0 -5.0 0.0"  size="4.0 4.0  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 0.1" size="3.8 3.8  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 0.2"  size="3.6 3.6  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 0.3" size="3.4 3.4  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 0.4"  size="3.2 3.2  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 0.5" size="3.0 3.0  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 0.6"  size="2.8 2.8  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 0.7" size="2.6 2.6  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 0.8"  size="2.4 2.4  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 0.9" size="2.2 2.2  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 1.0"  size="2.0 2.0  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 1.1" size="1.8 1.8  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 1.2"  size="1.6 1.6  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 1.3" size="1.4 1.4  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="-5.0 -5.0 1.4"  size="1.2 1.2  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="-5.0 -5.0 1.5" size="1.0 1.0  0.1"   material="pbr_plastic_white"/>  
+
+                <geom type="box" pos="0 -5.0 1.5"    size="5.0 0.5  0.1"   material="pbr_plastic_white"/>  
+
+                <geom type="box" pos="5.0 -5.0  0.0"  size="4.0 4.0  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  0.1" size="3.8 3.8  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  0.2"  size="3.6 3.6  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  0.3" size="3.4 3.4  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  0.4"  size="3.2 3.2  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  0.5" size="3.0 3.0  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  0.6"  size="2.8 2.8  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  0.7" size="2.6 2.6  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  0.8"  size="2.4 2.4  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  0.9" size="2.2 2.2  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  1.0"  size="2.0 2.0  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  1.1" size="1.8 1.8  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  1.2"  size="1.6 1.6  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  1.3" size="1.4 1.4  0.1"   material="pbr_plastic_white"/>
+                <geom type="box" pos="5.0 -5.0  1.4"  size="1.2 1.2  0.1"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="5.0 -5.0  1.5" size="1.0 1.0  0.1"   material="pbr_plastic_white"/>    
+
+                <geom type="box" pos="15.0 -5.0 0.05" size="3.8 3.8  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.1"  size="3.6 3.6  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.15" size="3.4 3.4  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.2"  size="3.2 3.2  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.25" size="3.0 3.0  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.3"  size="2.8 2.8  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.35" size="2.6 2.6  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.4"  size="2.4 2.4  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.45" size="2.2 2.2  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.5"  size="2.0 2.0  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.55" size="1.8 1.8  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.6"  size="1.6 1.6  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.65" size="1.4 1.4  0.05"   material="pbr_plastic_white"/>
+                <geom type="box" pos="15.0 -5.0 0.7"  size="1.2 1.2  0.05"   material="pbr_plastic_gray"/>
+                <geom type="box" pos="15.0 -5.0 0.75" size="1.0 1.0  0.05"   material="pbr_plastic_white"/>    
+            </body>
+
+            <body name="height_filed" pos="-20 10 0">
+                <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" euler="0 -4  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="12.8  0.0   0.5" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="25.5  0.0   1.6" euler="0 -10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield" pos="37.3   0.0   -0.5" euler="0 30  0" material="pbr_plastic_gray"/>
+            </body>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <!-- 在这里你可以定义一些控制器 -->
+    </actuator>
+
+</mujoco>

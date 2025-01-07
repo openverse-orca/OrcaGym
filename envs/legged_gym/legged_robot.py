@@ -957,16 +957,8 @@ class LeggedRobot(OrcaGymAgent):
         return rating
     
     def update_curriculum_level(self, qpos_buffer : np.ndarray) -> None:    
-        if not self._curriculum_learning:
+        if not self._curriculum_learning or self._player_control:
             return
-        
-        # 玩家控制，手动升级
-        if self._player_control:
-            if self._current_level == len(self._curriculum_levels) - 1:
-                self._current_level = 0
-            else:
-                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
-            
             
         ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
         mean_rating = np.mean(ratings)
