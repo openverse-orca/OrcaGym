@@ -590,14 +590,14 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
 
 
-        achieved_goal = np.zeros(3)
+        achieved_goal = np.zeros(3, dtype=np.float32)
         desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     ee_position,
                     ee_velocity,
                     np.zeros(1),
-                ]).copy()            
+                ], dtype=np.float32).copy()            
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
@@ -654,7 +654,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
+        goal = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         return goal
 
 
