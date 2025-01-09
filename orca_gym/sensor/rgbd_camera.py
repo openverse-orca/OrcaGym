@@ -181,6 +181,22 @@ class VideoPlayer:
                 break
         cv2.destroyAllWindows()
 
+class Monitor:
+    def __init__(self, name:str):
+        self.camera = CameraWrapper(name, 7070)
+        self.camera.start()
+        self.playing = False
+
+    def play(self):
+        self.playing = True
+        while self.playing:
+            frame = self.camera.get_frame()
+            cv2.imshow('video', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        cv2.destroyAllWindows()
+
+
 
 # if __name__ == "__main__":
     # camera = CameraCacher("camera", 7070)

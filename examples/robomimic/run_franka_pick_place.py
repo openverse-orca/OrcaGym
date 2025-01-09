@@ -13,15 +13,16 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from envs.robomimic.robomimic_env import ControlType
+from envs.robomimic.robomimic_env import RunMode, ControlDevice
 from envs.robomimic.dataset_util import DatasetWriter
+from orca_gym.sensor.rgbd_camera import Monitor
 
 import numpy as np
 import argparse
 
 
 
-def register_env(orcagym_addr, env_name, env_index, agent_name, max_episode_steps) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, ctrl_device : str, max_episode_steps) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
@@ -30,7 +31,8 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, max_episode_step
                 'orcagym_addr': orcagym_addr, 
                 'agent_names': agent_names, 
                 'time_step': TIME_STEP,
-                'control_type': ControlType.TELEOPERATION,
+                'run_mode': run_mode,
+                'ctrl_device': ctrl_device,
                 'control_freq': 20}           
     gym.register(
         id=env_id,
@@ -97,12 +99,12 @@ def do_teleoperation(env, dataset_writer):
                 'obs': obs_list
             })
 
-def run_example(orcagym_addr : str, agent_name : str, max_episode_steps : int):
+def run_example(orcagym_addr : str, agent_name : str, run_mode : str, ctrl_device : str, max_episode_steps : int):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         env_name = "Franka-Teleoperation-v0"
         env_index = 0
-        env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, max_episode_steps)
+        env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
         print("Registered environment: ", env_id)
 
         env = gym.make(env_id)        
@@ -125,15 +127,36 @@ def run_example(orcagym_addr : str, agent_name : str, max_episode_steps : int):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='Panda', help='The agent name to control')
+    parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
     parser.add_argument('--record_time', type=int, default=20, help='The time to record the teleoperation in 1 episode')
+    parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation or imitation or playback)')
+    parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
     args = parser.parse_args()
     
     orcagym_addr = args.orcagym_address
     agent_name = args.agent_name
     record_time = args.record_time
+    
+    if args.run_mode == 'teleoperation':
+        run_mode = RunMode.TELEOPERATION
+    elif args.run_mode == 'imitation':
+        run_mode = RunMode.IMITATION
+    elif args.run_mode == 'playback':
+        run_mode = RunMode.PLAYBACK
+    else:
+        print("Invalid run mode! Please input 'teleoperation' or 'imitation'.")
+        sys.exit(1)
+
+    if args.ctrl_device == 'xbox':
+        ctrl_device = ControlDevice.XBOX
+    elif args.ctrl_device == 'keyboard':
+        ctrl_device = ControlDevice.KEYBOARD
+    else:
+        print("Invalid control device! Please input 'xbox' or 'keyboard'.")
+        sys.exit(1)
+
 
     TIME_STEP = 0.01
     max_episode_steps = int(record_time / TIME_STEP)
 
-    run_example(orcagym_addr, agent_name, max_episode_steps)
+    run_example(orcagym_addr, agent_name, run_mode, ctrl_device, max_episode_steps)

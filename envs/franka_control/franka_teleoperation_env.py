@@ -9,7 +9,7 @@ from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from envs.robomimic.robomimic_env import RobomimicEnv
-from envs.robomimic.robomimic_env import ControlType
+from envs.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
 
 
@@ -22,17 +22,20 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     def __init__(
         self,
         frame_skip: int,        
+        reward_type: str,
         orcagym_addr: str,
         agent_names: list,
         time_step: float,
-        control_type: ControlType,
+        run_mode: RunMode,
+        ctrl_device: ControlDevice,
         control_freq: int,
         **kwargs,
     ):
 
-        self.control_type = control_type
-        self.control_freq = control_freq
-        self.reward_type = kwargs["reward_type"]
+        self._run_mode = run_mode
+        self._ctrl_device = ctrl_device
+        self._control_freq = control_freq
+        self._reward_type = reward_type
 
         
         super().__init__(
@@ -80,17 +83,18 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self._sample_object()
 
 
-        if self.control_type == ControlType.TELEOPERATION:
-            self._joystick_manager = XboxJoystickManager()
-            joystick_names = self._joystick_manager.get_joystick_names()
-            if len(joystick_names) == 0:
-                raise ValueError("No joystick detected.")
+        if self._run_mode == RunMode.TELEOPERATION:
+            if self._ctrl_device == ControlDevice.XBOX:
+                self._joystick_manager = XboxJoystickManager()
+                joystick_names = self._joystick_manager.get_joystick_names()
+                if len(joystick_names) == 0:
+                    raise ValueError("No joystick detected.")
 
-            self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
-            if self._joystick is None:
-                raise ValueError("Joystick not found.")
-        elif self.control_type == ControlType.KEYBOARD:
-            self._keyboard = KeyboardInput()
+                self._joystick = self._joystick_manager.get_joystick(joystick_names[0])
+                if self._joystick is None:
+                    raise ValueError("Joystick not found.")
+            elif self._ctrl_device == ControlDevice.KEYBOARD:
+                self._keyboard = KeyboardInput()
 
 
         self._controller_config = controller_config.load_config("osc_pose")
@@ -110,7 +114,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
             "qvel": qvel_offsets,
         }
         self._controller_config["actuator_range"] = self._ctrl_range
-        self._controller_config["policy_freq"] = self.control_freq
+        self._controller_config["policy_freq"] = self._control_freq
         self._controller_config["ndim"] = len(self._arm_joint_names)
         self._controller_config["control_delta"] = False
 
@@ -145,9 +149,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.mj_forward()
 
     def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
-        if self.reward_type == RewardType.SPARSE:
+        if self._reward_type == RewardType.SPARSE:
             return 1 if self._is_success(achieved_goal, desired_goal) else 0
-        elif self.reward_type == RewardType.DENSE:
+        elif self._reward_type == RewardType.DENSE:
             return -np.linalg.norm(achieved_goal - desired_goal)
         else:
             raise ValueError("Invalid reward type")
@@ -159,9 +163,9 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
     
     def step(self, action) -> tuple:
-        if self.control_type == ControlType.TELEOPERATION or self.control_type == ControlType.KEYBOARD:
+        if self._run_mode == RunMode.TELEOPERATION:
             ctrl = self._teleoperation_action()
-        elif self.control_type == ControlType.POLICY:
+        elif self._run_mode == RunMode.IMITATION:
             ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
         else:
             ctrl = action.copy()
@@ -193,18 +197,18 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         return state
     
     def _set_gripper_ctrl(self, state) -> None:
-        if self.control_type == ControlType.TELEOPERATION:
+        if self._ctrl_device == ControlDevice.XBOX:
             if (state["buttons"]["B"]):
                 self.ctrl[7] += 0.001
                 self.ctrl[8] += 0.001
             elif (state["buttons"]["A"]):
                 self.ctrl[7] -= 0.001
                 self.ctrl[8] -= 0.001
-        elif self.control_type == ControlType.KEYBOARD:
-            if (state["LShift"]):
+        elif self._ctrl_device == ControlDevice.KEYBOARD:
+            if (state["Z"]):
                 self.ctrl[7] += 0.001
                 self.ctrl[8] += 0.001
-            elif (state["RShift"]):
+            elif (state["X"]):
                 self.ctrl[7] -= 0.001
                 self.ctrl[8] -= 0.001
 
@@ -238,12 +242,12 @@ class FrankaTeleoperationEnv(RobomimicEnv):
 
 
     def _process_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
-        if self.control_type == ControlType.TELEOPERATION:
+        if self._ctrl_device == ControlDevice.XBOX:
             self._joystick_manager.update()
             pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
             rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
             self._set_gripper_ctrl(self._joystick.get_state())
-        elif self.control_type == ControlType.KEYBOARD:
+        elif self._ctrl_device == ControlDevice.KEYBOARD:
             self._keyboard.update()
             pos_ctrl_dict = self._keyboard.capture_keyboard_pos_ctrl()
             rot_ctrl_dict = self._keyboard.capture_keyboard_rot_ctrl()

@@ -8,7 +8,7 @@ from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.devices.hand_joytstick import HandJoystick
 from scipy.spatial.transform import Rotation as R
 import os
-from envs.openloong.camera_wrapper import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 from orca_gym.environment import OrcaGymRemoteEnv
 import time
 
