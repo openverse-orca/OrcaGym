@@ -423,8 +423,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
             self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["leftHand"]["primaryButtonPressed"]:
-            self._l_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
+            self._l_gripper_offset_rate_clip = 0
 
         # Press trigger to close gripper
         # Adjust sensitivity using an exponential function
@@ -455,8 +454,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
             self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["rightHand"]["primaryButtonPressed"]:
-            self._r_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
+            self._r_gripper_offset_rate_clip = 0
 
         # Adjust sensitivity using an exponential function
         trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]

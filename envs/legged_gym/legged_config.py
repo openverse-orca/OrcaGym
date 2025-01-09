@@ -481,7 +481,11 @@ LeggedRobotConfig = {
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.5,  
-        
+        "foot_square_wave" : {
+            "p5" :          0.5,
+            "phase_freq" :  1.0,
+            "eps" :         0.2,
+        },
 
         # Config for randomization
         "randomize_friction" :      True,
