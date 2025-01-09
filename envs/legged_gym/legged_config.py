@@ -472,8 +472,8 @@ LeggedRobotConfig = {
             "feet_slip" : 0.5,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 1.0,
-            "fly" : 5,
-            "stepping" : 5,
+            "fly" : 5.0,
+            "stepping" : 1.0,
         },
 
         # Config from gymloong
