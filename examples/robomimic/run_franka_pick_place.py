@@ -14,7 +14,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from envs.robomimic.robomimic_env import RunMode, ControlDevice
-from envs.robomimic.dataset_util import DatasetWriter
+from envs.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 
 import numpy as np
@@ -36,7 +36,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
                 'control_freq': 20}           
     gym.register(
         id=env_id,
-        entry_point="envs.franka_control.franka_teleoperation_env:FrankaTeleoperationEnv",
+        entry_point="envs.franka_control.franka_pick_place_env:FrankaPickPlaceEnv",
         kwargs=kwargs,
         max_episode_steps= max_episode_steps,  # 10 seconds
         reward_threshold=0.0,
@@ -99,25 +99,78 @@ def do_teleoperation(env, dataset_writer):
                 'obs': obs_list
             })
 
-def run_example(orcagym_addr : str, agent_name : str, run_mode : str, ctrl_device : str, max_episode_steps : int):
+def playback_episode(env, action_list, done_list):
+    obs, info = env.reset(seed=42)
+    for i in range(len(action_list)):
+        start_time = datetime.now()
+
+        action = action_list[i]
+        done = done_list[i]
+        obs, reward, terminated, truncated, info = env.step(action)
+        env.render()
+
+        elapsed_time = datetime.now() - start_time
+        if elapsed_time.total_seconds() < TIME_STEP:
+            time.sleep(TIME_STEP - elapsed_time.total_seconds())
+
+        if done:
+            print("Episode done!")
+            return
+
+        if terminated or truncated:
+            print("Episode terminated!")
+            return
+    
+    print("Episode tunkated!")
+
+def do_playback(env, dataset_reader : DatasetReader):
+    demo_names = dataset_reader.get_demo_names()
+    for demo_name in demo_names:
+        demo_data = dataset_reader.get_demo(demo_name)
+        action_list = demo_data['actions']
+        done_list = demo_data['dones']
+        print("Playing back episode: ", demo_name, " with ", len(action_list), " steps.")
+        for i, action in enumerate(action_list):
+            print(f"action ({i}): ", action)
+        exit()
+        playback_episode(env, action_list, done_list)
+        time.sleep(1)
+
+
+
+def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, run_mode : str, ctrl_device : str, max_episode_steps : int):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
-        env_name = "Franka-Teleoperation-v0"
-        env_index = 0
-        env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
-        print("Registered environment: ", env_id)
+        if run_mode == RunMode.PLAYBACK:
+            dataset_reader = DatasetReader(file_path=record_file_path)
+            env_name = dataset_reader.get_env_name()
+            env_index = 0
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            print("Registered environment: ", env_id)
 
-        env = gym.make(env_id)        
-        print("Starting simulation...")
+            env = gym.make(env_id)
+            print("Starting simulation...")
 
-        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        dataset_writer = DatasetWriter(file_path=f"teleoperation_dataset_{formatted_now}.hdf5",
-                                       env_name=env_id,
-                                       env_version=env.unwrapped.get_env_version(),
-                                       env_kwargs=kwargs)
+            do_playback(env, dataset_reader)
 
-        do_teleoperation(env, dataset_writer)
-        dataset_writer.finalize()
+        elif run_mode == RunMode.TELEOPERATION:
+            env_name = "Franka-Teleoperation-v0"
+            env_index = 0
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            print("Registered environment: ", env_id)
+
+            env = gym.make(env_id)        
+            print("Starting simulation...")
+            dataset_writer = DatasetWriter(file_path=record_file_path,
+                                        env_name=env_id,
+                                        env_version=env.unwrapped.get_env_version(),
+                                        env_kwargs=kwargs)
+
+            do_teleoperation(env, dataset_writer)
+            dataset_writer.finalize()
+        else:
+            print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
+
     except KeyboardInterrupt:
         print("Simulation stopped")        
         dataset_writer.finalize()
@@ -129,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
     parser.add_argument('--record_time', type=int, default=20, help='The time to record the teleoperation in 1 episode')
+    parser.add_argument('--record_file_path', type=str, help='The file path to save the record')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation or imitation or playback)')
     parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
     args = parser.parse_args()
@@ -136,15 +190,24 @@ if __name__ == "__main__":
     orcagym_addr = args.orcagym_address
     agent_name = args.agent_name
     record_time = args.record_time
+    record_file_path = args.record_file_path
     
     if args.run_mode == 'teleoperation':
         run_mode = RunMode.TELEOPERATION
+        if record_file_path is None:
+            now = datetime.now()
+            formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
+            record_file_path = f"teleoperation_dataset_{formatted_now}.hdf5"
     elif args.run_mode == 'imitation':
         run_mode = RunMode.IMITATION
     elif args.run_mode == 'playback':
         run_mode = RunMode.PLAYBACK
     else:
         print("Invalid run mode! Please input 'teleoperation' or 'imitation'.")
+        sys.exit(1)
+
+    if record_file_path is None:
+        print("Please input the record file path.")
         sys.exit(1)
 
     if args.ctrl_device == 'xbox':
@@ -159,4 +222,4 @@ if __name__ == "__main__":
     TIME_STEP = 0.01
     max_episode_steps = int(record_time / TIME_STEP)
 
-    run_example(orcagym_addr, agent_name, run_mode, ctrl_device, max_episode_steps)
+    run_example(orcagym_addr, agent_name, record_file_path, run_mode, ctrl_device, max_episode_steps)

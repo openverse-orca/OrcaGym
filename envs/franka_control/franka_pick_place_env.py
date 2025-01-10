@@ -13,7 +13,7 @@ from envs.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
 
 
-class FrankaTeleoperationEnv(RobomimicEnv):
+class FrankaPickPlaceEnv(RobomimicEnv):
     """
     通过遥操作控制franka机械臂
     """
@@ -138,7 +138,7 @@ class FrankaTeleoperationEnv(RobomimicEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
     def get_env_version(self):
-        return FrankaTeleoperationEnv.ENV_VERSION
+        return FrankaPickPlaceEnv.ENV_VERSION
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
@@ -165,11 +165,13 @@ class FrankaTeleoperationEnv(RobomimicEnv):
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl = self._teleoperation_action()
-        elif self._run_mode == RunMode.IMITATION:
+        elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
             ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
         else:
-            ctrl = action.copy()
-            
+            raise ValueError("Invalid run mode")
+        
+        # print("ctrl: ", ctrl)
+        
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
         obs = self._get_obs()
