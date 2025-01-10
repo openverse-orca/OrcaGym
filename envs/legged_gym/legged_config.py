@@ -145,6 +145,11 @@ LeggedRobotConfig = {
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_square_wave" : {
+            "p5" :          0.5,
+            "phase_freq" :  0.8,
+            "eps" :         0.2,
+        },
 
         # Config for randomization
         "randomize_friction" :      True,
@@ -458,7 +463,7 @@ LeggedRobotConfig = {
             "joint_angles" : 0.1,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
-            "action_rate" : 0.01,
+            "action_rate" : 0.1,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
             "follow_command_linvel" : 10, # From gymloong
