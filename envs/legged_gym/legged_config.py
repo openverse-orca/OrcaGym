@@ -98,7 +98,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",    
+                                        "terrain_brics_usda_terrain",                                     
                                         ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
@@ -256,7 +257,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",           
+                                        "terrain_brics_usda_terrain",                              
                                         ],
         
         "base_contact_body_names" : ["trunk_link", "fl_abad", "fr_abad", "hl_abad", "hr_abad"],
@@ -436,7 +438,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",    
+                                        "terrain_brics_usda_terrain",                                    
                                         ],
         
         "base_contact_body_names" : ["base_link", 
@@ -512,9 +515,9 @@ LeggedRobotConfig = {
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
             # {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
