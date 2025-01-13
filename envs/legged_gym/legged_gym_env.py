@@ -249,8 +249,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         elif "AzureLoong" in self._player_agent.name:
             robot_config = LeggedRobotConfig["AzureLoong"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 3
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 3
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play":
@@ -286,7 +286,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self._key_status["Space"] == 0 and key_status["Space"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
-            lin_vel[:2] *= 3
+            lin_vel[:2] *= 2
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)

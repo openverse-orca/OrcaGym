@@ -60,15 +60,17 @@ def generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_ran
 def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max, out_file):
     # 生成地形的所有geom块
     terrain_boxes = generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max)
-    
+    terrain_center = (num_x * -geom_size[0] / 2, num_y * -geom_size[1] / 2, 0)
+
     # 定义MuJoCo XML的头部和尾部
-    header = '''<mujoco model="random_box_terrain">
+    header = f'''<mujoco model="random_box_terrain">
     <compiler angle="degree" coordinate="local"/>
     <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
 
     <worldbody>
-        <body name="terrain">
-'''
+        <body name="terrain" pos="{terrain_center[0]} {terrain_center[1]} {terrain_center[2]}">
+    '''
+
     footer = '''
         </body>
     </worldbody>
@@ -101,10 +103,10 @@ def parse_geom_size(s):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
-    parser.add_argument('--num_x', type=int, default=10, help='Number of boxes in x direction')
-    parser.add_argument('--num_y', type=int, default=10, help='Number of boxes in y direction')
+    parser.add_argument('--num_x', type=int, default=20, help='Number of boxes in x direction')
+    parser.add_argument('--num_y', type=int, default=20, help='Number of boxes in y direction')
     parser.add_argument('--geom_type', type=str, default='box', help='Type of geom to use for terrain generation (sphere, ellipsoid, box, cylinder, capsule)')    
-    parser.add_argument('--geom_size', type=parse_geom_size, default="(1, 1, 0.1)", help='Size (x, y, z) of each geom')
+    parser.add_argument('--geom_size', type=parse_geom_size, default="(2, 2, 0.1)", help='Size (x, y, z) of each geom')
     parser.add_argument('--geom_size_cale_range', type=float, default=0.5, help="The random range of geom size")
     parser.add_argument('--max_tilt', type=float, default=3, help='Max tilt of each geom')
     parser.add_argument('--min_step', type=float, default=0.2, help='Min step between geoms')
