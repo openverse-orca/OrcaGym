@@ -8,8 +8,8 @@ from orca_gym.devices.keyboard import KeyboardInput
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
-from envs.robomimic.robomimic_env import RobomimicEnv
-from envs.robomimic.robomimic_env import RunMode, ControlDevice
+from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
 
 

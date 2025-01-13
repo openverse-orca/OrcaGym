@@ -13,8 +13,8 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from envs.robomimic.robomimic_env import RunMode, ControlDevice
-from envs.robomimic.dataset_util import DatasetWriter, DatasetReader
+from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
+from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 
 import numpy as np

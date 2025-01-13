@@ -1,7 +1,7 @@
 from datetime import datetime
 import numpy as np
 from gymnasium.core import ObsType
-from envs.robomimic.dataset_util import DatasetWriter
+from orca_gym.robomimic.dataset_util import DatasetWriter
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
