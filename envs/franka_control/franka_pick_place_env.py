@@ -147,6 +147,23 @@ class FrankaPickPlaceEnv(RobomimicEnv):
     def get_env_version(self):
         return FrankaPickPlaceEnv.ENV_VERSION
 
+    def check_success(self):
+        """
+        Check if the task condition(s) is reached. Should return a dictionary
+        { str: bool } with at least a "task" key for the overall task success,
+        and additional optional keys corresponding to other task criteria.
+        """        
+        achieved_goal = self._get_achieved_goal()
+        desired_goal = self._get_desired_goal()
+        success = self._is_success(achieved_goal, desired_goal)
+        return {"task": success}
+    
+    def render_callback(self, mode='human') -> None:
+        if mode == "human":
+            self.render()
+        else:
+            raise ValueError("Invalid render mode")
+
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self.set_joint_neutral()
@@ -167,13 +184,11 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         success_threshold = 0.02
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
-
-    
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
             scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-            print("no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
+            # print("no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
@@ -355,9 +370,6 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         # print("desired goal position: ", self.goal)
         return self.goal.copy()
 
-    def _render_callback(self) -> None:
-        pass
-
     def reset_model(self) -> dict:
         """
         Reset the environment, return observation
@@ -410,7 +422,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
     def _sample_goal(self, obj_xpos) -> np.ndarray:
         goal_xpos = obj_xpos.copy()
         goal_xpos[2] += 0.1
-        print("sample goal position: ", goal_xpos)
+        # print("sample goal position: ", goal_xpos)
         return goal_xpos
 
     def _sample_object(self) -> None:
@@ -427,7 +439,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         obj_euler[2] = np.random.uniform(-np.pi, np.pi)
         obj_xquat = rotations.euler2quat(obj_euler)
 
-        print("sample object position, quaternion: ", obj_xpos, obj_xquat)
+        # print("sample object position, quaternion: ", obj_xpos, obj_xquat)
 
         return obj_xpos, obj_xquat
 

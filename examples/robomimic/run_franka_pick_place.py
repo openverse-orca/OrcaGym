@@ -17,6 +17,7 @@ from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 from envs.franka_control.franka_pick_place_env import FrankaPickPlaceEnv
+from examples.robomimic.train_bc_rnn import run_train_bc_rnn
 
 import numpy as np
 import argparse
@@ -78,19 +79,21 @@ def run_episode(env : FrankaPickPlaceEnv, dataset_writer):
 
 def user_comfirm_save_record(task_result):
     while True:
-        user_input = input(f"Task is {task_result}! Do you want to save the record? (y/n): ")
+        user_input = input(f"Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(exit): ")
         if user_input == 'y':
-            return True
+            return True, False
         elif user_input == 'n':
-            return False
+            return False, False
+        elif user_input == 'e':
+            return False, True
         else:
-            print("Invalid input! Please input 'y' or 'n'.")
+            print("Invalid input! Please input 'y', 'n' or 'e'.")
 
 def do_teleoperation(env, dataset_writer):
     while True:
         obs_list, reward_list, done_list, info_list = run_episode(env, dataset_writer)
         task_result = "Success" if done_list[-1] == 1 else "Failed"
-        save_record = user_comfirm_save_record(task_result)
+        save_record, exit_program = user_comfirm_save_record(task_result)
         if save_record:
             dataset_writer.add_demo({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
@@ -99,6 +102,8 @@ def do_teleoperation(env, dataset_writer):
                 'dones': np.array(done_list),
                 'obs': obs_list
             })
+        if exit_program:
+            break
 
 def playback_episode(env : FrankaPickPlaceEnv, action_list, done_list):
     for i in range(len(action_list)):
@@ -129,7 +134,7 @@ def reset_playback_env(env : FrankaPickPlaceEnv, demo_data):
     object_data = demo_data['obs']['object']
     obj_xpos = object_data[0][0:3]
     obj_xquat = object_data[0][3:7]
-    print("Resetting object position: ", obj_xpos, obj_xquat)
+    # print("Resetting object position: ", obj_xpos, obj_xquat)
     env.unwrapped.replace_object(obj_xpos, obj_xquat)
     
 def do_playback(env : FrankaPickPlaceEnv, dataset_reader : DatasetReader):
@@ -175,7 +180,28 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
                                         env_kwargs=kwargs)
 
             do_teleoperation(env, dataset_writer)
+            # 将前 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
+            demo_names = dataset_writer.get_demo_names()
+            print("Demo names: ", demo_names)
+            dataset_writer.add_filter_key("train", demo_names[:int(0.8 * len(demo_names))])
+            dataset_writer.add_filter_key("valid", demo_names[int(0.8 * len(demo_names)):])
             dataset_writer.finalize()
+            
+        elif run_mode == RunMode.IMITATION:
+            dataset_reader = DatasetReader(file_path=record_file_path)
+            env_name = dataset_reader.get_env_name()
+            env_name = env_name.split("-OrcaGym-")[0]
+            env_index = 0
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            print("Registered environment: ", env_id)
+
+            env = gym.make(env_id)
+            print("Starting simulation...")
+            
+            now = datetime.now()
+            formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
+            output_dir = f"{current_file_path}/train_temp_dir_{formatted_now}"
+            run_train_bc_rnn(dataset_type="orca_gym", dataset=record_file_path, output=output_dir, debug=False)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
 
@@ -211,7 +237,7 @@ if __name__ == "__main__":
     elif args.run_mode == 'playback':
         run_mode = RunMode.PLAYBACK
     else:
-        print("Invalid run mode! Please input 'teleoperation' or 'imitation'.")
+        print("Invalid run mode! Please input 'teleoperation', 'playback' or 'imitation'.")
         sys.exit(1)
 
     if record_file_path is None:

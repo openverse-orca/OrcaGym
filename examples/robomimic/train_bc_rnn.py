@@ -40,7 +40,7 @@ def orca_gym_hyperparameters(config):
     ## save config - if and when to save checkpoints ##
     config.experiment.save.enabled = True                       # whether model saving should be enabled or disabled
     config.experiment.save.every_n_seconds = None               # save model every n seconds (set to None to disable)
-    config.experiment.save.every_n_epochs = 50                  # save model every n epochs (set to None to disable)
+    config.experiment.save.every_n_epochs = 10                  # save model every n epochs (set to None to disable)
     config.experiment.save.epochs = []                          # save model on these specific epochs
     config.experiment.save.on_best_validation = False           # save models that achieve best validation score
     config.experiment.save.on_best_rollout_return = False       # save models that achieve best rollout return
@@ -55,8 +55,8 @@ def orca_gym_hyperparameters(config):
     config.experiment.additional_envs = None                    # additional environments that should get evaluated
 
     ## rendering config ##
-    config.experiment.render = False                            # render on-screen or not
-    config.experiment.render_video = True                       # render evaluation rollouts to videos
+    config.experiment.render = True                            # render on-screen or not
+    config.experiment.render_video = False                       # render evaluation rollouts to videos
     config.experiment.keep_all_videos = False                   # save all videos, instead of only saving those for saved model checkpoints
     config.experiment.video_skip = 5                            # render video frame every n environment steps during rollout
 
@@ -112,10 +112,22 @@ def orca_gym_hyperparameters(config):
 
     ### Observation Config ###
     config.observation.modalities.obs.low_dim = [               # specify low-dim observations for agent
-        "robot0_eef_pos",
-        "robot0_eef_quat",
-        "robot0_gripper_qpos",
+        # "robot0_eef_pos",
+        # "robot0_eef_quat",
+        # "robot0_gripper_qpos",
+        # "object",
+    
         "object",
+        "ee_pos",
+        "ee_quat",
+        "ee_vel_linear",
+        "ee_vel_angular",
+        "joint_qpos",
+        "joint_qpos_sin",
+        "joint_qpos_cos",
+        "joint_vel",
+        "gripper_qpos",
+        "gripper_qvel",        
     ]
     config.observation.modalities.obs.rgb = []                # no image observations
     config.observation.modalities.goal.low_dim = []             # no low-dim goals
@@ -580,6 +592,25 @@ def get_config(dataset_type="robosuite", dataset_path=None, output_dir=None, deb
 
     return config
 
+def run_train_bc_rnn(dataset_type, dataset, output, debug):
+
+    # Turn debug mode on possibly
+    if debug:
+        Macros.DEBUG = True
+
+    # config for training
+    config = get_config(
+        dataset_type=dataset_type,
+        dataset_path=dataset,
+        output_dir=output,
+        debug=debug
+    )
+
+    # set torch device
+    device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
+
+    # run training
+    train(config, device=device)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -621,20 +652,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Turn debug mode on possibly
-    if args.debug:
-        Macros.DEBUG = True
-
-    # config for training
-    config = get_config(
-        dataset_type=args.dataset_type,
-        dataset_path=args.dataset,
-        output_dir=args.output,
-        debug=args.debug
-    )
-
-    # set torch device
-    device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)
-
-    # run training
-    train(config, device=device)
+    run_train_bc_rnn(args.dataset_type, args.dataset, args.output, args.debug)

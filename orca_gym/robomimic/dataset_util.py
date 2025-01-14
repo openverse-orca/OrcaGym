@@ -62,7 +62,7 @@ class DatasetWriter:
             demo_count = data_group.attrs['demo_count']
             total_samples = data_group.attrs['total']
 
-            demo_name = f'demo_{demo_count}'
+            demo_name = f'demo_{demo_count:03d}'
             demo_group = data_group.create_group(demo_name)
             num_samples = demo_data['actions'].shape[0]
             demo_group.attrs['num_samples'] = num_samples
@@ -122,19 +122,21 @@ class DatasetWriter:
         return next_obs
 
     def add_filter_key(self, filter_key_name, demo_names):
-        """
-        添加一个过滤器键，用于数据集的子集划分。
-
-        参数：
-        - filter_key_name: 过滤器键的名称。
-        - demo_names: 包含演示名称的列表，例如 ['demo_0', 'demo_2', 'demo_5']。
-        """
-        # 打开文件进行读写
         with h5py.File(self.file_path, 'r+') as f:
             mask_group = f['mask']
             # 将演示名称转换为字节串，适用于 HDF5
-            demo_names_bytes = np.array(demo_names, dtype=h5py.special_dtype(vlen=str))
+            demo_names_bytes = np.array([name.encode('utf-8') for name in demo_names], dtype='S')
+            # 如果过滤键已存在，先删除再创建
+            if filter_key_name in mask_group:
+                del mask_group[filter_key_name]
             mask_group.create_dataset(filter_key_name, data=demo_names_bytes)
+            print("Added filter key:", filter_key_name)
+
+    def get_demo_names(self):
+        with h5py.File(self.file_path, 'r') as f:
+            data_group = f['data']
+            demo_names = [name for name in data_group.keys()]
+        return demo_names
 
     def finalize(self):
         """
