@@ -130,7 +130,10 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
 
     def _set_action_space(self):
-        self.action_space = self.generate_action_space(self.model.get_actuator_ctrlrange())
+        # action range: [x, y, z, yaw, pitch, roll]
+        action_range = np.array([[-3.0, 3.0], [-3.0, 3.0], [-3.0, 3.0]
+                                 [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi]], dtype=np.float32)
+        self.action_space = self.generate_action_space(action_range)
 
     def _reset_grasp_mocap(self) -> None:
         self._saved_xpos = self._initial_grasp_site_xpos.copy()
@@ -164,7 +167,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
     
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
-            ctrl = self._teleoperation_action()
+            ctrl, teleop_action = self._teleoperation_action()
         elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
             ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
         else:
@@ -240,6 +243,14 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         
         self.ctrl[0:7] = self._controller.run_controller()
         
+        return self.ctrl.copy(), action.copy()
+    
+    def _playback_action(self, action) -> np.ndarray:
+        assert(len(action) == 6)
+        
+        self._controller.set_goal(action)
+        self.ctrl[0:7] = self._controller.run_controller()        
+        
         return self.ctrl.copy()
 
 
@@ -313,7 +324,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         joint_velocities = self.get_arm_joint_velocities()
 
         obs = {
-            "object": np.concatenate([obj_xpos, obj_xquat]),
+            "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32),
             "ee_pos": ee_position["xpos"],
             "ee_quat": ee_position["xquat"],
             "ee_vel_linear": ee_xvalp[self.EE_NAME],
@@ -419,13 +430,13 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
-        return np.concatenate([finger1, finger2])
+        return np.concatenate([finger1, finger2], dtype=np.float32)
     
     def get_gripper_qvel(self) -> np.ndarray:
         qvel_dict = self.query_joint_qvel([self.joint("finger_joint1"), self.joint("finger_joint2")])
         finger1 = qvel_dict[self.joint("finger_joint1")]
         finger2 = qvel_dict[self.joint("finger_joint2")]
-        return np.concatenate([finger1, finger2])
+        return np.concatenate([finger1, finger2], dtype=np.float32)
     
     def get_arm_joint_values(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos(self._arm_joint_names)
