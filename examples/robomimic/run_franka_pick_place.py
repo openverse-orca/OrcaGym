@@ -16,6 +16,7 @@ from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
+from envs.franka_control.franka_pick_place_env import FrankaPickPlaceEnv
 
 import numpy as np
 import argparse
@@ -43,7 +44,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
     )
     return env_id, kwargs
 
-def run_episode(env, dataset_writer):
+def run_episode(env : FrankaPickPlaceEnv, dataset_writer):
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
@@ -99,8 +100,7 @@ def do_teleoperation(env, dataset_writer):
                 'obs': obs_list
             })
 
-def playback_episode(env, action_list, done_list):
-    obs, info = env.reset(seed=42)
+def playback_episode(env : FrankaPickPlaceEnv, action_list, done_list):
     for i in range(len(action_list)):
         start_time = datetime.now()
 
@@ -123,15 +123,25 @@ def playback_episode(env, action_list, done_list):
     
     print("Episode tunkated!")
 
-def do_playback(env, dataset_reader : DatasetReader):
+def reset_playback_env(env : FrankaPickPlaceEnv, demo_data):
+    obs, info = env.reset(seed=42)
+    
+    object_data = demo_data['obs']['object']
+    obj_xpos = object_data[0][0:3]
+    obj_xquat = object_data[0][3:7]
+    print("Resetting object position: ", obj_xpos, obj_xquat)
+    env.unwrapped.replace_object(obj_xpos, obj_xquat)
+    
+def do_playback(env : FrankaPickPlaceEnv, dataset_reader : DatasetReader):
     demo_names = dataset_reader.get_demo_names()
     for demo_name in demo_names:
         demo_data = dataset_reader.get_demo(demo_name)
         action_list = demo_data['actions']
         done_list = demo_data['dones']
         print("Playing back episode: ", demo_name, " with ", len(action_list), " steps.")
-        for i, action in enumerate(action_list):
-            print(f"Playback Action ({i}): ", action)
+        # for i, action in enumerate(action_list):
+        #     print(f"Playback Action ({i}): ", action)
+        reset_playback_env(env, demo_data)
         playback_episode(env, action_list, done_list)
         time.sleep(1)
 
@@ -149,7 +159,6 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
 
             env = gym.make(env_id)
             print("Starting simulation...")
-
             do_playback(env, dataset_reader)
 
         elif run_mode == RunMode.TELEOPERATION:

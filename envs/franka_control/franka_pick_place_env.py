@@ -373,6 +373,11 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {}
+    
+    def replace_object(self, obj_xpos, obj_xquat) -> None:
+        self.set_object_qpos(obj_xpos, obj_xquat)
+        self.goal = self._sample_goal(obj_xpos)
+        self.mj_forward()
 
     # custom methods
     # -----------------------------
