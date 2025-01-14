@@ -6,11 +6,12 @@ import numpy as np
 
 
 
-current_file_path = os.path.abspath('./')
+current_file_path = os.path.abspath('./../../')
 
 if current_file_path not in sys.path:
     print("add path: ", current_file_path)
     sys.path.append(current_file_path)
+    
 from orca_gym.robomimic.dataset_util import DatasetWriter
 from orca_gym.sensor.rgbd_camera import CameraWrapper
 
@@ -30,7 +31,7 @@ def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
         kwargs={'frame_skip': 1,   
                 'reward_type': "dense",
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': [], 
+                'agent_names': ["AzureLoong"], 
                 'time_step': TIME_STEP,
                 'control_freq': control_freq},
         max_episode_steps=sys.maxsize,

@@ -69,6 +69,24 @@ def quat_angular_velocity(q1, q2, dt):
         angle = 2 * math.pi - angle
     return angle / dt
 
+import math
+
+def smooth_sqr_wave_np(phase, phase_freq, eps):
+    """
+    生成一个平滑的方波信号。
+
+    参数:
+    - phase: 当前相位（0到1之间的值，标量）。
+    - phase_freq: 相位频率，用于调整信号的周期（标量）。
+    - eps: 一个小值，用于防止分母为零（标量）。
+
+    返回:
+    - 平滑的方波信号，值介于0和1之间（标量）。
+    """
+    p = 2.0 * np.pi * phase * phase_freq
+    numerator = np.sin(p)
+    denominator = 2.0 * np.sqrt(np.sin(p)**2 + eps**2)
+    return numerator / denominator + 0.5
 
 class LeggedRobot(OrcaGymAgent):
     def __init__(self, 
@@ -116,6 +134,8 @@ class LeggedRobot(OrcaGymAgent):
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
         self._foot_touch_force_step_threshold = robot_config["foot_touch_force_step_threshold"]
         self._foot_touch_air_time_ideal = robot_config["foot_touch_air_time_ideal"]
+        self._foot_square_wave = robot_config["foot_square_wave"]
+        self._phase = 0.0
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
@@ -238,12 +258,16 @@ class LeggedRobot(OrcaGymAgent):
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
+        self._phase = np.fmod(self._phase + self.dt, 1.0)
+        square_wave = self._compute_square_wave()
+
         obs = np.concatenate(
                 [
                     self._body_lin_vel,
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
+                    np.array([square_wave]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
@@ -752,7 +776,7 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        if self._np_random.random() > 0.8:            
+        if self._np_random.random() < 0.8:            
             # Forward
             lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
                                 self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
@@ -836,6 +860,7 @@ class LeggedRobot(OrcaGymAgent):
         scale_ang_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["ang_vel"]
         scale_orientation = np.array([1, 1, 1])  # No scaling on the orientation
         scale_command = np.array([LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["ang_vel"]])
+        scale_square_wave = np.ones(1)  # No scaling on the square wave
         scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
         scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
@@ -845,6 +870,7 @@ class LeggedRobot(OrcaGymAgent):
                                     scale_ang_vel, 
                                     scale_orientation, 
                                     scale_command, 
+                                    scale_square_wave,
                                     scale_leg_joint_qpos, 
                                     scale_leg_joint_qvel, 
                                     scale_action, 
@@ -867,6 +893,7 @@ class LeggedRobot(OrcaGymAgent):
         noise_ang_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["ang_vel"] * LeggedObsConfig["scale"]["ang_vel"]
         noise_orientation = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["orientation"]
         noise_command = np.zeros(4)  # No noise on the command
+        noise_square_wave = np.zeros(1)  # No noise on the square wave
         noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * LeggedObsConfig["scale"]["qpos"]
         noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * LeggedObsConfig["scale"]["qvel"]
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
@@ -876,6 +903,7 @@ class LeggedRobot(OrcaGymAgent):
                                     noise_ang_vel, 
                                     noise_orientation, 
                                     noise_command, 
+                                    noise_square_wave,
                                     noise_leg_joint_qpos, 
                                     noise_leg_joint_qvel, 
                                     noise_action, 
@@ -957,16 +985,8 @@ class LeggedRobot(OrcaGymAgent):
         return rating
     
     def update_curriculum_level(self, qpos_buffer : np.ndarray) -> None:    
-        if not self._curriculum_learning:
+        if not self._curriculum_learning or self._player_control:
             return
-        
-        # 玩家控制，手动升级
-        if self._player_control:
-            if self._current_level == len(self._curriculum_levels) - 1:
-                self._current_level = 0
-            else:
-                self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
-            
             
         ratings = [curriculum_function["function"](curriculum_function["coeff"]) for curriculum_function in self._curriculum_functions]
         mean_rating = np.mean(ratings)
@@ -1028,3 +1048,23 @@ class LeggedRobot(OrcaGymAgent):
         self._reset_commands_config(0)
         command_type = self._curriculum_levels[0]["command_type"]
         self._command_resample_interval = self._curriculum_commands[command_type]["command_resample_interval"]              
+
+    def _compute_square_wave(self):
+        """
+        计算 square_wave 信号，条件不满足时使用平滑方波。
+
+        参数:
+        - time_to_stand_still: 当前时间到静止的时间（标量）。
+        - static_delay: 静止延迟时间（标量）。
+        - p5: 当条件满足时的常数值（标量）。
+        - phase: 当前相位（0到1之间的值，标量）。
+        - phase_freq: 相位频率，用于调整信号的周期（标量）。
+        - eps: 平滑方波的 epsilon 值（标量）。
+
+        返回:
+        - square_wave 信号（标量）。
+        """
+        if self._command["lin_vel"][0] == 0.0:
+            return self._foot_square_wave["p5"]
+        else:
+            return smooth_sqr_wave_np(self._phase, self._foot_square_wave["phase_freq"], self._foot_square_wave["eps"])

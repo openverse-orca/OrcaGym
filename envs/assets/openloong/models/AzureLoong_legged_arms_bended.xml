@@ -14,6 +14,9 @@
             <geom contype="1" conaffinity="1" friction="1.0 0.3 0.3" 
                 margin="0.001" group="0" euler="1.57 0 0" />
         </default>
+        <default class="foot">
+          <geom type="ellipsoid" friction="1 0.005 0.0001" priority="1" solref="0.02 1" solimp="0.9 0.4 0.01" margin="0.01" gap="0.001"/>
+        </default>
         <joint damping="0.1" frictionloss="0.02" armature="0.01"/>
     </default>
   <asset>
@@ -113,7 +116,7 @@
           <!-- <joint name="J_arm_r_03" pos="0 0 0" axis="0 -1 0" limited="true" range="-2.96706 2.96706"/> -->
           <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_arm_r_03"/>
           <geom type="mesh" group="3" mesh="Link_arm_r_03"/>
-          <body name="Link_arm_r_04" pos="0.0353 -0.1774 0.024" euler="-1.8 0 0">
+          <body name="Link_arm_r_04" pos="0.0353 -0.1774 0.024" euler="-1.0 0 0">
             <inertial pos="-0.038727 -0.060767 -0.021003" quat="0.327701 0.632603 -0.467367 0.523444" mass="0.6" diaginertia="0.00109261 0.000712422 0.000645102"/>
             <!-- <joint name="J_arm_r_04" pos="0 0 0" axis="-1 0 0" limited="true" range="0 2.96706"/> -->
             <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_arm_r_04"/>
@@ -155,7 +158,7 @@
                <!-- <joint name="J_arm_l_03" pos="0 0 0" axis="0 1 0" limited="true" range="-2.96706 2.96706"/> -->
                <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_arm_l_03"/>
                <geom type="mesh" group="3" mesh="Link_arm_l_03"/>
-               <body name="Link_arm_l_04" pos="-0.0353 0.1774 0.024" euler="1.8 0 0">
+               <body name="Link_arm_l_04" pos="-0.0353 0.1774 0.024" euler="1.0 0 0">
                    <inertial pos="0.038727 0.0607672 -0.0210032" quat="0.521173 0.498883 -0.604241 0.338212" mass="0.6" diaginertia="0.00109314 0.000708454 0.000648497"/>
                    <!-- <joint name="J_arm_l_04" pos="0 0 0" axis="1 0 0" limited="true" range="0 2.96706"/> -->
                    <geom type="mesh" contype="0" conaffinity="0" group="1" material="pbr_metal_gray" density="0" mesh="Link_arm_l_04"/>
@@ -227,10 +230,10 @@
                       <!-- <joint name="J_ankle_r_roll" pos="0 0 0" axis="1 0 0" limited="true" range="-0.43633 0.43633"/> -->
                       <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" mesh="Link_ankle_r_roll"/>
                       <!--geom type="mesh" rgba="0.89804 0.91765 0 .92941 1" mesh="Link_ankle_r_roll"/-->
-                      <geom type="box" group="3" rgba="1 0 0 0" pos="0.10750461363863139 8.266688098764184e-05 -0.02654531035541249" size="0.0625  0.0400  0.0435 "  />
-                      <site name="rf-tc-front" type="box" group="3" size="0.063  0.041   0.044" pos="0.10750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
-                      <geom type="box" group="3" rgba="1 0 0 0" pos="-0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" size="0.0325  0.0400  0.0435 "  />
-                      <site name="rf-tc-back" type="box" group="3" size="0.033  0.041   0.044" pos="-0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
+                      <geom group="3" class="foot" pos="0.10750461363863139 8.266688098764184e-05 -0.05654531035541249" size="0.0625  0.0600  0.02 "  />
+                      <site name="rf-tc-front" type="box" group="3" size="0.063  0.061   0.044" pos="0.10750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
+                      <geom group="3" class="foot"  pos="-0.04750461363863139 8.266688098764184e-05 -0.05654531035541249" size="0.0325  0.0600  0.02 "  />
+                      <site name="rf-tc-back" type="box" group="3" size="0.033  0.061   0.044" pos="-0.04750461363863139 8.266688098764184e-05 -0.02654531035541249" rgba="0 1 0 0" />
                     </body>
                   </body>
                 </body>
@@ -267,10 +270,10 @@
                       <!-- <joint name="J_ankle_l_roll" pos="0 0 0" axis="1 0 0" limited="true" range="-0.43633 0.43633"/> -->
                       <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" mesh="Link_ankle_l_roll"/>
                       <!--geom type="mesh" rgba="0.89804 0.91765 0.92941 1" mesh="Link_ankle_l_roll"/-->
-                      <geom type="box" group="3" pos="0.10749999940395355 0.0012208642475975968 -0.02722398766749333" rgba="1 0 0 0"  size="0.0625 0.0402  0.0442 "/>
-                      <site name="lf-tc-front" type="box" group="3" size="0.063 0.041  0.045"  pos="0.10749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
-                      <geom type="box" group="3" pos="-0.04749999940395355 0.0012208642475975968 -0.02722398766749333" rgba="1 0 0 0"  size="0.0325 0.0402  0.0442 "/>
-                      <site name="lf-tc-back" type="box" group="3" size="0.033 0.041  0.045"  pos="-0.04749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
+                      <geom group="3" class="foot" pos="0.10749999940395355 0.0012208642475975968 -0.05722398766749333"  size="0.0625 0.0602  0.02 "/>
+                      <site name="lf-tc-front" type="box" group="3" size="0.063 0.061  0.045"  pos="0.10749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
+                      <geom group="3" class="foot" pos="-0.04749999940395355 0.0012208642475975968 -0.05722398766749333" size="0.0325 0.0602  0.02 "/>
+                      <site name="lf-tc-back" type="box" group="3" size="0.033 0.061  0.045"  pos="-0.04749999940395355 0.0012208642475975968 -0.02722398766749333"  rgba="0 1 0 0" />
                     </body>
                   </body>
                 </body>

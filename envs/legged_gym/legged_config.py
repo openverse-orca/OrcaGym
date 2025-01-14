@@ -98,7 +98,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",    
+                                        "terrain_brics_usda_terrain",                                     
                                         ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
@@ -113,7 +114,7 @@ LeggedRobotConfig = {
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
-            "failure" : 100,
+            "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 0.1,
@@ -129,12 +130,12 @@ LeggedRobotConfig = {
             "body_ang_vel" : 0.05,
             "body_orientation" : 0,
             "feet_air_time" : 1,
-            "feet_self_contact" : 1,
-            "feet_slip" : 0.5,
+            "feet_self_contact" : 0,
+            "feet_slip" : 0.05,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.1,
-            "fly" : 1,
-            "stepping" : 1,            
+            "fly" : 0.1,
+            "stepping" : 0.1,            
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -256,7 +257,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",           
+                                        "terrain_brics_usda_terrain",                              
                                         ],
         
         "base_contact_body_names" : ["trunk_link", "fl_abad", "fr_abad", "hl_abad", "hr_abad"],
@@ -389,12 +391,12 @@ LeggedRobotConfig = {
                                   "J_hip_r_roll": -0.1, 
                                 #   "J_hip_r_yaw": 0.2, 
                                   "J_hip_r_pitch": 0.5, "J_knee_r_pitch": -1.1, 
-                                  "J_ankle_r_pitch": 0.7, 
+                                  "J_ankle_r_pitch": 0.605, 
                                 #   "J_ankle_r_roll": 0.1,
                                   "J_hip_l_roll": 0.1, 
                                 #   "J_hip_l_yaw": -0.2, 
                                   "J_hip_l_pitch": 0.5, "J_knee_l_pitch": -1.1, 
-                                  "J_ankle_l_pitch": 0.7, 
+                                  "J_ankle_l_pitch": 0.605, 
                                 #   "J_ankle_l_roll": -0.1,
                                   },
         
@@ -436,7 +438,8 @@ LeggedRobotConfig = {
                                         "terrain_perlin_smooth_slope_usda_terrain",
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",                                        
+                                        "terrain_stair_high_usda_terrain",    
+                                        "terrain_brics_usda_terrain",                                    
                                         ],
         
         "base_contact_body_names" : ["base_link", 
@@ -477,8 +480,8 @@ LeggedRobotConfig = {
             "feet_slip" : 0.5,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 1.0,
-            "fly" : 5,
-            "stepping" : 5,
+            "fly" : 5.0,
+            "stepping" : 1.0,
         },
 
         # Config from gymloong
@@ -486,7 +489,11 @@ LeggedRobotConfig = {
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.5,  
-        
+        "foot_square_wave" : {
+            "p5" :          0.5,
+            "phase_freq" :  1.0,
+            "eps" :         0.2,
+        },
 
         # Config for randomization
         "randomize_friction" :      True,
@@ -505,16 +512,17 @@ LeggedRobotConfig = {
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.3, 1.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate

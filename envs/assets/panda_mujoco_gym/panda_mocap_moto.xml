@@ -81,6 +81,15 @@
       <roughness  texture="Plastic010_roughness"/>      
       </material>
 
+      <texture type="2d" name="wood_texture" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
+      <texture type="2d" name="oak_veneer"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
+      <material name="oak_wood_material">
+        <rgb texture="oak_veneer"/>
+      </material>
+      <material name="wood_table_worn_material">
+        <rgb texture="wood_texture"/>
+      </material>
+
       <!-- Collision meshes -->
       <mesh name="link0_c" file="link0.stl"/>
       <mesh name="link1_c" file="link1.stl"/>

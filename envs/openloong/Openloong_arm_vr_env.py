@@ -374,8 +374,8 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         mocap_neck_xpos, mocap_neck_xquat = self._mocap_neck_xpos, self._mocap_neck_xquat
 
         # 将 x_axis 和 y_axis 输入转换为旋转角度，按需要调节比例系数
-        angle_x = x_axis * np.pi / 180  # 转换为弧度，模拟绕 X 轴的旋转
-        angle_y = y_axis * np.pi / 180  # 转换为弧度，模拟绕 Y 轴的旋转
+        angle_x = -x_axis * np.pi / 180  # 转换为弧度，模拟绕 X 轴的旋转
+        angle_y = -y_axis * np.pi / 180  # 转换为弧度，模拟绕 Y 轴的旋转
 
         # 设置旋转角度的限制
         self._neck_angle_x += angle_x
@@ -388,17 +388,10 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             self._neck_angle_y = np.clip(self._neck_angle_y, -np.pi / 3, np.pi / 3)
             angle_y = 0
 
-        # 创建绕 X 轴和 Y 轴的旋转四元数 (局部坐标系旋转)
-        rotation_x = R.from_euler('x', angle_x).as_quat()  # 绕 X 轴的旋转
-        rotation_y = R.from_euler('y', angle_y).as_quat()  # 绕 Y 轴的旋转
-
-        # 将初始的局部旋转四元数应用到增量旋转中，形成局部旋转的总四元数
-        initial_neck_quat = R.from_quat(self._initial_neck_site_xquat)
-        local_rotation = R.from_quat(rotation_x) * R.from_quat(rotation_y)
-        new_neck_quat_local = initial_neck_quat * local_rotation  # 在局部坐标系应用旋转
+        new_neck_quat_local = rotations.euler2quat(np.array([0.0, angle_y, angle_x]))
 
         # 将局部坐标系的旋转转换为全局坐标系，乘以当前全局旋转四元数
-        new_neck_quat_global = (R.from_quat(mocap_neck_xquat) * new_neck_quat_local).as_quat()
+        new_neck_quat_global = rotations.quat_mul(mocap_neck_xquat, new_neck_quat_local)
 
         # 将新的全局旋转四元数转换为轴角表示
         mocap_neck_axisangle = transform_utils.quat2axisangle(np.array([new_neck_quat_global[1], 
@@ -412,8 +405,8 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         # 将动作信息打包并发送到控制器
         action_neck = np.concatenate([mocap_neck_xpos, mocap_neck_axisangle])
 
-        # 更新 _mocap_neck_xquat 为新的全局旋转值
-        self._mocap_neck_xquat = new_neck_quat_global.copy()
+        # # 更新 _mocap_neck_xquat 为新的全局旋转值
+        self._mocap_neck_xquat = new_neck_quat_global
 
         self._neck_controller.set_goal(action_neck)
         ctrl = self._neck_controller.run_controller()
@@ -430,8 +423,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
             self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["leftHand"]["primaryButtonPressed"]:
-            self._l_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
+            self._l_gripper_offset_rate_clip = 0
 
         # Press trigger to close gripper
         # Adjust sensitivity using an exponential function
@@ -462,8 +454,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
             self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
             self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["rightHand"]["primaryButtonPressed"]:
-            self._r_gripper_offset_rate_clip += offset_rate_clip_adjust_rate * self.dt
-            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
+            self._r_gripper_offset_rate_clip = 0
 
         # Adjust sensitivity using an exponential function
         trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
@@ -597,14 +588,14 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
 
 
-        achieved_goal = np.zeros(3)
+        achieved_goal = np.zeros(3, dtype=np.float32)
         desired_goal = self.goal.copy()
         obs = np.concatenate(
                 [
                     ee_position,
                     ee_velocity,
                     np.zeros(1),
-                ]).copy()            
+                ], dtype=np.float32).copy()            
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
@@ -661,7 +652,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
 
     def _sample_goal(self) -> np.ndarray:
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
-        goal = np.array([0, 0, 0])
+        goal = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         return goal
 
 
