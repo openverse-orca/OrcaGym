@@ -66,6 +66,13 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         self._ctrl_range_max = self._ctrl_range[:, 1]
         print("ctrl range: ", self._ctrl_range)
 
+        # action range: [x, y, z, yaw, pitch, roll, finger1, finger2]
+        self._action_range = np.array([[-3.0, 3.0], [-3.0, 3.0], [-3.0, 3.0],
+                                 [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi],
+                                 self._ctrl_range[7], self._ctrl_range[8]], dtype=np.float32)
+        self._action_range_min = self._action_range[:, 0]
+        self._action_range_max = self._action_range[:, 1]
+
         # index used to distinguish arm and gripper joints
         self._arm_joint_names = [self.joint("joint1"), self.joint("joint2"), self.joint("joint3"), self.joint("joint4"), self.joint("joint5"), self.joint("joint6"), self.joint("joint7")]
         self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
@@ -130,10 +137,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
 
     def _set_action_space(self):
-        # action range: [x, y, z, yaw, pitch, roll]
-        action_range = np.array([[-3.0, 3.0], [-3.0, 3.0], [-3.0, 3.0]
-                                 [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi], [-2 * np.pi, 2 * np.pi]], dtype=np.float32)
-        self.action_space = self.generate_action_space(action_range)
+        self.action_space = self.generate_action_space(self._action_range)
 
     def _reset_grasp_mocap(self) -> None:
         self._saved_xpos = self._initial_grasp_site_xpos.copy()
@@ -167,9 +171,13 @@ class FrankaPickPlaceEnv(RobomimicEnv):
     
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
-            ctrl, teleop_action = self._teleoperation_action()
+            ctrl, noscaled_action = self._teleoperation_action()
+            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
+            print("no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
-            ctrl = self.denormalize_action(action, self._ctrl_range_min, self._ctrl_range_max)
+            scaled_action = action
+            noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
+            ctrl = self._playback_action(noscaled_action)
         else:
             raise ValueError("Invalid run mode")
         
@@ -181,10 +189,8 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         achieved_goal = self._get_achieved_goal()
         desired_goal = self._get_desired_goal()
 
-        # normalize the action space for recording
-        normalized_action = self.normalize_action(ctrl, self._ctrl_range_min, self._ctrl_range_max)
 
-        info = {"state": self.get_state(), "action": normalized_action}
+        info = {"state": self.get_state(), "action": scaled_action}
         terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
@@ -237,19 +243,21 @@ class FrankaPickPlaceEnv(RobomimicEnv):
                                                                    mocap_xquat[3], 
                                                                    mocap_xquat[0]]))
         # mocap_axisangle[1] = -mocap_axisangle[1]
-        action = np.concatenate([mocap_xpos, mocap_axisangle])
+        arm_action = np.concatenate([mocap_xpos, mocap_axisangle])
         # print("action:", action)
-        self._controller.set_goal(action)
+        self._controller.set_goal(arm_action)
         
         self.ctrl[0:7] = self._controller.run_controller()
+        action = np.concatenate([arm_action, self.ctrl[7:9]]).flatten()
         
-        return self.ctrl.copy(), action.copy()
+        return self.ctrl.copy(), action
     
     def _playback_action(self, action) -> np.ndarray:
-        assert(len(action) == 6)
+        assert(len(action) == self.action_space.shape[0])
         
         self._controller.set_goal(action)
-        self.ctrl[0:7] = self._controller.run_controller()        
+        self.ctrl[0:7] = self._controller.run_controller()      
+        self.ctrl[7:9] = action[6:8]
         
         return self.ctrl.copy()
 

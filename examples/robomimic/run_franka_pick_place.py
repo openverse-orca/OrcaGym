@@ -131,8 +131,7 @@ def do_playback(env, dataset_reader : DatasetReader):
         done_list = demo_data['dones']
         print("Playing back episode: ", demo_name, " with ", len(action_list), " steps.")
         for i, action in enumerate(action_list):
-            print(f"action ({i}): ", action)
-        exit()
+            print(f"Playback Action ({i}): ", action)
         playback_episode(env, action_list, done_list)
         time.sleep(1)
 
