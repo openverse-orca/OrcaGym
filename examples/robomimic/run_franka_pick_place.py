@@ -181,11 +181,20 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
                                         env_kwargs=kwargs)
 
             do_teleoperation(env, dataset_writer)
-            # 将前 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
+            # 将 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
             demo_names = dataset_writer.get_demo_names()
-            print("Demo names: ", demo_names)
-            dataset_writer.add_filter_key("train", demo_names[:int(0.8 * len(demo_names))])
-            dataset_writer.add_filter_key("valid", demo_names[int(0.8 * len(demo_names)):])
+            train_demos = []
+            valid_demos = []
+            for demo_name in demo_names:
+                if np.random.rand() < 0.8:
+                    train_demos.append(demo_name)
+                    print("Demo name: ", demo_name, " added to train.")
+                else:
+                    valid_demos.append(demo_name)
+                    print("Demo name: ", demo_name, " added to valid.")
+                    
+            dataset_writer.add_filter_key("train", train_demos)
+            dataset_writer.add_filter_key("valid", valid_demos)
             dataset_writer.finalize()
             
         elif run_mode == RunMode.IMITATION:

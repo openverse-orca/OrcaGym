@@ -291,7 +291,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
 
         # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
-        CTRL_MIN = 0.10000000
+        CTRL_MIN = 0.20000000
         if np.linalg.norm(pos_ctrl) < CTRL_MIN and np.linalg.norm(rot_ctrl) < CTRL_MIN:
             return mocap_xpos, mocap_xquat
 

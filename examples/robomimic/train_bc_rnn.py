@@ -62,8 +62,8 @@ def orca_gym_hyperparameters(config):
 
     ## evaluation rollout config ##
     config.experiment.rollout.enabled = True                    # enable evaluation rollouts
-    config.experiment.rollout.n = 50                            # number of rollouts per evaluation
-    config.experiment.rollout.horizon = 500                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
+    config.experiment.rollout.n = 5                            # number of rollouts per evaluation
+    config.experiment.rollout.horizon = 2000                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
     config.experiment.rollout.rate = 50                         # do rollouts every @rate epochs
     config.experiment.rollout.warmstart = 0                     # number of epochs to wait before starting rollouts
     config.experiment.rollout.terminate_on_success = True       # end rollout early after task success
@@ -112,22 +112,17 @@ def orca_gym_hyperparameters(config):
 
     ### Observation Config ###
     config.observation.modalities.obs.low_dim = [               # specify low-dim observations for agent
-        # "robot0_eef_pos",
-        # "robot0_eef_quat",
-        # "robot0_gripper_qpos",
-        # "object",
-    
         "object",
         "ee_pos",
         "ee_quat",
-        "ee_vel_linear",
-        "ee_vel_angular",
-        "joint_qpos",
-        "joint_qpos_sin",
-        "joint_qpos_cos",
-        "joint_vel",
+        # "ee_vel_linear",
+        # "ee_vel_angular",
+        # "joint_qpos",
+        # "joint_qpos_sin",
+        # "joint_qpos_cos",
+        # "joint_vel",
         "gripper_qpos",
-        "gripper_qvel",        
+        # "gripper_qvel",        
     ]
     config.observation.modalities.obs.rgb = []                # no image observations
     config.observation.modalities.goal.low_dim = []             # no low-dim goals
