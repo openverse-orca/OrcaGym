@@ -12,8 +12,8 @@ if current_file_path not in sys.path:
     print("add path: ", current_file_path)
     sys.path.append(current_file_path)
     
-from envs.robomimic.dataset_util import DatasetWriter
-from envs.openloong.camera_wrapper import CameraWrapper
+from orca_gym.robomimic.dataset_util import DatasetWriter
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 import gymnasium as gym
 from gymnasium.envs.registration import register
