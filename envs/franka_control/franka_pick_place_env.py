@@ -188,7 +188,6 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
             scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-            # print("no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
@@ -196,7 +195,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         else:
             raise ValueError("Invalid run mode")
         
-        # print("ctrl: ", ctrl)
+        # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
@@ -374,6 +373,9 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         """
         Reset the environment, return observation
         """
+        
+        print("Reset model")
+        
         self._set_init_state()
         self._reset_grasp_mocap()
 

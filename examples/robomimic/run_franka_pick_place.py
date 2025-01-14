@@ -174,6 +174,7 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
 
             env = gym.make(env_id)        
             print("Starting simulation...")
+            kwargs["run_mode"] = RunMode.IMITATION  # 此处用于训练的时候读取
             dataset_writer = DatasetWriter(file_path=record_file_path,
                                         env_name=env_id,
                                         env_version=env.unwrapped.get_env_version(),
