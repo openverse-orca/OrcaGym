@@ -16,6 +16,20 @@ if project_root not in sys.path:
 from envs.legged_gym.legged_config import LeggedEnvConfig
 import orca_gym.scripts.multi_agent_rl as rl
 
+def _create_tmp_dir(dir_name):
+    # 获取当前工作目录
+    current_dir = os.getcwd()
+
+    # 设置要检查的目录路径
+    dir_path = os.path.join(current_dir, dir_name)
+
+    # 检查目录是否存在，如果不存在则创建
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        print(f"目录 '{dir_path}' 已创建。")
+    else:
+        print(f"目录 '{dir_path}' 已存在。")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
@@ -64,14 +78,15 @@ if __name__ == "__main__":
 
     total_timesteps = training_episode * subenv_num * agent_num * max_episode_steps
 
+    _create_tmp_dir("trained_models_tmp")
+
     if args.model_file is not None:
         model_file = args.model_file
     elif run_mode == "training" and not load_existing_model:
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_file = f"{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
+        model_file = f"./trained_models_tmp/{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
     else:
         raise ValueError("Invalid model file! Please provide a model file for testing, or set `load_existing_model` to False for training")
-
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)

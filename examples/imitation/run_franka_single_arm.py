@@ -16,13 +16,11 @@ from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
-from envs.franka_control.franka_pick_place_env import FrankaPickPlaceEnv
-from examples.robomimic.train_bc_rnn import run_train_bc_rnn
+from envs.imitation.franka_env import FrankaEnv
+from examples.imitation.train_bc_rnn import run_train_bc_rnn
 
 import numpy as np
 import argparse
-
-
 
 def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, ctrl_device : str, max_episode_steps) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
@@ -38,14 +36,14 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
                 'control_freq': 20}           
     gym.register(
         id=env_id,
-        entry_point="envs.franka_control.franka_pick_place_env:FrankaPickPlaceEnv",
+        entry_point="envs.franka_control.franka_pick_place_env:FrankaEnv",
         kwargs=kwargs,
         max_episode_steps= max_episode_steps,  # 10 seconds
         reward_threshold=0.0,
     )
     return env_id, kwargs
 
-def run_episode(env : FrankaPickPlaceEnv, dataset_writer):
+def run_episode(env : FrankaEnv, dataset_writer):
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
@@ -105,7 +103,7 @@ def do_teleoperation(env, dataset_writer):
         if exit_program:
             break
 
-def playback_episode(env : FrankaPickPlaceEnv, action_list, done_list):
+def playback_episode(env : FrankaEnv, action_list, done_list):
     for i in range(len(action_list)):
         start_time = datetime.now()
 
@@ -128,7 +126,7 @@ def playback_episode(env : FrankaPickPlaceEnv, action_list, done_list):
     
     print("Episode tunkated!")
 
-def reset_playback_env(env : FrankaPickPlaceEnv, demo_data):
+def reset_playback_env(env : FrankaEnv, demo_data):
     obs, info = env.reset(seed=42)
     
     object_data = demo_data['obs']['object']
@@ -137,7 +135,7 @@ def reset_playback_env(env : FrankaPickPlaceEnv, demo_data):
     # print("Resetting object position: ", obj_xpos, obj_xquat)
     env.unwrapped.replace_object(obj_xpos, obj_xquat)
     
-def do_playback(env : FrankaPickPlaceEnv, dataset_reader : DatasetReader):
+def do_playback(env : FrankaEnv, dataset_reader : DatasetReader):
     demo_names = dataset_reader.get_demo_names()
     for demo_name in demo_names:
         demo_data = dataset_reader.get_demo(demo_name)

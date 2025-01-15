@@ -13,7 +13,7 @@ from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
 
 
-class FrankaPickPlaceEnv(RobomimicEnv):
+class FrankaEnv(RobomimicEnv):
     """
     通过遥操作控制franka机械臂
     """
@@ -145,7 +145,7 @@ class FrankaPickPlaceEnv(RobomimicEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
     def get_env_version(self):
-        return FrankaPickPlaceEnv.ENV_VERSION
+        return FrankaEnv.ENV_VERSION
 
     def check_success(self):
         """
