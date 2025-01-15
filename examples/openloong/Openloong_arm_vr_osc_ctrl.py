@@ -77,7 +77,7 @@ def continue_training(env):
                 camera_frames[camera.name] = camera.get_frame()
 
         # Save data to .h5 using DatasetWriter
-        dataset_writer.add_demo({
+        dataset_writer.add_demo_data({
             'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
             'actions': info["action"],
             'obs': observation,

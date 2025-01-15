@@ -1,2 +1,4 @@
 # model files
-train_temp_dir*/
+trained_models_tmp/
+records_tmp/
+processed_datasets_tmp/

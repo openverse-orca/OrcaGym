@@ -155,7 +155,7 @@ class RobomimicEnv(OrcaGymLocalEnv):
         :return: 归一化后的动作值
         """
         normalized_action = 2 * (action - min_action) / (max_action - min_action) - 1
-        return normalized_action
+        return np.clip(normalized_action, -1.0, 1.0)
 
     def denormalize_action(self, normalized_action, min_action, max_action):
         """

@@ -18,6 +18,7 @@ from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 from envs.imitation.franka_env import FrankaEnv
 from examples.imitation.train_bc_rnn import run_train_bc_rnn
+from orca_gym.utils.dir_utils import create_tmp_dir
 
 import numpy as np
 import argparse
@@ -36,7 +37,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
                 'control_freq': 20}           
     gym.register(
         id=env_id,
-        entry_point="envs.franka_control.franka_pick_place_env:FrankaEnv",
+        entry_point="envs.imitation.franka_env:FrankaEnv",
         kwargs=kwargs,
         max_episode_steps= max_episode_steps,  # 10 seconds
         reward_threshold=0.0,
@@ -77,7 +78,7 @@ def run_episode(env : FrankaEnv, dataset_writer):
 
 def user_comfirm_save_record(task_result):
     while True:
-        user_input = input(f"Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(exit): ")
+        user_input = input(f"Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(ignore & exit): ")
         if user_input == 'y':
             return True, False
         elif user_input == 'n':
@@ -138,7 +139,7 @@ def reset_playback_env(env : FrankaEnv, demo_data):
 def do_playback(env : FrankaEnv, dataset_reader : DatasetReader):
     demo_names = dataset_reader.get_demo_names()
     for demo_name in demo_names:
-        demo_data = dataset_reader.get_demo(demo_name)
+        demo_data = dataset_reader.get_demo_data(demo_name)
         action_list = demo_data['actions']
         done_list = demo_data['dones']
         print("Playing back episode: ", demo_name, " with ", len(action_list), " steps.")
@@ -179,20 +180,7 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
                                         env_kwargs=kwargs)
 
             do_teleoperation(env, dataset_writer)
-            # 将 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
-            demo_names = dataset_writer.get_demo_names()
-            train_demos = []
-            valid_demos = []
-            for demo_name in demo_names:
-                if np.random.rand() < 0.8:
-                    train_demos.append(demo_name)
-                    print("Demo name: ", demo_name, " added to train.")
-                else:
-                    valid_demos.append(demo_name)
-                    print("Demo name: ", demo_name, " added to valid.")
-                    
-            dataset_writer.add_filter_key("train", train_demos)
-            dataset_writer.add_filter_key("valid", valid_demos)
+            dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
         elif run_mode == RunMode.IMITATION:
@@ -208,7 +196,7 @@ def run_example(orcagym_addr : str, agent_name : str, record_file_path : str, ru
             
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            output_dir = f"{current_file_path}/train_temp_dir_{formatted_now}"
+            output_dir = f"{current_file_path}/trained_models_tmp/train_temp_dir_{formatted_now}"
             run_train_bc_rnn(dataset_type="orca_gym", dataset=record_file_path, output=output_dir, debug=False)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -234,12 +222,15 @@ if __name__ == "__main__":
     record_time = args.record_time
     record_file_path = args.record_file_path
     
+    create_tmp_dir("records_tmp")
+    create_tmp_dir("trained_models_tmp")
+    
     if args.run_mode == 'teleoperation':
         run_mode = RunMode.TELEOPERATION
         if record_file_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_file_path = f"teleoperation_dataset_{formatted_now}.hdf5"
+            record_file_path = f"./records_tmp/franka_singel_arm_{formatted_now}.hdf5"
     elif args.run_mode == 'imitation':
         run_mode = RunMode.IMITATION
     elif args.run_mode == 'playback':

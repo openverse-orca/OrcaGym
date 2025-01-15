@@ -38,7 +38,7 @@ class DatasetWriter:
 
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
 
-    def add_demo(self, demo_data, model_file=None):
+    def add_demo_data(self, demo_data, model_file=None):
         """
         添加一个新的演示（trajectory）。
 
@@ -62,7 +62,7 @@ class DatasetWriter:
             demo_count = data_group.attrs['demo_count']
             total_samples = data_group.attrs['total']
 
-            demo_name = f'demo_{demo_count:03d}'
+            demo_name = f'demo_{demo_count:05d}'   # 保存10万个演示
             demo_group = data_group.create_group(demo_name)
             num_samples = demo_data['actions'].shape[0]
             demo_group.attrs['num_samples'] = num_samples
@@ -130,14 +130,42 @@ class DatasetWriter:
             if filter_key_name in mask_group:
                 del mask_group[filter_key_name]
             mask_group.create_dataset(filter_key_name, data=demo_names_bytes)
-            print("Added filter key:", filter_key_name)
+            print("Added filter key:", filter_key_name, "with", len(demo_names), "demos.")
+            
+    def remove_filter_key(self, filter_key_name):
+        with h5py.File(self.file_path, 'r+') as f:
+            mask_group = f['mask']
+            if filter_key_name in mask_group:
+                del mask_group[filter_key_name]
+                print("Removed filter key:", filter_key_name)
 
     def get_demo_names(self):
         with h5py.File(self.file_path, 'r') as f:
             data_group = f['data']
             demo_names = [name for name in data_group.keys()]
         return demo_names
-
+    
+    def shuffle_demos(self, train_demo_ratio=0.8):
+        """
+        将 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
+        """
+        self.remove_filter_key("train")
+        self.remove_filter_key("valid")
+        
+        demo_names = self.get_demo_names()
+        train_demos = []
+        valid_demos = []
+        for demo_name in demo_names:
+            if np.random.rand() < train_demo_ratio:
+                train_demos.append(demo_name)
+                # print("Demo name: ", demo_name, " added to train.")
+            else:
+                valid_demos.append(demo_name)
+                # print("Demo name: ", demo_name, " added to valid.")
+                
+        self.add_filter_key("train", train_demos)
+        self.add_filter_key("valid", valid_demos)
+            
     def finalize(self):
         """
         由于每次操作都已保存并关闭文件，因此此方法可为空或用于其他清理操作。
@@ -244,7 +272,7 @@ class DatasetReader:
             demo_names = [name for name in data_group.keys()]
         return demo_names
 
-    def get_demo(self, demo_name):
+    def get_demo_data(self, demo_name):
         """
         获取指定名称的演示数据。
 
