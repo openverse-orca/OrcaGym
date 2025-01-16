@@ -216,6 +216,8 @@ def do_augmentation(env : FrankaEnv,
                     augmented_scale : float, 
                     augmented_times : int):
     
+    REALTIME = False
+    
     dataset_reader = DatasetReader(file_path=original_dataset_path)
     dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
                                     env_name=dataset_reader.get_env_name(),
@@ -224,13 +226,14 @@ def do_augmentation(env : FrankaEnv,
     
     demo_names = dataset_reader.get_demo_names()
     need_demo_count = len(demo_names) * augmented_times
-    while need_demo_count > 0:
+    done_demo_count = 0
+    while done_demo_count < need_demo_count:
         original_demo_name = np.random.choice(demo_names)
 
         demo_data = dataset_reader.get_demo_data(original_demo_name)
         print("Augmenting original demo: ", original_demo_name)
         
-        obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=False)
+        obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
         if done_list[-1] == 1:
             dataset_writer.add_demo_data({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
@@ -239,11 +242,13 @@ def do_augmentation(env : FrankaEnv,
                 'dones': np.array(done_list),
                 'obs': obs_list
             })
-            print("Episode done!")
-            need_demo_count -= 1
+            
+            done_demo_count += 1
+            print(f"Episode done! {done_demo_count} / {need_demo_count}")
         else:
             print("Episode failed!")
-        
+    
+    if REALTIME:
         time.sleep(1)
 
     dataset_writer.shuffle_demos()
