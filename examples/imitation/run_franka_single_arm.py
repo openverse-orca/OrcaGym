@@ -352,7 +352,8 @@ def run_example(orcagym_addr : str,
 
     except KeyboardInterrupt:
         print("Simulation stopped")        
-        dataset_writer.finalize()
+        if run_mode == RunMode.TELEOPERATION:
+            dataset_writer.finalize()
         env.close()
     
 
