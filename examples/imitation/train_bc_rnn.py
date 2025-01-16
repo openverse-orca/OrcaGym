@@ -62,8 +62,8 @@ def orca_gym_hyperparameters(config):
 
     ## evaluation rollout config ##
     config.experiment.rollout.enabled = True                    # enable evaluation rollouts
-    config.experiment.rollout.n = 5                            # number of rollouts per evaluation
-    config.experiment.rollout.horizon = 2000                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
+    config.experiment.rollout.n = 50                            # number of rollouts per evaluation
+    config.experiment.rollout.horizon = 1000                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
     config.experiment.rollout.rate = 50                         # do rollouts every @rate epochs
     config.experiment.rollout.warmstart = 0                     # number of epochs to wait before starting rollouts
     config.experiment.rollout.terminate_on_success = True       # end rollout early after task success
@@ -84,14 +84,14 @@ def orca_gym_hyperparameters(config):
     # if true, normalize observations at train and test time, using the global mean and standard deviation
     # of each observation in each dimension, computed across the training set. See SequenceDataset.normalize_obs
     # in utils/dataset.py for more information.
-    config.train.hdf5_normalize_obs = False                     # no obs normalization
+    config.train.hdf5_normalize_obs = False                    # no obs normalization
 
     # if provided, demonstrations are filtered by the list of demo keys under "mask/@hdf5_filter_key"
     config.train.hdf5_filter_key = "train"                      # by default, use "train" and "valid" filter keys corresponding to train-valid split
     config.train.hdf5_validation_filter_key = "valid"
 
     # fetch sequences of length 10 from dataset for RNN training
-    config.train.seq_length = 10
+    config.train.seq_length = 50  # 增加序列长度从10到50
 
     # keys from hdf5 to load per demonstration, besides "obs" and "next_obs"
     config.train.dataset_keys = (
@@ -167,27 +167,27 @@ def orca_gym_hyperparameters(config):
     # optimization parameters
     config.algo.optim_params.policy.learning_rate.initial = 1e-4        # policy learning rate
     config.algo.optim_params.policy.learning_rate.decay_factor = 0.1    # factor to decay LR by (if epoch schedule non-empty)
-    config.algo.optim_params.policy.learning_rate.epoch_schedule = []   # epochs where LR decay occurs
+    config.algo.optim_params.policy.learning_rate.epoch_schedule = [300]  # 配置学习率衰减计划，在第300个epoch衰减   # epochs where LR decay occurs
     config.algo.optim_params.policy.regularization.L2 = 0.00            # L2 regularization strength
 
     # loss weights
-    config.algo.loss.l2_weight = 1.0    # L2 loss weight
-    config.algo.loss.l1_weight = 0.0    # L1 loss weight
-    config.algo.loss.cos_weight = 0.0   # cosine loss weight
+    config.algo.loss.l2_weight = 0.8    # 调整L2损失权重从1.0到0.8    # L2 loss weight
+    config.algo.loss.l1_weight = 0.2    # 引入L1损失，设置为0.2    # L1 loss weight
+    config.algo.loss.cos_weight = 0.1   # 引入余弦相似度损失，设置为0.1   # cosine loss weight
 
     # MLP network architecture (layers after observation encoder and RNN, if present)
     config.algo.actor_layer_dims = ()   # empty MLP - go from RNN layer directly to action output
 
     # stochastic GMM policy
     config.algo.gmm.enabled = True                      # enable GMM policy - policy outputs GMM action distribution
-    config.algo.gmm.num_modes = 5                       # number of GMM modes
+    config.algo.gmm.num_modes = 10  # 增加GMM模式数量从5到10                       # number of GMM modes
     config.algo.gmm.min_std = 0.0001                    # minimum std output from network
     config.algo.gmm.std_activation = "softplus"         # activation to use for std output from policy net
     config.algo.gmm.low_noise_eval = True               # low-std at test-time
 
     # rnn policy config
     config.algo.rnn.enabled = True      # enable RNN policy
-    config.algo.rnn.horizon = 10        # unroll length for RNN - should usually match train.seq_length
+    config.algo.rnn.horizon = 50  # 增加RNN的时间步长从10到50        # unroll length for RNN - should usually match train.seq_length
     config.algo.rnn.hidden_dim = 400    # hidden dimension size
     config.algo.rnn.rnn_type = "LSTM"   # rnn type - one of "LSTM" or "GRU"
     config.algo.rnn.num_layers = 2      # number of RNN layers that are stacked
@@ -197,314 +197,15 @@ def orca_gym_hyperparameters(config):
     return config
 
 def robosuite_hyperparameters(config):
-    """
-    Sets robosuite-specific hyperparameters.
-
-    Args:
-        config (Config): Config to modify
-
-    Returns:
-        Config: Modified config
-    """
-    ## save config - if and when to save checkpoints ##
-    config.experiment.save.enabled = True                       # whether model saving should be enabled or disabled
-    config.experiment.save.every_n_seconds = None               # save model every n seconds (set to None to disable)
-    config.experiment.save.every_n_epochs = 50                  # save model every n epochs (set to None to disable)
-    config.experiment.save.epochs = []                          # save model on these specific epochs
-    config.experiment.save.on_best_validation = False           # save models that achieve best validation score
-    config.experiment.save.on_best_rollout_return = False       # save models that achieve best rollout return
-    config.experiment.save.on_best_rollout_success_rate = True  # save models that achieve best success rate
-
-    # epoch definition - if not None, set an epoch to be this many gradient steps, else the full dataset size will be used
-    config.experiment.epoch_every_n_steps = 100                 # each epoch is 100 gradient steps
-    config.experiment.validation_epoch_every_n_steps = 10       # each validation epoch is 10 gradient steps
-
-    # envs to evaluate model on (assuming rollouts are enabled), to override the metadata stored in dataset
-    config.experiment.env = None                                # no need to set this (unless you want to override)
-    config.experiment.additional_envs = None                    # additional environments that should get evaluated
-
-    ## rendering config ##
-    config.experiment.render = False                            # render on-screen or not
-    config.experiment.render_video = True                       # render evaluation rollouts to videos
-    config.experiment.keep_all_videos = False                   # save all videos, instead of only saving those for saved model checkpoints
-    config.experiment.video_skip = 5                            # render video frame every n environment steps during rollout
-
-    ## evaluation rollout config ##
-    config.experiment.rollout.enabled = True                    # enable evaluation rollouts
-    config.experiment.rollout.n = 50                            # number of rollouts per evaluation
-    config.experiment.rollout.horizon = 400                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
-    config.experiment.rollout.rate = 50                         # do rollouts every @rate epochs
-    config.experiment.rollout.warmstart = 0                     # number of epochs to wait before starting rollouts
-    config.experiment.rollout.terminate_on_success = True       # end rollout early after task success
-
-    ## dataset loader config ##
-
-    # num workers for loading data - generally set to 0 for low-dim datasets, and 2 for image datasets
-    config.train.num_data_workers = 0                           # assume low-dim dataset
-
-    # One of ["all", "low_dim", or None]. Set to "all" to cache entire hdf5 in memory - this is
-    # by far the fastest for data loading. Set to "low_dim" to cache all non-image data. Set
-    # to None to use no caching - in this case, every batch sample is retrieved via file i/o.
-    # You should almost never set this to None, even for large image datasets.
-    config.train.hdf5_cache_mode = "all"
-
-    config.train.hdf5_use_swmr = True                           # used for parallel data loading
-
-    # if true, normalize observations at train and test time, using the global mean and standard deviation
-    # of each observation in each dimension, computed across the training set. See SequenceDataset.normalize_obs
-    # in utils/dataset.py for more information.
-    config.train.hdf5_normalize_obs = False                     # no obs normalization
-
-    # if provided, demonstrations are filtered by the list of demo keys under "mask/@hdf5_filter_key"
-    config.train.hdf5_filter_key = "train"                      # by default, use "train" and "valid" filter keys corresponding to train-valid split
-    config.train.hdf5_validation_filter_key = "valid"
-
-    # fetch sequences of length 10 from dataset for RNN training
-    config.train.seq_length = 10
-
-    # keys from hdf5 to load per demonstration, besides "obs" and "next_obs"
-    config.train.dataset_keys = (
-        "actions",
-        "rewards",
-        "dones",
-    )
-
-    # one of [None, "last"] - set to "last" to include goal observations in each batch
-    config.train.goal_mode = None                               # no need for goal observations
-
-    ## learning config ##
-    config.train.cuda = True                                    # try to use GPU (if present) or not
-    config.train.batch_size = 100                               # batch size
-    config.train.num_epochs = 500                              # number of training epochs
-    config.train.seed = 1                                       # seed for training
-
-
-    ### Observation Config ###
-    config.observation.modalities.obs.low_dim = [               # specify low-dim observations for agent
-        "robot0_eef_pos",
-        "robot0_eef_quat",
-        "robot0_gripper_qpos",
-        "object",
-    ]
-    config.observation.modalities.obs.rgb = []                # no image observations
-    config.observation.modalities.goal.low_dim = []             # no low-dim goals
-    config.observation.modalities.goal.rgb = []               # no image goals
-
-    # observation encoder architecture - applies to all networks that take observation dicts as input
-
-    config.observation.encoder.rgb.core_class = "VisualCore"
-    config.observation.encoder.rgb.core_kwargs.feature_dimension = 64
-    config.observation.encoder.rgb.core_kwargs.backbone_class = 'ResNet18Conv'                         # ResNet backbone for image observations (unused if no image observations)
-    config.observation.encoder.rgb.core_kwargs.backbone_kwargs.pretrained = False                # kwargs for visual core
-    config.observation.encoder.rgb.core_kwargs.backbone_kwargs.input_coord_conv = False
-    config.observation.encoder.rgb.core_kwargs.pool_class = "SpatialSoftmax"                # Alternate options are "SpatialMeanPool" or None (no pooling)
-    config.observation.encoder.rgb.core_kwargs.pool_kwargs.num_kp = 32                      # Default arguments for "SpatialSoftmax"
-    config.observation.encoder.rgb.core_kwargs.pool_kwargs.learnable_temperature = False    # Default arguments for "SpatialSoftmax"
-    config.observation.encoder.rgb.core_kwargs.pool_kwargs.temperature = 1.0                # Default arguments for "SpatialSoftmax"
-    config.observation.encoder.rgb.core_kwargs.pool_kwargs.noise_std = 0.0                  # Default arguments for "SpatialSoftmax"
-
-    # if you prefer to use pre-trained visual representations, uncomment the following lines
-    # R3M
-    # config.observation.encoder.rgb.core_kwargs.backbone_class = 'R3MConv'                         # R3M backbone for image observations (unused if no image observations)
-    # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.r3m_model_class = 'resnet18'       # R3M model class (resnet18, resnet34, resnet50)
-    # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze = True                      # whether to freeze network during training or allow finetuning
-    # config.observation.encoder.rgb.core_kwargs.pool_class = None                                  # no pooling class for pretraining model
-    # MVP
-    # config.observation.encoder.rgb.core_kwargs.backbone_class = 'MVPConv'                                   # MVP backbone for image observations (unused if no image observations)
-    # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.mvp_model_class = 'vitb-mae-egosoup'         # MVP model class (vits-mae-hoi, vits-mae-in, vits-sup-in, vitb-mae-egosoup, vitl-256-mae-egosoup)
-    # config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze = True                                # whether to freeze network during training or allow finetuning
-    # config.observation.encoder.rgb.core_kwargs.pool_class = None                                            # no pooling class for pretraining model
-
-    # observation randomizer class - set to None to use no randomization, or 'CropRandomizer' to use crop randomization
-    config.observation.encoder.rgb.obs_randomizer_class = None
-
-    # kwargs for observation randomizers (for the CropRandomizer, this is size and number of crops)
-    config.observation.encoder.rgb.obs_randomizer_kwargs.crop_height = 76
-    config.observation.encoder.rgb.obs_randomizer_kwargs.crop_width = 76
-    config.observation.encoder.rgb.obs_randomizer_kwargs.num_crops = 1
-    config.observation.encoder.rgb.obs_randomizer_kwargs.pos_enc = False
-
-    ### Algo Config ###
-
-    # optimization parameters
-    config.algo.optim_params.policy.learning_rate.initial = 1e-4        # policy learning rate
-    config.algo.optim_params.policy.learning_rate.decay_factor = 0.1    # factor to decay LR by (if epoch schedule non-empty)
-    config.algo.optim_params.policy.learning_rate.epoch_schedule = []   # epochs where LR decay occurs
-    config.algo.optim_params.policy.regularization.L2 = 0.00            # L2 regularization strength
-
-    # loss weights
-    config.algo.loss.l2_weight = 1.0    # L2 loss weight
-    config.algo.loss.l1_weight = 0.0    # L1 loss weight
-    config.algo.loss.cos_weight = 0.0   # cosine loss weight
-
-    # MLP network architecture (layers after observation encoder and RNN, if present)
-    config.algo.actor_layer_dims = ()   # empty MLP - go from RNN layer directly to action output
-
-    # stochastic GMM policy
-    config.algo.gmm.enabled = True                      # enable GMM policy - policy outputs GMM action distribution
-    config.algo.gmm.num_modes = 5                       # number of GMM modes
-    config.algo.gmm.min_std = 0.0001                    # minimum std output from network
-    config.algo.gmm.std_activation = "softplus"         # activation to use for std output from policy net
-    config.algo.gmm.low_noise_eval = True               # low-std at test-time
-
-    # rnn policy config
-    config.algo.rnn.enabled = True      # enable RNN policy
-    config.algo.rnn.horizon = 10        # unroll length for RNN - should usually match train.seq_length
-    config.algo.rnn.hidden_dim = 400    # hidden dimension size
-    config.algo.rnn.rnn_type = "LSTM"   # rnn type - one of "LSTM" or "GRU"
-    config.algo.rnn.num_layers = 2      # number of RNN layers that are stacked
-    config.algo.rnn.open_loop = False   # if True, action predictions are only based on a single observation (not sequence) + hidden state
-    config.algo.rnn.kwargs.bidirectional = False          # rnn kwargs
-
     return config
 
 
 def momart_hyperparameters(config):
-    """
-    Sets momart-specific hyperparameters.
-
-    Args:
-        config (Config): Config to modify
-
-    Returns:
-        Config: Modified config
-    """
-    ## save config - if and when to save checkpoints ##
-    config.experiment.save.enabled = True                       # whether model saving should be enabled or disabled
-    config.experiment.save.every_n_seconds = None               # save model every n seconds (set to None to disable)
-    config.experiment.save.every_n_epochs = 3                   # save model every n epochs (set to None to disable)
-    config.experiment.save.epochs = []                          # save model on these specific epochs
-    config.experiment.save.on_best_validation = True            # save models that achieve best validation score
-    config.experiment.save.on_best_rollout_return = False       # save models that achieve best rollout return
-    config.experiment.save.on_best_rollout_success_rate = True  # save models that achieve best success rate
-
-    # epoch definition - if not None, set an epoch to be this many gradient steps, else the full dataset size will be used
-    config.experiment.epoch_every_n_steps = None                # each epoch is 100 gradient steps
-    config.experiment.validation_epoch_every_n_steps = 10       # each validation epoch is 10 gradient steps
-
-    # envs to evaluate model on (assuming rollouts are enabled), to override the metadata stored in dataset
-    config.experiment.env = None                                # no need to set this (unless you want to override)
-    config.experiment.additional_envs = None                    # additional environments that should get evaluated
-
-    ## rendering config ##
-    config.experiment.render = False                            # render on-screen or not
-    config.experiment.render_video = True                       # render evaluation rollouts to videos
-    config.experiment.keep_all_videos = False                   # save all videos, instead of only saving those for saved model checkpoints
-    config.experiment.video_skip = 5                            # render video frame every n environment steps during rollout
-
-    ## evaluation rollout config ##
-    config.experiment.rollout.enabled = True                    # enable evaluation rollouts
-    config.experiment.rollout.n = 30                            # number of rollouts per evaluation
-    config.experiment.rollout.horizon = 1500                    # maximum number of env steps per rollout
-    config.experiment.rollout.rate = 3                          # do rollouts every @rate epochs
-    config.experiment.rollout.warmstart = 0                     # number of epochs to wait before starting rollouts
-    config.experiment.rollout.terminate_on_success = True       # end rollout early after task success
-
-    ## dataset loader config ##
-
-    # num workers for loading data - generally set to 0 for low-dim datasets, and 2 for image datasets
-    config.train.num_data_workers = 2                           # assume low-dim dataset
-
-    # One of ["all", "low_dim", or None]. Set to "all" to cache entire hdf5 in memory - this is
-    # by far the fastest for data loading. Set to "low_dim" to cache all non-image data. Set
-    # to None to use no caching - in this case, every batch sample is retrieved via file i/o.
-    # You should almost never set this to None, even for large image datasets.
-    config.train.hdf5_cache_mode = "low_dim"
-
-    config.train.hdf5_use_swmr = True                           # used for parallel data loading
-
-    # if true, normalize observations at train and test time, using the global mean and standard deviation
-    # of each observation in each dimension, computed across the training set. See SequenceDataset.normalize_obs
-    # in utils/dataset.py for more information.
-    config.train.hdf5_normalize_obs = False                     # no obs normalization
-
-    # if provided, demonstrations are filtered by the list of demo keys under "mask/@hdf5_filter_key"
-    config.train.hdf5_filter_key = "train"                      # by default, use "train" and "valid" filter keys corresponding to train-valid split
-    config.train.hdf5_validation_filter_key = "valid"
-
-    # fetch sequences of length 10 from dataset for RNN training
-    config.train.seq_length = 50
-
-    # keys from hdf5 to load per demonstration, besides "obs" and "next_obs"
-    config.train.dataset_keys = (
-        "actions",
-        "rewards",
-        "dones",
-    )
-
-    # one of [None, "last"] - set to "last" to include goal observations in each batch
-    config.train.goal_mode = "last"                               # no need for goal observations
-
-    ## learning config ##
-    config.train.cuda = True                                    # try to use GPU (if present) or not
-    config.train.batch_size = 4                               # batch size
-    config.train.num_epochs = 31                              # number of training epochs
-    config.train.seed = 1                                       # seed for training
-
-
-    ### Observation Config ###
-    config.observation.modalities.obs.low_dim = [               # specify low-dim observations for agent
-        "proprio",
-    ]
-    config.observation.modalities.obs.rgb = [
-        "rgb",
-        "rgb_wrist",
-    ]
-
-    config.observation.modalities.obs.depth = [
-        "depth",
-        "depth_wrist",
-    ]
-    config.observation.modalities.obs.scan = [
-        "scan",
-    ]
-    config.observation.modalities.goal.low_dim = []             # no low-dim goals
-    config.observation.modalities.goal.rgb = []               # no rgb image goals
-
-    ### Algo Config ###
-
-    # optimization parameters
-    config.algo.optim_params.policy.learning_rate.initial = 1e-4        # policy learning rate
-    config.algo.optim_params.policy.learning_rate.decay_factor = 0.1    # factor to decay LR by (if epoch schedule non-empty)
-    config.algo.optim_params.policy.learning_rate.epoch_schedule = []   # epochs where LR decay occurs
-    config.algo.optim_params.policy.regularization.L2 = 0.00            # L2 regularization strength
-
-    # loss weights
-    config.algo.loss.l2_weight = 1.0    # L2 loss weight
-    config.algo.loss.l1_weight = 0.0    # L1 loss weight
-    config.algo.loss.cos_weight = 0.0   # cosine loss weight
-
-    # MLP network architecture (layers after observation encoder and RNN, if present)
-    config.algo.actor_layer_dims = (300, 400)           # MLP layers between RNN layer and action output
-
-    # stochastic GMM policy
-    config.algo.gmm.enabled = True                      # enable GMM policy - policy outputs GMM action distribution
-    config.algo.gmm.num_modes = 5                       # number of GMM modes
-    config.algo.gmm.min_std = 0.01                      # minimum std output from network
-    config.algo.gmm.std_activation = "softplus"         # activation to use for std output from policy net
-    config.algo.gmm.low_noise_eval = True               # low-std at test-time
-
-    # rnn policy config
-    config.algo.rnn.enabled = True      # enable RNN policy
-    config.algo.rnn.horizon = 50        # unroll length for RNN - should usually match train.seq_length
-    config.algo.rnn.hidden_dim = 1200   # hidden dimension size
-    config.algo.rnn.rnn_type = "LSTM"   # rnn type - one of "LSTM" or "GRU"
-    config.algo.rnn.num_layers = 2      # number of RNN layers that are stacked
-    config.algo.rnn.open_loop = False   # if True, action predictions are only based on a single observation (not sequence) + hidden state
-    config.algo.rnn.kwargs.bidirectional = False          # rnn kwargs
-
     return config
 
 def example_orca_gym_dataset_path():
     dataset_folder = os.path.join(os.path.dirname(__file__), "./tests/assets/")
     dataset_path = os.path.join(dataset_folder, "orca_gym_demo.hdf5")
-    if not os.path.exists(dataset_path):
-        print("\nWARNING: test hdf5 does not exist! Downloading from server...")
-        os.makedirs(dataset_folder, exist_ok=True)
-        FileUtils.download_url(
-            url="http://downloads.cs.stanford.edu/downloads/rt_benchmark/test_v141.hdf5", 
-            download_dir=dataset_folder,
-        )
     return dataset_path
 
 # Valid dataset types to use

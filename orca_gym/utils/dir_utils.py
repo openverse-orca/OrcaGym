@@ -13,5 +13,4 @@ def create_tmp_dir(dir_name):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
         print(f"目录 '{dir_path}' 已创建。")
-    else:
-        print(f"目录 '{dir_path}' 已存在。")
+

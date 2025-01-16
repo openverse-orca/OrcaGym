@@ -27,6 +27,8 @@ class RunMode:
     TELEOPERATION = "teleoperation"
     IMITATION = "imitation"
     PLAYBACK = "playback"
+    ROLLOUT = "rollout"
+    AUGMENTATION = "augmentation"
 
 class ControlDevice:
     """

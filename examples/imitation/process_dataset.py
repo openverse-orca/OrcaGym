@@ -32,6 +32,11 @@ def _check_dataset(dataset_file, verbose=False) -> bool:
 
     # use all demonstrations
     demos = sorted(list(f["data"].keys()))
+    
+    if len(demos) == 0:
+        print("")
+        print("Dataset {} has no demonstrations.".format(dataset_file))
+        return True
 
     # extract filter key information
     if "mask" in f:
@@ -154,14 +159,14 @@ def _glob_dataset_filenames(dataset_files):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", type=str, nargs='+', help="path to hdf5 dataset",)
-    parser.add_argument("--process", type=str, help="process to run (check / combine / merge)", default="check")
+    parser.add_argument("--task", type=str, help="task to run (check / combine / merge)", default="check")
     parser.add_argument("--verbose", type=bool, help="output more details", default=False)
     parser.add_argument("--filter_key", type=str, help="filter key to use for processing", default=None)
     parser.add_argument("--output", type=str, help="output file for combined dataset", default=None)
     
     args = parser.parse_args()
     dataset_files = args.datasets
-    process = args.process
+    task = args.task
     verbose = args.verbose
     filter_key = args.filter_key
     output_file = args.output
@@ -169,12 +174,12 @@ if __name__ == "__main__":
     dataset_files = _glob_dataset_filenames(dataset_files)
     create_tmp_dir("processed_datasets_tmp")
     
-    if process == "check":
+    if task == "check":
         _process_check(dataset_files)
-    elif process == "combine":
+    elif task == "combine":
         if output_file is None:
             formatted_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             output_file = f"./processed_datasets_tmp/combined_{formatted_time}.hdf5"            
         _process_combine(dataset_files, output_file)
     else:
-        print("Process not implemented: {}".format(process))
+        print("Process not implemented: {}".format(task))

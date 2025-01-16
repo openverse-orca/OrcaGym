@@ -71,10 +71,10 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
     policy.start_episode()
     obs = env.reset()
-    state_dict = env.get_state()
+    # state_dict = env.get_state()
 
     # hack that is necessary for robosuite tasks for deterministic action playback
-    obs = env.reset_to(state_dict)
+    # obs = env.reset_to(state_dict)
 
     results = {}
     video_count = 0  # video frame counter
@@ -110,7 +110,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
             # update for next iter
             obs = deepcopy(next_obs)
-            state_dict = env.get_state()
+            # state_dict = env.get_state()
 
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))

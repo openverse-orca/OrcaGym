@@ -188,12 +188,12 @@ class FrankaEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
             scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-        elif self._run_mode == RunMode.IMITATION or self._run_mode == RunMode.PLAYBACK:
+        elif self._run_mode in [RunMode.PLAYBACK, RunMode.IMITATION, RunMode.ROLLOUT, RunMode.AUGMENTATION]:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
             ctrl = self._playback_action(noscaled_action)
         else:
-            raise ValueError("Invalid run mode")
+            raise ValueError("Invalid run mode : ", self._run_mode)
         
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         
@@ -374,7 +374,7 @@ class FrankaEnv(RobomimicEnv):
         Reset the environment, return observation
         """
         
-        print("Reset model")
+        # print("Reset model")
         
         self._set_init_state()
         self._reset_grasp_mocap()
