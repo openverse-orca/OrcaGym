@@ -26,23 +26,32 @@ import orca_gym.utils.rotations as rotations
 import numpy as np
 import argparse
 
+ENV_ENTRY_POINT = {
+    "Franka": "envs.imitation.franka_env:FrankaEnv"
+}
+
+TIME_STEP = 0.005
+FRAME_SKIP = 4
+REALTIME_STEP = TIME_STEP * FRAME_SKIP
+CONTROL_FREQ = 1 / REALTIME_STEP
+
 def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, ctrl_device : str, max_episode_steps) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
-    kwargs = {'frame_skip': 1,   
+    kwargs = {'frame_skip': FRAME_SKIP,   
                 'reward_type': RewardType.SPARSE,
                 'orcagym_addr': orcagym_addr, 
                 'agent_names': agent_names, 
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
                 'ctrl_device': ctrl_device,
-                'control_freq': 20}           
+                'control_freq': CONTROL_FREQ}           
     gym.register(
         id=env_id,
-        entry_point="envs.imitation.franka_env:FrankaEnv",
+        entry_point=ENV_ENTRY_POINT[env_name],
         kwargs=kwargs,
-        max_episode_steps= max_episode_steps,  # 10 seconds
+        max_episode_steps= max_episode_steps,
         reward_threshold=0.0,
     )
     return env_id, kwargs
@@ -74,8 +83,8 @@ def run_episode(env : FrankaEnv):
             return obs_list, reward_list, done_list, info_list
 
         elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < TIME_STEP:
-            time.sleep(TIME_STEP - elapsed_time.total_seconds())
+        if elapsed_time.total_seconds() < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
         else:
             print("Over time! elapsed_time (ms): ", elapsed_time.total_seconds() * 1000)
 
@@ -117,8 +126,8 @@ def playback_episode(env : FrankaEnv, action_list, done_list):
         env.render()
 
         elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < TIME_STEP:
-            time.sleep(TIME_STEP - elapsed_time.total_seconds())
+        if elapsed_time.total_seconds() < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
         if done:
             print("Episode done!")
@@ -203,8 +212,8 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
             return obs_list, reward_list, done_list, info_list
 
         elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < TIME_STEP and realtime:
-            time.sleep(TIME_STEP - elapsed_time.total_seconds())
+        if elapsed_time.total_seconds() < REALTIME_STEP and realtime:
+            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
     return obs_list, reward_list, done_list, info_list
  
@@ -279,7 +288,7 @@ def run_example(orcagym_addr : str,
             do_playback(env, dataset_reader, playback_mode)
 
         elif run_mode == RunMode.TELEOPERATION:
-            env_name = "Franka-Teleoperation-v0"
+            env_name = "Franka"
             env_index = 0
             env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
@@ -418,8 +427,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
 
-    TIME_STEP = 0.01
-    max_episode_steps = int(record_time / TIME_STEP)
+
+    max_episode_steps = int(record_time / REALTIME_STEP)
 
     run_example(orcagym_addr, 
                 agent_name, 

@@ -98,9 +98,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return "human"
         
     @property
-    def render_remote(self) -> bool:
-        if hasattr(self, "_render_remote"):
-            return self._render_remote
+    def is_subenv(self) -> bool:
+        if hasattr(self, "_is_subenv"):
+            return self._is_subenv
         else:
             return False
 
@@ -126,6 +126,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.mj_step(nstep=n_frames)
 
     def set_time_step(self, time_step):
+        self.time_step = time_step
+        self.realtime_step = time_step * self.frame_skip
         self.gym.set_time_step(time_step)
         return
 
@@ -225,7 +227,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.update_equality_constraints(eq_list)
 
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
-        send_remote = self.render_mode == "human" and self.render_remote
+        send_remote = self.render_mode == "human" and not self.is_subenv
         self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))
 
     def query_contact_simple(self):

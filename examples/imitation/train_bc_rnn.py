@@ -47,7 +47,7 @@ def orca_gym_hyperparameters(config):
     config.experiment.save.on_best_rollout_success_rate = True  # save models that achieve best success rate
 
     # epoch definition - if not None, set an epoch to be this many gradient steps, else the full dataset size will be used
-    config.experiment.epoch_every_n_steps = 100                 # each epoch is 100 gradient steps
+    config.experiment.epoch_every_n_steps = 128                 # each epoch is 100 gradient steps
     config.experiment.validation_epoch_every_n_steps = 10       # each validation epoch is 10 gradient steps
 
     # envs to evaluate model on (assuming rollouts are enabled), to override the metadata stored in dataset
@@ -62,8 +62,8 @@ def orca_gym_hyperparameters(config):
 
     ## evaluation rollout config ##
     config.experiment.rollout.enabled = True                    # enable evaluation rollouts
-    config.experiment.rollout.n = 50                            # number of rollouts per evaluation
-    config.experiment.rollout.horizon = 1000                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
+    config.experiment.rollout.n = 5                            # number of rollouts per evaluation
+    config.experiment.rollout.horizon = 2000                     # set horizon based on length of demonstrations (can be obtained with scripts/get_dataset_info.py)
     config.experiment.rollout.rate = 50                         # do rollouts every @rate epochs
     config.experiment.rollout.warmstart = 0                     # number of epochs to wait before starting rollouts
     config.experiment.rollout.terminate_on_success = True       # end rollout early after task success
@@ -71,7 +71,7 @@ def orca_gym_hyperparameters(config):
     ## dataset loader config ##
 
     # num workers for loading data - generally set to 0 for low-dim datasets, and 2 for image datasets
-    config.train.num_data_workers = 0                           # assume low-dim dataset
+    config.train.num_data_workers = 1                           # assume low-dim dataset
 
     # One of ["all", "low_dim", or None]. Set to "all" to cache entire hdf5 in memory - this is
     # by far the fastest for data loading. Set to "low_dim" to cache all non-image data. Set
@@ -91,7 +91,7 @@ def orca_gym_hyperparameters(config):
     config.train.hdf5_validation_filter_key = "valid"
 
     # fetch sequences of length 10 from dataset for RNN training
-    config.train.seq_length = 50  # 增加序列长度从10到50
+    config.train.seq_length = 10  # 增加序列长度从10到50
 
     # keys from hdf5 to load per demonstration, besides "obs" and "next_obs"
     config.train.dataset_keys = (
@@ -105,8 +105,8 @@ def orca_gym_hyperparameters(config):
 
     ## learning config ##
     config.train.cuda = True                                    # try to use GPU (if present) or not
-    config.train.batch_size = 100                               # batch size
-    config.train.num_epochs = 500                              # number of training epochs
+    config.train.batch_size = 64                               # batch size
+    config.train.num_epochs = 3000                              # number of training epochs
     config.train.seed = 1                                       # seed for training
 
 
@@ -171,24 +171,24 @@ def orca_gym_hyperparameters(config):
     config.algo.optim_params.policy.regularization.L2 = 0.00            # L2 regularization strength
 
     # loss weights
-    config.algo.loss.l2_weight = 0.8    # 调整L2损失权重从1.0到0.8    # L2 loss weight
-    config.algo.loss.l1_weight = 0.2    # 引入L1损失，设置为0.2    # L1 loss weight
-    config.algo.loss.cos_weight = 0.1   # 引入余弦相似度损失，设置为0.1   # cosine loss weight
+    config.algo.loss.l2_weight = 1.0    # 调整L2损失权重从1.0到0.8    # L2 loss weight
+    config.algo.loss.l1_weight = 0.0    # 引入L1损失，设置为0.2    # L1 loss weight
+    config.algo.loss.cos_weight = 0.0   # 引入余弦相似度损失，设置为0.1   # cosine loss weight
 
     # MLP network architecture (layers after observation encoder and RNN, if present)
-    config.algo.actor_layer_dims = ()   # empty MLP - go from RNN layer directly to action output
+    config.algo.actor_layer_dims = (300, 400)   # empty MLP - go from RNN layer directly to action output
 
     # stochastic GMM policy
     config.algo.gmm.enabled = True                      # enable GMM policy - policy outputs GMM action distribution
-    config.algo.gmm.num_modes = 10  # 增加GMM模式数量从5到10                       # number of GMM modes
+    config.algo.gmm.num_modes = 5  # 增加GMM模式数量从5到10                       # number of GMM modes
     config.algo.gmm.min_std = 0.0001                    # minimum std output from network
     config.algo.gmm.std_activation = "softplus"         # activation to use for std output from policy net
     config.algo.gmm.low_noise_eval = True               # low-std at test-time
 
     # rnn policy config
     config.algo.rnn.enabled = True      # enable RNN policy
-    config.algo.rnn.horizon = 50  # 增加RNN的时间步长从10到50        # unroll length for RNN - should usually match train.seq_length
-    config.algo.rnn.hidden_dim = 400    # hidden dimension size
+    config.algo.rnn.horizon = 10  # 增加RNN的时间步长从10到50        # unroll length for RNN - should usually match train.seq_length
+    config.algo.rnn.hidden_dim = 1200    # hidden dimension size
     config.algo.rnn.rnn_type = "LSTM"   # rnn type - one of "LSTM" or "GRU"
     config.algo.rnn.num_layers = 2      # number of RNN layers that are stacked
     config.algo.rnn.open_loop = False   # if True, action predictions are only based on a single observation (not sequence) + hidden state

@@ -22,7 +22,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         time_step: float,    
         max_episode_steps: int,
         render_mode: str,
-        render_remote: bool,
+        is_subenv: bool,
         height_map_file: str,
         run_mode: str,
         env_id: str,
@@ -40,7 +40,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             agent_engry="envs.legged_gym.legged_robot:LeggedRobot",        
             max_episode_steps = max_episode_steps,
             render_mode = render_mode,
-            render_remote = render_remote,
+            is_subenv = is_subenv,
             env_id = env_id,
             task = task,
             **kwargs,
@@ -83,7 +83,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             act = action[i]
 
             agent.update_command(self.data.qpos)
-            agent_ctrl, agent_mocap = agent.step(act, update_mocap=(self.render_mode == "human" and self.render_remote and self._run_mode != "play"))
+            agent_ctrl, agent_mocap = agent.step(act, update_mocap=(self.render_mode == "human" and not self.is_subenv and self._run_mode != "play"))
             joint_qvel_dict = agent.push_robot(self.data.qvel)
             # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
             mocaps.update(agent_mocap)

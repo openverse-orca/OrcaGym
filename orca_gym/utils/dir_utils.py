@@ -14,3 +14,6 @@ def create_tmp_dir(dir_name):
         os.makedirs(dir_path)
         print(f"目录 '{dir_path}' 已创建。")
 
+
+def formate_now():
+    return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())

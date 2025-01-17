@@ -392,7 +392,7 @@ class FrankaEnv(OrcaGymLocalEnv):
         time_step: float,    
         max_episode_steps: int,
         render_mode: str,
-        render_remote: bool,
+        is_subenv: bool,
         env_id: str,
         task: str,
         distance_threshold: float,
@@ -404,7 +404,7 @@ class FrankaEnv(OrcaGymLocalEnv):
     ):
 
         self._render_mode = render_mode
-        self._render_remote = render_remote
+        self._is_subenv = is_subenv
         self._env_id = env_id
 
         super().__init__(
@@ -507,7 +507,7 @@ class FrankaEnv(OrcaGymLocalEnv):
 
         self.do_simulation(self.ctrl, self.frame_skip)
 
-        if self.render_mode == "human" and self._render_remote:
+        if self.render_mode == "human" and not self.is_subenv:
             self.render()
 
         obs = self._get_obs(self._agents).copy()

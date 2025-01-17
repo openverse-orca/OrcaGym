@@ -41,15 +41,6 @@
       <material class="panda" name="black" rgba="0.25 0.25 0.25 1"/>
       <material class="panda" name="green" rgba="0 1 0 1"/>
       <material class="panda" name="light_blue" rgba="0.039216 0.541176 0.780392 1"/>
-  
-      <texture type="2d" name="wood_texture" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
-      <texture type="2d" name="oak_veneer"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
-      <material name="oak_wood_material">
-        <rgb texture="oak_veneer"/>
-      </material>
-      <material name="wood_table_worn_material">
-        <rgb texture="wood_texture"/>
-      </material>
 
       <texture type="2d" name="Plastic006_color"      file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
       <texture type="2d" name="Plastic006_roughness"  file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
@@ -81,14 +72,25 @@
       <roughness  texture="Plastic010_roughness"/>      
       </material>
 
-      <texture type="2d" name="wood_texture" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
-      <texture type="2d" name="oak_veneer"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
-      <material name="oak_wood_material">
-        <rgb texture="oak_veneer"/>
-      </material>
+      <texture type="2d" name="wood_table_worn_diff_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
+      <texture type="2d" name="wood_table_worn_nor_dx_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_nor_dx_2k.png"/>
+      <texture type="2d" name="wood_table_worn_rough_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_rough_2k.png"/>
       <material name="wood_table_worn_material">
-        <rgb texture="wood_texture"/>
+        <rgb texture="wood_table_worn_diff_2k"/>
+        <normal texture="wood_table_worn_nor_dx_2k"/>
+        <roughness texture="wood_table_worn_rough_2k"/>
       </material>
+
+      <texture type="2d" name="oak_veneer_01_diff_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
+      <texture type="2d" name="oak_veneer_01_nor_dx_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_nor_dx_2k.png" />
+      <texture type="2d" name="oak_veneer_01_rough_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_rough_2k.png" />
+
+      <material name="oak_veneer_material">
+        <rgb texture="oak_veneer_01_diff_2k"/>
+        <normal texture="oak_veneer_01_nor_dx_2k"/>
+        <roughness texture="oak_veneer_01_rough_2k"/>
+      </material>
+
 
       <!-- Collision meshes -->
       <mesh name="link0_c" file="link0.stl"/>
@@ -166,22 +168,32 @@
       <light name="top" pos="0 0 2" mode="trackcom"/>
 
       <body mocap="true" name="panda_mocap" pos="0.6 0 0.4">
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0.5 0 0 0.1" size="0.5 0.005 0.005" type="box"></geom>
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0 0.5 0 0.1" size="0.005 0.5 0.001" type="box"></geom>
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0 0 0.5 0.1" size="0.005 0.005 0.5" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0.5 0 0 0.1" size="0.2 0.002 0.002" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0.5 0 0.1" size="0.002 0.2 0.001" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0 0.5 0.1" size="0.002 0.002 0.2" type="box"></geom>
       </body>
 
-      <body name="toys" pos="0 0 0">
+      <body name="toys" pos="0.55 0 0">
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
         <body name="box" pos="0 0 -0.06">
-          <geom name="box_geom" type="box" size="1 1 0.1" material="oak_wood_material" density="1000" condim="3" contype="1" conaffinity="1" />
+          <geom name="box_geom" type="box" size="1 1 0.1" material="oak_veneer_material" density="1000" condim="3" contype="1" conaffinity="1" />
         </body>
       </body>
-      <body name="item" pos="0.591 0.01 0.09">
+      <body name="item" pos="0.55 -0.1 0.09">
         <freejoint name="item_joint"/>
         <geom name="item_geom" type="box" size="0.025 0.025 0.025" material="wood_table_worn_material" density="500" contype="1" conaffinity="1" />
-        <site name="item_site" pos="0 0 0" size="0.02" />
+        <site name="item_site" pos="0 0 0" size="0.02" group="1"/>
+      </body>    
+
+      <body name="goal" pos="0.55 0.1 0.15">
+        <freejoint name="goal_joint"/>
+        <geom type="box" pos="0 0 -0.050" size="0.065 0.065 0.015" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
+        <geom type="box" pos="0.0502 0 0.0001" size="0.015 0.065 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
+        <geom type="box" pos="-0.0502 0 0.0002" size="0.015 0.065 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
+        <geom type="box" pos="0 0.0501 -0.0001" size="0.065 0.015 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
+        <geom type="box" pos="0 -0.0503 0" size="0.065 0.015 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />        
+        <site name="goal_site" pos="0 0 0" size="0.03" group="1"/>
       </body>    
 
       <body name="link0" childclass="panda" pos="0 0 0.05">

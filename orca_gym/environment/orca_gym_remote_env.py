@@ -221,6 +221,8 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
         return cfrc_ext_dict
         
     def set_time_step(self, time_step):
+        self.time_step = time_step
+        self.realtime_step = time_step * self.frame_skip
         self.loop.run_until_complete(self._set_time_step(time_step))
                                      
     async def _set_time_step(self, time_step):

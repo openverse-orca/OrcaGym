@@ -27,14 +27,14 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         agent_engry: str,
         max_episode_steps: int,
         render_mode: str,
-        render_remote: bool,
+        is_subenv: bool,
         env_id: str,
         task: str,            
         **kwargs        
     ):
 
         self._render_mode = render_mode
-        self._render_remote = render_remote
+        self._is_subenv = is_subenv
         self._env_id = env_id
         self._task = task
         
@@ -161,7 +161,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         self.do_simulation(self.ctrl, self.frame_skip)
         # step_sim = (datetime.datetime.now() - step_start).total_seconds() * 1000
 
-        if self.render_mode == "human" and self._render_remote:
+        if self.render_mode == "human" and not self.is_subenv:
             self.render()
         # step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
         

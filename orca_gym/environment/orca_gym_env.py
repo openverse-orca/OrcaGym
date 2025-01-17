@@ -54,6 +54,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.loop = asyncio.get_event_loop()
         self.initialize_grpc()
         self.pause_simulation()  # 暂停仿真，Gym 采用被动模式，OrcaSim侧不执行周期循环
+        self.frame_skip = frame_skip        
         self.set_time_step(time_step)  # 设置仿真时间步长
 
         self.model, self.data = self.initialize_simulation()
@@ -61,8 +62,6 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.reset_simulation() # 重置仿真环境
 
         self.init_qpos_qvel()
-
-        self.frame_skip = frame_skip
 
     # methods to override:
     # ----------------------------

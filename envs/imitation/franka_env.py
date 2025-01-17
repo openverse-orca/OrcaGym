@@ -222,20 +222,21 @@ class FrankaEnv(RobomimicEnv):
         return state
     
     def _set_gripper_ctrl(self, state) -> None:
+        GRIPPER_SPEED = self.realtime_step * 0.05  # 0.05 m/s
         if self._ctrl_device == ControlDevice.XBOX:
             if (state["buttons"]["B"]):
-                self.ctrl[7] += 0.001
-                self.ctrl[8] += 0.001
+                self.ctrl[7] += GRIPPER_SPEED
+                self.ctrl[8] += GRIPPER_SPEED
             elif (state["buttons"]["A"]):
-                self.ctrl[7] -= 0.001
-                self.ctrl[8] -= 0.001
+                self.ctrl[7] -= GRIPPER_SPEED
+                self.ctrl[8] -= GRIPPER_SPEED
         elif self._ctrl_device == ControlDevice.KEYBOARD:
             if (state["Z"]):
-                self.ctrl[7] += 0.001
-                self.ctrl[8] += 0.001
+                self.ctrl[7] += GRIPPER_SPEED
+                self.ctrl[8] += GRIPPER_SPEED
             elif (state["X"]):
-                self.ctrl[7] -= 0.001
-                self.ctrl[8] -= 0.001
+                self.ctrl[7] -= GRIPPER_SPEED
+                self.ctrl[8] -= GRIPPER_SPEED
 
         self.ctrl[7] = np.clip(self.ctrl[7], self._ctrl_range_min[7], self._ctrl_range_max[7])
         self.ctrl[8] = np.clip(self.ctrl[8], self._ctrl_range_min[8], self._ctrl_range_max[8])
@@ -298,12 +299,12 @@ class FrankaEnv(RobomimicEnv):
         mocap_xmat = rotations.quat2mat(mocap_xquat)
 
         # 平移控制
-        MOVE_SPEED = self.gym.opt.timestep * 0.2
+        MOVE_SPEED = self.realtime_step * 0.2   # 0.2 m/s
         mocap_xpos = mocap_xpos + np.dot(mocap_xmat, pos_ctrl) * MOVE_SPEED
         mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
 
         # 旋转控制
-        ROUTE_SPEED = self.gym.opt.timestep * 2
+        ROUTE_SPEED = self.realtime_step * np.pi / 2  # 90 degree/s    
         rot_offset = rot_ctrl * ROUTE_SPEED
         new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
         mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
