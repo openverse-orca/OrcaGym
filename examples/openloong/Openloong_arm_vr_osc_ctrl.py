@@ -64,6 +64,9 @@ def continue_training(env):
 
         action = env.action_space.sample()
         observation, reward, terminated, truncated, info = env.step(action)
+
+        env.render()
+
         # Collect data after each step
         obs_list = [observation]  # Collect observations for this step
         action_list = [action]  # Collect actions
