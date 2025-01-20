@@ -1,0 +1,452 @@
+<mujoco model="random_box_terrain">
+    <compiler angle="degree" coordinate="local"/>
+    <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
+
+    <asset>
+   
+    </asset>
+    <worldbody>
+        <body name="offset" pos="-55 -55 0">
+            <body name="terrain" pos="-5 5 0.0">
+
+                <!-- 3-1 -->
+                <geom group="3" type="box" pos="-5.0 -5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -5.0 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="5.0 -5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -5.0 0.75" size="1.0 1.0  0.05"   />    
+
+                <geom group="3" type="box" pos="15.0 -5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -5.0 0.75" size="1.0 1.0  0.05"   />    
+
+                <!-- 3-2 -->
+                <geom group="3" type="box" pos="-5.0 5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 5.0 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="5.0 5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 5.0 0.75" size="1.0 1.0  0.05"   />   
+
+                <geom group="3" type="box" pos="15.0 5.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 5.0 0.75" size="1.0 1.0  0.05"   />   
+
+                <!-- 3-3 -->
+                <geom group="3" type="box" pos="-5.0 -15.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-5.0 -15.0 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="5.0 -15.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="5.0 -15.0 0.75" size="1.0 1.0  0.05"   />   
+
+                <geom group="3" type="box" pos="15.0 -15.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="15.0 -15.0 0.75" size="1.0 1.0  0.05"   />   
+
+
+                <!-- 4-1 -->
+                <geom group="3" type="box" pos="-10.0 0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 0 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="0.0 0.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 0.0 0.75" size="1.0 1.0  0.05"   />
+
+                <geom group="3" type="box" pos="10.0 0.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 0.0 0.75" size="1.0 1.0  0.05"   />       
+                
+                <geom group="3" type="box" pos="20.0 0.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 0.0 0.75" size="1.0 1.0  0.05"   />          
+
+                <!-- 4-2 -->
+                <geom group="3" type="box" pos="-10.0 10 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 10 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="0.0 10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 10.0 0.75" size="1.0 1.0  0.05"   />
+
+                <geom group="3" type="box" pos="10.0 10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 10.0 0.75" size="1.0 1.0  0.05"   />       
+                
+                <geom group="3" type="box" pos="20.0 10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 10.0 0.75" size="1.0 1.0  0.05"   />    
+
+                <!-- 4-3 -->
+                <geom group="3" type="box" pos="-10.0 -10 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -10 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="0.0 -10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -10.0 0.75" size="1.0 1.0  0.05"   />
+
+                <geom group="3" type="box" pos="10.0 -10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -10.0 0.75" size="1.0 1.0  0.05"   />       
+                
+                <geom group="3" type="box" pos="20.0 -10.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -10.0 0.75" size="1.0 1.0  0.05"   />     
+
+                <!-- 4-4 -->
+                <geom group="3" type="box" pos="-10.0 -20 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="-10.0 -20 0.75" size="1.0 1.0  0.05"   />  
+
+                <geom group="3" type="box" pos="0.0 -20.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="0.0 -20.0 0.75" size="1.0 1.0  0.05"   />
+
+                <geom group="3" type="box" pos="10.0 -20.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="10.0 -20.0 0.75" size="1.0 1.0  0.05"   />       
+                
+                <geom group="3" type="box" pos="20.0 -20.0 0.0"  size="4.0 4.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.05" size="3.8 3.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.1"  size="3.6 3.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.15" size="3.4 3.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.2"  size="3.2 3.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.25" size="3.0 3.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.3"  size="2.8 2.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.35" size="2.6 2.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.4"  size="2.4 2.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.45" size="2.2 2.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.5"  size="2.0 2.0  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.55" size="1.8 1.8  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.6"  size="1.6 1.6  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.65" size="1.4 1.4  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.7"  size="1.2 1.2  0.05"   />
+                <geom group="3" type="box" pos="20.0 -20.0 0.75" size="1.0 1.0  0.05"   />                                                       
+            </body>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <!-- 在这里你可以定义一些控制器 -->
+    </actuator>
+
+</mujoco>
