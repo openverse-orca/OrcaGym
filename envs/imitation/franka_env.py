@@ -47,10 +47,13 @@ class FrankaEnv(RobomimicEnv):
         )
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
-        self.EE_NAME  = self.site("ee_center_site")
-        self.OBJ_NAME = self.body("item")
-        self.OBJ_SITE_NAME = self.site("item_site")
-        self.OBJ_JOINT_NAME = self.joint("item_joint")
+        self._ee_name  = self.site("ee_center_site")
+        self._obj_name = self.body("item")
+        self._obj_site_name = self.site("item_site")
+        self._obj_joint_name = self.joint("item_joint")
+        self._goal_name = self.site("goal")
+        self._goal_site_name = self.site("goal_site")
+        self._goal_joint_name = self.joint("goal_joint")
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -78,16 +81,19 @@ class FrankaEnv(RobomimicEnv):
         self._gripper_joint_names = [self.joint("finger_joint1"), self.joint("finger_joint2")]
 
         self._set_init_state()
-        site_dict = self.query_site_pos_and_quat([self.EE_NAME])
-        self._initial_grasp_site_xpos = site_dict[self.EE_NAME]['xpos']
-        self._initial_grasp_site_xquat = site_dict[self.EE_NAME]['xquat']
+        site_dict = self.query_site_pos_and_quat([self._ee_name])
+        self._initial_grasp_site_xpos = site_dict[self._ee_name]['xpos']
+        self._initial_grasp_site_xquat = site_dict[self._ee_name]['xquat']
         self._reset_grasp_mocap()
 
 
-        site_dict = self.query_site_pos_and_quat([self.OBJ_SITE_NAME])
-        self._initial_obj_site_xpos = site_dict[self.OBJ_SITE_NAME]['xpos']
-        self._initial_obj_site_xquat = site_dict[self.OBJ_SITE_NAME]['xquat']
-        self._sample_object()
+        site_dict = self.query_site_pos_and_quat([self._obj_site_name])
+        self._initial_obj_site_xpos = site_dict[self._obj_site_name]['xpos']
+        self._initial_obj_site_xquat = site_dict[self._obj_site_name]['xquat']
+        
+        site_dict = self.query_site_pos_and_quat([self._goal_site_name])
+        self._initial_goal_site_xpos = site_dict[self._goal_site_name]['xpos']
+        self._initial_goal_site_xquat = site_dict[self._goal_site_name]['xquat']
 
 
         if self._run_mode == RunMode.TELEOPERATION:
@@ -112,7 +118,7 @@ class FrankaEnv(RobomimicEnv):
         #   policy (control) freq, and ndim (# joints)
         self._controller_config["robot_name"] = agent_names[0]
         self._controller_config["sim"] = self.gym
-        self._controller_config["eef_name"] = self.EE_NAME
+        self._controller_config["eef_name"] = self._ee_name
         # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
         qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._arm_joint_names)
         self._controller_config["joint_indexes"] = {
@@ -181,7 +187,7 @@ class FrankaEnv(RobomimicEnv):
             raise ValueError("Invalid reward type")
     
     def _is_success(self, achieved_goal, desired_goal) -> bool:
-        success_threshold = 0.02
+        success_threshold = 0.03
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
 
     def step(self, action) -> tuple:
@@ -336,11 +342,12 @@ class FrankaEnv(RobomimicEnv):
         return new_xmat
 
     def _get_obs(self) -> dict:
-        ee_position = self.query_site_pos_and_quat([self.EE_NAME])[self.EE_NAME]
-        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self.EE_NAME])
+        ee_position = self.query_site_pos_and_quat([self._ee_name])[self._ee_name]
+        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self._ee_name])
         gripper_qpos = self.get_gripper_qpos()
         gripper_qvel = self.get_gripper_qvel()
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        goal_xpos, goal_xquat = self._query_goal_pos_and_quat()
         joint_values = self.get_arm_joint_values()
         joint_values_sin = np.sin(joint_values)
         joint_values_cos = np.cos(joint_values)
@@ -348,10 +355,11 @@ class FrankaEnv(RobomimicEnv):
 
         obs = {
             "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32),
+            "goal": np.concatenate([goal_xpos, goal_xquat], dtype=np.float32),
             "ee_pos": ee_position["xpos"],
             "ee_quat": ee_position["xquat"],
-            "ee_vel_linear": ee_xvalp[self.EE_NAME],
-            "ee_vel_angular": ee_xvalr[self.EE_NAME],
+            "ee_vel_linear": ee_xvalp[self._ee_name],
+            "ee_vel_angular": ee_xvalr[self._ee_name],
             "joint_qpos": joint_values,
             "joint_qpos_sin": joint_values_sin,
             "joint_qpos_cos": joint_values_cos,
@@ -362,13 +370,14 @@ class FrankaEnv(RobomimicEnv):
         return obs
     
     def _get_achieved_goal(self) -> np.ndarray:
-        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
+        obj_xpos, _ = self._query_obj_pos_and_quat()
         # print("achieved goal position: ", obj_xpos)
-        return obj_xpos.copy()
+        return obj_xpos
     
     def _get_desired_goal(self) -> np.ndarray:
-        # print("desired goal position: ", self.goal)
-        return self.goal.copy()
+        goal_xpos, _ = self._query_goal_pos_and_quat()
+        # print("desired goal position: ", goal_xpos)
+        return goal_xpos
 
     def reset_model(self) -> dict:
         """
@@ -380,18 +389,22 @@ class FrankaEnv(RobomimicEnv):
         self._set_init_state()
         self._reset_grasp_mocap()
 
-        obj_xpos, obj_xquat = self._sample_object()
-        self.set_object_qpos(obj_xpos, obj_xquat)
-
-        self.goal = self._sample_goal(obj_xpos)
+        contacted = True
+        while contacted:
+            obj_xpos, obj_xquat = self._sample_object()
+            goal_xpos, goal_xquat = self._sample_goal()
+            contacted = np.linalg.norm(obj_xpos - goal_xpos) < 0.2
+        
+        self.set_obj_qpos(obj_xpos, obj_xquat)
+        self.set_goal_qpos(goal_xpos, goal_xquat)
 
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {}
     
-    def replace_object(self, obj_xpos, obj_xquat) -> None:
-        self.set_object_qpos(obj_xpos, obj_xquat)
-        self.goal = self._sample_goal(obj_xpos)
+    def replace_obj_goal(self, obj_xpos, obj_xquat, goal_xpos, goal_xquat) -> None:
+        self.set_obj_qpos(obj_xpos, obj_xquat)
+        self.set_goal_qpos(goal_xpos, goal_xquat)
         self.mj_forward()
 
     # custom methods
@@ -400,9 +413,13 @@ class FrankaEnv(RobomimicEnv):
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_object_qpos(self, position, orientation) -> None:
-        obj_qpos = {self.OBJ_JOINT_NAME: np.concatenate([position, orientation])}
+    def set_obj_qpos(self, position, orientation) -> None:
+        obj_qpos = {self._obj_joint_name: np.concatenate([position, orientation])}
         self.set_joint_qpos(obj_qpos)
+        
+    def set_goal_qpos(self, position, orientation) -> None:
+        goal_qpos = {self._goal_joint_name: np.concatenate([position, orientation])}
+        self.set_joint_qpos(goal_qpos)
 
     def set_joint_neutral(self) -> None:
         # assign value to arm joints
@@ -418,15 +435,15 @@ class FrankaEnv(RobomimicEnv):
         self.set_joint_qpos(gripper_joint_qpos)
 
     def _query_obj_pos_and_quat(self) -> tuple:
-        site_dict = self.query_site_pos_and_quat([self.OBJ_SITE_NAME])
-        obj_xpos, obj_xquat = site_dict[self.OBJ_SITE_NAME]['xpos'], site_dict[self.OBJ_SITE_NAME]['xquat']
+        site_dict = self.query_site_pos_and_quat([self._obj_site_name])
+        obj_xpos, obj_xquat = site_dict[self._obj_site_name]['xpos'], site_dict[self._obj_site_name]['xquat']
         return obj_xpos, obj_xquat
+    
+    def _query_goal_pos_and_quat(self) -> tuple:
+        site_dict = self.query_site_pos_and_quat([self._goal_site_name])
+        goal_xpos, goal_xquat = site_dict[self._goal_site_name]['xpos'], site_dict[self._goal_site_name]['xquat']
+        return goal_xpos, goal_xquat
 
-    def _sample_goal(self, obj_xpos) -> np.ndarray:
-        goal_xpos = obj_xpos.copy()
-        goal_xpos[2] += 0.1
-        # print("sample goal position: ", goal_xpos)
-        return goal_xpos
 
     def _sample_object(self) -> None:
         """
@@ -445,6 +462,24 @@ class FrankaEnv(RobomimicEnv):
         # print("sample object position, quaternion: ", obj_xpos, obj_xquat)
 
         return obj_xpos, obj_xquat
+    
+    def _sample_goal(self) -> np.ndarray:
+        """
+        随机采样一个目标位置
+        """
+        goal_offset = 0.2
+        goal_xpos = self._initial_goal_site_xpos.copy()
+        goal_xquat = self._initial_goal_site_xquat.copy()
+        goal_euler = rotations.quat2euler(goal_xquat)
+
+        goal_xpos[0] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[0]
+        goal_xpos[1] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[1]
+        goal_euler[2] = np.random.uniform(-np.pi, np.pi)
+        goal_xquat = rotations.euler2quat(goal_euler)
+
+        # print("sample goal position, quaternion: ", goal_xpos, goal_xquat)
+
+        return goal_xpos, goal_xquat
 
 
 

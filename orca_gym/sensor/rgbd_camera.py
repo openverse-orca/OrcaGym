@@ -6,7 +6,11 @@ import io
 import threading
 import time
 import numpy as np
-
+import tkinter as tk
+from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+import matplotlib
+import matplotlib.animation as animation
 
 class CameraWrapper:
     def __init__(self, name:str, port:int):
@@ -166,8 +170,6 @@ class CameraDataParser:
             if self.current_index == index:
                 self.last_frame = frame.to_ndarray(format='bgr24')
                 return self.last_frame
-            
-
 
 class VideoPlayer:
     def __init__(self, name:str):
@@ -180,37 +182,54 @@ class VideoPlayer:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         cv2.destroyAllWindows()
-
+          
 class Monitor:
-    def __init__(self, name:str):
+    def __init__(self, name : str, fps=30):
         self.camera = CameraWrapper(name, 7070)
         self.camera.start()
-        self.playing = False
+        
+        self.fps = fps
+        self.interval = 1000 / self.fps  # 更新间隔，单位为毫秒
+        
+        # 创建 Matplotlib 图形和轴
+        self.fig, self.ax = plt.subplots()
+        self.ax.axis('off')  # 关闭坐标轴
+        
+        frame = self.camera.get_frame()
 
-    def play(self):
-        self.playing = True
-        while self.playing:
-            frame = self.camera.get_frame()
-            cv2.imshow('video', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        cv2.destroyAllWindows()
+        # 转换颜色从 BGR 到 RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # 显示初始图像
+        self.im = self.ax.imshow(frame)
+        self.ax.set_title("Camera Feed")
+    
+    def update(self, frame_num):
+        frame = self.camera.get_frame()
+
+        # 转换颜色从 BGR 到 RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # 更新图像数据
+        self.im.set_data(frame)
+        return self.im,
+    
+    def start(self):
+        # 创建动画
+        self.ani = animation.FuncAnimation(
+            self.fig,
+            self.update,
+            interval=self.interval,
+            blit=True
+        )
+        plt.show()
+    
+    def stop(self):
+        # 释放摄像头资源
+        self.camera.stop()
+        plt.close(self.fig)
+    
+    def __del__(self):
+        self.stop()
 
 
-
-# if __name__ == "__main__":
-    # camera = CameraCacher("camera", 7070)
-    # camera.start()
-    # while not camera.is_first_frame_received():
-    #     time.sleep(0.001)
-    # time.sleep(10)
-    # camera.stop()
-    # print("done")
-
-    # parser = CameraDataParser()
-    # print(parser.ts_list)
-    # print(parser.get_closed_frame(1731662211073)[0])
-
-    # player = VideoPlayer()
-    # player.play()
-    # print("done")

@@ -174,8 +174,6 @@
       </body>
 
       <body name="toys" pos="0.55 0 0">
-      <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
-      <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
         <body name="box" pos="0 0 -0.06">
           <geom name="box_geom" type="box" size="1 1 0.1" material="oak_veneer_material" density="1000" condim="3" contype="1" conaffinity="1" />
         </body>
@@ -183,7 +181,7 @@
       <body name="item" pos="0.55 -0.1 0.09">
         <freejoint name="item_joint"/>
         <geom name="item_geom" type="box" size="0.025 0.025 0.025" material="wood_table_worn_material" density="500" contype="1" conaffinity="1" />
-        <site name="item_site" pos="0 0 0" size="0.02" group="1"/>
+        <site name="item_site" pos="0 0 0" size="0.02" group="3"/>
       </body>    
 
       <body name="goal" pos="0.55 0.1 0.15">
@@ -300,13 +298,9 @@
                             <site name='ee_center_site' size="0.01" group="3"/>
                         </body>
 
-                        <body name="camera" pos="0.1 0 -0.1" euler="0.0 0.0 3.1415926">
-                          <site name='camera' size="0.01" group="3"/>
+                        <body name="rgbd_camera" pos="0.1 0 -0.1" euler="0.0 0.0 1.5707963">
+                          <site name='rgbd_camera' size="0.01" group="3"/>
                         </body>
-                        <body name="camera_aim" pos="-0.0 0 0.2">
-                          <site name='camera_aim' size="0.01" group="3"/>
-                        </body>
-                        
   
                         <body name="left_finger" pos="0 0 0.0584">
                           <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>

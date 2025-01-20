@@ -1,6 +1,8 @@
 import os
 import sys
 import time
+import subprocess
+import signal
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -100,7 +102,7 @@ def user_comfirm_save_record(task_result):
         else:
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
-def do_teleoperation(env, dataset_writer : DatasetWriter):
+def do_teleoperation(env, dataset_writer : DatasetWriter):    
     while True:
         obs_list, reward_list, done_list, info_list = run_episode(env)
         task_result = "Success" if done_list[-1] == 1 else "Failed"
@@ -146,14 +148,23 @@ def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
     obj_xpos = object_data[0][0:3]
     obj_xquat = object_data[0][3:7]
     
+    goal_data = demo_data['obs']['goal']
+    goal_xpos = goal_data[0][0:3]
+    goal_xquat = goal_data[0][3:7]
+    
     if noise_scale > 0.0:
         obj_xpos += np.random.normal(0, noise_scale, len(obj_xpos))
         obj_euler = rotations.quat2euler(obj_xquat)
         obj_euler += np.random.normal(0, noise_scale, len(obj_euler))
         obj_xquat = rotations.euler2quat(obj_euler)
+        
+        goal_xpos += np.random.normal(0, noise_scale, len(goal_xpos))
+        goal_euler = rotations.quat2euler(goal_xquat)
+        goal_euler += np.random.normal(0, noise_scale, len(goal_euler))
+        goal_xquat = rotations.euler2quat(goal_euler)
     
     # print("Resetting object position: ", obj_xpos, obj_xquat)
-    env.unwrapped.replace_object(obj_xpos, obj_xquat)
+    env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
     
 def do_playback(env : FrankaEnv, dataset_reader : DatasetReader, playback_mode : str):
     demo_names = dataset_reader.get_demo_names()
@@ -279,6 +290,7 @@ def run_example(orcagym_addr : str,
         if run_mode == RunMode.PLAYBACK:
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
+            env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
             env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
@@ -371,6 +383,36 @@ def run_example(orcagym_addr : str,
         env.close()
     
 
+def start_monitor():
+    """
+    启动 monitor.py 作为子进程。
+    """
+    # 获取当前脚本所在的目录
+    monitor_script = f"{project_root}/orca_gym/scripts/camera_monitor.py"
+
+    # 启动 monitor.py
+    # 使用 sys.executable 确保使用相同的 Python 解释器
+    process = subprocess.Popen(
+        [sys.executable, monitor_script],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    return process
+
+def terminate_monitor(process):
+    """
+    终止子进程。
+    """
+    try:
+        if os.name != 'nt':
+            # Unix/Linux: 发送 SIGTERM 给整个进程组
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        else:
+            # Windows: 使用 terminate 方法
+            process.terminate()
+    except Exception as e:
+        print(f"终止子进程时发生错误: {e}")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
@@ -378,7 +420,7 @@ if __name__ == "__main__":
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--record_path', type=str, help='The file path to save the record')
     parser.add_argument('--ckpt_path', type=str, help='The model file to load for rollout the policy')
-    parser.add_argument('--record_time', type=int, default=20, help='The time to record the teleoperation in 1 episode')
+    parser.add_argument('--record_time', type=int, default=30, help='The time to record the teleoperation in 1 episode')
     parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
@@ -426,9 +468,11 @@ if __name__ == "__main__":
         print("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
 
-
-
     max_episode_steps = int(record_time / REALTIME_STEP)
+
+    # 启动 Monitor 子进程
+    monitor_process = start_monitor()
+    print(f"Monitor 进程已启动，PID: {monitor_process.pid}")
 
     run_example(orcagym_addr, 
                 agent_name, 
@@ -441,3 +485,6 @@ if __name__ == "__main__":
                 ckpt_path, 
                 augmented_sacle,
                 augmented_times)
+
+    # 终止 Monitor 子进程
+    terminate_monitor(monitor_process)
