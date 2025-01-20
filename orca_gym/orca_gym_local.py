@@ -627,3 +627,12 @@ class OrcaGymLocal(OrcaGymBase):
             geom = model.geom(name)
             geom.friction = friction.copy()
             
+
+    def query_contact_force(self, contact_ids):
+        contact_force_dict = {}
+        for contact_id in contact_ids:
+            contact_force = np.zeros(6)
+            mujoco.mj_contactForce(self._mjModel, self._mjData, contact_id, contact_force)
+            contact_force_dict[contact_id] = contact_force
+        
+        return contact_force_dict

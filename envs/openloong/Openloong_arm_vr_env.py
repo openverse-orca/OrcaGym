@@ -10,10 +10,11 @@ from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
-from orca_gym.environment import OrcaGymRemoteEnv
+from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
 import time
-class OpenloongArmEnv(OrcaGymRemoteEnv):
+class OpenloongArmEnv(OrcaGymLocalEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
     """
     控制青龙机器人机械臂
     """
@@ -52,8 +53,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         self.gym.opt.noslip_tolerance = 50
         self.gym.opt.mpr_iterations = 100
         self.gym.opt.sdf_iterations = 50
-        self.set_opt_config()
-        print("opt_config: ", self.query_opt_config())
+        self.gym.set_opt_config()
 
         self.goal = self._sample_goal()
 
