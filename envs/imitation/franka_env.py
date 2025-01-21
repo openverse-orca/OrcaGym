@@ -11,7 +11,7 @@ import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.robomimic.robomimic_env import RobomimicEnv
 from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
-
+from orca_gym.utils.reward_printer import RewardPrinter
 
 class FrankaEnv(RobomimicEnv):
     """
@@ -37,6 +37,7 @@ class FrankaEnv(RobomimicEnv):
         self._control_freq = control_freq
         self._reward_type = reward_type
 
+        self._reward_printer = RewardPrinter()
         
         super().__init__(
             frame_skip = frame_skip,
@@ -150,10 +151,10 @@ class FrankaEnv(RobomimicEnv):
         self._saved_xquat = self._initial_grasp_site_xquat.copy()
         
         if self._run_mode == RunMode.TELEOPERATION:
-            self.set_grasp_mocap(self._saved_xpos, self._saved_xquat)
+            self._set_grasp_mocap(self._saved_xpos, self._saved_xquat)
         else:
             xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
-            self.set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
+            self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
 
 
     def get_env_version(self):
@@ -178,20 +179,12 @@ class FrankaEnv(RobomimicEnv):
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
-        self.set_joint_neutral()
+        self._set_joint_neutral()
 
         self.ctrl = np.array(self._neutral_joint_values[0:9])
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
-    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
-        if self._reward_type == RewardType.SPARSE:
-            return 1 if self._is_success(achieved_goal, desired_goal) else 0
-        elif self._reward_type == RewardType.DENSE:
-            return -np.linalg.norm(achieved_goal - desired_goal)
-        else:
-            raise ValueError("Invalid reward type")
-    
     def _is_success(self, achieved_goal, desired_goal) -> bool:
         success_threshold = 0.03
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
@@ -260,7 +253,7 @@ class FrankaEnv(RobomimicEnv):
         
 
         mocap_xpos, mocap_xquat = self._process_controller(mocap_xpos, mocap_xquat)
-        self.set_grasp_mocap(mocap_xpos, mocap_xquat)
+        self._set_grasp_mocap(mocap_xpos, mocap_xquat)
         self._saved_xpos = mocap_xpos
         self._saved_xquat = mocap_xquat
 
@@ -350,16 +343,16 @@ class FrankaEnv(RobomimicEnv):
     def _get_obs(self) -> dict:
         ee_position = self.query_site_pos_and_quat([self._ee_name])[self._ee_name]
         ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self._ee_name])
-        gripper_qpos = self.get_gripper_qpos()
-        gripper_qvel = self.get_gripper_qvel()
+        gripper_qpos = self._get_gripper_qpos()
+        gripper_qvel = self._get_gripper_qvel()
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
         goal_xpos, goal_xquat = self._query_goal_pos_and_quat()
-        joint_values = self.get_arm_joint_values()
+        joint_values = self._get_arm_joint_values()
         joint_values_sin = np.sin(joint_values)
         joint_values_cos = np.cos(joint_values)
-        joint_velocities = self.get_arm_joint_velocities()
+        joint_velocities = self._get_arm_joint_velocities()
 
-        obs = {
+        self._obs = {
             "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32),
             "goal": np.concatenate([goal_xpos, goal_xquat], dtype=np.float32),
             "ee_pos": ee_position["xpos"],
@@ -373,7 +366,7 @@ class FrankaEnv(RobomimicEnv):
             "gripper_qpos": gripper_qpos,
             "gripper_qvel": gripper_qvel,
         }
-        return obs
+        return self._obs
     
     def _get_achieved_goal(self) -> np.ndarray:
         obj_xpos, _ = self._query_obj_pos_and_quat()
@@ -397,33 +390,33 @@ class FrankaEnv(RobomimicEnv):
 
         obj_xpos, obj_xquat, goal_xpos, goal_xquat = self._sample_obj_goal()
         
-        self.set_obj_qpos(obj_xpos, obj_xquat)
-        self.set_goal_qpos(goal_xpos, goal_xquat)
+        self._set_obj_qpos(obj_xpos, obj_xquat)
+        self._set_goal_qpos(goal_xpos, goal_xquat)
 
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {}
     
     def replace_obj_goal(self, obj_xpos, obj_xquat, goal_xpos, goal_xquat) -> None:
-        self.set_obj_qpos(obj_xpos, obj_xquat)
-        self.set_goal_qpos(goal_xpos, goal_xquat)
+        self._set_obj_qpos(obj_xpos, obj_xquat)
+        self._set_goal_qpos(goal_xpos, goal_xquat)
         self.mj_forward()
 
     # custom methods
     # -----------------------------
-    def set_grasp_mocap(self, position, orientation) -> None:
+    def _set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
-    def set_obj_qpos(self, position, orientation) -> None:
+    def _set_obj_qpos(self, position, orientation) -> None:
         obj_qpos = {self._obj_joint_name: np.concatenate([position, orientation])}
         self.set_joint_qpos(obj_qpos)
         
-    def set_goal_qpos(self, position, orientation) -> None:
+    def _set_goal_qpos(self, position, orientation) -> None:
         goal_qpos = {self._goal_joint_name: np.concatenate([position, orientation])}
         self.set_joint_qpos(goal_qpos)
 
-    def set_joint_neutral(self) -> None:
+    def _set_joint_neutral(self) -> None:
         # assign value to arm joints
         arm_joint_qpos = {}
         for name, value in zip(self._arm_joint_names, self._neutral_joint_values[0:7]):
@@ -484,29 +477,29 @@ class FrankaEnv(RobomimicEnv):
 
         return obj_xpos, obj_xquat, goal_xpos, goal_xquat
 
-    def get_ee_xform(self) -> np.ndarray:
+    def _get_ee_xform(self) -> np.ndarray:
         pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site")])
         xpos = pos_dict[self.site("ee_center_site")]['xpos'].copy()
         xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
         return xpos, xmat
 
-    def get_gripper_qpos(self) -> np.ndarray:
+    def _get_gripper_qpos(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
         finger1 = qpos_dict[self.joint("finger_joint1")]
         finger2 = qpos_dict[self.joint("finger_joint2")]
         return np.concatenate([finger1, finger2], dtype=np.float32)
     
-    def get_gripper_qvel(self) -> np.ndarray:
+    def _get_gripper_qvel(self) -> np.ndarray:
         qvel_dict = self.query_joint_qvel([self.joint("finger_joint1"), self.joint("finger_joint2")])
         finger1 = qvel_dict[self.joint("finger_joint1")]
         finger2 = qvel_dict[self.joint("finger_joint2")]
         return np.concatenate([finger1, finger2], dtype=np.float32)
     
-    def get_arm_joint_values(self) -> np.ndarray:
+    def _get_arm_joint_values(self) -> np.ndarray:
         qpos_dict = self.query_joint_qpos(self._arm_joint_names)
         return np.array([qpos_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
     
-    def get_arm_joint_velocities(self) -> np.ndarray:
+    def _get_arm_joint_velocities(self) -> np.ndarray:
         qvel_dict = self.query_joint_qvel(self._arm_joint_names)
         return np.array([qvel_dict[joint_name] for joint_name in self._arm_joint_names]).flatten()
 
@@ -515,3 +508,69 @@ class FrankaEnv(RobomimicEnv):
             return obs
         else:
             return self._get_obs().copy()
+
+    def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
+        if self._reward_printer is not None:
+            self._reward_printer.print_reward(message, reward, coeff)
+        
+    def _compute_reward_obj_goal_distance(self) -> float:
+        tracking_sigma = 0.25  # 奖励的衰减因子
+        
+        obj_xpos = self._obs["object"][:3]
+        goal_xpos = self._obs["goal"][:3]
+        distance = np.linalg.norm(obj_xpos - goal_xpos)
+        distance = np.clip(distance, 0.1, distance)   # 当距离足够近的时候，避免从错误的方向靠近
+        
+        # 计算指数衰减奖励
+        reward = np.exp(-distance / tracking_sigma)
+        return reward
+    
+    def _compute_reward_obj_grasp_distance(self) -> float:
+        tracking_sigma = 0.25
+        
+        obj_xpos = self._obs["object"][:3]
+        ee_xpos = self._obs["ee_pos"]
+        distance = np.linalg.norm(obj_xpos - ee_xpos)
+        
+        # 计算指数衰减奖励
+        reward = np.exp(-distance / tracking_sigma)
+        return reward
+    
+    def _compute_reward_success(self) -> float:
+        achieved_goal = self._achieved_goal
+        desired_goal = self._desired_goal
+        return 1 if self._is_success(achieved_goal, desired_goal) else 0
+
+    def _setup_reward_functions(self, robot_config : dict) -> None:
+        self._reward_functions = [
+            {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
+            {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
+            {"function": self._compute_reward_success, "coeff": 10},
+        ]
+        
+    def _compute_dense_reward(self, achieved_goal, desired_goal,) -> float:
+        total_reward = 0.0
+        self._achieved_goal = achieved_goal
+        self._desired_goal = desired_goal
+
+        for reward_function in self._reward_functions:
+            if reward_function["coeff"] == 0:
+                continue
+            else:    
+                reward = reward_function["function"]() * reward_function["coeff"]
+                total_reward += reward
+                self._print_reward(reward_function["function"].__name__, reward, reward_function["coeff"])
+
+        self._print_reward("Total reward: ", total_reward)
+        return total_reward
+
+    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
+        if self._reward_type == RewardType.SPARSE:
+            return 1 if self._is_success(achieved_goal, desired_goal) else 0
+        elif self._reward_type == RewardType.DENSE:
+            return self._compute_dense_reward(achieved_goal, desired_goal)
+        else:
+            raise ValueError("Invalid reward type")
+        
+    
+        
