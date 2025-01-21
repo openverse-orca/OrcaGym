@@ -354,7 +354,8 @@ def run_example(orcagym_addr : str,
                     render=True, 
                     video_writer=None, 
                     video_skip=5, 
-                    camera_names=["agentview"]
+                    camera_names=["agentview"],
+                    realtime_step=REALTIME_STEP
                 )
                 print(stats)
         elif run_mode == RunMode.AUGMENTATION:

@@ -148,7 +148,13 @@ class FrankaEnv(RobomimicEnv):
     def _reset_grasp_mocap(self) -> None:
         self._saved_xpos = self._initial_grasp_site_xpos.copy()
         self._saved_xquat = self._initial_grasp_site_xquat.copy()
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        
+        if self._run_mode == RunMode.TELEOPERATION:
+            self.set_grasp_mocap(self._saved_xpos, self._saved_xquat)
+        else:
+            xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
+            self.set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
+
 
     def get_env_version(self):
         return FrankaEnv.ENV_VERSION
@@ -389,11 +395,7 @@ class FrankaEnv(RobomimicEnv):
         self._set_init_state()
         self._reset_grasp_mocap()
 
-        contacted = True
-        while contacted:
-            obj_xpos, obj_xquat = self._sample_object()
-            goal_xpos, goal_xquat = self._sample_goal()
-            contacted = np.linalg.norm(obj_xpos - goal_xpos) < 0.2
+        obj_xpos, obj_xquat, goal_xpos, goal_xquat = self._sample_obj_goal()
         
         self.set_obj_qpos(obj_xpos, obj_xquat)
         self.set_goal_qpos(goal_xpos, goal_xquat)
@@ -445,43 +447,42 @@ class FrankaEnv(RobomimicEnv):
         return goal_xpos, goal_xquat
 
 
-    def _sample_object(self) -> None:
+    def _sample_obj_goal(self) -> None:
         """
-        随机采样一个物体的位置
-        """
+        随机采样一个物体位置和目标位置
+        """        
+        contacted = True
         object_offset = 0.2
-        obj_xpos = self._initial_obj_site_xpos.copy()
-        obj_xquat = self._initial_obj_site_xquat.copy()
-        obj_euler = rotations.quat2euler(obj_xquat)
-
-        obj_xpos[0] = np.random.uniform(-object_offset, object_offset) + obj_xpos[0]
-        obj_xpos[1] = np.random.uniform(-object_offset, object_offset) + obj_xpos[1]
-        obj_euler[2] = np.random.uniform(-np.pi, np.pi)
-        obj_xquat = rotations.euler2quat(obj_euler)
-
-        # print("sample object position, quaternion: ", obj_xpos, obj_xquat)
-
-        return obj_xpos, obj_xquat
-    
-    def _sample_goal(self) -> np.ndarray:
-        """
-        随机采样一个目标位置
-        """
         goal_offset = 0.2
-        goal_xpos = self._initial_goal_site_xpos.copy()
-        goal_xquat = self._initial_goal_site_xquat.copy()
-        goal_euler = rotations.quat2euler(goal_xquat)
+        while contacted:
+            # 50%概率交换物体和目标位置
+            if np.random.uniform() < 0.5:
+                obj_xpos = self._initial_obj_site_xpos.copy()
+                obj_xquat = self._initial_obj_site_xquat.copy()
+                goal_xpos = self._initial_goal_site_xpos.copy()
+                goal_xquat = self._initial_goal_site_xquat.copy()
+            else:
+                obj_xpos = self._initial_goal_site_xpos.copy()
+                obj_xquat = self._initial_goal_site_xquat.copy()
+                goal_xpos = self._initial_obj_site_xpos.copy()
+                goal_xquat = self._initial_obj_site_xquat.copy()
+            
+            
+            obj_euler = rotations.quat2euler(obj_xquat)
+            obj_xpos[0] = np.random.uniform(-object_offset, object_offset) + obj_xpos[0]
+            obj_xpos[1] = np.random.uniform(-object_offset, object_offset) + obj_xpos[1]
+            obj_euler[2] = np.random.uniform(-np.pi, np.pi)
+            obj_xquat = rotations.euler2quat(obj_euler)
 
-        goal_xpos[0] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[0]
-        goal_xpos[1] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[1]
-        goal_euler[2] = np.random.uniform(-np.pi, np.pi)
-        goal_xquat = rotations.euler2quat(goal_euler)
+            goal_euler = rotations.quat2euler(goal_xquat)
+            goal_xpos[0] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[0]
+            goal_xpos[1] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[1]
+            goal_euler[2] = np.random.uniform(-np.pi, np.pi)
+            goal_xquat = rotations.euler2quat(goal_euler)
 
-        # print("sample goal position, quaternion: ", goal_xpos, goal_xquat)
+            contacted = np.linalg.norm(obj_xpos - goal_xpos) < 0.2
 
-        return goal_xpos, goal_xquat
-
-
+        return obj_xpos, obj_xquat, goal_xpos, goal_xquat
 
     def get_ee_xform(self) -> np.ndarray:
         pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site")])

@@ -191,7 +191,7 @@
         <geom type="box" pos="-0.0502 0 0.0002" size="0.015 0.065 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
         <geom type="box" pos="0 0.0501 -0.0001" size="0.065 0.015 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />
         <geom type="box" pos="0 -0.0503 0" size="0.065 0.015 0.065" material="oak_veneer_material" density="500" contype="1" conaffinity="1" />        
-        <site name="goal_site" pos="0 0 0" size="0.03" group="1"/>
+        <site name="goal_site" pos="0 0 0" size="0.03" group="3"/>
       </body>    
 
       <body name="link0" childclass="panda" pos="0 0 0.05">

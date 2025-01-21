@@ -17,6 +17,7 @@ from robomimic.envs.env_base import EnvBase
 from robomimic.algo import RolloutPolicy
 
 import urllib.request
+import time
 
 
 def download_dataset():
@@ -49,7 +50,7 @@ def create_env(ckpt_path):
 
     return env, policy
 
-def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, camera_names=None):
+def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, camera_names=None, realtime_step=0.0):
     """
     Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video, 
     and returns the rollout trajectory.
@@ -81,6 +82,8 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     total_reward = 0.
     try:
         for step_i in range(horizon):
+            if realtime_step > 0.0:
+                start_time = time.time()
 
             # get action from policy
             act = policy(ob=obs)
@@ -111,6 +114,12 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             # update for next iter
             obs = deepcopy(next_obs)
             # state_dict = env.get_state()
+            
+            # sleep to maintain real-time speed
+            if realtime_step > 0.0:
+                elapsed_time = time.time() - start_time
+                if elapsed_time < realtime_step:
+                    time.sleep(realtime_step - elapsed_time)
 
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))

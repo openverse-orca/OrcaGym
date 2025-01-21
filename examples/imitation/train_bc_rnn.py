@@ -91,7 +91,7 @@ def orca_gym_hyperparameters(config):
     config.train.hdf5_validation_filter_key = "valid"
 
     # fetch sequences of length 10 from dataset for RNN training
-    config.train.seq_length = 10  # 增加序列长度从10到50
+    config.train.seq_length = 20  # 增加序列长度从10到50
 
     # keys from hdf5 to load per demonstration, besides "obs" and "next_obs"
     config.train.dataset_keys = (
@@ -106,13 +106,14 @@ def orca_gym_hyperparameters(config):
     ## learning config ##
     config.train.cuda = True                                    # try to use GPU (if present) or not
     config.train.batch_size = 64                               # batch size
-    config.train.num_epochs = 3000                              # number of training epochs
+    config.train.num_epochs = 10000                              # number of training epochs
     config.train.seed = 1                                       # seed for training
 
 
     ### Observation Config ###
     config.observation.modalities.obs.low_dim = [               # specify low-dim observations for agent
         "object",
+        "goal",
         "ee_pos",
         "ee_quat",
         # "ee_vel_linear",
@@ -187,8 +188,8 @@ def orca_gym_hyperparameters(config):
 
     # rnn policy config
     config.algo.rnn.enabled = True      # enable RNN policy
-    config.algo.rnn.horizon = 10  # 增加RNN的时间步长从10到50        # unroll length for RNN - should usually match train.seq_length
-    config.algo.rnn.hidden_dim = 1200    # hidden dimension size
+    config.algo.rnn.horizon = 20  # 增加RNN的时间步长从10到50        # unroll length for RNN - should usually match train.seq_length
+    config.algo.rnn.hidden_dim = 1600    # hidden dimension size
     config.algo.rnn.rnn_type = "LSTM"   # rnn type - one of "LSTM" or "GRU"
     config.algo.rnn.num_layers = 2      # number of RNN layers that are stacked
     config.algo.rnn.open_loop = False   # if True, action predictions are only based on a single observation (not sequence) + hidden state
