@@ -20,6 +20,7 @@ from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 from envs.imitation.franka_env import FrankaEnv
 from examples.imitation.train_bc_rnn import run_train_bc_rnn
+from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
 from robomimic.utils.file_utils import maybe_dict_from_checkpoint
@@ -331,7 +332,7 @@ def run_example(orcagym_addr : str,
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
             output_dir = f"{current_file_path}/trained_models_tmp/train_temp_dir_{formatted_now}"
-            run_train_bc_rnn(dataset_type="orca_gym", dataset=record_path, output=output_dir, debug=False)
+            train_policy(config="cql.json", algo=None, dataset=record_path, name=None, output_dir=output_dir, debug=False)
             
         elif run_mode == RunMode.ROLLOUT:
             ckpt_dict = maybe_dict_from_checkpoint(ckpt_path=ckpt_path)
