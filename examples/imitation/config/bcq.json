@@ -1,7 +1,7 @@
 {
     "algo_name": "bcq",
     "experiment": {
-        "name": "test",
+        "name": "orca_gym_bcq",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -22,13 +22,13 @@
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
-        "render": false,
-        "render_video": true,
+        "render": true,
+        "render_video": false,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
             "enabled": true,
-            "n": 50,
+            "n": 5,
             "horizon": 400,
             "rate": 50,
             "warmstart": 0,
@@ -184,10 +184,11 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos",
-                    "robot0_eef_quat",
-                    "robot0_gripper_qpos",
-                    "object"
+                    "object",
+                    "goal",
+                    "ee_pos",
+                    "ee_quat",
+                    "gripper_qpos"
                 ],
                 "rgb": [],
                 "depth": [],

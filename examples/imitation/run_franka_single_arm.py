@@ -420,15 +420,29 @@ def terminate_monitor(process):
         
 def _get_algo_config(algo_name):
     if algo_name == "bc":
-        return "config/bc.json"
+        return ["config/bc.json"]
     elif algo_name == "td3_bc":
-        return "config/td3_bc.json"
+        return ["config/td3_bc.json"]
     elif algo_name == "cql":
-        return "config/cql.json"
+        return ["config/cql.json"]
     elif algo_name == "iris":
-        return "config/iris.json"
+        return ["config/iris.json"]
     elif algo_name == "hbc":
-        return "config/hbc.json"
+        return ["config/hbc.json"]
+    elif algo_name == "gl":
+        return ["config/gl.json"]
+    elif algo_name == "bcq":
+        return ["config/bcq.json"]
+    elif algo_name == "iql":
+        return ["config/iql.json"]
+    elif algo_name == "all":
+        return ["config/bc.json", 
+                "config/td3_bc.json", 
+                "config/cql.json", 
+                "config/iris.json", 
+                "config/hbc.json", 
+                "config/bcq.json", 
+                "config/iql.json"]
     else:
         raise ValueError(f"Invalid algorithm name: {algo_name}")
 
@@ -502,20 +516,21 @@ if __name__ == "__main__":
     monitor_process = start_monitor()
     print(f"Monitor 进程已启动，PID: {monitor_process.pid}")
 
-    run_example(orcagym_addr, 
-                agent_name, 
-                record_path, 
-                run_mode, 
-                algo_config,
-                ctrl_device, 
-                max_episode_steps, 
-                playback_mode, 
-                rollout_times, 
-                ckpt_path, 
-                augmented_sacle,
-                augmented_times,
-                fixed_record_length,
-                teleoperation_rounds)
+    for config in algo_config:
+        run_example(orcagym_addr, 
+                    agent_name, 
+                    record_path, 
+                    run_mode, 
+                    config,
+                    ctrl_device, 
+                    max_episode_steps, 
+                    playback_mode, 
+                    rollout_times, 
+                    ckpt_path, 
+                    augmented_sacle,
+                    augmented_times,
+                    fixed_record_length,
+                    teleoperation_rounds)
 
     # 终止 Monitor 子进程
     terminate_monitor(monitor_process)
