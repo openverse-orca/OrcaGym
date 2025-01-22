@@ -1,5 +1,5 @@
 {
-    "algo_name": "cql",
+    "algo_name": "iql",
     "experiment": {
         "name": "test",
         "validate": false,
@@ -22,13 +22,13 @@
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
-        "render": true,
-        "render_video": false,
+        "render": false,
+        "render_video": true,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
             "enabled": true,
-            "n": 10,
+            "n": 50,
             "horizon": 400,
             "rate": 50,
             "warmstart": 0,
@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../cql_trained_models",
+        "output_dir": "../iql_trained_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -56,7 +56,7 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 256,
+        "batch_size": 100,
         "num_epochs": 2000,
         "seed": 1
     },
@@ -64,7 +64,17 @@
         "optim_params": {
             "critic": {
                 "learning_rate": {
-                    "initial": 0.001,
+                    "initial": 0.0001,
+                    "decay_factor": 0.0,
+                    "epoch_schedule": []
+                },
+                "regularization": {
+                    "L2": 0.0
+                }
+            },
+            "vf": {
+                "learning_rate": {
+                    "initial": 0.0001,
                     "decay_factor": 0.0,
                     "epoch_schedule": []
                 },
@@ -74,7 +84,7 @@
             },
             "actor": {
                 "learning_rate": {
-                    "initial": 0.0003,
+                    "initial": 0.0001,
                     "decay_factor": 0.0,
                     "epoch_schedule": []
                 },
@@ -84,58 +94,57 @@
             }
         },
         "discount": 0.99,
-        "n_step": 1,
-        "target_tau": 0.005,
+        "target_tau": 0.01,
         "actor": {
-            "bc_start_steps": 0,
-            "target_entropy": "default",
-            "max_gradient_norm": null,
             "net": {
                 "type": "gaussian",
                 "common": {
-                    "std_activation": "exp",
-                    "use_tanh": true,
-                    "low_noise_eval": true
+                    "std_activation": "softplus",
+                    "low_noise_eval": true,
+                    "use_tanh": false
                 },
                 "gaussian": {
                     "init_last_fc_weight": 0.001,
                     "init_std": 0.3,
                     "fixed_std": false
+                },
+                "gmm": {
+                    "num_modes": 5,
+                    "min_std": 0.0001
                 }
             },
             "layer_dims": [
                 300,
                 400
-            ]
+            ],
+            "max_gradient_norm": null
         },
         "critic": {
-            "use_huber": false,
-            "max_gradient_norm": null,
-            "value_bounds": null,
-            "num_action_samples": 1,
-            "cql_weight": 1.0,
-            "deterministic_backup": true,
-            "min_q_weight": 1.0,
-            "target_q_gap": 5.0,
-            "num_random_actions": 10,
             "ensemble": {
                 "n": 2
             },
             "layer_dims": [
                 300,
                 400
-            ]
-        }
+            ],
+            "use_huber": false,
+            "max_gradient_norm": null
+        },
+        "adv": {
+            "clip_adv_value": null,
+            "beta": 1.0,
+            "use_final_clip": true
+        },
+        "vf_quantile": 0.9
     },
     "observation": {
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "object",
-                    "goal",
-                    "ee_pos",
-                    "ee_quat",
-                    "gripper_qpos"
+                    "robot0_eef_pos",
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos",
+                    "object"
                 ],
                 "rgb": [],
                 "depth": [],

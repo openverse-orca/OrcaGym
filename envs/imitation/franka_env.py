@@ -546,7 +546,7 @@ class FrankaEnv(RobomimicEnv):
         self._reward_functions = [
             {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
             {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
-            {"function": self._compute_reward_success, "coeff": 10},
+            {"function": self._compute_reward_success, "coeff": 1.0},
         ]
         
     def _compute_dense_reward(self, achieved_goal, desired_goal,) -> float:

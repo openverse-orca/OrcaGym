@@ -1,7 +1,7 @@
 {
-    "algo_name": "td3_bc",
+    "algo_name": "gl",
     "experiment": {
-        "name": "orca_gym_td3_bc",
+        "name": "test",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -12,37 +12,37 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 20,
+            "every_n_epochs": 50,
             "epochs": [],
             "on_best_validation": false,
-            "on_best_rollout_return": true,
-            "on_best_rollout_success_rate": false
+            "on_best_rollout_return": false,
+            "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 5000,
+        "epoch_every_n_steps": 100,
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
-        "render": true,
-        "render_video": false,
+        "render": false,
+        "render_video": true,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
             "enabled": true,
-            "n": 10,
-            "horizon": 1000,
-            "rate": 1,
+            "n": 50,
+            "horizon": 400,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
     },
     "train": {
         "data": null,
-        "output_dir": "../td3_bc_trained_models",
+        "output_dir": "../gl_trained_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": true,
-        "hdf5_normalize_obs": true,
+        "hdf5_normalize_obs": false,
         "hdf5_filter_key": null,
         "hdf5_validation_filter_key": null,
         "seq_length": 1,
@@ -56,62 +56,63 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 256,
-        "num_epochs": 200,
+        "batch_size": 100,
+        "num_epochs": 2000,
         "seed": 1
     },
     "algo": {
         "optim_params": {
-            "critic": {
+            "goal_network": {
                 "learning_rate": {
-                    "initial": 0.0003,
+                    "initial": 0.0001,
                     "decay_factor": 0.1,
                     "epoch_schedule": []
                 },
                 "regularization": {
                     "L2": 0.0
-                },
-                "start_epoch": -1,
-                "end_epoch": -1
-            },
-            "actor": {
-                "learning_rate": {
-                    "initial": 0.0003,
-                    "decay_factor": 0.1,
-                    "epoch_schedule": []
-                },
-                "regularization": {
-                    "L2": 0.0
-                },
-                "start_epoch": -1,
-                "end_epoch": -1
+                }
             }
         },
-        "alpha": 2.5,
-        "discount": 0.99,
-        "n_step": 1,
-        "target_tau": 0.005,
-        "infinite_horizon": false,
-        "critic": {
-            "use_huber": false,
-            "max_gradient_norm": null,
-            "value_bounds": null,
-            "ensemble": {
-                "n": 2,
-                "weight": 1.0
-            },
-            "layer_dims": [
-                256,
-                256
+        "subgoal_horizon": 10,
+        "ae": {
+            "planner_layer_dims": [
+                300,
+                400
             ]
         },
-        "actor": {
-            "update_freq": 2,
-            "noise_std": 0.2,
-            "noise_clip": 0.5,
-            "layer_dims": [
-                256,
-                256
+        "vae": {
+            "enabled": true,
+            "latent_dim": 16,
+            "latent_clip": null,
+            "kl_weight": 1.0,
+            "decoder": {
+                "is_conditioned": true,
+                "reconstruction_sum_across_elements": false
+            },
+            "prior": {
+                "learn": false,
+                "is_conditioned": false,
+                "use_gmm": false,
+                "gmm_num_modes": 10,
+                "gmm_learn_weights": false,
+                "use_categorical": false,
+                "categorical_dim": 10,
+                "categorical_gumbel_softmax_hard": false,
+                "categorical_init_temp": 1.0,
+                "categorical_temp_anneal_step": 0.001,
+                "categorical_min_temp": 0.3
+            },
+            "encoder_layer_dims": [
+                300,
+                400
+            ],
+            "decoder_layer_dims": [
+                300,
+                400
+            ],
+            "prior_layer_dims": [
+                300,
+                400
             ]
         }
     },
@@ -119,11 +120,10 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "object",
-                    "goal",
-                    "ee_pos",
-                    "ee_quat",
-                    "gripper_qpos"
+                    "robot0_eef_pos",
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos",
+                    "object"
                 ],
                 "rgb": [],
                 "depth": [],
@@ -131,6 +131,17 @@
             },
             "goal": {
                 "low_dim": [],
+                "rgb": [],
+                "depth": [],
+                "scan": []
+            },
+            "subgoal": {
+                "low_dim": [
+                    "robot0_eef_pos",
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos",
+                    "object"
+                ],
                 "rgb": [],
                 "depth": [],
                 "scan": []

@@ -19,7 +19,6 @@ from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
 from envs.imitation.franka_env import FrankaEnv
-from examples.imitation.train_bc_rnn import run_train_bc_rnn
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -89,9 +88,9 @@ def run_episode(env : FrankaEnv, fixed_record_length : bool):
         if elapsed_time.total_seconds() < REALTIME_STEP and terminated_times < 5:
             time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
             
-def user_comfirm_save_record(task_result):
+def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
     while True:
-        user_input = input(f"Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(ignore & exit): ")
+        user_input = input(f"Round {currnet_round} / {teleoperation_rounds}, Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(ignore & exit): ")
         if user_input == 'y':
             return True, False
         elif user_input == 'n':
@@ -101,12 +100,14 @@ def user_comfirm_save_record(task_result):
         else:
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
-def do_teleoperation(env, dataset_writer : DatasetWriter, fixed_record_length : bool):    
+def do_teleoperation(env, dataset_writer : DatasetWriter, fixed_record_length : bool, teleoperation_rounds : int):    
+    current_round = 1
     while True:
         obs_list, reward_list, done_list, info_list = run_episode(env, fixed_record_length)
         task_result = "Success" if done_list[-1] == 1 else "Failed"
-        save_record, exit_program = user_comfirm_save_record(task_result)
+        save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
+            current_round += 1
             dataset_writer.add_demo_data({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
                 'actions': np.array([info["action"] for info in info_list]),
@@ -114,7 +115,7 @@ def do_teleoperation(env, dataset_writer : DatasetWriter, fixed_record_length : 
                 'dones': np.array(done_list),
                 'obs': obs_list
             })
-        if exit_program:
+        if exit_program or current_round > teleoperation_rounds:
             break
 
 def playback_episode(env : FrankaEnv, action_list, done_list):
@@ -152,16 +153,18 @@ def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
     goal_xquat = goal_data[0][3:7]
     
     if noise_scale > 0.0:
-        obj_xpos += np.random.normal(0, noise_scale, len(obj_xpos))
+        offset_scale = 1 * noise_scale
+        rotate_scale = 2 * np.pi * noise_scale
+        obj_xpos += np.random.normal(0, offset_scale, len(obj_xpos))
         obj_euler = rotations.quat2euler(obj_xquat)
-        obj_euler += np.random.normal(0, noise_scale, len(obj_euler))
+        obj_euler += np.random.normal(0, rotate_scale, len(obj_euler))
         obj_xquat = rotations.euler2quat(obj_euler)
         
-        goal_xpos += np.random.normal(0, noise_scale, len(goal_xpos))
+        goal_xpos += np.random.normal(0, offset_scale, len(goal_xpos))
         goal_euler = rotations.quat2euler(goal_xquat)
-        goal_euler += np.random.normal(0, noise_scale, len(goal_euler))
+        goal_euler += np.random.normal(0, rotate_scale, len(goal_euler))
         goal_xquat = rotations.euler2quat(goal_euler)
-    
+
     # print("Resetting object position: ", obj_xpos, obj_xquat)
     env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
     
@@ -197,8 +200,6 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False, fix
     reset_playback_env(env, demo_data, noise_scale)    
     action_list = demo_data['actions']
     action_index_list = list(range(len(action_list)))
-    holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
-    action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
     
     for i in action_index_list:
         action = action_list[i]
@@ -286,7 +287,8 @@ def run_example(orcagym_addr : str,
                 ckpt_path : str, 
                 augmented_sacle : float,
                 augmented_times : int,
-                fixed_record_length : bool):
+                fixed_record_length : bool,
+                teleoperation_rounds : int):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == RunMode.PLAYBACK:
@@ -315,7 +317,7 @@ def run_example(orcagym_addr : str,
                                         env_version=env.unwrapped.get_env_version(),
                                         env_kwargs=kwargs)
 
-            do_teleoperation(env, dataset_writer, fixed_record_length)
+            do_teleoperation(env, dataset_writer, fixed_record_length, teleoperation_rounds)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
@@ -418,11 +420,15 @@ def terminate_monitor(process):
         
 def _get_algo_config(algo_name):
     if algo_name == "bc":
-        return "bc.json"
+        return "config/bc.json"
     elif algo_name == "td3_bc":
-        return "td3_bc.json"
+        return "config/td3_bc.json"
     elif algo_name == "cql":
-        return "cql.json"
+        return "config/cql.json"
+    elif algo_name == "iris":
+        return "config/iris.json"
+    elif algo_name == "hbc":
+        return "config/hbc.json"
     else:
         raise ValueError(f"Invalid algorithm name: {algo_name}")
 
@@ -431,7 +437,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
-    parser.add_argument('--algo', type=str, default='cql', help='The algorithm to use for training the policy')
+    parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--record_file', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
     parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
@@ -440,7 +446,9 @@ if __name__ == "__main__":
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
-    parser.add_argument('--augmented_times', type=int, default=5, help='The times to augment the dataset')
+    parser.add_argument('--augmented_times', type=int, default=4, help='The times to augment the dataset')
+    parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
+    
     args = parser.parse_args()
     
     orcagym_addr = args.orcagym_address
@@ -455,6 +463,7 @@ if __name__ == "__main__":
     augmented_sacle = args.augmented_sacle
     augmented_times = args.augmented_times
     fixed_record_length = args.fixed_record_length
+    teleoperation_rounds = args.teleoperation_rounds
         
     create_tmp_dir("records_tmp")
     create_tmp_dir("trained_models_tmp")
@@ -505,7 +514,8 @@ if __name__ == "__main__":
                 ckpt_path, 
                 augmented_sacle,
                 augmented_times,
-                fixed_record_length)
+                fixed_record_length,
+                teleoperation_rounds)
 
     # 终止 Monitor 子进程
     terminate_monitor(monitor_process)
