@@ -36,6 +36,7 @@ class FrankaEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._reward_type = reward_type
+        self._setup_reward_functions()
 
         self._reward_printer = RewardPrinter()
         
@@ -204,7 +205,7 @@ class FrankaEnv(RobomimicEnv):
         
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
-        obs = self._get_obs()
+        obs = self._get_obs().copy()
         achieved_goal = self._get_achieved_goal()
         desired_goal = self._get_desired_goal()
 
@@ -510,30 +511,30 @@ class FrankaEnv(RobomimicEnv):
             return self._get_obs().copy()
 
     def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
-        if self._reward_printer is not None:
+        if self._reward_printer is not None and self._run_mode == RunMode.TELEOPERATION:
             self._reward_printer.print_reward(message, reward, coeff)
         
     def _compute_reward_obj_goal_distance(self) -> float:
-        tracking_sigma = 0.25  # 奖励的衰减因子
+        tracking_sigma = 0.025  # 奖励的衰减因子
         
         obj_xpos = self._obs["object"][:3]
         goal_xpos = self._obs["goal"][:3]
-        distance = np.linalg.norm(obj_xpos - goal_xpos)
-        distance = np.clip(distance, 0.1, distance)   # 当距离足够近的时候，避免从错误的方向靠近
+        distance_squared = np.sum((obj_xpos - goal_xpos)**2)
+        distance_squared = np.clip(distance_squared, 0.01, distance_squared)   # 当距离足够近的时候，避免从错误的方向靠近
         
         # 计算指数衰减奖励
-        reward = np.exp(-distance / tracking_sigma)
+        reward = np.exp(-distance_squared / tracking_sigma)
         return reward
     
     def _compute_reward_obj_grasp_distance(self) -> float:
-        tracking_sigma = 0.25
+        tracking_sigma = 0.025
         
         obj_xpos = self._obs["object"][:3]
         ee_xpos = self._obs["ee_pos"]
-        distance = np.linalg.norm(obj_xpos - ee_xpos)
+        distance_squared = np.sum((obj_xpos - ee_xpos)**2)
         
         # 计算指数衰减奖励
-        reward = np.exp(-distance / tracking_sigma)
+        reward = np.exp(-distance_squared / tracking_sigma)
         return reward
     
     def _compute_reward_success(self) -> float:
@@ -541,7 +542,7 @@ class FrankaEnv(RobomimicEnv):
         desired_goal = self._desired_goal
         return 1 if self._is_success(achieved_goal, desired_goal) else 0
 
-    def _setup_reward_functions(self, robot_config : dict) -> None:
+    def _setup_reward_functions(self) -> None:
         self._reward_functions = [
             {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
             {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
