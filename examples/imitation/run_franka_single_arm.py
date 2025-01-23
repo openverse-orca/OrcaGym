@@ -451,7 +451,7 @@ if __name__ == "__main__":
     parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
-    parser.add_argument('--record_file', type=str, help='The file path to save the record')
+    parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
     parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
     parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
@@ -466,7 +466,7 @@ if __name__ == "__main__":
     orcagym_addr = args.orcagym_address
     agent_name = args.agent_name
     record_time = args.record_length
-    record_path = args.record_file
+    record_path = args.dataset
     playback_mode = args.playback_mode
     run_mode = args.run_mode
     algo = args.algo
