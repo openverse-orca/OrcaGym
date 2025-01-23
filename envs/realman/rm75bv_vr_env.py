@@ -553,7 +553,7 @@ class RM75BVVREnv(OrcaGymRemoteEnv):
                     ee_position,
                     ee_velocity,
                     fingers_width
-                ]).copy()            
+                ], dtype=np.float32).copy()            
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
