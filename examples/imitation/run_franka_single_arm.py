@@ -200,6 +200,8 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
     reset_playback_env(env, demo_data, noise_scale)    
     action_list = demo_data['actions']
     action_index_list = list(range(len(action_list)))
+    holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
+    action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
     
     for i in action_index_list:
         action = action_list[i]
@@ -207,6 +209,7 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
 
         if noise_scale > 0.0:
             action += np.random.normal(0, noise_scale, len(action))
+            action = np.clip(action, -1.0, 1.0)
         
         obs, reward, terminated, truncated, info = env.step(action)
         env.render()
