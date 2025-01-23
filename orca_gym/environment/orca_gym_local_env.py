@@ -44,6 +44,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
+        self.mj_forward()
 
 
     def initialize_simulation(

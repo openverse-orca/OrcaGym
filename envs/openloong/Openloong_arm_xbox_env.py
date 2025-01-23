@@ -339,7 +339,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
                     ee_position,
                     ee_velocity,
                     [0]
-                ]).copy()            
+                ], dtype=np.float32).copy()            
         result = {
             "observation": obs,
             "achieved_goal": achieved_goal,
