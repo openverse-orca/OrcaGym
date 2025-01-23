@@ -58,7 +58,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
     )
     return env_id, kwargs
 
-def run_episode(env : FrankaEnv, fixed_record_length : bool):
+def run_episode(env : FrankaEnv):
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
@@ -81,11 +81,11 @@ def run_episode(env : FrankaEnv, fixed_record_length : bool):
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
 
-        if (terminated_times >= 5 and not fixed_record_length) or truncated:
+        if terminated_times >= 5 or truncated:
             return obs_list, reward_list, done_list, info_list
 
         elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP and terminated_times < 5:
+        if elapsed_time.total_seconds() < REALTIME_STEP:
             time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
             
 def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
@@ -100,10 +100,10 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
         else:
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
-def do_teleoperation(env, dataset_writer : DatasetWriter, fixed_record_length : bool, teleoperation_rounds : int):    
+def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds : int):    
     current_round = 1
     while True:
-        obs_list, reward_list, done_list, info_list = run_episode(env, fixed_record_length)
+        obs_list, reward_list, done_list, info_list = run_episode(env)
         task_result = "Success" if done_list[-1] == 1 else "Failed"
         save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
@@ -189,7 +189,7 @@ def do_playback(env : FrankaEnv, dataset_reader : DatasetReader, playback_mode :
         playback_episode(env, action_list, done_list)
         time.sleep(1)
 
-def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False, fixed_record_length=False):
+def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
     obs, info = env.reset(seed=42)    
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
@@ -219,11 +219,11 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False, fix
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
 
-        if (terminated_times >= 5 and not fixed_record_length) or truncated:
+        if terminated_times >= 5 or truncated:
             return obs_list, reward_list, done_list, info_list
 
         elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP and realtime and terminated_times < 5:
+        if elapsed_time.total_seconds() < REALTIME_STEP and realtime:
             time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
     return obs_list, reward_list, done_list, info_list
@@ -234,8 +234,7 @@ def do_augmentation(env : FrankaEnv,
                     original_dataset_path : str, 
                     augmented_dataset_path : str, 
                     augmented_scale : float, 
-                    augmented_times : int,
-                    fixed_record_length : bool):
+                    augmented_times : int):
     
     REALTIME = False
     
@@ -254,7 +253,7 @@ def do_augmentation(env : FrankaEnv,
         demo_data = dataset_reader.get_demo_data(original_demo_name)
         print("Augmenting original demo: ", original_demo_name)
         
-        obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME, fixed_record_length=fixed_record_length)
+        obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
         if done_list[-1] == 1:
             dataset_writer.add_demo_data({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
@@ -287,7 +286,6 @@ def run_example(orcagym_addr : str,
                 ckpt_path : str, 
                 augmented_sacle : float,
                 augmented_times : int,
-                fixed_record_length : bool,
                 teleoperation_rounds : int):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
@@ -317,7 +315,7 @@ def run_example(orcagym_addr : str,
                                         env_version=env.unwrapped.get_env_version(),
                                         env_kwargs=kwargs)
 
-            do_teleoperation(env, dataset_writer, fixed_record_length, teleoperation_rounds)
+            do_teleoperation(env, dataset_writer, teleoperation_rounds)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
@@ -376,7 +374,7 @@ def run_example(orcagym_addr : str,
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
             agumented_dataset_file_path = f"{current_file_path}/augmented_datasets_tmp/augmented_dataset_{formatted_now}.hdf5"
-            do_augmentation(env, record_path, agumented_dataset_file_path, augmented_sacle, augmented_times, fixed_record_length)
+            do_augmentation(env, record_path, agumented_dataset_file_path, augmented_sacle, augmented_times)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -429,8 +427,6 @@ def _get_algo_config(algo_name):
         return ["config/iris.json"]
     elif algo_name == "hbc":
         return ["config/hbc.json"]
-    elif algo_name == "gl":
-        return ["config/gl.json"]
     elif algo_name == "bcq":
         return ["config/bcq.json"]
     elif algo_name == "iql":
@@ -455,7 +451,6 @@ if __name__ == "__main__":
     parser.add_argument('--record_file', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
     parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
-    parser.add_argument('--fixed_record_length', type=bool, default=True, help='Use Fixed record length for the teleoperation')
     parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
@@ -476,7 +471,6 @@ if __name__ == "__main__":
     ckpt_path = args.model_file
     augmented_sacle = args.augmented_sacle
     augmented_times = args.augmented_times
-    fixed_record_length = args.fixed_record_length
     teleoperation_rounds = args.teleoperation_rounds
         
     create_tmp_dir("records_tmp")
@@ -529,7 +523,6 @@ if __name__ == "__main__":
                     ckpt_path, 
                     augmented_sacle,
                     augmented_times,
-                    fixed_record_length,
                     teleoperation_rounds)
 
     # 终止 Monitor 子进程
