@@ -13,6 +13,15 @@ from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
 
+class Task:
+    """
+    Enum class for task
+    """
+    LIFT = "lift"
+    PUSH = "push"
+    PICK_AND_PLACE = "pick_and_place"
+    
+
 class FrankaEnv(RobomimicEnv):
     """
     通过遥操作控制franka机械臂
@@ -27,16 +36,18 @@ class FrankaEnv(RobomimicEnv):
         agent_names: list,
         time_step: float,
         run_mode: RunMode,
+        task: Task,
         ctrl_device: ControlDevice,
         control_freq: int,
         **kwargs,
     ):
 
         self._run_mode = run_mode
+        self._task = task
+        assert self._task in [Task.LIFT, Task.PUSH, Task.PICK_AND_PLACE], f"Invalid task: {self._task}"
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
-        self._reward_type = reward_type
-        self._setup_reward_functions()
+        self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
         
@@ -50,12 +61,14 @@ class FrankaEnv(RobomimicEnv):
 
         self._neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.00, 0.00])
         self._ee_name  = self.site("ee_center_site")
-        self._obj_name = self.body("item")
-        self._obj_site_name = self.site("item_site")
-        self._obj_joint_name = self.joint("item_joint")
+        self._obj_name = self.body("object")
+        self._obj_site_name = self.site("object_site")
+        self._obj_joint_name = self.joint("object_joint")
         self._goal_name = self.site("goal")
         self._goal_site_name = self.site("goal_site")
-        self._goal_joint_name = self.joint("goal_joint")
+        self._box_name = self.body("box")
+        self._box_site_name = self.site("box_site")
+        
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -96,6 +109,10 @@ class FrankaEnv(RobomimicEnv):
         site_dict = self.query_site_pos_and_quat([self._goal_site_name])
         self._initial_goal_site_xpos = site_dict[self._goal_site_name]['xpos']
         self._initial_goal_site_xquat = site_dict[self._goal_site_name]['xquat']
+        
+        site_dict = self.query_site_pos_and_quat([self._box_site_name])
+        self._initial_box_site_xpos = site_dict[self._box_site_name]['xpos']
+        self._initial_box_site_xquat = site_dict[self._box_site_name]['xquat']
 
 
         if self._run_mode == RunMode.TELEOPERATION:
@@ -208,9 +225,10 @@ class FrankaEnv(RobomimicEnv):
         obs = self._get_obs().copy()
         achieved_goal = self._get_achieved_goal()
         desired_goal = self._get_desired_goal()
+        goal_xpos, goal_xquat = self._query_goal_pos_and_quat()
+        goal = np.concatenate([goal_xpos, goal_xquat]).flatten()
 
-
-        info = {"state": self.get_state(), "action": scaled_action}
+        info = {"state": self.get_state(), "action": scaled_action, "goal": goal}
         terminated = self._is_success(achieved_goal, desired_goal)
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
@@ -251,7 +269,6 @@ class FrankaEnv(RobomimicEnv):
     def _teleoperation_action(self) -> np.ndarray:
         mocap_xpos = self._saved_xpos
         mocap_xquat = self._saved_xquat
-        
 
         mocap_xpos, mocap_xquat = self._process_controller(mocap_xpos, mocap_xquat)
         self._set_grasp_mocap(mocap_xpos, mocap_xquat)
@@ -355,7 +372,6 @@ class FrankaEnv(RobomimicEnv):
 
         self._obs = {
             "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32),
-            "goal": np.concatenate([goal_xpos, goal_xquat], dtype=np.float32),
             "ee_pos": ee_position["xpos"],
             "ee_quat": ee_position["xquat"],
             "ee_vel_linear": ee_xvalp[self._ee_name],
@@ -392,7 +408,7 @@ class FrankaEnv(RobomimicEnv):
         obj_xpos, obj_xquat, goal_xpos, goal_xquat = self._sample_obj_goal()
         
         self._set_obj_qpos(obj_xpos, obj_xquat)
-        self._set_goal_qpos(goal_xpos, goal_xquat)
+        self._set_goal_mocap(goal_xpos, goal_xquat)
 
         self.mj_forward()
         obs = self._get_obs().copy()
@@ -400,7 +416,7 @@ class FrankaEnv(RobomimicEnv):
     
     def replace_obj_goal(self, obj_xpos, obj_xquat, goal_xpos, goal_xquat) -> None:
         self._set_obj_qpos(obj_xpos, obj_xquat)
-        self._set_goal_qpos(goal_xpos, goal_xquat)
+        self._set_goal_mocap(goal_xpos, goal_xquat)
         self.mj_forward()
 
     # custom methods
@@ -413,9 +429,9 @@ class FrankaEnv(RobomimicEnv):
         obj_qpos = {self._obj_joint_name: np.concatenate([position, orientation])}
         self.set_joint_qpos(obj_qpos)
         
-    def _set_goal_qpos(self, position, orientation) -> None:
-        goal_qpos = {self._goal_joint_name: np.concatenate([position, orientation])}
-        self.set_joint_qpos(goal_qpos)
+    def _set_goal_mocap(self, position, orientation) -> None:
+        mocap_pos_and_quat_dict = {self._goal_name: {'pos': position, 'quat': orientation}}
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def _set_joint_neutral(self) -> None:
         # assign value to arm joints
@@ -475,6 +491,15 @@ class FrankaEnv(RobomimicEnv):
             goal_xquat = rotations.euler2quat(goal_euler)
 
             contacted = np.linalg.norm(obj_xpos - goal_xpos) < 0.2
+            
+        # 任务不同，目标位置也不同
+        if self._task == Task.LIFT:
+            goal_xpos = obj_xpos.copy()
+            goal_xpos[2] += 0.1
+            goal_xquat = obj_xquat.copy()
+        elif self._task == Task.PICK_AND_PLACE:
+            goal_xpos = self._initial_box_site_xpos.copy()
+            goal_xquat = self._initial_box_site_xquat.copy()
 
         return obj_xpos, obj_xquat, goal_xpos, goal_xquat
 
@@ -542,14 +567,21 @@ class FrankaEnv(RobomimicEnv):
         desired_goal = self._desired_goal
         return 1 if self._is_success(achieved_goal, desired_goal) else 0
 
-    def _setup_reward_functions(self) -> None:
-        self._reward_functions = [
-            {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
-            {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
-            {"function": self._compute_reward_success, "coeff": 1.0},
-        ]
+    def _setup_reward_functions(self, reward_type : RewardType) -> None:
+        if reward_type == RewardType.SPARSE:
+            self._reward_functions = [
+                {"function": self._compute_reward_success, "coeff": 1.0}
+            ]
+        elif reward_type == RewardType.DENSE:
+            self._reward_functions = [
+                {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
+                {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
+                {"function": self._compute_reward_success, "coeff": 1.0},
+            ]
+        else:
+            raise ValueError("Invalid reward type: ", reward_type)
         
-    def _compute_dense_reward(self, achieved_goal, desired_goal,) -> float:
+    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
         total_reward = 0.0
         self._achieved_goal = achieved_goal
         self._desired_goal = desired_goal
@@ -564,14 +596,6 @@ class FrankaEnv(RobomimicEnv):
 
         self._print_reward("Total reward: ", total_reward)
         return total_reward
-
-    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
-        if self._reward_type == RewardType.SPARSE:
-            return 1 if self._is_success(achieved_goal, desired_goal) else 0
-        elif self._reward_type == RewardType.DENSE:
-            return self._compute_dense_reward(achieved_goal, desired_goal)
-        else:
-            raise ValueError("Invalid reward type")
         
     
         

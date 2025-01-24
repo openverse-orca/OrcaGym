@@ -37,16 +37,17 @@ FRAME_SKIP = 4
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
-def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, ctrl_device : str, max_episode_steps) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, task : str, ctrl_device : str, max_episode_steps) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
     kwargs = {'frame_skip': FRAME_SKIP,   
-                'reward_type': RewardType.DENSE,
+                'reward_type': RewardType.SPARSE,
                 'orcagym_addr': orcagym_addr, 
                 'agent_names': agent_names, 
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
+                'task': task,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ}           
     gym.register(
@@ -111,6 +112,7 @@ def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds :
             dataset_writer.add_demo_data({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
                 'actions': np.array([info["action"] for info in info_list]),
+                'goals': np.array([info["goal"] for info in info_list]),
                 'rewards': np.array(reward_list),
                 'dones': np.array(done_list),
                 'obs': obs_list
@@ -261,6 +263,7 @@ def do_augmentation(env : FrankaEnv,
             dataset_writer.add_demo_data({
                 'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
                 'actions': np.array([info["action"] for info in info_list]),
+                'goals': np.array([info["goal"] for info in info_list]),
                 'rewards': np.array(reward_list),
                 'dones': np.array(done_list),
                 'obs': obs_list
@@ -281,6 +284,7 @@ def run_example(orcagym_addr : str,
                 agent_name : str, 
                 record_path : str, 
                 run_mode : str, 
+                task : str,
                 algo_config : str,
                 ctrl_device : str, 
                 max_episode_steps : int, 
@@ -294,10 +298,11 @@ def run_example(orcagym_addr : str,
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == RunMode.PLAYBACK:
             dataset_reader = DatasetReader(file_path=record_path)
+            task = dataset_reader.get_env_kwargs()["task"]            
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -307,7 +312,7 @@ def run_example(orcagym_addr : str,
         elif run_mode == RunMode.TELEOPERATION:
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -325,9 +330,10 @@ def run_example(orcagym_addr : str,
         elif run_mode == RunMode.IMITATION:
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
+            task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -346,7 +352,11 @@ def run_example(orcagym_addr : str,
             env_name = env_meta["env_name"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            
+            env_kwargs = env_meta["env_kwargs"]
+            task = env_kwargs["task"]  
+            
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -366,9 +376,10 @@ def run_example(orcagym_addr : str,
         elif run_mode == RunMode.AUGMENTATION:
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
+            task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -450,6 +461,7 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
+    parser.add_argument('--task', type=str, help='The task to do in the environment (pick_and_place / push / lift)')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
@@ -469,6 +481,7 @@ if __name__ == "__main__":
     record_path = args.dataset
     playback_mode = args.playback_mode
     run_mode = args.run_mode
+    task = args.task
     algo = args.algo
     rollout_times = args.rollout_times
     ckpt_path = args.model_file
@@ -480,13 +493,16 @@ if __name__ == "__main__":
     create_tmp_dir("trained_models_tmp")
     create_tmp_dir("augmented_datasets_tmp")
     
-    algo_config = _get_algo_config(algo)
+    algo_config = _get_algo_config(algo) if run_mode == RunMode.IMITATION else ["none_algorithm"]
     
     if run_mode == RunMode.TELEOPERATION:
+        if task is None:
+            task = "lift"
+            
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"./records_tmp/franka_singel_arm_{formatted_now}.hdf5"
+            record_path = f"./records_tmp/Franka_{task}_{formatted_now}.hdf5"
     if run_mode == RunMode.IMITATION or run_mode == RunMode.PLAYBACK or run_mode == RunMode.AUGMENTATION:
         if record_path is None:
             print("Please input the record file path.")
@@ -518,6 +534,7 @@ if __name__ == "__main__":
                     agent_name, 
                     record_path, 
                     run_mode, 
+                    task,
                     config,
                     ctrl_device, 
                     max_episode_steps, 

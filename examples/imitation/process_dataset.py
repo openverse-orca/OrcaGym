@@ -130,7 +130,44 @@ def _process_check(dataset_files):
         print("")
         print("All datasets are valid. Checked {} files.".format(checked_files_count))
 
+def _check_combination(dataset_files):
+    env_names = []
+    env_versions = []
+    env_kwargs = []
+    for dataset in dataset_files:
+        reader = DatasetReader(dataset)
+        env_names.append(reader.get_env_name())
+        env_versions.append(reader.get_env_version())
+        env_kwargs.append(reader.get_env_kwargs())
+        
+    if len(set(env_names)) > 1:
+        print("Different env names in datasets: {}".format(set(env_names)))
+        return False
+    if len(set(env_versions)) > 1:
+        print("Different env versions in datasets: {}".format(set(env_versions)))
+        return False
+    if not all(env_kwargs_item == env_kwargs[0] for env_kwargs_item in env_kwargs):
+        print("Different env kwargs in datasets!")
+        return False
+    
+    return True
+
+def _get_dataset_prefix(dataset_file):
+    reader = DatasetReader(dataset_file)
+    env_name = reader.get_env_name()
+    env_name = env_name.split("-OrcaGym-")[0]
+    env_version = reader.get_env_version()
+    env_task = reader.get_env_kwargs()["task"]
+    prefix = f"{env_name}_{env_version}_{env_task}"
+    prefix = prefix.replace(" ", "_")
+    prefix = prefix.replace(".", "_")
+    return prefix
+
 def _process_combine(dataset_files, output_file):
+    if not _check_combination(dataset_files):
+        print("Datasets are not compatible for combination. Cannot combine datasets.")
+        exit(1)
+        
     # combine datasets
     writer = None
     for dataset in dataset_files:
@@ -159,14 +196,14 @@ def _glob_dataset_filenames(dataset_files):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", type=str, nargs='+', help="path to hdf5 dataset",)
-    parser.add_argument("--task", type=str, help="task to run (check / combine / merge)", default="check")
+    parser.add_argument("--proc", type=str, help="proc to run (check / combine / merge)", default="check")
     parser.add_argument("--verbose", type=bool, help="output more details", default=False)
     parser.add_argument("--filter_key", type=str, help="filter key to use for processing", default=None)
     parser.add_argument("--output", type=str, help="output file for combined dataset", default=None)
     
     args = parser.parse_args()
     dataset_files = args.datasets
-    task = args.task
+    proc = args.proc
     verbose = args.verbose
     filter_key = args.filter_key
     output_file = args.output
@@ -174,12 +211,12 @@ if __name__ == "__main__":
     dataset_files = _glob_dataset_filenames(dataset_files)
     create_tmp_dir("processed_datasets_tmp")
     
-    if task == "check":
+    if proc == "check":
         _process_check(dataset_files)
-    elif task == "combine":
+    elif proc == "combine":
         if output_file is None:
             formatted_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            output_file = f"./processed_datasets_tmp/combined_{formatted_time}.hdf5"            
+            output_file = f"./processed_datasets_tmp/combined_{_get_dataset_prefix(dataset_files[0])}_{formatted_time}.hdf5"            
         _process_combine(dataset_files, output_file)
     else:
-        print("Process not implemented: {}".format(task))
+        print("Process not implemented: {}".format(proc))
