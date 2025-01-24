@@ -33,7 +33,7 @@ ENV_ENTRY_POINT = {
 }
 
 TIME_STEP = 0.005
-FRAME_SKIP = 4
+FRAME_SKIP = 8
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
@@ -249,33 +249,36 @@ def do_augmentation(env : FrankaEnv,
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
     
-    demo_names = dataset_reader.get_demo_names()
-    need_demo_count = len(demo_names) * augmented_times
+    need_demo_count = dataset_reader.get_demo_count() * augmented_times
     done_demo_count = 0
-    while done_demo_count < need_demo_count:
-        original_demo_name = np.random.choice(demo_names)
-
-        demo_data = dataset_reader.get_demo_data(original_demo_name)
-        print("Augmenting original demo: ", original_demo_name)
-        
-        obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
-        if done_list[-1] == 1:
-            dataset_writer.add_demo_data({
-                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-                'actions': np.array([info["action"] for info in info_list]),
-                'goals': np.array([info["goal"] for info in info_list]),
-                'rewards': np.array(reward_list),
-                'dones': np.array(done_list),
-                'obs': obs_list
-            })
-            
-            done_demo_count += 1
-            print(f"Episode done! {done_demo_count} / {need_demo_count}")
-        else:
-            print("Episode failed!")
     
-    if REALTIME:
-        time.sleep(1)
+    for _ in range(augmented_times):    
+        demo_names = dataset_reader.get_demo_names()
+        for original_demo_name in demo_names:
+            done = False
+            while not done:
+                demo_data = dataset_reader.get_demo_data(original_demo_name)
+                print("Augmenting original demo: ", original_demo_name)
+                
+                obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
+                if done_list[-1] == 1:
+                    dataset_writer.add_demo_data({
+                        'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
+                        'actions': np.array([info["action"] for info in info_list]),
+                        'goals': np.array([info["goal"] for info in info_list]),
+                        'rewards': np.array(reward_list),
+                        'dones': np.array(done_list),
+                        'obs': obs_list
+                    })
+                    
+                    done_demo_count += 1
+                    print(f"Episode done! {done_demo_count} / {need_demo_count}")
+                    done = True
+                else:
+                    print("Episode failed!")
+    
+                if REALTIME:
+                    time.sleep(1)
 
     dataset_writer.shuffle_demos()
     dataset_writer.finalize()          
@@ -524,6 +527,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     max_episode_steps = int(record_time / REALTIME_STEP)
+    print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
     monitor_process = start_monitor()

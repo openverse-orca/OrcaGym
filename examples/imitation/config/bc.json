@@ -29,9 +29,9 @@
         "rollout": {
             "enabled": true,
             "n": 10,
-            "horizon": 1000,
+            "horizon": 500,
             "rate": 50,
-            "warmstart": 200,
+            "warmstart": 100,
             "terminate_on_success": true
         }
     },
@@ -45,7 +45,7 @@
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 10,
+        "seq_length": 25,
         "pad_seq_length": true,
         "frame_stack": 1,
         "pad_frame_stack": true,
@@ -56,7 +56,7 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 64,
+        "batch_size": 32,
         "num_epochs": 2000,
         "seed": 1
     },
@@ -67,7 +67,7 @@
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [300],
+                    "epoch_schedule": [],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
@@ -136,7 +136,7 @@
         },
         "rnn": {
             "enabled": false,
-            "horizon": 10,
+            "horizon": 25,
             "hidden_dim": 400,
             "rnn_type": "LSTM",
             "num_layers": 2,
