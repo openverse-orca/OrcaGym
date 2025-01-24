@@ -67,7 +67,7 @@
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [],
+                    "epoch_schedule": [300],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
