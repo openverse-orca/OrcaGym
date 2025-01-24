@@ -150,7 +150,7 @@ def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
     obj_xpos = object_data[0][0:3]
     obj_xquat = object_data[0][3:7]
     
-    goal_data = demo_data['obs']['goal']
+    goal_data = demo_data['goals']
     goal_xpos = goal_data[0][0:3]
     goal_xquat = goal_data[0][3:7]
     
@@ -470,7 +470,7 @@ if __name__ == "__main__":
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
-    parser.add_argument('--augmented_times', type=int, default=4, help='The times to augment the dataset')
+    parser.add_argument('--augmented_times', type=int, default=2, help='The times to augment the dataset')
     parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
     
     args = parser.parse_args()

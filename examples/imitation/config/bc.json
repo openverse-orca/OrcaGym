@@ -12,14 +12,14 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 500,
+            "every_n_epochs": 200,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
         "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 20,
+        "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -30,8 +30,8 @@
             "enabled": true,
             "n": 10,
             "horizon": 1000,
-            "rate": 100,
-            "warmstart": 500,
+            "rate": 50,
+            "warmstart": 200,
             "terminate_on_success": true
         }
     },
@@ -54,7 +54,7 @@
             "rewards",
             "dones"
         ],
-        "goal_mode": "last",
+        "goal_mode": null,
         "cuda": true,
         "batch_size": 64,
         "num_epochs": 2000,
@@ -67,7 +67,7 @@
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [],
+                    "epoch_schedule": [300],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
@@ -76,9 +76,9 @@
             }
         },
         "loss": {
-            "l2_weight": 1.0,
-            "l1_weight": 0.0,
-            "cos_weight": 0.0
+            "l2_weight": 0.8,
+            "l1_weight": 0.2,
+            "cos_weight": 0.1
         },
         "actor_layer_dims": [
             1024,

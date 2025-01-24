@@ -47,6 +47,7 @@ class DatasetWriter:
             {
                 'states': np.ndarray (N, D),
                 'actions': np.ndarray (N, A),
+                'goals': np.ndarray (N, G)（可选，用于 HER 算法）,
                 'rewards': np.ndarray (N,),
                 'dones': np.ndarray (N,),
                 'obs': dict of np.ndarrays
@@ -71,7 +72,7 @@ class DatasetWriter:
                 demo_group.attrs['model_file'] = model_file
 
             # 存储数据集
-            for key in ['states', 'actions', 'rewards', 'dones']:
+            for key in ['states', 'actions', 'rewards', 'dones', 'goals']:
                 data = demo_data.get(key)
                 if data is not None:
                     demo_group.create_dataset(key, data=data)
@@ -284,6 +285,7 @@ class DatasetReader:
             {
                 'states': np.ndarray (N, D),
                 'actions': np.ndarray (N, A),
+                'goals': np.ndarray (N, G)（可选，用于 HER 算法）,
                 'rewards': np.ndarray (N,),
                 'dones': np.ndarray (N,),
                 'obs': dict of np.ndarrays
@@ -295,6 +297,7 @@ class DatasetReader:
             demo_data = {
                 'states': np.array(demo_group['states']),
                 'actions': np.array(demo_group['actions']),
+                'goals': np.array(demo_group['goals']) if 'goals' in demo_group else None,
                 'rewards': np.array(demo_group['rewards']),
                 'dones': np.array(demo_group['dones']),
                 'obs': {key: np.array(demo_group['obs'][key]) for key in demo_group['obs'].keys()},
