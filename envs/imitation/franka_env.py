@@ -206,6 +206,13 @@ class FrankaEnv(RobomimicEnv):
     def _is_success(self, achieved_goal, desired_goal) -> bool:
         success_threshold = 0.03
         return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
+    
+    def check_success(self):
+        achieved_goal = self._get_achieved_goal()
+        desired_goal = self._get_desired_goal()
+        success = self._is_success(achieved_goal, desired_goal)
+        # print("achieved goal: ", achieved_goal, "desired goal: ", desired_goal, "success: ", success)
+        return {"task": success}
 
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
