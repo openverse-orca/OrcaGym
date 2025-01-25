@@ -12,14 +12,14 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 200,
+            "every_n_epochs": 100,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 10,
+        "epoch_every_n_steps": null,
+        "validation_epoch_every_n_steps": null,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -30,8 +30,8 @@
             "enabled": true,
             "n": 10,
             "horizon": 500,
-            "rate": 50,
-            "warmstart": 100,
+            "rate": 10,
+            "warmstart": 0,
             "terminate_on_success": true
         }
     },
@@ -45,7 +45,7 @@
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 25,
+        "seq_length": 32,
         "pad_seq_length": true,
         "frame_stack": 1,
         "pad_frame_stack": true,
@@ -57,7 +57,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 32,
-        "num_epochs": 2000,
+        "num_epochs": 500,
         "seed": 1
     },
     "algo": {
@@ -67,7 +67,7 @@
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [300],
+                    "epoch_schedule": [],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
@@ -76,9 +76,9 @@
             }
         },
         "loss": {
-            "l2_weight": 0.8,
-            "l1_weight": 0.2,
-            "cos_weight": 0.1
+            "l2_weight": 1.0,
+            "l1_weight": 0.0,
+            "cos_weight": 0.0
         },
         "actor_layer_dims": [
             1024,
@@ -94,7 +94,7 @@
         },
         "gmm": {
             "enabled": false,
-            "num_modes": 10,
+            "num_modes": 5,
             "min_std": 0.0001,
             "std_activation": "softplus",
             "low_noise_eval": true
@@ -136,7 +136,7 @@
         },
         "rnn": {
             "enabled": false,
-            "horizon": 25,
+            "horizon": 32,
             "hidden_dim": 400,
             "rnn_type": "LSTM",
             "num_layers": 2,

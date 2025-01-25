@@ -168,11 +168,11 @@ class FrankaEnv(RobomimicEnv):
         self._saved_xpos = self._initial_grasp_site_xpos.copy()
         self._saved_xquat = self._initial_grasp_site_xquat.copy()
         
-        if self._run_mode == RunMode.TELEOPERATION:
-            self._set_grasp_mocap(self._saved_xpos, self._saved_xquat)
-        else:
-            xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
-            self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
+        # if self._run_mode == RunMode.TELEOPERATION:
+        self._set_grasp_mocap(self._saved_xpos, self._saved_xquat)
+        # else:
+        #     xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
+        #     self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
 
 
     def get_env_version(self):
@@ -296,6 +296,12 @@ class FrankaEnv(RobomimicEnv):
         self._controller.set_goal(action)
         self.ctrl[0:7] = self._controller.run_controller()      
         self.ctrl[7:9] = action[6:8]
+
+        mocap_xpos = action[:3]
+        axisangle = action[3:6]
+        quat = transform_utils.axisangle2quat(axisangle)
+        mocap_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])
+        self._set_grasp_mocap(mocap_xpos, mocap_xquat)
         
         return self.ctrl.copy()
 

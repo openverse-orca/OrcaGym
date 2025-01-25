@@ -155,7 +155,7 @@ def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
     goal_xquat = goal_data[0][3:7]
     
     if noise_scale > 0.0:
-        offset_scale = 1 * noise_scale
+        offset_scale = 0.4 * noise_scale
         rotate_scale = 2 * np.pi * noise_scale
         obj_xpos += np.random.normal(0, offset_scale, len(obj_xpos))
         obj_euler = rotations.quat2euler(obj_xquat)
@@ -210,7 +210,8 @@ def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
         start_time = datetime.now()
 
         if noise_scale > 0.0:
-            action += np.random.normal(0, noise_scale, len(action))
+            noise = np.random.normal(0, noise_scale, len(action))
+            action += noise * np.abs(action)
             action = np.clip(action, -1.0, 1.0)
         
         obs, reward, terminated, truncated, info = env.step(action)
