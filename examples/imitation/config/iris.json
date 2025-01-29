@@ -12,14 +12,14 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 100,
+            "every_n_epochs": 200,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": null,
-        "validation_epoch_every_n_steps": null,
+        "epoch_every_n_steps": 100,
+        "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -30,7 +30,7 @@
             "enabled": true,
             "n": 10,
             "horizon": 500,
-            "rate": 10,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
@@ -56,8 +56,8 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 32,
-        "num_epochs": 300,
+        "batch_size": 128,
+        "num_epochs": 2000,
         "seed": 1
     },
     "algo": {
@@ -196,7 +196,7 @@
                         1024
                     ],
                     "gmm": {
-                        "enabled": false,
+                        "enabled": true,
                         "num_modes": 5,
                         "min_std": 0.0001,
                         "std_activation": "softplus",
@@ -255,13 +255,13 @@
                 "policy": {
                     "optimizer_type": "adam",
                     "learning_rate": {
-                        "initial": 0.0001,
+                        "initial": 0.0003,
                         "decay_factor": 0.1,
-                        "epoch_schedule": [],
+                        "epoch_schedule": [1000, 1500],
                         "scheduler_type": "multistep"
                     },
                     "regularization": {
-                        "L2": 0.0
+                        "L2": 0.0001
                     }
                 }
             },
