@@ -17,25 +17,6 @@ import gymnasium as gym
 from gymnasium import error, spaces
 from gymnasium.spaces import Space
 
-class RunMode:
-    """
-    Enum class for control type
-    Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
-    Policy: control the robot with a policy. Use the normalized action passed to the step function.
-    Playback: replay the demonstration. Ignore the action passed to the step function.
-    """
-    TELEOPERATION = "teleoperation"
-    IMITATION = "imitation"
-    PLAYBACK = "playback"
-    ROLLOUT = "rollout"
-    AUGMENTATION = "augmentation"
-
-class ControlDevice:
-    """
-    Enum class for control
-    """
-    KEYBOARD = "keyboard"
-    XBOX = "xbox"
 
 class RobomimicEnv(OrcaGymLocalEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}

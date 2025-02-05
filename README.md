@@ -1,5 +1,4 @@
 [中文版](doc/README-CN.md)
-[中文版](doc/README-CN.md)
 # OrcaGym Project
 
 [![PyPI version](https://img.shields.io/pypi/v/orca-gym)](https://pypi.org/project/orca-gym/)

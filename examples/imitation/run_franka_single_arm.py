@@ -7,18 +7,17 @@ import signal
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
 
-if project_root not in sys.path:
-    sys.path.append(project_root)
+# if project_root not in sys.path:
+#     sys.path.append(project_root)
 
 
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.robomimic_env import RunMode, ControlDevice
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor
-from envs.imitation.franka_env import FrankaEnv
+from envs.franka.franka_env import FrankaEnv, RunMode, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -29,7 +28,7 @@ import numpy as np
 import argparse
 
 ENV_ENTRY_POINT = {
-    "Franka": "envs.imitation.franka_env:FrankaEnv"
+    "Franka": "envs.franka.franka_env:FrankaEnv"
 }
 
 TIME_STEP = 0.005
@@ -409,6 +408,8 @@ def start_monitor():
     启动 monitor.py 作为子进程。
     """
     # 获取当前脚本所在的目录
+    current_file_path = os.path.abspath('')
+    project_root = os.path.dirname(os.path.dirname(current_file_path))    
     monitor_script = f"{project_root}/orca_gym/scripts/camera_monitor.py"
 
     # 启动 monitor.py
