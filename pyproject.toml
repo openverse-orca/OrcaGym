@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OrcaGym"         # 修改为你的项目名称
+version = "0.1.0"                  # 修改为项目版本
+description = "OrcaGym"
+readme = "README.md"
+requires-python = ">=3.11"
+# 项目依赖，直接对应你的 requirements.txt 列表
+dependencies = [
+    "numpy<2.0",
+    "scipy",
+    "matplotlib",
+    "grpcio>=1.64.1",
+    "grpcio-tools",
+    "gymnasium>=0.29.1",
+    "stable-baselines3>=2.3.2",
+    "sb3_contrib>=2.3.0",
+    "pygame>=2.6.0",
+    "h5py",
+    "websockets",
+    "numba",
+    "termcolor",
+    "mujoco==3.2.2",
+    "tqdm",
+    "av",
+    "opencv-python"
+]
+
+# 可选依赖，可用于开发调试、测试、格式化代码等用途
+[project.optional-dependencies]
+dev = [
+    "pytest",         # 单元测试工具
+    "pytest-cov",     # 测试覆盖率工具
+    "flake8",         # 代码风格检查工具
+    "black",          # 代码格式化工具
+    "mypy",           # 静态类型检查工具
+]
+
+[tool.setuptools.packages.find]
+# 如果项目源码在 src/ 目录下，请取消下面的注释，并确保目录结构正确
+# where = ["src"]
+
+# 如果源码就在项目根目录下，此项可以忽略，setuptools 会自动发现
