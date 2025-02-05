@@ -1,56 +1,55 @@
 [中文版](doc/README-CN.md)
+[中文版](doc/README-CN.md)
 # OrcaGym Project
-Welcome to the OrcaGym project! OrcaGym is an enhanced simulation environment based on the OpenAI Gymnasium framework, designed for seamless integration with existing OpenAI Gym simulation environments and algorithms. Developed by Songying Technology, OrcaStudio offers robust support for various physics engines and ray-tracing rendering, delivering both physical and visual precision. This document serves as an introduction to OrcaGym, its background, purpose, usage, and important considerations.
+
+[![PyPI version](https://img.shields.io/pypi/v/orca-gym)](https://pypi.org/project/orca-gym/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+
+Welcome to the OrcaGym project! OrcaGym is a high-performance simulation environment designed to be compatible with the OpenAI Gym/Gymnasium interface, enabling seamless integration with existing reinforcement learning algorithms. Developed in conjunction with Songying Technology's OrcaStudio platform, OrcaGym provides robust support for multi-physics engines and ray-traced rendering while maintaining programming interface compatibility with popular RL frameworks.
 
 ## Background
-In the realm of robotics simulation, having a versatile and accurate environment is crucial for developing and testing algorithms. OpenAI Gym has been a cornerstone in this space, providing a standardized interface for reinforcement learning (RL) tasks. However, the need for more advanced features, such as support for multiple physics engines and high-fidelity rendering, led to the development of OrcaStudio. OrcaGym bridges the gap between OpenAI Gym and OrcaStudio, enabling researchers and developers to leverage the advanced capabilities of OrcaStudio while maintaining compatibility with OpenAI Gym environments and algorithms.
+Robotic simulation serves as a critical platform for embodied intelligence training, requiring both physical accuracy and scalable infrastructure. Traditional solutions often face trade-offs between fidelity and computational efficiency, particularly when scaling to distributed systems. OrcaGym bridges this gap by combining real-time physics simulation with cloud-native architecture, enabling researchers to prototype algorithms in high-fidelity environments and deploy them at scale.
 
 ## Purpose
-The primary goal of OrcaGym is to enhance the capabilities of OpenAI Gym by integrating it with the OrcaStudio simulation platform. This integration allows users to:
+OrcaGym aims to:
 
-1. Leverage Multiple Physics Engines: OrcaStudio supports Mujoco, PhysX, ODE, and more, providing users with flexibility in choosing the most suitable physics engine for their tasks.
-2. Achieve High-Fidelity Rendering: With ray-tracing support, OrcaStudio offers visually precise simulations, essential for tasks requiring accurate visual feedback.
-3. Enable Distributed Deployment: OrcaGym and OrcaStudio can run on the same node or across different nodes, facilitating distributed deployment and large-scale AI cluster training.
+1. Provide a GPU-accelerated simulation environment compatible with OpenAI Gym/Gymnasium APIs
+2. Support multiple physics backends (Mujoco, PhysX, ODE) through OrcaStudio integration
+3. Enable distributed training scenarios across heterogeneous computing nodes
+4. Deliver photorealistic rendering via ray tracing for vision-based RL tasks
 
-## Features
-* **Compatibility with OpenAI Gym:** Seamless integration with existing OpenAI Gym environments and algorithms.
-* **Multi-Physics Engine Support:** Choose from Mujoco, PhysX, ODE, and more.
-* **High-Fidelity Rendering:** Ray-tracing support for precise visual simulations.
-* **Distributed Deployment:** Run simulations on the same or different nodes, supporting large-scale AI training.
-* **Ease of Use:** Simple interface to transition from OpenAI Gym to OrcaGym.
+## Key Features
+- 🎮 **Gym/Gymnasium API Compatibility** - Seamless integration with existing RL algorithms
+- ⚡ **Multi-Physics Backends** - Simultaneous Mujoco/PhysX/ODE simulations
+- 🌐 **Distributed Deployment** - Hybrid local/remote operation via gRPC
+- 🔍 **Ray-Traced Rendering** - Photorealistic visual observations
+- 🤖 **Multi-Agent Support** - Native heterogeneous agent management
 
 ## Installation
-To install OrcaGym, follow these steps:
-
-1. **Clone the Repository:**
-If you are a release version user, please skip the following steps. The release version will automatically configure the environment for you, and you won't need to manually download and configure dependencies.
 ```bash
+# Clone repository
 git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
+
+# Initialize assets
 git lfs install
 git lfs pull
-```
 
-2. **Install Dependencies:**
-
-To facilitate quick installation, we can create a new Conda environment: (If you do not have anaconda or miniconda installed, please go to the [official website](https://www.anaconda.com/) to install it)
-```bash
-conda create --name orca python=3.12
+# Create conda environment
+conda create -n orca python=3.12
 conda activate orca
-```
 
-Then install the dependencies in the newly created environment:
-```bash
-pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# Install core package
 pip install -e .
 ```
 
-## Set Up OrcaStudio:
 
-Follow the instructions provided in the [OrcaStudio documentation](URL:http://orca3d.cn/) to install and configure OrcaStudio on your system.
+## OrcaStudio Configuration
 
+Download and install OrcaStudio from [official portal](http://orca3d.cn/)
 
-## Important Considerations
+## Performance Considerations
 * Performance: High-fidelity rendering and complex physics simulations can be computationally intensive. Ensure your hardware meets the requirements for running OrcaStudio effectively.
 * Configuration: Properly configure OrcaStudio to match your simulation needs. Refer to the OrcaStudio documentation for detailed configuration options.
 * Compatibility: While OrcaGym aims for compatibility with OpenAI Gym, some advanced features may require additional configuration or modification of existing Gym environments.
@@ -58,8 +57,18 @@ Follow the instructions provided in the [OrcaStudio documentation](URL:http://or
 ## Contributing
 We welcome contributions to the OrcaGym project. If you have suggestions, bug reports, or feature requests, please open an issue or submit a pull request on our GitHub repository.
 
+## Citation
+@software{OrcaGym2024,  
+  author = {Songying Technology},  
+  title = {OrcaGym: Cloud-Native Robotics Simulation Platform},  
+  year = {2024},  
+  publisher = {GitHub},  
+  journal = {GitHub repository},  
+  howpublished = {\url{https://github.com/openverse-orca/OrcaGym}}  
+}  
+
 ## License
-OrcaGym is licensed under the MIT License. See the LICENSE file for more information.
+Distributed under MIT License. See **LICENSE** for details.
 
 ## Contact
 For any inquiries or support, please contact us at huangwei@openverse.com.cn
