@@ -20,10 +20,7 @@ class RunMode:
     Playback: replay the demonstration. Ignore the action passed to the step function.
     """
     TELEOPERATION = "teleoperation"
-    IMITATION = "imitation"
-    PLAYBACK = "playback"
-    ROLLOUT = "rollout"
-    AUGMENTATION = "augmentation"
+    POLICY = "policy"
 
 class ControlDevice:
     """
@@ -42,7 +39,16 @@ class Task:
 
 class FrankaEnv(RobomimicEnv):
     """
-    通过遥操作控制franka机械臂
+    Franka single arm environment. The environment is used to train a policy to control the Franka robot arm.
+    
+    Task types: 
+    - lift: lift the object to a target position
+    - push: push the object to a target position
+    - pick_and_place: pick the object and place it to a box
+    
+    Control types: 
+    - Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
+    - Policy: control the robot with a policy. Use the normalized action passed to the step function.
     """
     ENV_VERSION = "1.0.0"
 
@@ -236,7 +242,7 @@ class FrankaEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
             scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-        elif self._run_mode in [RunMode.PLAYBACK, RunMode.IMITATION, RunMode.ROLLOUT, RunMode.AUGMENTATION]:
+        elif self._run_mode in [RunMode.POLICY]:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
             ctrl = self._playback_action(noscaled_action)

@@ -299,28 +299,28 @@ def run_example(orcagym_addr : str,
                 teleoperation_rounds : int):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
-        if run_mode == RunMode.PLAYBACK:
+        if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
             task = dataset_reader.get_env_kwargs()["task"]            
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
             print("Starting simulation...")
             do_playback(env, dataset_reader, playback_mode)
 
-        elif run_mode == RunMode.TELEOPERATION:
+        elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
             print("Starting simulation...")
-            kwargs["run_mode"] = RunMode.IMITATION  # 此处用于训练的时候读取
+            kwargs["run_mode"] = RunMode.POLICY  # 此处用于训练的时候读取
             dataset_writer = DatasetWriter(file_path=record_path,
                                         env_name=env_id,
                                         env_version=env.unwrapped.get_env_version(),
@@ -330,13 +330,13 @@ def run_example(orcagym_addr : str,
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
-        elif run_mode == RunMode.IMITATION:
+        elif run_mode == "imitation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -347,7 +347,7 @@ def run_example(orcagym_addr : str,
             output_dir = f"{current_file_path}/trained_models_tmp/train_temp_dir_{formatted_now}"
             train_policy(config=algo_config, algo=None, dataset=record_path, name=None, output_dir=output_dir, debug=False)
             
-        elif run_mode == RunMode.ROLLOUT:
+        elif run_mode == "rollout":
             ckpt_dict = maybe_dict_from_checkpoint(ckpt_path=ckpt_path)
 
             # metadata from model dict to get info needed to create environment
@@ -359,7 +359,7 @@ def run_example(orcagym_addr : str,
             env_kwargs = env_meta["env_kwargs"]
             task = env_kwargs["task"]  
             
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -376,13 +376,13 @@ def run_example(orcagym_addr : str,
                     realtime_step=REALTIME_STEP
                 )
                 print(stats)
-        elif run_mode == RunMode.AUGMENTATION:
+        elif run_mode == "augmentation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, run_mode, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY, task, ctrl_device, max_episode_steps)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -398,7 +398,7 @@ def run_example(orcagym_addr : str,
 
     except KeyboardInterrupt:
         print("Simulation stopped")        
-        if run_mode == RunMode.TELEOPERATION:
+        if run_mode == "teleoperation":
             dataset_writer.finalize()
         env.close()
     
@@ -498,9 +498,9 @@ if __name__ == "__main__":
     create_tmp_dir("trained_models_tmp")
     create_tmp_dir("augmented_datasets_tmp")
     
-    algo_config = _get_algo_config(algo) if run_mode == RunMode.IMITATION else ["none_algorithm"]
+    algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
     
-    if run_mode == RunMode.TELEOPERATION:
+    if run_mode == "teleoperation":
         if task is None:
             task = "lift"
             
@@ -508,15 +508,15 @@ if __name__ == "__main__":
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
             record_path = f"./records_tmp/Franka_{task}_{formatted_now}.hdf5"
-    if run_mode == RunMode.IMITATION or run_mode == RunMode.PLAYBACK or run_mode == RunMode.AUGMENTATION:
+    if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
             sys.exit(1)
-    if run_mode == RunMode.ROLLOUT:
+    if run_mode == "rollout":
         if ckpt_path is None:
             print("Please input the model file path.")
             sys.exit(1) 
-    if run_mode not in [RunMode.TELEOPERATION, RunMode.PLAYBACK, RunMode.IMITATION, RunMode.ROLLOUT, RunMode.AUGMENTATION]:
+    if run_mode not in ["teleoperation", "playback", "imitation", "rollout", "augmentation"]:
         print("Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
         sys.exit(1)
 

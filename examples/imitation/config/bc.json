@@ -42,7 +42,7 @@
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": true,
-        "hdf5_normalize_obs": true,
+        "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
         "seq_length": 10,
