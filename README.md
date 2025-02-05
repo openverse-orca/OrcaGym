@@ -29,64 +29,25 @@ git clone https://github.com/openverse-orca/OrcaGym.git
 cd OrcaGym
 git lfs install
 git lfs pull
-git submodule update --init --recursive
 ```
 
 2. **Install Dependencies:**
 
 To facilitate quick installation, we can create a new Conda environment: (If you do not have anaconda or miniconda installed, please go to the [official website](https://www.anaconda.com/) to install it)
 ```bash
-conda create --name orca_gym_test python=3.11
-conda activate orca_gym_test
+conda create --name orca python=3.12
+conda activate orca
 ```
 
 Then install the dependencies in the newly created environment:
 ```bash
 pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-pip install -r requirements.txt
-cd 3rd_party/robomimic
 pip install -e .
-```
-
-2. **Install PyTorch:**
-
-Using a combination of PyTorch and CUDA can effectively speed up reinforcement learning training. 
-
-* First, check if the CUDA version of PyTorch is installed on your system.
-
-  - Open `tutorial/Basic-RL-Example.ipynb`
-  - Run the first code cell, and if the output contains **"CUDA available: True"**, you can skip the following steps.
-
-* Install the corresponding CUDA package based on your GPU device. Here is an example:
-```bash
-pip install torch --extra-index-url https://download.pytorch.org/whl/cu12x
 ```
 
 ## Set Up OrcaStudio:
 
 Follow the instructions provided in the [OrcaStudio documentation](URL:http://orca3d.cn/) to install and configure OrcaStudio on your system.
-
-Please note that OrcaStudio is a program that runs on Windows and Linux. Therefore, when using WSL to run OrcaGym in conjunction with OrcaStudio run on Windows, we are actually performing cross-virtual machine communication. This requires some additional [configuration](./doc/setup-wsl-grpc-communication.md).
-
-
-## Usage
-Using OrcaGym is straightforward. Here are the examples to get you started:
-
-* **Validate OrcaGym Environment:**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the corresponding level, for example `Ant_Multiagent`. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in the `tutorial/GymEnvTest.ipynb` document to validate the basic functionality.
-
-* **OrcaGym's Mujoco Interface**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Humanoid_LQR` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/Humanoid-LQR.ipynb` to learn how to port the LQR example included in the Mujoco project into OrcaGym.
-
-* **Control the Franka Panda Robot Arm with an Xbox Controller**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `Franka_Joystick` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/Xbox-Joystick-Control.ipynb` to learn how to control the Franka Panda robot arm using the controller, and implement operation recording and replay.
-
-* **Reinforcement Learning Training Example**
-    * **Launch OrcaStudio**: Launch OrcaStudio and load the `FrankaPanda_RL` level. Click the "Start" button (Ctrl-G) to enter Game Play mode.
-    * **Follow the Guide**: Follow the instructions in `tutorial/FrankaPanda-RL/FrankaPanda-RL.md` to learn how to use multi-agent reinforcement learning training.
 
 
 ## Important Considerations
