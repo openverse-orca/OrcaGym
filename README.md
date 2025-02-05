@@ -58,6 +58,7 @@ Download and install OrcaStudio from [official portal](http://orca3d.cn/)
 We welcome contributions to the OrcaGym project. If you have suggestions, bug reports, or feature requests, please open an issue or submit a pull request on our GitHub repository.
 
 ## Citation
+```bibtex
 @software{OrcaGym2024,  
   author = {Songying Technology},  
   title = {OrcaGym: Cloud-Native Robotics Simulation Platform},  
@@ -66,6 +67,7 @@ We welcome contributions to the OrcaGym project. If you have suggestions, bug re
   journal = {GitHub repository},  
   howpublished = {\url{https://github.com/openverse-orca/OrcaGym}}  
 }  
+```
 
 ## License
 Distributed under MIT License. See **LICENSE** for details.
