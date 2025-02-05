@@ -8,3 +8,7 @@
 [submodule "3rd_party/acados"]
 	path = 3rd_party/acados
 	url = https://github.com/acados/acados.git
+	update = none
+[submodule "3rd_party/openvla"]
+	path = 3rd_party/openvla
+	url = git@github.com:openverse-orca/openvla.git
