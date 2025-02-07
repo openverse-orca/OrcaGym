@@ -184,8 +184,8 @@ class VideoPlayer:
         cv2.destroyAllWindows()
           
 class Monitor:
-    def __init__(self, name : str, fps=30):
-        self.camera = CameraWrapper(name, 7070)
+    def __init__(self, name : str, fps=30, port=7070):
+        self.camera = CameraWrapper(name, port)
         self.camera.start()
         
         self.fps = fps
@@ -198,20 +198,20 @@ class Monitor:
         frame = self.camera.get_frame()
 
         # 转换颜色从 BGR 到 RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         # 显示初始图像
-        self.im = self.ax.imshow(frame)
+        self.im = self.ax.imshow(self.frame)
         self.ax.set_title("Camera Feed")
     
     def update(self, frame_num):
         frame = self.camera.get_frame()
 
         # 转换颜色从 BGR 到 RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         # 更新图像数据
-        self.im.set_data(frame)
+        self.im.set_data(self.frame)
         return self.im,
     
     def start(self):
@@ -231,5 +231,5 @@ class Monitor:
     
     def __del__(self):
         self.stop()
-
+        
 

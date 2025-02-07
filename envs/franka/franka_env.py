@@ -16,11 +16,12 @@ class RunMode:
     """
     Enum class for control type
     Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
-    Policy: control the robot with a policy. Use the normalized action passed to the step function.
-    Playback: replay the demonstration. Ignore the action passed to the step function.
+    Policy normalized: control the robot with a policy. Use the normalized action passed to the step function.
+    Policy raw: control the robot with a policy. Use the raw action passed to the step function.
     """
     TELEOPERATION = "teleoperation"
-    POLICY = "policy"
+    POLICY_NORMALIZED = "policy_normalized"
+    POLICY_RAW = "policy_raw"
 
 class ControlDevice:
     """
@@ -242,9 +243,13 @@ class FrankaEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
             scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-        elif self._run_mode in [RunMode.POLICY]:
+        elif self._run_mode == RunMode.POLICY_NORMALIZED:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
+            ctrl = self._playback_action(noscaled_action)
+        elif self._run_mode == RunMode.POLICY_RAW:
+            noscaled_action = np.clip(action, self._action_range_min, self._action_range_max)
+            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
             ctrl = self._playback_action(noscaled_action)
         else:
             raise ValueError("Invalid run mode : ", self._run_mode)
