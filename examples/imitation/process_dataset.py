@@ -176,7 +176,6 @@ def _process_combine(dataset_files, output_file):
             env_name = reader.get_env_name()
             env_version = reader.get_env_version()
             env_kwargs = reader.get_env_kwargs()
-            env_kwargs["run_mode"] = "policy"   # 兼容老版本数据集
             writer = DatasetWriter(output_file, env_name, env_version, env_kwargs)
             
         demo_names = reader.get_demo_names()

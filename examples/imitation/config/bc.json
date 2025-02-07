@@ -82,11 +82,9 @@
             "cos_weight": 0.0
         },
         "actor_layer_dims": [
-            256,
-            256
         ],
         "gaussian": {
-            "enabled": true,
+            "enabled": false,
             "fixed_std": false,
             "init_std": 0.2,
             "min_std": 0.05,
@@ -94,7 +92,7 @@
             "low_noise_eval": true
         },
         "gmm": {
-            "enabled": false,
+            "enabled": true,
             "num_modes": 5,
             "min_std": 0.1,
             "std_activation": "softplus",
@@ -136,9 +134,9 @@
             ]
         },
         "rnn": {
-            "enabled": false,
+            "enabled": true,
             "horizon": 10,
-            "hidden_dim": 256,
+            "hidden_dim": 400,
             "rnn_type": "LSTM",
             "num_layers": 1,
             "open_loop": false,

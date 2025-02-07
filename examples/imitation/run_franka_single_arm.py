@@ -36,7 +36,15 @@ FRAME_SKIP = 8
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
-def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, task : str, ctrl_device : str, max_episode_steps) -> str:
+def register_env(orcagym_addr : str, 
+                 env_name : str, 
+                 env_index : int, 
+                 agent_name : str, 
+                 run_mode : str, 
+                 task : str, 
+                 ctrl_device : str, 
+                 max_episode_steps : int,
+                 sample_range : float) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
@@ -48,7 +56,8 @@ def register_env(orcagym_addr, env_name, env_index, agent_name, run_mode : str, 
                 'run_mode': run_mode,
                 'task': task,
                 'ctrl_device': ctrl_device,
-                'control_freq': CONTROL_FREQ}           
+                'control_freq': CONTROL_FREQ,
+                'sample_range': sample_range}           
     gym.register(
         id=env_id,
         entry_point=ENV_ENTRY_POINT[env_name],
@@ -296,7 +305,8 @@ def run_example(orcagym_addr : str,
                 ckpt_path : str, 
                 augmented_sacle : float,
                 augmented_times : int,
-                teleoperation_rounds : int):
+                teleoperation_rounds : int,
+                sample_range : float):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
@@ -305,7 +315,7 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -315,7 +325,7 @@ def run_example(orcagym_addr : str,
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -336,7 +346,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -359,7 +369,7 @@ def run_example(orcagym_addr : str,
             env_kwargs = env_meta["env_kwargs"]
             task = env_kwargs["task"]  
             
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -382,7 +392,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -477,6 +487,7 @@ if __name__ == "__main__":
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
     parser.add_argument('--augmented_times', type=int, default=2, help='The times to augment the dataset')
     parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
+    parser.add_argument('--sample_range', type=float, default=0.2, help='The area range to sample the object and goal position')
     
     args = parser.parse_args()
     
@@ -493,6 +504,13 @@ if __name__ == "__main__":
     augmented_sacle = args.augmented_sacle
     augmented_times = args.augmented_times
     teleoperation_rounds = args.teleoperation_rounds
+    sample_range = args.sample_range
+    
+    assert record_time > 0, "The record time should be greater than 0."
+    assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
+    assert sample_range >= 0.0, "The sample range should be greater than or equal to 0."
+    assert augmented_sacle >= 0.0, "The augmented scale should be greater than or equal to 0."
+    assert augmented_times > 0, "The augmented times should be greater than 0."
         
     create_tmp_dir("records_tmp")
     create_tmp_dir("trained_models_tmp")
@@ -549,7 +567,8 @@ if __name__ == "__main__":
                     ckpt_path, 
                     augmented_sacle,
                     augmented_times,
-                    teleoperation_rounds)
+                    teleoperation_rounds,
+                    sample_range)
 
     # 终止 Monitor 子进程
     terminate_monitor(monitor_process)
