@@ -16,7 +16,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
-from orca_gym.sensor.rgbd_camera import Monitor
+from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
 from envs.franka.franka_env import FrankaEnv, RunMode, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
@@ -67,13 +67,14 @@ def register_env(orcagym_addr : str,
     )
     return env_id, kwargs
 
-def run_episode(env : FrankaEnv):
+def run_episode(env : FrankaEnv, camera_primary : CameraWrapper, camera_wrist : CameraWrapper):
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
     info_list = []    
     terminated_times = 0
+    camera_frames = {camera_primary.name: [], camera_wrist.name: []}
     while True:
         start_time = datetime.now()
 
@@ -89,9 +90,14 @@ def run_episode(env : FrankaEnv):
         done_list.append(0 if not terminated else 1)
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
+        
+        camera_primary_frame = camera_primary.get_frame()
+        camera_wrist_frame = camera_wrist.get_frame()
+        camera_frames[camera_primary.name].append(camera_primary_frame)
+        camera_frames[camera_wrist.name].append(camera_wrist_frame)
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list
+            return obs_list, reward_list, done_list, info_list, camera_frames
 
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < REALTIME_STEP:
@@ -111,8 +117,13 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
 
 def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds : int):    
     current_round = 1
+    camera_primary = CameraWrapper(name="camera_primary", port=7090)
+    camera_primary.start()
+    camera_wrist = CameraWrapper(name="camera_wrist", port=7070)
+    camera_wrist.start()
+    
     while True:
-        obs_list, reward_list, done_list, info_list = run_episode(env)
+        obs_list, reward_list, done_list, info_list, camera_frames = run_episode(env, camera_primary, camera_wrist)
         task_result = "Success" if done_list[-1] == 1 else "Failed"
         save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
@@ -123,7 +134,8 @@ def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds :
                 'goals': np.array([info["goal"] for info in info_list]),
                 'rewards': np.array(reward_list),
                 'dones': np.array(done_list),
-                'obs': obs_list
+                'obs': obs_list,
+                'camera_frames': camera_frames
             })
         if exit_program or current_round > teleoperation_rounds:
             break
