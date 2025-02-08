@@ -413,7 +413,7 @@ def run_example(orcagym_addr : str,
         env.close()
     
 
-def start_monitor():
+def start_monitor(port=7070):
     """
     启动 monitor.py 作为子进程。
     """
@@ -425,7 +425,7 @@ def start_monitor():
     # 启动 monitor.py
     # 使用 sys.executable 确保使用相同的 Python 解释器
     process = subprocess.Popen(
-        [sys.executable, monitor_script],
+        [sys.executable, monitor_script, "--port", f"{port}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
@@ -550,8 +550,12 @@ if __name__ == "__main__":
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    monitor_process = start_monitor()
-    print(f"Monitor 进程已启动，PID: {monitor_process.pid}")
+    monitor_process_7070 = start_monitor(port=7070)
+    print(f"Monitor 进程已启动，PID: {monitor_process_7070.pid}")
+    monitor_process_7080 = start_monitor(port=7080)
+    print(f"Monitor 进程已启动，PID: {monitor_process_7080.pid}")
+    monitor_process_7090 = start_monitor(port=7090)
+    print(f"Monitor 进程已启动，PID: {monitor_process_7090.pid}")    
 
     for config in algo_config:
         run_example(orcagym_addr, 
@@ -571,4 +575,6 @@ if __name__ == "__main__":
                     sample_range)
 
     # 终止 Monitor 子进程
-    terminate_monitor(monitor_process)
+    terminate_monitor(monitor_process_7070)
+    terminate_monitor(monitor_process_7080)
+    terminate_monitor(monitor_process_7090)
