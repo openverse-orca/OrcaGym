@@ -8,3 +8,6 @@
 [submodule "3rd_party/openvla"]
 	path = 3rd_party/openvla
 	url = git@github.com:openverse-orca/openvla.git
+[submodule "3rd_party/rlds_dataset_builder"]
+	path = 3rd_party/rlds_dataset_builder
+	url = git@github.com:openverse-orca/rlds_dataset_builder.git
