@@ -115,7 +115,7 @@ def teleoperation_episode(env : FrankaEnv, cameras : list[CameraWrapper], rgb_si
                 camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
                 
-            print("Timestep: ", env.unwrapped.gym.data.time)
+            # print("Timestep: ", env.unwrapped.gym.data.time)
             timestep_list.append(env.unwrapped.gym.data.time)
 
         if terminated_times >= 5 or truncated:
@@ -142,7 +142,8 @@ def do_teleoperation(env,
                      teleoperation_rounds : int, 
                      cameras : list[CameraWrapper], 
                      rgb_size : tuple = (256, 256),
-                     action_step : int = 1):    
+                     action_step : int = 1,
+                     language_instruction : str = None):    
     
     current_round = 1
     
@@ -163,7 +164,8 @@ def do_teleoperation(env,
                 'dones': np.array(done_list),
                 'obs': obs_list,
                 'camera_frames': camera_frames,
-                'timesteps': np.array(timestep_list)
+                'timesteps': np.array(timestep_list),
+                'language_instruction': language_instruction
             })
         if exit_program or current_round > teleoperation_rounds:
             break

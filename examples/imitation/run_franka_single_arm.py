@@ -70,7 +70,6 @@ def run_example(orcagym_addr : str,
             env = gym.make(env_id)        
             print("Starting simulation...")
             kwargs["run_mode"] = RunMode.POLICY_NORMALIZED  # 此处用于训练的时候读取
-            kwargs["language_instruction"] = "pick up brown box"
             dataset_writer = DatasetWriter(file_path=record_path,
                                         env_name=env_id,
                                         env_version=env.unwrapped.get_env_version(),
@@ -80,7 +79,9 @@ def run_example(orcagym_addr : str,
                     #    CameraWrapper(name="camera_secondary", port=7080),
                        CameraWrapper(name="camera_wrist", port=7070)]
 
-            franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, cameras=cameras, rgb_size=RGB_SIZE)
+            franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
+                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=1,
+                                                 language_instruction="pick up brown box, lift it up for 10cm.")
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             

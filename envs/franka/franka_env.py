@@ -74,6 +74,7 @@ class FrankaEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range
+        self._reward_type = reward_type
         self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
@@ -587,7 +588,7 @@ class FrankaEnv(RobomimicEnv):
             return self._get_obs().copy()
 
     def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
-        if self._reward_printer is not None and self._run_mode == RunMode.TELEOPERATION:
+        if self._reward_printer is not None and self._reward_type == RewardType.DENSE:
             self._reward_printer.print_reward(message, reward, coeff)
         
     def _compute_reward_obj_goal_distance(self) -> float:
