@@ -168,6 +168,7 @@ def run_example(orcagym_addr : str,
             env = gym.make(env_id)        
             print("Starting simulation...")
             kwargs["run_mode"] = RunMode.POLICY_NORMALIZED  # 此处用于训练的时候读取
+            kwargs["language_instruction"] = "pick up brown box, lift it up for 10cm"
             dataset_writer = DatasetWriter(file_path=record_path,
                                         env_name=env_id,
                                         env_version=env.unwrapped.get_env_version(),
@@ -198,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
     parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
     parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
-    parser.add_argument('--sample_range', type=float, default=0.2, help='The area range to sample the object and goal position')
+    parser.add_argument('--sample_range', type=float, default=0.1, help='The area range to sample the object and goal position')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / rollout / augmentation)')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
