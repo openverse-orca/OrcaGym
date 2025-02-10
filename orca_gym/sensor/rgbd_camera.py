@@ -79,8 +79,6 @@ class CameraWrapper:
         if not self.enabled:
             return
         self.running = False
-        time.sleep(0.1)
-        self.thread.join()
         asyncio.get_event_loop().stop()
 
     def get_frame(self, format='bgr24', size : tuple = None):

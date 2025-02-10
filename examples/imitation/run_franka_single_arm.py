@@ -23,291 +23,13 @@ from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
 from robomimic.utils.file_utils import maybe_dict_from_checkpoint
 import orca_gym.utils.rotations as rotations
+import orca_gym.scripts.franka_manipulation as franka_manipulation
 
 import numpy as np
 import argparse
 
-ENV_ENTRY_POINT = {
-    "Franka": "envs.franka.franka_env:FrankaEnv"
-}
-
-TIME_STEP = 0.005
-FRAME_SKIP = 8
-REALTIME_STEP = TIME_STEP * FRAME_SKIP
-CONTROL_FREQ = 1 / REALTIME_STEP
 
 RGB_SIZE = (128, 128)
-
-def register_env(orcagym_addr : str, 
-                 env_name : str, 
-                 env_index : int, 
-                 agent_name : str, 
-                 run_mode : str, 
-                 task : str, 
-                 ctrl_device : str, 
-                 max_episode_steps : int,
-                 sample_range : float) -> str:
-    orcagym_addr_str = orcagym_addr.replace(":", "-")
-    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
-    agent_names = [f"{agent_name}"]
-    kwargs = {'frame_skip': FRAME_SKIP,   
-                'reward_type': RewardType.SPARSE,
-                'orcagym_addr': orcagym_addr, 
-                'agent_names': agent_names, 
-                'time_step': TIME_STEP,
-                'run_mode': run_mode,
-                'task': task,
-                'ctrl_device': ctrl_device,
-                'control_freq': CONTROL_FREQ,
-                'sample_range': sample_range}           
-    gym.register(
-        id=env_id,
-        entry_point=ENV_ENTRY_POINT[env_name],
-        kwargs=kwargs,
-        max_episode_steps= max_episode_steps,
-        reward_threshold=0.0,
-    )
-    return env_id, kwargs
-
-def run_episode(env : FrankaEnv, camera_primary : CameraWrapper, camera_wrist : CameraWrapper):
-    obs, info = env.reset(seed=42)
-    obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
-    reward_list = []
-    done_list = []
-    info_list = []    
-    terminated_times = 0
-    camera_frames = {camera_primary.name: [], camera_wrist.name: []}
-    while True:
-        start_time = datetime.now()
-
-        action = env.action_space.sample()
-        obs, reward, terminated, truncated, info = env.step(action)
-        
-        env.render()
-        
-        for obs_key, obs_data in obs.items():
-            obs_list[obs_key].append(obs_data)
-            
-        reward_list.append(reward)
-        done_list.append(0 if not terminated else 1)
-        info_list.append(info)
-        terminated_times = terminated_times + 1 if terminated else 0
-        
-        camera_primary_frame = camera_primary.get_frame(format='rgb24', size=RGB_SIZE)
-        camera_wrist_frame = camera_wrist.get_frame(format='rgb24', size=RGB_SIZE)
-        camera_frames[camera_primary.name].append(camera_primary_frame)
-        camera_frames[camera_wrist.name].append(camera_wrist_frame)
-
-        if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames
-
-        elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP:
-            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-            
-def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
-    while True:
-        user_input = input(f"Round {currnet_round} / {teleoperation_rounds}, Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(ignore & exit): ")
-        if user_input == 'y':
-            return True, False
-        elif user_input == 'n':
-            return False, False
-        elif user_input == 'e':
-            return False, True
-        else:
-            print("Invalid input! Please input 'y', 'n' or 'e'.")
-
-def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds : int):    
-    current_round = 1
-    camera_primary = CameraWrapper(name="camera_primary", port=7090)
-    camera_primary.start()
-    camera_wrist = CameraWrapper(name="camera_wrist", port=7070)
-    camera_wrist.start()
-    
-    while True:
-        obs_list, reward_list, done_list, info_list, camera_frames = run_episode(env, camera_primary, camera_wrist)
-        task_result = "Success" if done_list[-1] == 1 else "Failed"
-        save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
-        if save_record:
-            current_round += 1
-            dataset_writer.add_demo_data({
-                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-                'actions': np.array([info["action"] for info in info_list]),
-                'goals': np.array([info["goal"] for info in info_list]),
-                'rewards': np.array(reward_list),
-                'dones': np.array(done_list),
-                'obs': obs_list,
-                'camera_frames': camera_frames
-            })
-        if exit_program or current_round > teleoperation_rounds:
-            break
-        
-    camera_primary.stop()
-    camera_wrist.stop()
-
-def playback_episode(env : FrankaEnv, action_list, done_list):
-    for i in range(len(action_list)):
-        start_time = datetime.now()
-
-        action = action_list[i]
-        done = done_list[i]
-        obs, reward, terminated, truncated, info = env.step(action)
-        env.render()
-
-        elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP:
-            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-
-        if done:
-            print("Episode done!")
-            return
-
-        if terminated or truncated:
-            print("Episode terminated!")
-            return
-    
-    print("Episode tunkated!")
-
-def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
-    obs, info = env.reset(seed=42)
-    
-    object_data = demo_data['obs']['object']
-    obj_xpos = object_data[0][0:3]
-    obj_xquat = object_data[0][3:7]
-    
-    goal_data = demo_data['goals']
-    goal_xpos = goal_data[0][0:3]
-    goal_xquat = goal_data[0][3:7]
-    
-    if noise_scale > 0.0:
-        offset_scale = 0.4 * noise_scale
-        rotate_scale = 2 * np.pi * noise_scale
-        obj_xpos += np.random.normal(0, offset_scale, len(obj_xpos))
-        obj_euler = rotations.quat2euler(obj_xquat)
-        obj_euler += np.random.normal(0, rotate_scale, len(obj_euler))
-        obj_xquat = rotations.euler2quat(obj_euler)
-        
-        goal_xpos += np.random.normal(0, offset_scale, len(goal_xpos))
-        goal_euler = rotations.quat2euler(goal_xquat)
-        goal_euler += np.random.normal(0, rotate_scale, len(goal_euler))
-        goal_xquat = rotations.euler2quat(goal_euler)
-
-    # print("Resetting object position: ", obj_xpos, obj_xquat)
-    env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
-    
-def do_playback(env : FrankaEnv, dataset_reader : DatasetReader, playback_mode : str):
-    demo_names = dataset_reader.get_demo_names()
-    if playback_mode == "loop":
-        demo_name_index_list = list(range(len(demo_names)))
-    elif playback_mode == "random":
-        demo_name_index_list = np.random.permutation(list(range(len(demo_names))))
-    else:
-        print("Invalid playback mode! Please input 'loop' or 'random'.")
-        return
-    
-    for i in demo_name_index_list:
-        demo_data = dataset_reader.get_demo_data(demo_names[i])
-        action_list = demo_data['actions']
-        done_list = demo_data['dones']
-        print("Playing back episode: ", demo_names[i], " with ", len(action_list), " steps.")
-        # for i, action in enumerate(action_list):
-        #     print(f"Playback Action ({i}): ", action)
-        reset_playback_env(env, demo_data)
-        playback_episode(env, action_list, done_list)
-        time.sleep(1)
-
-def autment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
-    obs, info = env.reset(seed=42)    
-    obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
-    reward_list = []
-    done_list = []
-    info_list = []    
-    terminated_times = 0    
-    
-    reset_playback_env(env, demo_data, noise_scale)    
-    action_list = demo_data['actions']
-    action_index_list = list(range(len(action_list)))
-    holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
-    action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
-    
-    for i in action_index_list:
-        action = action_list[i]
-        start_time = datetime.now()
-
-        if noise_scale > 0.0:
-            noise = np.random.normal(0, noise_scale, len(action))
-            action += noise * np.abs(action)
-            action = np.clip(action, -1.0, 1.0)
-        
-        obs, reward, terminated, truncated, info = env.step(action)
-        env.render()
-
-        for obs_key, obs_data in obs.items():
-            obs_list[obs_key].append(obs_data)
-            
-        reward_list.append(reward)
-        done_list.append(0 if not terminated else 1)
-        info_list.append(info)
-        terminated_times = terminated_times + 1 if terminated else 0
-
-        if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list
-
-        elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP and realtime:
-            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-
-    return obs_list, reward_list, done_list, info_list
- 
-    
-
-def do_augmentation(env : FrankaEnv, 
-                    original_dataset_path : str, 
-                    augmented_dataset_path : str, 
-                    augmented_scale : float, 
-                    augmented_times : int):
-    
-    REALTIME = False
-    
-    dataset_reader = DatasetReader(file_path=original_dataset_path)
-    dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
-                                    env_name=dataset_reader.get_env_name(),
-                                    env_version=dataset_reader.get_env_version(),
-                                    env_kwargs=dataset_reader.get_env_kwargs())
-    
-    need_demo_count = dataset_reader.get_demo_count() * augmented_times
-    done_demo_count = 0
-    
-    for _ in range(augmented_times):    
-        demo_names = dataset_reader.get_demo_names()
-        for original_demo_name in demo_names:
-            done = False
-            while not done:
-                demo_data = dataset_reader.get_demo_data(original_demo_name)
-                print("Augmenting original demo: ", original_demo_name)
-                
-                obs_list, reward_list, done_list, info_list = autment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
-                if done_list[-1] == 1:
-                    dataset_writer.add_demo_data({
-                        'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-                        'actions': np.array([info["action"] for info in info_list]),
-                        'goals': np.array([info["goal"] for info in info_list]),
-                        'rewards': np.array(reward_list),
-                        'dones': np.array(done_list),
-                        'obs': obs_list
-                    })
-                    
-                    done_demo_count += 1
-                    print(f"Episode done! {done_demo_count} / {need_demo_count}")
-                    done = True
-                else:
-                    print("Episode failed!")
-    
-                if REALTIME:
-                    time.sleep(1)
-
-    dataset_writer.shuffle_demos()
-    dataset_writer.finalize()          
 
 def run_example(orcagym_addr : str, 
                 agent_name : str, 
@@ -332,17 +54,17 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
             print("Starting simulation...")
-            do_playback(env, dataset_reader, playback_mode)
+            franka_manipulation.do_playback(env, dataset_reader, playback_mode)
 
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -353,7 +75,11 @@ def run_example(orcagym_addr : str,
                                         env_version=env.unwrapped.get_env_version(),
                                         env_kwargs=kwargs)
 
-            do_teleoperation(env, dataset_writer, teleoperation_rounds)
+            cameras = [CameraWrapper(name="camera_primary", port=7090),
+                    #    CameraWrapper(name="camera_secondary", port=7080),
+                       CameraWrapper(name="camera_wrist", port=7070)]
+
+            franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, cameras=cameras, rgb_size=RGB_SIZE)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
@@ -363,7 +89,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -386,7 +112,7 @@ def run_example(orcagym_addr : str,
             env_kwargs = env_meta["env_kwargs"]
             task = env_kwargs["task"]  
             
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -400,7 +126,7 @@ def run_example(orcagym_addr : str,
                     video_writer=None, 
                     video_skip=5, 
                     camera_names=["agentview"],
-                    realtime_step=REALTIME_STEP
+                    realtime_step=franka_manipulation.REALTIME_STEP
                 )
                 print(stats)
         elif run_mode == "augmentation":
@@ -409,7 +135,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -418,7 +144,7 @@ def run_example(orcagym_addr : str,
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
             agumented_dataset_file_path = f"{current_file_path}/augmented_datasets_tmp/augmented_dataset_{formatted_now}.hdf5"
-            do_augmentation(env, record_path, agumented_dataset_file_path, augmented_sacle, augmented_times)
+            franka_manipulation.do_augmentation(env, record_path, agumented_dataset_file_path, augmented_sacle, augmented_times)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -429,38 +155,6 @@ def run_example(orcagym_addr : str,
             dataset_writer.finalize()
         env.close()
     
-
-def start_monitor(port=7070):
-    """
-    启动 monitor.py 作为子进程。
-    """
-    # 获取当前脚本所在的目录
-    current_file_path = os.path.abspath('')
-    project_root = os.path.dirname(os.path.dirname(current_file_path))    
-    monitor_script = f"{project_root}/orca_gym/scripts/camera_monitor.py"
-
-    # 启动 monitor.py
-    # 使用 sys.executable 确保使用相同的 Python 解释器
-    process = subprocess.Popen(
-        [sys.executable, monitor_script, "--port", f"{port}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    return process
-
-def terminate_monitor(process):
-    """
-    终止子进程。
-    """
-    try:
-        if os.name != 'nt':
-            # Unix/Linux: 发送 SIGTERM 给整个进程组
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        else:
-            # Windows: 使用 terminate 方法
-            process.terminate()
-    except Exception as e:
-        print(f"终止子进程时发生错误: {e}")
         
 def _get_algo_config(algo_name):
     if algo_name == "bc":
@@ -563,16 +257,15 @@ if __name__ == "__main__":
         print("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
 
-    max_episode_steps = int(record_time / REALTIME_STEP)
+    max_episode_steps = int(record_time / franka_manipulation.REALTIME_STEP)
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    monitor_process_7070 = start_monitor(port=7070)
-    print(f"Monitor 进程已启动，PID: {monitor_process_7070.pid}")
-    monitor_process_7080 = start_monitor(port=7080)
-    print(f"Monitor 进程已启动，PID: {monitor_process_7080.pid}")
-    monitor_process_7090 = start_monitor(port=7090)
-    print(f"Monitor 进程已启动，PID: {monitor_process_7090.pid}")    
+    ports = [7070, 7080, 7090]
+    monitor_processes = []
+    for port in ports:
+        process = franka_manipulation.start_monitor(port=port, project_root=project_root)
+        monitor_processes.append(process)
 
     for config in algo_config:
         run_example(orcagym_addr, 
@@ -592,9 +285,5 @@ if __name__ == "__main__":
                     sample_range)
 
     # 终止 Monitor 子进程
-    terminate_monitor(monitor_process_7070)
-    print("Monitor 进程已终止，PID: ", monitor_process_7070.pid)
-    terminate_monitor(monitor_process_7080)
-    print("Monitor 进程已终止，PID: ", monitor_process_7080.pid)
-    terminate_monitor(monitor_process_7090)
-    print("Monitor 进程已终止，PID: ", monitor_process_7090.pid)
+    for process in monitor_processes:
+        franka_manipulation.terminate_monitor(process)

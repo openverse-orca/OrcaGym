@@ -426,6 +426,7 @@ class OrcaGymLocal(OrcaGymBase):
         self.data.update_qpos_qvel_qacc(self._qpos_cache, self._qvel_cache, self._qacc_cache)        
         self.data.update_qfrc_bias(qfrc_bias)
 
+        self.data.time = self._mjData.time
     
     def query_qfrc_bias(self):
         qfrc_bias = self._mjData.qfrc_bias

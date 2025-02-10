@@ -51,6 +51,7 @@ class DatasetWriter:
                 'rewards': np.ndarray (N,),
                 'dones': np.ndarray (N,),
                 'obs': dict of np.ndarrays
+                'timesteps': np.ndarray (N,)（可选，用于 robosuite 数据集）,
                 # 'next_obs' 可选，如果未提供，将自动生成
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
@@ -72,7 +73,7 @@ class DatasetWriter:
                 demo_group.attrs['model_file'] = model_file
 
             # 存储数据集
-            for key in ['states', 'actions', 'rewards', 'dones', 'goals']:
+            for key in ['states', 'actions', 'rewards', 'dones', 'goals', 'timesteps']:
                 data = demo_data.get(key)
                 if data is not None:
                     demo_group.create_dataset(key, data=data)
