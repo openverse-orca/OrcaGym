@@ -14,7 +14,7 @@ import matplotlib.animation as animation
 
 class CameraWrapper:
     def __init__(self, name:str, port:int):
-        self.name = name
+        self._name = name
         self.port = port
         self.image = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
         self.enabled = True
@@ -36,8 +36,9 @@ class CameraWrapper:
     def loop(self):
         asyncio.run(self.do_stuff())
     
-    def get_name(self):
-        return self.name
+    @property
+    def name(self):
+        return self._name
     
     def is_first_frame_received(self):
         return self.received_first_frame
@@ -75,10 +76,23 @@ class CameraWrapper:
 
 
     def stop(self):
-        pass
+        if not self.enabled:
+            return
+        self.running = False
+        time.sleep(0.1)
+        self.thread.join()
+        asyncio.get_event_loop().stop()
 
-    def get_frame(self):
-        return self.image
+    def get_frame(self, format='bgr24', size : tuple = None):
+        if format == 'bgr24':
+            frame = self.image
+        elif format == 'rgb24':
+            frame = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            
+        if size is not None:
+            frame = cv2.resize(frame, size)
+            
+        return frame
     
 
 
@@ -195,23 +209,17 @@ class Monitor:
         self.fig, self.ax = plt.subplots()
         self.ax.axis('off')  # 关闭坐标轴
         
-        frame = self.camera.get_frame()
-
-        # 转换颜色从 BGR 到 RGB
-        self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = self.camera.get_frame(format='rgb24')
         
         # 显示初始图像
-        self.im = self.ax.imshow(self.frame)
+        self.im = self.ax.imshow(frame)
         self.ax.set_title("Camera Feed")
     
     def update(self, frame_num):
-        frame = self.camera.get_frame()
-
-        # 转换颜色从 BGR 到 RGB
-        self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = self.camera.get_frame(format='rgb24')
         
         # 更新图像数据
-        self.im.set_data(self.frame)
+        self.im.set_data(frame)
         return self.im,
     
     def start(self):

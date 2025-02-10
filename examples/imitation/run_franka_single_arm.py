@@ -36,6 +36,8 @@ FRAME_SKIP = 8
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
+RGB_SIZE = (128, 128)
+
 def register_env(orcagym_addr : str, 
                  env_name : str, 
                  env_index : int, 
@@ -91,8 +93,8 @@ def run_episode(env : FrankaEnv, camera_primary : CameraWrapper, camera_wrist : 
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
         
-        camera_primary_frame = camera_primary.get_frame()
-        camera_wrist_frame = camera_wrist.get_frame()
+        camera_primary_frame = camera_primary.get_frame(format='rgb24', size=RGB_SIZE)
+        camera_wrist_frame = camera_wrist.get_frame(format='rgb24', size=RGB_SIZE)
         camera_frames[camera_primary.name].append(camera_primary_frame)
         camera_frames[camera_wrist.name].append(camera_wrist_frame)
 
@@ -139,6 +141,9 @@ def do_teleoperation(env, dataset_writer : DatasetWriter, teleoperation_rounds :
             })
         if exit_program or current_round > teleoperation_rounds:
             break
+        
+    camera_primary.stop()
+    camera_wrist.stop()
 
 def playback_episode(env : FrankaEnv, action_list, done_list):
     for i in range(len(action_list)):
@@ -588,5 +593,8 @@ if __name__ == "__main__":
 
     # 终止 Monitor 子进程
     terminate_monitor(monitor_process_7070)
+    print("Monitor 进程已终止，PID: ", monitor_process_7070.pid)
     terminate_monitor(monitor_process_7080)
+    print("Monitor 进程已终止，PID: ", monitor_process_7080.pid)
     terminate_monitor(monitor_process_7090)
+    print("Monitor 进程已终止，PID: ", monitor_process_7090.pid)

@@ -86,10 +86,7 @@ def run_episode(env : FrankaEnv, processor, vla, camera_arm : CameraWrapper):
 
         # Grab image input & format prompt
 
-        frame = camera_arm.get_frame()
-
-        # 转换颜色从 BGR 到 RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = camera_arm.get_frame(format='rgb24')
         print("frame shape = ", frame.shape, "frame type = ", frame.dtype)
         
         image: Image.Image = Image.fromarray(frame)
