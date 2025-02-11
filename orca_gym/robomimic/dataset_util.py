@@ -45,15 +45,16 @@ class DatasetWriter:
         参数：
         - demo_data: 包含演示数据的字典，结构如下：
             {
-                'states': np.ndarray (N, D),
-                'actions': np.ndarray (N, A),
-                'goals': np.ndarray (N, G)（可选，用于 HER 算法）,
-                'rewards': np.ndarray (N,),
-                'dones': np.ndarray (N,),
-                'obs': dict of np.ndarrays
-                'timesteps': np.ndarray (N,)（可选，用于 robosuite 数据集）,
-                'language_instruction': str（可选，用于语言指导任务）,
-                # 'next_obs' 可选，如果未提供，将自动生成
+                'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
+                'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
+                'goals': np.ndarray (N, G)      # 目标位姿（可选）
+                'rewards': np.ndarray (N,),     # 奖励
+                'dones': np.ndarray (N,),       # 完成标志
+                'obs': dict of np.ndarrays      # 观测数据字典
+                'timesteps': np.ndarray (N,)    # 仿真时间，单位为秒
+                'language_instruction': str     # 语言指令（可选）
+                'next_obs'                      # 如果未提供，将自动生成
+                'camera_frames'                 # 可选，用于存储相机帧
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
         """
@@ -285,13 +286,16 @@ class DatasetReader:
         返回：
         - demo_data: 包含演示数据的字典，结构如下：
             {
-                'states': np.ndarray (N, D),
-                'actions': np.ndarray (N, A),
-                'goals': np.ndarray (N, G)（可选，用于 HER 算法）,
-                'rewards': np.ndarray (N,),
-                'dones': np.ndarray (N,),
-                'obs': dict of np.ndarrays
-                'next_obs': dict of np.ndarrays
+                'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
+                'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
+                'goals': np.ndarray (N, G)      # 目标位姿（可选）
+                'rewards': np.ndarray (N,),     # 奖励
+                'dones': np.ndarray (N,),       # 完成标志
+                'obs': dict of np.ndarrays      # 观测数据字典
+                'timesteps': np.ndarray (N,)    # 仿真时间，单位为秒
+                'language_instruction': str     # 语言指令（可选）
+                'next_obs'                      # 如果未提供，将自动生成
+                'camera_frames'                 # 用于存储相机帧 (可选)
             }
         """
         with h5py.File(self.file_path, 'r') as f:
@@ -303,6 +307,10 @@ class DatasetReader:
                 'rewards': np.array(demo_group['rewards']),
                 'dones': np.array(demo_group['dones']),
                 'obs': {key: np.array(demo_group['obs'][key]) for key in demo_group['obs'].keys()},
-                'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()}
+                'timesteps': np.array(demo_group['timesteps']),
+                'language_instruction': demo_group.attrs.get('language_instruction', None),
+                'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
+                'camera_frames': {camera_name: [np.array(frame_data) for _, frame_data in camera_group.items()]
+                                  for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')}
             }
         return demo_data

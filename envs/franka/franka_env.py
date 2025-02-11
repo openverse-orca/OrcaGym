@@ -416,17 +416,17 @@ class FrankaEnv(RobomimicEnv):
         joint_velocities = self._get_arm_joint_velocities()
 
         self._obs = {
-            "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32),
-            "ee_pos": ee_position["xpos"],
-            "ee_quat": ee_position["xquat"],
-            "ee_vel_linear": ee_xvalp[self._ee_name],
-            "ee_vel_angular": ee_xvalr[self._ee_name],
-            "joint_qpos": joint_values,
-            "joint_qpos_sin": joint_values_sin,
-            "joint_qpos_cos": joint_values_cos,
-            "joint_vel": joint_velocities,
-            "gripper_qpos": gripper_qpos,
-            "gripper_qvel": gripper_qvel,
+            "object": np.concatenate([obj_xpos, obj_xquat], dtype=np.float32).flatten(),
+            "ee_pos": ee_position["xpos"].flatten().astype(np.float32),
+            "ee_quat": ee_position["xquat"].flatten().astype(np.float32),
+            "ee_vel_linear": ee_xvalp[self._ee_name].flatten().astype(np.float32),
+            "ee_vel_angular": ee_xvalr[self._ee_name].flatten().astype(np.float32),
+            "joint_qpos": joint_values.flatten().astype(np.float32),
+            "joint_qpos_sin": joint_values_sin.flatten().astype(np.float32),
+            "joint_qpos_cos": joint_values_cos.flatten().astype(np.float32),
+            "joint_vel": joint_velocities.flatten().astype(np.float32),
+            "gripper_qpos": gripper_qpos.flatten().astype(np.float32),
+            "gripper_qvel": gripper_qvel.flatten().astype(np.float32),
         }
         return self._obs
     

@@ -157,14 +157,14 @@ def do_teleoperation(env,
         if save_record:
             current_round += 1
             dataset_writer.add_demo_data({
-                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-                'actions': np.array([info["action"] for info in info_list]),
-                'goals': np.array([info["goal"] for info in info_list]),
-                'rewards': np.array(reward_list),
-                'dones': np.array(done_list),
+                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
+                'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
+                'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
+                'rewards': np.array(reward_list, dtype=np.float32),
+                'dones': np.array(done_list, dtype=np.int32),
                 'obs': obs_list,
                 'camera_frames': camera_frames,
-                'timesteps': np.array(timestep_list),
+                'timesteps': np.array(timestep_list, dtype=np.float32),
                 'language_instruction': language_instruction
             })
         if exit_program or current_round > teleoperation_rounds:
