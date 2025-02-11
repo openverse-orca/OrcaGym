@@ -7,7 +7,7 @@ name = "OrcaGym"         # 修改为你的项目名称
 version = "0.1.0"                  # 修改为项目版本
 description = "OrcaGym"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 # 项目依赖，直接对应你的 requirements.txt 列表
 dependencies = [
     "numpy<2.0",

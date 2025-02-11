@@ -264,7 +264,7 @@ class DatasetReader:
             demo_count = data_group.attrs['demo_count']
         return demo_count
     
-    def get_demo_names(self):
+    def get_demo_names(self, filter_key : str = None):
         """
         获取数据集中的所有演示名称。
 
@@ -274,7 +274,16 @@ class DatasetReader:
         with h5py.File(self.file_path, 'r') as f:
             data_group = f['data']
             demo_names = [name for name in data_group.keys()]
+            if filter_key is not None:
+                mask_group = f['mask']
+                filter_key_names = mask_group[filter_key]
+                filter_key_names = [name.decode('utf-8') for name in filter_key_names]
+                demo_names = [name for name in demo_names if name in filter_key_names]
         return demo_names
+            
+        #     data_group = f['data']
+        #     demo_names = [name for name in data_group.keys()]
+        # return demo_names
 
     def get_demo_data(self, demo_name):
         """
@@ -308,7 +317,7 @@ class DatasetReader:
                 'dones': np.array(demo_group['dones']),
                 'obs': {key: np.array(demo_group['obs'][key]) for key in demo_group['obs'].keys()},
                 'timesteps': np.array(demo_group['timesteps']),
-                'language_instruction': demo_group.attrs.get('language_instruction', None),
+                'language_instruction': demo_group['language_instruction'][()] if 'language_instruction' in demo_group else None,
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
                 'camera_frames': {camera_name: [np.array(frame_data) for _, frame_data in camera_group.items()]
                                   for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')}
