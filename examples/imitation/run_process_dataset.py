@@ -17,14 +17,16 @@ import argparse
 import orca_gym.scripts.process_dataset as process_dataset
 from orca_gym.utils.dir_utils import create_tmp_dir
 from datetime import datetime
+import json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", type=str, nargs='+', help="path to hdf5 dataset",)
-    parser.add_argument("--proc", type=str, help="proc to run (check / combine / merge)", default="check")
+    parser.add_argument("--proc", type=str, help="proc to run (check / combine / update_kwargs)", default="check")
     parser.add_argument("--verbose", type=bool, help="output more details", default=False)
     parser.add_argument("--filter_key", type=str, help="filter key to use for processing", default=None)
     parser.add_argument("--output", type=str, help="output file for combined dataset", default=None)
+    parser.add_argument("--kwargs", type=str, help="additional kwargs for processing", default=None)
     
     args = parser.parse_args()
     dataset_files = args.datasets
@@ -43,5 +45,9 @@ if __name__ == "__main__":
             formatted_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             output_file = f"./processed_datasets_tmp/combined_{process_dataset.get_dataset_prefix(dataset_files[0])}_{formatted_time}.hdf5"            
         process_dataset.process_combine(dataset_files, output_file)
+    elif proc == "update_kwargs":
+        kwargs = eval(args.kwargs)
+        print("update kwargs: ", kwargs)
+        process_dataset.process_update_kwargs(dataset_files, kwargs)
     else:
         print("Process not implemented: {}".format(proc))

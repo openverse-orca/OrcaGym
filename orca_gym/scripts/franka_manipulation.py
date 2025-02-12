@@ -39,7 +39,8 @@ def register_env(orcagym_addr : str,
                  task : str, 
                  ctrl_device : str, 
                  max_episode_steps : int,
-                 sample_range : float) -> str:
+                 sample_range : float,
+                 action_step : int) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
@@ -52,7 +53,8 @@ def register_env(orcagym_addr : str,
                 'task': task,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
-                'sample_range': sample_range}           
+                'sample_range': sample_range,
+                'action_step': action_step}           
     gym.register(
         id=env_id,
         entry_point=ENV_ENTRY_POINT[env_name],
@@ -137,6 +139,26 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
         else:
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
+def add_demo_to_dataset(dataset_writer : DatasetWriter,
+                          obs_list, 
+                          reward_list, 
+                          done_list, 
+                          info_list, 
+                          camera_frames, 
+                          timestep_list, 
+                          language_instruction):
+        dataset_writer.add_demo_data({
+            'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
+            'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
+            'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
+            'rewards': np.array(reward_list, dtype=np.float32),
+            'dones': np.array(done_list, dtype=np.int32),
+            'obs': obs_list,
+            'camera_frames': camera_frames,
+            'timesteps': np.array(timestep_list, dtype=np.float32),
+            'language_instruction': language_instruction
+        })
+
 def do_teleoperation(env, 
                      dataset_writer : DatasetWriter, 
                      teleoperation_rounds : int, 
@@ -156,35 +178,35 @@ def do_teleoperation(env,
         save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
             current_round += 1
-            dataset_writer.add_demo_data({
-                'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
-                'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-                'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
-                'rewards': np.array(reward_list, dtype=np.float32),
-                'dones': np.array(done_list, dtype=np.int32),
-                'obs': obs_list,
-                'camera_frames': camera_frames,
-                'timesteps': np.array(timestep_list, dtype=np.float32),
-                'language_instruction': language_instruction
-            })
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
         if exit_program or current_round > teleoperation_rounds:
             break
         
     for camera in cameras:
         camera.stop()
 
-def playback_episode(env : FrankaEnv, action_list, done_list):
+def playback_episode(env : FrankaEnv, 
+                     action_list : list[np.ndarray], 
+                     done_list : list[int],
+                     action_step : int = 1,
+                     realtime : bool = False):
     for i in range(len(action_list)):
-        start_time = datetime.now()
+
 
         action = action_list[i]
         done = done_list[i]
-        obs, reward, terminated, truncated, info = env.step(action)
-        env.render()
+        
+        for _ in range(action_step):
+            if realtime:
+                start_time = datetime.now()
+                        
+            obs, reward, terminated, truncated, info = env.step(action)
+            env.render()
 
-        elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP:
-            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+            if realtime:
+                elapsed_time = datetime.now() - start_time
+                if elapsed_time.total_seconds() < REALTIME_STEP:
+                    time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
         if done:
             print("Episode done!")
@@ -196,34 +218,30 @@ def playback_episode(env : FrankaEnv, action_list, done_list):
     
     print("Episode tunkated!")
 
-def reset_playback_env(env : FrankaEnv, demo_data, noise_scale=0.0):
+def reset_playback_env(env : FrankaEnv, demo_data, sample_range=0.0):
     obs, info = env.reset(seed=42)
     
     object_data = demo_data['obs']['object']
-    obj_xpos = object_data[0][0:3]
-    obj_xquat = object_data[0][3:7]
+    init_obj_xpos = object_data[0][0:3]
+    init_obj_xquat = object_data[0][3:7]
     
     goal_data = demo_data['goals']
-    goal_xpos = goal_data[0][0:3]
-    goal_xquat = goal_data[0][3:7]
+    init_goal_xpos = goal_data[0][0:3]
+    init_goal_xquat = goal_data[0][3:7]
     
-    if noise_scale > 0.0:
-        offset_scale = 0.4 * noise_scale
-        rotate_scale = 2 * np.pi * noise_scale
-        obj_xpos += np.random.normal(0, offset_scale, len(obj_xpos))
-        obj_euler = rotations.quat2euler(obj_xquat)
-        obj_euler += np.random.normal(0, rotate_scale, len(obj_euler))
-        obj_xquat = rotations.euler2quat(obj_euler)
-        
-        goal_xpos += np.random.normal(0, offset_scale, len(goal_xpos))
-        goal_euler = rotations.quat2euler(goal_xquat)
-        goal_euler += np.random.normal(0, rotate_scale, len(goal_euler))
-        goal_xquat = rotations.euler2quat(goal_euler)
-
+    obj_xpos, obj_xquat, goal_xpos, goal_xquat = env.unwrapped.sample_obj_goal(init_obj_xpos, init_obj_xquat, init_goal_xpos, init_goal_xquat, sample_range)
+    
     # print("Resetting object position: ", obj_xpos, obj_xquat)
+    
     env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
     
-def do_playback(env : FrankaEnv, dataset_reader : DatasetReader, playback_mode : str):
+    # print("Resetting object position: ", obj_xpos, obj_xquat)
+    
+def do_playback(env : FrankaEnv, 
+                dataset_reader : DatasetReader, 
+                playback_mode : str,
+                action_step : int = 1,
+                realtime : bool = False):
     demo_names = dataset_reader.get_demo_names()
     if playback_mode == "loop":
         demo_name_index_list = list(range(len(demo_names)))
@@ -241,18 +259,27 @@ def do_playback(env : FrankaEnv, dataset_reader : DatasetReader, playback_mode :
         # for i, action in enumerate(action_list):
         #     print(f"Playback Action ({i}): ", action)
         reset_playback_env(env, demo_data)
-        playback_episode(env, action_list, done_list)
+        playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
 
-def augment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
+def augment_episode(env : FrankaEnv, 
+                    cameras : list[CameraWrapper], 
+                    rgb_size : tuple,
+                    demo_data : dict, 
+                    noise_scale : float, 
+                    sample_range : float, 
+                    realtime : bool = False,
+                    action_step : int = 1):
     obs, info = env.reset(seed=42)    
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
     info_list = []    
     terminated_times = 0    
+    camera_frames = {camera.name: [] for camera in cameras}
+    timestep_list = []
     
-    reset_playback_env(env, demo_data, noise_scale)    
+    reset_playback_env(env, demo_data, sample_range)    
     action_list = demo_data['actions']
     action_index_list = list(range(len(action_list)))
     holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
@@ -260,15 +287,28 @@ def augment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
     
     for i in action_index_list:
         action = action_list[i]
-        start_time = datetime.now()
+
 
         if noise_scale > 0.0:
             noise = np.random.normal(0, noise_scale, len(action))
             action += noise * np.abs(action)
             action = np.clip(action, -1.0, 1.0)
         
-        obs, reward, terminated, truncated, info = env.step(action)
-        env.render()
+        for _ in range(action_step):
+            if realtime:
+                start_time = datetime.now()
+                
+            obs, reward, terminated, truncated, info = env.step(action)
+            env.render()
+            
+            if realtime:
+                elapsed_time = datetime.now() - start_time
+                if elapsed_time.total_seconds() < REALTIME_STEP:
+                    time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+
+        for camera in cameras:
+            camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+            camera_frames[camera.name].append(camera_frame)
 
         for obs_key, obs_data in obs.items():
             obs_list[obs_key].append(obs_data)
@@ -277,23 +317,25 @@ def augment_episode(env : FrankaEnv, demo_data, noise_scale, realtime=False):
         done_list.append(0 if not terminated else 1)
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
+        timestep_list.append(env.unwrapped.gym.data.time)
+        
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list
-
-        elapsed_time = datetime.now() - start_time
-        if elapsed_time.total_seconds() < REALTIME_STEP and realtime:
-            time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-
-    return obs_list, reward_list, done_list, info_list
+            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
+        
+    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
  
     
 
 def do_augmentation(env : FrankaEnv, 
+                    cameras : list[CameraWrapper], 
+                    rgb_size : tuple,                    
                     original_dataset_path : str, 
                     augmented_dataset_path : str, 
                     augmented_scale : float, 
-                    augmented_times : int):
+                    sample_range : float,
+                    augmented_times : int,
+                    action_step : int = 1):
     
     REALTIME = False
     
@@ -306,6 +348,9 @@ def do_augmentation(env : FrankaEnv,
     need_demo_count = dataset_reader.get_demo_count() * augmented_times
     done_demo_count = 0
     
+    for camera in cameras:
+        camera.start()
+    
     for _ in range(augmented_times):    
         demo_names = dataset_reader.get_demo_names()
         for original_demo_name in demo_names:
@@ -313,17 +358,15 @@ def do_augmentation(env : FrankaEnv,
             while not done:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
                 print("Augmenting original demo: ", original_demo_name)
+                language_instruction = demo_data['language_instruction']
                 
-                obs_list, reward_list, done_list, info_list = augment_episode(env, demo_data, noise_scale=augmented_scale, realtime=REALTIME)
+                obs_list, reward_list, done_list, info_list\
+                    , camera_frames, timestep_list = augment_episode(env, cameras,rgb_size,
+                                                                    demo_data, noise_scale=augmented_scale, 
+                                                                    sample_range=sample_range, realtime=REALTIME, 
+                                                                    action_step=action_step)
                 if done_list[-1] == 1:
-                    dataset_writer.add_demo_data({
-                        'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list]),
-                        'actions': np.array([info["action"] for info in info_list]),
-                        'goals': np.array([info["goal"] for info in info_list]),
-                        'rewards': np.array(reward_list),
-                        'dones': np.array(done_list),
-                        'obs': obs_list
-                    })
+                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
                     
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count}")
@@ -336,6 +379,9 @@ def do_augmentation(env : FrankaEnv,
 
     dataset_writer.shuffle_demos()
     dataset_writer.finalize()       
+    
+    for camera in cameras:
+        camera.stop()
     
 def start_monitor(port=7070, project_root : str = None):
     """

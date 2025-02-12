@@ -30,6 +30,7 @@ import argparse
 
 
 RGB_SIZE = (128, 128)
+ACTION_STEP = 5
 
 def run_example(orcagym_addr : str, 
                 agent_name : str, 
@@ -45,7 +46,8 @@ def run_example(orcagym_addr : str,
                 augmented_sacle : float,
                 augmented_times : int,
                 teleoperation_rounds : int,
-                sample_range : float):
+                sample_range : float,
+                realtime_playback : bool):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
@@ -54,17 +56,17 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
             print("Starting simulation...")
-            franka_manipulation.do_playback(env, dataset_reader, playback_mode)
+            franka_manipulation.do_playback(env, dataset_reader, playback_mode, ACTION_STEP, realtime_playback)
 
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -80,7 +82,7 @@ def run_example(orcagym_addr : str,
                        CameraWrapper(name="camera_wrist", port=7070)]
 
             franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
-                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=1,
+                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
                                                  language_instruction="pick up brown box, lift it up for 10cm.")
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
@@ -91,7 +93,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -114,10 +116,12 @@ def run_example(orcagym_addr : str,
             env_kwargs = env_meta["env_kwargs"]
             task = env_kwargs["task"]  
             
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
+            print("Sample range: ", env.env.unwrapped._sample_range)
+            env.env.unwrapped._sample_range = sample_range
 
             for i in range(rollout_times):
                 stats = rollout(
@@ -137,7 +141,7 @@ def run_example(orcagym_addr : str,
             task = dataset_reader.get_env_kwargs()["task"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -146,7 +150,12 @@ def run_example(orcagym_addr : str,
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
             agumented_dataset_file_path = f"{current_file_path}/augmented_datasets_tmp/augmented_dataset_{formatted_now}.hdf5"
-            franka_manipulation.do_augmentation(env, record_path, agumented_dataset_file_path, augmented_sacle, augmented_times)
+            
+            cameras = [CameraWrapper(name="camera_primary", port=7090),
+                    #    CameraWrapper(name="camera_secondary", port=7080),
+                        CameraWrapper(name="camera_wrist", port=7070)]
+            
+            franka_manipulation.do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_times, ACTION_STEP)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -200,7 +209,8 @@ if __name__ == "__main__":
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
     parser.add_argument('--augmented_times', type=int, default=2, help='The times to augment the dataset')
     parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
-    parser.add_argument('--sample_range', type=float, default=0.2, help='The area range to sample the object and goal position')
+    parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
+    parser.add_argument('--realtime_playback', type=bool, default=True, help='The flag to enable the real-time playback or rollout')
     
     args = parser.parse_args()
     
@@ -218,6 +228,7 @@ if __name__ == "__main__":
     augmented_times = args.augmented_times
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
+    realtime_playback = args.realtime_playback
     
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
@@ -284,7 +295,8 @@ if __name__ == "__main__":
                     augmented_sacle,
                     augmented_times,
                     teleoperation_rounds,
-                    sample_range)
+                    sample_range,
+                    realtime_playback)
 
     # 终止 Monitor 子进程
     for process in monitor_processes:

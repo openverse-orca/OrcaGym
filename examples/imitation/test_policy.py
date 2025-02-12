@@ -72,6 +72,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
     policy.start_episode()
     obs = env.reset()
+    action_step = env.env.unwrapped.get_action_step()
+    print("env sample range: ", env.env.unwrapped._sample_range, "action step: ", action_step)
+    
     # state_dict = env.get_state()
 
     # hack that is necessary for robosuite tasks for deterministic action playback
@@ -89,15 +92,22 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             act = policy(ob=obs)
 
             # play action
-            next_obs, r, done, _ = env.step(act)
+            for _ in range(action_step):
+                next_obs, r, done, _ = env.step(act)
+                if render:
+                    env.render(mode="human", camera_name=camera_names[0])
+
+                # sleep to maintain real-time speed
+                if realtime_step > 0.0:
+                    elapsed_time = time.time() - start_time
+                    if elapsed_time < realtime_step:
+                        time.sleep(realtime_step - elapsed_time)
 
             # compute reward
             total_reward += r
             success = env.is_success()["task"]
 
             # visualization
-            if render:
-                env.render(mode="human", camera_name=camera_names[0])
             if video_writer is not None:
                 if video_count % video_skip == 0:
                     video_img = []
@@ -115,11 +125,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             obs = deepcopy(next_obs)
             # state_dict = env.get_state()
             
-            # sleep to maintain real-time speed
-            if realtime_step > 0.0:
-                elapsed_time = time.time() - start_time
-                if elapsed_time < realtime_step:
-                    time.sleep(realtime_step - elapsed_time)
+
 
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))

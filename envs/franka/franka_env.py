@@ -65,6 +65,7 @@ class FrankaEnv(RobomimicEnv):
         ctrl_device: ControlDevice,
         control_freq: int,
         sample_range: float,
+        action_step: int,
         **kwargs,
     ):
 
@@ -74,6 +75,7 @@ class FrankaEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range
+        self._action_step = action_step
         self._reward_type = reward_type
         self._setup_reward_functions(reward_type)
 
@@ -202,6 +204,8 @@ class FrankaEnv(RobomimicEnv):
         #     xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
         #     self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
 
+    def get_action_step(self):
+        return self._action_step
 
     def get_env_version(self):
         return FrankaEnv.ENV_VERSION
@@ -450,12 +454,13 @@ class FrankaEnv(RobomimicEnv):
         self._set_init_state()
         self._reset_grasp_mocap()
 
-        obj_xpos, obj_xquat, goal_xpos, goal_xquat = self._sample_obj_goal()
+        obj_xpos, obj_xquat, goal_xpos, goal_xquat = self.sample_obj_goal(self._initial_obj_site_xpos,
+                                                                          self._initial_obj_site_xquat,
+                                                                          self._initial_goal_site_xpos,
+                                                                          self._initial_goal_site_xquat,
+                                                                          self._sample_range)
         
-        self._set_obj_qpos(obj_xpos, obj_xquat)
-        self._set_goal_mocap(goal_xpos, goal_xquat)
-
-        self.mj_forward()
+        self.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
         obs = self._get_obs().copy()
         return obs, {}
     
@@ -502,47 +507,49 @@ class FrankaEnv(RobomimicEnv):
         return goal_xpos, goal_xquat
 
 
-    def _sample_obj_goal(self) -> None:
+    def sample_obj_goal(self, init_obj_xpos, init_obj_xquat, init_goal_xpos, init_goal_xquat, sample_range) -> tuple:
         """
         随机采样一个物体位置和目标位置
         """
-        if self._sample_range > 0:
+        # print("Sample obj and goal position, range: ", sample_range)        
+        if sample_range > 0:
             contacted = True
-            object_offset = self._sample_range
-            goal_offset = self._sample_range
+            object_offset = sample_range
+            goal_offset = sample_range
+            rotate_offset = np.pi / sample_range
             while contacted:
-                # 如果采用随机采样，则按照50%概率交换物体和目标位置，增加足够的多样性
-                if np.random.uniform() < 0.5:
-                    obj_xpos = self._initial_obj_site_xpos.copy()
-                    obj_xquat = self._initial_obj_site_xquat.copy()
-                    goal_xpos = self._initial_goal_site_xpos.copy()
-                    goal_xquat = self._initial_goal_site_xquat.copy()
-                else:
-                    obj_xpos = self._initial_goal_site_xpos.copy()
-                    obj_xquat = self._initial_goal_site_xquat.copy()
-                    goal_xpos = self._initial_obj_site_xpos.copy()
-                    goal_xquat = self._initial_obj_site_xquat.copy()
+                obj_xpos = init_obj_xpos.copy()
+                obj_xquat = init_obj_xquat.copy()
+                goal_xpos = init_goal_xpos.copy()
+                goal_xquat = init_goal_xquat.copy()
+
+                # 如果是push任务，则按照50%概率交换物体和目标位置，增加足够的多样性, 否则固定物体位置
+                if np.random.uniform() < 0.5 and self._task == Task.PUSH:
+                    obj_xpos = init_goal_xpos.copy()
+                    obj_xquat = init_goal_xquat.copy()
+                    goal_xpos = init_obj_xpos.copy()
+                    goal_xquat = init_obj_xquat.copy()
                 
                 
                 obj_euler = rotations.quat2euler(obj_xquat)
                 obj_xpos[0] = np.random.uniform(-object_offset, object_offset) + obj_xpos[0]
                 obj_xpos[1] = np.random.uniform(-object_offset, object_offset) + obj_xpos[1]
-                obj_euler[2] = np.random.uniform(-np.pi, np.pi)
+                obj_euler[2] = np.random.uniform(-rotate_offset, rotate_offset)
                 obj_xquat = rotations.euler2quat(obj_euler)
 
                 goal_euler = rotations.quat2euler(goal_xquat)
                 goal_xpos[0] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[0]
                 goal_xpos[1] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[1]
-                goal_euler[2] = np.random.uniform(-np.pi, np.pi)
+                goal_euler[2] = np.random.uniform(-rotate_offset, rotate_offset)
                 goal_xquat = rotations.euler2quat(goal_euler)
 
-                contacted = np.linalg.norm(obj_xpos - goal_xpos) < 0.2
+                contacted = self._is_success(obj_xpos, goal_xpos)
         else:
             # 固定采样，物体位置固定不变
-            obj_xpos = self._initial_obj_site_xpos.copy()
-            obj_xquat = self._initial_obj_site_xquat.copy()
-            goal_xpos = self._initial_goal_site_xpos.copy()
-            goal_xquat = self._initial_goal_site_xquat.copy()
+            obj_xpos = init_obj_xpos.copy()
+            obj_xquat = init_obj_xquat.copy()
+            goal_xpos = init_goal_xpos.copy()
+            goal_xquat = init_goal_xquat.copy()
             
         # 任务不同，目标位置也不同
         if self._task == Task.LIFT:

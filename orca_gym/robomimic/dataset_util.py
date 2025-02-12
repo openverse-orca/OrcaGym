@@ -18,25 +18,39 @@ class DatasetWriter:
         - env_kwargs: 环境参数字典（可选）。
         """
         self.file_path = file_path
-        self.env_args = {
+        # 如果文件已存在，跳过创建和初始化
+        if os.path.exists(self.file_path):
+            reader = DatasetReader(self.file_path)
+            self._env_args = reader._get_env_args()
+            return
+
+        self._env_args = {
             "env_name": env_name,
             "type": EB.EnvType.ORCA_GYM_TYPE,
             "env_version": env_version,
             "env_kwargs": env_kwargs or {}
         }
 
-        # 如果文件已存在，删除它以清空内容
-        if os.path.exists(self.file_path):
-            os.remove(self.file_path)
-
         # 创建新的 HDF5 文件，写入初始数据，然后关闭文件
         with h5py.File(self.file_path, 'w') as f:
             data_group = f.create_group('data')
-            data_group.attrs['env_args'] = json.dumps(self.env_args)
+            data_group.attrs['env_args'] = json.dumps(self._env_args)
             data_group.attrs['total'] = 0  # 初始化总样本数为 0
             data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
 
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
+
+    def set_env_kwargs(self, env_kwargs):
+        """
+        设置环境参数。
+
+        参数：
+        - env_kwargs: 环境参数字典。
+        """
+        self._env_args['env_kwargs'] = env_kwargs
+        with h5py.File(self.file_path, 'r+') as f:
+            data_group = f['data']
+            data_group.attrs['env_args'] = json.dumps(self._env_args)
 
     def add_demo_data(self, demo_data, model_file=None):
         """

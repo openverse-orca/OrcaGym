@@ -42,6 +42,7 @@ import matplotlib.animation as animation
 import orca_gym.scripts.franka_manipulation as franka_manipulation
 
 RGB_SIZE = (256, 256)
+ACTION_STEP = 5
 
 def run_episode(env : FrankaEnv, processor, vla, camera_arm : CameraWrapper):
     obs, info = env.reset(seed=42)
@@ -151,7 +152,7 @@ def run_example(orcagym_addr : str,
         if run_mode == "rollout":        
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_RAW, task, ControlDevice.XBOX, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_RAW, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -162,7 +163,7 @@ def run_example(orcagym_addr : str,
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ControlDevice.XBOX, max_episode_steps, sample_range)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -179,7 +180,7 @@ def run_example(orcagym_addr : str,
                        ]
 
             franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
-                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=5,
+                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
                                                  language_instruction="pick up brown box, lift it up for 10cm.")
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()

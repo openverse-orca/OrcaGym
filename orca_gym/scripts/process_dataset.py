@@ -176,3 +176,23 @@ def glob_dataset_filenames(dataset_files):
     for dataset_file in dataset_files:
         matched_files.extend(glob.glob(dataset_file))
     return matched_files
+
+def process_update_kwargs(dataset_files, kwargs):
+    for dataset in dataset_files:
+        reader = DatasetReader(dataset)
+        env_name = reader.get_env_name()
+        env_version = reader.get_env_version()
+        env_kwargs = reader.get_env_kwargs()
+        
+        for key in kwargs:
+            if key not in env_kwargs:
+                print(f"Key {key} not in env_kwargs. Skip updating.")
+                continue
+            env_kwargs[key] = kwargs[key]
+            print(f"Update key {key} to {kwargs[key]}")
+        
+        
+        writer = DatasetWriter(dataset, env_name, env_version, env_kwargs)
+        writer.set_env_kwargs(env_kwargs)
+        writer.finalize()
+    
