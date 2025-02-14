@@ -180,7 +180,7 @@ def run_example(orcagym_addr : str,
                        ]
 
             franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
-                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
+                                                 cameras=cameras, obs_camera=False, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
                                                  language_instruction="pick up brown box, lift it up for 10cm.")
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()

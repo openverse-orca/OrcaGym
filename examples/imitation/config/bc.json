@@ -12,14 +12,14 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 200,
+            "every_n_epochs": 20,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 10,
+        "epoch_every_n_steps": null,
+        "validation_epoch_every_n_steps": null,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -28,9 +28,9 @@
         "video_skip": 5,
         "rollout": {
             "enabled": true,
-            "n": 10,
-            "horizon": 500,
-            "rate": 50,
+            "n": 20,
+            "horizon": 100,
+            "rate": 2,
             "warmstart": 0,
             "terminate_on_success": true
         }
@@ -45,7 +45,7 @@
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 10,
+        "seq_length": 2,
         "pad_seq_length": true,
         "frame_stack": 1,
         "pad_frame_stack": true,
@@ -57,7 +57,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,
-        "num_epochs": 2000,
+        "num_epochs": 100,
         "seed": 1
     },
     "algo": {
@@ -65,15 +65,15 @@
             "policy": {
                 "optimizer_type": "adam",
                 "learning_rate": {
-                    "initial": 0.0001,
+                    "initial": 0.001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [1000, 1500],
+                    "epoch_schedule": [],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
-                    "L2": 0.001
+                    "L2": 0.00
                 },
-                "max_gradient_norm": 5.0
+                "max_gradient_norm": 10.0
             }
         },
         "loss": {
@@ -82,6 +82,8 @@
             "cos_weight": 0.0
         },
         "actor_layer_dims": [
+            300,
+            400
         ],
         "gaussian": {
             "enabled": false,
@@ -94,7 +96,7 @@
         "gmm": {
             "enabled": true,
             "num_modes": 5,
-            "min_std": 0.1,
+            "min_std": 0.01,
             "std_activation": "softplus",
             "low_noise_eval": true
         },
@@ -135,10 +137,10 @@
         },
         "rnn": {
             "enabled": true,
-            "horizon": 10,
-            "hidden_dim": 400,
+            "horizon": 2,
+            "hidden_dim": 1200,
             "rnn_type": "LSTM",
-            "num_layers": 1,
+            "num_layers": 2,
             "open_loop": false,
             "kwargs": {
                 "bidirectional": false

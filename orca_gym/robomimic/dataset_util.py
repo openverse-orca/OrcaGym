@@ -69,6 +69,7 @@ class DatasetWriter:
                 'language_instruction': str     # 语言指令（可选）
                 'next_obs'                      # 如果未提供，将自动生成
                 'camera_frames'                 # 可选，用于存储相机帧
+                'obs_camera_frames'             # 可选，用于存储观测相机帧
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
         """
@@ -105,6 +106,11 @@ class DatasetWriter:
                     camera_group = demo_group.create_group(camera_name)
                     for i, frame in enumerate(frames):
                         camera_group.create_dataset(f'frame_{i:05d}', data=frame, compression="gzip", compression_opts=4)
+            
+            if 'obs_camera_frames' in demo_data:
+                camera_frames = demo_data['obs_camera_frames']
+                for camera_name, frames in camera_frames.items():
+                    obs_group.create_dataset(camera_name, data=frames, compression="gzip", compression_opts=4)
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
@@ -319,6 +325,7 @@ class DatasetReader:
                 'language_instruction': str     # 语言指令（可选）
                 'next_obs'                      # 如果未提供，将自动生成
                 'camera_frames'                 # 用于存储相机帧 (可选)
+                'obs_camera_frames'             # 用于存储观测相机帧 (可选)
             }
         """
         with h5py.File(self.file_path, 'r') as f:
@@ -334,6 +341,8 @@ class DatasetReader:
                 'language_instruction': demo_group['language_instruction'][()] if 'language_instruction' in demo_group else None,
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
                 'camera_frames': {camera_name: [np.array(frame_data) for _, frame_data in camera_group.items()]
-                                  for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')}
+                                  for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')},
+                'obs_camera_frames': {camera_name: np.array(demo_group['obs'][camera_name]) 
+                                      for camera_name in demo_group['obs'].keys() if camera_name.startswith('camera')}    
             }
         return demo_data

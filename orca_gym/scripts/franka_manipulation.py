@@ -140,29 +140,36 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
 def add_demo_to_dataset(dataset_writer : DatasetWriter,
-                          obs_list, 
-                          reward_list, 
-                          done_list, 
-                          info_list, 
-                          camera_frames, 
-                          timestep_list, 
-                          language_instruction):
-        dataset_writer.add_demo_data({
-            'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
-            'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-            'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
-            'rewards': np.array(reward_list, dtype=np.float32),
-            'dones': np.array(done_list, dtype=np.int32),
-            'obs': obs_list,
-            'camera_frames': camera_frames,
-            'timesteps': np.array(timestep_list, dtype=np.float32),
-            'language_instruction': language_instruction
-        })
+                        obs_list, 
+                        reward_list, 
+                        done_list, 
+                        info_list, 
+                        camera_frames, 
+                        obs_camera,
+                        timestep_list, 
+                        language_instruction):
+    if obs_camera:
+        camera_frame_key = 'obs_camera_frames'
+    else:
+        camera_frame_key = 'camera_frames'
+        
+    dataset_writer.add_demo_data({
+        'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
+        'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
+        'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
+        'rewards': np.array(reward_list, dtype=np.float32),
+        'dones': np.array(done_list, dtype=np.int32),
+        'obs': obs_list,
+        camera_frame_key: camera_frames,
+        'timesteps': np.array(timestep_list, dtype=np.float32),
+        'language_instruction': language_instruction
+    })
 
 def do_teleoperation(env, 
                      dataset_writer : DatasetWriter, 
                      teleoperation_rounds : int, 
                      cameras : list[CameraWrapper], 
+                     obs_camera : bool,
                      rgb_size : tuple = (256, 256),
                      action_step : int = 1,
                      language_instruction : str = None):    
@@ -178,7 +185,7 @@ def do_teleoperation(env,
         save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
             current_round += 1
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, obs_camera, timestep_list, language_instruction)
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -329,29 +336,38 @@ def augment_episode(env : FrankaEnv,
 
 def do_augmentation(env : FrankaEnv, 
                     cameras : list[CameraWrapper], 
+                    obs_camera : bool,
                     rgb_size : tuple,                    
                     original_dataset_path : str, 
                     augmented_dataset_path : str, 
                     augmented_scale : float, 
                     sample_range : float,
-                    augmented_times : int,
+                    augmented_rounds : int,
                     action_step : int = 1):
     
     REALTIME = False
     
+    # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
     dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
-    
-    need_demo_count = dataset_reader.get_demo_count() * augmented_times
-    done_demo_count = 0
-    
+    demo_names = dataset_reader.get_demo_names()
+    for demo_name in demo_names:
+        demo_data = dataset_reader.get_demo_data(demo_name)
+        dataset_writer.add_demo_data(demo_data)
+        
+    # Use the augmented dataset as the new dataset reader
+    dataset_reader = DatasetReader(file_path=augmented_dataset_path)
+
     for camera in cameras:
         camera.start()
     
-    for _ in range(augmented_times):    
+    for round in range(augmented_rounds):    
+        need_demo_count = dataset_reader.get_demo_count()
+        done_demo_count = 0
+            
         demo_names = dataset_reader.get_demo_names()
         for original_demo_name in demo_names:
             done = False
@@ -366,10 +382,10 @@ def do_augmentation(env : FrankaEnv,
                                                                     sample_range=sample_range, realtime=REALTIME, 
                                                                     action_step=action_step)
                 if done_list[-1] == 1:
-                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
+                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, obs_camera, timestep_list, language_instruction)
                     
                     done_demo_count += 1
-                    print(f"Episode done! {done_demo_count} / {need_demo_count}")
+                    print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
                 else:
                     print("Episode failed!")
