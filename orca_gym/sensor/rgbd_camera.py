@@ -65,6 +65,7 @@ class CameraWrapper:
                     frames = packet.decode()
                     for frame in frames:
                         self.image = frame.to_ndarray(format='bgr24')
+                        # print("get new frame for port ", self.port)
                         if self.received_first_frame == False:
                             self.received_first_frame = True
                         # print(img.shape)

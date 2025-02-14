@@ -65,7 +65,6 @@ class FrankaEnv(RobomimicEnv):
         ctrl_device: ControlDevice,
         control_freq: int,
         sample_range: float,
-        action_step: int,
         **kwargs,
     ):
 
@@ -75,7 +74,6 @@ class FrankaEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range
-        self._action_step = action_step
         self._reward_type = reward_type
         self._setup_reward_functions(reward_type)
 
@@ -203,9 +201,6 @@ class FrankaEnv(RobomimicEnv):
         # else:
         #     xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
         #     self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
-
-    def get_action_step(self):
-        return self._action_step
 
     def get_env_version(self):
         return FrankaEnv.ENV_VERSION

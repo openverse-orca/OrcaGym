@@ -30,9 +30,11 @@ import argparse
 
 
 RGB_SIZE = (128, 128)
+CAMERA_CONFIG = {"camera_primary": 7090, "camera_wrist": 7070}
 ACTION_STEP = 5
 
 # RGB_SIZE = None
+# CAMERA_CONFIG = {}
 # ACTION_STEP = 1
 
 def run_example(orcagym_addr : str, 
@@ -55,11 +57,12 @@ def run_example(orcagym_addr : str,
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
-            task = dataset_reader.get_env_kwargs()["task"]            
+            task = dataset_reader.get_env_kwargs()["task"]    
+            camera_config = dataset_reader.get_env_kwargs()["camera_config"]        
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -69,23 +72,24 @@ def run_example(orcagym_addr : str,
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
+            camera_config = CAMERA_CONFIG
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
             print("Starting simulation...")
             kwargs["run_mode"] = RunMode.POLICY_NORMALIZED  # 此处用于训练的时候读取
+            
+            if RGB_SIZE is None:
+                cameras = []
+            else:
+                cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
+                        
             dataset_writer = DatasetWriter(file_path=record_path,
                                         env_name=env_id,
                                         env_version=env.unwrapped.get_env_version(),
                                         env_kwargs=kwargs)
 
-            if RGB_SIZE is None:
-                cameras = []
-            else:
-                cameras = [CameraWrapper(name="camera_primary", port=7090),
-                        #    CameraWrapper(name="camera_secondary", port=7080),
-                        CameraWrapper(name="camera_wrist", port=7070)]
 
             franka_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
                                                  cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
@@ -97,9 +101,10 @@ def run_example(orcagym_addr : str,
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
             task = dataset_reader.get_env_kwargs()["task"]
+            camera_config = dataset_reader.get_env_kwargs()["camera_config"]       
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -121,9 +126,10 @@ def run_example(orcagym_addr : str,
             
             env_kwargs = env_meta["env_kwargs"]
             task = env_kwargs["task"]  
+            camera_config = env_kwargs["camera_config"]
             sample_range = env_kwargs["sample_range"]
             
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -144,9 +150,10 @@ def run_example(orcagym_addr : str,
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
             task = dataset_reader.get_env_kwargs()["task"]
+            camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -159,9 +166,7 @@ def run_example(orcagym_addr : str,
             if RGB_SIZE is None:
                 cameras = []
             else:
-                cameras = [CameraWrapper(name="camera_primary", port=7090),
-                        #    CameraWrapper(name="camera_secondary", port=7080),
-                            CameraWrapper(name="camera_wrist", port=7070)]
+                cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
             
             franka_manipulation.do_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, ACTION_STEP)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
@@ -178,26 +183,29 @@ def run_example(orcagym_addr : str,
 def _get_algo_config(algo_name):
     if algo_name == "bc":
         return ["config/bc.json"]
-    elif algo_name == "td3_bc":
-        return ["config/td3_bc.json"]
-    elif algo_name == "cql":
-        return ["config/cql.json"]
-    elif algo_name == "iris":
-        return ["config/iris.json"]
-    elif algo_name == "hbc":
-        return ["config/hbc.json"]
-    elif algo_name == "bcq":
-        return ["config/bcq.json"]
-    elif algo_name == "iql":
-        return ["config/iql.json"]
+    elif algo_name == "bc_transformer":
+        return ["config/bc_transformer.json"]
+    # elif algo_name == "td3_bc":
+    #     return ["config/td3_bc.json"]
+    # elif algo_name == "cql":
+    #     return ["config/cql.json"]
+    # elif algo_name == "iris":
+    #     return ["config/iris.json"]
+    # elif algo_name == "hbc":
+    #     return ["config/hbc.json"]
+    # elif algo_name == "bcq":
+    #     return ["config/bcq.json"]
+    # elif algo_name == "iql":
+    #     return ["config/iql.json"]
     elif algo_name == "all":
         return ["config/bc.json", 
-                "config/td3_bc.json", 
-                "config/cql.json", 
-                "config/iris.json", 
-                "config/hbc.json", 
-                "config/bcq.json", 
-                "config/iql.json"]
+                # "config/td3_bc.json", 
+                # "config/cql.json", 
+                # "config/iris.json", 
+                # "config/hbc.json", 
+                # "config/bcq.json", 
+                # "config/iql.json",
+                "config/bc_transformer.json"]
     else:
         raise ValueError(f"Invalid algorithm name: {algo_name}")
 

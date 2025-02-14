@@ -5,7 +5,7 @@ import subprocess
 import signal
 
 
-
+from typing import Any, Dict
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
@@ -40,7 +40,8 @@ def register_env(orcagym_addr : str,
                  ctrl_device : str, 
                  max_episode_steps : int,
                  sample_range : float,
-                 action_step : int) -> str:
+                 action_step : int,
+                 camera_config : Dict[str, Any]) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}"]
@@ -54,7 +55,8 @@ def register_env(orcagym_addr : str,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
                 'sample_range': sample_range,
-                'action_step': action_step}           
+                'action_step': action_step,
+                'camera_config': camera_config}           
     gym.register(
         id=env_id,
         entry_point=ENV_ENTRY_POINT[env_name],
@@ -145,13 +147,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         done_list, 
                         info_list, 
                         camera_frames, 
-                        obs_camera,
                         timestep_list, 
                         language_instruction):
-    if obs_camera:
-        camera_frame_key = 'obs_camera_frames'
-    else:
-        camera_frame_key = 'camera_frames'
         
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
@@ -160,7 +157,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
-        camera_frame_key: camera_frames,
+        'camera_frames': camera_frames,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'language_instruction': language_instruction
     })
@@ -185,7 +182,15 @@ def do_teleoperation(env,
         save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         if save_record:
             current_round += 1
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, obs_camera, timestep_list, language_instruction)
+            
+            if obs_camera:
+                for camera in cameras:
+                    obs_list[camera.name] = camera_frames[camera.name]
+                    camera_frames[camera.name] = []         
+                empty_camera_frames = {}
+                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, language_instruction)
+            else:
+                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -306,16 +311,20 @@ def augment_episode(env : FrankaEnv,
                 start_time = datetime.now()
                 
             obs, reward, terminated, truncated, info = env.step(action)
-            env.render()
             
             if realtime:
+                env.render()
                 elapsed_time = datetime.now() - start_time
                 if elapsed_time.total_seconds() < REALTIME_STEP:
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-
-        for camera in cameras:
-            camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
-            camera_frames[camera.name].append(camera_frame)
+                    
+        env.render()
+                    
+        if len(cameras) > 0:
+            time.sleep(0.03)    # wait for camera to get new frame
+            for camera in cameras:
+                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                camera_frames[camera.name].append(camera_frame)
 
         for obs_key, obs_data in obs.items():
             obs_list[obs_key].append(obs_data)
@@ -345,7 +354,7 @@ def do_augmentation(env : FrankaEnv,
                     augmented_rounds : int,
                     action_step : int = 1):
     
-    REALTIME = False
+    realtime = False
     
     # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
@@ -379,10 +388,16 @@ def do_augmentation(env : FrankaEnv,
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_scale, 
-                                                                    sample_range=sample_range, realtime=REALTIME, 
+                                                                    sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if done_list[-1] == 1:
-                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, obs_camera, timestep_list, language_instruction)
+                    if obs_camera:
+                        for camera in cameras:
+                            obs_list[camera.name] = camera_frames[camera.name]
+                        empty_camera_frames = {}
+                        add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, language_instruction)
+                    else:
+                        add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
                     
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
@@ -390,8 +405,6 @@ def do_augmentation(env : FrankaEnv,
                 else:
                     print("Episode failed!")
     
-                if REALTIME:
-                    time.sleep(1)
 
     dataset_writer.shuffle_demos()
     dataset_writer.finalize()       

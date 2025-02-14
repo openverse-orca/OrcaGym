@@ -93,8 +93,13 @@ class RobomimicEnv(OrcaGymLocalEnv):
         orcagym_addr: str,
         agent_names: list[str],
         time_step: float,        
+        action_step: int,        
+        camera_config: Dict[str, Any],
         **kwargs        
     ):
+        self._action_step = action_step
+        self._camera_config = camera_config
+                
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -113,6 +118,12 @@ class RobomimicEnv(OrcaGymLocalEnv):
     
     def step(self, action) -> tuple:
         raise NotImplementedError
+    
+    def get_action_step(self):
+        return self._action_step    
+    
+    def get_camera_config(self):
+        return self._camera_config
     
     def get_env_version(self):
         """

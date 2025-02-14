@@ -152,7 +152,7 @@ def run_example(orcagym_addr : str,
         if run_mode == "rollout":        
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_RAW, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_RAW, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -163,7 +163,7 @@ def run_example(orcagym_addr : str,
         elif run_mode == "teleoperation":
             env_name = "Franka"
             env_index = 0
-            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP)
+            env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ControlDevice.XBOX, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
