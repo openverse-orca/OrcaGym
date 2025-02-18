@@ -18,8 +18,8 @@
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": null,
-        "validation_epoch_every_n_steps": null,
+        "epoch_every_n_steps": 100,
+        "validation_epoch_every_n_steps": 20,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -71,7 +71,7 @@
                 "regularization": {
                     "L2": 0.01
                 },
-                "max_gradient_norm": 10.0
+                "max_gradient_norm": 0.1
             }
         },
         "loss": {
@@ -108,10 +108,6 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "object",
-                    "ee_pos",
-                    "ee_quat",
-                    "gripper_qpos"
                 ],
                 "rgb": [
                     "camera_primary",
