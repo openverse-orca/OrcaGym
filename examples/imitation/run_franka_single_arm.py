@@ -22,6 +22,7 @@ from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
 from robomimic.utils.file_utils import maybe_dict_from_checkpoint
+from robomimic.utils.train_utils import run_rollout
 import orca_gym.utils.rotations as rotations
 import orca_gym.scripts.franka_manipulation as franka_manipulation
 
@@ -135,14 +136,11 @@ def run_example(orcagym_addr : str,
             env, policy = create_env(ckpt_path)
 
             for i in range(rollout_times):
-                stats = rollout(
+                stats = run_rollout(
                     policy=policy, 
                     env=env, 
-                    horizon=max_episode_steps, 
+                    horizon=int(max_episode_steps / ACTION_STEP), 
                     render=True, 
-                    video_writer=None, 
-                    video_skip=5, 
-                    camera_names=["agentview"],
                     realtime_step=franka_manipulation.REALTIME_STEP
                 )
                 print(stats)

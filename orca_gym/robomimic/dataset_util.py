@@ -61,6 +61,7 @@ class DatasetWriter:
             {
                 'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
                 'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
+                'objects': np.ndarray (N, O),   # 物体的位姿
                 'goals': np.ndarray (N, G)      # 目标位姿（可选）
                 'rewards': np.ndarray (N,),     # 奖励
                 'dones': np.ndarray (N,),       # 完成标志
@@ -89,7 +90,7 @@ class DatasetWriter:
                 demo_group.attrs['model_file'] = model_file
 
             # 存储数据集
-            for key in ['states', 'actions', 'rewards', 'dones', 'goals', 'timesteps', 'language_instruction']:
+            for key in ['states', 'actions', 'rewards', 'dones', 'goals', 'timesteps', 'language_instruction', 'objects']:
                 data = demo_data.get(key)
                 if data is not None:
                     demo_group.create_dataset(key, data=data)
@@ -311,6 +312,7 @@ class DatasetReader:
             {
                 'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
                 'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
+                'objects': np.ndarray (N, O),   # 物体的位姿
                 'goals': np.ndarray (N, G)      # 目标位姿（可选）
                 'rewards': np.ndarray (N,),     # 奖励
                 'dones': np.ndarray (N,),       # 完成标志
@@ -326,6 +328,7 @@ class DatasetReader:
             demo_data = {
                 'states': np.array(demo_group['states']),
                 'actions': np.array(demo_group['actions']),
+                'objects': np.array(demo_group['objects']) if 'objects' in demo_group else None,
                 'goals': np.array(demo_group['goals']) if 'goals' in demo_group else None,
                 'rewards': np.array(demo_group['rewards']),
                 'dones': np.array(demo_group['dones']),

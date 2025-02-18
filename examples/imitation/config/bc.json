@@ -12,7 +12,7 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 20,
+            "every_n_epochs": 200,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
@@ -30,7 +30,7 @@
             "enabled": true,
             "n": 5,
             "horizon": 100,
-            "rate": 5,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
@@ -45,7 +45,7 @@
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 10,
+        "seq_length": 30,
         "pad_seq_length": true,
         "frame_stack": 1,
         "pad_frame_stack": true,
@@ -57,7 +57,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 64,
-        "num_epochs": 200,
+        "num_epochs": 2000,
         "seed": 1
     },
     "algo": {
@@ -67,13 +67,13 @@
                 "learning_rate": {
                     "initial": 0.005,
                     "decay_factor": 0.5,
-                    "epoch_schedule": [20, 100],
+                    "epoch_schedule": [50, 200, 400],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
                     "L2": 0.00
                 },
-                "max_gradient_norm": 10.0
+                "max_gradient_norm": 1.0
             }
         },
         "loss": {
@@ -95,13 +95,13 @@
         },
         "gmm": {
             "enabled": true,
-            "num_modes": 10,
-            "min_std": 0.01,
+            "num_modes": 5,
+            "min_std": 0.0001,
             "std_activation": "softplus",
             "low_noise_eval": true
         },
         "vae": {
-            "enabled": true,
+            "enabled": false,
             "latent_dim": 14,
             "latent_clip": null,
             "kl_weight": 1.0,
@@ -137,8 +137,8 @@
         },
         "rnn": {
             "enabled": true,
-            "horizon": 10,
-            "hidden_dim": 1200,
+            "horizon": 30,
+            "hidden_dim": 400,
             "rnn_type": "LSTM",
             "num_layers": 2,
             "open_loop": false,
@@ -170,10 +170,7 @@
                     "ee_quat",
                     "gripper_qpos"
                 ],
-                "rgb": [
-                    "camera_primary",
-                    "camera_wrist"
-                ],
+                "rgb": [],
                 "depth": [],
                 "scan": []
             },

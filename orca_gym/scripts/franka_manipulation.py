@@ -153,6 +153,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
+        'objects': np.array([info["object"] for info in info_list], dtype=np.float32),
         'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
@@ -233,7 +234,7 @@ def playback_episode(env : FrankaEnv,
 def reset_playback_env(env : FrankaEnv, demo_data, sample_range=0.0):
     obs, info = env.reset(seed=42)
     
-    object_data = demo_data['obs']['object']
+    object_data = demo_data['objects']
     init_obj_xpos = object_data[0][0:3]
     init_obj_xquat = object_data[0][3:7]
     
@@ -243,7 +244,7 @@ def reset_playback_env(env : FrankaEnv, demo_data, sample_range=0.0):
     
     obj_xpos, obj_xquat, goal_xpos, goal_xquat = env.unwrapped.sample_obj_goal(init_obj_xpos, init_obj_xquat, init_goal_xpos, init_goal_xquat, sample_range)
     
-    # print("Resetting object position: ", obj_xpos, obj_xquat)
+    # print("Resetting object position: ", obj_xpos, obj_xquat, goal_xquat)
     
     env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
     

@@ -202,6 +202,14 @@ class OrcaGymModel:
         ctrlrange = np.array(list(actuator_ctrlrange.values()))
         return ctrlrange
     
+    def get_joint_qposrange(self, joint_names : dict):
+        joint_range = {}
+        for joint_name in joint_names:
+            joint = self.get_joint_byname(joint_name)
+            joint_range[joint_name] = joint["Range"]
+        qposrange = np.array(list(joint_range.values()))
+        return qposrange
+    
     def init_site_dict(self, site_dict):
         for i, (site_name, site) in enumerate(site_dict.items()):
             site["SiteId"] = i
