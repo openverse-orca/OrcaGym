@@ -30,13 +30,7 @@ import numpy as np
 import argparse
 
 
-RGB_SIZE = (128, 128)
-CAMERA_CONFIG = {"camera_primary": 7090, "camera_wrist": 7070}
-ACTION_STEP = 5
 
-# RGB_SIZE = None
-# CAMERA_CONFIG = {}
-# ACTION_STEP = 1
 
 def run_example(orcagym_addr : str, 
                 agent_name : str, 
@@ -225,6 +219,7 @@ if __name__ == "__main__":
     parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
     parser.add_argument('--realtime_playback', type=bool, default=True, help='The flag to enable the real-time playback or rollout')
+    parser.add_argument('--save_rgb', type=bool, default=False, help='The flag to save the RGB images')
     
     args = parser.parse_args()
     
@@ -243,6 +238,15 @@ if __name__ == "__main__":
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
     realtime_playback = args.realtime_playback
+    
+    if args.save_rgb:
+        RGB_SIZE = (128, 128)
+        CAMERA_CONFIG = {"camera_primary": 7090, "camera_wrist": 7070}
+        ACTION_STEP = 5
+    else:
+        RGB_SIZE = None
+        CAMERA_CONFIG = {}
+        ACTION_STEP = 1    
     
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."

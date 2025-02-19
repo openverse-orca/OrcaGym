@@ -18,8 +18,8 @@
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": null,
-        "validation_epoch_every_n_steps": null,
+        "epoch_every_n_steps": 100,
+        "validation_epoch_every_n_steps": 20,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -28,8 +28,8 @@
         "video_skip": 5,
         "rollout": {
             "enabled": true,
-            "n": 5,
-            "horizon": 100,
+            "n": 20,
+            "horizon": 300,
             "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
@@ -45,7 +45,7 @@
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 30,
+        "seq_length": 10,
         "pad_seq_length": true,
         "frame_stack": 1,
         "pad_frame_stack": true,
@@ -56,7 +56,7 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 64,
+        "batch_size": 128,
         "num_epochs": 2000,
         "seed": 1
     },
@@ -65,15 +65,15 @@
             "policy": {
                 "optimizer_type": "adam",
                 "learning_rate": {
-                    "initial": 0.005,
-                    "decay_factor": 0.5,
-                    "epoch_schedule": [50, 200, 400],
+                    "initial": 0.0001,
+                    "decay_factor": 0.1,
+                    "epoch_schedule": [],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
                     "L2": 0.00
                 },
-                "max_gradient_norm": 1.0
+                "max_gradient_norm": null
             }
         },
         "loss": {
@@ -82,8 +82,6 @@
             "cos_weight": 0.0
         },
         "actor_layer_dims": [
-            300,
-            400
         ],
         "gaussian": {
             "enabled": false,
@@ -137,7 +135,7 @@
         },
         "rnn": {
             "enabled": true,
-            "horizon": 30,
+            "horizon": 10,
             "hidden_dim": 400,
             "rnn_type": "LSTM",
             "num_layers": 2,

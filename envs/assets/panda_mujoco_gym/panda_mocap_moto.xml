@@ -174,9 +174,9 @@
       <light name="top" pos="0 0 2" mode="trackcom"/>
 
       <body mocap="true" name="panda_mocap" pos="0.6 0 0.4">
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0.5 0 0 0.1" size="0.2 0.002 0.002" type="box"></geom>
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0.5 0 0.1" size="0.002 0.2 0.001" type="box"></geom>
-          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0 0.5 0.1" size="0.002 0.002 0.2" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0.5 0 0 0.1" size="0.2 0.002 0.002" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0 0.5 0 0.1" size="0.002 0.2 0.001" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "3" rgba="0 0 0.5 0.1" size="0.002 0.002 0.2" type="box"></geom>
       </body>
 
       <body name="toys" pos="0.55 0 0">
@@ -219,6 +219,11 @@
         <geom mesh="link0_10" material="pbr_plastic_gray" class="visual"/>
         <geom mesh="link0_11" material="pbr_plastic_white" class="visual"/>
         <geom mesh="link0_c" class="collision"/>
+
+        <body name="camera_primary" pos="1.5 0.0 0.75" euler="0.0 -2.3561925 1.570795">
+          <site name="camera_primary_site" size="0.01" group="3"/>
+          <camera name="camera_primary" />
+        </body>
 
         <body name="link1" pos="0 0 0.333">
           <inertial mass="4.970684" pos="0.003875 0.002081 -0.04762" fullinertia="0.70337 0.70661 0.0091170 -0.00013900 0.0067720 0.019169"/>
@@ -309,8 +314,9 @@
                             <site name='ee_center_site' size="0.01" group="3"/>
                         </body>
 
-                        <body name="rgbd_camera" pos="0.1 0 -0.1" euler="0.0 0.0 1.5707963">
-                          <site name='rgbd_camera' size="0.01" group="3"/>
+                        <body name="camera_wrist" pos="0.1 0 -0.1" euler="0.0 0.0 1.5707963">
+                          <site name="camera_wrist_site" size="0.01" group="3"/>
+                          <camera name="camera_wrist"/>
                         </body>
   
                         <body name="left_finger" pos="0 0 0.0584">
