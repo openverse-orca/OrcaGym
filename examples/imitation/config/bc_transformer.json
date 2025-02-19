@@ -19,7 +19,7 @@
             "on_best_rollout_success_rate": true
         },
         "epoch_every_n_steps": 100,
-        "validation_epoch_every_n_steps": 20,
+        "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
         "render": true,
@@ -38,14 +38,14 @@
     "train": {
         "data": null,
         "output_dir": "../bc_transformer_trained_models",
-        "num_data_workers": 0,
-        "hdf5_cache_mode": "all",
+        "num_data_workers": 10,
+        "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 1,
+        "seq_length": 30,
         "pad_seq_length": true,
         "frame_stack": 10,
         "pad_frame_stack": true,
@@ -54,7 +54,7 @@
         ],
         "goal_mode": null,
         "cuda": true,
-        "batch_size": 64,
+        "batch_size": 32,
         "num_epochs": 500,
         "seed": 1
     },
@@ -69,9 +69,9 @@
                     "scheduler_type": "linear"
                 },
                 "regularization": {
-                    "L2": 0.01
+                    "L2": 0.00
                 },
-                "max_gradient_norm": 0.1
+                "max_gradient_norm": 1.0
             }
         },
         "loss": {
@@ -79,7 +79,10 @@
             "l1_weight": 0.0,
             "cos_weight": 0.0
         },
-        "actor_layer_dims": [],
+        "actor_layer_dims": [
+            1024,
+            1024
+        ],
         "gaussian": {
             "enabled": false
         },
