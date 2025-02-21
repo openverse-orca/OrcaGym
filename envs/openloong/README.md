@@ -13,8 +13,7 @@
 
 
     ```bash
-    cd openloong/external
-    git clone git@atomgit.com:openloong/openloong-dyn-control.git
+    git submodule update --init
     sudo apt-get update
     sudo apt install git cmake gcc-11 g++-11
     sudo apt install libglu1-mesa-dev freeglut3-dev    
@@ -27,8 +26,7 @@
     ``` bash
     conda activate orca_gym_test
     pip install pybind11
-    cd ..  #注意此路径为envs/openloong
-    mkdir build
+    mkdir build  #注意此路径为envs/openloong
     cd build
     cmake .. -DCMAKE_PREFIX_PATH=$(python -m pybind11 --cmakedir)
     make -j20

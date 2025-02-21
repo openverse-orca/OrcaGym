@@ -33,20 +33,20 @@ set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} ${NUM_CORES})
 
 
 # 添加外部库的子模块
-add_subdirectory(external/openloong-dyn-control)
+add_subdirectory(external/Openloong-dyn-control)
 
 # 使用外部库中定义的头文件目录
-set(dirEigen "external/openloong-dyn-control/third_party/eigen3")
-set(dirGlfw "external/openloong-dyn-control/third_party/glfw")
-set(dirPino "external/openloong-dyn-control/third_party/pinocchio")
-set(dirJson "external/openloong-dyn-control/third_party/jsoncpp")
-set(dirQuill "external/openloong-dyn-control/third_party/quill")
-set(dirQP "external/openloong-dyn-control/third_party/qpOASES")
+set(dirEigen "external/Openloong-dyn-control/third_party/eigen3")
+set(dirGlfw "external/Openloong-dyn-control/third_party/glfw")
+set(dirPino "external/Openloong-dyn-control/third_party/pinocchio")
+set(dirJson "external/Openloong-dyn-control/third_party/jsoncpp")
+set(dirQuill "external/Openloong-dyn-control/third_party/quill")
+set(dirQP "external/Openloong-dyn-control/third_party/qpOASES")
 
-set(libURDF "external/openloong-dyn-control/third_party/urdfdom")
-set(incFmt "external/openloong-dyn-control/third_party/quill/quill/bundled")
-set(incBoost "external/openloong-dyn-control/third_party/boost")
-set(incMujoco "external/openloong-dyn-control/third_party/mujoco")
+set(libURDF "external/Openloong-dyn-control/third_party/urdfdom")
+set(incFmt "external/Openloong-dyn-control/third_party/quill/quill/bundled")
+set(incBoost "external/Openloong-dyn-control/third_party/boost")
+set(incMujoco "external/Openloong-dyn-control/third_party/mujoco")
 
 
 
@@ -56,16 +56,16 @@ set(allLib ${allDir} ${libURDF})
 set(allInc ${dirEigen} ${dirGlfw} ${dirPino} ${dirJson} ${dirQuill} ${dirQP} ${incFmt} ${incBoost} ${incMujoco})
 
 include_directories(${allInc})
-include_directories("external/openloong-dyn-control/algorithm")
-include_directories("external/openloong-dyn-control/common")
-include_directories("external/openloong-dyn-control/math")
-include_directories("external/openloong-dyn-control/sim_interface")
+include_directories("external/Openloong-dyn-control/algorithm")
+include_directories("external/Openloong-dyn-control/common")
+include_directories("external/Openloong-dyn-control/math")
+include_directories("external/Openloong-dyn-control/sim_interface")
 
 message(${CMAKE_SYSTEM_PROCESSOR})
 if(${CMAKE_CXX_COMPILER} MATCHES "aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
-	list(APPEND allLib "external/openloong-dyn-control/third_party/mujoco/lin_arm64")
+	list(APPEND allLib "external/Openloong-dyn-control/third_party/mujoco/lin_arm64")
 else()
-	list(APPEND allLib "external/openloong-dyn-control/third_party/mujoco/lin_x64")
+	list(APPEND allLib "external/Openloong-dyn-control/third_party/mujoco/lin_x64")
 endif()
 link_directories(${allLib})
 
@@ -89,5 +89,5 @@ add_custom_command(TARGET openloong_dyn_ctrl POST_BUILD
 # 将头文件路径传递给 openloong_dyn_ctrl 目标
 target_include_directories(openloong_dyn_ctrl PRIVATE ${EXTERNAL_INCLUDE_DIRS})
 
-# 链接外部库 (假设 core 是 openloong-dyn-control 生成的库)
+# 链接外部库 (假设 core 是 Openloong-dyn-control 生成的库)
 target_link_libraries(openloong_dyn_ctrl PRIVATE core pthread)
