@@ -10,3 +10,6 @@
 [submodule "envs/openloong/external/Openloong-dyn-control"]
 	path = envs/openloong/external/Openloong-dyn-control
 	url = git@github.com:openverse-orca/Openloong-dyn-control.git
+[submodule "3rd_party/dlimp"]
+	path = 3rd_party/dlimp
+	url = git@github.com:openverse-orca/dlimp_openvla.git
