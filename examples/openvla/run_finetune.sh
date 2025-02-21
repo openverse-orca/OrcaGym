@@ -9,8 +9,8 @@ torchrun \
   --run_root_dir train_lora \
   --adapter_tmp_dir train_lora/tmp \
   --lora_rank 32 \
-  --batch_size 8 \
-  --grad_accumulation_steps 2 \
+  --batch_size 10 \
+  --grad_accumulation_steps 1 \
   --learning_rate 0.0005 \
   --image_aug true \
   --wandb_project orca_gym_openvla_test \
