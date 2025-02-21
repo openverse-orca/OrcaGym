@@ -3,3 +3,6 @@ trained_models_tmp/
 records_tmp/
 processed_datasets_tmp/
 augmented_datasets_tmp/
+
+train_lora/
+wandb/
