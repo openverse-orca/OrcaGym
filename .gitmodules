@@ -1,6 +1,3 @@
-[submodule "envs/openloong/external/openloong-dyn-control"]
-	path = envs/openloong/external/openloong-dyn-control
-	url = git@github.com:openverse-orca/Openloong-dyn-control.git
 [submodule "3rd_party/robomimic"]
 	path = 3rd_party/robomimic
 	url = https://github.com/openverse-orca/robomimic.git
@@ -10,3 +7,6 @@
 [submodule "3rd_party/rlds_dataset_builder"]
 	path = 3rd_party/rlds_dataset_builder
 	url = git@github.com:openverse-orca/rlds_dataset_builder.git
+[submodule "envs/openloong/external/Openloong-dyn-control"]
+	path = envs/openloong/external/Openloong-dyn-control
+	url = git@github.com:openverse-orca/Openloong-dyn-control.git
