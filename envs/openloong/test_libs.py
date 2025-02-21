@@ -44,9 +44,9 @@ if not os.path.exists("./records"):
     os.makedirs("./records")
 
 # 创建 OpenLoongWBC 实例
-open_env = OpenLoongWBC("./external/openloong-dyn-control/models/AzureLoong.urdf", 
+open_env = OpenLoongWBC("./external/Openloong-dyn-control/models/AzureLoong.urdf", 
                                       0.01, 
-                                      "./external/openloong-dyn-control/common/joint_ctrl_config.json", 
+                                      "./external/Openloong-dyn-control/common/joint_ctrl_config.json", 
                                       "./records/datalog.log", 
                                       model_nq, 
                                       model_nv)
