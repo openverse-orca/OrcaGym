@@ -222,7 +222,7 @@
 
         <body name="camera_primary" pos="1.5 0.0 0.75" euler="0.0 -2.3561925 1.570795">
           <site name="camera_primary_site" size="0.01" group="3"/>
-          <camera name="camera_primary" />
+          <camera name="camera_primary" user="7070 7071"/>
         </body>
 
         <body name="link1" pos="0 0 0.333">
@@ -316,7 +316,7 @@
 
                         <body name="camera_wrist" pos="0.1 0 -0.1" euler="0.0 0.0 1.5707963">
                           <site name="camera_wrist_site" size="0.01" group="3"/>
-                          <camera name="camera_wrist"/>
+                          <camera name="camera_wrist" user="7090 7091"/>
                         </body>
   
                         <body name="left_finger" pos="0 0 0.0584">
