@@ -240,3 +240,27 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
+
+    def query_actuator_torques(self, actuator_names):
+        actuator_torques = self.gym.query_actuator_torques(actuator_names)
+        return actuator_torques
+
+    def query_joint_dofadrs(self, joint_names):
+        joint_dofadrs = self.gym.query_joint_dofadrs(joint_names)
+        return joint_dofadrs
+
+    def query_velocity_body_B(self, ee_body, base_body):
+        velocity_bodys_B = self.gym.query_velocity_body_B(ee_body, base_body)
+        return velocity_bodys_B
+
+    def query_position_body_B(self, ee_body, base_body):
+        position_body_B = self.gym.query_position_body_B(ee_body, base_body)
+        return position_body_B
+
+    def query_orientation_body_B(self, ee_body, base_body):
+        orientation_body_B = self.gym.query_orientation_body_B(ee_body, base_body)
+        return orientation_body_B
+
+    def query_joint_axes_B(self, joint_names, base_body):
+        joint_axes_B = self.gym.query_joint_axes_B(joint_names, base_body)
+        return joint_axes_B

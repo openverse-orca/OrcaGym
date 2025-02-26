@@ -18,7 +18,7 @@ from orca_gym.orca_gym_opt_config import OrcaGymOptConfig
 from orca_gym.orca_gym import OrcaGymBase
 
 import mujoco
-
+from scipy.spatial.transform import Rotation as R
 
 
 def get_qpos_size(joint_type):
@@ -637,3 +637,92 @@ class OrcaGymLocal(OrcaGymBase):
             contact_force_dict[contact_id] = contact_force
         
         return contact_force_dict
+
+    def query_actuator_torques(self, actuator_names):
+        actuator_torques = {}
+        actuator_dict = self.query_all_actuators()
+        for actuator_name in actuator_names:
+            actuator_id = self._mjModel.actuator(actuator_name).id
+            joint_name = actuator_dict[actuator_name]["JointName"]
+            joint_id = self._mjModel.joint(joint_name).id
+            joint_type = self._mjModel.jnt_type[joint_id]
+            if joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+                gear = self._mjModel.actuator(actuator_id).gear
+            else:
+                gear = self._mjModel.actuator(actuator_id).gear[:3]
+            actuator_torques[actuator_name] = self._mjData.actuator_force[actuator_id] * gear
+
+        return actuator_torques
+
+    def query_joint_dofadrs(self, joint_names):
+        dof_adrs = {}
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            dof_adrs[joint_name] = self._mjModel.jnt_dofadr[joint_id]
+        return dof_adrs
+
+    def query_velocity_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        ee_id = self._mjModel.body(ee_body).id
+
+        ee_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self._mjModel, self._mjData, mujoco.mjtObj.mjOBJ_BODY,
+                                 ee_id, ee_vel, 0)
+        base_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self._mjModel, self._mjData, mujoco.mjtObj.mjOBJ_BODY,
+                                 base_id, base_vel, 0)
+
+        base_pos = self._mjData.body(base_id).xpos.copy()
+        base_rot = self._mjData.body(base_id).xmat.copy().reshape(3, 3)
+
+        linear_vel_B = base_rot.T @ (ee_vel[:3] - base_vel[:3])
+
+        angular_vel_B = base_rot.T @ (ee_vel[3:] - base_vel[3:])
+
+        return linear_vel_B, angular_vel_B
+
+    def query_position_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        base_pos = self._mjData.body(base_id).xpos.copy()
+
+        ee_id = self._mjModel.body(ee_body).id
+        ee_pos = self._mjData.body(ee_id).xpos.copy()
+        relative_pos = ee_pos - base_pos
+
+        return relative_pos
+
+    def query_orientation_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        base_xpos = self._mjData.body(base_id).xpos.copy()
+        base_quat = self._mjData.body(base_id).xquat.copy()
+        rot_base = R.from_quat(base_quat[[1, 2, 3, 0]])
+
+        ee_id = self._mjModel.body(ee_body).id
+        ee_xpos = self._mjData.body(ee_id).xpos.copy()
+        ee_quat = self._mjData.body(ee_id).xquat.copy()
+        rot_ee = R.from_quat(ee_quat[[1, 2, 3, 0]])
+
+        relative_xpos = ee_xpos - base_xpos
+        relative_rot = rot_base.inv() * rot_ee
+        relative_quat = relative_rot.as_quat()
+
+        return relative_xpos, relative_quat
+
+    def query_joint_axes_B(self, joint_names, base_body):
+        joint_axes = {}
+        base_id = self._mjModel.body(base_body).id
+        base_rot = R.from_quat(self._mjData.body(base_id).xquat[[1, 2, 3, 0]])
+
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            jnt_axis = self._mjModel.jnt_axis[joint_id]
+
+            body_id = self._mjModel.jnt_bodyid[joint_id]
+            body_rot = R.from_quat(self._mjData.body(body_id).xquat[[1, 2, 3, 0]])
+
+            axis_global = body_rot.apply(jnt_axis)
+            axis_base = base_rot.inv().apply(axis_global)
+            joint_axes[joint_name] = axis_base
+
+        return joint_axes
+
