@@ -250,8 +250,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return joint_dofadrs
 
     def query_velocity_body_B(self, ee_body, base_body):
-        velocity_bodys_B = self.gym.query_velocity_body_B(ee_body, base_body)
-        return velocity_bodys_B
+        return self.gym.query_velocity_body_B(ee_body, base_body)
 
     def query_position_body_B(self, ee_body, base_body):
         position_body_B = self.gym.query_position_body_B(ee_body, base_body)
@@ -264,3 +263,15 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_joint_axes_B(self, joint_names, base_body):
         joint_axes_B = self.gym.query_joint_axes_B(joint_names, base_body)
         return joint_axes_B
+
+    def query_robot_velocity_odom(self, base_body, initial_base_pos, initial_base_quat):
+        linear, angular = self.gym.query_robot_velocity_odom(base_body, initial_base_pos, initial_base_quat)
+        return linear, angular
+
+    def query_robot_position_odom(self, base_body, initial_base_pos, initial_base_quat):
+        robot_position_odom = self.gym.query_robot_position_odom(base_body, initial_base_pos, initial_base_quat)
+        return robot_position_odom
+
+    def query_robot_orientation_odom(self, base_body, initial_base_pos, initial_base_quat):
+        robot_orientation_odom = self.gym.query_robot_orientation_odom(base_body, initial_base_pos, initial_base_quat)
+        return robot_orientation_odom
