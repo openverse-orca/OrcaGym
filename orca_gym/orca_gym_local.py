@@ -18,7 +18,7 @@ from orca_gym.orca_gym_opt_config import OrcaGymOptConfig
 from orca_gym.orca_gym import OrcaGymBase
 
 import mujoco
-
+from scipy.spatial.transform import Rotation as R
 
 
 def get_qpos_size(joint_type):
@@ -637,3 +637,145 @@ class OrcaGymLocal(OrcaGymBase):
             contact_force_dict[contact_id] = contact_force
         
         return contact_force_dict
+
+    def query_actuator_torques(self, actuator_names):
+        actuator_torques = {}
+        for actuator_name in actuator_names:
+            # 获取执行器ID
+            actuator_id = self._mjModel.actuator(actuator_name).id
+
+            # 获取关联的关节信息
+            joint_name = self._mjModel.actuator(actuator_name).trnid[0]  # 直接从模型获取更高效
+            joint_id = self._mjModel.joint(joint_name).id
+            joint_type = self._mjModel.jnt_type[joint_id]
+
+            # 初始化6维力矩向量
+            torque_vector = np.zeros(6, dtype=np.float32)
+
+            if joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+                # 铰链关节处理（单自由度）
+                gear = self._mjModel.actuator_gear[actuator_id][0]  # 取第一个gear值
+                raw_torque = self._mjData.actuator_force[actuator_id]
+                torque_vector[0] = raw_torque * gear  # 填充到力矩向量第一维
+            else:
+                # 其他类型关节（代码保护）
+                gear = self._mjModel.actuator_gear[actuator_id][:3]  # 取前3个gear值
+                raw_torque = self._mjData.actuator_force[actuator_id][:3]
+                torque_vector[:3] = raw_torque * gear  # 填充前三维
+
+            actuator_torques[actuator_name] = torque_vector
+
+        return actuator_torques
+
+    def query_joint_dofadrs(self, joint_names):
+        dof_adrs = {}
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            dof_adrs[joint_name] = self._mjModel.jnt_dofadr[joint_id]
+        return dof_adrs
+
+    def query_velocity_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        ee_id = self._mjModel.body(ee_body).id
+
+        ee_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self._mjModel, self._mjData, mujoco.mjtObj.mjOBJ_BODY,
+                                 ee_id, ee_vel, 0)
+        base_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self._mjModel, self._mjData, mujoco.mjtObj.mjOBJ_BODY,
+                                 base_id, base_vel, 0)
+
+        base_pos = self._mjData.body(base_id).xpos.copy()
+        base_rot = self._mjData.body(base_id).xmat.copy().reshape(3, 3)
+
+        linear_vel_B = base_rot.T @ (ee_vel[:3] - base_vel[:3])
+
+        angular_vel_B = base_rot.T @ (ee_vel[3:] - base_vel[3:])
+
+        combined_vel = np.concatenate([linear_vel_B, angular_vel_B])
+        return combined_vel.astype(np.float32)
+
+    def query_position_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        base_pos = self._mjData.body(base_id).xpos.copy()
+
+        ee_id = self._mjModel.body(ee_body).id
+        ee_pos = self._mjData.body(ee_id).xpos.copy()
+        relative_pos = ee_pos - base_pos
+
+        return relative_pos
+
+    def query_orientation_body_B(self, ee_body, base_body):
+        base_id = self._mjModel.body(base_body).id
+        base_quat = self._mjData.body(base_id).xquat.copy()  # MuJoCo格式 [w,x,y,z]
+
+        # 转换为SciPy需要的[x,y,z,w]格式
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+
+        ee_id = self._mjModel.body(ee_body).id
+        ee_quat = self._mjData.body(ee_id).xquat.copy()
+        rot_ee = R.from_quat([ee_quat[1], ee_quat[2], ee_quat[3], ee_quat[0]])
+
+        relative_rot = rot_base.inv() * rot_ee
+
+        return relative_rot.as_quat().astype(np.float32)
+
+
+    def query_joint_axes_B(self, joint_names, base_body):
+        joint_axes = {}
+        base_id = self._mjModel.body(base_body).id
+        base_rot = R.from_quat(self._mjData.body(base_id).xquat[[1, 2, 3, 0]])
+
+        for joint_name in joint_names:
+            joint_id = self._mjModel.joint(joint_name).id
+            jnt_axis = self._mjModel.jnt_axis[joint_id]
+
+            body_id = self._mjModel.jnt_bodyid[joint_id]
+            body_rot = R.from_quat(self._mjData.body(body_id).xquat[[1, 2, 3, 0]])
+
+            axis_global = body_rot.apply(jnt_axis)
+            axis_base = base_rot.inv().apply(axis_global)
+            joint_axes[joint_name] = axis_base
+
+        return {
+            name:axis_base.astype(np.float32)
+            for name, axis_base in joint_axes.items()
+        }
+
+    def query_robot_velocity_odom(self, base_body, initial_base_pos, initial_base_quat):
+        base_id = self._mjModel.body(base_body).id
+        base_pos = self._mjData.body(base_id).xpos.copy()
+        base_quat = self._mjData.body(base_id).xquat.copy()
+
+        initial_base_rot = R.from_quat(initial_base_quat[[1, 2, 3, 0]])
+
+        linera_vel_global = self._mjData.body(base_id).cvel[:3]
+        angular_vel_global = self._mjData.body(base_id).cvel[3:]
+
+        linera_vel_odom = initial_base_rot.inv().apply(linera_vel_global)
+        angular_vel_odom = initial_base_rot.inv().apply(angular_vel_global)
+
+        return linera_vel_odom.astype(np.float32), angular_vel_odom.astype(np.float32)
+
+    def query_robot_position_odom(self, base_body, initial_base_pos, initial_base_quat):
+        base_id = self._mjModel.body(base_body).id
+        base_pos = self._mjData.body(base_id).xpos.copy()
+
+        initial_base_rot = R.from_quat(initial_base_quat[[1, 2, 3, 0]])
+
+        relative_pos = base_pos - initial_base_pos
+        pos_odom = initial_base_rot.inv().apply(relative_pos)
+
+        return pos_odom.astype(np.float32)
+
+    def query_robot_orientation_odom(self, base_body, initial_base_pos, initial_base_quat):
+        base_id = self._mjModel.body(base_body).id
+        base_quat = self._mjData.body(base_id).xquat.copy()
+
+        initial_base_rot = R.from_quat(initial_base_quat[[1, 2, 3, 0]])
+        base_rot = R.from_quat(base_quat[[1, 2, 3, 0]])
+
+        rot = initial_base_rot.inv() * base_rot
+        quat_odom = rot.as_quat()
+
+        return quat_odom.astype(np.float32)
