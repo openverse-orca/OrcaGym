@@ -94,8 +94,6 @@ class FrankaEnv(RobomimicEnv):
         self._obj_joint_name = self.joint("object_joint")
         self._goal_name = self.site("goal")
         self._goal_site_name = self.site("goal_site")
-        self._box_name = self.body("box")
-        self._box_site_name = self.site("box_site")
         
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
