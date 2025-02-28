@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import argparse
+import subprocess
+import signal
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -11,6 +13,36 @@ if project_root not in sys.path:
 
 
 from orca_gym.sensor.rgbd_camera import Monitor
+
+
+def start_monitor(port=7070, project_root : str = None):
+    """
+    启动 monitor.py 作为子进程。
+    """
+    monitor_script = f"{project_root}/orca_gym/scripts/camera_monitor.py"
+
+    # 启动 monitor.py
+    # 使用 sys.executable 确保使用相同的 Python 解释器
+    process = subprocess.Popen(
+        [sys.executable, monitor_script, "--port", f"{port}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    return process
+
+def terminate_monitor(process):
+    """
+    终止子进程。
+    """
+    try:
+        if os.name != 'nt':
+            # Unix/Linux: 发送 SIGTERM 给整个进程组
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        else:
+            # Windows: 使用 terminate 方法
+            process.terminate()
+    except Exception as e:
+        print(f"终止子进程时发生错误: {e}")    
 
 
 if __name__ == "__main__":

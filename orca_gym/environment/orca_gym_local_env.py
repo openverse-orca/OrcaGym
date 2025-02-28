@@ -25,6 +25,8 @@ from datetime import datetime
 import time
 
 class OrcaGymLocalEnv(OrcaGymBaseEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
+    
     def __init__(
         self,
         frame_skip: int,

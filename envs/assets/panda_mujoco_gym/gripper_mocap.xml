@@ -1,0 +1,182 @@
+<mujoco model="panda">
+  <compiler angle="radian" meshdir="meshes"/>
+  <option integrator="implicitfast"/>
+    <default>
+      <default class="panda">
+        <material specular="0.5" shininess="0.25"/>
+        <joint armature="0.1" damping="1" axis="0 0 1" range="-2.8973 2.8973"/>
+        <general dyntype="none" biastype="affine" ctrlrange="-2.8973 2.8973" forcerange="-87 87"/>
+        <default class="finger">
+          <joint axis="0 1 0" type="slide" range="0 0.04"/>
+        </default>
+  
+        <default class="visual">
+          <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+
+        <default class="collision">
+        <geom type="mesh" group="3"/>
+        <default class="fingertip_pad_collision_1">
+          <geom type="box" size="0.0085 0.004 0.0085" pos="0 0.0055 0.0445"/>
+        </default>
+        <default class="fingertip_pad_collision_2">
+          <geom type="box" size="0.003 0.002 0.003" pos="0.0055 0.002 0.05"/>
+        </default>
+        <default class="fingertip_pad_collision_3">
+          <geom type="box" size="0.003 0.002 0.003" pos="-0.0055 0.002 0.05"/>
+        </default>
+        <default class="fingertip_pad_collision_4">
+          <geom type="box" size="0.003 0.002 0.0035" pos="0.0055 0.002 0.0395"/>
+        </default>
+        <default class="fingertip_pad_collision_5">
+          <geom type="box" size="0.003 0.002 0.0035" pos="-0.0055 0.002 0.0395"/>
+        </default>
+        </default>
+      </default>
+    </default>
+  
+    <asset>
+      <material class="panda" name="white" rgba="1 1 1 1"/>
+      <material class="panda" name="off_white" rgba="0.901961 0.921569 0.929412 1"/>
+      <material class="panda" name="black" rgba="0.25 0.25 0.25 1"/>
+      <material class="panda" name="green" rgba="0 1 0 1"/>
+      <material class="panda" name="light_blue" rgba="0.039216 0.541176 0.780392 1"/>
+
+      <texture type="2d" name="Plastic006_color"      file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
+      <texture type="2d" name="Plastic006_roughness"  file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
+      <texture type="2d" name="Plastic006_normal"     file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
+
+      <material name="pbr_plastic_black" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Plastic006_color"/>
+      <normal     texture="Plastic006_normal"/>
+      <roughness  texture="Plastic006_roughness"/>
+      </material>
+
+      <texture type="2d" name="Plastic013A_color"      file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Color.png"/>
+      <texture type="2d" name="Plastic013A_roughness"  file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Roughness.png"/>
+      <texture type="2d" name="Plastic013A_normal"     file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_NormalDX.png"/>
+
+      <material name="pbr_plastic_white" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Plastic013A_color"/>
+      <normal     texture="Plastic013A_normal"/>
+      <roughness  texture="Plastic013A_roughness"/>
+      </material>
+
+      <texture type="2d" name="Plastic010_color"      file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Color.png"/>
+      <texture type="2d" name="Plastic010_roughness"  file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Roughness.png"/>
+      <texture type="2d" name="Plastic010_normal"     file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
+
+      <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
+      <rgb        texture="Plastic010_color"/>
+      <normal     texture="Plastic010_normal"/>
+      <roughness  texture="Plastic010_roughness"/>      
+      </material>
+
+      <texture type="2d" name="wood_table_worn_diff_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
+      <texture type="2d" name="wood_table_worn_nor_dx_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_nor_dx_2k.png"/>
+      <texture type="2d" name="wood_table_worn_rough_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_rough_2k.png"/>
+      <material name="wood_table_worn_material">
+        <rgb texture="wood_table_worn_diff_2k"/>
+        <normal texture="wood_table_worn_nor_dx_2k"/>
+        <roughness texture="wood_table_worn_rough_2k"/>
+      </material>
+
+      <texture type="2d" name="oak_veneer_01_diff_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
+      <texture type="2d" name="oak_veneer_01_nor_dx_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_nor_dx_2k.png" />
+      <texture type="2d" name="oak_veneer_01_rough_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_rough_2k.png" />
+
+      <material name="oak_veneer_material">
+        <rgb texture="oak_veneer_01_diff_2k"/>
+        <normal texture="oak_veneer_01_nor_dx_2k"/>
+        <roughness texture="oak_veneer_01_rough_2k"/>
+      </material>
+
+      <texture type="2d" name="transparent_red" file="..\textures\transparent_red.png"/>
+      <material name="transparent_red_material" emission = "0.2" roughness="0.1" metallic="0.9">
+        <rgba texture="transparent_red"/>
+        <normal texture="wood_table_worn_nor_dx_2k"/>
+      </material>
+
+
+      <!-- Collision meshes -->
+      <mesh name="hand_c" file="hand.stl"/>
+  
+      <!-- Visual meshes -->
+      <mesh file="hand_0.obj"/>
+      <mesh file="hand_1.obj"/>
+      <mesh file="hand_2.obj"/>
+      <mesh file="hand_3.obj"/>
+      <mesh file="hand_4.obj"/>
+      <mesh file="finger_0.obj"/>
+      <mesh file="finger_1.obj"/>
+    </asset>
+  
+    <worldbody>
+      <light name="top" pos="0 0 2" mode="trackcom"/>
+
+      <body mocap="true" name="panda_mocap" pos="0.0 0 0.1">
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0.5 0 0 0.1" size="0.2 0.002 0.002" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0.5 0 0.1" size="0.002 0.2 0.001" type="box"></geom>
+          <geom conaffinity="0" contype="0" pos="0 0 0" group = "1" rgba="0 0 0.5 0.1" size="0.002 0.002 0.2" type="box"></geom>
+      </body>
+
+
+      <body name="hand" pos="0 0 0" >
+        <freejoint/>
+        <inertial mass="0.73" pos="-0.01 0 0.03" diaginertia="0.001 0.0025 0.0017"/>
+        <geom mesh="hand_0" material="pbr_plastic_gray" class="visual"/>
+        <geom mesh="hand_1" material="pbr_plastic_black" class="visual"/>
+        <geom mesh="hand_2" material="pbr_plastic_black" class="visual"/>
+        <geom mesh="hand_3" material="pbr_plastic_white" class="visual"/>
+        <geom mesh="hand_4" material="pbr_plastic_gray" class="visual"/>
+        <geom mesh="hand_c" class="collision"/>
+
+        <!-- refer to the panda_grasptarget in panda.urdf in panda_gym -->
+        <body name="ee_center_body" pos="0 0 0.105">
+            <site name='ee_center_site' size="0.01" group="3"/>
+        </body>
+
+        <body name="camera_wrist" pos="0.2 0 -0.5" euler="0.0 0.0 1.5707963">
+          <site name="camera_wrist_site" size="0.01" group="3"/>
+          <camera name="camera_wrist" user="7090 7091"/>
+        </body>
+
+        <body name="left_finger" pos="0 0 0.0584">
+          <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
+          <joint name="finger_joint1" class="finger"/>
+          <geom mesh="finger_0" material="pbr_plastic_gray" class="visual"/>
+          <geom mesh="finger_1" material="pbr_plastic_black" class="visual"/>
+          <geom mesh="finger_0" class="collision"/>
+          <geom class="fingertip_pad_collision_1"/>
+          <geom class="fingertip_pad_collision_2"/>
+          <geom class="fingertip_pad_collision_3"/>
+          <geom class="fingertip_pad_collision_4"/>
+          <geom class="fingertip_pad_collision_5"/>
+        </body>
+
+        <body name="right_finger" pos="0 0 0.0584" quat="0 0 0 1">
+          <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
+          <joint name="finger_joint2" class="finger"/>
+          <geom mesh="finger_0" material="pbr_plastic_gray" class="visual"/>
+          <geom mesh="finger_1" material="pbr_plastic_black" class="visual"/>
+          <geom mesh="finger_0" class="collision"/>
+          <geom class="fingertip_pad_collision_1"/>
+          <geom class="fingertip_pad_collision_2"/>
+          <geom class="fingertip_pad_collision_3"/>
+          <geom class="fingertip_pad_collision_4"/>
+          <geom class="fingertip_pad_collision_5"/>
+        </body>
+      </body>
+
+    </worldbody>
+
+    <actuator>
+      <general name="r_gripper_finger_joint" joint="finger_joint1" class="panda" gainprm="500 0 0" biasprm="0 -500 -10" forcerange="-120 120" ctrlrange="0 0.04"/>
+      <general name="l_gripper_finger_joint" joint="finger_joint2" class="panda" gainprm="500 0 0" biasprm="0 -500 -10" forcerange="-120 120" ctrlrange="0 0.04"/>
+    </actuator>
+
+    <equality>
+      <weld body1="panda_mocap" body2="ee_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+    </equality>
+
+</mujoco>

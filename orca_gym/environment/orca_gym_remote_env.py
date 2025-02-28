@@ -22,6 +22,8 @@ from . import OrcaGymBaseEnv
 import grpc
 
 class OrcaGymRemoteEnv(OrcaGymBaseEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
+        
     def __init__(
         self,
         frame_skip: int,
