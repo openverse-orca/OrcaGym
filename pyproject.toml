@@ -10,12 +10,12 @@ readme = "README.md"
 requires-python = ">=3.9"
 # 项目依赖，直接对应你的 requirements.txt 列表
 dependencies = [
-    "numpy<2.0",
+    "numpy>=2.0.0",
     "scipy",
     "matplotlib",
     "grpcio==1.66.1",
     "grpcio-tools==1.66.1",
-    "gymnasium>=0.29.1",
+    "gymnasium>=1.0.0",
     "stable-baselines3>=2.3.2",
     "sb3_contrib>=2.3.0",
     "pygame>=2.6.0",
@@ -23,7 +23,7 @@ dependencies = [
     "websockets",
     "numba",
     "termcolor",
-    "mujoco==3.2.2",
+    "mujoco>=3.3.0",
     "tqdm",
     "av",
     "opencv-python"
