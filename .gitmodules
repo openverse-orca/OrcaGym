@@ -13,3 +13,9 @@
 [submodule "3rd_party/dlimp"]
 	path = 3rd_party/dlimp
 	url = git@github.com:openverse-orca/dlimp_openvla.git
+[submodule "3rd_party/openpi"]
+	path = 3rd_party/openpi
+	url = git@github.com:openverse-orca/openpi.git
+[submodule "3rd_party/gym_aloha"]
+	path = 3rd_party/gym_aloha
+	url = git@github.com:openverse-orca/gym-aloha.git
