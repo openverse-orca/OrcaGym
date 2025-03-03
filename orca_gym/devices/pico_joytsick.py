@@ -29,6 +29,7 @@ class PicoJoystick:
         self.current_transform = None
         self.current_key_state = None
         self.suceess_AB = 0 #AB键长按次数
+        self.suceess_XY = 0 #XY键长按次数
         self.reset_pos = False
         self.loop = asyncio.new_event_loop()
         self.clients = set()  # 初始化 self.clients
@@ -173,11 +174,22 @@ class PicoJoystick:
         if key_state is None:
             return False
         right_hand_key_state = key_state["rightHand"]
-        if right_hand_key_state["primaryButtonPressed"] and right_hand_key_state["primaryButtonPressed"]:
+        if right_hand_key_state["primaryButtonPressed"] and right_hand_key_state["secondaryButtonPressed"]:
             self.suceess_AB += 1
         else:
             self.suceess_AB = 0
         return self.suceess_AB >= 20
+
+    def get_success_XY(self) -> bool:
+        key_state = self.get_key_state()
+        if key_state is None:
+            return False
+        left_hand_key_state = key_state["leftHand"]
+        if left_hand_key_state["primaryButtonPressed"] and left_hand_key_state["secondaryButtonPressed"]:
+            self.suceess_XY += 1
+        else:
+            self.suceess_XY = 0
+        return self.suceess_XY >= 20
 
     def get_left_relative_move(self, transform):
         relative_position = transform[0][0]
