@@ -126,7 +126,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.tolerance = self.opt.tolerance
         self._mjModel.opt.ls_tolerance = self.opt.ls_tolerance
         self._mjModel.opt.noslip_tolerance = self.opt.noslip_tolerance
-        self._mjModel.opt.mpr_tolerance = self.opt.mpr_tolerance
+        self._mjModel.opt.ccd_tolerance = self.opt.ccd_tolerance
         self._mjModel.opt.gravity = self.opt.gravity
         self._mjModel.opt.wind = self.opt.wind
         self._mjModel.opt.magnetic = self.opt.magnetic
@@ -143,7 +143,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.iterations = self.opt.iterations
         self._mjModel.opt.ls_iterations = self.opt.ls_iterations
         self._mjModel.opt.noslip_iterations = self.opt.noslip_iterations
-        self._mjModel.opt.mpr_iterations = self.opt.mpr_iterations
+        self._mjModel.opt.ccd_iterations = self.opt.ccd_iterations
         self._mjModel.opt.disableflags = self.opt.disableflags
         self._mjModel.opt.enableflags = self.opt.enableflags
         self._mjModel.opt.disableactuator = self.opt.disableactuator
@@ -159,7 +159,7 @@ class OrcaGymLocal(OrcaGymBase):
             "tolerance": self._mjModel.opt.tolerance,
             "ls_tolerance": self._mjModel.opt.ls_tolerance,
             "noslip_tolerance": self._mjModel.opt.noslip_tolerance,
-            "mpr_tolerance": self._mjModel.opt.mpr_tolerance,
+            "ccd_tolerance": self._mjModel.opt.ccd_tolerance,
             "gravity": list(self._mjModel.opt.gravity),
             "wind": list(self._mjModel.opt.wind),
             "magnetic": list(self._mjModel.opt.magnetic),
@@ -176,7 +176,7 @@ class OrcaGymLocal(OrcaGymBase):
             "iterations": self._mjModel.opt.iterations,
             "ls_iterations": self._mjModel.opt.ls_iterations,
             "noslip_iterations": self._mjModel.opt.noslip_iterations,
-            "mpr_iterations": self._mjModel.opt.mpr_iterations,
+            "ccd_iterations": self._mjModel.opt.ccd_iterations,
             "disableflags": self._mjModel.opt.disableflags,
             "enableflags": self._mjModel.opt.enableflags,
             "disableactuator": self._mjModel.opt.disableactuator,

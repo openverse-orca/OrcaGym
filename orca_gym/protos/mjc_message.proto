@@ -133,7 +133,7 @@ message QueryOptConfigResponse {
     double tolerance = 4;
     double ls_tolerance = 5;
     double noslip_tolerance = 6;
-    double mpr_tolerance = 7;
+    double ccd_tolerance = 7;
     repeated double gravity = 8;
     repeated double wind = 9;
     repeated double magnetic = 10;
@@ -150,7 +150,7 @@ message QueryOptConfigResponse {
     int32 iterations = 21;
     int32 ls_iterations = 22;
     int32 noslip_iterations = 23;
-    int32 mpr_iterations = 24;
+    int32 ccd_iterations = 24;
     int32 disableflags = 25;
     int32 enableflags = 26;
     int32 disableactuator = 27;
@@ -165,7 +165,7 @@ message SetOptConfigRequest {
     double tolerance = 4;
     double ls_tolerance = 5;
     double noslip_tolerance = 6;
-    double mpr_tolerance = 7;
+    double ccd_tolerance = 7;
     repeated double gravity = 8;
     repeated double wind = 9;
     repeated double magnetic = 10;
@@ -182,7 +182,7 @@ message SetOptConfigRequest {
     int32 iterations = 21;
     int32 ls_iterations = 22;
     int32 noslip_iterations = 23;
-    int32 mpr_iterations = 24;
+    int32 ccd_iterations = 24;
     int32 disableflags = 25;
     int32 enableflags = 26;
     int32 disableactuator = 27;

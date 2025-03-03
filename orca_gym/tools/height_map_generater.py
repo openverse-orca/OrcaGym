@@ -171,7 +171,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self.gym.opt.gravity = np.array([0, 0, 0])
         self.gym.opt.iterations = 10
         self.gym.opt.noslip_iterations = 0
-        self.gym.opt.mpr_iterations = 0
+        self.gym.opt.ccd_iterations = 0
         self.gym.opt.sdf_iterations = 0
         self.gym.opt.timestep = 0.001
         self.gym.set_opt_config()

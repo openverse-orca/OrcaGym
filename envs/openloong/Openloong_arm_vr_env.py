@@ -51,7 +51,7 @@ class OpenloongArmEnv(OrcaGymLocalEnv):
 
         self.gym.opt.iterations = 150
         self.gym.opt.noslip_tolerance = 50
-        self.gym.opt.mpr_iterations = 100
+        self.gym.opt.ccd_iterations = 100
         self.gym.opt.sdf_iterations = 50
         self.gym.set_opt_config()
 
