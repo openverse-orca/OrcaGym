@@ -1,9 +1,9 @@
-import gym_aloha  # noqa: F401
-import gymnasium
+import gymnasium as gym
 import numpy as np
 from openpi_client import image_tools
 from openpi_client.runtime import environment as _environment
 from typing_extensions import override
+
 
 
 class AlohaSimEnvironment(_environment.Environment):
@@ -13,7 +13,7 @@ class AlohaSimEnvironment(_environment.Environment):
         np.random.seed(seed)
         self._rng = np.random.default_rng(seed)
 
-        self._gym = gymnasium.make(task, obs_type=obs_type)
+        self._gym = gym.make(task, obs_type=obs_type)
 
         self._last_obs = None
         self._done = True
