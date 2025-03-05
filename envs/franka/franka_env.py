@@ -445,7 +445,7 @@ class FrankaEnv(RobomimicEnv):
         # print("desired goal position: ", goal_xpos)
         return goal_xpos
 
-    def reset_model(self) -> dict:
+    def reset_model(self) -> tuple[dict, dict]:
         """
         Reset the environment, return observation
         """

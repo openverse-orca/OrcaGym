@@ -353,7 +353,7 @@ class OpenloongArmEnv(OrcaGymRemoteEnv):
         # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
         goal = np.array([0, 0, 0])
         return goal
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)

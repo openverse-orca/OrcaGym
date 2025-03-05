@@ -70,7 +70,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
     ) -> Tuple[NDArray[np.float64], np.float64, bool, bool, Dict[str, np.float64]]:
         raise NotImplementedError
 
-    def reset_model(self) -> NDArray[np.float64]:
+    def reset_model(self) -> tuple[dict, dict]:
         """
         Reset the robot degrees of freedom (qpos and qvel).
         Implement this in each subclass.

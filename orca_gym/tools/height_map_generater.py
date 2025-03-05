@@ -280,7 +280,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         }
         return result
 
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         self._set_init_state()
         obs = self._get_obs().copy()
         return obs, {}

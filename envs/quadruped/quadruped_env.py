@@ -279,9 +279,9 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
         self.step_num += 1
         return obs, reward, is_terminated, is_truncated, info
 
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         # Robot_env 统一处理，这里实现空函数就可以
-        pass
+        return {}, {}
 
     def reset(self,
               qpos: np.ndarray = None,

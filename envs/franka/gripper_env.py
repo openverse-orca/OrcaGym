@@ -251,7 +251,7 @@ class GripperEnv(OrcaGymLocalEnv):
         return obs
 
 
-    def reset_model(self) -> dict:
+    def reset_model(self) -> tuple[dict, dict]:
         """
         Reset the environment, return observation
         """

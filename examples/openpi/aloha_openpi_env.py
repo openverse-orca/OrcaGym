@@ -6,7 +6,7 @@ from typing_extensions import override
 
 
 
-class AlohaSimEnvironment(_environment.Environment):
+class AlohaOpenpiEnv(_environment.Environment):
     """An environment for an Aloha robot in simulation."""
 
     def __init__(self, env_id: str, obs_type: str = "pixels_agent_pos", seed: int = 0) -> None:
