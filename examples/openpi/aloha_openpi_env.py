@@ -9,11 +9,11 @@ from typing_extensions import override
 class AlohaSimEnvironment(_environment.Environment):
     """An environment for an Aloha robot in simulation."""
 
-    def __init__(self, task: str, obs_type: str = "pixels_agent_pos", seed: int = 0) -> None:
+    def __init__(self, env_id: str, obs_type: str = "pixels_agent_pos", seed: int = 0) -> None:
         np.random.seed(seed)
         self._rng = np.random.default_rng(seed)
 
-        self._gym = gym.make(task, obs_type=obs_type)
+        self._gym = gym.make(env_id, obs_type=obs_type)
 
         self._last_obs = None
         self._done = True

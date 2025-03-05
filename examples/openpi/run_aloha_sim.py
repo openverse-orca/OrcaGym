@@ -11,7 +11,7 @@ import tyro
 import gymnasium as gym
 
 ENV_ENTRY_POINT = {
-    "Aloha": "envs.franka.franka_env:FrankaEnv"
+    "AlohaTransferCube": "envs.aloha.aloha_env:AlohaEnv"
 }
 
 TIME_STEP = 0.005
@@ -44,8 +44,11 @@ def register_env(orcagym_addr : str,
 
 @dataclasses.dataclass
 class Args:
+    orca_gym_address: str = 'localhost:50051'
     task: str = "AlohaTransferCube"
     seed: int = 0
+    agent_name: str = "bimanual_viperx_transfer_cube_usda"
+    record_time: int = 60
 
     action_horizon: int = 10
 
@@ -55,9 +58,20 @@ class Args:
     display: bool = False
 
 def main(args: Args) -> None:
+    max_episode_steps = args.record_time * CONTROL_FREQ
+    env_id, kwargs = register_env(
+        orcagym_addr=args.orca_gym_address,
+        env_name=args.task, 
+        env_index=0, 
+        agent_name=args.agent_name, 
+        max_episode_steps=max_episode_steps
+    )
+    
+    print("Registered Simulation Environment: ", env_id, " with kwargs: ", kwargs)
+    
     runtime = _runtime.Runtime(
         environment=_env.AlohaSimEnvironment(
-            task=args.task,
+            env_id=env_id,
             seed=args.seed,
         ),
         agent=_policy_agent.PolicyAgent(
