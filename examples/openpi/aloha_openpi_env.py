@@ -47,18 +47,12 @@ class AlohaOpenpiEnv(_environment.Environment):
     def _convert_observation(self, gym_obs: dict) -> dict:
         img = gym_obs["pixels"]["top"]
         
-        # print("img: ", img)
-        
         # img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
         img = cv2.resize(img, (224, 224))
-        
-        # print("resized img: ", img)
         
         # Convert axis order from [H, W, C] --> [C, H, W]
         img = np.transpose(img, (2, 0, 1))
         
-        print("transposed img: ", img)
-
         return {
             "state": gym_obs["agent_pos"],
             "images": {"cam_high": img},

@@ -4,7 +4,7 @@ from gym_aloha.tasks.sim import TransferCubeTask
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from orca_gym.sensor.rgbd_camera import CameraWrapper
 from dm_control.mujoco.engine import Physics
-
+import time
 class TransferCubeTask_OrcaGym(TransferCubeTask):
     def __init__(self, 
                  random,
@@ -17,7 +17,7 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
         self._top_camera = cameras[0]
         self._top_camera.start()
-        
+
     def get_observation(self, physics):
         obs = collections.OrderedDict()
         obs["qpos"] = self.get_qpos(physics)
@@ -39,4 +39,9 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         data = physics.data
         self._orcagym_env.gym.update_data_external(data.qpos, data.qvel, data.qacc, data.qfrc_bias, data.time)
         self._orcagym_env.render()
+        
+        # 等待渲染结果串流到orcagym的客户端，最长等待时间不超过最大帧率
+        time.sleep(0.02) # max_hz=50
+        
+        
         return

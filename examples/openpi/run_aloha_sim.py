@@ -15,8 +15,8 @@ ENV_ENTRY_POINT = {
     "AlohaTransferCube": "envs.aloha.aloha_dm_env:AlohaDMEnv"
 }
 
-TIME_STEP = 0.0025
-FRAME_SKIP = 1
+TIME_STEP = 0.002
+FRAME_SKIP = 10
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
@@ -60,7 +60,7 @@ class Args:
     env_name: str = "AlohaTransferCube"
     seed: int = 0
     agent_name: str = "bimanual_viperx_transfer_cube_usda"
-    record_time: int = 60
+    record_time: int = 20
     task: str = "transfer_cube"
     obs_type: str = "pixels"
 

@@ -16,3 +16,5 @@
 *.STL filter=lfs diff=lfs merge=lfs -text
 *.hdf5 filter=lfs diff=lfs merge=lfs -text
 *.HDF5 filter=lfs diff=lfs merge=lfs -text
+*.EXR filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text

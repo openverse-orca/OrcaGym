@@ -12,22 +12,23 @@
         <mesh name="vx300s_8_gripper_prop" file="vx300s_8_gripper_prop.stl" scale="0.001 0.001 0.001" />
         <mesh name="vx300s_9_gripper_bar" file="vx300s_9_gripper_bar.stl" scale="0.001 0.001 0.001" />
         <mesh name="vx300s_10_gripper_finger_left" file="vx300s_10_custom_finger_left.stl" scale="0.001 0.001 0.001" />
+        <mesh name="tabletop" file="tabletop.stl" scale="0.001 0.001 0.001"/>
         <mesh name="vx300s_10_gripper_finger_right" file="vx300s_10_custom_finger_right.stl" scale="0.001 0.001 0.001" />
 
-        <mesh file="tabletop.stl" name="tabletop" scale="0.001 0.001 0.001"/>
+        
     </asset>
     
     <worldbody>
         <!-- <include file="vx300s_left.xml" /> -->
 
-        <body name="table" pos="0 .6 0.001">
+        <body name="table" pos="0 .6 0.00">
             <geom group="1" mesh="tabletop" pos="0 0 0" type="mesh" conaffinity="1" contype="1" name="table" rgba="0.2 0.2 0.2 1" />
         </body>
         <body name="midair" pos="0 .6 0.2">
             <site pos="0 0 0" size="0.01" type="sphere" name="midair" rgba="1 0 0 0" group="3"/>
         </body>
 
-        <camera name="top" pos="0 0.6 0.8" euler="3.1415926 0 0" user="7070 7071" fovy="78"/>
+        <camera name="top" pos="0 0.6 0.8" euler="3.1416 0 0" user="7070 7071" fovy="78"/>
 
         <body name="vx300s_left" pos="-0.469 0.5 0">
             <geom quat="0.707107 0 0 0.707107" type="mesh" mesh="vx300s_1_base" name="vx300s_left_1_base" contype="0" conaffinity="0"/>

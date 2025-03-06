@@ -344,6 +344,8 @@ class OrcaGymLocal(OrcaGymBase):
                 "Stiffness": joint.stiffness[0],
                 "ActfrcRange": model.jnt_actfrcrange[i],
                 "Margin": joint.margin[0],
+                "Frictionloss": joint.frictionloss[0],
+                "Damping": joint.damping[0],
             }
             
         return joint_dict
