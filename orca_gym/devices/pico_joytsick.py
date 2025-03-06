@@ -154,7 +154,8 @@ class PicoJoystick:
                 message["leftHand"]["joystickPosition"]["x"],
                 message["leftHand"]["joystickPosition"]["y"]
             ],
-            "joystickPressed": message["leftHand"]["joystickPressed"]
+            "joystickPressed": message["leftHand"]["joystickPressed"],
+            "gripButtonPressed": message["leftHand"]["gripButtonPressed"]
         }
 
         right_hand_key_state = {
@@ -165,9 +166,30 @@ class PicoJoystick:
                 message["rightHand"]["joystickPosition"]["x"],
                 message["rightHand"]["joystickPosition"]["y"]
             ],
-            "joystickPressed": message["rightHand"]["joystickPressed"]
+            "joystickPressed": message["rightHand"]["joystickPressed"],
+            "gripButtonPressed": message["rightHand"]["gripButtonPressed"]
         }
         return {"leftHand": left_hand_key_state, "rightHand": right_hand_key_state}
+
+    def get_right_gripButton(self) -> bool:
+        key_state = self.get_key_state()
+        if key_state is None:
+            return False
+        right_hand_key_state = key_state["rightHand"]
+        if right_hand_key_state["gripButtonPressed"]:
+            return True
+
+        return False
+    
+    def get_left_gripButton(self) -> bool:
+        key_state = self.get_key_state()
+        if key_state is None:
+            return False
+        left_hand_key_state = key_state["leftHand"]
+        if left_hand_key_state["gripButtonPressed"]:
+            return True
+
+        return False
 
     def get_success_AB(self) -> bool:
         key_state = self.get_key_state()
