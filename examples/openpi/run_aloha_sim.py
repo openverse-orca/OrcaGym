@@ -15,8 +15,8 @@ ENV_ENTRY_POINT = {
     "AlohaTransferCube": "envs.aloha.aloha_dm_env:AlohaDMEnv"
 }
 
-TIME_STEP = 0.005
-FRAME_SKIP = 8
+TIME_STEP = 0.0025
+FRAME_SKIP = 1
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 

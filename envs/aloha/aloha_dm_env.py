@@ -21,10 +21,11 @@ from envs.aloha.aloha_env import AlohaEnv
 import time
 from envs.aloha.aloha_orcagym_task import TransferCubeTask_OrcaGym
 from dm_control.mujoco import wrapper
+import imageio
 
 class AlohaDMEnv(gym.Env):
     # TODO(aliberts): add "human" render_mode
-    metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 50}
+    metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 30}
 
     def __init__(
         self,
@@ -54,6 +55,7 @@ class AlohaDMEnv(gym.Env):
 
         self._aloha_env = self._make_orca_gym_local_env(frame_skip, orcagym_addr, agent_names, time_step, **kwargs)
         self._aloha_env.reset()
+        print("Init aloha orca gym env, reseted.")
         
         self._dm_env = self._make_dm_env_task(
             task_name=self.task,
@@ -121,7 +123,7 @@ class AlohaDMEnv(gym.Env):
         # TODO(rcadene): render and visualizer several cameras (e.g. angle, front_close)
         # image = self._dm_env.physics.render(height=height, width=width, camera_id="top")
         
-        self._aloha_env.render()
+        # self._aloha_env.render()
         return
 
     def _make_orca_gym_local_env(self, 
@@ -225,6 +227,10 @@ class AlohaDMEnv(gym.Env):
         info = {"is_success": is_success}
 
         observation = self._format_raw_obs(raw_obs)
+        
+        # img_data = observation["pixels"]["top"]
+        # time = self._dm_env.physics.data.time
+        # imageio.imwrite(f"camera_frame_top_{time}.png", img_data)
 
         truncated = False
         return observation, reward, terminated, truncated, info

@@ -1,8 +1,33 @@
 <mujoco>
-    <include file="scene.xml"/>
-    <include file="vx300s_dependencies.xml"/>
+    <compiler angle="radian" inertiafromgeom="auto" inertiagrouprange="4 5"/>
+
+    <asset>
+        <mesh name="vx300s_1_base" file="vx300s_1_base.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_2_shoulder" file="vx300s_2_shoulder.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_3_upper_arm" file="vx300s_3_upper_arm.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_4_upper_forearm" file="vx300s_4_upper_forearm.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_5_lower_forearm" file="vx300s_5_lower_forearm.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_6_wrist" file="vx300s_6_wrist.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_7_gripper" file="vx300s_7_gripper.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_8_gripper_prop" file="vx300s_8_gripper_prop.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_9_gripper_bar" file="vx300s_9_gripper_bar.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_10_gripper_finger_left" file="vx300s_10_custom_finger_left.stl" scale="0.001 0.001 0.001" />
+        <mesh name="vx300s_10_gripper_finger_right" file="vx300s_10_custom_finger_right.stl" scale="0.001 0.001 0.001" />
+
+        <mesh file="tabletop.stl" name="tabletop" scale="0.001 0.001 0.001"/>
+    </asset>
+    
     <worldbody>
         <!-- <include file="vx300s_left.xml" /> -->
+
+        <body name="table" pos="0 .6 0.001">
+            <geom group="1" mesh="tabletop" pos="0 0 0" type="mesh" conaffinity="1" contype="1" name="table" rgba="0.2 0.2 0.2 1" />
+        </body>
+        <body name="midair" pos="0 .6 0.2">
+            <site pos="0 0 0" size="0.01" type="sphere" name="midair" rgba="1 0 0 0" group="3"/>
+        </body>
+
+        <camera name="top" pos="0 0.6 0.8" euler="3.1415926 0 0" user="7070 7071" fovy="78"/>
 
         <body name="vx300s_left" pos="-0.469 0.5 0">
             <geom quat="0.707107 0 0 0.707107" type="mesh" mesh="vx300s_1_base" name="vx300s_left_1_base" contype="0" conaffinity="0"/>
@@ -28,11 +53,11 @@
                                 <geom quat="0.707107 0 0 0.707107" type="mesh" mesh="vx300s_6_wrist" name="vx300s_left_6_wrist" />
                                 <body name="vx300s_left_gripper_link" pos="0.069744 0 0">
                                     <body name="vx300s_left_camera_focus" pos="0.15 0 0.01">
-                                        <site pos="0 0 0" size="0.01" type="sphere" name="left_cam_focus" rgba="0 0 1 0"/>
+                                        <site pos="0 0 0" size="0.01" type="sphere" name="left_cam_focus" rgba="0 0 1 0" group="3"/>
                                     </body>
-                                    <site pos="0.15 0 0" size="0.003 0.003 0.03" type="box" name="cali_left_site1" rgba="0 0 1 0"/>
-                                    <site pos="0.15 0 0" size="0.003 0.03 0.003" type="box" name="cali_left_site2" rgba="0 0 1 0"/>
-                                    <site pos="0.15 0 0" size="0.03 0.003 0.003" type="box" name="cali_left_site3" rgba="0 0 1 0"/>
+                                    <site pos="0.15 0 0" size="0.003 0.003 0.03" type="box" name="cali_left_site1" rgba="0 0 1 0" group="3"/>
+                                    <site pos="0.15 0 0" size="0.003 0.03 0.003" type="box" name="cali_left_site2" rgba="0 0 1 0" group="3"/>
+                                    <site pos="0.15 0 0" size="0.03 0.003 0.003" type="box" name="cali_left_site3" rgba="0 0 1 0" group="3"/>
                                     <!-- <camera name="left_wrist" pos="-0.1 0 0.16" fovy="20" mode="targetbody" target="vx300s_left_camera_focus"/> -->
                                     <inertial pos="0.0395662 -2.56311e-07 0.00400649" quat="0.62033 0.619916 -0.339682 0.339869" mass="0.251652" diaginertia="0.000689546 0.000650316 0.000468142" />
                                     <joint name="vx300s_left_wrist_rotate" pos="0 0 0" axis="1 0 0" limited="true" range="-3.14158 3.14158" frictionloss="30" />
@@ -88,11 +113,11 @@
                                 <geom quat="0.707107 0 0 0.707107" type="mesh" mesh="vx300s_6_wrist" name="vx300s_right_6_wrist" />
                                 <body name="vx300s_right_gripper_link" pos="0.069744 0 0">
                                     <body name="vx300s_right_camera_focus" pos="0.15 0 0.01">
-                                        <site pos="0 0 0" size="0.01" type="sphere" name="right_cam_focus" rgba="0 0 1 0"/>
+                                        <site pos="0 0 0" size="0.01" type="sphere" name="right_cam_focus" rgba="0 0 1 0" group="3"/>
                                     </body>
-                                    <site pos="0.15 0 0" size="0.003 0.003 0.03" type="box" name="cali_right_site1" rgba="0 0 1 0"/>
-                                    <site pos="0.15 0 0" size="0.003 0.03 0.003" type="box" name="cali_right_site2" rgba="0 0 1 0"/>
-                                    <site pos="0.15 0 0" size="0.03 0.003 0.003" type="box" name="cali_right_site3" rgba="0 0 1 0"/>
+                                    <site pos="0.15 0 0" size="0.003 0.003 0.03" type="box" name="cali_right_site1" rgba="0 0 1 0" group="3"/>
+                                    <site pos="0.15 0 0" size="0.003 0.03 0.003" type="box" name="cali_right_site2" rgba="0 0 1 0" group="3"/>
+                                    <site pos="0.15 0 0" size="0.03 0.003 0.003" type="box" name="cali_right_site3" rgba="0 0 1 0" group="3"/>
                                     <!-- <camera name="right_wrist" pos="-0.1 0 0.16" fovy="20" mode="targetbody" target="vx300s_right_camera_focus"/> -->
                                     <inertial pos="0.0395662 -2.56311e-07 0.00400649" quat="0.62033 0.619916 -0.339682 0.339869" mass="0.251652" diaginertia="0.000689546 0.000650316 0.000468142" />
                                     <joint name="vx300s_right_wrist_rotate" pos="0 0 0" axis="1 0 0" limited="true" range="-3.14158 3.14158" frictionloss="30" />
@@ -152,9 +177,9 @@
 
     </actuator>
 
-    <keyframe>
+    <!-- <keyframe>
         <key qpos="0 -0.96 1.16 0 -0.3 0 0.024 -0.024  0 -0.96 1.16 0 -0.3 0 0.024 -0.024  0.2 0.5 0.05 1 0 0 0"/>
-    </keyframe>
+    </keyframe> -->
 
 
 </mujoco>

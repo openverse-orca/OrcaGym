@@ -417,16 +417,23 @@ class OrcaGymLocal(OrcaGymBase):
         self._qpos_cache[:] = self._mjData.qpos
         self._qvel_cache[:] = self._mjData.qvel
         self._qacc_cache[:] = self._mjData.qacc
-        # print("qpos_cache: ", len(self._qpos_cache))
-        # print("qvel_cache: ", len(self._qvel_cache))
-        # print("qacc_cache: ", len(self._qacc_cache))
-
-        qfrc_bias = self.query_qfrc_bias()
-        
+        qfrc_bias = self.query_qfrc_bias()        
         self.data.update_qpos_qvel_qacc(self._qpos_cache, self._qvel_cache, self._qacc_cache)        
         self.data.update_qfrc_bias(qfrc_bias)
-
         self.data.time = self._mjData.time
+        # print("data: ", self.data.qpos, self.data.qvel, self.data.qacc, self.data.qfrc_bias, self.data.time)
+        
+    def update_data_external(self, qpos, qvel, qacc, qfrc_bias, time):
+        """
+        Cooperate with the external environment.
+        Update the data for rendering in orcagym environment.
+        """
+        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
+        self.data.update_qfrc_bias(qfrc_bias)
+        self.data.time = time
+        
+        # print("data: ", self.data.qpos, self.data.qvel, self.data.qacc, self.data.qfrc_bias, self.data.time)
+    
     
     def query_qfrc_bias(self):
         qfrc_bias = self._mjData.qfrc_bias

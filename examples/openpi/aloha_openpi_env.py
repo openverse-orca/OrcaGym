@@ -3,7 +3,7 @@ import numpy as np
 from openpi_client import image_tools
 from openpi_client.runtime import environment as _environment
 from typing_extensions import override
-
+import cv2
 
 
 class AlohaOpenpiEnv(_environment.Environment):
@@ -46,9 +46,18 @@ class AlohaOpenpiEnv(_environment.Environment):
 
     def _convert_observation(self, gym_obs: dict) -> dict:
         img = gym_obs["pixels"]["top"]
-        img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
+        
+        # print("img: ", img)
+        
+        # img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
+        img = cv2.resize(img, (224, 224))
+        
+        # print("resized img: ", img)
+        
         # Convert axis order from [H, W, C] --> [C, H, W]
         img = np.transpose(img, (2, 0, 1))
+        
+        print("transposed img: ", img)
 
         return {
             "state": gym_obs["agent_pos"],
