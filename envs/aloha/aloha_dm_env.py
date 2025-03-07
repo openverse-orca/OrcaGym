@@ -70,6 +70,7 @@ class AlohaDMEnv(gym.Env):
                 dtype=np.float64,
             )
         elif self.obs_type == "pixels":
+            print("obs_type: pixels")
             self.observation_space = spaces.Dict(
                 {
                     "top": spaces.Box(
@@ -81,6 +82,7 @@ class AlohaDMEnv(gym.Env):
                 }
             )
         elif self.obs_type == "pixels_agent_pos":
+            print("obs_type: pixels_agent_pos")
             self.observation_space = spaces.Dict(
                 {
                     "pixels": spaces.Dict(
@@ -203,6 +205,7 @@ class AlohaDMEnv(gym.Env):
         # TODO(rcadene): do not use global variable for this
         if self.task == "transfer_cube":
             BOX_POSE[0] = sample_box_pose(seed)  # used in sim reset
+            BOX_POSE[1] = sample_box_pose(seed)  # used in sim reset
         elif self.task == "insertion":
             BOX_POSE[0] = np.concatenate(sample_insertion_pose(seed))  # used in sim reset
         else:

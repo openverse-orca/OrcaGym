@@ -9,7 +9,11 @@ import cv2
 class AlohaOpenpiEnv(_environment.Environment):
     """An environment for an Aloha robot in simulation."""
 
-    def __init__(self, env_id: str, obs_type: str = "pixels_agent_pos", seed: int = 0) -> None:
+    def __init__(self, 
+                 env_id: str, 
+                 obs_type: str = "pixels_agent_pos", 
+                 prompt: str = "Transfer cube",
+                 seed: int = 0) -> None:
         np.random.seed(seed)
         self._rng = np.random.default_rng(seed)
 
@@ -18,6 +22,7 @@ class AlohaOpenpiEnv(_environment.Environment):
         self._last_obs = None
         self._done = True
         self._episode_reward = 0.0
+        self._prompt = prompt
 
     @override
     def reset(self) -> None:
@@ -56,4 +61,5 @@ class AlohaOpenpiEnv(_environment.Environment):
         return {
             "state": gym_obs["agent_pos"],
             "images": {"cam_high": img},
+            "prompt": self._prompt,
         }

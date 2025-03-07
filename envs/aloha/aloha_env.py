@@ -123,13 +123,13 @@ class AlohaEnv(OrcaGymLocalEnv):
             joint = self.gym._mjModel.joint(joint_id)
             joint.frictionloss[0] = JOINT_FRIC_LOSS[joint_name]
         
-        for joint_name in self._arm_gripper_joint_names:
-            joint = self.model.get_joint_byname(joint_name)
-            print("joint: ", joint)
+        # for joint_name in self._arm_gripper_joint_names:
+        #     joint = self.model.get_joint_byname(joint_name)
+        #     print("joint: ", joint)
             
-        for body_name in self._arm_gripper_body_name:
-            body = self.model.get_body_byname(body_name)
-            print("body: ", body)
+        # for body_name in self._arm_gripper_body_name:
+        #     body = self.model.get_body_byname(body_name)
+        #     print("body: ", body)
         
     @property
     def agent_name(self):

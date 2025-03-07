@@ -28,7 +28,10 @@
             <site pos="0 0 0" size="0.01" type="sphere" name="midair" rgba="1 0 0 0" group="3"/>
         </body>
 
-        <camera name="top" pos="0 0.6 0.8" euler="3.1416 0 0" user="7070 7071" fovy="78"/>
+        <body name="camera_pos" pos="0 0.6 0.8" euler="3.1416 0 0" >
+            <camera name="top" pos="0 0. 0." user="7070 7071" fovy="78"/>
+            <site pos="0 0 0" size="0.01" type="sphere" name="camera_top_site" rgba="1 0 0 0" group="3"/>
+        </body>
 
         <body name="vx300s_left" pos="-0.469 0.5 0">
             <geom quat="0.707107 0 0 0.707107" type="mesh" mesh="vx300s_1_base" name="vx300s_left_1_base" contype="0" conaffinity="0"/>
@@ -149,10 +152,16 @@
 
 
 
-        <body name="box" pos="0.2 0.5 0.05">
+        <body name="red_box" pos="0.2 0.5 0.05">
             <joint name="red_box_joint" type="free" frictionloss="0.01" />
             <inertial pos="0 0 0" mass="0.05" diaginertia="0.002 0.002 0.002" />
-            <geom condim="4" solimp="2 1 0.01" solref="0.01 1" friction="1 0.005 0.0001" pos="0 0 0" size="0.02 0.02 0.02" type="box" name="red_box" rgba="1 0 0 1" />
+            <geom condim="4" solimp="2 1 0.01" solref="0.01 1" friction="1 0.005 0.0001" pos="0 0 0" size="0.02 0.02 0.02" type="box" name="red_box" rgba="0 0 1 1" />
+        </body>
+
+        <body name="blue_box" pos="0 0.5 0.05">
+            <joint name="blue_box_joint" type="free" frictionloss="0.01" />
+            <inertial pos="0 0 0" mass="0.05" diaginertia="0.002 0.002 0.002" />
+            <geom condim="4" solimp="2 1 0.01" solref="0.01 1" friction="1 0.005 0.0001" pos="0 0 0" size="0.02 0.02 0.02" type="box" name="blue_box" rgba="0 0 1 1" />
         </body>
 
     </worldbody>

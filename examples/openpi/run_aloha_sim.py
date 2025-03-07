@@ -62,7 +62,8 @@ class Args:
     agent_name: str = "bimanual_viperx_transfer_cube_usda"
     record_time: int = 20
     task: str = "transfer_cube"
-    obs_type: str = "pixels"
+    obs_type: str = "pixels_agent_pos"
+    prompt: str = "Transfer cube"
 
     action_horizon: int = 10
 
@@ -96,6 +97,7 @@ def main(args: Args) -> None:
         environment=_env.AlohaOpenpiEnv(
             env_id=env_id,
             seed=args.seed,
+            prompt=args.prompt,
         ),
         agent=_policy_agent.PolicyAgent(
             policy=action_chunk_broker.ActionChunkBroker(

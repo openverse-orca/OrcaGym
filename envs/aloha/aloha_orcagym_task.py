@@ -1,6 +1,7 @@
 import collections
 
-from gym_aloha.tasks.sim import TransferCubeTask
+from gym_aloha.tasks.sim import TransferCubeTask, START_ARM_POSE, BOX_POSE
+import numpy as np
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from orca_gym.sensor.rgbd_camera import CameraWrapper
 from dm_control.mujoco.engine import Physics
@@ -36,6 +37,9 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         而是需要将mujoco的数据传递给orcagym_env，然后渲染orcagym_env
         """
         super().after_step(physics)
+        
+        print("Physics step, time=", physics.time())
+        
         data = physics.data
         self._orcagym_env.gym.update_data_external(data.qpos, data.qvel, data.qacc, data.qfrc_bias, data.time)
         self._orcagym_env.render()
@@ -45,3 +49,16 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         
         
         return
+    
+    def initialize_episode(self, physics):
+        """Sets the state of the environment at the start of each episode."""
+        # TODO Notice: this function does not randomize the env configuration. Instead, set BOX_POSE from outside
+        # reset qpos, control and box position
+        with physics.reset_context():
+            physics.named.data.qpos[:16] = START_ARM_POSE
+            np.copyto(physics.data.ctrl, START_ARM_POSE)
+            assert BOX_POSE[0] is not None and BOX_POSE[1] is not None
+            physics.named.data.qpos[-7:] = BOX_POSE[0]
+            physics.named.data.qpos[-7 * 2 : -7] = BOX_POSE[1]
+            # print(f"{BOX_POSE=}")
+        super().initialize_episode(physics)    
