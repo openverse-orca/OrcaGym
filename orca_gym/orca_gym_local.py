@@ -54,10 +54,13 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
 
-    async def init_simulation(self):
-
+    async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
-        # print("Model XML Path: ", model_xml_path)
+        await self.process_xml_file(model_xml_path)
+        return model_xml_path
+
+    async def init_simulation(self, model_xml_path):
+        print("Model XML Path: ", model_xml_path)
 
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
@@ -108,18 +111,35 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.UpdateLocalEnv(request)
         return response
     
-    def process_xml_node(self, node : ET.Element):
+    async def load_content_file(self, content_file_name):
+        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
+        response = await self.stub.LoadContentFile(request)
+
+        if response.status != mjc_message_pb2.LoadContentFileResponse.SUCCESS:
+            raise Exception("Load content file failed.")
+
+        content = response.content
+        if content is None or len(content) == 0:
+            raise Exception("Content is empty.")
+        
+        content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        async with aiofiles.open(content_file_path, 'wb') as f:
+            await f.write(content)
+
+        return
+
+    async def process_xml_node(self, node : ET.Element):
         if node.tag == 'mesh':
-            file = node.get('file')
-            if file is not None:
-                file_path = os.path.join(self.xml_file_dir, file)
-                if not os.path.exists(file_path):
+            content_file_name = node.get('file')
+            if content_file_name is not None:
+                content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+                if not os.path.exists(content_file_path):
                     # 下载文件
-                    print("Download file: ", file_path)
-                    # download_file(file_path)
+                    print("Load content file: ", content_file_name)
+                    await self.load_content_file(content_file_name)
         else:
             for child in node:
-                self.process_xml_node(child)
+                await self.process_xml_node(child)
         return
 
     @property
@@ -129,14 +149,14 @@ class OrcaGymLocal(OrcaGymBase):
         os.makedirs(save_dir, exist_ok=True)
         return save_dir
 
-    def process_xml_file(self, file_path):
+    async def process_xml_file(self, file_path):
         # 读取xml文件
         with open(file_path, 'r') as f:
             xml_content = f.read()
 
         # 解析xml文件，检查涉及到外部文件的节点，读取file属性，检查文件是否存在，如果不存在则下载
         root = ET.fromstring(xml_content)
-        self.process_xml_node(root)
+        await self.process_xml_node(root)
         return
 
     async def load_local_env(self):
@@ -166,9 +186,6 @@ class OrcaGymLocal(OrcaGymBase):
             # 异步写入文件（使用aiofiles）
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(xml_content)
-
-        # 解析xml文件，检查涉及到外部文件的节点，读取file属性，检查文件是否存在，如果不存在则下载
-        self.process_xml_file(file_path)
         
         # 返回绝对路径
         return os.path.abspath(file_path)

@@ -9,6 +9,7 @@ service GrpcService {
   rpc LoadKeyFrame (LoadKeyFrameRequest) returns (LoadKeyFrameResponse);
   rpc UpdateLocalEnv (UpdateLocalEnvRequest) returns (UpdateLocalEnvResponse);
   rpc LoadLocalEnv (LoadLocalEnvRequest) returns (LoadLocalEnvResponse);
+  rpc LoadContentFile (LoadContentFileRequest) returns (LoadContentFileResponse);
 
 
   // 配置查询
@@ -969,4 +970,18 @@ message LoadLocalEnvResponse {
     }
     Status status = 3; // 添加状态码字段
     string error_message = 4; // 错误详情（可选）
+}
+
+message LoadContentFileRequest {
+    string file_name = 1;
+}
+
+message LoadContentFileResponse {
+    bytes content = 1; // 使用bytes类型存储文件内容
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 2; // 添加状态码字段
+    string error_message = 3; // 错误详情（可选）
 }

@@ -53,17 +53,28 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
         print(f"Initializing simulation: Class: {self.__class__.__name__}")
-        self.loop.run_until_complete(self._initialize_orca_sim())
+        model_xml_path = self.loop.run_until_complete(self._load_model_xml())
+        self.loop.run_until_complete(self._initialize_orca_sim(model_xml_path))
         model = self.gym.model
         data = self.gym.data
         return model, data
+    
+    async def _load_model_xml(self):
+        model_xml_path = await self.gym.load_model_xml()
+        return model_xml_path
 
-    async def _initialize_orca_sim(self):
-        await self.gym.init_simulation()
+    async def _initialize_orca_sim(self, model_xml_path):
+        await self.gym.init_simulation(model_xml_path)
         return
 
     def initialize_grpc(self):
-        self.channel = grpc.aio.insecure_channel(self.orcagym_addr)
+        self.channel = grpc.aio.insecure_channel(
+            self.orcagym_addr,
+            options=[
+                ('grpc.max_receive_message_length', 1024 * 1024 * 1024),
+                ('grpc.max_send_message_length', 1024 * 1024 * 1024),
+            ]
+        )
         self.stub = GrpcServiceStub(self.channel)
         self.gym = OrcaGymLocal(self.stub)
     
