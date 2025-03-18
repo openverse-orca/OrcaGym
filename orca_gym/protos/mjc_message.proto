@@ -952,8 +952,21 @@ message UpdateLocalEnvRequest{
 
 message UpdateLocalEnvResponse{}
 
-message LoadLocalEnvRequest {}
+message LoadLocalEnvRequest {
+    enum ReqType {
+        XML_FILE_NAME = 0;
+        XML_FILE_CONTENT = 1;
+    }
+    ReqType req_type = 1;
+}
 
-message LoadLocalEnvResponse{
-    string xml_path = 1;
+message LoadLocalEnvResponse {
+    string file_name = 1;   // 返回文件名
+    bytes xml_content = 2; // 使用bytes类型存储文件内容
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 3; // 添加状态码字段
+    string error_message = 4; // 错误详情（可选）
 }

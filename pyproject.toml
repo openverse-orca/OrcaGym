@@ -26,7 +26,8 @@ dependencies = [
     "mujoco>=3.3.0",
     "tqdm",
     "av",
-    "opencv-python"
+    "opencv-python",
+    aiofiles,
 ]
 
 # 可选依赖，可用于开发调试、测试、格式化代码等用途

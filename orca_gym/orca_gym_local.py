@@ -1,12 +1,14 @@
 import sys
 import os
 import grpc
+import aiofiles
+import xml.etree.ElementTree as ET
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 proto_path = os.path.abspath(os.path.join(current_dir, "protos"))
 sys.path.append(proto_path)
-import mjc_message_pb2
-import mjc_message_pb2_grpc
+import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
+import orca_gym.protos.mjc_message_pb2_grpc as mjc_message_pb2_grpc
 
 import numpy as np
 import scipy.linalg
@@ -106,10 +108,70 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.UpdateLocalEnv(request)
         return response
     
+    def process_xml_node(self, node : ET.Element):
+        if node.tag == 'mesh':
+            file = node.get('file')
+            if file is not None:
+                file_path = os.path.join(self.xml_file_dir, file)
+                if not os.path.exists(file_path):
+                    # 下载文件
+                    print("Download file: ", file_path)
+                    # download_file(file_path)
+        else:
+            for child in node:
+                self.process_xml_node(child)
+        return
+
+    @property
+    def xml_file_dir(self):
+        user_home = os.path.expanduser('~')  # 自动适配Windows/Linux/Mac
+        save_dir = os.path.join(user_home, '.orcagym', 'tmp')
+        os.makedirs(save_dir, exist_ok=True)
+        return save_dir
+
+    def process_xml_file(self, file_path):
+        # 读取xml文件
+        with open(file_path, 'r') as f:
+            xml_content = f.read()
+
+        # 解析xml文件，检查涉及到外部文件的节点，读取file属性，检查文件是否存在，如果不存在则下载
+        root = ET.fromstring(xml_content)
+        self.process_xml_node(root)
+        return
+
     async def load_local_env(self):
+        # 第一步：先获取文件名
         request = mjc_message_pb2.LoadLocalEnvRequest()
+        request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_NAME
         response = await self.stub.LoadLocalEnv(request)
-        return response.xml_path
+
+        if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+            raise Exception("Load local env failed.")
+
+        # 文件存储在指定路径
+        file_name = response.file_name
+        file_path = os.path.join(self.xml_file_dir, file_name)
+
+        # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
+        if not os.path.exists(file_path):
+            request = mjc_message_pb2.LoadLocalEnvRequest()
+            request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
+            response = await self.stub.LoadLocalEnv(request)
+
+            if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+                raise Exception("Load local env failed.")
+
+            xml_content = response.xml_content
+            
+            # 异步写入文件（使用aiofiles）
+            async with aiofiles.open(file_path, 'wb') as f:
+                await f.write(xml_content)
+
+        # 解析xml文件，检查涉及到外部文件的节点，读取file属性，检查文件是否存在，如果不存在则下载
+        self.process_xml_file(file_path)
+        
+        # 返回绝对路径
+        return os.path.abspath(file_path)
 
     def set_time_step(self, time_step):
         self._timestep = time_step
