@@ -4,9 +4,3 @@
 [submodule "envs/openloong/external/Openloong-dyn-control"]
 	path = envs/openloong/external/Openloong-dyn-control
 	url = git@github.com:openverse-orca/Openloong-dyn-control.git
-[submodule "3rd_party/gym_aloha"]
-	path = 3rd_party/gym_aloha
-	url = git@github.com:openverse-orca/gym-aloha.git
-[submodule "3rd_party/lerobot"]
-	path = 3rd_party/lerobot
-	url = git@github.com:openverse-orca/lerobot.git
