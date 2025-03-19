@@ -211,7 +211,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             }
         return site_dict
     
-    def query_site_pos_and_quat(self, site_names):
+    def query_site_pos_and_quat(self, site_names) -> Dict[str, Dict[str, Union[NDArray[np.float64], NDArray[np.float64]]]]:
         query_dict = self.gym.query_site_pos_and_mat(site_names)
         site_dict = {}
         for site in query_dict:
@@ -227,7 +227,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_joint_qvel(self, joint_qvel):
         self.gym.set_joint_qvel(joint_qvel)
     
-    def query_site_xvalp_xvalr(self, site_names):
+    def query_site_xvalp_xvalr(self, site_names) -> Tuple[Dict[str, NDArray[np.float64]], Dict[str, NDArray[np.float64]]]:
         query_dict = self.gym.mj_jac_site(site_names)
         xvalp_dict = {}
         xvalr_dict = {}

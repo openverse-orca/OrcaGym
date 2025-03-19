@@ -14,7 +14,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.franka.gripper_env import GripperEnv, ControlDevice
+from envs.manipulation.gripper_env import GripperEnv, ControlDevice
 import orca_gym.utils.rotations as rotations
 
 import numpy as np
@@ -31,7 +31,7 @@ import camera_monitor
 
 
 ENV_ENTRY_POINT = {
-    "Gripper": "envs.franka.gripper_env:GripperEnv"
+    "Gripper": "envs.manipulation.gripper_env:GripperEnv"
 }
 
 TIME_STEP = 0.005

@@ -379,11 +379,11 @@ if __name__ == "__main__":
     start_her_episode = args.start_her_episode
 
     if task == 'reach':
-        entry_point = 'envs.franka.reach:FrankaReachEnv'
+        entry_point = 'envs.manipulation.reach:FrankaReachEnv'
         max_episode_steps = 250
         frame_skip = FRAME_SKIP_LONG
     elif task == 'pick_and_place':
-        entry_point = 'envs.franka.pick_and_place:FrankaPickAndPlaceEnv'
+        entry_point = 'envs.manipulation.pick_and_place:FrankaPickAndPlaceEnv'
         max_episode_steps = 500
         frame_skip = FRAME_SKIP_SHORT
     else:
