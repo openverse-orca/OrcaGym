@@ -17,7 +17,7 @@ from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.manipulation.franka_env import FrankaEnv, RunMode, ControlDevice
+from envs.manipulation.openloong_env import ControlDevice, RunMode, OpenLoongEnv
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -204,14 +204,14 @@ def _get_algo_config(algo_name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='panda_mocap_moto_usda', help='The agent name to control')
+    parser.add_argument('--agent_name', type=str, default='AzureLoong', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--task', type=str, help='The task to do in the environment (pick_and_place / push / lift)')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
-    parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
-    parser.add_argument('--ctrl_device', type=str, default='xbox', help='The control device to use (xbox or keyboard)')
+    parser.add_argument('--record_length', type=int, default=3600, help='The time length in seconds to record the teleoperation in 1 episode')
+    parser.add_argument('--ctrl_device', type=str, default='vr', help='The control device to use ')
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
@@ -280,8 +280,8 @@ if __name__ == "__main__":
         print("Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
         sys.exit(1)
 
-    if args.ctrl_device == 'xbox':
-        ctrl_device = ControlDevice.XBOX
+    if args.ctrl_device == 'vr':
+        ctrl_device = ControlDevice.VR
     elif args.ctrl_device == 'keyboard':
         ctrl_device = ControlDevice.KEYBOARD
     else:
@@ -292,11 +292,11 @@ if __name__ == "__main__":
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    ports = [7070, 7090]
-    monitor_processes = []
-    for port in ports:
-        process = openloong_manipulation.start_monitor(port=port, project_root=project_root)
-        monitor_processes.append(process)
+    # ports = [7070, 7090]
+    # monitor_processes = []
+    # for port in ports:
+    #     process = openloong_manipulation.start_monitor(port=port, project_root=project_root)
+    #     monitor_processes.append(process)
 
     for config in algo_config:
         run_example(orcagym_addr, 
@@ -317,5 +317,5 @@ if __name__ == "__main__":
                     realtime_playback)
 
     # 终止 Monitor 子进程
-    for process in monitor_processes:
-        openloong_manipulation.terminate_monitor(process)
+    # for process in monitor_processes:
+    #     openloong_manipulation.terminate_monitor(process)

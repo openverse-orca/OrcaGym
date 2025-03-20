@@ -186,6 +186,11 @@ class OpenLoongEnv(RobomimicEnv):
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
+        self._setup_action_range()
+        arm_qpos_range_l = self.model.get_joint_qposrange(self._l_arm_joint_names)
+        arm_qpos_range_r = self.model.get_joint_qposrange(self._r_arm_joint_names)
+        self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
+
         NECK_NAME  = self.site("neck_center_site")
         site_dict = self.query_site_pos_and_quat([NECK_NAME])
         self._initial_neck_site_xpos = site_dict[NECK_NAME]['xpos']
@@ -236,7 +241,7 @@ class OpenLoongEnv(RobomimicEnv):
             "qvel": qvel_offsets,
         }
         self._neck_controller_config["actuator_range"] = neck_ctrl_range
-        self._neck_controller_config["policy_freq"] = self.control_freq
+        self._neck_controller_config["policy_freq"] = self._control_freq
         self._neck_controller_config["ndim"] = len(self._neck_joint_names)
         self._neck_controller_config["control_delta"] = False
 
@@ -263,7 +268,7 @@ class OpenLoongEnv(RobomimicEnv):
             "qvel": qvel_offsets,
         }
         self._r_controller_config["actuator_range"] = r_ctrl_range
-        self._r_controller_config["policy_freq"] = self.control_freq
+        self._r_controller_config["policy_freq"] = self._control_freq
         self._r_controller_config["ndim"] = len(self._r_arm_joint_names)
         self._r_controller_config["control_delta"] = False
 
@@ -293,7 +298,7 @@ class OpenLoongEnv(RobomimicEnv):
             "qvel": qvel_offsets,
         }
         self._l_controller_config["actuator_range"] = l_ctrl_range
-        self._l_controller_config["policy_freq"] = self.control_freq
+        self._l_controller_config["policy_freq"] = self._control_freq
         self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
         self._l_controller_config["control_delta"] = False
 
@@ -351,13 +356,11 @@ class OpenLoongEnv(RobomimicEnv):
         self.set_neck_mocap(self._mocap_neck_xpos, self._mocap_neck_xquat)
         self._neck_angle_x, self._neck_angle_y = 0, 0
 
-    def _is_success(self, achieved_goal, desired_goal) -> bool:
+    def _is_success(self) -> bool:
         return False
     
     def check_success(self):
-        achieved_goal = self._get_achieved_goal()
-        desired_goal = self._get_desired_goal()
-        success = self._is_success(achieved_goal, desired_goal)
+        success = self._is_success()
         # print("achieved goal: ", achieved_goal, "desired goal: ", desired_goal, "success: ", success)
         return {"task": success}
 
@@ -387,20 +390,12 @@ class OpenLoongEnv(RobomimicEnv):
 
         obs = self._get_obs().copy()
 
-        obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
-        object = np.concatenate([obj_xpos, obj_xquat]).flatten()
-        goal_xpos, goal_xquat = self._query_goal_pos_and_quat()
-        goal = np.concatenate([goal_xpos, goal_xquat]).flatten()
-
-        info = {"state": self.get_state(), "action": scaled_action, "object" : object, "goal": goal}
+        info = {"state": self.get_state(), "action": scaled_action}
         terminated = self._is_success()
         truncated = False
-        reward = self._compute_reward(achieved_goal, desired_goal, info)
+        reward = self._compute_reward(info)
 
         return obs, reward, terminated, truncated, info
-
-
-
 
     def get_state(self) -> dict:
         state = {
@@ -411,29 +406,9 @@ class OpenLoongEnv(RobomimicEnv):
             "ctrl": self.ctrl.copy(),
         }
         return state
-    
-    def _set_gripper_ctrl_l(self, state) -> None:
-        GRIPPER_SPEED = self.realtime_step * 0.05  # 0.05 m/s
-        if self._ctrl_device == ControlDevice.XBOX:
-            if (state["buttons"]["B"]):
-                self.ctrl[7] += GRIPPER_SPEED
-                self.ctrl[8] += GRIPPER_SPEED
-            elif (state["buttons"]["A"]):
-                self.ctrl[7] -= GRIPPER_SPEED
-                self.ctrl[8] -= GRIPPER_SPEED
-        elif self._ctrl_device == ControlDevice.KEYBOARD:
-            if (state["Z"]):
-                self.ctrl[7] += GRIPPER_SPEED
-                self.ctrl[8] += GRIPPER_SPEED
-            elif (state["X"]):
-                self.ctrl[7] -= GRIPPER_SPEED
-                self.ctrl[8] -= GRIPPER_SPEED
-
-        self.ctrl[7] = np.clip(self.ctrl[7], self._ctrl_range_min[7], self._ctrl_range_max[7])
-        self.ctrl[8] = np.clip(self.ctrl[8], self._ctrl_range_min[8], self._ctrl_range_max[8])
 
 
-    def _teleoperation_action(self) -> np.ndarray:
+    def _teleoperation_action(self) -> tuple:
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
 
         if self._pico_joystick is not None:
@@ -443,7 +418,7 @@ class OpenLoongEnv(RobomimicEnv):
             self._process_pico_joystick_operation()
             # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
         else:
-            return
+            return self.ctrl.copy(), np.zeros(14)
 
 
         # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
@@ -474,11 +449,22 @@ class OpenLoongEnv(RobomimicEnv):
         for i in range(len(self._l_arm_actuator_id)):
             self.ctrl[self._l_arm_actuator_id[i]] = ctrl[i]
         
-        return self.ctrl.copy(), action_l, action_r
+        return self.ctrl.copy(), np.concatenate([action_l, [self._grasp_value_l], action_r, [self._grasp_value_r]]).flatten()
 
     def _playback_action(self, action) -> np.ndarray:
         assert(len(action) == self.action_space.shape[0])
         
+        action_l = action[:7]
+        action_r = action[7:14]
+
+        self._l_controller.set_goal(action_l)
+        self.ctrl[0:7] = self._l_controller.run_controller()
+        
+
+        self._r_controller.set_goal(action_r)
+        self.ctrl[10:17] = self._r_controller.run_controller()
+        self.ctrl[17:19] = action[13:15]
+
         self._controller.set_goal(action)
         self.ctrl[0:7] = self._controller.run_controller()      
         self.ctrl[7:9] = action[6:8]
@@ -601,9 +587,7 @@ class OpenLoongEnv(RobomimicEnv):
         return reward
     
     def _compute_reward_success(self) -> float:
-        achieved_goal = self._achieved_goal
-        desired_goal = self._desired_goal
-        return 1 if self._is_success(achieved_goal, desired_goal) else 0
+        return 1 if self._is_success() else 0
 
     def _setup_reward_functions(self, reward_type : RewardType) -> None:
         if reward_type == RewardType.SPARSE:
@@ -619,10 +603,8 @@ class OpenLoongEnv(RobomimicEnv):
         else:
             raise ValueError("Invalid reward type: ", reward_type)
         
-    def _compute_reward(self, achieved_goal, desired_goal, info) -> float:
+    def _compute_reward(self, info) -> float:
         total_reward = 0.0
-        self._achieved_goal = achieved_goal
-        self._desired_goal = desired_goal
 
         for reward_function in self._reward_functions:
             if reward_function["coeff"] == 0:
@@ -636,24 +618,32 @@ class OpenLoongEnv(RobomimicEnv):
         return total_reward
         
     
-    def _setup_action_range(self, finger_range) -> None:
+    def _setup_action_range(self) -> None:
         # 支持的动作范围空间，遥操作时不能超过这个范围
         # 模型接收的是 [-1, 1] 的动作空间，这里是真实的物理空间，需要进行归一化
-        # action range: [x, y, z, yaw, pitch, roll, finger1, finger2]
-        self._action_range = np.array([[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],
-                                 [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi],
-                                 finger_range[0], finger_range[1]], dtype=np.float32)
+        self._action_range = np.array(
+            [
+                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # left hand ee pos
+                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # left hand ee angle euler
+                [0.0, 1.0],                                        # left hand grasp value
+                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # right hand ee pos
+                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # right hand ee angle euler
+                [0.0, 1.0],                                        # right hand grasp value
+             ]
+            , dtype=np.float32
+            )
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
 
-    def _setup_obs_scale(self, arm_qpos_range, gripper_qpos_range) -> None:
+    def _setup_obs_scale(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
         # 观测空间范围
         ee_xpos_scale = np.array([max(abs(act_range[0]), abs(act_range[1])) for act_range in self._action_range[:3]], dtype=np.float32)   # 末端位置范围
         ee_xquat_scale = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)   # 裁剪到 -pi, pi 的单位四元数范围
         max_ee_linear_vel = 2.0  # 末端线速度范围 m/s
         max_ee_angular_vel = np.pi # 末端角速度范围 rad/s
 
-        arm_qpos_scale = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range], dtype=np.float32)  # 关节角度范围
+        arm_qpos_scale_l = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range_l], dtype=np.float32)  # 关节角度范围
+        arm_qpos_scale_r = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range_r], dtype=np.float32)  # 关节角度范围
         max_arm_joint_vel = np.pi  # 关节角速度范围 rad/s
                 
         self._obs_scale = {
@@ -667,15 +657,15 @@ class OpenLoongEnv(RobomimicEnv):
             "ee_vel_linear_r": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
             "ee_vel_angular_r": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
 
-            "arm_joint_qpos_l": 1.0 / arm_qpos_scale,
-            "arm_joint_qpos_sin_l": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "arm_joint_qpos_cos_l": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "arm_joint_vel_l": np.ones(len(arm_qpos_scale), dtype=np.float32) / max_arm_joint_vel,
+            "arm_joint_qpos_l": 1.0 / arm_qpos_scale_l,
+            "arm_joint_qpos_sin_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32),
+            "arm_joint_qpos_cos_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32),
+            "arm_joint_vel_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32) / max_arm_joint_vel,
 
-            "arm_joint_qpos_r": 1.0 / arm_qpos_scale,
-            "arm_joint_qpos_sin_r": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "arm_joint_qpos_cos_r": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "arm_joint_vel_r": np.ones(len(arm_qpos_scale), dtype=np.float32) / max_arm_joint_vel,
+            "arm_joint_qpos_r": 1.0 / arm_qpos_scale_r,
+            "arm_joint_qpos_sin_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32),
+            "arm_joint_qpos_cos_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32),
+            "arm_joint_vel_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32) / max_arm_joint_vel,
 
             "grasp_value_l": np.ones(1, dtype=np.float32),
             "grasp_value_r": np.ones(1, dtype=np.float32),       
@@ -880,53 +870,6 @@ class OpenLoongEnv(RobomimicEnv):
         self._set_gripper_ctrl_r(joystick_state)
         self._set_gripper_ctrl_l(joystick_state)
         self._set_head_ctrl(joystick_state)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def reset_model(self) -> tuple[dict, dict]:

@@ -60,7 +60,7 @@ class OrcaGymLocal(OrcaGymBase):
         return model_xml_path
 
     async def init_simulation(self, model_xml_path):
-        print("Model XML Path: ", model_xml_path)
+        # print("Model XML Path: ", model_xml_path)
 
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
