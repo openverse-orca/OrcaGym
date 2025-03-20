@@ -199,6 +199,7 @@ class OpenLoongEnv(RobomimicEnv):
         site_dict = self.query_site_pos_and_quat([self._ee_site_l])
         self._initial_grasp_site_xpos = site_dict[self._ee_site_l]['xpos']
         self._initial_grasp_site_xquat = site_dict[self._ee_site_l]['xquat']
+        self._grasp_value_l = 0.0
 
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
@@ -206,6 +207,7 @@ class OpenLoongEnv(RobomimicEnv):
         site_dict = self.query_site_pos_and_quat([self._ee_site_r])
         self._initial_grasp_site_xpos_r = site_dict[self._ee_site_r]['xpos']
         self._initial_grasp_site_xquat_r = site_dict[self._ee_site_r]['xquat']
+        self._grasp_value_r = 0.0
 
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         
@@ -313,16 +315,6 @@ class OpenLoongEnv(RobomimicEnv):
         scaled_action_range = np.ones(self._action_range.shape, dtype=np.float32)
         self.action_space = self.generate_action_space(scaled_action_range)
 
-    def _reset_grasp_mocap(self) -> None:
-        self._saved_xpos = self._initial_grasp_site_xpos.copy()
-        self._saved_xquat = self._initial_grasp_site_xquat.copy()
-        
-        # if self._run_mode == RunMode.TELEOPERATION:
-        self._set_grasp_mocap(self._saved_xpos, self._saved_xquat)
-        # else:
-        #     xpos = self._initial_grasp_site_xpos + np.array([0.0, 0.0, -100])
-        #     self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
-
     def get_env_version(self):
         return OpenLoongEnv.ENV_VERSION
 
@@ -332,9 +324,7 @@ class OpenLoongEnv(RobomimicEnv):
         { str: bool } with at least a "task" key for the overall task success,
         and additional optional keys corresponding to other task criteria.
         """        
-        achieved_goal = self._get_achieved_goal()
-        desired_goal = self._get_desired_goal()
-        success = self._is_success(achieved_goal, desired_goal)
+        success = self._is_success()
         return {"task": success}
     
     def render_callback(self, mode='human') -> None:
@@ -362,8 +352,7 @@ class OpenLoongEnv(RobomimicEnv):
         self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def _is_success(self, achieved_goal, desired_goal) -> bool:
-        success_threshold = 0.03
-        return np.linalg.norm(achieved_goal - desired_goal) < success_threshold
+        return False
     
     def check_success(self):
         achieved_goal = self._get_achieved_goal()
@@ -397,16 +386,14 @@ class OpenLoongEnv(RobomimicEnv):
         self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
         obs = self._get_obs().copy()
-        achieved_goal = self._get_achieved_goal()
-        desired_goal = self._get_desired_goal()
-        
+
         obj_xpos, obj_xquat = self._query_obj_pos_and_quat()
         object = np.concatenate([obj_xpos, obj_xquat]).flatten()
         goal_xpos, goal_xquat = self._query_goal_pos_and_quat()
         goal = np.concatenate([goal_xpos, goal_xquat]).flatten()
 
         info = {"state": self.get_state(), "action": scaled_action, "object" : object, "goal": goal}
-        terminated = self._is_success(achieved_goal, desired_goal)
+        terminated = self._is_success()
         truncated = False
         reward = self._compute_reward(achieved_goal, desired_goal, info)
 
@@ -425,7 +412,7 @@ class OpenLoongEnv(RobomimicEnv):
         }
         return state
     
-    def _set_gripper_ctrl(self, state) -> None:
+    def _set_gripper_ctrl_l(self, state) -> None:
         GRIPPER_SPEED = self.realtime_step * 0.05  # 0.05 m/s
         if self._ctrl_device == ControlDevice.XBOX:
             if (state["buttons"]["B"]):
@@ -503,72 +490,11 @@ class OpenLoongEnv(RobomimicEnv):
         self._set_grasp_mocap(mocap_xpos, mocap_xquat)
         
         return self.ctrl.copy()
-
-
-    def _process_controller(self, mocap_xpos, mocap_xquat) -> tuple[np.ndarray, np.ndarray]:
-        if self._ctrl_device == ControlDevice.XBOX:
-            self._joystick_manager.update()
-            pos_ctrl_dict = self._joystick.capture_joystick_pos_ctrl()
-            rot_ctrl_dict = self._joystick.capture_joystick_rot_ctrl()
-            self._set_gripper_ctrl(self._joystick.get_state())
-        elif self._ctrl_device == ControlDevice.KEYBOARD:
-            self._keyboard.update()
-            pos_ctrl_dict = self._keyboard.capture_keyboard_pos_ctrl()
-            rot_ctrl_dict = self._keyboard.capture_keyboard_rot_ctrl()
-            self._set_gripper_ctrl(self._keyboard.get_state())
-        pos_ctrl = np.array([pos_ctrl_dict['y'], pos_ctrl_dict['x'], pos_ctrl_dict['z']])
-        rot_ctrl = np.array([rot_ctrl_dict['yaw'], rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
-
-        # 考虑到手柄误差，只有输入足够的控制量，才移动mocap点
-        CTRL_MIN = 0.20000000
-        if np.linalg.norm(pos_ctrl) < CTRL_MIN and np.linalg.norm(rot_ctrl) < CTRL_MIN:
-            return mocap_xpos, mocap_xquat
-
-        mocap_xmat = rotations.quat2mat(mocap_xquat)
-
-        # 平移控制
-        MOVE_SPEED = self.realtime_step * 0.2   # 0.2 m/s
-        mocap_xpos = mocap_xpos + np.dot(mocap_xmat, pos_ctrl) * MOVE_SPEED
-        mocap_xpos[2] = np.max((0, mocap_xpos[2]))  # 确保在地面以上
-
-        # 旋转控制
-        ROUTE_SPEED = self.realtime_step * np.pi / 2  # 90 degree/s    
-        rot_offset = rot_ctrl * ROUTE_SPEED
-        new_xmat = self.calc_rotate_matrix(rot_offset[0], rot_offset[1], rot_offset[2])
-        mocap_xquat = rotations.mat2quat(np.dot(mocap_xmat, new_xmat))
-
-        return mocap_xpos, mocap_xquat
     
-
-    def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
-        # x = yaw, y = pitch, z = roll
-        R_yaw = np.array([
-            [1, 0, 0],
-            [0, np.cos(yaw), -np.sin(yaw)],
-            [0, np.sin(yaw), np.cos(yaw)]
-        ])
-
-        R_pitch = np.array([
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ])
-
-        R_roll = np.array([
-            [np.cos(roll), -np.sin(roll), 0],
-            [np.sin(roll), np.cos(roll), 0],
-            [0, 0, 1]
-        ])
-
-        new_xmat = np.dot(R_yaw, np.dot(R_pitch, R_roll))
-        return new_xmat
 
     def _get_obs(self) -> dict:
         ee_sites = self.query_site_pos_and_quat([self._ee_site_l, self._ee_site_r])
         ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self._ee_site_l, self._ee_site_r])
-        
-        gripper_qpos = self._get_gripper_qpos()
-        gripper_qvel = self._get_gripper_qvel()
 
         arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
         arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
@@ -596,53 +522,11 @@ class OpenLoongEnv(RobomimicEnv):
             "arm_joint_qpos_cos_r": np.cos(arm_joint_values_r).flatten().astype(np.float32),
             "arm_joint_vel_r": arm_joint_velocities_r.flatten().astype(np.float32),
 
-
-            "gripper_qpos": gripper_qpos.flatten().astype(np.float32),
-            "gripper_qvel": gripper_qvel.flatten().astype(np.float32),
+            "grasp_value_l": np.array([self._grasp_value_l], dtype=np.float32),
+            "grasp_value_r": np.array([self._grasp_value_r], dtype=np.float32),
         }
         scaled_obs = {key : self._obs[key] * self._obs_scale[key] for key in self._obs.keys()}
         return scaled_obs
-
-
-
-
-    def _get_obs(self) -> dict:
-        # robot
-        EE_NAME = self.site("ee_center_site")
-        ee_position = self.query_site_pos_and_quat([EE_NAME])[EE_NAME]['xpos'].copy()
-        ee_xvalp, _ = self.query_site_xvalp_xvalr([EE_NAME])
-        ee_velocity = ee_xvalp[EE_NAME].copy() * self.dt
-
-
-        achieved_goal = np.zeros(3, dtype=np.float32)
-        desired_goal = self.goal.copy()
-        obs = np.concatenate(
-                [
-                    ee_position,
-                    ee_velocity,
-                    np.zeros(1),
-                ], dtype=np.float32).copy()            
-        result = {
-            "observation": obs,
-            "achieved_goal": achieved_goal,
-            "desired_goal": desired_goal,
-        }
-        return result
-
-
-
-
-
-
-    def _get_achieved_goal(self) -> np.ndarray:
-        obj_xpos, _ = self._query_obj_pos_and_quat()
-        # print("achieved goal position: ", obj_xpos)
-        return obj_xpos
-    
-    def _get_desired_goal(self) -> np.ndarray:
-        goal_xpos, _ = self._query_goal_pos_and_quat()
-        # print("desired goal position: ", goal_xpos)
-        return goal_xpos
 
     def reset_model(self) -> tuple[dict, dict]:
         """
@@ -652,36 +536,17 @@ class OpenLoongEnv(RobomimicEnv):
         # print("Reset model")
         
         self._set_init_state()
-        self._reset_grasp_mocap()
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
+        self._reset_gripper()
 
-        obj_xpos, obj_xquat, goal_xpos, goal_xquat = self.sample_obj_goal(self._initial_obj_site_xpos,
-                                                                          self._initial_obj_site_xquat,
-                                                                          self._initial_goal_site_xpos,
-                                                                          self._initial_goal_site_xquat,
-                                                                          self._sample_range)
-        
-        self.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
+        self._reset_neck_mocap()
+        self.mj_forward()      
         obs = self._get_obs().copy()
         return obs, {}
-    
-    def replace_obj_goal(self, obj_xpos, obj_xquat, goal_xpos, goal_xquat) -> None:
-        self._set_obj_qpos(obj_xpos, obj_xquat)
-        self._set_goal_mocap(goal_xpos, goal_xquat)
-        self.mj_forward()
 
     # custom methods
     # -----------------------------
-    def _set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("panda_mocap"): {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
-
-    def _set_obj_qpos(self, position, orientation) -> None:
-        obj_qpos = {self._obj_joint_name: np.concatenate([position, orientation])}
-        self.set_joint_qpos(obj_qpos)
-        
-    def _set_goal_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self._goal_name: {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def _set_joint_neutral(self) -> None:
         # assign value to arm joints
@@ -693,80 +558,6 @@ class OpenLoongEnv(RobomimicEnv):
         for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])
         self.set_joint_qpos(arm_joint_qpos)
-
-
-    def sample_obj_goal(self, init_obj_xpos, init_obj_xquat, init_goal_xpos, init_goal_xquat, sample_range) -> tuple:
-        """
-        随机采样一个物体位置和目标位置
-        """
-        # print("Sample obj and goal position, range: ", sample_range)        
-        if sample_range > 0:
-            contacted = True
-            object_offset = sample_range
-            goal_offset = sample_range
-            rotate_offset = np.pi / sample_range
-            while contacted:
-                obj_xpos = init_obj_xpos.copy()
-                obj_xquat = init_obj_xquat.copy()
-                goal_xpos = init_goal_xpos.copy()
-                goal_xquat = init_goal_xquat.copy()
-
-                # 如果是push任务，则按照50%概率交换物体和目标位置，增加足够的多样性, 否则固定物体位置
-                if np.random.uniform() < 0.5 and self._task == Task.PUSH:
-                    obj_xpos = init_goal_xpos.copy()
-                    obj_xquat = init_goal_xquat.copy()
-                    goal_xpos = init_obj_xpos.copy()
-                    goal_xquat = init_obj_xquat.copy()
-                
-                
-                obj_euler = rotations.quat2euler(obj_xquat)
-                obj_xpos[0] = np.random.uniform(-object_offset, object_offset) + obj_xpos[0]
-                obj_xpos[1] = np.random.uniform(-object_offset, object_offset) + obj_xpos[1]
-                obj_euler[2] = np.random.uniform(-rotate_offset, rotate_offset)
-                obj_xquat = rotations.euler2quat(obj_euler)
-
-                goal_euler = rotations.quat2euler(goal_xquat)
-                goal_xpos[0] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[0]
-                goal_xpos[1] = np.random.uniform(-goal_offset, goal_offset) + goal_xpos[1]
-                goal_euler[2] = np.random.uniform(-rotate_offset, rotate_offset)
-                goal_xquat = rotations.euler2quat(goal_euler)
-
-                contacted = self._is_success(obj_xpos, goal_xpos)
-        else:
-            # 固定采样，物体位置固定不变
-            obj_xpos = init_obj_xpos.copy()
-            obj_xquat = init_obj_xquat.copy()
-            goal_xpos = init_goal_xpos.copy()
-            goal_xquat = init_goal_xquat.copy()
-            
-        # 任务不同，目标位置也不同
-        if self._task == Task.LIFT:
-            goal_xpos = obj_xpos.copy()
-            goal_xpos[2] += 0.1
-            goal_xquat = obj_xquat.copy()
-        elif self._task == Task.PICK_AND_PLACE:
-            goal_xpos = self._initial_box_site_xpos.copy()
-            goal_xquat = self._initial_box_site_xquat.copy()
-
-        return obj_xpos, obj_xquat, goal_xpos, goal_xquat
-
-    def _get_ee_xform(self) -> np.ndarray:
-        pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site")])
-        xpos = pos_dict[self.site("ee_center_site")]['xpos'].copy()
-        xmat = pos_dict[self.site("ee_center_site")]['xmat'].copy().reshape(3, 3)
-        return xpos, xmat
-
-    def _get_gripper_qpos(self) -> np.ndarray:
-        qpos_dict = self.query_joint_qpos([self.joint("finger_joint1"), self.joint("finger_joint2")])
-        finger1 = qpos_dict[self.joint("finger_joint1")]
-        finger2 = qpos_dict[self.joint("finger_joint2")]
-        return np.concatenate([finger1, finger2], dtype=np.float32)
-    
-    def _get_gripper_qvel(self) -> np.ndarray:
-        qvel_dict = self.query_joint_qvel([self.joint("finger_joint1"), self.joint("finger_joint2")])
-        finger1 = qvel_dict[self.joint("finger_joint1")]
-        finger2 = qvel_dict[self.joint("finger_joint2")]
-        return np.concatenate([finger1, finger2], dtype=np.float32)
     
     def _get_arm_joint_values(self, joint_names) -> np.ndarray:
         qpos_dict = self.query_joint_qpos(joint_names)
@@ -864,32 +655,36 @@ class OpenLoongEnv(RobomimicEnv):
 
         arm_qpos_scale = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range], dtype=np.float32)  # 关节角度范围
         max_arm_joint_vel = np.pi  # 关节角速度范围 rad/s
-        
-        gripper_qpos_scale = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in gripper_qpos_range], dtype=np.float32)  # 夹爪角度范围
-        max_gripper_vel = 1.0  # 夹爪角速度范围 m/s
                 
         self._obs_scale = {
-            "object": 1.0 / np.concatenate([ee_xpos_scale, ee_xquat_scale], dtype=np.float32).flatten(),  # 物体位置和四元数，保持和末端位置一致
-            "ee_pos": 1.0 / ee_xpos_scale,
-            "ee_quat": 1.0 / ee_xquat_scale,
-            "ee_vel_linear": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
-            "ee_vel_angular": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
-            "joint_qpos": 1.0 / arm_qpos_scale,
-            "joint_qpos_sin": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "joint_qpos_cos": np.ones(len(arm_qpos_scale), dtype=np.float32),
-            "joint_vel": np.ones(len(arm_qpos_scale), dtype=np.float32) / max_arm_joint_vel,
-            "gripper_qpos": 1.0 / gripper_qpos_scale,
-            "gripper_qvel": np.ones(len(gripper_qpos_scale), dtype=np.float32) / max_gripper_vel,
+            "ee_pos_l": 1.0 / ee_xpos_scale,
+            "ee_quat_l": 1.0 / ee_xquat_scale,
+            "ee_pos_r": 1.0 / ee_xpos_scale,
+            "ee_quat_r": 1.0 / ee_xquat_scale,
+
+            "ee_vel_linear_l": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
+            "ee_vel_angular_l": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
+            "ee_vel_linear_r": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
+            "ee_vel_angular_r": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
+
+            "arm_joint_qpos_l": 1.0 / arm_qpos_scale,
+            "arm_joint_qpos_sin_l": np.ones(len(arm_qpos_scale), dtype=np.float32),
+            "arm_joint_qpos_cos_l": np.ones(len(arm_qpos_scale), dtype=np.float32),
+            "arm_joint_vel_l": np.ones(len(arm_qpos_scale), dtype=np.float32) / max_arm_joint_vel,
+
+            "arm_joint_qpos_r": 1.0 / arm_qpos_scale,
+            "arm_joint_qpos_sin_r": np.ones(len(arm_qpos_scale), dtype=np.float32),
+            "arm_joint_qpos_cos_r": np.ones(len(arm_qpos_scale), dtype=np.float32),
+            "arm_joint_vel_r": np.ones(len(arm_qpos_scale), dtype=np.float32) / max_arm_joint_vel,
+
+            "grasp_value_l": np.ones(1, dtype=np.float32),
+            "grasp_value_r": np.ones(1, dtype=np.float32),       
         }
         
         # print("obs scale: ", self._obs_scale)
 
     def close(self):
         self._pico_joystick.close()
-
-
-
-
 
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()
@@ -960,7 +755,22 @@ class OpenLoongEnv(RobomimicEnv):
         # 更新头部位置
         self.set_neck_mocap(mocap_neck_xpos, self._mocap_neck_xquat)
 
-    def _set_gripper_ctrl(self, joystick_state) -> None:
+    def _set_l_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._l_hand_actuator_id:
+            actuator_name = self.model.actuator_id2name(actuator_id)
+            if actuator_name == self.actuator("M_zbll_J3"):
+                offset_dir = -1
+            else:
+                offset_dir = 1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self.ctrl[actuator_id] = np.clip(
+                self.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
+            
+    def _set_gripper_ctrl_l(self, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
         offset_rate_clip_adjust_rate = 0.1  # 10% per second
         if joystick_state["leftHand"]["secondaryButtonPressed"]:
@@ -976,10 +786,13 @@ class OpenLoongEnv(RobomimicEnv):
         adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
         offset_rate = -adjusted_value
         offset_rate = np.clip(offset_rate, -1, self._l_gripper_offset_rate_clip)
-
-        for actuator_id in self._l_hand_actuator_id:
+        self._set_l_hand_actuator_ctrl(offset_rate)
+        self._grasp_value_l = offset_rate
+            
+    def _set_r_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._r_hand_actuator_id:
             actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbll_J3"):
+            if actuator_name == self.actuator("M_zbr_J2") or actuator_name == self.actuator("M_zbr_J3"):
                 offset_dir = -1
             else:
                 offset_dir = 1
@@ -1006,20 +819,8 @@ class OpenLoongEnv(RobomimicEnv):
         adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
         offset_rate = -adjusted_value
         offset_rate = np.clip(offset_rate, -1, self._r_gripper_offset_rate_clip)
-
-        for actuator_id in self._r_hand_actuator_id:
-            actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbr_J2") or actuator_name == self.actuator("M_zbr_J3"):
-                offset_dir = -1
-            else:
-                offset_dir = 1
-
-            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
-            self.ctrl[actuator_id] = np.clip(
-                self.ctrl[actuator_id],
-                self._all_ctrlrange[actuator_id][0],
-                self._all_ctrlrange[actuator_id][1])
+        self._set_r_hand_actuator_ctrl(offset_rate)
+        self._grasp_value_r = offset_rate
 
  
     def _processe_pico_joystick_move(self):
@@ -1077,7 +878,7 @@ class OpenLoongEnv(RobomimicEnv):
             return
 
         self._set_gripper_ctrl_r(joystick_state)
-        self._set_gripper_ctrl(joystick_state)
+        self._set_gripper_ctrl_l(joystick_state)
         self._set_head_ctrl(joystick_state)
 
 

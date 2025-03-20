@@ -18,3 +18,9 @@
 *.HDF5 filter=lfs diff=lfs merge=lfs -text
 *.EXR filter=lfs diff=lfs merge=lfs -text
 *.exr filter=lfs diff=lfs merge=lfs -text
+*.USDC filter=lfs diff=lfs merge=lfs -text
+*.usdc filter=lfs diff=lfs merge=lfs -text
+*.usdz filter=lfs diff=lfs merge=lfs -text
+*.USDZ filter=lfs diff=lfs merge=lfs -text
+*.USD filter=lfs diff=lfs merge=lfs -text
+*.usd filter=lfs diff=lfs merge=lfs -text

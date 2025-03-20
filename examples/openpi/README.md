@@ -1,15 +1,15 @@
 首先获取 openpi 相关的第三方代码：
 
 ```bash
+git clone git@github.com:openverse-orca/OrcaGym_Openpi.git
 git submodule update --init --recursive
+export PROJECT_HOME={你的OrcaGym_Openpi目录}
 ```
 
 然后以开发模式安装 openpi 相关的第三方代码：
 
 
 ```bash
-export PROJECT_HOME=你的OrcaGym目录
-
 cd $PROJECT_HOME/3rd_party/openpi
 pip install -e .
 
@@ -39,7 +39,7 @@ INFO:websockets.server:server listening on 0.0.0.0:8000
 然后在另一个终端中运行：
 
 ```bash
-export PROJECT_HOME=你的OrcaGym目录
+export PROJECT_HOME={你的OrcaGym_Openpi目录}
 conda activate orca
 cd $PROJECT_HOME/3rd_party/openpi
 MUJOCO_GL=egl python examples/aloha_sim/main.py
