@@ -384,13 +384,14 @@ class OpenLoongEnv(RobomimicEnv):
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
 
-        r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
-        l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
-        self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
+        if self._run_mode == RunMode.TELEOPERATION:
+            r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
+            l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
+            self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
         obs = self._get_obs().copy()
 
-        info = {"state": self.get_state(), "action": scaled_action}
+        info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3)}
         terminated = self._is_success()
         truncated = False
         reward = self._compute_reward(info)
@@ -432,9 +433,7 @@ class OpenLoongEnv(RobomimicEnv):
         self._r_controller.set_goal(action_r)
         ctrl = self._r_controller.run_controller()
         # print("ctrl r: ", ctrl)
-        for i in range(len(self._r_arm_actuator_id)):
-            self.ctrl[self._r_arm_actuator_id[i]] = ctrl[i]
-
+        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
 
         mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
                                                                    mocap_l_xquat[2], 
@@ -446,34 +445,34 @@ class OpenLoongEnv(RobomimicEnv):
         self._l_controller.set_goal(action_l)
         ctrl = self._l_controller.run_controller()
         # print("ctrl l: ", ctrl)
-        for i in range(len(self._l_arm_actuator_id)):
-            self.ctrl[self._l_arm_actuator_id[i]] = ctrl[i]
+        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
         
         return self.ctrl.copy(), np.concatenate([action_l, [self._grasp_value_l], action_r, [self._grasp_value_r]]).flatten()
+
+    def _set_arm_ctrl(self, arm_actuator_id, ctrl) -> None:
+        for i in range(len(arm_actuator_id)):
+            self.ctrl[arm_actuator_id[i]] = ctrl[i]
+
 
     def _playback_action(self, action) -> np.ndarray:
         assert(len(action) == self.action_space.shape[0])
         
-        action_l = action[:7]
-        action_r = action[7:14]
+        action_l = action[:6]
+        action_r = action[7:13]
 
         self._l_controller.set_goal(action_l)
-        self.ctrl[0:7] = self._l_controller.run_controller()
-        
+        ctrl = self._l_controller.run_controller()
+        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
+
+        self._grasp_value_l = action[6]
+        self._set_l_hand_actuator_ctrl(self._grasp_value_l)
 
         self._r_controller.set_goal(action_r)
-        self.ctrl[10:17] = self._r_controller.run_controller()
-        self.ctrl[17:19] = action[13:15]
+        ctrl = self._r_controller.run_controller()
+        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
 
-        self._controller.set_goal(action)
-        self.ctrl[0:7] = self._controller.run_controller()      
-        self.ctrl[7:9] = action[6:8]
-
-        mocap_xpos = action[:3]
-        axisangle = action[3:6]
-        quat = transform_utils.axisangle2quat(axisangle)
-        mocap_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])
-        self._set_grasp_mocap(mocap_xpos, mocap_xquat)
+        self._grasp_value_r = action[13]
+        self._set_r_hand_actuator_ctrl(self._grasp_value_r)
         
         return self.ctrl.copy()
     
@@ -518,7 +517,7 @@ class OpenLoongEnv(RobomimicEnv):
         """
         Reset the environment, return observation
         """
-        
+        # self.reset_simulation()
         # print("Reset model")
         
         self._set_init_state()
@@ -625,10 +624,10 @@ class OpenLoongEnv(RobomimicEnv):
             [
                 [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # left hand ee pos
                 [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # left hand ee angle euler
-                [0.0, 1.0],                                        # left hand grasp value
+                [-1.0, 0.0],                                        # left hand grasp value
                 [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # right hand ee pos
                 [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # right hand ee angle euler
-                [0.0, 1.0],                                        # right hand grasp value
+                [-1.0, 0.0],                                        # right hand grasp value
              ]
             , dtype=np.float32
             )
@@ -674,7 +673,8 @@ class OpenLoongEnv(RobomimicEnv):
         # print("obs scale: ", self._obs_scale)
 
     def close(self):
-        self._pico_joystick.close()
+        if hasattr(self, "_pico_joystick") and self._pico_joystick is not None:
+            self._pico_joystick.close()
 
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()

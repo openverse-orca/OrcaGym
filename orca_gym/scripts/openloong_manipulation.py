@@ -242,12 +242,6 @@ def reset_playback_env(env : OpenLoongEnv, demo_data, sample_range=0.0):
     init_goal_xpos = goal_data[0][0:3]
     init_goal_xquat = goal_data[0][3:7]
     
-    obj_xpos, obj_xquat, goal_xpos, goal_xquat = env.unwrapped.sample_obj_goal(init_obj_xpos, init_obj_xquat, init_goal_xpos, init_goal_xquat, sample_range)
-    
-    # print("Resetting object position: ", obj_xpos, obj_xquat, goal_xquat)
-    
-    env.unwrapped.replace_obj_goal(obj_xpos, obj_xquat, goal_xpos, goal_xquat)
-    
     # print("Resetting object position: ", obj_xpos, obj_xquat)
     
 def do_playback(env : OpenLoongEnv, 

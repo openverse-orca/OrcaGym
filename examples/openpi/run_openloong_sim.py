@@ -165,7 +165,7 @@ def run_example(orcagym_addr : str,
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
 
-    except KeyboardInterrupt:
+    finally:
         print("Simulation stopped")        
         if run_mode == "teleoperation":
             dataset_writer.finalize()
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
-    parser.add_argument('--record_length', type=int, default=3600, help='The time length in seconds to record the teleoperation in 1 episode')
+    parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
     parser.add_argument('--ctrl_device', type=str, default='vr', help='The control device to use ')
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
@@ -267,7 +267,7 @@ if __name__ == "__main__":
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"./records_tmp/Franka_{task}_{formatted_now}.hdf5"
+            record_path = f"./records_tmp/OpenLoong_{task}_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
@@ -282,8 +282,6 @@ if __name__ == "__main__":
 
     if args.ctrl_device == 'vr':
         ctrl_device = ControlDevice.VR
-    elif args.ctrl_device == 'keyboard':
-        ctrl_device = ControlDevice.KEYBOARD
     else:
         print("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
