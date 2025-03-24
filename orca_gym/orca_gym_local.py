@@ -60,14 +60,11 @@ class OrcaGymLocal(OrcaGymBase):
         return model_xml_path
 
     async def init_simulation(self, model_xml_path):
-        # print("Model XML Path: ", model_xml_path)
-
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
 
         size_model = mujoco.mj_sizeModel(self._mjModel)
         print("size_model: ", size_model)
-
 
         # Update the timestep setting form the env parameter.
         self.set_opt_timestep(self._timestep)
@@ -129,7 +126,7 @@ class OrcaGymLocal(OrcaGymBase):
         return
 
     async def process_xml_node(self, node : ET.Element):
-        if node.tag == 'mesh':
+        if node.tag == 'mesh' or node.tag == 'hfield':
             content_file_name = node.get('file')
             if content_file_name is not None:
                 content_file_path = os.path.join(self.xml_file_dir, content_file_name)
@@ -171,7 +168,7 @@ class OrcaGymLocal(OrcaGymBase):
         # 文件存储在指定路径
         file_name = response.file_name
         file_path = os.path.join(self.xml_file_dir, file_name)
-
+        
         # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
         if not os.path.exists(file_path):
             request = mjc_message_pb2.LoadLocalEnvRequest()
@@ -180,6 +177,8 @@ class OrcaGymLocal(OrcaGymBase):
 
             if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
                 raise Exception("Load local env failed.")
+            
+            print("Load xml from remote: ", file_name)
 
             xml_content = response.xml_content
             
