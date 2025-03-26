@@ -245,7 +245,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         }
         return result
 
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         obs = self._get_obs().copy()
         return obs, {}
 

@@ -15,13 +15,13 @@ LeggedEnvConfig = {
     "phy_low" : {
         "iterations" : 10,
         "noslip_iterations" : 0,
-        "mpr_iterations" : 0,
+        "ccd_iterations" : 0,
         "sdf_iterations" : 0,
     },
     "phy_high" : {
         "iterations" : 100,
         "noslip_iterations" : 10,
-        "mpr_iterations" : 50,
+        "ccd_iterations" : 50,
         "sdf_iterations" : 10,  
     },
     "phy_config" : "phy_high",

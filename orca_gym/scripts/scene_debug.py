@@ -4,25 +4,17 @@ import time
 import subprocess
 import signal
 
-current_file_path = os.path.abspath('')
-project_root = os.path.dirname(os.path.dirname(current_file_path))
 
 # if project_root not in sys.path:
 #     sys.path.append(project_root)
 
-
+from typing import Any, Dict
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.franka.gripper_env import GripperEnv, ControlDevice
-from examples.imitation.train_policy import train_policy
-from examples.imitation.test_policy import create_env, rollout
-from orca_gym.utils.dir_utils import create_tmp_dir
-from robomimic.utils.file_utils import maybe_dict_from_checkpoint
-from robomimic.utils.train_utils import run_rollout
+from envs.manipulation.gripper_env import GripperEnv, ControlDevice
 import orca_gym.utils.rotations as rotations
 
 import numpy as np
@@ -34,27 +26,12 @@ import time
 import subprocess
 import signal
 
-
-from typing import Any, Dict
-import gymnasium as gym
-from gymnasium.envs.registration import register
-from datetime import datetime
-from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
-from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.franka.franka_env import FrankaEnv, RunMode, ControlDevice
-from examples.imitation.train_policy import train_policy
-from examples.imitation.test_policy import create_env, rollout
-from orca_gym.utils.dir_utils import create_tmp_dir
-from robomimic.utils.file_utils import maybe_dict_from_checkpoint
-import orca_gym.utils.rotations as rotations
-
 import numpy as np
 import camera_monitor
 
 
 ENV_ENTRY_POINT = {
-    "Gripper": "envs.franka.gripper_env:GripperEnv"
+    "Gripper": "envs.manipulation.gripper_env:GripperEnv"
 }
 
 TIME_STEP = 0.005
@@ -157,7 +134,7 @@ if __name__ == "__main__":
     ports = [7090]
     monitor_processes = []
     for port in ports:
-        process = camera_monitor.start_monitor(port=port, project_root=project_root)
+        process = camera_monitor.start_monitor(port=port)
         monitor_processes.append(process)
 
     run_example(orcagym_addr, 

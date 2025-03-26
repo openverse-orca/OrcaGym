@@ -297,11 +297,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         phy_config = LeggedEnvConfig["phy_config"]
         self.gym.opt.iterations = LeggedEnvConfig[phy_config]["iterations"]
         self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
-        self.gym.opt.mpr_iterations = LeggedEnvConfig[phy_config]["mpr_iterations"]
+        self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
         self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
         self.gym.set_opt_config()
 
-        print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.mpr_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)
+        print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)
 
     def _update_no_action_ctrl(self) -> None:
         ctrl = []
