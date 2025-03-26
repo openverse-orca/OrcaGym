@@ -178,7 +178,7 @@ class OrcaGymLocal(OrcaGymBase):
             if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
                 raise Exception("Load local env failed.")
             
-            print("Load xml from remote: ", file_name)
+            # print("Load xml from remote: ", file_name)
 
             xml_content = response.xml_content
             

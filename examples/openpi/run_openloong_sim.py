@@ -88,7 +88,7 @@ def run_example(orcagym_addr : str,
 
             openloong_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
                                                  cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
-                                                 language_instruction="pick up brown box, lift it up for 10cm.")
+                                                 language_instruction="pick up the apple.")
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
@@ -240,8 +240,12 @@ if __name__ == "__main__":
     realtime_playback = args.realtime_playback
     
     if args.save_rgb:
-        RGB_SIZE = (128, 128)
-        CAMERA_CONFIG = {"camera_primary": 7090, "camera_wrist": 7070}
+        RGB_SIZE = (320, 240)
+        CAMERA_CONFIG = {
+            "camera_head": 7070, 
+            # "camera_wrist_r": 7080,
+            # "camera_wrist_l": 7090,
+        }
         ACTION_STEP = 5
     else:
         RGB_SIZE = None
@@ -290,11 +294,11 @@ if __name__ == "__main__":
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    # ports = [7070, 7090]
-    # monitor_processes = []
-    # for port in ports:
-    #     process = openloong_manipulation.start_monitor(port=port, project_root=project_root)
-    #     monitor_processes.append(process)
+    ports = [7070, 7080, 7090]
+    monitor_processes = []
+    for port in ports:
+        process = openloong_manipulation.start_monitor(port=port, project_root=project_root)
+        monitor_processes.append(process)
 
     for config in algo_config:
         run_example(orcagym_addr, 
@@ -315,5 +319,5 @@ if __name__ == "__main__":
                     realtime_playback)
 
     # 终止 Monitor 子进程
-    # for process in monitor_processes:
-    #     openloong_manipulation.terminate_monitor(process)
+    for process in monitor_processes:
+        openloong_manipulation.terminate_monitor(process)

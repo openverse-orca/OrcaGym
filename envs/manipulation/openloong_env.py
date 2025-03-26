@@ -41,6 +41,16 @@ class Task:
     Enum class for task
     """
     PICK_AND_PLACE = "pick_and_place"
+    
+class TaskStatus:
+    """
+    Enum class for task status
+    """
+    NOT_STARTED = "not_started"
+    GET_READY = "get_ready"
+    BEGIN = "begin"
+    SUCCESS = "success"
+    FAILURE = "failure"
 
 
 class OpenLoongEnv(RobomimicEnv):
@@ -340,6 +350,7 @@ class OpenLoongEnv(RobomimicEnv):
 
     def _set_init_state(self) -> None:
         # print("Set initial state")
+        self._task_status = TaskStatus.NOT_STARTED
         self._set_joint_neutral()
 
         self.ctrl = np.zeros(self.nu)       
@@ -357,7 +368,7 @@ class OpenLoongEnv(RobomimicEnv):
         self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def _is_success(self) -> bool:
-        return False
+        return self._task_status == TaskStatus.END
     
     def check_success(self):
         success = self._is_success()
@@ -391,7 +402,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         obs = self._get_obs().copy()
 
-        info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3)}
+        info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3), "task_status": self._task_status}
         terminated = self._is_success()
         truncated = False
         reward = self._compute_reward(info)
@@ -691,6 +702,22 @@ class OpenLoongEnv(RobomimicEnv):
             compose_force += np.linalg.norm(force[:3])
         return compose_force
 
+    def _set_task_status(self, joystick_state) -> None:
+        if self._task_status == TaskStatus.NOT_STARTED and joystick_state["leftHand"]["gripButtonPressed"]:
+            self._task_status = TaskStatus.GET_READY
+            
+        if self._task_status == TaskStatus.GET_READY and not joystick_state["rightHand"]["gripButtonPressed"]:
+            print("Start to record task....")            
+            self._task_status = TaskStatus.BEGIN
+            
+        if self._task_status == TaskStatus.BEGIN and joystick_state["leftHand"]["gripButtonPressed"]:
+            print("Task failed....")
+            self._task_status = TaskStatus.FAILURE
+        
+        if self._task_status == TaskStatus.BEGIN and joystick_state["rightHand"]["gripButtonPressed"]:
+            print("Task success....")
+            self._task_status = TaskStatus.SUCCESS
+
     def _set_head_ctrl(self, joystick_state) -> None:
         x_axis = joystick_state["rightHand"]["joystickPosition"][0]
         if x_axis == 0:
@@ -866,10 +893,14 @@ class OpenLoongEnv(RobomimicEnv):
         joystick_state = self._pico_joystick.get_key_state()
         if joystick_state is None:
             return
+        
+        # print("Josytick state: ", joystick_state)
 
         self._set_gripper_ctrl_r(joystick_state)
         self._set_gripper_ctrl_l(joystick_state)
         self._set_head_ctrl(joystick_state)
+        self._set_task_status(joystick_state)
+        
 
 
     def reset_model(self) -> tuple[dict, dict]:

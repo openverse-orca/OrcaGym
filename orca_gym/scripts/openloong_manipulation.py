@@ -18,6 +18,7 @@ from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
 from robomimic.utils.file_utils import maybe_dict_from_checkpoint
 import orca_gym.utils.rotations as rotations
+from envs.manipulation.openloong_env import TaskStatus
 
 import numpy as np
 
@@ -99,25 +100,25 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
         start_time = datetime.now()
 
         action = env.action_space.sample()
-  
         obs, reward, terminated, truncated, info = env.step(action)
-        
         env.render()
+        task_status = info['task_status']
         
         action_step_taken += 1
         if action_step_taken >= action_step:        
             action_step_taken = 0
-            for obs_key, obs_data in obs.items():
-                obs_list[obs_key].append(obs_data)
+            if task_status in [TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.BEGIN]:
+                for obs_key, obs_data in obs.items():
+                    obs_list[obs_key].append(obs_data)
+                    
+                reward_list.append(reward)
+                done_list.append(0 if not terminated else 1)
+                info_list.append(info)
+                terminated_times = terminated_times + 1 if terminated else 0
                 
-            reward_list.append(reward)
-            done_list.append(0 if not terminated else 1)
-            info_list.append(info)
-            terminated_times = terminated_times + 1 if terminated else 0
-            
-            for camera in cameras:
-                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
-                camera_frames[camera.name].append(camera_frame)
+                for camera in cameras:
+                    camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                    camera_frames[camera.name].append(camera_frame)
                 
             # print("Timestep: ", env.unwrapped.gym.data.time)
             timestep_list.append(env.unwrapped.gym.data.time)
