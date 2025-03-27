@@ -36,7 +36,7 @@ def run_example(orcagym_addr : str,
                 agent_name : str, 
                 record_path : str, 
                 run_mode : str, 
-                task : str,
+                task_instruction : str,
                 algo_config : str,
                 ctrl_device : str, 
                 max_episode_steps : int, 
@@ -52,12 +52,12 @@ def run_example(orcagym_addr : str,
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
-            task = dataset_reader.get_env_kwargs()["task"]    
+            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]    
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]        
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
+            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task_instruction, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -68,7 +68,7 @@ def run_example(orcagym_addr : str,
             env_name = "OpenLoong"
             env_index = 0
             camera_config = CAMERA_CONFIG
-            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
+            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task_instruction, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)        
@@ -88,18 +88,18 @@ def run_example(orcagym_addr : str,
 
             openloong_manipulation.do_teleoperation(env, dataset_writer, teleoperation_rounds, 
                                                  cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=ACTION_STEP,
-                                                 language_instruction="pick up the apple.")
+                                                 language_instruction=task_instruction)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
             
         elif run_mode == "imitation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            task = dataset_reader.get_env_kwargs()["task"]
+            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]       
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
+            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task_instruction, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -120,11 +120,11 @@ def run_example(orcagym_addr : str,
             env_index = 0
             
             env_kwargs = env_meta["env_kwargs"]
-            task = env_kwargs["task"]  
+            task_instruction = env_kwargs["task_instruction"]  
             camera_config = env_kwargs["camera_config"]
             sample_range = env_kwargs["sample_range"]
             
-            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
+            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task_instruction, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
             
             env, policy = create_env(ckpt_path)
@@ -141,11 +141,11 @@ def run_example(orcagym_addr : str,
         elif run_mode == "augmentation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            task = dataset_reader.get_env_kwargs()["task"]
+            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
+            env_id, kwargs = openloong_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task_instruction, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -206,11 +206,11 @@ if __name__ == "__main__":
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_name', type=str, default='AzureLoong', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
-    parser.add_argument('--task', type=str, help='The task to do in the environment (pick_and_place / push / lift)')
+    parser.add_argument('--task', type=str, help='The task instruction to do teleoperation')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')
     parser.add_argument('--model_file', type=str, help='The model file to load for rollout the policy')
-    parser.add_argument('--record_length', type=int, default=20, help='The time length in seconds to record the teleoperation in 1 episode')
+    parser.add_argument('--record_length', type=int, default=1200, help='The time length in seconds to record the teleoperation in 1 episode')
     parser.add_argument('--ctrl_device', type=str, default='vr', help='The control device to use ')
     parser.add_argument('--playback_mode', type=str, default='random', help='The playback mode of the environment (loop or random)')
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     record_path = args.dataset
     playback_mode = args.playback_mode
     run_mode = args.run_mode
-    task = args.task
+    task_instruction = args.task
     algo = args.algo
     rollout_times = args.rollout_times
     ckpt_path = args.model_file
@@ -252,6 +252,7 @@ if __name__ == "__main__":
         CAMERA_CONFIG = {}
         ACTION_STEP = 1    
     
+    assert task_instruction is not None, "The task instruction should not be None."
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
     assert sample_range >= 0.0, "The sample range should be greater than or equal to 0."
@@ -264,14 +265,11 @@ if __name__ == "__main__":
     
     algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
     
-    if run_mode == "teleoperation":
-        if task is None:
-            task = "pick_and_place"
-            
+    if run_mode == "teleoperation":            
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"./records_tmp/OpenLoong_{task}_{formatted_now}.hdf5"
+            record_path = f"./records_tmp/OpenLoong_{task_instruction}_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
@@ -305,7 +303,7 @@ if __name__ == "__main__":
                     agent_name, 
                     record_path, 
                     run_mode, 
-                    task,
+                    task_instruction,
                     config,
                     ctrl_device, 
                     max_episode_steps, 

@@ -12,7 +12,7 @@ from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.manipulation.openloong_env import OpenLoongEnv, ControlDevice, Task
+from envs.manipulation.openloong_env import OpenLoongEnv, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -37,7 +37,7 @@ def register_env(orcagym_addr : str,
                  env_index : int, 
                  agent_name : str, 
                  run_mode : str, 
-                 task : str, 
+                 task_instruction : str, 
                  ctrl_device : str, 
                  max_episode_steps : int,
                  sample_range : float,
@@ -52,7 +52,7 @@ def register_env(orcagym_addr : str,
                 'agent_names': agent_names, 
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
-                'task': task,
+                'task_instruction': task_instruction,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
                 'sample_range': sample_range,
@@ -180,9 +180,12 @@ def do_teleoperation(env,
     
     while True:
         obs_list, reward_list, done_list, info_list, camera_frames, timestep_list = teleoperation_episode(env, cameras, rgb_size, action_step)
-        task_result = "Success" if done_list[-1] == 1 else "Failed"
-        save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
+        task_result = "Success" if len(done_list) > 0 and done_list[-1] == 1 else "Failed"
+        # save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
+        save_record = task_result == "Success"
+        exit_program = False
         if save_record:
+            print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
             
             if obs_camera:
@@ -193,6 +196,8 @@ def do_teleoperation(env,
                 add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, language_instruction)
             else:
                 add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
+            
+        time.sleep(2)
         if exit_program or current_round > teleoperation_rounds:
             break
         

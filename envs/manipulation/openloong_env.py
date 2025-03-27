@@ -36,11 +36,6 @@ class ControlDevice:
     """
     VR = "vr"
 
-class Task:
-    """
-    Enum class for task
-    """
-    PICK_AND_PLACE = "pick_and_place"
     
 class TaskStatus:
     """
@@ -75,7 +70,7 @@ class OpenLoongEnv(RobomimicEnv):
         agent_names: list,
         time_step: float,
         run_mode: RunMode,
-        task: Task,
+        task_instruction: str,
         ctrl_device: ControlDevice,
         control_freq: int,
         sample_range: float,
@@ -83,8 +78,7 @@ class OpenLoongEnv(RobomimicEnv):
     ):
 
         self._run_mode = run_mode
-        self._task = task
-        assert self._task in [Task.PICK_AND_PLACE], f"Invalid task: {self._task}"
+        self._task_instruction = task_instruction
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range
@@ -124,8 +118,8 @@ class OpenLoongEnv(RobomimicEnv):
         self._neck_joint_names = [self.joint("J_head_yaw"), self.joint("J_head_pitch")]
         self._neck_actuator_names = [self.actuator("M_head_yaw"), self.actuator("M_head_pitch")]
         self._neck_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-        self._neck_neutral_joint_values = np.array([0.0, 0.0])
-        self._neck_ctrl_values = {"yaw": 0.0, "pitch": 0.0}
+        self._neck_neutral_joint_values = np.array([0, -0.7854])
+        self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
 
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
@@ -368,12 +362,10 @@ class OpenLoongEnv(RobomimicEnv):
         self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def _is_success(self) -> bool:
-        return self._task_status == TaskStatus.END
+        return self._task_status == TaskStatus.SUCCESS
     
-    def check_success(self):
-        success = self._is_success()
-        # print("achieved goal: ", achieved_goal, "desired goal: ", desired_goal, "success: ", success)
-        return {"task": success}
+    def _is_truncated(self) -> bool:
+        return self._task_status == TaskStatus.FAILURE
 
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
@@ -404,7 +396,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3), "task_status": self._task_status}
         terminated = self._is_success()
-        truncated = False
+        truncated = self._is_truncated()
         reward = self._compute_reward(info)
 
         return obs, reward, terminated, truncated, info
@@ -535,6 +527,10 @@ class OpenLoongEnv(RobomimicEnv):
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
         self._reset_gripper()
+
+        # Tips for the operator
+        print("Task : ", self._task_instruction)
+        print("Press left hand grip button to start recording task......")
 
         self._reset_neck_mocap()
         self.mj_forward()      
@@ -706,16 +702,16 @@ class OpenLoongEnv(RobomimicEnv):
         if self._task_status == TaskStatus.NOT_STARTED and joystick_state["leftHand"]["gripButtonPressed"]:
             self._task_status = TaskStatus.GET_READY
             
-        if self._task_status == TaskStatus.GET_READY and not joystick_state["rightHand"]["gripButtonPressed"]:
-            print("Start to record task....")            
+        if self._task_status == TaskStatus.GET_READY and not joystick_state["leftHand"]["gripButtonPressed"]:
+            print("Start to record task....... Press left hand grip if task failed, press right hand grip if task success.")            
             self._task_status = TaskStatus.BEGIN
             
         if self._task_status == TaskStatus.BEGIN and joystick_state["leftHand"]["gripButtonPressed"]:
-            print("Task failed....")
+            print("Task failed!")
             self._task_status = TaskStatus.FAILURE
         
         if self._task_status == TaskStatus.BEGIN and joystick_state["rightHand"]["gripButtonPressed"]:
-            print("Task success....")
+            print("Task success!")
             self._task_status = TaskStatus.SUCCESS
 
     def _set_head_ctrl(self, joystick_state) -> None:
@@ -902,16 +898,6 @@ class OpenLoongEnv(RobomimicEnv):
         self._set_task_status(joystick_state)
         
 
-
-    def reset_model(self) -> tuple[dict, dict]:
-        self._set_init_state()
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
-        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
-        self._reset_gripper()
-        self._reset_neck_mocap()
-        self.mj_forward()      
-        obs = self._get_obs().copy()
-        return obs, {}
 
     # custom methods
     # -----------------------------
