@@ -25,6 +25,7 @@ from robomimic.utils.file_utils import maybe_dict_from_checkpoint
 from robomimic.utils.train_utils import run_rollout
 import orca_gym.utils.rotations as rotations
 import orca_gym.scripts.openloong_manipulation as openloong_manipulation
+import re
 
 import numpy as np
 import argparse
@@ -177,26 +178,12 @@ def _get_algo_config(algo_name):
         return ["config/bc.json"]
     elif algo_name == "bc_transformer":
         return ["config/bc_transformer.json"]
-    # elif algo_name == "td3_bc":
-    #     return ["config/td3_bc.json"]
-    # elif algo_name == "cql":
-    #     return ["config/cql.json"]
-    # elif algo_name == "iris":
-    #     return ["config/iris.json"]
-    # elif algo_name == "hbc":
-    #     return ["config/hbc.json"]
-    # elif algo_name == "bcq":
-    #     return ["config/bcq.json"]
-    # elif algo_name == "iql":
-    #     return ["config/iql.json"]
+    elif algo_name == "openpi":
+        return ["openpi"]
+
     elif algo_name == "all":
         return ["config/bc.json", 
-                # "config/td3_bc.json", 
-                # "config/cql.json", 
-                # "config/iris.json", 
-                # "config/hbc.json", 
-                # "config/bcq.json", 
-                # "config/iql.json",
+
                 "config/bc_transformer.json"]
     else:
         raise ValueError(f"Invalid algorithm name: {algo_name}")
@@ -252,7 +239,7 @@ if __name__ == "__main__":
         CAMERA_CONFIG = {}
         ACTION_STEP = 1    
     
-    assert task_instruction is not None, "The task instruction should not be None."
+    
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
     assert sample_range >= 0.0, "The sample range should be greater than or equal to 0."
@@ -265,11 +252,14 @@ if __name__ == "__main__":
     
     algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
     
-    if run_mode == "teleoperation":            
+    if run_mode == "teleoperation":           
+        assert task_instruction is not None, "The task instruction should not be None." 
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"./records_tmp/OpenLoong_{task_instruction}_{formatted_now}.hdf5"
+            task_format = task_instruction.replace(" ", "_")
+            task_format = re.sub(r"[,:;.?!]", "", task_format)
+            record_path = f"./records_tmp/AzureLoong_{task_format}_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
