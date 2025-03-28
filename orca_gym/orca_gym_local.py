@@ -697,11 +697,16 @@ class OrcaGymLocal(OrcaGymBase):
 
     def query_position_body_B(self, ee_body, base_body):
         base_id = self._mjModel.body(base_body).id
+        base_quat = self._mjData.body(base_id).xquat.copy()  # MuJoCo格式 [w,x,y,z]
         base_pos = self._mjData.body(base_id).xpos.copy()
 
         ee_id = self._mjModel.body(ee_body).id
         ee_pos = self._mjData.body(ee_id).xpos.copy()
-        relative_pos = ee_pos - base_pos
+
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot_inv = rot_base.inv()
+
+        relative_pos = rot_inv.apply(ee_pos - base_pos)
 
         return relative_pos
 
