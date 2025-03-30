@@ -35,6 +35,7 @@ class ControlDevice:
     Enum class for control
     """
     VR = "vr"
+    RANDOM_SAMPLE = "random_sample"
 
     
 class TaskStatus:
@@ -223,6 +224,8 @@ class OpenLoongEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             if self._ctrl_device == ControlDevice.VR:
                 self._pico_joystick = PicoJoystick()
+            elif self._ctrl_device == ControlDevice.RANDOM_SAMPLE:
+                self._pico_joystick = None
             else:
                 raise ValueError("Invalid control device: ", self._ctrl_device)
 
@@ -387,7 +390,7 @@ class OpenLoongEnv(RobomimicEnv):
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
 
-        if self._run_mode == RunMode.TELEOPERATION:
+        if self._run_mode == RunMode.TELEOPERATION and self._pico_joystick is not None:
             r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
             l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
             self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
@@ -421,6 +424,12 @@ class OpenLoongEnv(RobomimicEnv):
             self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
             self._process_pico_joystick_operation()
             # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
+        elif self._ctrl_device == ControlDevice.RANDOM_SAMPLE:
+            if self._task_status == TaskStatus.NOT_STARTED:
+                self._task_status = TaskStatus.BEGIN
+            if self._task_status == TaskStatus.BEGIN and np.random.uniform(0, 1) < 0.02:
+                self._task_status = TaskStatus.SUCCESS
+            return self.ctrl.copy(), np.random.uniform(-1.0, 1.0, 14)
         else:
             return self.ctrl.copy(), np.zeros(14)
 

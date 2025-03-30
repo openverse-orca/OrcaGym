@@ -274,6 +274,8 @@ if __name__ == "__main__":
 
     if args.ctrl_device == 'vr':
         ctrl_device = ControlDevice.VR
+    elif args.ctrl_device == 'random_sample':
+        ctrl_device = ControlDevice.RANDOM_SAMPLE
     else:
         print("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
