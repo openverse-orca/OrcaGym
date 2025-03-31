@@ -13,7 +13,7 @@ from orca_gym.robomimic.dataset_util import DatasetReader
 import dataclasses
 import argparse
 
-REPO_NAME = "orca_gym/libero"  # Name of the output dataset, also used for the Hugging Face Hub
+REPO_NAME = "orca_gym/AzureLoong"  # Name of the output dataset, also used for the Hugging Face Hub
 
 
 
@@ -38,11 +38,11 @@ def main(args) -> None:
                 "shape": (240, 320, 3),
                 "names": ["height", "width", "channel"],
             },
-            # "wrist_image": {
-            #     "dtype": "image",
-            #     "shape": (256, 256, 3),
-            #     "names": ["height", "width", "channel"],
-            # },
+            "wrist_image": {
+                "dtype": "image",
+                "shape": (240, 320, 3),
+                "names": ["height", "width", "channel"],
+            },
             "state": {
                 "dtype": "float32",
                 "shape": (145,),
@@ -69,7 +69,7 @@ def main(args) -> None:
             dataset.add_frame(
                 {
                     "image": demo_data["obs"]["camera_head"][step],
-                    # "wrist_image": step["observation"]["wrist_image"],
+                    "wrist_image": demo_data["obs"]["camera_head"][step],   # 临时使用相同的图像
                     "state": demo_data["states"][step],
                     "actions": demo_data["actions"][step],
                 }
