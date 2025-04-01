@@ -6,7 +6,6 @@ import shutil
 
 from lerobot.common.datasets.lerobot_dataset import LEROBOT_HOME
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-import tensorflow_datasets as tfds
 import tyro
 
 from orca_gym.robomimic.dataset_util import DatasetReader
@@ -45,7 +44,7 @@ def main(args) -> None:
             },
             "state": {
                 "dtype": "float32",
-                "shape": (145,),
+                "shape": (14,),
                 "names": ["state"],
             },
             "actions": {
@@ -70,7 +69,7 @@ def main(args) -> None:
                 {
                     "image": demo_data["obs"]["camera_head"][step],
                     "wrist_image": demo_data["obs"]["camera_head"][step],   # 临时使用相同的图像
-                    "state": demo_data["states"][step],
+                    "state": demo_data["actions"][step],                    # pi0使用 action 作为 state
                     "actions": demo_data["actions"][step],
                 }
             )
