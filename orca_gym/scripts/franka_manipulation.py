@@ -116,7 +116,7 @@ def teleoperation_episode(env : FrankaEnv, cameras : list[CameraWrapper], rgb_si
             terminated_times = terminated_times + 1 if terminated else 0
             
             for camera in cameras:
-                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
                 
             # print("Timestep: ", env.unwrapped.gym.data.time)
@@ -324,7 +324,7 @@ def augment_episode(env : FrankaEnv,
         if len(cameras) > 0:
             time.sleep(0.03)    # wait for camera to get new frame
             for camera in cameras:
-                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
 
         for obs_key, obs_data in obs.items():

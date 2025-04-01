@@ -19,6 +19,7 @@ class CameraWrapper:
         self.image = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
         self.enabled = True
         self.received_first_frame = False
+        self.image_index : int = 0
 
     def __del__(self):
         if not self.enabled:
@@ -65,6 +66,7 @@ class CameraWrapper:
                     frames = packet.decode()
                     for frame in frames:
                         self.image = frame.to_ndarray(format='bgr24')
+                        self.image_index += 1
                         # print("get new frame for port ", self.port)
                         if self.received_first_frame == False:
                             self.received_first_frame = True
@@ -82,7 +84,7 @@ class CameraWrapper:
         self.running = False
         asyncio.get_event_loop().stop()
 
-    def get_frame(self, format='bgr24', size : tuple = None):
+    def get_frame(self, format='bgr24', size : tuple = None) -> tuple[np.ndarray, int]:
         if format == 'bgr24':
             frame = self.image
         elif format == 'rgb24':
@@ -91,7 +93,7 @@ class CameraWrapper:
         if size is not None:
             frame = cv2.resize(frame, size)
             
-        return frame
+        return frame, self.image_index
     
 
 
@@ -208,14 +210,14 @@ class Monitor:
         self.fig, self.ax = plt.subplots()
         self.ax.axis('off')  # 关闭坐标轴
         
-        frame = self.camera.get_frame(format='rgb24')
+        frame, _ = self.camera.get_frame(format='rgb24')
         
         # 显示初始图像
         self.im = self.ax.imshow(frame)
         self.ax.set_title("Camera Feed")
     
     def update(self, frame_num):
-        frame = self.camera.get_frame(format='rgb24')
+        frame, _ = self.camera.get_frame(format='rgb24')
         
         # 更新图像数据
         self.im.set_data(frame)

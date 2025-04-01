@@ -59,3 +59,11 @@ INFO:root:Saving video to data/aloha_sim/videos/out_0.mp4
 ``` 
 
 最后，在 $PROJECT_HOME/3rd_party/openpi/data 目录下会生成一个名为 `aloha_sim` 的目录，里面存放了运行仿真生成的视频，例如 out_0.mp4。
+
+## 注意事项
+如果是在headless模式下运行，则无法运行客户端，这部分需要在有图形界面的环境下运行。
+另外，当headless服务器作为server端的时候，需要安装对应的库，可以通过以下命令安装：
+
+```bash
+sudo apt-get update && sudo apt-get install -y libgl1 libglu1
+```

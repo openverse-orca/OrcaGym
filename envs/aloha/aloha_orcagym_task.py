@@ -25,7 +25,7 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         obs["qvel"] = self.get_qvel(physics)
         obs["env_state"] = self.get_env_state(physics)
         obs["images"] = {}
-        obs["images"]["top"] = self._top_camera.get_frame(format='rgb24')
+        obs["images"]["top"], _ = self._top_camera.get_frame(format='rgb24')
         # obs["images"]["angle"] = physics.render(height=480, width=640, camera_id="angle")
         # obs["images"]["vis"] = physics.render(height=480, width=640, camera_id="front_close")
 

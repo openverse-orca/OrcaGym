@@ -14,7 +14,7 @@ import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
 import time
-
+from orca_gym.utils.joint_controller import JointController
 
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
@@ -36,6 +36,13 @@ class ControlDevice:
     """
     VR = "vr"
     RANDOM_SAMPLE = "random_sample"
+    
+class ActionType:
+    """
+    Enum class for action type
+    """
+    END_EFFECTOR = "end_effector"
+    JOINT_POS = "joint_pos"
 
     
 class TaskStatus:
@@ -71,6 +78,7 @@ class OpenLoongEnv(RobomimicEnv):
         agent_names: list,
         time_step: float,
         run_mode: RunMode,
+        action_type: ActionType,
         task_instruction: str,
         ctrl_device: ControlDevice,
         control_freq: int,
@@ -79,6 +87,7 @@ class OpenLoongEnv(RobomimicEnv):
     ):
 
         self._run_mode = run_mode
+        self._action_type = action_type
         self._task_instruction = task_instruction
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
@@ -191,9 +200,9 @@ class OpenLoongEnv(RobomimicEnv):
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
-        self._setup_action_range()
         arm_qpos_range_l = self.model.get_joint_qposrange(self._l_arm_joint_names)
         arm_qpos_range_r = self.model.get_joint_qposrange(self._r_arm_joint_names)
+        self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
 
         NECK_NAME  = self.site("neck_center_site")
@@ -228,6 +237,8 @@ class OpenLoongEnv(RobomimicEnv):
                 self._pico_joystick = None
             else:
                 raise ValueError("Invalid control device: ", self._ctrl_device)
+        else:
+            self._joint_controllers = self._setup_joint_controllers()
 
         # -----------------------------
         # Neck controller
@@ -373,7 +384,6 @@ class OpenLoongEnv(RobomimicEnv):
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
-            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
         elif self._run_mode == RunMode.POLICY_NORMALIZED:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
@@ -390,10 +400,14 @@ class OpenLoongEnv(RobomimicEnv):
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
 
-        if self._run_mode == RunMode.TELEOPERATION and self._pico_joystick is not None:
-            r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
-            l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
-            self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
+        if self._run_mode == RunMode.TELEOPERATION: 
+            noscaled_action = self._fill_arm_joint_pos(noscaled_action)
+            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
+            
+            if self._pico_joystick is not None:
+                r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
+                l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
+                self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
         obs = self._get_obs().copy()
 
@@ -443,9 +457,9 @@ class OpenLoongEnv(RobomimicEnv):
         action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
         # print("action r:", action_r)
         self._r_controller.set_goal(action_r)
-        ctrl = self._r_controller.run_controller()
+        ctrl_r = self._r_controller.run_controller()
         # print("ctrl r: ", ctrl)
-        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
+        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
 
         mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
                                                                    mocap_l_xquat[2], 
@@ -455,11 +469,26 @@ class OpenLoongEnv(RobomimicEnv):
         # print("action l:", action_l)        
         # print(action)
         self._l_controller.set_goal(action_l)
-        ctrl = self._l_controller.run_controller()
+        ctrl_l = self._l_controller.run_controller()
         # print("ctrl l: ", ctrl)
-        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
+        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
         
-        return self.ctrl.copy(), np.concatenate([action_l, [self._grasp_value_l], action_r, [self._grasp_value_r]]).flatten()
+        action = np.concatenate([action_l,                  # left eef pos and angle, 0-5
+                                 np.zeros(7),               # left arm joint pos, 6-12 (will be fill after do simulation)
+                                 [self._grasp_value_l],     # left hand grasp value, 13
+                                 action_r,                  # right eef pos and angle, 14-19
+                                 np.zeros(7),               # right arm joint pos, 20-26 (will be fill after do simulation)
+                                 [self._grasp_value_r]]     # right hand grasp value, 27
+                                ).flatten()
+
+        return self.ctrl.copy(), action
+    
+    def _fill_arm_joint_pos(self, action) -> None:
+        arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
+        arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
+        action[6:13] = arm_joint_values_l
+        action[20:27] = arm_joint_values_r
+        return action
 
     def _set_arm_ctrl(self, arm_actuator_id, ctrl) -> None:
         for i in range(len(arm_actuator_id)):
@@ -469,22 +498,44 @@ class OpenLoongEnv(RobomimicEnv):
     def _playback_action(self, action) -> np.ndarray:
         assert(len(action) == self.action_space.shape[0])
         
-        action_l = action[:6]
-        action_r = action[7:13]
-
-        self._l_controller.set_goal(action_l)
-        ctrl = self._l_controller.run_controller()
-        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
-
-        self._grasp_value_l = action[6]
+        self._grasp_value_l = action[13]
         self._set_l_hand_actuator_ctrl(self._grasp_value_l)
-
-        self._r_controller.set_goal(action_r)
-        ctrl = self._r_controller.run_controller()
-        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
-
-        self._grasp_value_r = action[13]
+        self._grasp_value_r = action[27]
         self._set_r_hand_actuator_ctrl(self._grasp_value_r)
+        
+        if self._action_type == ActionType.END_EFFECTOR:
+            action_l = action[:6]
+            self._l_controller.set_goal(action_l)
+            ctrl = self._l_controller.run_controller()
+            self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
+            
+            action_r = action[14:20]
+            self._r_controller.set_goal(action_r)
+            ctrl = self._r_controller.run_controller()
+            self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
+
+        elif self._action_type == ActionType.JOINT_POS:
+            l_arm_joint_action = action[6:13]
+            l_arm_joint_qpos = self._get_arm_joint_values(self._l_arm_joint_names)
+            l_arm_joint_qvel = self._get_arm_joint_velocities(self._l_arm_joint_names)
+            l_arm_torque = np.zeros(7)
+            for i in range(len(l_arm_joint_action)):
+                l_arm_torque[i] = self._joint_controllers[self._l_arm_joint_names[i]].compute_torque(
+                    l_arm_joint_action[i], l_arm_joint_qpos[i], l_arm_joint_qvel[i], self.dt)
+            # print("l_arm_joint_action: ", l_arm_joint_action, "l_arm_torque: ", l_arm_torque)
+            self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_torque)
+            
+            r_arm_joint_action = action[20:27]
+            r_arm_joint_qpos = self._get_arm_joint_values(self._r_arm_joint_names)
+            r_arm_joint_qvel = self._get_arm_joint_velocities(self._r_arm_joint_names)
+            r_arm_torque = np.zeros(7)
+            for i in range(len(r_arm_joint_action)):
+                r_arm_torque[i] = self._joint_controllers[self._r_arm_joint_names[i]].compute_torque(
+                    r_arm_joint_action[i], r_arm_joint_qpos[i], r_arm_joint_qvel[i], self.dt)
+            # print("r_arm_joint_action: ", r_arm_joint_action, "r_arm_torque: ", r_arm_torque)
+            self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_torque)
+        else:
+            raise ValueError("Invalid action type: ", self._action_type)
         
         return self.ctrl.copy()
     
@@ -539,7 +590,9 @@ class OpenLoongEnv(RobomimicEnv):
 
         # Tips for the operator
         print("Task : ", self._task_instruction)
-        print("Press left hand grip button to start recording task......")
+        
+        if self._run_mode == RunMode.TELEOPERATION:
+            print("Press left hand grip button to start recording task......")
 
         self._reset_neck_mocap()
         self.mj_forward()      
@@ -633,22 +686,68 @@ class OpenLoongEnv(RobomimicEnv):
         return total_reward
         
     
-    def _setup_action_range(self) -> None:
+    def _setup_action_range(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
         # 支持的动作范围空间，遥操作时不能超过这个范围
         # 模型接收的是 [-1, 1] 的动作空间，这里是真实的物理空间，需要进行归一化
-        self._action_range = np.array(
+        self._action_range =  np.concatenate(
             [
-                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # left hand ee pos
-                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # left hand ee angle euler
-                [-1.0, 0.0],                                        # left hand grasp value
-                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # right hand ee pos
-                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # right hand ee angle euler
-                [-1.0, 0.0],                                        # right hand grasp value
-             ]
-            , dtype=np.float32
-            )
+                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # left hand ee pos and angle euler
+                arm_qpos_range_l,                                                                           # left arm joint pos          
+                [[-1.0, 0.0]],                                                                                # left hand grasp value
+                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # right hand ee pos and angle euler
+                arm_qpos_range_r,                                                                           # right arm joint pos
+                [[-1.0, 0.0]],                                                                                # right hand grasp value
+            ],
+            dtype=np.float32,
+            axis=0
+        )
+        
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
+
+    def _setup_joint_controllers(self) -> dict[str, JointController]:
+        joint_config = {
+            "large" : {
+                "kp": 400,
+                "ki": 0.05,
+                "kd": 1.0, 
+                "kv": 40,
+                "max_speed": 80,
+                "ctrlrange": (-80, 80),
+            },
+            "middle" : {
+                "kp": 300,
+                "ki": 0.1,
+                "kd": 2.0, 
+                "kv": 30,
+                "max_speed": 48,
+                "ctrlrange": (-48, 48),
+            },
+            "small" : {
+                "kp": 150,
+                "ki": 0.1,
+                "kd": 2.0, 
+                "kv": 15,
+                "max_speed": 12.4,
+                "ctrlrange": (-12.4, 12.4),
+            },
+        }
+        
+        joint_types = {
+            "large": [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_r_01"), self.joint("J_arm_r_02")],
+            "middle": [self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04")],
+            "small": [self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")],
+        }
+        
+        controllers = {}
+        for joint_name in self._l_arm_joint_names:
+            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
+            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
+            
+        for joint_name in self._r_arm_joint_names:
+            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
+            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
+        return controllers
 
     def _setup_obs_scale(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
         # 观测空间范围
