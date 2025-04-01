@@ -288,3 +288,6 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_robot_orientation_odom(self, base_body, initial_base_pos, initial_base_quat):
         robot_orientation_odom = self.gym.query_robot_orientation_odom(base_body, initial_base_pos, initial_base_quat)
         return robot_orientation_odom
+    
+    def disable_actuator(self, actuator_id):
+        self.gym.disable_actuator(actuator_id)

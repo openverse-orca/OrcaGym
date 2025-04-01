@@ -135,17 +135,25 @@ class OpenLoongEnv(RobomimicEnv):
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
                                  self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
                                  self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")]
-        self._r_arm_moto_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
+        self._r_arm_motor_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
                                 self.actuator("M_arm_r_03"),self.actuator("M_arm_r_04"),
                                 self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
-        self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_moto_names]
+        self._r_arm_position_names = [self.actuator("P_arm_r_01"), self.actuator("P_arm_r_02"),
+                                      self.actuator("P_arm_r_03"),self.actuator("P_arm_r_04"),
+                                      self.actuator("P_arm_r_05"),self.actuator("P_arm_r_06"),self.actuator("P_arm_r_07")]
+        if self._action_use_motor():    
+            self._disable_actuators(self._r_arm_position_names) 
+            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
+        else:
+            self._disable_actuators(self._r_arm_motor_names)
+            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
         
-        self._r_hand_moto_names = [self.actuator("M_zbr_J1"), self.actuator("M_zbr_J2"), self.actuator("M_zbr_J3")
+        self._r_hand_motor_names = [self.actuator("M_zbr_J1"), self.actuator("M_zbr_J2"), self.actuator("M_zbr_J3")
                                    ,self.actuator("M_zbr_J4"),self.actuator("M_zbr_J5"),self.actuator("M_zbr_J6"),
                                    self.actuator("M_zbr_J7"),self.actuator("M_zbr_J8"),self.actuator("M_zbr_J9"),
                                    self.actuator("M_zbr_J10"),self.actuator("M_zbr_J11")]
-        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_moto_names]
+        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
         self._r_hand_body_names = [self.body("zbr_Link1"), self.body("zbr_Link2"), self.body("zbr_Link3"),
                                    self.body("zbr_Link4"), self.body("zbr_Link5"), self.body("zbr_Link6"), 
                                    self.body("zbr_Link7"), self.body("zbr_Link8"), self.body("zbr_Link9"),
@@ -165,7 +173,15 @@ class OpenLoongEnv(RobomimicEnv):
         self._l_arm_moto_names = [self.actuator("M_arm_l_01"), self.actuator("M_arm_l_02"),
                                 self.actuator("M_arm_l_03"),self.actuator("M_arm_l_04"),
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
-        self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
+        self._l_arm_position_names = [self.actuator("P_arm_l_01"), self.actuator("P_arm_l_02"),
+                                      self.actuator("P_arm_l_03"),self.actuator("P_arm_l_04"),
+                                      self.actuator("P_arm_l_05"),self.actuator("P_arm_l_06"),self.actuator("P_arm_l_07")]
+        if self._action_use_motor():
+            self._disable_actuators(self._l_arm_position_names)
+            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
+        else:
+            self._disable_actuators(self._l_arm_moto_names)
+            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
         # self._l_neutral_joint_values = np.zeros(7)
 
@@ -516,24 +532,26 @@ class OpenLoongEnv(RobomimicEnv):
 
         elif self._action_type == ActionType.JOINT_POS:
             l_arm_joint_action = action[6:13]
-            l_arm_joint_qpos = self._get_arm_joint_values(self._l_arm_joint_names)
-            l_arm_joint_qvel = self._get_arm_joint_velocities(self._l_arm_joint_names)
-            l_arm_torque = np.zeros(7)
-            for i in range(len(l_arm_joint_action)):
-                l_arm_torque[i] = self._joint_controllers[self._l_arm_joint_names[i]].compute_torque(
-                    l_arm_joint_action[i], l_arm_joint_qpos[i], l_arm_joint_qvel[i], self.dt)
-            # print("l_arm_joint_action: ", l_arm_joint_action, "l_arm_torque: ", l_arm_torque)
-            self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_torque)
+            # l_arm_joint_qpos = self._get_arm_joint_values(self._l_arm_joint_names)
+            # l_arm_joint_qvel = self._get_arm_joint_velocities(self._l_arm_joint_names)
+            # l_arm_torque = np.zeros(7)
+            # for i in range(len(l_arm_joint_action)):
+            #     l_arm_torque[i] = self._joint_controllers[self._l_arm_joint_names[i]].compute_torque(
+            #         l_arm_joint_action[i], l_arm_joint_qpos[i], l_arm_joint_qvel[i], self.dt)
+            # # print("l_arm_joint_action: ", l_arm_joint_action, "l_arm_torque: ", l_arm_torque)
+            # self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_torque)
+            self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_joint_action)
             
             r_arm_joint_action = action[20:27]
-            r_arm_joint_qpos = self._get_arm_joint_values(self._r_arm_joint_names)
-            r_arm_joint_qvel = self._get_arm_joint_velocities(self._r_arm_joint_names)
-            r_arm_torque = np.zeros(7)
-            for i in range(len(r_arm_joint_action)):
-                r_arm_torque[i] = self._joint_controllers[self._r_arm_joint_names[i]].compute_torque(
-                    r_arm_joint_action[i], r_arm_joint_qpos[i], r_arm_joint_qvel[i], self.dt)
-            # print("r_arm_joint_action: ", r_arm_joint_action, "r_arm_torque: ", r_arm_torque)
-            self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_torque)
+            # r_arm_joint_qpos = self._get_arm_joint_values(self._r_arm_joint_names)
+            # r_arm_joint_qvel = self._get_arm_joint_velocities(self._r_arm_joint_names)
+            # r_arm_torque = np.zeros(7)
+            # for i in range(len(r_arm_joint_action)):
+            #     r_arm_torque[i] = self._joint_controllers[self._r_arm_joint_names[i]].compute_torque(
+            #         r_arm_joint_action[i], r_arm_joint_qpos[i], r_arm_joint_qvel[i], self.dt)
+            # # print("r_arm_joint_action: ", r_arm_joint_action, "r_arm_torque: ", r_arm_torque)
+            # self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_torque)
+            self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_joint_action)
         else:
             raise ValueError("Invalid action type: ", self._action_type)
         
@@ -1052,3 +1070,22 @@ class OpenLoongEnv(RobomimicEnv):
             return obs
         else:
             return self._get_obs().copy()
+        
+    def _action_use_motor(self):
+        if self._run_mode == RunMode.TELEOPERATION:
+            # 遥操作采用OSC算法，因此采用电机控制
+            return True
+        else:
+            if self._action_type == ActionType.END_EFFECTOR:
+                # 回放采用OSC解算末端位姿，因此采用电机控制
+                return True
+            elif self._action_type == ActionType.JOINT_POS:
+                # 回放直接采用关节角度，因此采用关节控制
+                return False
+            else:
+                raise ValueError("Invalid action type: ", self._action_type)
+            
+    def _disable_actuators(self, actuator_names):
+        for actuator_name in actuator_names:
+            actuator_id = self.model.actuator_name2id(actuator_name)
+            self.disable_actuator(actuator_id)

@@ -366,6 +366,11 @@ class OrcaGymLocal(OrcaGymBase):
                 "LengthRange": actuator.lengthrange,
             }
         return actuator_dict
+    
+    def disable_actuator(self, actuator_id):
+        model = self._mjModel
+        actuator = model.actuator(actuator_id)
+        actuator.trnid[0] = -1
 
     def query_all_bodies(self):
         model = self._mjModel
