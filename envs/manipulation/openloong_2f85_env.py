@@ -15,7 +15,6 @@ from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
 from orca_gym.task.abstract_task import AbstractTask, TaskType
 import time
-from orca_gym.utils.joint_controller import JointController
 import random
 
 from orca_gym.environment.orca_gym_env import RewardType
@@ -37,14 +36,6 @@ class ControlDevice:
     Enum class for control
     """
     VR = "vr"
-    RANDOM_SAMPLE = "random_sample"
-
-class ActionType:
-    """
-    Enum class for action type
-    """
-    END_EFFECTOR = "end_effector"
-    JOINT_POS = "joint_pos"
 
 class OpenLoongTask(AbstractTask):
     def __init__(self, task_type: str, config: dict):
@@ -61,6 +52,9 @@ class OpenLoongTask(AbstractTask):
         object_len = len(self.object_bodys)
         goal_len = len(self.goal_bodys)
         min_len = min(object_len, goal_len)
+        if min_len == 0:
+            return self.task_dict
+        
         random_x = random.randint(1, min_len)
 
         ind_list = random.sample(range(object_len), random_x)
@@ -73,16 +67,19 @@ class OpenLoongTask(AbstractTask):
         pass
 
     def get_language_instruction(self) -> str:
+        if len(self.task_dict) == 0:
+            return "\033[91m No task \033[0m"
+
         object_str = "object: "
         for key in self.task_dict.keys():
             object_str += key + " "
-
+        
         goal_str = "goal: "
         for value in self.task_dict.values():
             goal_str += value + " "
-
+        
         language_instruction = f"level: {self.level_name}\ntask: {self.task_type}"
-        language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"
+        language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"                               
 
         return language_instruction
 
@@ -119,7 +116,6 @@ class OpenLoongEnv(RobomimicEnv):
         agent_names: list,
         time_step: float,
         run_mode: RunMode,
-        action_type: ActionType,
         task: str,
         ctrl_device: ControlDevice,
         control_freq: int,
@@ -128,7 +124,6 @@ class OpenLoongEnv(RobomimicEnv):
     ):
 
         self._run_mode = run_mode
-        self._action_type = action_type
 
         task_config_dict = kwargs["task_config_dict"]
         self._task = OpenLoongTask(task, task_config_dict)
@@ -180,29 +175,16 @@ class OpenLoongEnv(RobomimicEnv):
         self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
                                  self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
                                  self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")]
-        self._r_arm_motor_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
+        self._r_arm_moto_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
                                 self.actuator("M_arm_r_03"),self.actuator("M_arm_r_04"),
                                 self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
-        self._r_arm_position_names = [self.actuator("P_arm_r_01"), self.actuator("P_arm_r_02"),
-                                      self.actuator("P_arm_r_03"),self.actuator("P_arm_r_04"),
-                                      self.actuator("P_arm_r_05"),self.actuator("P_arm_r_06"),self.actuator("P_arm_r_07")]
-        if self._action_use_motor():
-            self._disable_actuators(self._r_arm_position_names)
-            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
-        else:
-            self._disable_actuators(self._r_arm_motor_names)
-            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
+        self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_moto_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
         
-        self._r_hand_motor_names = [self.actuator("M_zbr_J1"), self.actuator("M_zbr_J2"), self.actuator("M_zbr_J3")
-                                   ,self.actuator("M_zbr_J4"),self.actuator("M_zbr_J5"),self.actuator("M_zbr_J6"),
-                                   self.actuator("M_zbr_J7"),self.actuator("M_zbr_J8"),self.actuator("M_zbr_J9"),
-                                   self.actuator("M_zbr_J10"),self.actuator("M_zbr_J11")]
-        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
-        self._r_hand_body_names = [self.body("zbr_Link1"), self.body("zbr_Link2"), self.body("zbr_Link3"),
-                                   self.body("zbr_Link4"), self.body("zbr_Link5"), self.body("zbr_Link6"), 
-                                   self.body("zbr_Link7"), self.body("zbr_Link8"), self.body("zbr_Link9"),
-                                   self.body("zbr_Link10"), self.body("zbr_Link11")]
+        self._r_hand_actuator_names = [self.actuator("r_fingers_actuator")]
+
+        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
+        self._r_hand_body_names = [self.body("r_left_pad"), self.body("r_right_pad")]
         self._r_hand_gemo_ids = []
         for geom_info in self.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._r_hand_body_names:
@@ -218,28 +200,15 @@ class OpenLoongEnv(RobomimicEnv):
         self._l_arm_moto_names = [self.actuator("M_arm_l_01"), self.actuator("M_arm_l_02"),
                                 self.actuator("M_arm_l_03"),self.actuator("M_arm_l_04"),
                                 self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
-        self._l_arm_position_names = [self.actuator("P_arm_l_01"), self.actuator("P_arm_l_02"),
-                                      self.actuator("P_arm_l_03"),self.actuator("P_arm_l_04"),
-                                      self.actuator("P_arm_l_05"),self.actuator("P_arm_l_06"),self.actuator("P_arm_l_07")]
-        if self._action_use_motor():
-            self._disable_actuators(self._l_arm_position_names)
-            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
-        else:
-            self._disable_actuators(self._l_arm_moto_names)
-            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
+        self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
         # self._l_neutral_joint_values = np.zeros(7)
 
         print("arm_actuator_id: ", self._l_arm_actuator_id)
-        self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
-                                    ,self.actuator("M_zbll_J4"),self.actuator("M_zbll_J5"),self.actuator("M_zbll_J6"),
-                                    self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
-                                    self.actuator("M_zbll_J10"),self.actuator("M_zbll_J11")]
-        self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
-        self._l_hand_body_names = [self.body("zbll_Link1"), self.body("zbll_Link2"), self.body("zbll_Link3"),
-                                   self.body("zbll_Link4"), self.body("zbll_Link5"), self.body("zbll_Link6"), 
-                                   self.body("zbll_Link7"), self.body("zbll_Link8"), self.body("zbll_Link9"),
-                                   self.body("zbll_Link10"), self.body("zbll_Link11")]
+        self._l_hand_actuator_names = [self.actuator("l_fingers_actuator")]
+        
+        self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
+        self._l_hand_body_names = [self.body("l_left_pad"), self.body("l_right_pad")]
         self._l_hand_gemo_ids = []
         for geom_info in self.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._l_hand_body_names:
@@ -261,9 +230,9 @@ class OpenLoongEnv(RobomimicEnv):
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
+        self._setup_action_range()
         arm_qpos_range_l = self.model.get_joint_qposrange(self._l_arm_joint_names)
         arm_qpos_range_r = self.model.get_joint_qposrange(self._r_arm_joint_names)
-        self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
 
         NECK_NAME  = self.site("neck_center_site")
@@ -294,12 +263,8 @@ class OpenLoongEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             if self._ctrl_device == ControlDevice.VR:
                 self._pico_joystick = PicoJoystick()
-            elif self._ctrl_device == ControlDevice.RANDOM_SAMPLE:
-                self._pico_joystick = None
             else:
                 raise ValueError("Invalid control device: ", self._ctrl_device)
-        else:
-            self._joint_controllers = self._setup_joint_controllers()
 
         # -----------------------------
         # Neck controller
@@ -445,6 +410,7 @@ class OpenLoongEnv(RobomimicEnv):
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
+            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
         elif self._run_mode == RunMode.POLICY_NORMALIZED:
             scaled_action = action
             noscaled_action = self.denormalize_action(action, self._action_range_min, self._action_range_max)
@@ -462,13 +428,9 @@ class OpenLoongEnv(RobomimicEnv):
         self.do_simulation(ctrl, self.frame_skip)
 
         if self._run_mode == RunMode.TELEOPERATION:
-            noscaled_action = self._fill_arm_joint_pos(noscaled_action)
-            scaled_action = self.normalize_action(noscaled_action, self._action_range_min, self._action_range_max)
-
-            if self._pico_joystick is not None:
-                r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
-                l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
-                self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
+            r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
+            l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
+            self._pico_joystick.send_force_message(l_hand_force, r_hand_force)
 
         obs = self._get_obs().copy()
 
@@ -500,12 +462,6 @@ class OpenLoongEnv(RobomimicEnv):
             self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
             self._process_pico_joystick_operation()
             # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
-        elif self._ctrl_device == ControlDevice.RANDOM_SAMPLE:
-            if self._task_status == TaskStatus.NOT_STARTED:
-                self._task_status = TaskStatus.BEGIN
-            if self._task_status == TaskStatus.BEGIN and np.random.uniform(0, 1) < 0.02:
-                self._task_status = TaskStatus.SUCCESS
-            return self.ctrl.copy(), np.random.uniform(-1.0, 1.0, 14)
         else:
             return self.ctrl.copy(), np.zeros(14)
 
@@ -519,9 +475,9 @@ class OpenLoongEnv(RobomimicEnv):
         action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
         # print("action r:", action_r)
         self._r_controller.set_goal(action_r)
-        ctrl_r = self._r_controller.run_controller()
+        ctrl = self._r_controller.run_controller()
         # print("ctrl r: ", ctrl)
-        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
+        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
 
         mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
                                                                    mocap_l_xquat[2], 
@@ -531,26 +487,11 @@ class OpenLoongEnv(RobomimicEnv):
         # print("action l:", action_l)        
         # print(action)
         self._l_controller.set_goal(action_l)
-        ctrl_l = self._l_controller.run_controller()
+        ctrl = self._l_controller.run_controller()
         # print("ctrl l: ", ctrl)
-        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
+        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
         
-        action = np.concatenate([action_l,                  # left eef pos and angle, 0-5
-                                 np.zeros(7),               # left arm joint pos, 6-12 (will be fill after do simulation)
-                                 [self._grasp_value_l],     # left hand grasp value, 13
-                                 action_r,                  # right eef pos and angle, 14-19
-                                 np.zeros(7),               # right arm joint pos, 20-26 (will be fill after do simulation)
-                                 [self._grasp_value_r]]     # right hand grasp value, 27
-                                ).flatten()
-
-        return self.ctrl.copy(), action
-
-    def _fill_arm_joint_pos(self, action) -> None:
-        arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
-        arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
-        action[6:13] = arm_joint_values_l
-        action[20:27] = arm_joint_values_r
-        return action
+        return self.ctrl.copy(), np.concatenate([action_l, [self._grasp_value_l], action_r, [self._grasp_value_r]]).flatten()
 
     def _set_arm_ctrl(self, arm_actuator_id, ctrl) -> None:
         for i in range(len(arm_actuator_id)):
@@ -560,46 +501,22 @@ class OpenLoongEnv(RobomimicEnv):
     def _playback_action(self, action) -> np.ndarray:
         assert(len(action) == self.action_space.shape[0])
         
-        self._grasp_value_l = action[13]
+        action_l = action[:6]
+        action_r = action[7:13]
+
+        self._l_controller.set_goal(action_l)
+        ctrl = self._l_controller.run_controller()
+        self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
+
+        self._grasp_value_l = action[6]
         self._set_l_hand_actuator_ctrl(self._grasp_value_l)
-        self._grasp_value_r = action[27]
+
+        self._r_controller.set_goal(action_r)
+        ctrl = self._r_controller.run_controller()
+        self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
+
+        self._grasp_value_r = action[13]
         self._set_r_hand_actuator_ctrl(self._grasp_value_r)
-
-        if self._action_type == ActionType.END_EFFECTOR:
-            action_l = action[:6]
-            self._l_controller.set_goal(action_l)
-            ctrl = self._l_controller.run_controller()
-            self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
-
-            action_r = action[14:20]
-            self._r_controller.set_goal(action_r)
-            ctrl = self._r_controller.run_controller()
-            self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
-
-        elif self._action_type == ActionType.JOINT_POS:
-            l_arm_joint_action = action[6:13]
-            # l_arm_joint_qpos = self._get_arm_joint_values(self._l_arm_joint_names)
-            # l_arm_joint_qvel = self._get_arm_joint_velocities(self._l_arm_joint_names)
-            # l_arm_torque = np.zeros(7)
-            # for i in range(len(l_arm_joint_action)):
-            #     l_arm_torque[i] = self._joint_controllers[self._l_arm_joint_names[i]].compute_torque(
-            #         l_arm_joint_action[i], l_arm_joint_qpos[i], l_arm_joint_qvel[i], self.dt)
-            # # print("l_arm_joint_action: ", l_arm_joint_action, "l_arm_torque: ", l_arm_torque)
-            # self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_torque)
-            self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_joint_action)
-
-            r_arm_joint_action = action[20:27]
-            # r_arm_joint_qpos = self._get_arm_joint_values(self._r_arm_joint_names)
-            # r_arm_joint_qvel = self._get_arm_joint_velocities(self._r_arm_joint_names)
-            # r_arm_torque = np.zeros(7)
-            # for i in range(len(r_arm_joint_action)):
-            #     r_arm_torque[i] = self._joint_controllers[self._r_arm_joint_names[i]].compute_torque(
-            #         r_arm_joint_action[i], r_arm_joint_qpos[i], r_arm_joint_qvel[i], self.dt)
-            # # print("r_arm_joint_action: ", r_arm_joint_action, "r_arm_torque: ", r_arm_torque)
-            # self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_torque)
-            self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_joint_action)
-        else:
-            raise ValueError("Invalid action type: ", self._action_type)
         
         return self.ctrl.copy()
     
@@ -752,68 +669,22 @@ class OpenLoongEnv(RobomimicEnv):
         return total_reward
         
     
-    def _setup_action_range(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
+    def _setup_action_range(self) -> None:
         # 支持的动作范围空间，遥操作时不能超过这个范围
         # 模型接收的是 [-1, 1] 的动作空间，这里是真实的物理空间，需要进行归一化
-        self._action_range =  np.concatenate(
+        self._action_range = np.array(
             [
-                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # left hand ee pos and angle euler
-                arm_qpos_range_l,                                                                           # left arm joint pos
-                [[-1.0, 0.0]],                                                                                # left hand grasp value
-                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # right hand ee pos and angle euler
-                arm_qpos_range_r,                                                                           # right arm joint pos
-                [[-1.0, 0.0]],                                                                                # right hand grasp value
-            ],
-            dtype=np.float32,
-            axis=0
-        )
-
+                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # left hand ee pos
+                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # left hand ee angle euler
+                [-1.0, 0.0],                                        # left hand grasp value
+                [-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0],             # right hand ee pos
+                [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi], # right hand ee angle euler
+                [-1.0, 0.0],                                        # right hand grasp value
+             ]
+            , dtype=np.float32
+            )
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
-
-    def _setup_joint_controllers(self) -> dict[str, JointController]:
-        joint_config = {
-            "large" : {
-                "kp": 400,
-                "ki": 0.05,
-                "kd": 1.0,
-                "kv": 40,
-                "max_speed": 80,
-                "ctrlrange": (-80, 80),
-            },
-            "middle" : {
-                "kp": 300,
-                "ki": 0.1,
-                "kd": 2.0,
-                "kv": 30,
-                "max_speed": 48,
-                "ctrlrange": (-48, 48),
-            },
-            "small" : {
-                "kp": 150,
-                "ki": 0.1,
-                "kd": 2.0,
-                "kv": 15,
-                "max_speed": 12.4,
-                "ctrlrange": (-12.4, 12.4),
-            },
-        }
-
-        joint_types = {
-            "large": [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_r_01"), self.joint("J_arm_r_02")],
-            "middle": [self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04")],
-            "small": [self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")],
-        }
-
-        controllers = {}
-        for joint_name in self._l_arm_joint_names:
-            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
-            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
-
-        for joint_name in self._r_arm_joint_names:
-            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
-            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
-        return controllers
 
     def _setup_obs_scale(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
         # 观测空间范围
@@ -944,11 +815,7 @@ class OpenLoongEnv(RobomimicEnv):
 
     def _set_l_hand_actuator_ctrl(self, offset_rate) -> None:
         for actuator_id in self._l_hand_actuator_id:
-            actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbll_J3"):
-                offset_dir = -1
-            else:
-                offset_dir = 1
+            offset_dir = -1
 
             abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
             self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
@@ -959,7 +826,7 @@ class OpenLoongEnv(RobomimicEnv):
             
     def _set_gripper_ctrl_l(self, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1  # 10% per second
+        offset_rate_clip_adjust_rate = 0.5  # 10% per second
         if joystick_state["leftHand"]["secondaryButtonPressed"]:
             self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
             self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
@@ -978,11 +845,7 @@ class OpenLoongEnv(RobomimicEnv):
             
     def _set_r_hand_actuator_ctrl(self, offset_rate) -> None:
         for actuator_id in self._r_hand_actuator_id:
-            actuator_name = self.model.actuator_id2name(actuator_id)
-            if actuator_name == self.actuator("M_zbr_J2") or actuator_name == self.actuator("M_zbr_J3"):
-                offset_dir = -1
-            else:
-                offset_dir = 1
+            offset_dir = -1
 
             abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
             self.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
@@ -993,7 +856,7 @@ class OpenLoongEnv(RobomimicEnv):
 
     def _set_gripper_ctrl_r(self, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1
+        offset_rate_clip_adjust_rate = 0.5
         if joystick_state["rightHand"]["secondaryButtonPressed"]:
             self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
             self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
@@ -1117,22 +980,3 @@ class OpenLoongEnv(RobomimicEnv):
             return obs
         else:
             return self._get_obs().copy()
-
-    def _action_use_motor(self):
-        if self._run_mode == RunMode.TELEOPERATION:
-            # 遥操作采用OSC算法，因此采用电机控制
-            return True
-        else:
-            if self._action_type == ActionType.END_EFFECTOR:
-                # 回放采用OSC解算末端位姿，因此采用电机控制
-                return True
-            elif self._action_type == ActionType.JOINT_POS:
-                # 回放直接采用关节角度，因此采用关节控制
-                return False
-            else:
-                raise ValueError("Invalid action type: ", self._action_type)
-
-    def _disable_actuators(self, actuator_names):
-        for actuator_name in actuator_names:
-            actuator_id = self.model.actuator_name2id(actuator_name)
-            self.disable_actuator(actuator_id)
