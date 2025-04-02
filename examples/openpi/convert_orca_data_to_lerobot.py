@@ -11,6 +11,7 @@ import tyro
 from orca_gym.robomimic.dataset_util import DatasetReader
 import dataclasses
 import argparse
+import numpy as np
 
 REPO_NAME = "orca_gym/AzureLoong"  # Name of the output dataset, also used for the Hugging Face Hub
 
@@ -30,26 +31,21 @@ def main(args) -> None:
     dataset = LeRobotDataset.create(
         repo_id=REPO_NAME,
         robot_type="AzureLoong",
-        fps=5,
-        features={
-            "image": {
+        fps=50,
+        features={       
+            "observation.images.head": {
                 "dtype": "image",
-                "shape": (240, 320, 3),
+                "shape": (224, 224, 3),
                 "names": ["height", "width", "channel"],
             },
-            "wrist_image": {
-                "dtype": "image",
-                "shape": (240, 320, 3),
-                "names": ["height", "width", "channel"],
-            },
-            "state": {
+            "observation.state": {
                 "dtype": "float32",
-                "shape": (14,),
+                "shape": (16,),
                 "names": ["state"],
             },
-            "actions": {
+            "action": {
                 "dtype": "float32",
-                "shape": (14,),
+                "shape": (16,),
                 "names": ["actions"],
             },
         },
@@ -65,12 +61,21 @@ def main(args) -> None:
         demo_data = dataset_reader.get_demo_data(demo_name)
         demo_steps = len(demo_data["actions"])
         for step in range(demo_steps):
+            action_data = demo_data["actions"][step]
+            action_joint_pos = np.concatenate([action_data[6:14], action_data[20:28]]).flatten()       
+            joint_qpos = np.concatenate([
+                demo_data["obs"]["arm_joint_qpos_l"][step], 
+                demo_data["obs"]["grasp_value_l"][step],
+                demo_data["obs"]["arm_joint_qpos_r"][step],
+                demo_data["obs"]["grasp_value_r"][step],
+                ]).flatten()
             dataset.add_frame(
                 {
-                    "image": demo_data["obs"]["camera_head"][step],
-                    "wrist_image": demo_data["obs"]["camera_head"][step],   # 临时使用相同的图像
-                    "state": demo_data["actions"][step],                    # pi0使用 action 作为 state
-                    "actions": demo_data["actions"][step],
+                    "observation.images.head": demo_data["obs"]["camera_head"][step],
+                    "action": action_joint_pos,                                        # action 是下发到ctrl的位控的pos
+                    "observation.state": joint_qpos,                              # state 是记录的当前关节的qpos
+                    # "observation.velocity": demo_data["obs"]["velocity"][step],
+                    # "observation.effort": demo_data["obs"]["effort"][step],
                 }
             )
 
