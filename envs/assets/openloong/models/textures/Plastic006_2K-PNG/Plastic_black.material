@@ -1,0 +1,10 @@
+{
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.textureMap": "Plastic006_2K-PNG_Color.png",
+        "metallic.factor": 0.10999999940395355,
+        "normal.textureMap": "Plastic006_2K-PNG_NormalDX.png",
+        "roughness.factor": 0.800000011920929
+    }
+}

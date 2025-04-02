@@ -1,0 +1,14 @@
+{
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.textureMap": "Metal009_2K-PNG_Color.png",
+        "clearCoat.enable": true,
+        "clearCoat.factor": 0.1599999964237213,
+        "metallic.textureMap": "Metal009_2K-PNG_Metalness.png",
+        "normal.textureMap": "Metal009_2K-PNG_NormalDX.png",
+        "parallax.factor": 0.012000000104308128,
+        "parallax.useTexture": false,
+        "roughness.textureMap": "Metal009_2K-PNG_Roughness.png"
+    }
+}
