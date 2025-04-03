@@ -20,6 +20,7 @@ import random
 
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
+from envs.manipulation.openloong_agent import OpenLoongAgentBase, AzureLoongHandAgent
 
 class RunMode:
     """
@@ -170,227 +171,15 @@ class OpenLoongEnv(RobomimicEnv):
         self.gym.opt.sdf_iterations = 50
         self.gym.set_opt_config()
 
-        self._base_body_name = [self.body("base_link")]
-        self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
-        # print("base_body_xpos: ", self._base_body_xpos)
-        # print("base_body_xquat: ", self._base_body_xquat)
-
-        self._neck_joint_names = [self.joint("J_head_yaw"), self.joint("J_head_pitch")]
-        self._neck_actuator_names = [self.actuator("M_head_yaw"), self.actuator("M_head_pitch")]
-        self._neck_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-        self._neck_neutral_joint_values = np.array([0, -0.7854])
-        self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
-
-        # index used to distinguish arm and gripper joints
-        self._r_arm_joint_names = [self.joint("J_arm_r_01"), self.joint("J_arm_r_02"), 
-                                 self.joint("J_arm_r_03"), self.joint("J_arm_r_04"), 
-                                 self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")]
-        self._r_arm_motor_names = [self.actuator("M_arm_r_01"), self.actuator("M_arm_r_02"),
-                                self.actuator("M_arm_r_03"),self.actuator("M_arm_r_04"),
-                                self.actuator("M_arm_r_05"),self.actuator("M_arm_r_06"),self.actuator("M_arm_r_07")]
-        self._r_arm_position_names = [self.actuator("P_arm_r_01"), self.actuator("P_arm_r_02"),
-                                      self.actuator("P_arm_r_03"),self.actuator("P_arm_r_04"),
-                                      self.actuator("P_arm_r_05"),self.actuator("P_arm_r_06"),self.actuator("P_arm_r_07")]
-        if self._action_use_motor():
-            self._disable_actuators(self._r_arm_position_names)
-            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
-        else:
-            self._disable_actuators(self._r_arm_motor_names)
-            self._r_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
-        self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
-        
-        self._r_hand_motor_names = [self.actuator("M_zbr_J1"), self.actuator("M_zbr_J2"), self.actuator("M_zbr_J3")
-                                   ,self.actuator("M_zbr_J4"),self.actuator("M_zbr_J5"),self.actuator("M_zbr_J6"),
-                                   self.actuator("M_zbr_J7"),self.actuator("M_zbr_J8"),self.actuator("M_zbr_J9"),
-                                   self.actuator("M_zbr_J10"),self.actuator("M_zbr_J11")]
-        self._r_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
-        self._r_hand_body_names = [self.body("zbr_Link1"), self.body("zbr_Link2"), self.body("zbr_Link3"),
-                                   self.body("zbr_Link4"), self.body("zbr_Link5"), self.body("zbr_Link6"), 
-                                   self.body("zbr_Link7"), self.body("zbr_Link8"), self.body("zbr_Link9"),
-                                   self.body("zbr_Link10"), self.body("zbr_Link11")]
-        self._r_hand_gemo_ids = []
-        for geom_info in self.model.get_geom_dict().values():
-            if geom_info["BodyName"] in self._r_hand_body_names:
-                self._r_hand_gemo_ids.append(geom_info["GeomId"])
-
-        # print("arm_actuator_id: ", self._r_arm_actuator_id)
-        # print("hand_actuator_id: ", self._r_hand_actuator_id)
-
-        # index used to distinguish arm and gripper joints
-        self._l_arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), 
-                                 self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), 
-                                 self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07")]
-        self._l_arm_moto_names = [self.actuator("M_arm_l_01"), self.actuator("M_arm_l_02"),
-                                self.actuator("M_arm_l_03"),self.actuator("M_arm_l_04"),
-                                self.actuator("M_arm_l_05"),self.actuator("M_arm_l_06"),self.actuator("M_arm_l_07")]
-        self._l_arm_position_names = [self.actuator("P_arm_l_01"), self.actuator("P_arm_l_02"),
-                                      self.actuator("P_arm_l_03"),self.actuator("P_arm_l_04"),
-                                      self.actuator("P_arm_l_05"),self.actuator("P_arm_l_06"),self.actuator("P_arm_l_07")]
-        if self._action_use_motor():
-            self._disable_actuators(self._l_arm_position_names)
-            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
-        else:
-            self._disable_actuators(self._l_arm_moto_names)
-            self._l_arm_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
-        self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
-        # self._l_neutral_joint_values = np.zeros(7)
-
-        # print("arm_actuator_id: ", self._l_arm_actuator_id)
-        self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
-                                    ,self.actuator("M_zbll_J4"),self.actuator("M_zbll_J5"),self.actuator("M_zbll_J6"),
-                                    self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
-                                    self.actuator("M_zbll_J10"),self.actuator("M_zbll_J11")]
-        self._l_hand_actuator_id = [self.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
-        self._l_hand_body_names = [self.body("zbll_Link1"), self.body("zbll_Link2"), self.body("zbll_Link3"),
-                                   self.body("zbll_Link4"), self.body("zbll_Link5"), self.body("zbll_Link6"), 
-                                   self.body("zbll_Link7"), self.body("zbll_Link8"), self.body("zbll_Link9"),
-                                   self.body("zbll_Link10"), self.body("zbll_Link11")]
-        self._l_hand_gemo_ids = []
-        for geom_info in self.model.get_geom_dict().values():
-            if geom_info["BodyName"] in self._l_hand_body_names:
-                self._l_hand_gemo_ids.append(geom_info["GeomId"])
-
-
-
-        # control range
-        self._all_ctrlrange = self.model.get_actuator_ctrlrange()
-        neck_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._neck_actuator_id]
-        # print("ctrl_range: ", neck_ctrl_range)
-
-        r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
-        # print("ctrl_range: ", r_ctrl_range)
-
-        l_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
-        # print("ctrl_range: ", l_ctrl_range)
-
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()
 
-        arm_qpos_range_l = self.model.get_joint_qposrange(self._l_arm_joint_names)
-        arm_qpos_range_r = self.model.get_joint_qposrange(self._r_arm_joint_names)
-        self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
-        self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
-
-        NECK_NAME  = self.site("neck_center_site")
-        site_dict = self.query_site_pos_and_quat([NECK_NAME])
-        self._initial_neck_site_xpos = site_dict[NECK_NAME]['xpos']
-        self._initial_neck_site_xquat = site_dict[NECK_NAME]['xquat']
-
-        self.set_neck_mocap(self._initial_neck_site_xpos, self._initial_neck_site_xquat)
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self._neck_angle_x, self._neck_angle_y = 0, 0
-
-        self._ee_site_l  = self.site("ee_center_site")
-        site_dict = self.query_site_pos_and_quat([self._ee_site_l])
-        self._initial_grasp_site_xpos = site_dict[self._ee_site_l]['xpos']
-        self._initial_grasp_site_xquat = site_dict[self._ee_site_l]['xquat']
-        self._grasp_value_l = 0.0
-
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
-
-        self._ee_site_r  = self.site("ee_center_site_r")
-        site_dict = self.query_site_pos_and_quat([self._ee_site_r])
-        self._initial_grasp_site_xpos_r = site_dict[self._ee_site_r]['xpos']
-        self._initial_grasp_site_xquat_r = site_dict[self._ee_site_r]['xquat']
-        self._grasp_value_r = 0.0
-
-        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
+        self._agents : dict[str, OpenLoongAgentBase] = {}
+        for id, agent_name in enumerate(self._agent_names):
+            if agent_name.startswith("AzureLoongHand"):
+                self._agents[agent_name] = AzureLoongHandAgent(self, id)
         
-        if self._run_mode == RunMode.TELEOPERATION:
-            if self._ctrl_device == ControlDevice.VR:
-                self._pico_joystick = PicoJoystick()
-            elif self._ctrl_device == ControlDevice.RANDOM_SAMPLE:
-                self._pico_joystick = None
-            else:
-                raise ValueError("Invalid control device: ", self._ctrl_device)
-        else:
-            self._joint_controllers = self._setup_joint_controllers()
-
-        # -----------------------------
-        # Neck controller
-        self._neck_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
-
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._neck_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
-        self._neck_controller_config["sim"] = self.gym
-        self._neck_controller_config["eef_name"] = NECK_NAME
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._neck_joint_names)
-        self._neck_controller_config["joint_indexes"] = {
-            "joints": self._neck_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._neck_controller_config["actuator_range"] = neck_ctrl_range
-        self._neck_controller_config["policy_freq"] = self._control_freq
-        self._neck_controller_config["ndim"] = len(self._neck_joint_names)
-        self._neck_controller_config["control_delta"] = False
-
-
-        self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
-        self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
-
-        # -----------------------------
-        # Right controller
-        self._r_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
-
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._r_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
-        self._r_controller_config["sim"] = self.gym
-        self._r_controller_config["eef_name"] = self._ee_site_r
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._r_arm_joint_names)
-        self._r_controller_config["joint_indexes"] = {
-            "joints": self._r_arm_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._r_controller_config["actuator_range"] = r_ctrl_range
-        self._r_controller_config["policy_freq"] = self._control_freq
-        self._r_controller_config["ndim"] = len(self._r_arm_joint_names)
-        self._r_controller_config["control_delta"] = False
-
-
-        self._r_controller = controller_factory(self._r_controller_config["type"], self._r_controller_config)
-        self._r_controller.update_initial_joints(self._r_neutral_joint_values)
-
-        self._r_gripper_offset_rate_clip = 0.0
-
-
-        # -----------------------------
-        # Left controller
-        self._l_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
-
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._l_controller_config["robot_name"] = agent_names[0] if len(agent_names) > 0 else "robot"
-        self._l_controller_config["sim"] = self.gym
-        self._l_controller_config["eef_name"] = self._ee_site_l
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = self.query_joint_offsets(self._l_arm_joint_names)
-        self._l_controller_config["joint_indexes"] = {
-            "joints": self._l_arm_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._l_controller_config["actuator_range"] = l_ctrl_range
-        self._l_controller_config["policy_freq"] = self._control_freq
-        self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
-        self._l_controller_config["control_delta"] = False
-
-
-        self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
-        self._l_controller.update_initial_joints(self._l_neutral_joint_values)
-
-        self._l_gripper_offset_rate_clip = 0.0
+        assert len(self._agents) > 0, "At least one agent should be created."
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
@@ -407,6 +196,18 @@ class OpenLoongEnv(RobomimicEnv):
     def get_env_version(self):
         return OpenLoongEnv.ENV_VERSION
 
+    @property
+    def run_mode(self) -> RunMode:
+        return self._run_mode
+    
+    @property
+    def ctrl_device(self) -> ControlDevice:  
+        return self._ctrl_device
+    
+    @property
+    def control_freq(self) -> int:
+        return self._control_freq
+    
     def check_success(self):
         """
         Check if the task condition(s) is reached. Should return a dictionary
@@ -425,21 +226,13 @@ class OpenLoongEnv(RobomimicEnv):
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self._task_status = TaskStatus.NOT_STARTED
-        self._set_joint_neutral()
+        [agent.set_joint_neutral(self) for agent in self._agents.values()]
 
         self.ctrl = np.zeros(self.nu)       
         self.set_ctrl(self.ctrl)
         self.mj_forward()
 
 
-    def _reset_gripper(self) -> None:
-        self._l_gripper_offset_rate_clip = 0.0
-        self._r_gripper_offset_rate_clip = 0.0
-
-    def _reset_neck_mocap(self) -> None:
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self.set_neck_mocap(self._mocap_neck_xpos, self._mocap_neck_xquat)
-        self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def _is_success(self) -> bool:
         return self._task_status == TaskStatus.SUCCESS
@@ -610,40 +403,10 @@ class OpenLoongEnv(RobomimicEnv):
     
 
     def _get_obs(self) -> dict:
-        ee_sites = self.query_site_pos_and_quat([self._ee_site_l, self._ee_site_r])
-        ee_xvalp, ee_xvalr = self.query_site_xvalp_xvalr([self._ee_site_l, self._ee_site_r])
-
-        arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
-        arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
-        arm_joint_velocities_l = self._get_arm_joint_velocities(self._l_arm_joint_names)
-        arm_joint_velocities_r = self._get_arm_joint_velocities(self._r_arm_joint_names)
-
-        self._obs = {
-            "ee_pos_l": ee_sites[self._ee_site_l]["xpos"].flatten().astype(np.float32),
-            "ee_quat_l": ee_sites[self._ee_site_l]["xquat"].flatten().astype(np.float32),
-            "ee_pos_r": ee_sites[self._ee_site_r]["xpos"].flatten().astype(np.float32),
-            "ee_quat_r": ee_sites[self._ee_site_r]["xquat"].flatten().astype(np.float32),
-
-            "ee_vel_linear_l": ee_xvalp[self._ee_site_l].flatten().astype(np.float32),
-            "ee_vel_angular_l": ee_xvalr[self._ee_site_l].flatten().astype(np.float32),
-            "ee_vel_linear_r": ee_xvalp[self._ee_site_r].flatten().astype(np.float32),
-            "ee_vel_angular_r": ee_xvalr[self._ee_site_r].flatten().astype(np.float32),
-
-            "arm_joint_qpos_l": arm_joint_values_l.flatten().astype(np.float32),
-            "arm_joint_qpos_sin_l": np.sin(arm_joint_values_l).flatten().astype(np.float32),
-            "arm_joint_qpos_cos_l": np.cos(arm_joint_values_l).flatten().astype(np.float32),
-            "arm_joint_vel_l": arm_joint_velocities_l.flatten().astype(np.float32),
-
-            "arm_joint_qpos_r": arm_joint_values_r.flatten().astype(np.float32),
-            "arm_joint_qpos_sin_r": np.sin(arm_joint_values_r).flatten().astype(np.float32),
-            "arm_joint_qpos_cos_r": np.cos(arm_joint_values_r).flatten().astype(np.float32),
-            "arm_joint_vel_r": arm_joint_velocities_r.flatten().astype(np.float32),
-
-            "grasp_value_l": np.array([self._grasp_value_l], dtype=np.float32),
-            "grasp_value_r": np.array([self._grasp_value_r], dtype=np.float32),
-        }
-        scaled_obs = {key : self._obs[key] * self._obs_scale[key] for key in self._obs.keys()}
-        return scaled_obs
+        obs = {}
+        for agent in self._agents.values():
+            obs[agent.name] = agent.get_obs(self)
+        return obs
 
     def reset_model(self) -> tuple[dict, dict]:
         """
@@ -653,11 +416,8 @@ class OpenLoongEnv(RobomimicEnv):
         # print("Reset model")
         
         self._set_init_state()
-        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
-        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
-        self._reset_gripper()
-
-        self._reset_neck_mocap()
+        
+        [agent.on_reset_model(self) for agent in self._agents.values()]
 
         self._task.get_task(self)
 
@@ -673,24 +433,7 @@ class OpenLoongEnv(RobomimicEnv):
     # custom methods
     # -----------------------------
 
-    def _set_joint_neutral(self) -> None:
-        # assign value to arm joints
-        arm_joint_qpos = {}
-        for name, value in zip(self._r_arm_joint_names, self._r_neutral_joint_values):
-            arm_joint_qpos[name] = np.array([value])
-        for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
-            arm_joint_qpos[name] = np.array([value])     
-        for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
-            arm_joint_qpos[name] = np.array([value])
-        self.set_joint_qpos(arm_joint_qpos)
-    
-    def _get_arm_joint_values(self, joint_names) -> np.ndarray:
-        qpos_dict = self.query_joint_qpos(joint_names)
-        return np.array([qpos_dict[joint_name] for joint_name in joint_names]).flatten()
-    
-    def _get_arm_joint_velocities(self, joint_names) -> np.ndarray:
-        qvel_dict = self.query_joint_qvel(joint_names)
-        return np.array([qvel_dict[joint_name] for joint_name in joint_names]).flatten()
+
 
     def get_observation(self, obs=None):
         if obs is not None:
@@ -756,111 +499,56 @@ class OpenLoongEnv(RobomimicEnv):
         self._print_reward("Total reward: ", total_reward)
         return total_reward
         
-    
-    def _setup_action_range(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
-        # 支持的动作范围空间，遥操作时不能超过这个范围
-        # 模型接收的是 [-1, 1] 的动作空间，这里是真实的物理空间，需要进行归一化
-        self._action_range =  np.concatenate(
-            [
-                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # left hand ee pos and angle euler
-                arm_qpos_range_l,                                                                           # left arm joint pos
-                [[-1.0, 0.0]],                                                                                # left hand grasp value
-                [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # right hand ee pos and angle euler
-                arm_qpos_range_r,                                                                           # right arm joint pos
-                [[-1.0, 0.0]],                                                                                # right hand grasp value
-            ],
-            dtype=np.float32,
-            axis=0
-        )
 
-        self._action_range_min = self._action_range[:, 0]
-        self._action_range_max = self._action_range[:, 1]
+    # def _setup_joint_controllers(self) -> dict[str, JointController]:
+    #     joint_config = {
+    #         "large" : {
+    #             "kp": 400,
+    #             "ki": 0.05,
+    #             "kd": 1.0,
+    #             "kv": 40,
+    #             "max_speed": 80,
+    #             "ctrlrange": (-80, 80),
+    #         },
+    #         "middle" : {
+    #             "kp": 300,
+    #             "ki": 0.1,
+    #             "kd": 2.0,
+    #             "kv": 30,
+    #             "max_speed": 48,
+    #             "ctrlrange": (-48, 48),
+    #         },
+    #         "small" : {
+    #             "kp": 150,
+    #             "ki": 0.1,
+    #             "kd": 2.0,
+    #             "kv": 15,
+    #             "max_speed": 12.4,
+    #             "ctrlrange": (-12.4, 12.4),
+    #         },
+    #     }
 
-    def _setup_joint_controllers(self) -> dict[str, JointController]:
-        joint_config = {
-            "large" : {
-                "kp": 400,
-                "ki": 0.05,
-                "kd": 1.0,
-                "kv": 40,
-                "max_speed": 80,
-                "ctrlrange": (-80, 80),
-            },
-            "middle" : {
-                "kp": 300,
-                "ki": 0.1,
-                "kd": 2.0,
-                "kv": 30,
-                "max_speed": 48,
-                "ctrlrange": (-48, 48),
-            },
-            "small" : {
-                "kp": 150,
-                "ki": 0.1,
-                "kd": 2.0,
-                "kv": 15,
-                "max_speed": 12.4,
-                "ctrlrange": (-12.4, 12.4),
-            },
-        }
+    #     joint_types = {
+    #         "large": [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_r_01"), self.joint("J_arm_r_02")],
+    #         "middle": [self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04")],
+    #         "small": [self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")],
+    #     }
 
-        joint_types = {
-            "large": [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), self.joint("J_arm_r_01"), self.joint("J_arm_r_02")],
-            "middle": [self.joint("J_arm_l_03"), self.joint("J_arm_l_04"), self.joint("J_arm_r_03"), self.joint("J_arm_r_04")],
-            "small": [self.joint("J_arm_l_05"), self.joint("J_arm_l_06"), self.joint("J_arm_l_07"), self.joint("J_arm_r_05"), self.joint("J_arm_r_06"), self.joint("J_arm_r_07")],
-        }
+    #     controllers = {}
+    #     for joint_name in self._l_arm_joint_names:
+    #         config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
+    #         controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
 
-        controllers = {}
-        for joint_name in self._l_arm_joint_names:
-            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
-            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
+    #     for joint_name in self._r_arm_joint_names:
+    #         config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
+    #         controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
+    #     return controllers
 
-        for joint_name in self._r_arm_joint_names:
-            config = joint_config["large"] if joint_name in joint_types["large"] else joint_config["middle"] if joint_name in joint_types["middle"] else joint_config["small"]
-            controllers[joint_name] = JointController(config["kp"], config["ki"], config["kd"], config["kv"], config["max_speed"], config["ctrlrange"])
-        return controllers
 
-    def _setup_obs_scale(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
-        # 观测空间范围
-        ee_xpos_scale = np.array([max(abs(act_range[0]), abs(act_range[1])) for act_range in self._action_range[:3]], dtype=np.float32)   # 末端位置范围
-        ee_xquat_scale = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)   # 裁剪到 -pi, pi 的单位四元数范围
-        max_ee_linear_vel = 2.0  # 末端线速度范围 m/s
-        max_ee_angular_vel = np.pi # 末端角速度范围 rad/s
-
-        arm_qpos_scale_l = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range_l], dtype=np.float32)  # 关节角度范围
-        arm_qpos_scale_r = np.array([max(abs(qpos_range[0]), abs(qpos_range[1])) for qpos_range in arm_qpos_range_r], dtype=np.float32)  # 关节角度范围
-        max_arm_joint_vel = np.pi  # 关节角速度范围 rad/s
-                
-        self._obs_scale = {
-            "ee_pos_l": 1.0 / ee_xpos_scale,
-            "ee_quat_l": 1.0 / ee_xquat_scale,
-            "ee_pos_r": 1.0 / ee_xpos_scale,
-            "ee_quat_r": 1.0 / ee_xquat_scale,
-
-            "ee_vel_linear_l": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
-            "ee_vel_angular_l": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
-            "ee_vel_linear_r": np.ones(3, dtype=np.float32) / max_ee_linear_vel,
-            "ee_vel_angular_r": np.ones(3, dtype=np.float32) / max_ee_angular_vel,
-
-            "arm_joint_qpos_l": 1.0 / arm_qpos_scale_l,
-            "arm_joint_qpos_sin_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32),
-            "arm_joint_qpos_cos_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32),
-            "arm_joint_vel_l": np.ones(len(arm_qpos_scale_l), dtype=np.float32) / max_arm_joint_vel,
-
-            "arm_joint_qpos_r": 1.0 / arm_qpos_scale_r,
-            "arm_joint_qpos_sin_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32),
-            "arm_joint_qpos_cos_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32),
-            "arm_joint_vel_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32) / max_arm_joint_vel,
-
-            "grasp_value_l": np.ones(1, dtype=np.float32),
-            "grasp_value_r": np.ones(1, dtype=np.float32),       
-        }
-        
         # print("obs scale: ", self._obs_scale)
 
     def close(self):
-        if hasattr(self, "_pico_joystick") and self._pico_joystick is not None:
-            self._pico_joystick.close()
+        [agent.on_close() for agent in self._agents.values()]
 
     def _query_hand_force(self, hand_geom_ids):
         contact_simple_list = self.query_contact_simple()
@@ -1079,18 +767,6 @@ class OpenLoongEnv(RobomimicEnv):
 
     # custom methods
     # -----------------------------
-    def set_neck_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("neckMocap"): {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
-
-    def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("leftHandMocap"): {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
-
-    def set_grasp_mocap_r(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self.mocap("rightHandMocap"): {'pos': position, 'quat': orientation}}
-        # print("Set grasp mocap: ", position, orientation)
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_goal_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
@@ -1123,7 +799,7 @@ class OpenLoongEnv(RobomimicEnv):
         else:
             return self._get_obs().copy()
 
-    def _action_use_motor(self):
+    def action_use_motor(self):
         if self._run_mode == RunMode.TELEOPERATION:
             # 遥操作采用OSC算法，因此采用电机控制
             return True
@@ -1137,7 +813,10 @@ class OpenLoongEnv(RobomimicEnv):
             else:
                 raise ValueError("Invalid action type: ", self._action_type)
 
-    def _disable_actuators(self, actuator_names):
+    def disable_actuators(self, actuator_names):
         for actuator_name in actuator_names:
             actuator_id = self.model.actuator_name2id(actuator_name)
             self.disable_actuator(actuator_id)
+            
+            
+            
