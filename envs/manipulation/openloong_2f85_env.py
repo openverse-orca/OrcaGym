@@ -78,7 +78,7 @@ class OpenLoongTask(AbstractTask):
         for value in self.task_dict.values():
             goal_str += value + " "
         
-        language_instruction = f"level: {self.level_name}\ntask: {self.task_type}"
+        language_instruction = f"level: {self.level_name}\ntask: {self.prompt}"
         language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"                               
 
         return language_instruction
@@ -128,7 +128,7 @@ class OpenLoongEnv(RobomimicEnv):
         task_config_dict = kwargs["task_config_dict"]
         self._task = OpenLoongTask(task, task_config_dict)
 
-        assert self._task.task_type in [TaskType.PICK_AND_PLACE], f"Invalid task: {self._task}"
+        assert self._task.prompt in [TaskType.PICK_AND_PLACE], f"Invalid task: {self._task}"
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range

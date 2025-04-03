@@ -13,7 +13,7 @@ import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
-from orca_gym.task.abstract_task import AbstractTask, TaskType
+from orca_gym.task.abstract_task import AbstractTask
 import time
 from orca_gym.utils.joint_controller import JointController
 import random
@@ -61,6 +61,9 @@ class OpenLoongTask(AbstractTask):
         object_len = len(self.object_bodys)
         goal_len = len(self.goal_bodys)
         min_len = min(object_len, goal_len)
+        if min_len == 0:
+            return self.task_dict
+        
         random_x = random.randint(1, min_len)
 
         ind_list = random.sample(range(object_len), random_x)
@@ -73,16 +76,19 @@ class OpenLoongTask(AbstractTask):
         pass
 
     def get_language_instruction(self) -> str:
+        if len(self.task_dict) == 0:
+            return f"\033[91m {self.prompt} \033[0m"
+
         object_str = "object: "
         for key in self.task_dict.keys():
             object_str += key + " "
-
+        
         goal_str = "goal: "
         for value in self.task_dict.values():
             goal_str += value + " "
-
-        language_instruction = f"level: {self.level_name}\ntask: {self.task_type}"
-        language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"
+        
+        language_instruction = f"level: {self.level_name}\ntask: {self.prompt}"
+        language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"                               
 
         return language_instruction
 
@@ -120,7 +126,7 @@ class OpenLoongEnv(RobomimicEnv):
         time_step: float,
         run_mode: RunMode,
         action_type: ActionType,
-        task: str,
+        prompt: str,
         ctrl_device: ControlDevice,
         control_freq: int,
         sample_range: float,
@@ -131,9 +137,8 @@ class OpenLoongEnv(RobomimicEnv):
         self._action_type = action_type
 
         task_config_dict = kwargs["task_config_dict"]
-        self._task = OpenLoongTask(task, task_config_dict)
+        self._task = OpenLoongTask(prompt, task_config_dict)
 
-        assert self._task.task_type in [TaskType.PICK_AND_PLACE], f"Invalid task: {self._task}"
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
         self._sample_range = sample_range
@@ -167,8 +172,8 @@ class OpenLoongEnv(RobomimicEnv):
 
         self._base_body_name = [self.body("base_link")]
         self._base_body_xpos, _, self._base_body_xquat = self.get_body_xpos_xmat_xquat(self._base_body_name)
-        print("base_body_xpos: ", self._base_body_xpos)
-        print("base_body_xquat: ", self._base_body_xquat)
+        # print("base_body_xpos: ", self._base_body_xpos)
+        # print("base_body_xquat: ", self._base_body_xquat)
 
         self._neck_joint_names = [self.joint("J_head_yaw"), self.joint("J_head_pitch")]
         self._neck_actuator_names = [self.actuator("M_head_yaw"), self.actuator("M_head_pitch")]
@@ -208,8 +213,8 @@ class OpenLoongEnv(RobomimicEnv):
             if geom_info["BodyName"] in self._r_hand_body_names:
                 self._r_hand_gemo_ids.append(geom_info["GeomId"])
 
-        print("arm_actuator_id: ", self._r_arm_actuator_id)
-        print("hand_actuator_id: ", self._r_hand_actuator_id)
+        # print("arm_actuator_id: ", self._r_arm_actuator_id)
+        # print("hand_actuator_id: ", self._r_hand_actuator_id)
 
         # index used to distinguish arm and gripper joints
         self._l_arm_joint_names = [self.joint("J_arm_l_01"), self.joint("J_arm_l_02"), 
@@ -230,7 +235,7 @@ class OpenLoongEnv(RobomimicEnv):
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
         # self._l_neutral_joint_values = np.zeros(7)
 
-        print("arm_actuator_id: ", self._l_arm_actuator_id)
+        # print("arm_actuator_id: ", self._l_arm_actuator_id)
         self._l_hand_moto_names = [self.actuator("M_zbll_J1"), self.actuator("M_zbll_J2"), self.actuator("M_zbll_J3")
                                     ,self.actuator("M_zbll_J4"),self.actuator("M_zbll_J5"),self.actuator("M_zbll_J6"),
                                     self.actuator("M_zbll_J7"),self.actuator("M_zbll_J8"),self.actuator("M_zbll_J9"),
@@ -250,13 +255,13 @@ class OpenLoongEnv(RobomimicEnv):
         # control range
         self._all_ctrlrange = self.model.get_actuator_ctrlrange()
         neck_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._neck_actuator_id]
-        print("ctrl_range: ", neck_ctrl_range)
+        # print("ctrl_range: ", neck_ctrl_range)
 
         r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
-        print("ctrl_range: ", r_ctrl_range)
+        # print("ctrl_range: ", r_ctrl_range)
 
         l_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
-        print("ctrl_range: ", l_ctrl_range)
+        # print("ctrl_range: ", l_ctrl_range)
 
         self.ctrl = np.zeros(self.nu)
         self._set_init_state()

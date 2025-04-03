@@ -3,20 +3,13 @@ from orca_gym.robomimic.robomimic_env import RobomimicEnv
 from orca_gym.utils import rotations
 import numpy as np
 
-class TaskType:
-    """
-    Enum class for task type.
-    """
-    PICK_AND_PLACE = "pick_and_place"
-    PUSH = "push"
-    LIFT = "lift"
-
 class AbstractTask:
     """
-    :param task_type: Task type.
+    :param prompt: The prompt for the task.
+    :param config: The configuration for the task.
     """
-    def __init__(self, task_type: str, config: dict):
-        self.task_type = task_type
+    def __init__(self, prompt: str, config: dict):
+        self.prompt = prompt
         self.object_bodys = []
         self.object_sites = []
         self.object_joints = []

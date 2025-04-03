@@ -50,7 +50,7 @@ def register_env(orcagym_addr : str,
                  agent_name : str, 
                  run_mode : str, 
                  action_type : str,
-                 task : str,
+                 prompt : str,
                  ctrl_device : str,
                  max_episode_steps : int,
                  sample_range : float,
@@ -67,7 +67,7 @@ def register_env(orcagym_addr : str,
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
                 'action_type': action_type,
-                'task': task,
+                'prompt': prompt,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
                 'sample_range': sample_range,
@@ -471,7 +471,7 @@ def run_example(orcagym_addr : str,
                 run_mode : str,
                 action_type : str,
                 action_step : int,
-                task : str,
+                prompt : str,
                 algo_config : str,
                 ctrl_device : str,
                 max_episode_steps : int,
@@ -489,14 +489,14 @@ def run_example(orcagym_addr : str,
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
-            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]
+            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, task, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -514,7 +514,7 @@ def run_example(orcagym_addr : str,
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, action_type, task, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -534,20 +534,20 @@ def run_example(orcagym_addr : str,
 
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
                                                  cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=action_step,
-                                                 language_instruction=task)
+                                                 language_instruction=prompt)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
 
         elif run_mode == "imitation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]
+            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, task, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -568,13 +568,13 @@ def run_example(orcagym_addr : str,
             env_index = 0
 
             env_kwargs = env_meta["env_kwargs"]
-            task_instruction = env_kwargs["task_instruction"]
+            prompt = env_kwargs["task_instruction"]
             camera_config = env_kwargs["camera_config"]
             sample_range = env_kwargs["sample_range"]
             action_step = env_kwargs["action_step"]
             action_type = env_kwargs["action_type"]
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, task, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env, policy = create_env(ckpt_path)
@@ -591,13 +591,13 @@ def run_example(orcagym_addr : str,
         elif run_mode == "augmentation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            task_instruction = dataset_reader.get_env_kwargs()["task_instruction"]
+            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, task, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -649,7 +649,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     run_mode = args.run_mode
     action_type = args.action_type
     action_step = args.action_step
-    task = args.task
+    prompt = args.prompt
     task_config = args.task_config
     algo = args.algo
     rollout_times = args.rollout_times
@@ -673,11 +673,11 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
 
     if run_mode == "teleoperation":
-        assert task is not None, "The task instruction should not be None."
+        assert prompt is not None, "The task instruction should not be None."
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            task_format = task.replace(" ", "_")
+            task_format = prompt.replace(" ", "_")
             task_format = re.sub(r"[,:;.?!]", "", task_format)
             record_path = f"{current_file_path}/records_tmp/AzureLoong_{task_format}_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
@@ -717,7 +717,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
                     run_mode,
                     action_type,
                     action_step,
-                    task,
+                    prompt,
                     config,
                     ctrl_device,
                     max_episode_steps,
