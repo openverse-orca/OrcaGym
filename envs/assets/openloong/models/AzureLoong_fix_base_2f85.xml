@@ -237,8 +237,8 @@
                           <geom class="collision_2f85" pos="0.0509079 -0.10392 -0.0091" quat="1 -1 0 0" type="mesh" mesh="follower"/>
                           <geom class="collision_2f85" pos="0.0509079 -0.10392 -0.0091" quat="1 -1 0 0" type="mesh" mesh="tongue"/>
                           <body name="r_left_pad" pos="-0.0377897 -0.103916 -0.0091" quat="1 -1 0 0">
-                            <geom class="pad_box1" name="r_left_pad1"/>
-                            <geom class="pad_box2" name="r_left_pad2"/>
+                            <geom class="pad_box1" name="r_left_pad1" group="2"/>
+                            <geom class="pad_box2" name="r_left_pad2" group="2"/>
                           </body>
                         </body>
                       </body>
@@ -267,8 +267,8 @@
                           <geom class="collision_2f85" pos="0.0509079 -0.10392 -0.0091" quat="1 -1 0 0" mesh="tongue"/>
                           <geom class="collision_2f85" pos="0.0509079 -0.10392 -0.0091" quat="1 -1 0 0" mesh="follower"/>
                           <body name="r_right_pad" pos="-0.0377897 -0.103916 -0.0091" quat="1 -1 0 0">
-                            <geom class="pad_box1" name="r_right_pad1"/>
-                            <geom class="pad_box2" name="r_right_pad2"/>
+                            <geom class="pad_box1" name="r_right_pad1" group="2"/>
+                            <geom class="pad_box2" name="r_right_pad2" group="2"/>
                           </body>
                         </body>
                       </body>
