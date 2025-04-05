@@ -140,6 +140,13 @@ class OpenLoongEnv(RobomimicEnv):
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
+        
+        if self._ctrl_device == ControlDevice.VR:
+            pico_joystick = PicoJoystick()
+            self._joystick = {}
+            for agent_name in agent_names:
+                self._joystick[agent_name] = pico_joystick
+        
         self._sample_range = sample_range
         self._reward_type = reward_type
         self._setup_reward_functions(reward_type)
@@ -219,9 +226,12 @@ class OpenLoongEnv(RobomimicEnv):
     def action_type(self) -> ActionType:
         return self._action_type
     
+    @property
+    def joystick(self) -> Optional[PicoJoystick]:
+        if self._ctrl_device == ControlDevice.VR:
+            return self._joystick
+    
     def set_task_status(self, status: TaskStatus):
-        if status not in [TaskStatus.NOT_STARTED, TaskStatus.SUCCESS, TaskStatus.FAILURE]:
-            raise ValueError(f"Invalid task status: {status}")
         if status == TaskStatus.SUCCESS:
             print("Task success!")
         elif status == TaskStatus.FAILURE:
@@ -501,10 +511,10 @@ class OpenLoongEnv(RobomimicEnv):
             else:
                 raise ValueError("Invalid action type: ", self._action_type)
 
-    def disable_actuators(self, actuator_names):
+    def disable_actuators(self, actuator_names, trnid):
         for actuator_name in actuator_names:
             actuator_id = self.model.actuator_name2id(actuator_name)
-            self.disable_actuator(actuator_id)
+            self.set_actuator_trnid(actuator_id, trnid)
 
 
 ## --------------------------------            
@@ -527,7 +537,10 @@ class OpenLoongAgent:
         self._base_body_name = [env.body("base_link", id)]
         self._base_body_xpos, _, self._base_body_xquat = env.get_body_xpos_xmat_xquat(self._base_body_name)
         print("base_body_xpos: ", self._base_body_xpos)
-        print("base_body_xquat: ", self._base_body_xquat)        
+        print("base_body_xquat: ", self._base_body_xquat)     
+        
+        self._waist_pitch_joint_name = env.joint("J_waist_pitch", id)
+        self._waist_pitch_joint_id = env.model.joint_name2id(self._waist_pitch_joint_name)
 
         self._neck_joint_names = [env.joint("J_head_yaw", id), env.joint("J_head_pitch", id)]
         self._neck_actuator_names = [env.actuator("M_head_yaw", id), env.actuator("M_head_pitch", id)]
@@ -546,15 +559,15 @@ class OpenLoongAgent:
                                       env.actuator("P_arm_r_03", id),env.actuator("P_arm_r_04", id),
                                       env.actuator("P_arm_r_05", id),env.actuator("P_arm_r_06", id),env.actuator("P_arm_r_07", id)]
         if env.action_use_motor():
-            env.disable_actuators(self._r_arm_position_names)
+            env.disable_actuators(self._r_arm_position_names, self._waist_pitch_joint_id)
             self._r_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
         else:
-            env.disable_actuators(self._r_arm_motor_names)
+            env.disable_actuators(self._r_arm_motor_names, self._waist_pitch_joint_id)
             self._r_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
         
 
-        # print("arm_actuator_id: ", self._r_arm_actuator_id)
+        
         # print("hand_actuator_id: ", self._r_hand_actuator_id)
 
         # index used to distinguish arm and gripper joints
@@ -568,13 +581,15 @@ class OpenLoongAgent:
                                       env.actuator("P_arm_l_03", id),env.actuator("P_arm_l_04", id),
                                       env.actuator("P_arm_l_05", id),env.actuator("P_arm_l_06", id),env.actuator("P_arm_l_07", id)]
         if env.action_use_motor():
-            env.disable_actuators(self._l_arm_position_names)
+            env.disable_actuators(self._l_arm_position_names, self._waist_pitch_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         else:
-            env.disable_actuators(self._l_arm_moto_names)
+            env.disable_actuators(self._l_arm_moto_names, self._waist_pitch_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
         # self._l_neutral_joint_values = np.zeros(7)
+        
+        print("arm_actuator_id: ", self._r_arm_actuator_id, self._l_arm_actuator_id)
 
         # control range
         self._all_ctrlrange = env.model.get_actuator_ctrlrange()
@@ -592,6 +607,9 @@ class OpenLoongAgent:
         arm_qpos_range_r = env.model.get_joint_qposrange(self._r_arm_joint_names)
         self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
+
+        self.set_joint_neutral(env)
+        env.mj_forward()
 
         NECK_NAME  = env.site("neck_center_site", id)
         site_dict = env.query_site_pos_and_quat([NECK_NAME])
@@ -620,7 +638,7 @@ class OpenLoongAgent:
         
         if env.run_mode == RunMode.TELEOPERATION:
             if env.ctrl_device == ControlDevice.VR:
-                self._pico_joystick = PicoJoystick()
+                self._pico_joystick = env.joystick[self.name]
             else:
                 raise ValueError("Invalid control device: ", env.ctrl_device)
 
