@@ -20,7 +20,7 @@ import argparse
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='AzureLoong', help='The agent name to control')
+    parser.add_argument('--agent_name', type=str, default='OpenLoongHand', help='The agent name to control')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--action_type', type=str, default='end_effector', help='The action type of the environment (end_effector / joint_pos)')
     parser.add_argument('--action_step', type=int, default=5, help='How may simulation steps to take for each action, 5 for end_effector, 1 for joint_pos')
