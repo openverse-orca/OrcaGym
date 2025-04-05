@@ -46,9 +46,9 @@ class ActionType:
     JOINT_POS = "joint_pos"
 
 class OpenLoongTask(AbstractTask):
-    def __init__(self, task_type: str, config: dict):
+    def __init__(self, config: dict):
 
-        super().__init__(task_type, config)
+        super().__init__(config)
 
     def get_task(self, env: RobomimicEnv):
         """ 从object,goal中选择数量最少的
@@ -76,7 +76,7 @@ class OpenLoongTask(AbstractTask):
 
     def get_language_instruction(self) -> str:
         if len(self.task_dict) == 0:
-            return f"\033[91m {self.prompt} \033[0m"
+            return "Do something."
 
         object_str = "object: "
         for key in self.task_dict.keys():
@@ -86,8 +86,8 @@ class OpenLoongTask(AbstractTask):
         for value in self.task_dict.values():
             goal_str += value + " "
         
-        language_instruction = f"level: {self.level_name}\ntask: {self.prompt}"
-        language_instruction += f" \033[91m{object_str}\033[0m to \033[91m{goal_str}\033[0m"                               
+        language_instruction = f"level: {self.level_name} task: {self.prompt}"
+        language_instruction += f"{object_str} to {goal_str}"                               
 
         return language_instruction
 
@@ -125,18 +125,17 @@ class OpenLoongEnv(RobomimicEnv):
         time_step: float,
         run_mode: RunMode,
         action_type: ActionType,
-        prompt: str,
         ctrl_device: ControlDevice,
         control_freq: int,
         sample_range: float,
+        task_config_dict: dict,
         **kwargs,
     ):
 
         self._run_mode = run_mode
         self._action_type = action_type
 
-        task_config_dict = kwargs["task_config_dict"]
-        self._task = OpenLoongTask(prompt, task_config_dict)
+        self._task = OpenLoongTask(task_config_dict)
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
@@ -539,8 +538,7 @@ class OpenLoongAgent:
         print("base_body_xpos: ", self._base_body_xpos)
         print("base_body_xquat: ", self._base_body_xquat)     
         
-        self._waist_pitch_joint_name = env.joint("J_waist_pitch", id)
-        self._waist_pitch_joint_id = env.model.joint_name2id(self._waist_pitch_joint_name)
+        dummy_joint_id = env.model.joint_name2id(env.joint("dummy_joint", id))
 
         self._neck_joint_names = [env.joint("J_head_yaw", id), env.joint("J_head_pitch", id)]
         self._neck_actuator_names = [env.actuator("M_head_yaw", id), env.actuator("M_head_pitch", id)]
@@ -559,10 +557,10 @@ class OpenLoongAgent:
                                       env.actuator("P_arm_r_03", id),env.actuator("P_arm_r_04", id),
                                       env.actuator("P_arm_r_05", id),env.actuator("P_arm_r_06", id),env.actuator("P_arm_r_07", id)]
         if env.action_use_motor():
-            env.disable_actuators(self._r_arm_position_names, self._waist_pitch_joint_id)
+            env.disable_actuators(self._r_arm_position_names, dummy_joint_id)
             self._r_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
         else:
-            env.disable_actuators(self._r_arm_motor_names, self._waist_pitch_joint_id)
+            env.disable_actuators(self._r_arm_motor_names, dummy_joint_id)
             self._r_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
         self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
         
@@ -581,10 +579,10 @@ class OpenLoongAgent:
                                       env.actuator("P_arm_l_03", id),env.actuator("P_arm_l_04", id),
                                       env.actuator("P_arm_l_05", id),env.actuator("P_arm_l_06", id),env.actuator("P_arm_l_07", id)]
         if env.action_use_motor():
-            env.disable_actuators(self._l_arm_position_names, self._waist_pitch_joint_id)
+            env.disable_actuators(self._l_arm_position_names, dummy_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_moto_names]
         else:
-            env.disable_actuators(self._l_arm_moto_names, self._waist_pitch_joint_id)
+            env.disable_actuators(self._l_arm_moto_names, dummy_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
         # self._l_neutral_joint_values = np.zeros(7)
@@ -1078,19 +1076,19 @@ class OpenLoongAgent:
             action_l = action[:6]
             self._l_controller.set_goal(action_l)
             ctrl = self._l_controller.run_controller()
-            self._set_arm_ctrl(self._l_arm_actuator_id, ctrl)
+            self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl)
 
             action_r = action[14:20]
             self._r_controller.set_goal(action_r)
             ctrl = self._r_controller.run_controller()
-            self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
+            self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl)
 
         elif env.action_type == ActionType.JOINT_POS:
             l_arm_joint_action = action[6:13]
-            self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_joint_action)
+            self._set_arm_ctrl(env, self._l_arm_actuator_id, l_arm_joint_action)
 
             r_arm_joint_action = action[20:27]
-            self._set_arm_ctrl(self._r_arm_actuator_id, r_arm_joint_action)
+            self._set_arm_ctrl(env, self._r_arm_actuator_id, r_arm_joint_action)
         else:
             raise ValueError("Invalid action type: ", self._action_type)
         

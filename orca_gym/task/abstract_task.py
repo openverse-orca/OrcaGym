@@ -8,8 +8,7 @@ class AbstractTask:
     :param prompt: The prompt for the task.
     :param config: The configuration for the task.
     """
-    def __init__(self, prompt: str, config: dict):
-        self.prompt = prompt
+    def __init__(self, config: dict):
         self.object_bodys = []
         self.object_sites = []
         self.object_joints = []
@@ -49,7 +48,7 @@ class AbstractTask:
         """
         Load task configuration from a dictionary.
         """
-        if len(config) == 0:
+        if config is None or len(config) == 0:
             return
         self.object_bodys = config["object_bodys"]
         self.object_sites = config["object_sites"]
