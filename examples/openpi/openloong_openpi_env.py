@@ -8,8 +8,8 @@ from orca_gym.sensor.rgbd_camera import CameraWrapper
 from orca_gym.scripts.openloong_manipulation import RGB_SIZE, CAMERA_CONFIG
 
 
-class AzureLoongOpenpiEnv(_environment.Environment):
-    """An environment for an AzureLoong robot in simulation."""
+class OpenLoongOpenpiEnv(_environment.Environment):
+    """An environment for an OpenLoong robot in simulation."""
 
     def __init__(self, 
                  env_id: str, 

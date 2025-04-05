@@ -367,10 +367,10 @@ class OrcaGymLocal(OrcaGymBase):
             }
         return actuator_dict
     
-    def disable_actuator(self, actuator_id):
+    def set_actuator_trnid(self, actuator_id, trnid):
         model = self._mjModel
         actuator = model.actuator(actuator_id)
-        actuator.trnid[0] = -1
+        actuator.trnid[0] = trnid
 
     def query_all_bodies(self):
         model = self._mjModel

@@ -13,7 +13,7 @@ import argparse
 
 import logging
 
-import examples.openpi.azureloong_openpi_env as _env
+import examples.openpi.openloong_openpi_env as _env
 from openpi_client import action_chunk_broker
 from openpi_client import websocket_client_policy as _websocket_client_policy
 from openpi_client.runtime import runtime as _runtime
@@ -83,7 +83,7 @@ def main(args) -> None:
     
         
     runtime = _runtime.Runtime(
-        environment=_env.AzureLoongOpenpiEnv(
+        environment=_env.OpenLoongOpenpiEnv(
             env_id=env_id,
             seed=seed,
             prompt=task_instruction,
@@ -114,11 +114,10 @@ def main(args) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='AzureLoong', help='The agent name to control')
+    parser.add_argument('--agent_names', type=str, default='OpenLoongHand', help='The agent names to control, separated by space')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--action_type', type=str, default='joint_pos', help='The action type of the environment (end_effector / joint_pos)')
     parser.add_argument('--action_step', type=int, default=1, help='How may simulation steps to take for each action. 5 for end_effector, 1 for joint_pos')
-    parser.add_argument('--prompt', type=str, help='The task instruction to do teleoperation')
     parser.add_argument('--task_config', type=str, help='The task config file to load')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')
     parser.add_argument('--dataset', type=str, help='The file path to save the record')

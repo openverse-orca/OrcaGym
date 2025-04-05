@@ -47,10 +47,9 @@ CAMERA_CONFIG = {
 def register_env(orcagym_addr : str, 
                  env_name : str, 
                  env_index : int, 
-                 agent_name : str, 
+                 agent_names : str, 
                  run_mode : str, 
                  action_type : str,
-                 prompt : str,
                  ctrl_device : str,
                  max_episode_steps : int,
                  sample_range : float,
@@ -59,21 +58,20 @@ def register_env(orcagym_addr : str,
                  task_config_dict: Dict[str, Any] = None) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
-    agent_names = [f"{agent_name}"]
+    agent_names_list = agent_names.split(" ")
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'reward_type': RewardType.SPARSE,
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': agent_names, 
+                'agent_names': agent_names_list, 
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
                 'action_type': action_type,
-                'prompt': prompt,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
                 'sample_range': sample_range,
                 'action_step': action_step,
                 'camera_config': camera_config,
-              'task_config_dict': task_config_dict}
+                'task_config_dict': task_config_dict}
     gym.register(
         id=env_id,
         entry_point=ENV_ENTRY_POINT[env_name],
@@ -186,8 +184,7 @@ def do_teleoperation(env,
                      cameras : list[CameraWrapper], 
                      obs_camera : bool,
                      rgb_size : tuple = (256, 256),
-                     action_step : int = 1,
-                     language_instruction : str = None):    
+                     action_step : int = 1,):    
     
     current_round = 1
     
@@ -466,12 +463,11 @@ def terminate_monitor(process):
 
 
 def run_example(orcagym_addr : str,
-                agent_name : str,
+                agent_names : str,
                 record_path : str,
                 run_mode : str,
                 action_type : str,
                 action_step : int,
-                prompt : str,
                 algo_config : str,
                 ctrl_device : str,
                 max_episode_steps : int,
@@ -489,14 +485,14 @@ def run_example(orcagym_addr : str,
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
-            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
+            print("kwargs: ", dataset_reader.get_env_kwargs())
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -514,7 +510,7 @@ def run_example(orcagym_addr : str,
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.TELEOPERATION, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -533,21 +529,19 @@ def run_example(orcagym_addr : str,
 
 
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
-                                                 cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=action_step,
-                                                 language_instruction=prompt)
+                                                 cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=action_step,)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
 
         elif run_mode == "imitation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -568,13 +562,12 @@ def run_example(orcagym_addr : str,
             env_index = 0
 
             env_kwargs = env_meta["env_kwargs"]
-            prompt = env_kwargs["task_instruction"]
             camera_config = env_kwargs["camera_config"]
             sample_range = env_kwargs["sample_range"]
             action_step = env_kwargs["action_step"]
             action_type = env_kwargs["action_type"]
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env, policy = create_env(ckpt_path)
@@ -591,13 +584,12 @@ def run_example(orcagym_addr : str,
         elif run_mode == "augmentation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
-            prompt = dataset_reader.get_env_kwargs()["task_instruction"]
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, action_type, prompt, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -642,14 +634,13 @@ def _get_algo_config(algo_name):
 
 def run_openloong_sim(args, project_root : str = None, current_file_path : str = None):
     orcagym_addr = args.orcagym_address
-    agent_name = args.agent_name
+    agent_names = args.agent_names
     record_time = args.record_length
     record_path = args.dataset
     playback_mode = args.playback_mode
     run_mode = args.run_mode
     action_type = args.action_type
     action_step = args.action_step
-    prompt = args.prompt
     task_config = args.task_config
     algo = args.algo
     rollout_times = args.rollout_times
@@ -673,13 +664,10 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
 
     if run_mode == "teleoperation":
-        assert prompt is not None, "The task instruction should not be None."
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            task_format = prompt.replace(" ", "_")
-            task_format = re.sub(r"[,:;.?!]", "", task_format)
-            record_path = f"{current_file_path}/records_tmp/AzureLoong_{task_format}_{formatted_now}.hdf5"
+            record_path = f"{current_file_path}/records_tmp/OpenLoong_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
@@ -694,8 +682,6 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
 
     if args.ctrl_device == 'vr':
         ctrl_device = ControlDevice.VR
-    elif args.ctrl_device == 'random_sample':
-        ctrl_device = ControlDevice.RANDOM_SAMPLE
     else:
         print("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
@@ -704,7 +690,10 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    ports = [7070, 7080, 7090]
+    ports = [
+        7070, 7080, 7090,        # Agent1
+        8070, 8080, 8090,        # Agent2
+    ]
     monitor_processes = []
     for port in ports:
         process = start_monitor(port=port, project_root=project_root)
@@ -712,12 +701,11 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
 
     for config in algo_config:
         run_example(orcagym_addr,
-                    agent_name,
+                    agent_names,
                     record_path,
                     run_mode,
                     action_type,
                     action_step,
-                    prompt,
                     config,
                     ctrl_device,
                     max_episode_steps,
