@@ -47,7 +47,8 @@ CAMERA_CONFIG = {
 def register_env(orcagym_addr : str, 
                  env_name : str, 
                  env_index : int, 
-                 agent_names : str, 
+                 agent_names : str,
+                 pico_ports : str,
                  run_mode : str, 
                  action_type : str,
                  ctrl_device : str,
@@ -59,10 +60,14 @@ def register_env(orcagym_addr : str,
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names_list = agent_names.split(" ")
+    print("Agent names: ", agent_names_list)
+    pico_ports = pico_ports.split(" ")
+    print("Pico ports: ", pico_ports)
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'reward_type': RewardType.SPARSE,
                 'orcagym_addr': orcagym_addr, 
-                'agent_names': agent_names_list, 
+                'agent_names': agent_names_list,
+                'pico_ports': pico_ports,
                 'time_step': TIME_STEP,
                 'run_mode': run_mode,
                 'action_type': action_type,
@@ -464,6 +469,7 @@ def terminate_monitor(process):
 
 def run_example(orcagym_addr : str,
                 agent_names : str,
+                pico_ports : str,
                 record_path : str,
                 run_mode : str,
                 action_type : str,
@@ -492,7 +498,7 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -510,7 +516,7 @@ def run_example(orcagym_addr : str,
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.TELEOPERATION, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.TELEOPERATION, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -541,7 +547,7 @@ def run_example(orcagym_addr : str,
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -567,7 +573,7 @@ def run_example(orcagym_addr : str,
             action_step = env_kwargs["action_step"]
             action_type = env_kwargs["action_type"]
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env, policy = create_env(ckpt_path)
@@ -589,7 +595,7 @@ def run_example(orcagym_addr : str,
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -635,6 +641,7 @@ def _get_algo_config(algo_name):
 def run_openloong_sim(args, project_root : str = None, current_file_path : str = None):
     orcagym_addr = args.orcagym_address
     agent_names = args.agent_names
+    pico_ports = args.pico_ports
     record_time = args.record_length
     record_path = args.dataset
     playback_mode = args.playback_mode
@@ -702,6 +709,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     for config in algo_config:
         run_example(orcagym_addr,
                     agent_names,
+                    pico_ports,
                     record_path,
                     run_mode,
                     action_type,

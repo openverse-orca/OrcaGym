@@ -547,6 +547,14 @@
   </contact>
 
   <actuator>
+    <position name="P_arm_l_01" joint="J_arm_l_01" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-80 80"/>
+    <position name="P_arm_l_02" joint="J_arm_l_02" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.8326 1.8326" forcelimited="true" forcerange="-80 80"/>
+    <position name="P_arm_l_03" joint="J_arm_l_03" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-48 48"/>
+    <position name="P_arm_l_04" joint="J_arm_l_04" kp="200" kv="20" ctrllimited="true" ctrlrange="0 2.96706" forcelimited="true" forcerange="-48 48"/>
+    <position name="P_arm_l_05" joint="J_arm_l_05" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-12.4 12.4"/>
+    <position name="P_arm_l_06" joint="J_arm_l_06" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.8326 1.8326" forcelimited="true" forcerange="-12.4 12.4"/>
+    <position name="P_arm_l_07" joint="J_arm_l_07" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.0472 1.0472" forcelimited="true" forcerange="-12.4 12.4"/>
+
     <motor name="M_arm_l_01" joint="J_arm_l_01" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
     <motor name="M_arm_l_02" joint="J_arm_l_02" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
     <motor name="M_arm_l_03" joint="J_arm_l_03" gear="1" ctrllimited="true" ctrlrange="-48 48"/>
@@ -554,6 +562,14 @@
     <motor name="M_arm_l_05" joint="J_arm_l_05" gear="1" ctrllimited="true" ctrlrange="-12.4 12.4"/>
     <motor name="M_arm_l_06" joint="J_arm_l_06" gear="1" ctrllimited="true" ctrlrange="-12.4 12.4"/>
     <motor name="M_arm_l_07" joint="J_arm_l_07" gear="1" ctrllimited="true" ctrlrange="-12.4 12.4"/>
+
+    <position name="P_arm_r_01" joint="J_arm_r_01" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-80 80"/>
+    <position name="P_arm_r_02" joint="J_arm_r_02" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.8326 1.8326" forcelimited="true" forcerange="-80 80"/>
+    <position name="P_arm_r_03" joint="J_arm_r_03" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-48 48"/>
+    <position name="P_arm_r_04" joint="J_arm_r_04" kp="200" kv="20" ctrllimited="true" ctrlrange="0 2.96706" forcelimited="true" forcerange="-48 48"/>
+    <position name="P_arm_r_05" joint="J_arm_r_05" kp="200" kv="20" ctrllimited="true" ctrlrange="-2.96706 2.96706" forcelimited="true" forcerange="-12.4 12.4"/>
+    <position name="P_arm_r_06" joint="J_arm_r_06" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.8326 1.8326" forcelimited="true" forcerange="-12.4 12.4"/>
+    <position name="P_arm_r_07" joint="J_arm_r_07" kp="200" kv="20" ctrllimited="true" ctrlrange="-1.0472 1.0472" forcelimited="true" forcerange="-12.4 12.4"/>
 
     <motor name="M_arm_r_01" joint="J_arm_r_01" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
     <motor name="M_arm_r_02" joint="J_arm_r_02" gear="1" ctrllimited="true" ctrlrange="-80 80"/>
