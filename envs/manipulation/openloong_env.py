@@ -143,8 +143,12 @@ class OpenLoongEnv(RobomimicEnv):
         
         if self._ctrl_device == ControlDevice.VR:
             self._joystick = {}
+            pico_joystick = []
+            for i in range(len(pico_ports)):
+                pico_joystick.append(PicoJoystick(int(pico_ports[i])))
             for i in range(len(agent_names)):
-                self._joystick[agent_names[i]] = PicoJoystick(int(pico_ports[i]))
+                # 当agent数量大于pico数量时，使用最后一个pico
+                self._joystick[agent_names[i]] = pico_joystick[min(i, len(pico_joystick) - 1)]
         
         self._sample_range = sample_range
         self._reward_type = reward_type
@@ -178,7 +182,7 @@ class OpenLoongEnv(RobomimicEnv):
         self.ctrl = np.zeros(self.nu)
         self.mj_forward()   # Do this before initializing the controller, joints, sites, bodies, to avoid NaN error.
 
-        self._agents : dict[str, OpenLoongAgent] = {}
+        self._agents : dict[str, AgentBase] = {}
         for id, agent_name in enumerate(self._agent_names):
             if agent_name.startswith("OpenLoongHand"):
                 self._agents[agent_name] = OpenLoongHandAgent(self, id=id, name=agent_name)
@@ -519,7 +523,7 @@ class OpenLoongEnv(RobomimicEnv):
 ## --------------------------------            
 ## Agent Class
 ## --------------------------------            
-class OpenLoongAgent:
+class AgentBase:
     def __init__(self, env: OpenLoongEnv, id: int, name: str) -> None:
         self._id = id
         self._name = name
@@ -531,6 +535,38 @@ class OpenLoongAgent:
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def action_range(self) -> np.ndarray:
+        return self._action_range
+
+    def set_joint_neutral(self, env: OpenLoongEnv) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def update_force_feedback(self, env: OpenLoongEnv) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def fill_arm_joint_pos(self, env: OpenLoongEnv, action: np.ndarray) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def on_playback_action(self, env: OpenLoongEnv, action: np.ndarray) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def get_obs(self, env: OpenLoongEnv) -> dict:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def on_reset_model(self, env: OpenLoongEnv) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+    
+    def on_close(self) -> None:
+        pass
+    
+class OpenLoongAgent(AgentBase):
+    def __init__(self, env: OpenLoongEnv, id: int, name: str) -> None:
+        super().__init__(env, id, name)
 
     def init_agent(self, env: OpenLoongEnv, id: int):
         self._base_body_name = [env.body("base_link", id)]
@@ -872,9 +908,7 @@ class OpenLoongAgent:
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
         
-    @property
-    def action_range(self) -> np.ndarray:
-        return self._action_range
+
 
     def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
@@ -924,7 +958,7 @@ class OpenLoongAgent:
 
         return action
 
-    def fill_arm_joint_pos(self, env : OpenLoongEnv, action) -> None:
+    def fill_arm_joint_pos(self, env : OpenLoongEnv, action : np.ndarray) -> np.ndarray:
         arm_joint_values_l = self._get_arm_joint_values(env, self._l_arm_joint_names)
         arm_joint_values_r = self._get_arm_joint_values(env, self._r_arm_joint_names)
         action[6:13] = arm_joint_values_l
