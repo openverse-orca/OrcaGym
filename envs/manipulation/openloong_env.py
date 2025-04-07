@@ -122,6 +122,7 @@ class OpenLoongEnv(RobomimicEnv):
         reward_type: str,
         orcagym_addr: str,
         agent_names: list,
+        pico_ports: list,
         time_step: float,
         run_mode: RunMode,
         action_type: ActionType,
@@ -141,10 +142,9 @@ class OpenLoongEnv(RobomimicEnv):
         self._control_freq = control_freq
         
         if self._ctrl_device == ControlDevice.VR:
-            pico_joystick = PicoJoystick()
             self._joystick = {}
-            for agent_name in agent_names:
-                self._joystick[agent_name] = pico_joystick
+            for i in range(len(agent_names)):
+                self._joystick[agent_names[i]] = PicoJoystick(int(pico_ports[i]))
         
         self._sample_range = sample_range
         self._reward_type = reward_type
