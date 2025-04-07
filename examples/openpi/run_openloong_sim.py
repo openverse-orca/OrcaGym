@@ -114,6 +114,19 @@ def main(args) -> None:
 
 
 if __name__ == "__main__":
+
+    # 如果要使用多Pico设备，需要设置adb反向端口转发
+    # adb device 命令查看设备序列号
+
+    # PICO_01:8001 -----> PC:8001
+    # adb -s <device_serial_number_01> reverse tcp:8001 tcp:8001
+
+    #PICO_02:8001 -----> PC:8002
+    # adb -s <device_serial_number_02> reverse tcp:8001 tcp:8002  
+    
+    # 脚本参数a增加--pico_ports参数，指定多个端口
+    # 例如：--pico_ports "8001 8002"
+
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_names', type=str, default='OpenLoongHand', help='The agent names to control, separated by space')

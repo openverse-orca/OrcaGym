@@ -1153,7 +1153,7 @@ class OpenLoongHandAgent(OpenLoongAgent):
         # Press secondary button to set gripper minimal value
         offset_rate_clip_adjust_rate = 0.1  # 10% per second
         if joystick_state["leftHand"]["secondaryButtonPressed"]:
-            self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt    
+            self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * env.dt    
             self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["leftHand"]["primaryButtonPressed"]:
             self._l_gripper_offset_rate_clip = 0
@@ -1173,7 +1173,7 @@ class OpenLoongHandAgent(OpenLoongAgent):
         # Press secondary button to set gripper minimal value
         offset_rate_clip_adjust_rate = 0.1
         if joystick_state["rightHand"]["secondaryButtonPressed"]:
-            self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self.dt
+            self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * env.dt
             self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
         elif joystick_state["rightHand"]["primaryButtonPressed"]:
             self._r_gripper_offset_rate_clip = 0
