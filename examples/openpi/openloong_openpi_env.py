@@ -6,7 +6,7 @@ from typing_extensions import override
 import cv2
 from orca_gym.sensor.rgbd_camera import CameraWrapper
 from orca_gym.scripts.openloong_manipulation import RGB_SIZE, CAMERA_CONFIG
-
+import time
 
 class OpenLoongOpenpiEnv(_environment.Environment):
     """An environment for an OpenLoong robot in simulation."""
@@ -48,13 +48,28 @@ class OpenLoongOpenpiEnv(_environment.Environment):
 
     @override
     def apply_action(self, action: dict) -> None:
-        gym_obs, reward, terminated, truncated, info = self._gym.step(action["actions"])
+        joint_pos = action["actions"]
+        agetn_action = np.concatenate([
+            np.zeros(6),                # left hand ee pos and angle euler
+            joint_pos[:7],              # left arm joint pos
+            joint_pos[7:8],             # left hand grasp value
+            np.zeros(6),                # right hand ee pos and angle euler
+            joint_pos[8:15],             # right arm joint pos
+            joint_pos[15:16],           # right hand grasp value
+        ]).flatten()
+        gym_obs, reward, terminated, truncated, info = self._gym.step(agetn_action)
+        
+        self._gym.render()
+        
+        # 等待渲染结果串流到orcagym的客户端，最长等待时间不超过最大帧率
+        time.sleep(0.02) # max_hz=50
+        
         self._last_obs = self._convert_observation(gym_obs)  # type: ignore
         self._done = terminated or truncated
         self._episode_reward = max(self._episode_reward, reward)
 
     def _convert_observation(self, gym_obs: dict) -> dict:
-        img = self._camera.get_frame(format="rgb24", size=RGB_SIZE)
+        img, _ = self._camera.get_frame(format="rgb24", size=RGB_SIZE)
         
         # img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
         img = cv2.resize(img, (224, 224))
@@ -62,8 +77,18 @@ class OpenLoongOpenpiEnv(_environment.Environment):
         # Convert axis order from [H, W, C] --> [C, H, W]
         img = np.transpose(img, (2, 0, 1))
         
+        
+        joint_qpos = np.concatenate([
+            gym_obs["arm_joint_qpos_l"], 
+            gym_obs["grasp_value_l"],
+            gym_obs["arm_joint_qpos_r"],
+            gym_obs["grasp_value_r"],
+        ]).flatten()        
+        
+        
         return {
-            "state": gym_obs["agent_pos"],
+            "state": joint_qpos,
             "images": {"cam_high": img},
             "prompt": self._prompt,
         }
+
