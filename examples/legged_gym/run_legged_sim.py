@@ -93,7 +93,7 @@ def main(orcagym_addr: str,
         print("Starting simulation...")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = PPO.load(model_file, env=env, device=device)
+        model = PPO.load(model_file, device=device)
 
         agent_name_list = agent_names.split(" ")
         run_simulation(
