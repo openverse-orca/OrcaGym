@@ -42,6 +42,8 @@ FRAME_SKIP = 4
 REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for rendering
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for ppo policy
 
+MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
+
 def register_env(orcagym_addr : str, 
                  env_name : str, 
                  env_index : int, 
@@ -52,12 +54,12 @@ def register_env(orcagym_addr : str,
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names_list = agent_names.split(" ")
     print("Agent names: ", agent_names_list)
-    pico_ports = pico_ports.split(" ")
-    print("Pico ports: ", pico_ports)
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'orcagym_addr': orcagym_addr, 
+                'env_id': env_id,
                 'agent_names': agent_names_list,
                 'time_step': TIME_STEP,
+                'max_episode_steps': max_episode_steps,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,}
     gym.register(
@@ -70,20 +72,21 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 
-def run_sim(orcagym_addresses, 
-               agent_name, 
-               model_file,
-               ctrl_device,):
+def main(orcagym_addr: str,
+                   agent_names: str,
+                   model_file: str,
+                   ctrl_device: str = "keyboard",):
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addresses)
+        print("simulation running... , orcagym_addr: ", orcagym_addr)
         env_name = "LeggedSim-v0"
-        env_id, kwargs = register_env(orcagym_addresses, 
-                                      env_name, 
-                                      0, 
-                                      [agent_name], 
-                                      ctrl_device, 
-                                      sys.maxsize, 
-                                      )
+        env_id, kwargs = register_env(
+            orcagym_addr=orcagym_addr, 
+            env_name=env_name, 
+            env_index=0, 
+            agent_names=agent_names, 
+            ctrl_device=ctrl_device, 
+            max_episode_steps=MAX_EPISODE_STEPS,
+        )
         print("Registered environment: ", env_id)
 
         env = gym.make(env_id)
@@ -92,27 +95,49 @@ def run_sim(orcagym_addresses,
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = PPO.load(model_file, env=env, device=device)
 
-        testing_model(env, 1, model, time_step, max_episode_steps, frame_skip)
-    except KeyboardInterrupt:
+        agent_name_list = agent_names.split(" ")
+        run_simulation(
+            env=env,
+            agent_name_list=agent_name_list,
+            model=model,
+            time_step=TIME_STEP,
+            frame_skip=FRAME_SKIP
+        )
+    finally:
         print("退出仿真环境")
         env.close()
 
-def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episode_steps, frame_skip):
-    # 测试模型
-    observations = env.reset()
-    test = 0
-    total_rewards = np.zeros(agent_num)
-    step = 0
+def segment_obs(obs: dict[str, np.ndarray], agent_name_list: list[str]) -> dict[str, dict[str, np.ndarray]]:
+    if len(agent_name_list) == 1:
+        return {agent_name_list[0]: obs}
+    
+    segmented_obs = {}
+    for agent_name in agent_name_list:
+        segmented_obs[agent_name] = {}
+        for key in obs.keys():
+            if key.startswith(agent_name):
+                new_key = key.replace(f"{agent_name}_", "")
+                segmented_obs[agent_name][new_key] = obs[key]
+    return segmented_obs
+    
+
+def run_simulation(env: gym.Env, 
+                 agent_name_list: list[str],
+                 model: nn.Module, 
+                 time_step: float, 
+                 frame_skip: int):
+    obs, info = env.reset()
+    # print("obs: ", obs)
     dt = time_step * frame_skip
-    print("Start Testing!")
     try:
         while True:
-            step += 1
             start_time = datetime.now()
 
-            obs_list = _segment_observation(observations, agent_num)
+            segmented_obs = segment_obs(obs, agent_name_list)
+            # print("segmented_obs: ", segmented_obs)
             action_list = []
-            for agent_obs in obs_list:
+            for agent_obs in segmented_obs.values():
+                # print("agent_obs: ", agent_obs)
                 # predict_start = datetime.now()
                 action, _states = model.predict(agent_obs, deterministic=True)
                 action_list.append(action)
@@ -122,7 +147,7 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
             action = np.concatenate(action_list).flatten()
             # print("action: ", action)
             # setp_start = datetime.now()
-            observations, rewards, dones, infos = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
 
             # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
 
@@ -131,19 +156,10 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
             # step_time = datetime.now() - setp_start
             # print("Step Time: ", step_time.total_seconds(), flush=True)
 
-            total_rewards += rewards
-
-            # 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:
                 # print("Sleep for ", dt - elapsed_time.total_seconds())
                 time.sleep(dt - elapsed_time.total_seconds())
-
-            if step == max_episode_steps:
-                _output_test_info(test, total_rewards, rewards, dones, infos)
-                step = 0
-                test += 1
-                total_rewards = np.zeros(agent_num)
             
     finally:
         print("退出仿真环境")
@@ -151,22 +167,17 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
-    parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
-    parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
+    parser.add_argument('--orcagym_addr', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
+    parser.add_argument('--agent_names', type=str, default='go2', help='The name list of the agent to control, separated by space')
+    parser.add_argument('--model_file', type=str, help='The model file to load')
     parser.add_argument('--ctrl_device', type=str, default='keyboard', help='The control device to use ')
     args = parser.parse_args()
 
-
-
-    orcagym_addresses = args.orcagym_addresses
-    model_file = args.model_file
-    agent_name = args.agent_name
-    ctrl_device = args.ctrl_device
-
-    run_sim(orcagym_addresses, 
-               agent_name, 
-               model_file,
-               ctrl_device)    
+    main(
+        orcagym_addr=args.orcagym_addr, 
+        agent_names=args.agent_names, 
+        model_file=args.model_file,
+        ctrl_device=args.ctrl_device
+    )    
 
 

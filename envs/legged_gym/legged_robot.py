@@ -301,7 +301,6 @@ class LeggedRobot(OrcaGymAgent):
         self._action[:] = action
     
     def set_action_space(self, action_space : spaces) -> None:
-        self._action_space = action_space
         self._action_space_range = np.array([action_space.low[0], action_space.high[0]]) 
         
     def init_joint_index(self, qpos_offset, qvel_offset, qacc_offset, qpos_length, qvel_length, qacc_length) -> None:

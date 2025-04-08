@@ -27,6 +27,8 @@ class ControlDevice:
 
 
 class LeggedSimEnv(OrcaGymLocalEnv):
+    metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
+    
     """
     Legged robot simulation environment.
     Robot's locomotion is controlled by ppo policy.
@@ -38,14 +40,18 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self,
         frame_skip: int,        
         orcagym_addr: str,
+        env_id: str,
         agent_names: list,
         time_step: float,
+        max_episode_steps: int,
         ctrl_device: ControlDevice,
         control_freq: int,
         **kwargs,
     ):
 
-
+        self._render_mode = "human"
+        self.env_id = env_id
+        self.max_episode_steps = max_episode_steps
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq        
 
@@ -92,7 +98,9 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self.env_action_range_min = env_action_range[:, 0]
         self.env_action_range_max = env_action_range[:, 1]
         # print("env action range: ", action_range)
-        scaled_action_range = np.ones(env_action_range.shape, dtype=np.float32)
+        # 归一化到 [-1, 1]区间
+        scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
+        # print("Scaled action range: ", scaled_action_range)
         self.action_space = self.generate_action_space(scaled_action_range)
 
 
@@ -219,7 +227,8 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self.mj_forward()
 
         obs = self._get_obs().copy()
-        return obs, {}
+        info = {}
+        return obs, info
 
     def get_observation(self, obs=None):
         if obs is not None:
@@ -279,20 +288,8 @@ class AgentBase:
     def set_joint_neutral(self, env: LeggedSimEnv) -> None:
         raise NotImplementedError("This method should be overridden by subclasses")
     
-    def update_force_feedback(self, env: LeggedSimEnv) -> None:
-        raise NotImplementedError("This method should be overridden by subclasses")
-
-    def fill_arm_joint_pos(self, env: LeggedSimEnv, action: np.ndarray) -> np.ndarray:
-        raise NotImplementedError("This method should be overridden by subclasses")
-    
     def on_step(self, env: LeggedSimEnv, action: np.ndarray) -> None:
-        pass
-    
-    def on_teleoperation_action(self, env: LeggedSimEnv) -> np.ndarray:
-        pass
-    
-    def on_playback_action(self, env: LeggedSimEnv, action: np.ndarray) -> None:
-        pass
+        raise NotImplementedError("This method should be overridden by subclasses")
     
     def get_obs(self, env: LeggedSimEnv) -> dict:
         raise NotImplementedError("This method should be overridden by subclasses")
@@ -307,13 +304,15 @@ class AgentBase:
 class Go2Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)
+        
+        self.init_agent(env, id)
 
     def init_agent(self, env: LeggedSimEnv, id: int):
         self._legged_agent = LeggedRobot(
-            env_id = "LeggedSimEnv",
+            env_id = env.env_id,
             agent_name=self.name,
             task="follow_command",
-            max_episode_steps=sys.maxsize,
+            max_episode_steps=env.max_episode_steps,
             dt=env.dt,
         )
         
@@ -329,11 +328,14 @@ class Go2Agent(AgentBase):
         )
         
         action_size = self.agent.get_action_size()
+        self._action_range = np.array([[-1.0, 1.0]] * action_size, dtype=np.float32)
         action_space = spaces.Box(
-            low=np.array([-1.0] * action_size, dtype=np.float32),
-            high=np.array([1.0] * action_size, dtype=np.float32),
+            low=self._action_range[:, 0],
+            high=self._action_range[:, 1],
             dtype=np.float32,
+            shape=(action_size, ),
         )
+        print("Action space: ", action_space)
         self.agent.set_action_space(action_space) 
         self.generate_action_scale_array(self._query_ctrl_info())
         self._init_playable()
@@ -349,7 +351,7 @@ class Go2Agent(AgentBase):
 
                     
         # print("Step agents: ", action)
-        self._update_playable()
+        self._update_playable(env)
 
         actuator_ctrl = self._action2ctrl(action)
         self.set_acatuator_ctrl(env, actuator_ctrl)
