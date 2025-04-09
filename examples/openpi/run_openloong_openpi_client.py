@@ -31,11 +31,11 @@ class Args:
     orca_gym_address: str = 'localhost:50051'
     env_name: str = "OpenLoong"
     seed: int = 0
-    agent_names: str = "OpenLoongHand"
+    agent_names: str = "OpenLoongGripper"
     record_time: int = 20
     task: str = "Manipulation"
     obs_type: str = "pixels_agent_pos"
-    prompt: str = "Pick up the apple"
+    prompt: str = "Do something."
 
     action_horizon: int = 10
 
