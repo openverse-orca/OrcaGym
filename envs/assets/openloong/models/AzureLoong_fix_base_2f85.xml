@@ -143,6 +143,10 @@
       <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" mesh="base_link" material="pbr_metal_gray"/>
       <geom type="mesh" group="3" mesh="base_link"/>
       <site name="imu" quat="1 0 0 0"/>
+      <body name="dummy_body" pos="0 0 0.3">
+        <joint name="dummy_joint" pos="0 0 0" axis="0 0 1" limited="false"/>
+        <geom type="sphere" size="0.01 0 0" group="3" density="1000"/>
+      </body>      
       <body name="Link_head_yaw" pos="0.009 0 0.4064">
         <inertial pos="4.6974e-12 -0.0020814 0.044801" quat="0.706933 -0.0156756 0.0156771 0.706933" mass="0.84249" diaginertia="0.000700588 0.000629 0.000553812"/>
         <joint name="J_head_yaw" pos="0 0 0" axis="0 0 1" limited="true" range="-1.5708 1.5708" damping="1.0"/>
@@ -476,6 +480,7 @@
     </body>
   </worldbody>
   <contact>
+    <exclude name="ex_baselink_dummy" body1="base_link" body2="dummy_body" />
     <exclude name="ex_baselink_waist_pitch" body1="base_link" body2="Link_waist_pitch" />
     <exclude name="ex_waist_pitch_waist_roll" body1="Link_waist_pitch" body2="Link_waist_roll" />
     <exclude name="ex_waist_roll_waist_yaw" body1="Link_waist_roll" body2="Link_waist_yaw" />
