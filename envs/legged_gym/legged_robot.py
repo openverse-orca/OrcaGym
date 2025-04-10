@@ -20,6 +20,8 @@ def get_legged_robot_name(agent_name: str) -> str:
         return "A01B"
     elif agent_name.startswith("AzureLoong"):
         return "AzureLoong"
+    elif agent_name.startswith("g1"):
+        return "g1"
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
 
@@ -110,6 +112,9 @@ class LeggedRobot(OrcaGymAgent):
 
         self._neutral_joint_angles = robot_config["neutral_joint_angles"]
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
+        
+        self._neutral_joint_angles_coeff = robot_config["neutral_joint_angles_coeff"]
+        self._neutral_joint_angles_coeff_value = np.array([self._neutral_joint_angles_coeff[key] for key in self._neutral_joint_angles_coeff]).flatten()
         
         self._actuator_names = self.name_space_list(robot_config["actuator_names"])
         self._actuator_type = robot_config["actuator_type"]
@@ -509,7 +514,10 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
-        reward = -np.sum(np.abs(self._leg_joint_qpos - self._neutral_joint_values)) * coeff * self.dt
+        # print("Joint angles: ", self._leg_joint_qpos, "Neutral joint values: ", self._neutral_joint_values, "Joint angles coeff: ", self._neutral_joint_angles_coeff_value)
+        joint_angles_diff = np.abs(self._leg_joint_qpos - self._neutral_joint_values) * self._neutral_joint_angles_coeff_value
+        # print("Joint angles diff: ", joint_angles_diff)
+        reward = -np.sum(joint_angles_diff) * coeff * self.dt
         self._print_reward("Joint angles reward: ", reward, coeff * self.dt)
         return reward
     
