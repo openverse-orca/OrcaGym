@@ -54,41 +54,44 @@ class OpenLoongTask(AbstractTask):
         """ 从object,goal中选择数量最少的
             在生成一个随机整数x，在挑选x个object, goal
         """
-        self.task_dict.clear()
+        # 使用列表替代字典
+        self.task_list = []
         self.random_objs_and_goals(env, bounds=0.1)
-
+    
         object_len = len(self.object_bodys)
-        goal_len = len(self.goal_bodys)
-        min_len = min(object_len, goal_len)
+        min_len = min(1, object_len)
+        
         if min_len == 0:
-            return self.task_dict
+            return self.task_list  # 返回空列表
         
         random_x = random.randint(1, min_len)
-
-        ind_list = random.sample(range(object_len), random_x)
+        
+        # 随机选择索引时保证object和goal一一对应
+        ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
+        
         for ind in ind_list:
-            self.task_dict[self.object_bodys[ind]] = self.goal_bodys[ind]
-
-        return self.task_dict
-
-    def is_success(self, env: RobomimicEnv):
-        pass
-
+            # 以元组形式存储object-goal对
+            self.task_list.append(
+                (self.object_bodys[ind])
+            )
+        
+        return self.task_list
+    
     def get_language_instruction(self) -> str:
-        if len(self.task_dict) == 0:
+        if len(self.task_list) == 0:
             return "Do something."
-
+    
         object_str = "object: "
-        for key in self.task_dict.keys():
-            object_str += key + " "
-        
         goal_str = "goal: "
-        for value in self.task_dict.values():
-            goal_str += value + " "
         
-        language_instruction = f"level: {self.level_name} task: {self.prompt}"
-        language_instruction += f"{object_str} to {goal_str}"                               
-
+        # 遍历列表中的元组元素
+        for obj in self.task_list:
+            object_str += obj + " "
+ 
+        
+        language_instruction = f"level: {self.level_name}"
+        language_instruction += f"{object_str} to basket"
+        
         return language_instruction
 
 class TaskStatus:
@@ -140,7 +143,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
-        
+
         if self._ctrl_device == ControlDevice.VR:
             self._joystick = {}
             pico_joystick = []
@@ -623,8 +626,7 @@ class OpenLoongAgent(AgentBase):
             env.disable_actuators(self._l_arm_moto_names, dummy_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
-        # self._l_neutral_joint_values = np.zeros(7)
-        
+        # self._l_neutral_joint_values = np.zeros(7)            
         print("arm_actuator_id: ", self._r_arm_actuator_id, self._l_arm_actuator_id)
 
         # control range
@@ -1053,7 +1055,7 @@ class OpenLoongAgent(AgentBase):
 
         # 更新头部位置
         self.set_neck_mocap(env, mocap_neck_xpos, self._mocap_neck_xquat)
- 
+
     def _processe_pico_joystick_move(self, env : OpenLoongEnv) -> tuple:
         if self._pico_joystick.is_reset_pos():
             self._pico_joystick.set_reset_pos(False)
@@ -1273,7 +1275,64 @@ class OpenLoongHandAgent(OpenLoongAgent):
         compose_force = 0
         for force in contact_force_dict.values():
             compose_force += np.linalg.norm(force[:3])
-        return compose_force            
+        return compose_force
+    
+    def on_playback_action(self, env: OpenLoongEnv, action) -> None:
+        assert(len(action) == self.action_range.shape[0])
+        effector_force_l, effector_force_r = action[12:23], action[23:34]
+        self._grasp_value_l = action[13]
+        self._set_l_hand_actuator_ctrl(env, self._grasp_value_l)
+        self._grasp_value_r = action[27]
+        self._set_r_hand_actuator_ctrl(env, self._grasp_value_r)
+
+        base_link_pos, base_link_xmat, base_link_quat = env.get_body_xpos_xmat_xquat(self._base_body_name)
+        # 处理左手末端执行器（End-Effector）的相对坐标
+        ee_pos_l, ee_axisangle_l = action[:3], action[6:9]
+
+        # 将末端执行器位置从全局坐标转换为相对坐标
+        base_link_rot = R.from_quat(base_link_quat[[1, 2, 3, 0]])  # 机器人的旋转四元数
+        ee_pos_l_relative = ee_pos_l - base_link_pos  # 将位置从全局坐标转换为相对坐标
+        ee_ori_l = transform_utils.axisangle2quat(ee_axisangle_l)
+
+        ee_ori_rot_l = R.from_quat(ee_ori_l)
+        ee_ori_rot_l_relative = base_link_rot.inv() * ee_ori_rot_l  # 旋转从全局转换为相对坐标系
+        ee_ori_l_relative = ee_ori_rot_l_relative.as_quat()
+
+        action_l_relative = np.concatenate([ee_pos_l_relative, transform_utils.quat2axisangle(ee_ori_l_relative)])
+        self._l_controller.set_goal(action_l_relative)
+        ctrl_l = self._l_controller.run_controller()
+        for i in range(len(self._l_arm_actuator_id)):
+            env.ctrl[self._l_arm_actuator_id[i]] = ctrl_l[i]
+
+        # 处理右手末端执行器（End-Effector）的相对坐标
+        ee_pos_r, ee_axisangle_r = action[3:6], action[9:12]
+
+        # 将末端执行器位置从全局坐标转换为相对坐标
+        ee_pos_r_relative = ee_pos_r - base_link_pos
+        ee_ori_r = transform_utils.axisangle2quat(ee_axisangle_r)
+
+        ee_ori_rot_r = R.from_quat(ee_ori_r)
+        ee_ori_rot_r_relative = base_link_rot.inv() * ee_ori_rot_r
+        ee_ori_r_relative = ee_ori_rot_r_relative.as_quat()
+
+        action_r_relative = np.concatenate([ee_pos_r_relative, transform_utils.quat2axisangle(ee_ori_r_relative)])
+        self._r_controller.set_goal(action_r_relative)
+        ctrl_r = self._r_controller.run_controller()
+        for i in range(len(self._r_arm_actuator_id)):
+            env.ctrl[self._r_arm_actuator_id[i]] = ctrl_r[i]
+        effector_force_l, effector_force_r = action[12:23], action[23:34]
+        # # 处理左手和右手的抓取力度控制
+        # for i in range(len(self._l_arm_actuator_id)):
+        #     env.ctrl[self._l_arm_actuator_id[i]] = action[12 + i]  # 使用action中的相应值
+        # for i in range(len(self._r_arm_actuator_id)):
+        #     env.ctrl[self._r_arm_actuator_id[i]] = action[23 + i]  # 使用action中的相应值
+        #手指控制
+        for i in range(len(self._l_hand_actuator_id)):
+            self.ctrl[self._l_hand_actuator_id[i]] = effector_force_l[i]
+        for i in range(len(self._r_hand_actuator_id)):
+            self.ctrl[self._r_hand_actuator_id[i]] = effector_force_r[i]
+
+        return         
     
     
     
