@@ -35,7 +35,7 @@ class OrcaGymBase:
               f"timestep:{self.opt.timestep}", 
               f"iterations:{self.opt.iterations}", 
               f"noslip_iterations:{self.opt.noslip_iterations}",
-              f"mpr_iterations:{self.opt.mpr_iterations}",
+              f"ccd_iterations:{self.opt.ccd_iterations}",
               f"sdf_iterations:{self.opt.sdf_iterations}",
               f"gravity:{self.opt.gravity}",)
         

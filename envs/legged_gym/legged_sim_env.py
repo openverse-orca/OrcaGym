@@ -2,12 +2,23 @@ from datetime import datetime
 import sys
 import numpy as np
 from gymnasium.core import ObsType
+<<<<<<< HEAD
+=======
+from orca_gym.robomimic.dataset_util import DatasetWriter
+from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.utils import rotations
+>>>>>>> origin/main
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
+<<<<<<< HEAD
+=======
+from orca_gym.task.abstract_task import AbstractTask
+from orca_gym.environment.orca_gym_env import RewardType
+>>>>>>> origin/main
 from envs.legged_gym.legged_robot import LeggedRobot
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.devices.keyboard import KeyboardInput
@@ -76,8 +87,11 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         for id, agent_name in enumerate(self._agent_names):
             if agent_name.startswith("go2"):
                 self._agents[agent_name] = Go2Agent(self, id=id, name=agent_name)
+<<<<<<< HEAD
             elif agent_name.startswith("Lite3"):
                 self._agents[agent_name] = Lite3Agent(self, id=id, name=agent_name)
+=======
+>>>>>>> origin/main
         
         assert len(self._agents) > 0, "At least one agent should be created."
         self._set_init_state()
@@ -296,6 +310,7 @@ class AgentBase:
     
     def on_close(self) -> None:
         pass
+<<<<<<< HEAD
 
     
 class Lite3Agent(AgentBase):
@@ -488,6 +503,9 @@ class Lite3Agent(AgentBase):
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
         
         return lin_vel, turn_angel, reborn     
+=======
+    
+>>>>>>> origin/main
     
 class Go2Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:

@@ -21,7 +21,7 @@ class ControlDevice:
     
 
 
-class LeggedSimEnv(OrcaGymLocalEnv):
+class LeggedRealEnv(OrcaGymLocalEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
     
     """
@@ -85,6 +85,8 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
+    def send_command()
 
 
     def _set_obs_space(self):

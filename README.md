@@ -35,6 +35,9 @@ cd OrcaGym
 git lfs install
 git lfs pull
 
+# Initialize submodules
+git submodule update --init --recursive
+
 # Create conda environment
 conda create -n orca python=3.12
 conda activate orca

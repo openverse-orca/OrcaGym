@@ -53,17 +53,28 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
         print(f"Initializing simulation: Class: {self.__class__.__name__}")
-        self.loop.run_until_complete(self._initialize_orca_sim())
+        model_xml_path = self.loop.run_until_complete(self._load_model_xml())
+        self.loop.run_until_complete(self._initialize_orca_sim(model_xml_path))
         model = self.gym.model
         data = self.gym.data
         return model, data
+    
+    async def _load_model_xml(self):
+        model_xml_path = await self.gym.load_model_xml()
+        return model_xml_path
 
-    async def _initialize_orca_sim(self):
-        await self.gym.init_simulation()
+    async def _initialize_orca_sim(self, model_xml_path):
+        await self.gym.init_simulation(model_xml_path)
         return
 
     def initialize_grpc(self):
-        self.channel = grpc.aio.insecure_channel(self.orcagym_addr)
+        self.channel = grpc.aio.insecure_channel(
+            self.orcagym_addr,
+            options=[
+                ('grpc.max_receive_message_length', 1024 * 1024 * 1024),
+                ('grpc.max_send_message_length', 1024 * 1024 * 1024),
+            ]
+        )
         self.stub = GrpcServiceStub(self.channel)
         self.gym = OrcaGymLocal(self.stub)
     
@@ -200,7 +211,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             }
         return site_dict
     
-    def query_site_pos_and_quat(self, site_names):
+    def query_site_pos_and_quat(self, site_names) -> Dict[str, Dict[str, Union[NDArray[np.float64], NDArray[np.float64]]]]:
         query_dict = self.gym.query_site_pos_and_mat(site_names)
         site_dict = {}
         for site in query_dict:
@@ -216,7 +227,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_joint_qvel(self, joint_qvel):
         self.gym.set_joint_qvel(joint_qvel)
     
-    def query_site_xvalp_xvalr(self, site_names):
+    def query_site_xvalp_xvalr(self, site_names) -> Tuple[Dict[str, NDArray[np.float64]], Dict[str, NDArray[np.float64]]]:
         query_dict = self.gym.mj_jac_site(site_names)
         xvalp_dict = {}
         xvalr_dict = {}
@@ -280,3 +291,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_robot_orientation_odom(self, base_body, initial_base_pos, initial_base_quat):
         robot_orientation_odom = self.gym.query_robot_orientation_odom(base_body, initial_base_pos, initial_base_quat)
         return robot_orientation_odom
+    
+    def set_actuator_trnid(self, actuator_id, trnid):
+        self.gym.set_actuator_trnid(actuator_id, trnid)
+        return

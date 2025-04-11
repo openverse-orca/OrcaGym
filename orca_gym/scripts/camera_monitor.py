@@ -4,22 +4,17 @@ import time
 import argparse
 import subprocess
 import signal
-
-current_file_path = os.path.abspath('')
-project_root = os.path.dirname(os.path.dirname(current_file_path))
-
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
+from pathlib import Path
 
 from orca_gym.sensor.rgbd_camera import Monitor
 
 
-def start_monitor(port=7070, project_root : str = None):
+def start_monitor(port=7070):
     """
     启动 monitor.py 作为子进程。
     """
-    monitor_script = f"{project_root}/orca_gym/scripts/camera_monitor.py"
+    monitor_script = Path(__file__).resolve()
+    print("monitor_script: ", monitor_script)
 
     # 启动 monitor.py
     # 使用 sys.executable 确保使用相同的 Python 解释器

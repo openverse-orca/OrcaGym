@@ -46,10 +46,10 @@
       <texture type="2d" name="Plastic006_roughness"  file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
       <texture type="2d" name="Plastic006_normal"     file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
 
-      <material name="pbr_plastic_black" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
-      <rgb        texture="Plastic006_color"/>
-      <normal     texture="Plastic006_normal"/>
-      <roughness  texture="Plastic006_roughness"/>
+      <material name="pbr_plastic_black" metallic ="0.05">
+        <layer role="rgb"        texture="Plastic006_color"/>
+        <layer role="normal"     texture="Plastic006_normal"/>
+        <layer role="roughness"  texture="Plastic006_roughness"/>
       </material>
 
       <texture type="2d" name="Plastic013A_color"      file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_Color.png"/>
@@ -57,9 +57,9 @@
       <texture type="2d" name="Plastic013A_normal"     file="../textures/Plastic013A_2K-PNG/Plastic013A_2K-PNG_NormalDX.png"/>
 
       <material name="pbr_plastic_white" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
-      <rgb        texture="Plastic013A_color"/>
-      <normal     texture="Plastic013A_normal"/>
-      <roughness  texture="Plastic013A_roughness"/>
+        <layer role="rgb"        texture="Plastic013A_color"/>
+        <layer role="normal"     texture="Plastic013A_normal"/>
+        <layer role="roughness"  texture="Plastic013A_roughness"/>
       </material>
 
       <texture type="2d" name="Plastic010_color"      file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_Color.png"/>
@@ -67,18 +67,18 @@
       <texture type="2d" name="Plastic010_normal"     file="../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
 
       <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
-      <rgb        texture="Plastic010_color"/>
-      <normal     texture="Plastic010_normal"/>
-      <roughness  texture="Plastic010_roughness"/>      
+        <layer role="rgb"        texture="Plastic010_color"/>
+        <layer role="normal"     texture="Plastic010_normal"/>
+        <layer role="roughness"  texture="Plastic010_roughness"/>    
       </material>
 
       <texture type="2d" name="wood_table_worn_diff_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_diff_2k.png"/>
       <texture type="2d" name="wood_table_worn_nor_dx_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_nor_dx_2k.png"/>
       <texture type="2d" name="wood_table_worn_rough_2k" file="..\textures\wood_table_worn_2k\textures\wood_table_worn_rough_2k.png"/>
       <material name="wood_table_worn_material">
-        <rgb texture="wood_table_worn_diff_2k"/>
-        <normal texture="wood_table_worn_nor_dx_2k"/>
-        <roughness texture="wood_table_worn_rough_2k"/>
+        <layer role="rgb" texture="wood_table_worn_diff_2k"/>
+        <layer role="normal" texture="wood_table_worn_nor_dx_2k"/>
+        <layer role="roughness" texture="wood_table_worn_rough_2k"/>
       </material>
 
       <texture type="2d" name="oak_veneer_01_diff_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_diff_2k.png" />
@@ -86,15 +86,15 @@
       <texture type="2d" name="oak_veneer_01_rough_2k"  file="..\textures\oak_veneer_01_2k\textures\oak_veneer_01_rough_2k.png" />
 
       <material name="oak_veneer_material">
-        <rgb texture="oak_veneer_01_diff_2k"/>
-        <normal texture="oak_veneer_01_nor_dx_2k"/>
-        <roughness texture="oak_veneer_01_rough_2k"/>
+        <layer role="rgb" texture="oak_veneer_01_diff_2k"/>
+        <layer role="normal" texture="oak_veneer_01_nor_dx_2k"/>
+        <layer role="roughness" texture="oak_veneer_01_rough_2k"/>
       </material>
 
       <texture type="2d" name="transparent_red" file="..\textures\transparent_red.png"/>
       <material name="transparent_red_material" emission = "0.2" roughness="0.1" metallic="0.9">
-        <rgba texture="transparent_red"/>
-        <normal texture="wood_table_worn_nor_dx_2k"/>
+        <layer role="rgba" texture="transparent_red"/>
+        <layer role="normal" texture="wood_table_worn_nor_dx_2k"/>
       </material>
 
 

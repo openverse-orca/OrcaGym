@@ -74,7 +74,7 @@ class RM75BVJoystickEnv(OrcaGymRemoteEnv):
         self.goal = self._sample_goal()
         self.gym.opt.iterations = 150
         self.gym.opt.noslip_tolerance = 50
-        self.gym.opt.mpr_iterations = 100
+        self.gym.opt.ccd_iterations = 100
         self.gym.opt.sdf_iterations = 50
         self.set_opt_config()
         #t1 = np.array([1.96802058e+00,1.39846599e+00,-8.21389393e-01, 1.10729520e+00,1.81520426e+00,-1.10680011e+00,1.04188856e+00])

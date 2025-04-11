@@ -335,7 +335,7 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
         return result
 
 
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         self._set_init_state()
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
         self.mj_forward()

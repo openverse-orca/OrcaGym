@@ -12,7 +12,7 @@ from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.franka.franka_env import FrankaEnv, RunMode, ControlDevice
+from envs.manipulation.franka_env import FrankaEnv, RunMode, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -23,7 +23,7 @@ import numpy as np
 
 
 ENV_ENTRY_POINT = {
-    "Franka": "envs.franka.franka_env:FrankaEnv"
+    "Franka": "envs.manipulation.franka_env:FrankaEnv"
 }
 
 TIME_STEP = 0.005
@@ -116,7 +116,7 @@ def teleoperation_episode(env : FrankaEnv, cameras : list[CameraWrapper], rgb_si
             terminated_times = terminated_times + 1 if terminated else 0
             
             for camera in cameras:
-                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
                 
             # print("Timestep: ", env.unwrapped.gym.data.time)
@@ -324,7 +324,7 @@ def augment_episode(env : FrankaEnv,
         if len(cameras) > 0:
             time.sleep(0.03)    # wait for camera to get new frame
             for camera in cameras:
-                camera_frame = camera.get_frame(format='rgb24', size=rgb_size)
+                camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
 
         for obs_key, obs_data in obs.items():

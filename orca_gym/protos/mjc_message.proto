@@ -9,6 +9,7 @@ service GrpcService {
   rpc LoadKeyFrame (LoadKeyFrameRequest) returns (LoadKeyFrameResponse);
   rpc UpdateLocalEnv (UpdateLocalEnvRequest) returns (UpdateLocalEnvResponse);
   rpc LoadLocalEnv (LoadLocalEnvRequest) returns (LoadLocalEnvResponse);
+  rpc LoadContentFile (LoadContentFileRequest) returns (LoadContentFileResponse);
 
 
   // 配置查询
@@ -133,7 +134,7 @@ message QueryOptConfigResponse {
     double tolerance = 4;
     double ls_tolerance = 5;
     double noslip_tolerance = 6;
-    double mpr_tolerance = 7;
+    double ccd_tolerance = 7;
     repeated double gravity = 8;
     repeated double wind = 9;
     repeated double magnetic = 10;
@@ -150,7 +151,7 @@ message QueryOptConfigResponse {
     int32 iterations = 21;
     int32 ls_iterations = 22;
     int32 noslip_iterations = 23;
-    int32 mpr_iterations = 24;
+    int32 ccd_iterations = 24;
     int32 disableflags = 25;
     int32 enableflags = 26;
     int32 disableactuator = 27;
@@ -165,7 +166,7 @@ message SetOptConfigRequest {
     double tolerance = 4;
     double ls_tolerance = 5;
     double noslip_tolerance = 6;
-    double mpr_tolerance = 7;
+    double ccd_tolerance = 7;
     repeated double gravity = 8;
     repeated double wind = 9;
     repeated double magnetic = 10;
@@ -182,7 +183,7 @@ message SetOptConfigRequest {
     int32 iterations = 21;
     int32 ls_iterations = 22;
     int32 noslip_iterations = 23;
-    int32 mpr_iterations = 24;
+    int32 ccd_iterations = 24;
     int32 disableflags = 25;
     int32 enableflags = 26;
     int32 disableactuator = 27;
@@ -952,8 +953,35 @@ message UpdateLocalEnvRequest{
 
 message UpdateLocalEnvResponse{}
 
-message LoadLocalEnvRequest {}
+message LoadLocalEnvRequest {
+    enum ReqType {
+        XML_FILE_NAME = 0;
+        XML_FILE_CONTENT = 1;
+    }
+    ReqType req_type = 1;
+}
 
-message LoadLocalEnvResponse{
-    string xml_path = 1;
+message LoadLocalEnvResponse {
+    string file_name = 1;   // 返回文件名
+    bytes xml_content = 2; // 使用bytes类型存储文件内容
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 3; // 添加状态码字段
+    string error_message = 4; // 错误详情（可选）
+}
+
+message LoadContentFileRequest {
+    string file_name = 1;
+}
+
+message LoadContentFileResponse {
+    bytes content = 1; // 使用bytes类型存储文件内容
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 2; // 添加状态码字段
+    string error_message = 3; // 错误详情（可选）
 }

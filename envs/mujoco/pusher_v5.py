@@ -253,7 +253,7 @@ class PusherEnv(OrcaGymRemoteEnv, utils.EzPickle):
 
         return reward, reward_info
 
-    def reset_model(self):
+    def reset_model(self) -> tuple[dict, dict]:
         qpos = self.init_qpos
 
         self.goal_pos = np.asarray([0, 0])

@@ -1,12 +1,14 @@
 import sys
 import os
 import grpc
+import aiofiles
+import xml.etree.ElementTree as ET
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 proto_path = os.path.abspath(os.path.join(current_dir, "protos"))
 sys.path.append(proto_path)
-import mjc_message_pb2
-import mjc_message_pb2_grpc
+import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
+import orca_gym.protos.mjc_message_pb2_grpc as mjc_message_pb2_grpc
 
 import numpy as np
 import scipy.linalg
@@ -52,17 +54,21 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
 
-    async def init_simulation(self):
-
+    async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
+<<<<<<< HEAD
         print("Model XML Path: ", model_xml_path)
+=======
+        await self.process_xml_file(model_xml_path)
+        return model_xml_path
+>>>>>>> origin/main
 
+    async def init_simulation(self, model_xml_path):
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
 
         size_model = mujoco.mj_sizeModel(self._mjModel)
         print("size_model: ", size_model)
-
 
         # Update the timestep setting form the env parameter.
         self.set_opt_timestep(self._timestep)
@@ -106,10 +112,86 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.UpdateLocalEnv(request)
         return response
     
+    async def load_content_file(self, content_file_name):
+        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
+        response = await self.stub.LoadContentFile(request)
+
+        if response.status != mjc_message_pb2.LoadContentFileResponse.SUCCESS:
+            raise Exception("Load content file failed.")
+
+        content = response.content
+        if content is None or len(content) == 0:
+            raise Exception("Content is empty.")
+        
+        content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        async with aiofiles.open(content_file_path, 'wb') as f:
+            await f.write(content)
+
+        return
+
+    async def process_xml_node(self, node : ET.Element):
+        if node.tag == 'mesh' or node.tag == 'hfield':
+            content_file_name = node.get('file')
+            if content_file_name is not None:
+                content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+                if not os.path.exists(content_file_path):
+                    # 下载文件
+                    print("Load content file: ", content_file_name)
+                    await self.load_content_file(content_file_name)
+        else:
+            for child in node:
+                await self.process_xml_node(child)
+        return
+
+    @property
+    def xml_file_dir(self):
+        user_home = os.path.expanduser('~')  # 自动适配Windows/Linux/Mac
+        save_dir = os.path.join(user_home, '.orcagym', 'tmp')
+        os.makedirs(save_dir, exist_ok=True)
+        return save_dir
+
+    async def process_xml_file(self, file_path):
+        # 读取xml文件
+        with open(file_path, 'r') as f:
+            xml_content = f.read()
+
+        # 解析xml文件，检查涉及到外部文件的节点，读取file属性，检查文件是否存在，如果不存在则下载
+        root = ET.fromstring(xml_content)
+        await self.process_xml_node(root)
+        return
+
     async def load_local_env(self):
+        # 第一步：先获取文件名
         request = mjc_message_pb2.LoadLocalEnvRequest()
+        request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_NAME
         response = await self.stub.LoadLocalEnv(request)
-        return response.xml_path
+
+        if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+            raise Exception("Load local env failed.")
+
+        # 文件存储在指定路径
+        file_name = response.file_name
+        file_path = os.path.join(self.xml_file_dir, file_name)
+        
+        # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
+        if not os.path.exists(file_path):
+            request = mjc_message_pb2.LoadLocalEnvRequest()
+            request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
+            response = await self.stub.LoadLocalEnv(request)
+
+            if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+                raise Exception("Load local env failed.")
+            
+            # print("Load xml from remote: ", file_name)
+
+            xml_content = response.xml_content
+            
+            # 异步写入文件（使用aiofiles）
+            async with aiofiles.open(file_path, 'wb') as f:
+                await f.write(xml_content)
+        
+        # 返回绝对路径
+        return os.path.abspath(file_path)
 
     def set_time_step(self, time_step):
         self._timestep = time_step
@@ -126,7 +208,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.tolerance = self.opt.tolerance
         self._mjModel.opt.ls_tolerance = self.opt.ls_tolerance
         self._mjModel.opt.noslip_tolerance = self.opt.noslip_tolerance
-        self._mjModel.opt.mpr_tolerance = self.opt.mpr_tolerance
+        self._mjModel.opt.ccd_tolerance = self.opt.ccd_tolerance
         self._mjModel.opt.gravity = self.opt.gravity
         self._mjModel.opt.wind = self.opt.wind
         self._mjModel.opt.magnetic = self.opt.magnetic
@@ -143,7 +225,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.iterations = self.opt.iterations
         self._mjModel.opt.ls_iterations = self.opt.ls_iterations
         self._mjModel.opt.noslip_iterations = self.opt.noslip_iterations
-        self._mjModel.opt.mpr_iterations = self.opt.mpr_iterations
+        self._mjModel.opt.ccd_iterations = self.opt.ccd_iterations
         self._mjModel.opt.disableflags = self.opt.disableflags
         self._mjModel.opt.enableflags = self.opt.enableflags
         self._mjModel.opt.disableactuator = self.opt.disableactuator
@@ -159,7 +241,7 @@ class OrcaGymLocal(OrcaGymBase):
             "tolerance": self._mjModel.opt.tolerance,
             "ls_tolerance": self._mjModel.opt.ls_tolerance,
             "noslip_tolerance": self._mjModel.opt.noslip_tolerance,
-            "mpr_tolerance": self._mjModel.opt.mpr_tolerance,
+            "ccd_tolerance": self._mjModel.opt.ccd_tolerance,
             "gravity": list(self._mjModel.opt.gravity),
             "wind": list(self._mjModel.opt.wind),
             "magnetic": list(self._mjModel.opt.magnetic),
@@ -176,7 +258,7 @@ class OrcaGymLocal(OrcaGymBase):
             "iterations": self._mjModel.opt.iterations,
             "ls_iterations": self._mjModel.opt.ls_iterations,
             "noslip_iterations": self._mjModel.opt.noslip_iterations,
-            "mpr_iterations": self._mjModel.opt.mpr_iterations,
+            "ccd_iterations": self._mjModel.opt.ccd_iterations,
             "disableflags": self._mjModel.opt.disableflags,
             "enableflags": self._mjModel.opt.enableflags,
             "disableactuator": self._mjModel.opt.disableactuator,
@@ -288,6 +370,11 @@ class OrcaGymLocal(OrcaGymBase):
                 "LengthRange": actuator.lengthrange,
             }
         return actuator_dict
+    
+    def set_actuator_trnid(self, actuator_id, trnid):
+        model = self._mjModel
+        actuator = model.actuator(actuator_id)
+        actuator.trnid[0] = trnid
 
     def query_all_bodies(self):
         model = self._mjModel
@@ -344,6 +431,8 @@ class OrcaGymLocal(OrcaGymBase):
                 "Stiffness": joint.stiffness[0],
                 "ActfrcRange": model.jnt_actfrcrange[i],
                 "Margin": joint.margin[0],
+                "Frictionloss": joint.frictionloss[0],
+                "Damping": joint.damping[0],
             }
             
         return joint_dict
@@ -417,16 +506,23 @@ class OrcaGymLocal(OrcaGymBase):
         self._qpos_cache[:] = self._mjData.qpos
         self._qvel_cache[:] = self._mjData.qvel
         self._qacc_cache[:] = self._mjData.qacc
-        # print("qpos_cache: ", len(self._qpos_cache))
-        # print("qvel_cache: ", len(self._qvel_cache))
-        # print("qacc_cache: ", len(self._qacc_cache))
-
-        qfrc_bias = self.query_qfrc_bias()
-        
+        qfrc_bias = self.query_qfrc_bias()        
         self.data.update_qpos_qvel_qacc(self._qpos_cache, self._qvel_cache, self._qacc_cache)        
         self.data.update_qfrc_bias(qfrc_bias)
-
         self.data.time = self._mjData.time
+        # print("data: ", self.data.qpos, self.data.qvel, self.data.qacc, self.data.qfrc_bias, self.data.time)
+        
+    def update_data_external(self, qpos, qvel, qacc, qfrc_bias, time):
+        """
+        Cooperate with the external environment.
+        Update the data for rendering in orcagym environment.
+        """
+        self.data.update_qpos_qvel_qacc(qpos, qvel, qacc)
+        self.data.update_qfrc_bias(qfrc_bias)
+        self.data.time = time
+        
+        # print("data: ", self.data.qpos, self.data.qvel, self.data.qacc, self.data.qfrc_bias, self.data.time)
+    
     
     def query_qfrc_bias(self):
         qfrc_bias = self._mjData.qfrc_bias
@@ -707,11 +803,16 @@ class OrcaGymLocal(OrcaGymBase):
 
     def query_position_body_B(self, ee_body, base_body):
         base_id = self._mjModel.body(base_body).id
+        base_quat = self._mjData.body(base_id).xquat.copy()  # MuJoCo格式 [w,x,y,z]
         base_pos = self._mjData.body(base_id).xpos.copy()
 
         ee_id = self._mjModel.body(ee_body).id
         ee_pos = self._mjData.body(ee_id).xpos.copy()
-        relative_pos = ee_pos - base_pos
+
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot_inv = rot_base.inv()
+
+        relative_pos = rot_inv.apply(ee_pos - base_pos)
 
         return relative_pos
 

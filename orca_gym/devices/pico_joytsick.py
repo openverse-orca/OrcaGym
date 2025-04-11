@@ -23,7 +23,7 @@ def transform_quaternion_to_mujoco(q_unity):
     return R.from_rotvec(v).as_quat()
 
 class PicoJoystick:
-    def __init__(self):
+    def __init__(self, port=8001):
         self.mutex = threading.Lock()
         self.running = True
         self.current_transform = None
@@ -33,6 +33,7 @@ class PicoJoystick:
         self.reset_pos = False
         self.loop = asyncio.new_event_loop()
         self.clients = set()  # 初始化 self.clients
+        self.port = port
         self.thread = threading.Thread(target=self._start_server_thread)
         self.thread.start()
 
@@ -53,7 +54,7 @@ class PicoJoystick:
 
     async def _start_server(self):
         server = await asyncio.start_server(
-            self._handle_client, '0.0.0.0', 8001)
+            self._handle_client, '0.0.0.0', self.port)
         async with server:
             await server.serve_forever()
 
