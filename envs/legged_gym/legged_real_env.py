@@ -8,8 +8,6 @@ from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R
-
-
 from envs.legged_gym.legged_robot import LeggedRobot
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.devices.keyboard import KeyboardInput
@@ -23,7 +21,7 @@ class ControlDevice:
     
 
 
-class LeggedSimEnv(OrcaGymLocalEnv):
+class LeggedRealEnv(OrcaGymLocalEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
     
     """
@@ -87,6 +85,8 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
+    def send_command()
 
 
     def _set_obs_space(self):
@@ -490,7 +490,6 @@ class Lite3Agent(AgentBase):
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
         
         return lin_vel, turn_angel, reborn     
-
     
 class Go2Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:

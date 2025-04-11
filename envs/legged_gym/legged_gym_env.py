@@ -45,9 +45,9 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             task = task,
             **kwargs,
         )
-        
 
         self._randomize_agent_foot_friction()
+        self._add_randomized_weight(0.01, 0.8)
         self._init_playable()
         self._reset_phy_config()
      
@@ -180,7 +180,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self._run_mode == "testing" or self._run_mode == "play":
             print("Skip randomize foot friction in testing or play mode")
             return
-        
+
         random_friction = self.np_random.uniform(0, 1.0)
         geom_friction_dict = {}
         for i in range(len(self.agents)):
@@ -190,6 +190,22 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         # print("Set geom friction: ", geom_friction_dict)
         self.set_geom_friction(geom_friction_dict)
+
+    def _add_randomized_weight(self, pos_scale, weight_delta_max) -> None:
+        if self._run_mode == "testing" or self._run_mode == "play":
+            print("Skip randomized weight load in testing or play mode")
+            return   
+
+        random_weight = [self.np_random.uniform(0, weight_delta_max) for _ in range(len(self.agents))]
+        random_weight_pos = [[self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0] for _ in range(len(self.agents))]
+        weight_load_dict = {}
+        for i in range(len(self.agents)):
+            agent : LeggedRobot = self.agents[i]
+            weight_load_tmp = agent.generate_randomized_weight_on_base(random_weight[i], random_weight_pos[i], self.model.get_body_dict())
+            weight_load_dict.update(weight_load_tmp)
+
+        print("Set weight load: ", weight_load_dict)
+        self.add_extra_weight(weight_load_dict)
         
     def _init_height_map(self, height_map_file: str) -> None:
         if height_map_file is not None:
@@ -241,13 +257,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 agent.init_playable()
                 agent.player_control = True
                 break
-            
+
         if "go2" in self._player_agent.name:
             robot_config = LeggedRobotConfig["go2"]
         elif "A01B" in self._player_agent.name:
             robot_config = LeggedRobotConfig["A01B"]
         elif "AzureLoong" in self._player_agent.name:
             robot_config = LeggedRobotConfig["AzureLoong"]
+        elif "Lite3" in self._player_agent.name:
+            robot_config = LeggedRobotConfig["Lite3"]
             
         self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
         self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2

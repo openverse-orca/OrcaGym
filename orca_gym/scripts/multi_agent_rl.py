@@ -54,7 +54,10 @@ def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run
 def training_model(model, total_timesteps, model_file):
     # 训练模型，每10亿步保存一次check point
     try:
-        CKP_LEN = 1000000000
+        # CKP_LEN = 1000000000
+        CKP_LEN = 50000000
+        # CKP_LEN = 100000
+
         training_loop = []
         if total_timesteps <= CKP_LEN:
             training_loop.append(total_timesteps)
@@ -64,7 +67,7 @@ def training_model(model, total_timesteps, model_file):
             else:
                 training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
                 training_loop.append(total_timesteps % CKP_LEN)
-        
+
         for i, loop in enumerate(training_loop):
             model.learn(loop)
 
@@ -152,7 +155,9 @@ def setup_model_ppo(env,
 
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
-        n_steps = 64  # 每个环境采样步数
+
+        n_steps = 128  # 每个环境采样步数
+
         batch_size = total_envs * 16  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
@@ -170,7 +175,8 @@ def setup_model_ppo(env,
             clip_range=0.2, 
             ent_coef=0.01, 
             policy_kwargs=policy_kwargs, 
-            device=device
+            device=device,
+            tensorboard_log="./ppo_tensorboard/",  # TensorBoard 日志目录
         )
 
     # 打印模型摘要
