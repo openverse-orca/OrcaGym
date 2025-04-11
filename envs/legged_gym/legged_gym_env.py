@@ -7,6 +7,7 @@ from gymnasium import spaces
 import datetime
 from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
+import time
 
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
@@ -162,7 +163,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def _generate_contact_dict(self) -> dict[str, list[str]]:
         contacts = self.query_contact_simple()
-        # print("Contacts: ", contacts)
+
         contact_dict : dict[str, list[str]] = {}
         for contact in contacts:
             body_name1 = self.model.get_geom_body_name(contact["Geom1"])
@@ -173,6 +174,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 contact_dict[body_name2] = []
             contact_dict[body_name1].append(body_name2)
             contact_dict[body_name2].append(body_name1)
+
+        # print("Contact dict: ", contact_dict)
 
         return contact_dict
 
