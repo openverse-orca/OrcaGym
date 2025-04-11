@@ -8,6 +8,8 @@ import datetime
 from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
 
+import requests
+from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
 
@@ -27,10 +29,18 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         run_mode: str,
         env_id: str,
         task: str,
+        port:int = 15632, 
+        ip:str="localhost",
         **kwargs,
     ):
         self._init_height_map(height_map_file)
         self._run_mode = run_mode       
+        
+        if self._run_mode == "nav":
+            self.url = "http://"+ip+f":{port}/posyaw"  
+            self.rec_action = RecAction(ip=ip)
+        print("------------------------------")
+        print("ip:", ip, "port:", port)
         
         super().__init__(
             frame_skip = frame_skip,
@@ -50,6 +60,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self._add_randomized_weight(0.01, 0.8)
         self._init_playable()
         self._reset_phy_config()
+
      
     @property
     def agents(self) -> list[LeggedRobot]:
@@ -133,6 +144,53 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             env_obs_list.append(obs["observation"])
             agent_obs.append(obs)
 
+        if self._run_mode == "nav":
+            infofeedback = self.gym.query_body_xpos_xmat_xquat([self.body("base")])
+            quat = infofeedback['go2_000_base']['Quat']
+            pos = infofeedback['go2_000_base']['Pos']
+
+            mat = infofeedback['go2_000_base']['Mat']
+            mat = mat.reshape(3, 3)
+            # 将mat和pos结合成4x4的矩阵
+            mat = np.concatenate((mat, pos.reshape(3, 1)), axis=1)
+            mat = np.concatenate((mat, np.array([[0, 0, 0, 1]])), axis=0)
+            # pos_noise = np.random.normal(0, 0.05, size=pos.shape)
+            # pos += pos_noise
+            w, x, y, z = quat
+
+            # 计算yaw角 （ZYX顺序）
+            numerator = 2 * (w * z + x * y)
+            denominator = 1 - 2 * (y**2 + z**2)
+            yaw_radians = np.arctan2(numerator, denominator)
+
+            mocap_quat = np.array([np.cos(yaw_radians / 2), 0, 0, np.sin(yaw_radians / 2)])
+            # mocap_pos = np.array([pos[0], pos[1], 0.7])
+            mocap_pos = (mat @np.array([0.325, 0, 0.4, 1])).flatten()[:3]
+            mocap_pos[2] = 0.43
+            mocap_pos_and_quat_dict = {self.mocap("mocap"): {'pos': mocap_pos, 'quat': mocap_quat}}
+            self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+
+
+            # 转换为度数
+            yaw_degrees = np.degrees(yaw_radians)
+            # print("Mat: ", mat)
+            # print("Yaw :", yaw_degrees, "Pos: ", pos)
+            # print("------------")
+            # print(infofeedback['go2_000_base']['Pos'])
+            # print(infofeedback['go2_000_base']['Mat'].dtype)
+            # print(infofeedback['go2_000_base']['Quat'].dtype)
+            # print("------------")
+                
+            data = {
+                "pos": pos.tolist(),
+                "yaw": yaw_degrees.tolist(),
+                "mat": mat.flatten().tolist()
+            }
+            try:
+                response = requests.post(self.url, json=data)
+            except Exception as e:
+                pass
+                
         achieved_goals = np.array(achieved_goals)
         desired_goals = np.array(desired_goals)
         env_obs = {}
@@ -177,7 +235,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         return contact_dict
 
     def _randomize_agent_foot_friction(self) -> None:
-        if self._run_mode == "testing" or self._run_mode == "play":
+        if self._run_mode == "testing" or self._run_mode == "play" or self._run_mode == "nav":
             print("Skip randomize foot friction in testing or play mode")
             return
 
@@ -245,7 +303,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             
     
     def _init_playable(self) -> None:
-        if self._run_mode != "play":
+        if self._run_mode != "play" and self._run_mode != "nav":
             return
         
         self._keyboard_controller = KeyboardInput()
@@ -271,10 +329,42 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
-        if self._run_mode != "play":
+        if self._run_mode != "play" and self._run_mode != "nav":
             return
         
         lin_vel, turn_angel, reborn = self._update_keyboard_control()
+        if self._run_mode == "nav":
+            # lin_vel=lin_vel/1.3
+            # turn_angel=turn_angel/2
+            step = self.rec_action.get_step()
+            mode = self.rec_action.get_mode()
+            action = self.rec_action.get_action()
+            # print(f"step:{step} | mode:{mode} | action:{action} ")
+            if lin_vel.any() == 0.0 and turn_angel == 0.0:
+                # mode = initialize / explore / navigate
+                if mode == "initialize" and self.rec_action.trigger:
+                    self.rec_action.trigger = False
+                    # turn_angel += np.pi / 2 * self.dt
+                    turn_angel += np.deg2rad(15)
+                    # print("action: ", action,mode)
+
+                if (mode == "navigate" or mode == "explore") :
+                    self.rec_action.trigger = False
+                    if action is not None:
+                        change_angel = 15
+                        if action == 1:#前進
+                            # 在realtimeGI时候，处以3
+                            lin_vel[0] = self._player_agent_lin_vel_x[1]/1.6
+                        elif action == 3:#右轉
+                            # 在realtimeGI时候，除以12
+                            turn_angel -= np.pi / 10 * self.dt
+                            # turn_angel -= np.deg2rad(change_angel)
+                        elif action == 2:#左轉
+                            turn_angel += np.pi / 10 * self.dt
+                            # turn_angel += np.deg2rad(change_angel)
+                    # print("action: ", action,mode)
+        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
+
         self._player_agent.update_playable(lin_vel, turn_angel)
         agent_cmd_mocap = self._player_agent.reset_command_indicator(self.data.qpos)
         self.set_mocap_pos_and_quat(agent_cmd_mocap)      

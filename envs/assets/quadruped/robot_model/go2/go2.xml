@@ -133,9 +133,14 @@
 
   <worldbody>
     <body name="command_indicator_mocap" pos="0 0 0" mocap="true">
-      <geom conaffinity="0" contype="0" pos="0.3 0 0" rgba="0.7 0 0 0.5" size="0.4 0.005 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0.3 0" rgba="0 0.7 0 0.5" size="0.005 0.4 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.4" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0.1 0 0" rgba="0.7 0 0 0.5" size="0.1 0.005 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0.1 0" rgba="0 0.7 0 0.5" size="0.005 0.1 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0 0.1" rgba="0 0 0.7 0.5" size="0.005 0.005 0.1" type="box" group="1"></geom>
+    </body>
+    <body mocap="true" name="mocap" pos="0. 0. 0.78">
+      <site pos="0 0 0.075" size="0.003 0.003 0.1" type="box" name="mocap_left_site1" rgba="0 0 1 1"/>
+      <site pos="0 0.075 0" size="0.003 0.1 0.003" type="box" name="mocap_left_site2" rgba="0 1 0 1"/>
+      <!-- <site pos="0.075 0 0" size="0.1 0.003 0.003" type="box" name="mocap_left_site3" rgba="1 0 0 1"/> -->
     </body>
 
     <body name="base" pos="0 0 0.445" childclass="go2">
