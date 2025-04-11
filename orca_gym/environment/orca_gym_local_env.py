@@ -238,6 +238,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     
     def set_geom_friction(self, geom_friction_dict):
         self.gym.set_geom_friction(geom_friction_dict)
+
+    def add_extra_weight(self, weight_load_dict):
+        self.gym.add_extra_weight(weight_load_dict)
     
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)

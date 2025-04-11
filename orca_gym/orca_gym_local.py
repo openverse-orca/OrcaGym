@@ -55,7 +55,7 @@ class OrcaGymLocal(OrcaGymBase):
     async def init_simulation(self):
 
         model_xml_path = await self.load_local_env()
-        # print("Model XML Path: ", model_xml_path)
+        print("Model XML Path: ", model_xml_path)
 
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
@@ -627,7 +627,17 @@ class OrcaGymLocal(OrcaGymBase):
         for name, friction in geom_friction_dict.items():
             geom = model.geom(name)
             geom.friction = friction.copy()
-            
+
+    def add_extra_weight(self, random_weight_dict):
+        # Find the body ID for target_name
+        model = self._mjModel
+        for name, weight_info in random_weight_dict.items():
+            torso = model.body(name)
+
+            torso.ipos = weight_info['pos']
+            torso.mass = [weight_info['weight'] + torso.mass.copy()[0]]
+
+            print(f"Added extra weight to {name}, new weight: {torso.mass}, new ipos: {torso.ipos}")
 
     def query_contact_force(self, contact_ids):
         contact_force_dict = {}
