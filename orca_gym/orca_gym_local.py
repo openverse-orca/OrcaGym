@@ -56,12 +56,10 @@ class OrcaGymLocal(OrcaGymBase):
 
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
-<<<<<<< HEAD
+
         print("Model XML Path: ", model_xml_path)
-=======
         await self.process_xml_file(model_xml_path)
         return model_xml_path
->>>>>>> origin/main
 
     async def init_simulation(self, model_xml_path):
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)

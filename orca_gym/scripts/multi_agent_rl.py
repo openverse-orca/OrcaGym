@@ -155,11 +155,9 @@ def setup_model_ppo(env,
 
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
-<<<<<<< HEAD
+
         n_steps = 128  # 每个环境采样步数
-=======
-        n_steps = 64  # 每个环境采样步数
->>>>>>> origin/main
+
         batch_size = total_envs * 16  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
