@@ -2,7 +2,6 @@ from datetime import datetime
 import sys
 import numpy as np
 from gymnasium.core import ObsType
-
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
@@ -491,12 +490,7 @@ class Lite3Agent(AgentBase):
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
         
         return lin_vel, turn_angel, reborn     
-=======
-    
->>>>>>> origin/main
-=======
-    
->>>>>>> origin/main
+
     
 class Go2Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
