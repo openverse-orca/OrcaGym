@@ -81,12 +81,42 @@ if __name__ == "__main__":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        rl.train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, total_timesteps, start_her_episode, model_file, height_map_file, load_existing_model)
-    elif run_mode == "testing" or run_mode == "play" or run_mode == "nav":
+        rl.train_model(
+            orcagym_addresses=orcagym_addresses, 
+            subenv_num=subenv_num, 
+            agent_num=agent_num, 
+            agent_name=agent_name, 
+            task=task, 
+            entry_point=entry_point, 
+            time_step=TIME_STEP, 
+            max_episode_steps=max_episode_steps, 
+            frame_skip=frame_skip, 
+            model_type=model_type, 
+            total_timesteps=total_timesteps, 
+            start_her_episode=start_her_episode, 
+            model_file=model_file, 
+            height_map_file=height_map_file, 
+            load_existing_model=load_existing_model
+        )
+    elif run_mode in ["testing", "play", "nav"]:
         print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
         print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
         print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        rl.test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, nav_ip, entry_point, TIME_STEP, max_episode_steps, frame_skip, model_type, model_file, height_map_file)    
+        rl.test_model(
+            orcagym_addresses=orcagym_addresses, 
+            agent_num=agent_num, 
+            agent_name=agent_name, 
+            task=task, 
+            run_mode=run_mode, 
+            nav_ip=nav_ip, 
+            entry_point=entry_point, 
+            time_step=TIME_STEP, 
+            max_episode_steps=max_episode_steps, 
+            frame_skip=frame_skip, 
+            model_type=model_type, 
+            model_file=model_file, 
+            height_map_file=height_map_file
+        )    
     else:
         raise ValueError("Invalid run mode")
 
