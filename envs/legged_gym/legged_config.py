@@ -714,7 +714,7 @@ LeggedRobotConfig = {
         ],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
+        "action_scale" :         0.3,
         
         "imu_site_name" :       "imu_in_pelvis",
         "contact_site_names" :  ["lf-tc-front", "lf-tc-back", "rf-tc-front", "rf-tc-back"],
@@ -752,27 +752,27 @@ LeggedRobotConfig = {
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
-            "failure" : 100,
+            "failure" : 200,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 5.0,
+            "joint_angles" : 1.0,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
             "action_rate" : 0.1,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 10, # From gymloong
-            "follow_command_angvel" : 5,  # From gymloong
+            "follow_command_linvel" : 1,
+            "follow_command_angvel" : 1,
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
-            "body_orientation" : 0,
+            "body_orientation" : 2,
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
-            "feet_slip" : 0.5,
+            "feet_slip" : 0.25,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 1.0,
-            "fly" : 5.0,
+            "fly" : 1.0,
             "stepping" : 1.0,
         },
 
@@ -814,9 +814,9 @@ LeggedRobotConfig = {
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : [0, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [0, 1.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [0, 0.1], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
