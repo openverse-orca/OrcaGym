@@ -28,6 +28,7 @@ class OrcaGymAgent:
 
         self._actuator_type = None
         self._action_scale = None
+        self._action_scale_mask = None
         self._action_space_range = None
         self._ctrl_range = None
         self._ctrl_delta_range = None
@@ -115,6 +116,7 @@ class OrcaGymAgent:
         return {
             "actuator_type": self._actuator_type,
             "action_scale": self._action_scale,
+            "action_scale_mask": self._action_scale_mask,
             "action_space_range": self._action_space_range,
             "ctrl_range": self._ctrl_range,
             "ctrl_delta_range": self._ctrl_delta_range,

@@ -14,36 +14,83 @@ import numpy as np
 import os
 import sys
 import time
+from envs.legged_gym.legged_config import LeggedRobotConfig
 
-
-def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) -> str:
+def register_env(
+    orcagym_addr: str,
+    env_name: str,
+    env_index: int,
+    agent_num: int,
+    agent_name: str,
+    task: str,
+    run_mode: str,
+    nav_ip: str,
+    entry_point: str,
+    time_step: float,
+    max_episode_steps: int,
+    frame_skip: int,
+    is_subenv: bool,
+    height_map_file: str
+) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
         entry_point=entry_point,
-        kwargs={'frame_skip': frame_skip, 
-                'task': task,
-                'orcagym_addr': orcagym_addr, 
-                'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)], 
-                'time_step': time_step,
-                'max_episode_steps': max_episode_steps, # 环境永不停止，agent有最大步数
-                'render_mode': "human",
-                'is_subenv': is_subenv,
-                'height_map_file': height_map_file,
-                'run_mode': run_mode,
-                'ip': nav_ip,
-                'env_id': env_id},
-        max_episode_steps=sys.maxsize,      # 环境永不停止，agent有最大步数
+        kwargs={
+            'frame_skip': frame_skip,
+            'task': task,
+            'orcagym_addr': orcagym_addr,
+            'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)],
+            'time_step': time_step,
+            'max_episode_steps': max_episode_steps,  # 环境永不停止，agent有最大步数
+            'render_mode': "human",
+            'is_subenv': is_subenv,
+            'height_map_file': height_map_file,
+            'run_mode': run_mode,
+            'ip': nav_ip,
+            'env_id': env_id
+        },
+        max_episode_steps=sys.maxsize,  # 环境永不停止，agent有最大步数
         reward_threshold=0.0,
     )
     return env_id
 
 
-def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file):
+def make_env(
+    orcagym_addr: str, 
+    env_name: str, 
+    env_index: int, 
+    agent_num: int, 
+    agent_name: str, 
+    task: str, 
+    run_mode: str, 
+    nav_ip: str, 
+    entry_point: str, 
+    time_step: float, 
+    max_episode_steps: int, 
+    frame_skip: int, 
+    is_subenv: bool, 
+    height_map_file: str
+) -> callable:
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode,nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file)
+        env_id = register_env(
+            orcagym_addr=orcagym_addr, 
+            env_name=env_name, 
+            env_index=env_index, 
+            agent_num=agent_num, 
+            agent_name=agent_name, 
+            task=task, 
+            run_mode=run_mode, 
+            nav_ip=nav_ip, 
+            entry_point=entry_point, 
+            time_step=time_step, 
+            max_episode_steps=max_episode_steps, 
+            frame_skip=frame_skip, 
+            is_subenv=is_subenv, 
+            height_map_file=height_map_file
+        )
         print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
@@ -52,7 +99,11 @@ def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run
         return env
     return _init
 
-def training_model(model, total_timesteps, model_file):
+def training_model(
+    model, 
+    total_timesteps: int, 
+    model_file: str
+):
     # 训练模型，每10亿步保存一次check point
     try:
         # CKP_LEN = 1000000000
@@ -78,48 +129,15 @@ def training_model(model, total_timesteps, model_file):
     finally:
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
-        
-# def setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     # 加载已有模型或初始化新模型
-#     if os.path.exists(f"{model_file}.zip") and load_existing_model:
-#         model = PPO.load(model_file, env=env, device=device)
-#     else:
-#         # 定义自定义策略网络
-#         policy_kwargs = dict(
-#             net_arch=dict(
-#                 pi=[512, 256, 128],  # 策略网络结构
-#                 vf=[512, 256, 128]   # 值函数网络结构
-#             ),
-#             ortho_init=True,
-#             # activation_fn=nn.ReLU,
-#             activation_fn=nn.ELU,
-#             # log_std_init=2,  # 设置log_std的初始值
-#         )
-#         model = PPO("MultiInputPolicy", 
-#                     env, 
-#                     verbose=1, 
-#                     learning_rate=0.0003, 
-#                     n_steps=2048, 
-#                     batch_size=2048, 
-#                     gamma=0.99, 
-#                     clip_range=0.2, 
-#                     ent_coef=0.01,
-#                     # target_kl=0.01,
-#                     policy_kwargs=policy_kwargs, 
-#                     device=device)
-        
-#     return model
 
-
-def setup_model_ppo(env, 
-                    env_num, 
-                    agent_num, 
-                    total_timesteps, 
-                    start_episode, 
-                    max_episode_steps, 
-                    model_file, 
-                    load_existing_model):
+def setup_model_ppo(
+    env: SubprocVecEnvMA, 
+    env_num: int, 
+    agent_num: int, 
+    agent_name: str,
+    model_file: str, 
+    load_existing_model: bool
+) -> PPO:
     """
     设置或加载 PPO 模型。
 
@@ -127,9 +145,6 @@ def setup_model_ppo(env,
     - env: 训练环境
     - env_num: 环境数量
     - agent_num: 每个环境中的智能体数量
-    - total_timesteps: 总时间步数
-    - start_episode: 开始的回合数
-    - max_episode_steps: 每回合最大步数
     - model_file: 模型文件路径
     - load_existing_model: 是否加载现有模型标志
 
@@ -145,10 +160,13 @@ def setup_model_ppo(env,
     else:
         print("初始化新模型")
         # 定义自定义策略网络
+        
+        robot_config = LeggedRobotConfig[agent_name]
+
         policy_kwargs = dict(
             net_arch=dict(
-                pi=[1024, 512, 256],  # 策略网络结构
-                vf=[1024, 512, 256]   # 值函数网络结构
+                pi=robot_config["pi"],  # 策略网络结构
+                vf=robot_config["vf"]   # 值函数网络结构
             ),
             ortho_init=True,       # 正交初始化
             activation_fn=nn.ELU,  # 激活函数
@@ -157,13 +175,15 @@ def setup_model_ppo(env,
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
 
-        n_steps = 128  # 每个环境采样步数
+        n_steps = robot_config["n_steps"]  # 每个环境采样步数
 
-        batch_size = total_envs * 16  # 批次大小
+        batch_size = robot_config["batch_size"]  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
-        assert (total_envs * n_steps) % batch_size == 0, \
-            f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。"
+        if (total_envs * n_steps) % batch_size != 0:
+            Warning(f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
+            batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
+            
 
         model = PPO(
             policy="MultiInputPolicy",  # 多输入策略
@@ -181,33 +201,44 @@ def setup_model_ppo(env,
         )
 
     # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
 
     return model
 
-def setup_model_sac(env, 
-                    env_num: int, 
-                    agent_num: int, 
-                    total_timesteps: int, 
-                    start_episode: int, 
-                    max_episode_steps: int, 
-                    model_file: str, 
-                    load_existing_model: bool) -> SAC:
+def setup_model_sac(
+    env: SubprocVecEnvMA, 
+    env_num: int, 
+    agent_num: int, 
+    total_timesteps: int, 
+    start_her_episode: int, 
+    max_episode_steps: int, 
+    model_file: str, 
+    load_existing_model: bool
+) -> SAC:
     """
     设置或加载 SAC 模型。
 
     参数:
-    - env: 训练环境（应为 VecEnv 类型，支持并行环境）
-    - env_num: 环境数量
-    - agent_num: 每个环境中的智能体数量
-    - total_timesteps: 总时间步数
-    - start_episode: 开始的回合数
-    - max_episode_steps: 每回合最大步数
-    - model_file: 模型文件路径
-    - load_existing_model: 是否加载现有模型标志
+    - env: SubprocVecEnvMA
+        训练环境（应为 VecEnv 类型，支持并行环境）
+    - env_num: int
+        环境数量
+    - agent_num: int
+        每个环境中的智能体数量
+    - total_timesteps: int
+        总时间步数
+    - start_her_episode: int
+        开始的回合数
+    - max_episode_steps: int
+        每回合最大步数
+    - model_file: str
+        模型文件路径
+    - load_existing_model: bool
+        是否加载现有模型标志
 
     返回:
-    - model: 初始化的或加载的 SAC 模型
+    - model: SAC
+        初始化的或加载的 SAC 模型
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -228,7 +259,6 @@ def setup_model_sac(env,
         # 计算总环境数量
         total_envs = env_num * agent_num
 
-
         # SAC 参数设置
         buffer_size = 1000000  # 经验回放缓冲区大小
         batch_size = 256  # 从缓冲区中采样的批次大小
@@ -239,7 +269,7 @@ def setup_model_sac(env,
             verbose=1, 
             learning_rate=3e-4, 
             buffer_size=buffer_size, 
-            learning_starts= max_episode_steps * env_num * agent_num * start_episode,
+            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
             batch_size=batch_size, 
             gamma=0.99, 
             tau=0.005, 
@@ -256,23 +286,59 @@ def setup_model_sac(env,
 
     return model
 
-def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
+def setup_model_ddpg(
+    env: SubprocVecEnvMA,
+    env_num: int,
+    agent_num: int,
+    total_timesteps: int,
+    start_her_episode: int,
+    max_episode_steps: int,
+    model_file: str,
+    load_existing_model: bool
+) -> DDPG:
+    """
+    设置或加载 DDPG 模型。
+
+    参数:
+    - env: SubprocVecEnvMA
+        训练环境（应为 VecEnv 类型，支持并行环境）
+    - env_num: int
+        环境数量
+    - agent_num: int
+        每个环境中的智能体数量
+    - total_timesteps: int
+        总时间步数
+    - start_her_episode: int
+        开始的回合数
+    - max_episode_steps: int
+        每回合最大步数
+    - model_file: str
+        模型文件路径
+    - load_existing_model: bool
+        是否加载现有模型标志
+
+    返回:
+    - model: DDPG
+        初始化的或加载的 DDPG 模型
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if os.path.exists(f"{model_file}.zip") and load_existing_model:
+        print(f"加载现有模型：{model_file}")
         model = DDPG.load(model_file, env=env, device=device)
-    else:        
-        # https://arxiv.org/html/2312.13788v2
-        # Open-Source Reinforcement Learning Environments Implemented in MuJoCo with Franka Manipulator。        
+    else:
+        print("初始化新模型")
+        # 动作噪声
         n_actions = env.action_space.shape[0]
         noise_std = 0.2
         action_noise = NormalActionNoise(
             mean=np.zeros(n_actions), sigma=noise_std * np.ones(n_actions)
         )
 
+        # 初始化 DDPG 模型
         model = DDPG(
-            "MultiInputPolicy",
-            env,
+            policy="MultiInputPolicy",
+            env=env,
             replay_buffer_class=HerReplayBuffer,
             replay_buffer_kwargs=dict(
                 n_sampled_goal=4,
@@ -284,22 +350,58 @@ def setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, ma
             action_noise=action_noise,
             gamma=0.95,
             batch_size=512,
-            learning_starts= max_episode_steps * env_num * agent_num * start_episode,
+            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
             policy_kwargs=dict(net_arch=[256, 256, 256]),
+            device=device
         )
+
+    # 打印模型摘要
+    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- Buffer Size: {model.replay_buffer.buffer_size}")
 
     return model
 
 
-def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model):
+def setup_model_tqc(
+    env: SubprocVecEnvMA, 
+    env_num: int, 
+    agent_num: int, 
+    total_timesteps: int, 
+    start_her_episode: int, 
+    max_episode_steps: int, 
+    model_file: str, 
+    load_existing_model: bool
+) -> TQC:
+    """
+    设置或加载 TQC 模型。
+
+    参数:
+    - env: SubprocVecEnvMA
+        训练环境（应为 VecEnv 类型，支持并行环境）
+    - env_num: int
+        环境数量
+    - agent_num: int
+        每个环境中的智能体数量
+    - total_timesteps: int
+        总时间步数
+    - start_her_episode: int
+        开始的回合数
+    - max_episode_steps: int
+        每回合最大步数
+    - model_file: str
+        模型文件路径
+    - load_existing_model: bool
+        是否加载现有模型标志
+
+    返回:
+    - model: TQC
+        初始化的或加载的 TQC 模型
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if os.path.exists(f"{model_file}.zip") and load_existing_model:
         model = TQC.load(model_file, env=env, device=device)
-    else:        
-        # https://arxiv.org/html/2312.13788v2
-        # Open-Source Reinforcement Learning Environments Implemented in MuJoCo with Franka Manipulator。        
-        # Training phase: Use HER
+    else:
+        # HER 策略
         goal_selection_strategy = "future"  # 选择 'future' 策略
 
         policy_kwargs = dict(
@@ -311,24 +413,24 @@ def setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max
 
         replay_buffer_class = HerReplayBuffer
         replay_buffer_kwargs = dict(
-            n_sampled_goal = 10,    
+            n_sampled_goal=10,
             goal_selection_strategy=goal_selection_strategy
         )
 
-        # Initialize the model
+        # 初始化 TQC 模型
         model = TQC(
-            "MultiInputPolicy", 
-            env, 
+            policy="MultiInputPolicy",
+            env=env,
             replay_buffer_class=replay_buffer_class,
             replay_buffer_kwargs=replay_buffer_kwargs,
-            verbose=1, 
+            verbose=1,
             learning_rate=0.001,  # 学习率
             buffer_size=1000000,  # 重播缓冲区大小
             batch_size=2048,  # 批量大小
-            tau=0.05, 
+            tau=0.05,
             gamma=0.95,  # 折扣因子
-            learning_starts= max_episode_steps * env_num * agent_num * start_episode,
-            policy_kwargs=policy_kwargs, 
+            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
+            policy_kwargs=policy_kwargs,
             device=device
         )
 
@@ -350,7 +452,23 @@ def generate_env_list(orcagym_addresses, subenv_num):
     return orcagym_addr_list, env_index_list, is_subenv_list
 
 
-def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entry_point, time_step, max_episode_steps, frame_skip, model_type, total_timesteps, start_episode, model_file, height_map_file, load_existing_model):
+def train_model(
+    orcagym_addresses: str,
+    subenv_num: int,
+    agent_num: int,
+    agent_name: str,
+    task: str,
+    entry_point: str,
+    time_step: float,
+    max_episode_steps: int,
+    frame_skip: int,
+    model_type: str,
+    total_timesteps: int,
+    start_her_episode: int,
+    model_file: str,
+    height_map_file: str,
+    load_existing_model: bool,
+):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -358,21 +476,73 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, subenv_num)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, "training", entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [
+            make_env(
+                orcagym_addr=orcagym_addr,
+                env_name=env_name,
+                env_index=env_index,
+                agent_num=agent_num,
+                agent_name=agent_name,
+                task=task,
+                run_mode="training",
+                nav_ip="localhost",
+                entry_point=entry_point,
+                time_step=time_step,
+                max_episode_steps=max_episode_steps,
+                frame_skip=frame_skip,
+                is_subenv=is_subenv,
+                height_map_file=height_map_file,
+            )
+            for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
+        ]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         print("Start Simulation!")
         if model_type == "ppo":
-            model = setup_model_ppo(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
+            model = setup_model_ppo(
+                env=env,
+                env_num=env_num,
+                agent_num=agent_num,
+                agent_name=agent_name,
+                model_file=model_file,
+                load_existing_model=load_existing_model,
+            )
         elif model_type == "tqc":
-            model = setup_model_tqc(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
+            model = setup_model_tqc(
+                env=env,
+                env_num=env_num,
+                agent_num=agent_num,
+                total_timesteps=total_timesteps,
+                start_her_episode=start_her_episode,
+                max_episode_steps=max_episode_steps,
+                model_file=model_file,
+                load_existing_model=load_existing_model,
+            )
         elif model_type == "sac":
-            model = setup_model_sac(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
+            model = setup_model_sac(
+                env=env,
+                env_num=env_num,
+                agent_num=agent_num,
+                total_timesteps=total_timesteps,
+                start_her_episode=start_her_episode,
+                max_episode_steps=max_episode_steps,
+                model_file=model_file,
+                load_existing_model=load_existing_model,
+            )
         elif model_type == "ddpg":
-            model = setup_model_ddpg(env, env_num, agent_num, total_timesteps, start_episode, max_episode_steps, model_file, load_existing_model)
+            model = setup_model_ddpg(
+                env=env,
+                env_num=env_num,
+                agent_num=agent_num,
+                total_timesteps=total_timesteps,
+                start_her_episode=start_her_episode,
+                max_episode_steps=max_episode_steps,
+                model_file=model_file,
+                load_existing_model=load_existing_model,
+            )
         else:
             raise ValueError("Invalid model type")
-        
+
         training_model(model, total_timesteps, model_file)
 
     finally:
@@ -381,7 +551,21 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         model.save(model_file)
         env.close()
 
-def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file, height_map_file):
+def test_model(
+    orcagym_addresses: str,
+    agent_num: int,
+    agent_name: str,
+    task: str,
+    run_mode: str,
+    nav_ip: str,
+    entry_point: str,
+    time_step: float,
+    max_episode_steps: int,
+    frame_skip: int,
+    model_type: str,
+    model_file: str,
+    height_map_file: str
+):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
@@ -389,22 +573,48 @@ def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, nav_ip,
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, 1)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [
+            make_env(
+                orcagym_addr=orcagym_addr,
+                env_name=env_name,
+                env_index=env_index,
+                agent_num=agent_num,
+                agent_name=agent_name,
+                task=task,
+                run_mode=run_mode,
+                nav_ip=nav_ip,
+                entry_point=entry_point,
+                time_step=time_step,
+                max_episode_steps=max_episode_steps,
+                frame_skip=frame_skip,
+                is_subenv=is_subenv,
+                height_map_file=height_map_file,
+            )
+            for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
+        ]
         env = SubprocVecEnvMA(env_fns, agent_num)
-
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         if model_type == "ppo":
-            model = PPO.load(model_file, env=env, device=device)
+            model: PPO = PPO.load(model_file, env=env, device=device)
         elif model_type == "tqc":
-            model = TQC.load(model_file, env=env, device=device)
+            model: TQC = TQC.load(model_file, env=env, device=device)
         elif model_type == "sac":
-            model = SAC.load(model_file, env=env, device=device)
+            model: SAC = SAC.load(model_file, env=env, device=device)
         elif model_type == "ddpg":
-            model = DDPG.load(model_file, env=env, device=device)
+            model: DDPG = DDPG.load(model_file, env=env, device=device)
         else:
             raise ValueError("Invalid model type")
+        
+        testing_model(
+            env=env,
+            agent_num=agent_num,
+            model=model,
+            time_step=time_step,
+            max_episode_steps=max_episode_steps,
+            frame_skip=frame_skip
+        )
 
-        testing_model(env, agent_num, model, time_step, max_episode_steps, frame_skip)
     except KeyboardInterrupt:
         print("退出仿真环境")
         env.close()
@@ -420,7 +630,13 @@ def _segment_observation(observation, agent_num):
         obs_list.append(agent_obs)
     return obs_list
 
-def _output_test_info(test, total_rewards, rewards, dones, infos):
+def _output_test_info(
+    test: int,
+    total_rewards: np.ndarray,
+    rewards: np.ndarray,
+    dones: np.ndarray,
+    infos: list
+):
     print(f"----------------Test: {test}----------------")
     print("Total Reward: ", total_rewards)
     print("Reward: ", rewards)
@@ -428,7 +644,31 @@ def _output_test_info(test, total_rewards, rewards, dones, infos):
     print("is_success: ", [agent_info["is_success"] for agent_info in infos])
     print("---------------------------------------")
 
-def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episode_steps, frame_skip):
+def testing_model(
+    env: SubprocVecEnvMA, 
+    agent_num: int, 
+    model, 
+    time_step: float, 
+    max_episode_steps: int, 
+    frame_skip: int
+):
+    """
+    测试模型。
+
+    参数:
+    - env: SubprocVecEnvMA
+        测试环境
+    - agent_num: int
+        智能体数量
+    - model: Any
+        训练好的模型
+    - time_step: float
+        时间步长
+    - max_episode_steps: int
+        每回合最大步数
+    - frame_skip: int
+        帧跳跃数
+    """
     # 测试模型
     observations = env.reset()
     test = 0
@@ -444,30 +684,18 @@ def testing_model(env : SubprocVecEnvMA, agent_num, model, time_step, max_episod
             obs_list = _segment_observation(observations, agent_num)
             action_list = []
             for agent_obs in obs_list:
-                # predict_start = datetime.now()
                 action, _states = model.predict(agent_obs, deterministic=True)
                 action_list.append(action)
-                # predict_time = datetime.now() - predict_start
-                # print("Predict Time: ", predict_time.total_seconds(), flush=True)
 
             action = np.concatenate(action_list).flatten()
-            # print("action: ", action)
-            # setp_start = datetime.now()
             observations, rewards, dones, infos = env.step(action)
 
-            # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
-
-
             env.render()
-            # step_time = datetime.now() - setp_start
-            # print("Step Time: ", step_time.total_seconds(), flush=True)
 
             total_rewards += rewards
 
-            # 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:
-                # print("Sleep for ", dt - elapsed_time.total_seconds())
                 time.sleep(dt - elapsed_time.total_seconds())
 
             if step == max_episode_steps:
