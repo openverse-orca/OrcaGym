@@ -108,5 +108,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# training stuff
+trained_models_tmp/
+ppo_tensorboard/
+
 
 

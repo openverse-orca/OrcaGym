@@ -422,7 +422,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             )
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
-        
+
         return actuator_ctrl
 
     # @property

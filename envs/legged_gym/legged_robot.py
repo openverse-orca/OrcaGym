@@ -20,6 +20,8 @@ def get_legged_robot_name(agent_name: str) -> str:
         return "A01B"
     elif agent_name.startswith("AzureLoong"):
         return "AzureLoong"
+    elif agent_name.startswith("Lite3"):
+        return "Lite3"
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
 
@@ -271,7 +273,7 @@ class LeggedRobot(OrcaGymAgent):
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
-                    np.array([self._body_height]),
+                    # np.array([self._body_height]),
                 ]).reshape(-1).astype(np.float32)
         
         obs *= self._obs_scale_vec
@@ -481,6 +483,13 @@ class LeggedRobot(OrcaGymAgent):
                 geom_friction_dict[name] = friction
 
         return geom_friction_dict
+    
+    def generate_randomized_weight_on_base(self, random_weight, random_weight_pos, body_dict):
+        randomized_body_weight = {}
+        for name, body in body_dict.items():
+            if name == self._base_joint_name:
+                randomized_body_weight[name] = {"weight": random_weight, "pos": random_weight_pos}
+        return randomized_body_weight
 
     def _compute_reward_alive(self, coeff) -> SupportsFloat:
         reward = 1.0 * coeff * self.dt
@@ -863,7 +872,7 @@ class LeggedRobot(OrcaGymAgent):
         scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
         scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
-        scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
+        # scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
 
         scale_vec = np.concatenate([scale_lin_vel, 
                                     scale_ang_vel, 
@@ -873,7 +882,8 @@ class LeggedRobot(OrcaGymAgent):
                                     scale_leg_joint_qpos, 
                                     scale_leg_joint_qvel, 
                                     scale_action, 
-                                    scale_height]).flatten()
+                                    # scale_height
+                                    ]).flatten()
         
         return scale_vec.astype(np.float32)
 
@@ -906,7 +916,8 @@ class LeggedRobot(OrcaGymAgent):
                                     noise_leg_joint_qpos, 
                                     noise_leg_joint_qvel, 
                                     noise_action, 
-                                    noise_height]).flatten()
+                                    # noise_height
+                                    ]).flatten()
         
         # print("noise vec: ", noise_vec)
 

@@ -16,7 +16,7 @@ import sys
 import time
 
 
-def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) -> str:
+def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
@@ -32,6 +32,7 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task,
                 'is_subenv': is_subenv,
                 'height_map_file': height_map_file,
                 'run_mode': run_mode,
+                'ip': nav_ip,
                 'env_id': env_id},
         max_episode_steps=sys.maxsize,      # 环境永不停止，agent有最大步数
         reward_threshold=0.0,
@@ -39,10 +40,10 @@ def register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task,
     return env_id
 
 
-def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file):
+def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file):
     def _init():
         # 注册环境，确保子进程中也能访问
-        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file)
+        env_id = register_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode,nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file)
         print("Registering environment with id: ", env_id)
 
         env = gym.make(env_id)
@@ -54,7 +55,10 @@ def make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run
 def training_model(model, total_timesteps, model_file):
     # 训练模型，每10亿步保存一次check point
     try:
-        CKP_LEN = 1000000000
+        # CKP_LEN = 1000000000
+        CKP_LEN = 50000000
+        # CKP_LEN = 100000
+
         training_loop = []
         if total_timesteps <= CKP_LEN:
             training_loop.append(total_timesteps)
@@ -64,7 +68,7 @@ def training_model(model, total_timesteps, model_file):
             else:
                 training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
                 training_loop.append(total_timesteps % CKP_LEN)
-        
+
         for i, loop in enumerate(training_loop):
             model.learn(loop)
 
@@ -152,7 +156,9 @@ def setup_model_ppo(env,
 
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
-        n_steps = 64  # 每个环境采样步数
+
+        n_steps = 128  # 每个环境采样步数
+
         batch_size = total_envs * 16  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
@@ -170,7 +176,8 @@ def setup_model_ppo(env,
             clip_range=0.2, 
             ent_coef=0.01, 
             policy_kwargs=policy_kwargs, 
-            device=device
+            device=device,
+            tensorboard_log="./ppo_tensorboard/",  # TensorBoard 日志目录
         )
 
     # 打印模型摘要
@@ -374,7 +381,7 @@ def train_model(orcagym_addresses, subenv_num, agent_num, agent_name, task, entr
         model.save(model_file)
         env.close()
 
-def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file, height_map_file):
+def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, model_type, model_file, height_map_file):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
@@ -382,7 +389,7 @@ def test_model(orcagym_addresses, agent_num, agent_name, task, run_mode, entry_p
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, 1)
         env_num = len(orcagym_addr_list)
         print("env num: ", env_num)
-        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)]
+        env_fns = [make_env(orcagym_addr, env_name, env_index, agent_num, agent_name, task, run_mode, nav_ip, entry_point, time_step, max_episode_steps, frame_skip, is_subenv, height_map_file) for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)]
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

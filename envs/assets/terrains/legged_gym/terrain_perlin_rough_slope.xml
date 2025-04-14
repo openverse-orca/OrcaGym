@@ -8,9 +8,9 @@
         <texture type="2d" name="Plastic010_normal"     file="../../textures/Plastic010_2K-PNG/Plastic010_2K-PNG_NormalDX.png"/>
 
         <material name="pbr_plastic_gray" metallic ="0.05" roughness="1.0" rgba="1 0 0 1.0">
-        <rgb        texture="Plastic010_color"/>
-        <normal     texture="Plastic010_normal"/>
-        <roughness  texture="Plastic010_roughness"/>      
+        <layer role="rgb"        texture="Plastic010_color"/>
+        <layer role="normal"     texture="Plastic010_normal"/>
+        <layer role="roughness"  texture="Plastic010_roughness"/>      
         </material>
 
         <hfield name="perlin_hfield" size="6.4 6.4 0.2 0.5" file="height_field_rough.png"/>
