@@ -54,41 +54,44 @@ class OpenLoongTask(AbstractTask):
         """ 从object,goal中选择数量最少的
             在生成一个随机整数x，在挑选x个object, goal
         """
-        self.task_dict.clear()
+        # 使用列表替代字典
+        self.task_list = []
         self.random_objs_and_goals(env, bounds=0.1)
-
+    
         object_len = len(self.object_bodys)
-        goal_len = len(self.goal_bodys)
-        min_len = min(object_len, goal_len)
+        min_len = min(1, object_len)
+        
         if min_len == 0:
-            return self.task_dict
+            return self.task_list  # 返回空列表
         
         random_x = random.randint(1, min_len)
-
-        ind_list = random.sample(range(object_len), random_x)
+        
+        # 随机选择索引时保证object和goal一一对应
+        ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
+        
         for ind in ind_list:
-            self.task_dict[self.object_bodys[ind]] = self.goal_bodys[ind]
-
-        return self.task_dict
-
-    def is_success(self, env: RobomimicEnv):
-        pass
-
+            # 以元组形式存储object-goal对
+            self.task_list.append(
+                (self.object_bodys[ind])
+            )
+        
+        return self.task_list
+    
     def get_language_instruction(self) -> str:
-        if len(self.task_dict) == 0:
+        if len(self.task_list) == 0:
             return "Do something."
-
+    
         object_str = "object: "
-        for key in self.task_dict.keys():
-            object_str += key + " "
-        
         goal_str = "goal: "
-        for value in self.task_dict.values():
-            goal_str += value + " "
         
-        language_instruction = f"level: {self.level_name} task: {self.prompt}"
-        language_instruction += f"{object_str} to {goal_str}"                               
-
+        # 遍历列表中的元组元素
+        for obj in self.task_list:
+            object_str += obj + " "
+ 
+        
+        language_instruction = f"level: {self.level_name}"
+        language_instruction += f"{object_str} to basket"
+        
         return language_instruction
 
 class TaskStatus:
@@ -140,7 +143,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
-        
+
         if self._ctrl_device == ControlDevice.VR:
             self._joystick = {}
             pico_joystick = []
@@ -623,8 +626,7 @@ class OpenLoongAgent(AgentBase):
             env.disable_actuators(self._l_arm_moto_names, dummy_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
-        # self._l_neutral_joint_values = np.zeros(7)
-        
+        # self._l_neutral_joint_values = np.zeros(7)            
         print("arm_actuator_id: ", self._r_arm_actuator_id, self._l_arm_actuator_id)
 
         # control range
@@ -811,8 +813,8 @@ class OpenLoongAgent(AgentBase):
         self.set_grasp_mocap_r(env, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
 
     def get_obs(self, env: OpenLoongEnv) -> dict:
-        ee_sites = env.query_site_pos_and_quat([self._ee_site_l, self._ee_site_r])
-        ee_xvalp, ee_xvalr = env.query_site_xvalp_xvalr([self._ee_site_l, self._ee_site_r])
+        ee_sites = env.query_site_pos_and_quat_B([self._ee_site_l, self._ee_site_r], self._base_body_name)
+        ee_xvalp, ee_xvalr = env.query_site_xvalp_xvalr_B([self._ee_site_l, self._ee_site_r], self._base_body_name)
 
         arm_joint_values_l = self._get_arm_joint_values(env, self._l_arm_joint_names)
         arm_joint_values_r = self._get_arm_joint_values(env, self._r_arm_joint_names)
@@ -950,10 +952,13 @@ class OpenLoongAgent(AgentBase):
         # print("ctrl l: ", ctrl)
         self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
         
-        action = np.concatenate([action_l,                  # left eef pos and angle, 0-5
+        action_l_B = self._action_to_action_B(env, action_l)
+        action_r_B = self._action_to_action_B(env, action_r)
+
+        action = np.concatenate([action_l_B,                # left eef pos and angle, 0-5
                                  np.zeros(7),               # left arm joint pos, 6-12 (will be fill after do simulation)
                                  [self._grasp_value_l],     # left hand grasp value, 13
-                                 action_r,                  # right eef pos and angle, 14-19
+                                 action_r_B,                # right eef pos and angle, 14-19
                                  np.zeros(7),               # right arm joint pos, 20-26 (will be fill after do simulation)
                                  [self._grasp_value_r]]     # right hand grasp value, 27
                                 ).flatten()
@@ -1053,7 +1058,7 @@ class OpenLoongAgent(AgentBase):
 
         # 更新头部位置
         self.set_neck_mocap(env, mocap_neck_xpos, self._mocap_neck_xquat)
- 
+
     def _processe_pico_joystick_move(self, env : OpenLoongEnv) -> tuple:
         if self._pico_joystick.is_reset_pos():
             self._pico_joystick.set_reset_pos(False)
@@ -1109,12 +1114,12 @@ class OpenLoongAgent(AgentBase):
         self._set_r_hand_actuator_ctrl(env, self._grasp_value_r)
 
         if env.action_type == ActionType.END_EFFECTOR:
-            action_l = action[:6]
+            action_l = self._action_B_to_action(env, action[:6])
             self._l_controller.set_goal(action_l)
             ctrl = self._l_controller.run_controller()
             self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl)
 
-            action_r = action[14:20]
+            action_r = self._action_B_to_action(env, action[14:20])
             self._r_controller.set_goal(action_r)
             ctrl = self._r_controller.run_controller()
             self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl)
@@ -1129,6 +1134,47 @@ class OpenLoongAgent(AgentBase):
             raise ValueError("Invalid action type: ", self._action_type)
         
         return
+    
+    def _action_B_to_action(self, env: OpenLoongEnv, action_B: np.ndarray) -> np.ndarray:
+        ee_pos = action_B[:3]
+        ee_axisangle = action_B[3:6]
+
+        base_link_pos, base_link_xmat, base_link_quat = env.get_body_xpos_xmat_xquat(self._base_body_name)
+
+        # 在h5文件中的数据是B系数据，需要转换到世界坐标系
+
+        base_link_rot = R.from_quat(base_link_quat[[1, 2, 3, 0]])
+        ee_pos_global = base_link_pos + base_link_rot.apply(ee_pos)
+
+        ee_quat = transform_utils.axisangle2quat(ee_axisangle)
+        ee_rot = R.from_quat(ee_quat)
+        ee_rot_global = base_link_rot * ee_rot
+
+        ee_axisangle_global = transform_utils.quat2axisangle(ee_rot_global.as_quat())
+        return np.concatenate([ee_pos_global, ee_axisangle_global], dtype=np.float32).flatten()
+
+    def _action_to_action_B(self, env: OpenLoongEnv, action_global: np.ndarray) -> np.ndarray:
+        ee_pos_global = action_global[:3]
+        ee_axisangle_global = action_global[3:6]
+
+        # 获取基础链接的全局位姿
+        base_link_pos, _, base_link_quat = env.get_body_xpos_xmat_xquat(self._base_body_name)
+        
+        # 处理四元数顺序（假设环境返回wxyz格式）
+        quat_xyzw = base_link_quat[[1, 2, 3, 0]]  # 转换为xyzw格式
+        base_rot = R.from_quat(quat_xyzw)
+        base_rot_matrix = base_rot.as_matrix()
+
+        # 位置转换（全局→局部）
+        pos_local = base_rot_matrix.T @ (ee_pos_global - base_link_pos)
+
+        # 旋转转换（全局→局部）
+        global_quat = transform_utils.axisangle2quat(ee_axisangle_global)
+        global_rot = R.from_quat(global_quat)
+        local_rot = base_rot.inv() * global_rot  # 旋转的逆运算
+        local_axisangle = transform_utils.quat2axisangle(local_rot.as_quat())
+
+        return np.concatenate([pos_local, local_axisangle], dtype=np.float32).flatten()
 
     def _set_gripper_ctrl_r(self, env: OpenLoongEnv, joystick_state) -> None:
         raise NotImplementedError("This method should be implemented in the derived class.")
@@ -1273,8 +1319,7 @@ class OpenLoongHandAgent(OpenLoongAgent):
         compose_force = 0
         for force in contact_force_dict.values():
             compose_force += np.linalg.norm(force[:3])
-        return compose_force            
-    
+        return compose_force
     
     
 class OpenLoongGripperAgent(OpenLoongAgent):
