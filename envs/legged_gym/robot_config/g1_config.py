@@ -233,7 +233,7 @@ g1Config = {
             "failure" : 100,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 10,#1.0,
+            "joint_angles" : 1.0,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
             "action_rate" : 0.1,
@@ -268,15 +268,15 @@ g1Config = {
         # Config for randomization
         "randomize_friction" :      True,
         "friction_range" :          [0.5, 1.25],
-        "randomize_base_mass" :     False,
-        "added_mass_range" :        [-1., 1.],
+        "randomize_base_mass" :     True,
+        "added_mass_range" :        [-1., 5.],
         "push_robots" :             True,
         "push_interval_s" :         2,
         "max_push_vel_xy" :         0.5,
         "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
         
         # Config for ccurriculum learning
-        "curriculum_learning" :     False, #True,
+        "curriculum_learning" :     True,
         "curriculum_levels" : [
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
@@ -296,15 +296,15 @@ g1Config = {
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_resample_interval" : 20, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
-                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right
-                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 1.0,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_lin_vel_range_x" : [0.0, 0.7], # x direction for forward
+                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+                "command_lin_vel_threshold" : [0.0, 0.2], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_resample_interval" : 20, # second to resample the command
             },
             
             "stairs" : {

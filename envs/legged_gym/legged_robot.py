@@ -180,6 +180,8 @@ class LeggedRobot(OrcaGymAgent):
 
         self._randomize_friction = robot_config["randomize_friction"]
         self._friction_range = robot_config["friction_range"]
+        self._randomize_base_mass = robot_config["randomize_base_mass"]
+        self._added_mass_range = robot_config["added_mass_range"]
         
         self._pos_random_range = robot_config["pos_random_range"]
         
@@ -243,6 +245,14 @@ class LeggedRobot(OrcaGymAgent):
     @player_control.setter
     def player_control(self, value: bool) -> None:
         self._player_control = value
+        
+    @property
+    def added_mass_range(self) -> np.ndarray:
+        return self._added_mass_range
+    
+    @property
+    def base_joint_name(self) -> str:
+        return self._base_joint_name
 
     # @property
     # def body_contact_force_threshold(self) -> float:
@@ -496,11 +506,12 @@ class LeggedRobot(OrcaGymAgent):
 
         return geom_friction_dict
     
-    def generate_randomized_weight_on_base(self, random_weight, random_weight_pos, body_dict):
+    def generate_randomized_weight_on_base(self, random_weight, random_weight_pos, joint_dict):
         randomized_body_weight = {}
-        for name, body in body_dict.items():
-            if name == self._base_joint_name:
-                randomized_body_weight[name] = {"weight": random_weight, "pos": random_weight_pos}
+        for joint_name, joint in joint_dict.items():
+            if joint_name == self._base_joint_name:
+                body_id = joint["BodyID"]
+                randomized_body_weight[body_id] = {"weight": random_weight, "pos": random_weight_pos}
         return randomized_body_weight
 
     def _compute_reward_alive(self, coeff) -> SupportsFloat:

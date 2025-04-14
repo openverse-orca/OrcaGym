@@ -58,7 +58,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         )
 
         self._randomize_agent_foot_friction()
-        self._add_randomized_weight(0.01, 0.8)
+        self._add_randomized_weight()
         self._init_playable()
         self._reset_phy_config()
 
@@ -252,17 +252,22 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # print("Set geom friction: ", geom_friction_dict)
         self.set_geom_friction(geom_friction_dict)
 
-    def _add_randomized_weight(self, pos_scale, weight_delta_max) -> None:
+    def _add_randomized_weight(self) -> None:
+        print("Add randomized weight")
         if self._run_mode == "testing" or self._run_mode == "play":
             print("Skip randomized weight load in testing or play mode")
             return   
 
-        random_weight = [self.np_random.uniform(0, weight_delta_max) for _ in range(len(self.agents))]
-        random_weight_pos = [[self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0] for _ in range(len(self.agents))]
+        pos_scale = 0.01
         weight_load_dict = {}
+        all_joint_dict = self.model.get_joint_dict()        
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
-            weight_load_tmp = agent.generate_randomized_weight_on_base(random_weight[i], random_weight_pos[i], self.model.get_body_dict())
+            random_weight = self.np_random.uniform(agent.added_mass_range[0], agent.added_mass_range[1])
+            random_weight_pos = [self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0]
+
+            base_body_id = all_joint_dict[agent.base_joint_name]["BodyID"]
+            weight_load_tmp = {base_body_id : {"weight": random_weight, "pos": random_weight_pos}}
             weight_load_dict.update(weight_load_tmp)
 
         print("Set weight load: ", weight_load_dict)

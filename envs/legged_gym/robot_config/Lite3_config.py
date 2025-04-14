@@ -105,8 +105,8 @@ Lite3Config = {
         # Config for randomization
         "randomize_friction" :      True,
         "friction_range" :          [0.5, 1.25],
-        "randomize_base_mass" :     False,
-        "added_mass_range" :        [-1., 1.],
+        "randomize_base_mass" :     True,
+        "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
         "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,
