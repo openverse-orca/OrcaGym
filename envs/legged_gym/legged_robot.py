@@ -116,7 +116,7 @@ class LeggedRobot(OrcaGymAgent):
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
         
         if robot_config.get("neutral_joint_angles_coeff") is None:
-            self._neutral_joint_angles_coeff_value = np.ones(len(self._neutral_joint_values))
+            self._neutral_joint_angles_coeff_value = None
         else:
             neutral_joint_angles_coeff = robot_config["neutral_joint_angles_coeff"]
             self._neutral_joint_angles_coeff_value = np.array([neutral_joint_angles_coeff[key] for key in neutral_joint_angles_coeff]).flatten()
@@ -531,7 +531,10 @@ class LeggedRobot(OrcaGymAgent):
     
     def _compute_reward_joint_angles(self, coeff) -> SupportsFloat:
         # print("Joint angles: ", self._leg_joint_qpos, "Neutral joint values: ", self._neutral_joint_values, "Joint angles coeff: ", self._neutral_joint_angles_coeff_value)
-        joint_angles_diff = np.abs(self._leg_joint_qpos - self._neutral_joint_values) * self._neutral_joint_angles_coeff_value
+        if self._neutral_joint_angles_coeff_value is None:
+            joint_angles_diff = np.abs(self._leg_joint_qpos - self._neutral_joint_values)
+        else:
+            joint_angles_diff = np.abs(self._leg_joint_qpos - self._neutral_joint_values) * self._neutral_joint_angles_coeff_value
         # print("Joint angles diff: ", joint_angles_diff)
         reward = -np.sum(joint_angles_diff) * coeff * self.dt
         self._print_reward("Joint angles reward: ", reward, coeff * self.dt)
