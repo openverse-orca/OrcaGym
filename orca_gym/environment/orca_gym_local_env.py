@@ -18,6 +18,7 @@ from orca_gym.utils.rotations import mat2quat, quat2mat
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
 from . import OrcaGymBaseEnv
+from scipy.spatial.transform import Rotation as R
 
 import grpc
 
@@ -220,6 +221,29 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
                 'xquat': mat2quat(np.array(query_dict[site]['xmat']).reshape(3, 3))
             }
         return site_dict
+    
+    def query_site_pos_and_quat_B(self, site_names, base_body_list) -> Dict[str, Dict[str, Union[NDArray[np.float32], NDArray[np.float32]]]]:
+        site_dict = self.gym.query_site_pos_and_mat(site_names)
+        base_pos, _, base_quat = self.get_body_xpos_xmat_xquat(base_body_list)
+        site_pos_quat_B = {}
+        for site_name, site_value in site_dict.items():
+            ee_pos = np.array(site_value['xpos'])
+            ee_quat = mat2quat(np.array(site_value['xmat']).reshape(3, 3))
+
+            # 转换为SciPy需要的[x,y,z,w]格式
+            rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+            rot_base_inv = rot_base.inv()
+
+            rot_ee = R.from_quat([ee_quat[1], ee_quat[2], ee_quat[3], ee_quat[0]])
+            relative_rot_ee = rot_base_inv * rot_ee
+            relative_pos_ee = rot_base_inv.apply(ee_pos - base_pos)
+
+            site_pos_quat_B[site_name] = {}
+            site_pos_quat_B[site_name]["xpos"] = relative_pos_ee
+            site_pos_quat_B[site_name]["xquat"] = relative_rot_ee.as_quat().astype(np.float32)
+
+        return site_pos_quat_B
+
 
     def set_joint_qpos(self, joint_qpos):
         self.gym.set_joint_qpos(joint_qpos)
@@ -236,6 +260,28 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             xvalr_dict[site] = np.array(query_dict[site]['jacr']).reshape(3, -1) @ self.data.qvel
 
         return xvalp_dict, xvalr_dict        
+    
+    def query_site_xvalp_xvalr_B(self, site_names, base_body_list) -> Tuple[Dict[str, NDArray[np.float32]], Dict[str, NDArray[np.float32]]]:
+        query_dict = self.gym.mj_jac_site(site_names)
+        _, base_mat, _ = self.get_body_xpos_xmat_xquat(base_body_list)
+        xvalp_dict = {}
+        xvalr_dict = {}
+        for site in query_dict:
+            ee_xvalp = np.array(query_dict[site]['jacp']).reshape(3, -1) @ self.data.qvel
+            ee_xvalr = np.array(query_dict[site]['jacr']).reshape(3, -1) @ self.data.qvel
+
+            # 目前只有固定基座，不涉及基座的速度
+            base_xvalp = np.zeros(3)
+            base_xvalr = np.zeros(3)
+
+            base_mat = base_mat.reshape(3, 3)
+            linear_vel_B = base_mat.T @ (ee_xvalp - base_xvalp)
+            angular_vel_B = base_mat.T @ (ee_xvalr - base_xvalr)
+
+            xvalp_dict[site] = linear_vel_B.astype(np.float32)
+            xvalr_dict[site] = angular_vel_B.astype(np.float32)
+
+        return xvalp_dict, xvalr_dict
     
     def update_equality_constraints(self, eq_list):
         self.gym.update_equality_constraints(eq_list)
