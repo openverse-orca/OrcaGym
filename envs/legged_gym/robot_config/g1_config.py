@@ -233,7 +233,7 @@ g1Config = {
             "failure" : 200,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 1.0,
+            "joint_angles" : 20,#1.0,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
             "action_rate" : 0.1,
