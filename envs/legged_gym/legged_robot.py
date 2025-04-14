@@ -115,12 +115,19 @@ class LeggedRobot(OrcaGymAgent):
         self._neutral_joint_angles = robot_config["neutral_joint_angles"]
         self._neutral_joint_values = np.array([self._neutral_joint_angles[key] for key in self._neutral_joint_angles]).flatten()
         
-        self._neutral_joint_angles_coeff = robot_config["neutral_joint_angles_coeff"]
-        self._neutral_joint_angles_coeff_value = np.array([self._neutral_joint_angles_coeff[key] for key in self._neutral_joint_angles_coeff]).flatten()
+        if robot_config.get("neutral_joint_angles_coeff") is None:
+            self._neutral_joint_angles_coeff_value = np.ones(len(self._neutral_joint_values))
+        else:
+            neutral_joint_angles_coeff = robot_config["neutral_joint_angles_coeff"]
+            self._neutral_joint_angles_coeff_value = np.array([neutral_joint_angles_coeff[key] for key in neutral_joint_angles_coeff]).flatten()
         
         self._actuator_names = self.name_space_list(robot_config["actuator_names"])
         self._actuator_type = robot_config["actuator_type"]
         self._action_scale = robot_config["action_scale"]
+        
+        if robot_config.get("action_scale_mask") is not None:
+            mask = robot_config["action_scale_mask"]
+            self._action_scale_mask = np.array([mask[key] for key in mask]).flatten()
         
         self._imu_site_name = self.name_space(robot_config["imu_site_name"])
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])

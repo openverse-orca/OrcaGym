@@ -229,7 +229,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
 
     def reset_model(self) -> tuple[ObsType, dict[str, np.ndarray]]:
-        print("Reset model")
+        # print("Reset model")
 
         # 依次 reset 每个agent
         self.reset_agents(self._agents)

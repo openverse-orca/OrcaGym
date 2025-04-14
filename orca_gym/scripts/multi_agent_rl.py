@@ -14,7 +14,7 @@ import numpy as np
 import os
 import sys
 import time
-
+from envs.legged_gym.legged_config import LeggedRobotConfig
 
 def register_env(
     orcagym_addr: str,
@@ -134,9 +134,7 @@ def setup_model_ppo(
     env: SubprocVecEnvMA, 
     env_num: int, 
     agent_num: int, 
-    total_timesteps: int, 
-    start_her_episode: int, 
-    max_episode_steps: int, 
+    agent_name: str,
     model_file: str, 
     load_existing_model: bool
 ) -> PPO:
@@ -147,9 +145,6 @@ def setup_model_ppo(
     - env: 训练环境
     - env_num: 环境数量
     - agent_num: 每个环境中的智能体数量
-    - total_timesteps: 总时间步数
-    - start_her_episode: 开始的回合数
-    - max_episode_steps: 每回合最大步数
     - model_file: 模型文件路径
     - load_existing_model: 是否加载现有模型标志
 
@@ -165,10 +160,13 @@ def setup_model_ppo(
     else:
         print("初始化新模型")
         # 定义自定义策略网络
+        
+        robot_config = LeggedRobotConfig[agent_name]
+
         policy_kwargs = dict(
             net_arch=dict(
-                pi=[1024, 512, 256],  # 策略网络结构
-                vf=[1024, 512, 256]   # 值函数网络结构
+                pi=robot_config["pi"],  # 策略网络结构
+                vf=robot_config["vf"]   # 值函数网络结构
             ),
             ortho_init=True,       # 正交初始化
             activation_fn=nn.ELU,  # 激活函数
@@ -177,13 +175,15 @@ def setup_model_ppo(
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
 
-        n_steps = 128  # 每个环境采样步数
+        n_steps = robot_config["n_steps"]  # 每个环境采样步数
 
-        batch_size = total_envs * 16  # 批次大小
+        batch_size = robot_config["batch_size"]  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
-        assert (total_envs * n_steps) % batch_size == 0, \
-            f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。"
+        if (total_envs * n_steps) % batch_size != 0:
+            Warning(f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
+            batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
+            
 
         model = PPO(
             policy="MultiInputPolicy",  # 多输入策略
@@ -201,7 +201,7 @@ def setup_model_ppo(
         )
 
     # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
 
     return model
 
@@ -503,9 +503,7 @@ def train_model(
                 env=env,
                 env_num=env_num,
                 agent_num=agent_num,
-                total_timesteps=total_timesteps,
-                start_her_episode=start_her_episode,
-                max_episode_steps=max_episode_steps,
+                agent_name=agent_name,
                 model_file=model_file,
                 load_existing_model=load_existing_model,
             )
