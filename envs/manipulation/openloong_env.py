@@ -1321,64 +1321,6 @@ class OpenLoongHandAgent(OpenLoongAgent):
             compose_force += np.linalg.norm(force[:3])
         return compose_force
     
-    def on_playback_action(self, env: OpenLoongEnv, action) -> None:
-        assert(len(action) == self.action_range.shape[0])
-        effector_force_l, effector_force_r = action[12:23], action[23:34]
-        self._grasp_value_l = action[13]
-        self._set_l_hand_actuator_ctrl(env, self._grasp_value_l)
-        self._grasp_value_r = action[27]
-        self._set_r_hand_actuator_ctrl(env, self._grasp_value_r)
-
-        base_link_pos, base_link_xmat, base_link_quat = env.get_body_xpos_xmat_xquat(self._base_body_name)
-        # 处理左手末端执行器（End-Effector）的相对坐标
-        ee_pos_l, ee_axisangle_l = action[:3], action[6:9]
-
-        # 将末端执行器位置从全局坐标转换为相对坐标
-        base_link_rot = R.from_quat(base_link_quat[[1, 2, 3, 0]])  # 机器人的旋转四元数
-        ee_pos_l_relative = ee_pos_l - base_link_pos  # 将位置从全局坐标转换为相对坐标
-        ee_ori_l = transform_utils.axisangle2quat(ee_axisangle_l)
-
-        ee_ori_rot_l = R.from_quat(ee_ori_l)
-        ee_ori_rot_l_relative = base_link_rot.inv() * ee_ori_rot_l  # 旋转从全局转换为相对坐标系
-        ee_ori_l_relative = ee_ori_rot_l_relative.as_quat()
-
-        action_l_relative = np.concatenate([ee_pos_l_relative, transform_utils.quat2axisangle(ee_ori_l_relative)])
-        self._l_controller.set_goal(action_l_relative)
-        ctrl_l = self._l_controller.run_controller()
-        for i in range(len(self._l_arm_actuator_id)):
-            env.ctrl[self._l_arm_actuator_id[i]] = ctrl_l[i]
-
-        # 处理右手末端执行器（End-Effector）的相对坐标
-        ee_pos_r, ee_axisangle_r = action[3:6], action[9:12]
-
-        # 将末端执行器位置从全局坐标转换为相对坐标
-        ee_pos_r_relative = ee_pos_r - base_link_pos
-        ee_ori_r = transform_utils.axisangle2quat(ee_axisangle_r)
-
-        ee_ori_rot_r = R.from_quat(ee_ori_r)
-        ee_ori_rot_r_relative = base_link_rot.inv() * ee_ori_rot_r
-        ee_ori_r_relative = ee_ori_rot_r_relative.as_quat()
-
-        action_r_relative = np.concatenate([ee_pos_r_relative, transform_utils.quat2axisangle(ee_ori_r_relative)])
-        self._r_controller.set_goal(action_r_relative)
-        ctrl_r = self._r_controller.run_controller()
-        for i in range(len(self._r_arm_actuator_id)):
-            env.ctrl[self._r_arm_actuator_id[i]] = ctrl_r[i]
-        effector_force_l, effector_force_r = action[12:23], action[23:34]
-        # # 处理左手和右手的抓取力度控制
-        # for i in range(len(self._l_arm_actuator_id)):
-        #     env.ctrl[self._l_arm_actuator_id[i]] = action[12 + i]  # 使用action中的相应值
-        # for i in range(len(self._r_arm_actuator_id)):
-        #     env.ctrl[self._r_arm_actuator_id[i]] = action[23 + i]  # 使用action中的相应值
-        #手指控制
-        for i in range(len(self._l_hand_actuator_id)):
-            self.ctrl[self._l_hand_actuator_id[i]] = effector_force_l[i]
-        for i in range(len(self._r_hand_actuator_id)):
-            self.ctrl[self._r_hand_actuator_id[i]] = effector_force_r[i]
-
-        return         
-    
-    
     
 class OpenLoongGripperAgent(OpenLoongAgent):
     def __init__(self, env: OpenLoongEnv, id: int, name: str) -> None:
