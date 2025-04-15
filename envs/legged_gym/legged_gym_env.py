@@ -8,6 +8,7 @@ import datetime
 from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
 import time
+from collections import defaultdict
 
 import requests
 from examples.vln.imgrec import RecAction
@@ -219,19 +220,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self._reset_agent_joint_qpos(agents)
         self._reset_command_indicators(agents)
 
-    def _generate_contact_dict(self) -> dict[str, list[str]]:
+    def _generate_contact_dict(self) -> dict[str, set[str]]:
         contacts = self.query_contact_simple()
 
-        contact_dict : dict[str, list[str]] = {}
+        contact_dict: dict[str, set[str]] = defaultdict(set)
         for contact in contacts:
             body_name1 = self.model.get_geom_body_name(contact["Geom1"])
             body_name2 = self.model.get_geom_body_name(contact["Geom2"])
-            if body_name1 not in contact_dict:
-                contact_dict[body_name1] = []
-            if body_name2 not in contact_dict:
-                contact_dict[body_name2] = []
-            contact_dict[body_name1].append(body_name2)
-            contact_dict[body_name2].append(body_name1)
+            contact_dict[body_name1].add(body_name2)
+            contact_dict[body_name2].add(body_name1)
 
         # print("Contact dict: ", contact_dict)
 
@@ -270,7 +267,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             weight_load_tmp = {base_body_id : {"weight": random_weight, "pos": random_weight_pos}}
             weight_load_dict.update(weight_load_tmp)
 
-        print("Set weight load: ", weight_load_dict)
+        # print("Set weight load: ", weight_load_dict)
         self.add_extra_weight(weight_load_dict)
         
     def _init_height_map(self, height_map_file: str) -> None:

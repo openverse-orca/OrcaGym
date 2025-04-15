@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 from envs.legged_gym.legged_robot import LeggedRobot
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.devices.keyboard import KeyboardInput
+from collections import defaultdict
 
 class ControlDevice:
     """
@@ -246,19 +247,17 @@ class LeggedRealEnv(OrcaGymLocalEnv):
             return self._get_obs().copy()
 
 
-    def generate_contact_dict(self) -> dict[str, list[str]]:
+    def generate_contact_dict(self) -> dict[str, set[str]]:
         contacts = self.query_contact_simple()
-        # print("Contacts: ", contacts)
-        contact_dict : dict[str, list[str]] = {}
+
+        contact_dict: dict[str, set[str]] = defaultdict(set)
         for contact in contacts:
             body_name1 = self.model.get_geom_body_name(contact["Geom1"])
             body_name2 = self.model.get_geom_body_name(contact["Geom2"])
-            if body_name1 not in contact_dict:
-                contact_dict[body_name1] = []
-            if body_name2 not in contact_dict:
-                contact_dict[body_name2] = []
-            contact_dict[body_name1].append(body_name2)
-            contact_dict[body_name2].append(body_name1)
+            contact_dict[body_name1].add(body_name2)
+            contact_dict[body_name2].add(body_name1)
+
+        # print("Contact dict: ", contact_dict)
 
         return contact_dict
 
