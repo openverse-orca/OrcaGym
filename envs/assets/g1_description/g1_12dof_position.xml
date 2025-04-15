@@ -131,10 +131,10 @@
                   <inertial pos="0.026505 0 -0.016425" quat="-0.000481092 0.728482 -0.000618967 0.685065" mass="0.608" diaginertia="0.00167218 0.0016161 0.000217621"/>
                   <joint name="left_ankle_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.2618 0.2618" actuatorfrcrange="-50 50"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" rgba="0.2 0.2 0.2 1" mesh="left_ankle_roll_link"/>
-                  <geom size="0.005" pos="-0.05 0.025 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="0.12 0.03 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="-0.05 0.015 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="-0.05 -0.015 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="0.12 0.02 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="0.12 -0.02 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
                   <site name="lf-tc-front" type="box" group="3" size="0.063  0.061   0.044" pos="0.08 0 -0.02" rgba="0 1 0 0" />
                   <site name="lf-tc-back" type="box" group="3" size="0.033  0.061   0.044" pos="-0.05 0 -0.02" rgba="0 1 0 0" />                  
                 </body>
@@ -172,10 +172,10 @@
                   <inertial pos="0.026505 0 -0.016425" quat="0.000481092 0.728482 0.000618967 0.685065" mass="0.608" diaginertia="0.00167218 0.0016161 0.000217621"/>
                   <joint name="right_ankle_roll_joint" pos="0 0 0" axis="1 0 0" range="-0.2618 0.2618" actuatorfrcrange="-50 50"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1"  material="pbr_plastic_black" density="0" rgba="0.2 0.2 0.2 1" mesh="right_ankle_roll_link"/>
-                  <geom size="0.005" pos="-0.05 0.025 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="-0.05 -0.025 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="0.12 0.03 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
-                  <geom size="0.005" pos="0.12 -0.03 -0.03" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="-0.05 0.015 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="-0.05 -0.015 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="0.12 0.02 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
+                  <geom size="0.02" pos="0.12 -0.02 -0.02" rgba="0.2 0.2 0.2 1" group="3"/>
                   <site name="rf-tc-front" type="box" group="3" size="0.063  0.061   0.044" pos="0.08 0 -0.02" rgba="0 1 0 0" />
                   <site name="rf-tc-back" type="box" group="3" size="0.033  0.061   0.044" pos="-0.05 0 -0.02" rgba="0 1 0 0" />                  
                 </body>
