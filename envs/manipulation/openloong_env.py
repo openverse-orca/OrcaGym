@@ -306,12 +306,15 @@ class OpenLoongEnv(RobomimicEnv):
 
         obs = self._get_obs().copy()
 
-        info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3),
-                "task_status": self._task_status, "language_instruction": self._task.get_language_instruction()}
+        info = {"state": self.get_state(),
+                "action": scaled_action,
+                "object": self.objects,  # 提取第一个对象的位置
+                "goal": np.zeros(3),
+                "task_status": self._task_status,
+                "language_instruction": self._task.get_language_instruction()}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)
-
         return obs, reward, terminated, truncated, info
 
     def _split_agent_action(self, action) -> dict:
@@ -394,15 +397,21 @@ class OpenLoongEnv(RobomimicEnv):
         [agent.on_reset_model(self) for agent in self._agents.values()]
 
         self._task.get_task(self)
+        randomized_positions = self._task.randomized_object_positions
+        objects = []
+        for joint_name, qpos in randomized_positions.items():
+            objects.append({
+                "joint_name": joint_name,
+                "position": qpos[:3],  # 提取位置
+                "orientation": qpos[3:]  # 提取四元数
+            })
 
-        # Tips for the operator
-        print(self._task.get_language_instruction())
-        print("Press left hand grip button to start recording task......")
-
+        objects_array = np.array([obj["position"] for obj in objects], dtype=np.float32)
+        self.objects = objects_array
         self.mj_forward()
 
         obs = self._get_obs().copy()
-        return obs, {}
+        return obs, {"objects": objects_array}
 
     def get_observation(self, obs=None):
         if obs is not None:
