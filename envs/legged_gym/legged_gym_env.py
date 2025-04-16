@@ -140,7 +140,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         achieved_goals = []
         desired_goals = []
         for agent in self.agents:
-            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict, site_pos_quat)
+            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict, site_pos_quat, self._height_map)
             achieved_goals.append(obs["achieved_goal"])
             desired_goals.append(obs["desired_goal"])
             env_obs_list.append(obs["observation"])

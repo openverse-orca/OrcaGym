@@ -41,18 +41,18 @@ g1Config = {
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
         "neutral_joint_angles" : {
-                                "left_hip_pitch_joint": 0.0,
+                                "left_hip_pitch_joint": -0.1,
                                 "left_hip_roll_joint": 0.0,
                                 "left_hip_yaw_joint": 0.0,
-                                "left_knee_joint": 0.0,
-                                "left_ankle_pitch_joint": 0.0,
+                                "left_knee_joint": 0.3,
+                                "left_ankle_pitch_joint": -0.2,
                                 "left_ankle_roll_joint": 0.0,
                                 
-                                "right_hip_pitch_joint": 0.0,
+                                "right_hip_pitch_joint": -0.1,
                                 "right_hip_roll_joint": 0.0,
                                 "right_hip_yaw_joint": 0.0,
-                                "right_knee_joint": 0.0,
-                                "right_ankle_pitch_joint": 0.0,
+                                "right_knee_joint": 0.3,
+                                "right_ankle_pitch_joint": -0.2,
                                 "right_ankle_roll_joint": 0.0,
                                 
                                 # "waist_yaw_joint": 0.0,
@@ -155,7 +155,7 @@ g1Config = {
         ],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
+        "action_scale" :         0.25,
         
         # "action_scale_mask" :  {
         #                         "left_hip_pitch_joint" : 1.0,
@@ -228,9 +228,9 @@ g1Config = {
 
         # Config for reward
         "reward_coeff" : {
-            "alive" : 0,
+            "alive" : 0.15,
             "success" : 0,
-            "failure" : 100,
+            "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 1.0,
@@ -247,11 +247,14 @@ g1Config = {
             "body_orientation" : 2,
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
-            "feet_slip" : 0.25,
+            "feet_slip" : 0.0,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 1.0,
             "fly" : 1.0,
-            "stepping" : 1.0,
+            "stepping" : 0.0,
+            "feet_contact" : 0.18,
+            "feet_swing_height" : 20,
+            "contact_no_vel" : 0.2
         },
 
         # Config from gymloong
@@ -259,17 +262,23 @@ g1Config = {
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.5,  
-        "foot_square_wave" : {
-            "p5" :          0.5,
-            "phase_freq" :  1.0,
-            "eps" :         0.2,
+        # "foot_square_wave" : {
+        #     "p5" :          0.5,
+        #     "phase_freq" :  1.0,
+        #     "eps" :         0.2,
+        # },
+        "foot_leg_period" : {
+            "period" : 0.8,
+            "offset" : 0.5,
+            "stance_threshold" : 0.55,
+            "swing_height" : 0.08,
         },
 
         # Config for randomization
         "randomize_friction" :      True,
         "friction_range" :          [0.5, 1.25],
         "randomize_base_mass" :     True,
-        "added_mass_range" :        [-1., 5.],
+        "added_mass_range" :        [-1., 3.],
         "push_robots" :             True,
         "push_interval_s" :         2,
         "max_push_vel_xy" :         0.5,
