@@ -271,7 +271,7 @@ g1Config = {
             "period" : 0.8,
             "offset" : 0.5,
             "stance_threshold" : 0.55,
-            "swing_height" : 0.08,
+            "swing_height" : 0.1,
         },
 
         # Config for randomization

@@ -699,7 +699,7 @@ class LeggedRobot(OrcaGymAgent):
         is_stance = self._leg_phase[:] < self._foot_leg_period["stance_threshold"]
         contact = self._feet_contact[:] > 0
                 
-        # print("Feet contact: ", contact, "Stance: ", is_stance, "command: ", self._command["lin_vel"][0])
+        # print("Robot: ", self.name, "Feet contact: ", contact, "Stance: ", is_stance, "command: ", self._command["lin_vel"][0])
                 
         reward = np.sum(~(contact ^ is_stance)) * coeff * self.dt
         self._print_reward("Feet contact reward: ", reward, coeff * self.dt)
@@ -1179,10 +1179,11 @@ class LeggedRobot(OrcaGymAgent):
         if self._foot_leg_period is None:
             return 0.0, 0.0
         
-        if self._command["lin_vel"][0] == 0.0:
+        #if self._command["lin_vel"][0] == 0.0:
             # If the robot is not moving, return a constant value for the leg period and phase
-            self._leg_phase = np.zeros(4)
-            return 0.707, 0.707
+            # print("Robot: ", self.name, " is not moving, return constant leg period and phase")
+          #  self._leg_phase = np.zeros(4)
+          #  return 0.0, 1.0
             
         period = self._foot_leg_period["period"]
         offset = self._foot_leg_period["offset"]
@@ -1195,5 +1196,7 @@ class LeggedRobot(OrcaGymAgent):
         
         sin_phase = np.sin(leg_period_phase * 2 * np.pi)
         cos_phase = np.cos(leg_period_phase * 2 * np.pi)
+        
+        # print("Robot: ", self.name, " Sin phase: ", sin_phase, "Cos phase: ", cos_phase)
         
         return sin_phase, cos_phase

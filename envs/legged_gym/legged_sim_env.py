@@ -80,6 +80,8 @@ class LeggedSimEnv(OrcaGymLocalEnv):
                 self._agents[agent_name] = Go2Agent(self, id=id, name=agent_name)
             elif agent_name.startswith("Lite3"):
                 self._agents[agent_name] = Lite3Agent(self, id=id, name=agent_name)
+            elif agent_name.startswith("g1"):
+                self._agents[agent_name] = G1Agent(self, id=id, name=agent_name)
         
         assert len(self._agents) > 0, "At least one agent should be created."
         self._set_init_state()
@@ -373,7 +375,7 @@ class AgentBase:
         site_pos_quat = env.query_site_pos_and_quat(self.agent.site_names)
         # get_obs_site = (datetime.datetime.now() - get_obs_start).total_seconds() * 1000
 
-        scaled_obs = self.agent.get_obs(sensor_data, env.data.qpos, env.data.qvel, env.data.qacc, contact_dict, site_pos_quat)
+        scaled_obs = self.agent.get_obs(sensor_data, env.data.qpos, env.data.qvel, env.data.qacc, contact_dict, site_pos_quat, env.height_map)
         return scaled_obs
 
     def _query_sensor_data(self, env: LeggedSimEnv) -> dict[str, np.ndarray]:
@@ -384,7 +386,10 @@ class AgentBase:
 
     def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
         # 缩放后的 action
-        scaled_action = action * self._action_scale * self._action_scale_mask
+        if self._action_scale_mask is None:
+            scaled_action = action * self._action_scale
+        else:
+            scaled_action = action * self._action_scale * self._action_scale_mask
 
         # 限制 scaled_action 在有效范围内
         clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
@@ -487,3 +492,8 @@ class Go2Agent(AgentBase):
         self.init_agent(env, id)
 
 
+class G1Agent(AgentBase):
+    def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
+        super().__init__(env, id, name)
+        
+        self.init_agent(env, id)
