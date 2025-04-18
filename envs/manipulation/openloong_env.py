@@ -393,21 +393,34 @@ class OpenLoongEnv(RobomimicEnv):
         # print("Reset model")
         
         self._set_init_state()
-        
         [agent.on_reset_model(self) for agent in self._agents.values()]
 
-        self._task.get_task(self)
-        randomized_positions = self._task.randomized_object_positions
-        objects = []
-        for joint_name, qpos in randomized_positions.items():
-            objects.append({
-                "joint_name": joint_name,
-                "position": qpos[:3],  # 提取位置
-                "orientation": qpos[3:]  # 提取四元数
-            })
+        if self._run_mode in [RunMode.POLICY_RAW]:
+            return
+        else:
 
-        objects_array = np.array([obj["position"] for obj in objects], dtype=np.float32)
-        self.objects = objects_array
+            self._task.get_task(self)
+            randomized_positions = self._task.randomized_object_positions
+            print(self._task.get_language_instruction())
+            print("Press left hand grip button to start recording task......")
+            objects = []
+            for joint_name, qpos in randomized_positions.items():
+                objects.append({
+                    "joint_name": joint_name,
+                    "position": qpos[:3],  # 提取位置
+                    "orientation": qpos[3:]  # 提取四元数
+                })
+    
+            dtype = np.dtype([
+                ('joint_name', 'U50'),  # 字符串类型，最大长度为 50
+                ('position', 'f4', (3,)),  # 3D 浮点数组
+                ('orientation', 'f4', (4,))  # 4D 浮点数组
+            ])
+            objects_array = np.array(
+                [(obj["joint_name"], obj["position"], obj["orientation"]) for obj in objects],
+                dtype=dtype
+            )
+            self.objects = objects_array
         self.mj_forward()
 
         obs = self._get_obs().copy()

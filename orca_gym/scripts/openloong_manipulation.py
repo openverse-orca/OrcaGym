@@ -9,6 +9,8 @@ from typing import Any, Dict
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
+
+import h5py
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
@@ -170,10 +172,34 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         timestep_list, 
                         language_instruction):
         
+    # 只处理第一个info对象（初始状态）
+    first_info = info_list[0]
+    
+    dtype = np.dtype([
+        ('joint_name', h5py.special_dtype(vlen=str)),
+        ('position', 'f4', (3,)),
+        ('orientation', 'f4', (4,))
+    ])
+    
+    # 只提取第一个对象的关节信息
+    objects_array = np.array([
+        (
+            joint_name,
+            position,
+            orientation
+        )
+        for joint_name, position, orientation in zip(
+            first_info['object']['joint_name'],
+            first_info['object']['position'],
+            first_info['object']['orientation']
+        )
+    ], dtype=dtype)
+
+        
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-        'objects': np.array([info["object"] for info in info_list], dtype=np.float32),
+        'objects': objects_array,
         'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
