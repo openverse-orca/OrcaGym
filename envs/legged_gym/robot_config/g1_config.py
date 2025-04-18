@@ -16,64 +16,64 @@ g1Config = {
                                 "right_ankle_pitch_joint",
                                 "right_ankle_roll_joint",
                                 
-                                "waist_yaw_joint",
-                                "waist_roll_joint",
-                                "waist_pitch_joint",
+                                # "waist_yaw_joint",
+                                # "waist_roll_joint",
+                                # "waist_pitch_joint",
                                 
-                                "left_shoulder_pitch_joint",
-                                "left_shoulder_roll_joint",
-                                "left_shoulder_yaw_joint",
-                                "left_elbow_joint",
-                                "left_wrist_roll_joint",
-                                "left_wrist_pitch_joint",
-                                "left_wrist_yaw_joint",
+                                # "left_shoulder_pitch_joint",
+                                # "left_shoulder_roll_joint",
+                                # "left_shoulder_yaw_joint",
+                                # "left_elbow_joint",
+                                # "left_wrist_roll_joint",
+                                # "left_wrist_pitch_joint",
+                                # "left_wrist_yaw_joint",
                                 
-                                "right_shoulder_pitch_joint",
-                                "right_shoulder_roll_joint",
-                                "right_shoulder_yaw_joint",
-                                "right_elbow_joint",
-                                "right_wrist_roll_joint",
-                                "right_wrist_pitch_joint",
-                                "right_wrist_yaw_joint",
+                                # "right_shoulder_pitch_joint",
+                                # "right_shoulder_roll_joint",
+                                # "right_shoulder_yaw_joint",
+                                # "right_elbow_joint",
+                                # "right_wrist_roll_joint",
+                                # "right_wrist_pitch_joint",
+                                # "right_wrist_yaw_joint",
         ],
         
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
         "neutral_joint_angles" : {
-                                "left_hip_pitch_joint": 0.0,
+                                "left_hip_pitch_joint": -0.1,
                                 "left_hip_roll_joint": 0.0,
                                 "left_hip_yaw_joint": 0.0,
-                                "left_knee_joint": 0.0,
-                                "left_ankle_pitch_joint": 0.0,
+                                "left_knee_joint": 0.3,
+                                "left_ankle_pitch_joint": -0.2,
                                 "left_ankle_roll_joint": 0.0,
                                 
-                                "right_hip_pitch_joint": 0.0,
+                                "right_hip_pitch_joint": -0.1,
                                 "right_hip_roll_joint": 0.0,
                                 "right_hip_yaw_joint": 0.0,
-                                "right_knee_joint": 0.0,
-                                "right_ankle_pitch_joint": 0.0,
+                                "right_knee_joint": 0.3,
+                                "right_ankle_pitch_joint": -0.2,
                                 "right_ankle_roll_joint": 0.0,
                                 
-                                "waist_yaw_joint": 0.0,
-                                "waist_roll_joint": 0.0,
-                                "waist_pitch_joint": 0.0,
+                                # "waist_yaw_joint": 0.0,
+                                # "waist_roll_joint": 0.0,
+                                # "waist_pitch_joint": 0.0,
                                 
-                                "left_shoulder_pitch_joint": 0.0, #0.2,
-                                "left_shoulder_roll_joint": 0.0, #0.2,
-                                "left_shoulder_yaw_joint": 0.0,
-                                "left_elbow_joint": 0.0, #1.28,
-                                "left_wrist_roll_joint": 0.0,
-                                "left_wrist_pitch_joint": 0.0,
-                                "left_wrist_yaw_joint": 0.0,
+                                # "left_shoulder_pitch_joint": 0.0, #0.2,
+                                # "left_shoulder_roll_joint": 0.0, #0.2,
+                                # "left_shoulder_yaw_joint": 0.0,
+                                # "left_elbow_joint": 0.0, #1.28,
+                                # "left_wrist_roll_joint": 0.0,
+                                # "left_wrist_pitch_joint": 0.0,
+                                # "left_wrist_yaw_joint": 0.0,
                                 
-                                "right_shoulder_pitch_joint": 0.0, #0.2,
-                                "right_shoulder_roll_joint": 0.0, #-0.2,
-                                "right_shoulder_yaw_joint": 0.0,
-                                "right_elbow_joint": 0.0, #1.28,
-                                "right_wrist_roll_joint": 0.0,
-                                "right_wrist_pitch_joint": 0.0,
-                                "right_wrist_yaw_joint": 0.0,
+                                # "right_shoulder_pitch_joint": 0.0, #0.2,
+                                # "right_shoulder_roll_joint": 0.0, #-0.2,
+                                # "right_shoulder_yaw_joint": 0.0,
+                                # "right_elbow_joint": 0.0, #1.28,
+                                # "right_wrist_roll_joint": 0.0,
+                                # "right_wrist_pitch_joint": 0.0,
+                                # "right_wrist_yaw_joint": 0.0,
         },
         
         "neutral_joint_angles_coeff" : {
@@ -91,25 +91,25 @@ g1Config = {
                                 "right_ankle_pitch_joint": 0.02,
                                 "right_ankle_roll_joint": 0.02,
                                 
-                                "waist_yaw_joint": 0.2,
-                                "waist_roll_joint": 0.2,
-                                "waist_pitch_joint": 0.2,
+                                # "waist_yaw_joint": 0.2,
+                                # "waist_roll_joint": 0.2,
+                                # "waist_pitch_joint": 0.2,
                                 
-                                "left_shoulder_pitch_joint": 0.15,
-                                "left_shoulder_roll_joint": 0.2,
-                                "left_shoulder_yaw_joint": 0.2,
-                                "left_elbow_joint": 0.15,
-                                "left_wrist_roll_joint": 0.2,
-                                "left_wrist_pitch_joint": 0.2,
-                                "left_wrist_yaw_joint": 0.2,
+                                # "left_shoulder_pitch_joint": 0.15,
+                                # "left_shoulder_roll_joint": 0.2,
+                                # "left_shoulder_yaw_joint": 0.2,
+                                # "left_elbow_joint": 0.15,
+                                # "left_wrist_roll_joint": 0.2,
+                                # "left_wrist_pitch_joint": 0.2,
+                                # "left_wrist_yaw_joint": 0.2,
                                 
-                                "right_shoulder_pitch_joint": 0.15,
-                                "right_shoulder_roll_joint": 0.2,
-                                "right_shoulder_yaw_joint": 0.2,
-                                "right_elbow_joint": 0.15,
-                                "right_wrist_roll_joint": 0.2,
-                                "right_wrist_pitch_joint": 0.2,
-                                "right_wrist_yaw_joint": 0.2,
+                                # "right_shoulder_pitch_joint": 0.15,
+                                # "right_shoulder_roll_joint": 0.2,
+                                # "right_shoulder_yaw_joint": 0.2,
+                                # "right_elbow_joint": 0.15,
+                                # "right_wrist_roll_joint": 0.2,
+                                # "right_wrist_pitch_joint": 0.2,
+                                # "right_wrist_yaw_joint": 0.2,
         },
         
         
@@ -133,65 +133,65 @@ g1Config = {
                                 "right_ankle_pitch_joint",
                                 "right_ankle_roll_joint",
                                 
-                                "waist_yaw_joint",
-                                "waist_roll_joint",
-                                "waist_pitch_joint",
+                                # "waist_yaw_joint",
+                                # "waist_roll_joint",
+                                # "waist_pitch_joint",
                                 
-                                "left_shoulder_pitch_joint",
-                                "left_shoulder_roll_joint",
-                                "left_shoulder_yaw_joint",
-                                "left_elbow_joint",
-                                "left_wrist_roll_joint",
-                                "left_wrist_pitch_joint",
-                                "left_wrist_yaw_joint",
+                                # "left_shoulder_pitch_joint",
+                                # "left_shoulder_roll_joint",
+                                # "left_shoulder_yaw_joint",
+                                # "left_elbow_joint",
+                                # "left_wrist_roll_joint",
+                                # "left_wrist_pitch_joint",
+                                # "left_wrist_yaw_joint",
                                 
-                                "right_shoulder_pitch_joint",
-                                "right_shoulder_roll_joint",
-                                "right_shoulder_yaw_joint",
-                                "right_elbow_joint",
-                                "right_wrist_roll_joint",
-                                "right_wrist_pitch_joint",
-                                "right_wrist_yaw_joint",                                
+                                # "right_shoulder_pitch_joint",
+                                # "right_shoulder_roll_joint",
+                                # "right_shoulder_yaw_joint",
+                                # "right_elbow_joint",
+                                # "right_wrist_roll_joint",
+                                # "right_wrist_pitch_joint",
+                                # "right_wrist_yaw_joint",                                
         ],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
+        "action_scale" :         0.25,
         
-        "action_scale_mask" :  {
-                                "left_hip_pitch_joint" : 1.0,
-                                "left_hip_roll_joint" : 1.0,
-                                "left_hip_yaw_joint" : 1.0,
-                                "left_knee_joint" : 1.0,
-                                "left_ankle_pitch_joint" : 1.0,
-                                "left_ankle_roll_joint" : 1.0,
+        # "action_scale_mask" :  {
+        #                         "left_hip_pitch_joint" : 1.0,
+        #                         "left_hip_roll_joint" : 1.0,
+        #                         "left_hip_yaw_joint" : 1.0,
+        #                         "left_knee_joint" : 1.0,
+        #                         "left_ankle_pitch_joint" : 1.0,
+        #                         "left_ankle_roll_joint" : 1.0,
                                 
-                                "right_hip_pitch_joint" : 1.0,
-                                "right_hip_roll_joint" : 1.0,
-                                "right_hip_yaw_joint" : 1.0,
-                                "right_knee_joint" : 1.0,
-                                "right_ankle_pitch_joint" : 1.0,
-                                "right_ankle_roll_joint" : 1.0,
+        #                         "right_hip_pitch_joint" : 1.0,
+        #                         "right_hip_roll_joint" : 1.0,
+        #                         "right_hip_yaw_joint" : 1.0,
+        #                         "right_knee_joint" : 1.0,
+        #                         "right_ankle_pitch_joint" : 1.0,
+        #                         "right_ankle_roll_joint" : 1.0,
                                 
-                                "waist_yaw_joint" : 0.0,
-                                "waist_roll_joint" : 0.0,
-                                "waist_pitch_joint" : 0.0,
+        #                         "waist_yaw_joint" : 0.0,
+        #                         "waist_roll_joint" : 0.0,
+        #                         "waist_pitch_joint" : 0.0,
                                 
-                                "left_shoulder_pitch_joint" : 0.0,
-                                "left_shoulder_roll_joint" : 0.0,
-                                "left_shoulder_yaw_joint" : 0.0,
-                                "left_elbow_joint" : 0.0,
-                                "left_wrist_roll_joint" : 0.0,
-                                "left_wrist_pitch_joint" : 0.0,
-                                "left_wrist_yaw_joint" : 0.0,
+        #                         "left_shoulder_pitch_joint" : 0.0,
+        #                         "left_shoulder_roll_joint" : 0.0,
+        #                         "left_shoulder_yaw_joint" : 0.0,
+        #                         "left_elbow_joint" : 0.0,
+        #                         "left_wrist_roll_joint" : 0.0,
+        #                         "left_wrist_pitch_joint" : 0.0,
+        #                         "left_wrist_yaw_joint" : 0.0,
                                 
-                                "right_shoulder_pitch_joint" : 0.0,
-                                "right_shoulder_roll_joint" : 0.0,
-                                "right_shoulder_yaw_joint" : 0.0,
-                                "right_elbow_joint" : 0.0,
-                                "right_wrist_roll_joint" : 0.0,
-                                "right_wrist_pitch_joint" : 0.0,
-                                "right_wrist_yaw_joint" : 0.0,                  
-        },
+        #                         "right_shoulder_pitch_joint" : 0.0,
+        #                         "right_shoulder_roll_joint" : 0.0,
+        #                         "right_shoulder_yaw_joint" : 0.0,
+        #                         "right_elbow_joint" : 0.0,
+        #                         "right_wrist_roll_joint" : 0.0,
+        #                         "right_wrist_pitch_joint" : 0.0,
+        #                         "right_wrist_yaw_joint" : 0.0,                  
+        # },
         
         
         "imu_site_name" :       "imu_in_pelvis",
@@ -228,9 +228,9 @@ g1Config = {
 
         # Config for reward
         "reward_coeff" : {
-            "alive" : 0,
+            "alive" : 0.15,
             "success" : 0,
-            "failure" : 200,
+            "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
             "joint_angles" : 1.0,
@@ -239,19 +239,22 @@ g1Config = {
             "action_rate" : 0.1,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 1,
-            "follow_command_angvel" : 1,
+            "follow_command_linvel" : 10,
+            "follow_command_angvel" : 10,
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
             "body_orientation" : 2,
             "feet_air_time" : 1,
             "feet_self_contact" : 1,
-            "feet_slip" : 0.25,
+            "feet_slip" : 0.0,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 1.0,
             "fly" : 1.0,
-            "stepping" : 1.0,
+            "stepping" : 0.0,
+            "feet_contact" : 0.18,
+            "feet_swing_height" : 20,
+            "contact_no_vel" : 0.2
         },
 
         # Config from gymloong
@@ -259,35 +262,41 @@ g1Config = {
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
         "foot_touch_air_time_ideal" : 0.5,  
-        "foot_square_wave" : {
-            "p5" :          0.5,
-            "phase_freq" :  1.0,
-            "eps" :         0.2,
+        # "foot_square_wave" : {
+        #     "p5" :          0.5,
+        #     "phase_freq" :  1.0,
+        #     "eps" :         0.2,
+        # },
+        "foot_leg_period" : {
+            "period" : 0.8,
+            "offset" : 0.5,
+            "stance_threshold" : 0.55,
+            "swing_height" : 0.1,
         },
 
         # Config for randomization
         "randomize_friction" :      True,
         "friction_range" :          [0.5, 1.25],
-        "randomize_base_mass" :     False,
-        "added_mass_range" :        [-1., 1.],
+        "randomize_base_mass" :     True,
+        "added_mass_range" :        [-1., 3.],
         "push_robots" :             True,
         "push_interval_s" :         2,
         "max_push_vel_xy" :         0.5,
         "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
         
         # Config for ccurriculum learning
-        "curriculum_learning" :     False, #True,
+        "curriculum_learning" :     True,
         "curriculum_levels" : [
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
             # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
             # {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
@@ -296,15 +305,15 @@ g1Config = {
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_resample_interval" : 20, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
-                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right
-                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 1.0,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_lin_vel_range_x" : [0.0, 0.7], # x direction for forward
+                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+                "command_lin_vel_threshold" : [0.0, 0.2], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_resample_interval" : 20, # second to resample the command
             },
             
             "stairs" : {

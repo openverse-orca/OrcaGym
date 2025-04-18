@@ -16,6 +16,33 @@ import sys
 import time
 from envs.legged_gym.legged_config import LeggedRobotConfig
 
+from stable_baselines3.common.callbacks import BaseCallback
+class SnapshotCallback(BaseCallback):
+    def __init__(self, 
+                 save_interval : int, 
+                 save_path : str,
+                 model_nstep : int,
+                 verbose=0):
+        super().__init__(verbose)
+        self.save_interval = save_interval  # 保存间隔迭代数
+        self.steps_count = 0                # 步数计数器
+        self.iteration_count = 0            # 迭代计数器
+        self.save_path = save_path          # 保存路径前缀
+        self.model_nstep = model_nstep      # 模型每迭代执行步数
+
+    def _on_step(self) -> bool:
+        # 每步递增计数器
+        self.steps_count += 1
+        if self.steps_count % self.model_nstep == 0:
+            self.iteration_count += 1
+        # print("callback step: ", self.steps_count, " iteration: ", self.iteration_count)
+        # 满足间隔条件时保存
+        if self.iteration_count % self.save_interval == 0 and self.steps_count % self.model_nstep == 0:
+            model_path = f"{self.save_path}_iteration_{self.iteration_count}.zip"
+            self.logger.info(f"保存模型到 {model_path}")
+            self.model.save(model_path)
+        return True  # 确保训练继续
+
 def register_env(
     orcagym_addr: str,
     env_name: str,
@@ -100,32 +127,19 @@ def make_env(
     return _init
 
 def training_model(
-    model, 
+    model : PPO, 
     total_timesteps: int, 
-    model_file: str
+    model_file: str,
 ):
     # 训练模型，每10亿步保存一次check point
     try:
-        # CKP_LEN = 1000000000
-        CKP_LEN = 50000000
-        # CKP_LEN = 100000
-
-        training_loop = []
-        if total_timesteps <= CKP_LEN:
-            training_loop.append(total_timesteps)
-        else:
-            if total_timesteps % CKP_LEN == 0:
-                training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
-            else:
-                training_loop = [CKP_LEN] * (total_timesteps // CKP_LEN)
-                training_loop.append(total_timesteps % CKP_LEN)
-
-        for i, loop in enumerate(training_loop):
-            model.learn(loop)
-
-            if i < len(training_loop) - 1:
-                model.save(f"{model_file}_ckp{(i + 1) * loop}")
-                print(f"-----------------Save Model Checkpoint: {(i + 1) * loop}-----------------")
+        snapshot_callback = SnapshotCallback(save_interval=100, 
+                                             save_path=model_file,
+                                             model_nstep=model.n_steps)
+        
+        
+        model.learn(total_timesteps=total_timesteps, 
+                    callback=snapshot_callback)
     finally:
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
@@ -205,237 +219,6 @@ def setup_model_ppo(
 
     return model
 
-def setup_model_sac(
-    env: SubprocVecEnvMA, 
-    env_num: int, 
-    agent_num: int, 
-    total_timesteps: int, 
-    start_her_episode: int, 
-    max_episode_steps: int, 
-    model_file: str, 
-    load_existing_model: bool
-) -> SAC:
-    """
-    设置或加载 SAC 模型。
-
-    参数:
-    - env: SubprocVecEnvMA
-        训练环境（应为 VecEnv 类型，支持并行环境）
-    - env_num: int
-        环境数量
-    - agent_num: int
-        每个环境中的智能体数量
-    - total_timesteps: int
-        总时间步数
-    - start_her_episode: int
-        开始的回合数
-    - max_episode_steps: int
-        每回合最大步数
-    - model_file: str
-        模型文件路径
-    - load_existing_model: bool
-        是否加载现有模型标志
-
-    返回:
-    - model: SAC
-        初始化的或加载的 SAC 模型
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # 如果存在模型文件且指定加载现有模型，则加载模型
-    if os.path.exists(f"{model_file}.zip") and load_existing_model:
-        print(f"加载现有模型：{model_file}")
-        model = SAC.load(model_file, env=env, device=device)
-    else:
-        # 定义自定义策略网络
-        policy_kwargs = dict(
-            net_arch=dict(
-                pi=[1024, 512, 256],  # 策略网络结构
-                qf=[1024, 512, 256]   # Q 函数网络结构
-            ),
-            activation_fn=nn.ELU,  # 激活函数
-        )
-
-        # 计算总环境数量
-        total_envs = env_num * agent_num
-
-        # SAC 参数设置
-        buffer_size = 1000000  # 经验回放缓冲区大小
-        batch_size = 256  # 从缓冲区中采样的批次大小
-
-        model = SAC(
-            policy="MultiInputPolicy",  # 多输入策略，适用于多智能体环境
-            env=env, 
-            verbose=1, 
-            learning_rate=3e-4, 
-            buffer_size=buffer_size, 
-            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
-            batch_size=batch_size, 
-            gamma=0.99, 
-            tau=0.005, 
-            ent_coef="auto",  # 自动调整熵系数
-            target_update_interval=1,  # 目标网络更新间隔
-            train_freq=(1, "step"),  # 每步训练一次
-            gradient_steps=1,  # 每步进行一次梯度更新
-            policy_kwargs=policy_kwargs, 
-            device=device
-        )
-
-    # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- Buffer Size: {model.replay_buffer.buffer_size}")
-
-    return model
-
-def setup_model_ddpg(
-    env: SubprocVecEnvMA,
-    env_num: int,
-    agent_num: int,
-    total_timesteps: int,
-    start_her_episode: int,
-    max_episode_steps: int,
-    model_file: str,
-    load_existing_model: bool
-) -> DDPG:
-    """
-    设置或加载 DDPG 模型。
-
-    参数:
-    - env: SubprocVecEnvMA
-        训练环境（应为 VecEnv 类型，支持并行环境）
-    - env_num: int
-        环境数量
-    - agent_num: int
-        每个环境中的智能体数量
-    - total_timesteps: int
-        总时间步数
-    - start_her_episode: int
-        开始的回合数
-    - max_episode_steps: int
-        每回合最大步数
-    - model_file: str
-        模型文件路径
-    - load_existing_model: bool
-        是否加载现有模型标志
-
-    返回:
-    - model: DDPG
-        初始化的或加载的 DDPG 模型
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if os.path.exists(f"{model_file}.zip") and load_existing_model:
-        print(f"加载现有模型：{model_file}")
-        model = DDPG.load(model_file, env=env, device=device)
-    else:
-        print("初始化新模型")
-        # 动作噪声
-        n_actions = env.action_space.shape[0]
-        noise_std = 0.2
-        action_noise = NormalActionNoise(
-            mean=np.zeros(n_actions), sigma=noise_std * np.ones(n_actions)
-        )
-
-        # 初始化 DDPG 模型
-        model = DDPG(
-            policy="MultiInputPolicy",
-            env=env,
-            replay_buffer_class=HerReplayBuffer,
-            replay_buffer_kwargs=dict(
-                n_sampled_goal=4,
-                goal_selection_strategy="future",
-            ),
-            verbose=1,
-            buffer_size=int(1e6),
-            learning_rate=1e-3,
-            action_noise=action_noise,
-            gamma=0.95,
-            batch_size=512,
-            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
-            policy_kwargs=dict(net_arch=[256, 256, 256]),
-            device=device
-        )
-
-    # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Batch Size: {model.batch_size}\n- Buffer Size: {model.replay_buffer.buffer_size}")
-
-    return model
-
-
-def setup_model_tqc(
-    env: SubprocVecEnvMA, 
-    env_num: int, 
-    agent_num: int, 
-    total_timesteps: int, 
-    start_her_episode: int, 
-    max_episode_steps: int, 
-    model_file: str, 
-    load_existing_model: bool
-) -> TQC:
-    """
-    设置或加载 TQC 模型。
-
-    参数:
-    - env: SubprocVecEnvMA
-        训练环境（应为 VecEnv 类型，支持并行环境）
-    - env_num: int
-        环境数量
-    - agent_num: int
-        每个环境中的智能体数量
-    - total_timesteps: int
-        总时间步数
-    - start_her_episode: int
-        开始的回合数
-    - max_episode_steps: int
-        每回合最大步数
-    - model_file: str
-        模型文件路径
-    - load_existing_model: bool
-        是否加载现有模型标志
-
-    返回:
-    - model: TQC
-        初始化的或加载的 TQC 模型
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if os.path.exists(f"{model_file}.zip") and load_existing_model:
-        model = TQC.load(model_file, env=env, device=device)
-    else:
-        # HER 策略
-        goal_selection_strategy = "future"  # 选择 'future' 策略
-
-        policy_kwargs = dict(
-            net_arch=[256, 256, 128],
-            n_critics=2,
-            n_quantiles=25,
-            activation_fn=torch.nn.ReLU
-        )
-
-        replay_buffer_class = HerReplayBuffer
-        replay_buffer_kwargs = dict(
-            n_sampled_goal=10,
-            goal_selection_strategy=goal_selection_strategy
-        )
-
-        # 初始化 TQC 模型
-        model = TQC(
-            policy="MultiInputPolicy",
-            env=env,
-            replay_buffer_class=replay_buffer_class,
-            replay_buffer_kwargs=replay_buffer_kwargs,
-            verbose=1,
-            learning_rate=0.001,  # 学习率
-            buffer_size=1000000,  # 重播缓冲区大小
-            batch_size=2048,  # 批量大小
-            tau=0.05,
-            gamma=0.95,  # 折扣因子
-            learning_starts=max_episode_steps * env_num * agent_num * start_her_episode,
-            policy_kwargs=policy_kwargs,
-            device=device
-        )
-
-    return model
-
 
 
 def generate_env_list(orcagym_addresses, subenv_num):
@@ -507,39 +290,6 @@ def train_model(
                 model_file=model_file,
                 load_existing_model=load_existing_model,
             )
-        elif model_type == "tqc":
-            model = setup_model_tqc(
-                env=env,
-                env_num=env_num,
-                agent_num=agent_num,
-                total_timesteps=total_timesteps,
-                start_her_episode=start_her_episode,
-                max_episode_steps=max_episode_steps,
-                model_file=model_file,
-                load_existing_model=load_existing_model,
-            )
-        elif model_type == "sac":
-            model = setup_model_sac(
-                env=env,
-                env_num=env_num,
-                agent_num=agent_num,
-                total_timesteps=total_timesteps,
-                start_her_episode=start_her_episode,
-                max_episode_steps=max_episode_steps,
-                model_file=model_file,
-                load_existing_model=load_existing_model,
-            )
-        elif model_type == "ddpg":
-            model = setup_model_ddpg(
-                env=env,
-                env_num=env_num,
-                agent_num=agent_num,
-                total_timesteps=total_timesteps,
-                start_her_episode=start_her_episode,
-                max_episode_steps=max_episode_steps,
-                model_file=model_file,
-                load_existing_model=load_existing_model,
-            )
         else:
             raise ValueError("Invalid model type")
 
@@ -597,12 +347,6 @@ def test_model(
         
         if model_type == "ppo":
             model: PPO = PPO.load(model_file, env=env, device=device)
-        elif model_type == "tqc":
-            model: TQC = TQC.load(model_file, env=env, device=device)
-        elif model_type == "sac":
-            model: SAC = SAC.load(model_file, env=env, device=device)
-        elif model_type == "ddpg":
-            model: DDPG = DDPG.load(model_file, env=env, device=device)
         else:
             raise ValueError("Invalid model type")
         

@@ -13,31 +13,31 @@
         <layer role="roughness"  texture="Plastic010_roughness"/>      
         </material>
 
-        <hfield name="perlin_hfield" size="6.4 6.4 0.2 0.5" file="height_field_rough.png"/>
+        <hfield name="perlin_hfield_rough" size="6.4 6.4 0.2 0.5" file="height_field_rough.png"/>
     </asset>
 
     <worldbody>
         <body name="offset" pos="55 0 0">
             <body name="terrain" pos="-19.2 -19.2 1.5" euler="0 0 0">
-                <geom type="hfield" hfield="perlin_hfield" pos="0.0   0.0   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="12.6  0.0   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="25.2  0.0   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="37.8  0.0   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>                              
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="0.0   0.0   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="12.6  0.0   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="25.2  0.0   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="37.8  0.0   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>                              
             
-                <geom type="hfield" hfield="perlin_hfield" pos="0.0   12.8   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="12.6  12.8   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="25.2  12.8   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="37.8  12.8   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>     
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="0.0   12.8   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="12.6  12.8   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="25.2  12.8   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="37.8  12.8   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>     
 
-                <geom type="hfield" hfield="perlin_hfield" pos="0.0   25.6   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="12.6  25.6   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="25.2  25.6   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="37.8  25.6   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>      
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="0.0   25.6   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="12.6  25.6   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="25.2  25.6   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="37.8  25.6   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>      
 
-                <geom type="hfield" hfield="perlin_hfield" pos="0.0   38.4   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="12.6  38.4   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="25.2  38.4   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
-                <geom type="hfield" hfield="perlin_hfield" pos="37.8  38.4   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>       
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="0.0   38.4   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="12.6  38.4   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="25.2  38.4   0.0" euler="0 10  0" material="pbr_plastic_gray"/>
+                <geom type="hfield" hfield="perlin_hfield_rough" pos="37.8  38.4   0.0" euler="0 -10 0" material="pbr_plastic_gray"/>       
             </body>
         </body>
     </worldbody>

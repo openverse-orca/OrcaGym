@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any, SupportsFloat
 import numpy as np
-
+import os
 
 
 class RewardPrinter:
@@ -14,6 +14,9 @@ class RewardPrinter:
         self._buffer_size = buffer_size
 
         self.reward_history = {}
+        
+        if "reward_history.txt" in os.listdir("."):
+            os.remove("reward_history.txt")
 
     def print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1.0):
         if self._reward_data.get(message) is None:

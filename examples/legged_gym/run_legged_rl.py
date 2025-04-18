@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
     parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
     parser.add_argument('--task', type=str, default='follow_command', help='The task to run')
-    parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo/tqc/sac/ddpg)')
+    parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo only now)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training / testing / play / nav)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
@@ -73,7 +73,9 @@ if __name__ == "__main__":
         model_file = args.model_file
     elif run_mode == "training" and not load_existing_model:
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_file = f"./trained_models_tmp/{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
+        model_dir = f"./trained_models_tmp/{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
+        os.makedirs(model_dir, exist_ok=True)
+        model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
     else:
         raise ValueError("Invalid model file! Please provide a model file for testing, or set `load_existing_model` to False for training")
 

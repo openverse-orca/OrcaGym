@@ -17,7 +17,7 @@ from gymnasium import spaces
 import numpy as np
 import gymnasium as gym
 import time
-
+import mujoco
 
 ObsType = Any
 
@@ -30,7 +30,6 @@ class HeightMapGenerater(OrcaGymLocalEnv):
     通过检测物理碰撞，生成当前环境的高程图。分辨率为 x,y,z 方向 0.1m 
     使用方法：
     1. 首先将关卡中的agents移除，避免高程图包含了 agents 的信息
-    2. 导入envs/assets/terrains/height_map_helper.xml模型，放置于关卡中，运行关卡
     3. 运行此脚本，生成高程图文件
     4. 在legged_gym等任务中，使用高程图文件
     """
@@ -122,13 +121,13 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             "idel_qpos": np.array([0, 0, 2000, 1, 0, 0, 0]).flatten(),  # 用于将big_box移出碰撞
         }
             
-        self._build_ruler_geom_offsets()
-        self._query_helper_qpos_offset()
+        # self._build_ruler_geom_offsets()
+        # self._query_helper_qpos_offset()
 
-        # raise NotImplementedError("Please implement the rest of the class")
+        # # raise NotImplementedError("Please implement the rest of the class")
 
-        # 定义初始位置和其他状态信息
-        self._set_init_state()
+        # # 定义初始位置和其他状态信息
+        # self._set_init_state()
 
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
@@ -183,8 +182,9 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self.mj_forward()
 
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        self._generate_mini_map(action)
-        self._generate_height_map(action)
+        # self._generate_mini_map(action)
+        # self._generate_height_map(action)
+        self._generate_height_map_ray_casting(action)
         obs = self._get_obs().copy()
         info = {"height_map": self._height_map["map"]["data"]}
         terminated = False
@@ -192,6 +192,29 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         reward = 0
 
         return obs, reward, terminated, truncated, info
+        
+    def _generate_height_map_ray_casting(self, action):
+        self.mj_forward()
+        # 通过射线投射的方式生成高程图
+        for x in range(self._height_map["map"]["width"]):
+            print("Generate Height map: ", x, "/", self._height_map["map"]["width"])
+            for y in range(self._height_map["map"]["height"]):
+                if self._height_map["map"]["data"][x, y] < self._height_map["height_range"][0]:
+                    # print("Height map ", x, y, " is already the lowest height")
+                    continue
+                point = np.array([self._height_map["left_up_corner"][0] + x * self._height_map["map"]["resolution"],
+                                 self._height_map["left_up_corner"][1] + y * self._height_map["map"]["resolution"],
+                                 10.0], dtype=float)
+                direction = np.array([0, 0, -1], dtype=float)
+                geomgroup = np.ones(6, dtype=np.intc)
+                flg_static = 1
+                bodyexclude = -1
+                geomid = np.zeros(1, dtype=np.intc)
+                distance = mujoco.mj_ray(self.gym._mjModel, self.gym._mjData, point, direction, geomgroup, flg_static, bodyexclude, geomid)
+                height = 10.0 - distance
+                if distance > 0.0 and height > 0.001:
+                    # print("Height map: ", x, y, height, "Geom ID: ", geomid[0])
+                    self._height_map["map"]["data"][x, y] = height
         
     def _generate_height_map(self, action):
         for x in range(self._height_map["mini_map"]["width"]):
@@ -244,7 +267,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             for y in range(self._height_map["mini_map"]["height"]):
                 z = self._height_map["height_range"][1]
                 while z >= self._height_map["height_range"][0]:
-                    # self._render(action)
+                    self._render(action)
                         
                     qpos[0] = self._height_map["left_up_corner"][0] + x * self._height_map["mini_map"]["resolution"]
                     qpos[1] = self._height_map["left_up_corner"][1] + y * self._height_map["mini_map"]["resolution"]
@@ -255,7 +278,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
                     
                     if len(contact_dict) > 0:
                         self._height_map["mini_map"]["data"][x, y] = z
-                        # print("Mini map: ", x, y, z)
+                        print("Mini map: ", x, y, z)
                         break
                     
                     z -= self._height_map["mini_map"]["resolution"]
@@ -274,14 +297,14 @@ class HeightMapGenerater(OrcaGymLocalEnv):
 
 
     def _get_obs(self) -> dict:
-        obs = np.concatenate([self.ctrl]).copy()
+        obs = np.concatenate([self.ctrl], dtype=np.float32).copy()
         result = {
             "observation": obs,
         }
         return result
 
     def reset_model(self) -> tuple[dict, dict]:
-        self._set_init_state()
+        # self._set_init_state()
         obs = self._get_obs().copy()
         return obs, {}
 
@@ -292,6 +315,31 @@ class HeightMapGenerater(OrcaGymLocalEnv):
             return self._get_obs().copy()
         
 TIME_STEP = 0.005
+
+def statiscs_height_map(flat_height_map):
+    """
+    统计高程图的高度分布
+    """
+    flat_height_map = flat_height_map.flatten()
+    
+    print("Height map size: ", len(flat_height_map))
+    print("min: ", np.min(flat_height_map))
+    print("max: ", np.max(flat_height_map))
+    print("mean: ", np.mean(flat_height_map))
+    print("std: ", np.std(flat_height_map))
+    
+    height_map_positive = flat_height_map[flat_height_map > 0]    
+    if len(height_map_positive) == 0:
+        print("No positive height map")
+    else:
+        print("Height map positive size: ", len(height_map_positive))
+        area_coverage = len(height_map_positive) / len(flat_height_map)
+        print(f"Area coverage: {area_coverage:.2%}")
+        print("min: ", np.min(height_map_positive))
+        print("max: ", np.max(height_map_positive))
+        print("mean: ", np.mean(height_map_positive))
+        print("std: ", np.std(height_map_positive))
+
         
 def register_env(orcagym_addr, env_name, env_index, height_map_border, height_range, render_mode):
     orcagym_addr_str = orcagym_addr.replace(":", "-")
@@ -302,7 +350,7 @@ def register_env(orcagym_addr, env_name, env_index, height_map_border, height_ra
         kwargs={
             'frame_skip': 1,   # 1 action per frame
             'orcagym_addr': orcagym_addr,
-            'agent_names': ['height_map_helper'],
+            'agent_names': ['height_map_helper_usda'],
             'time_step': TIME_STEP,
             'render_mode': render_mode,
             'height_map_border': height_map_border,
@@ -348,6 +396,8 @@ if __name__ == "__main__":
             
         print("Height map generation completed!")
         height_map = info["height_map"]
+        
+        statiscs_height_map(height_map)
         # output to the npy file
         np.save(output_file, height_map)
             

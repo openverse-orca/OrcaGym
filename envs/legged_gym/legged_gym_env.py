@@ -8,6 +8,7 @@ import datetime
 from orca_gym.devices.keyboard import KeyboardInput
 import gymnasium as gym
 import time
+from collections import defaultdict
 
 import requests
 from examples.vln.imgrec import RecAction
@@ -58,7 +59,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         )
 
         self._randomize_agent_foot_friction()
-        self._add_randomized_weight(0.01, 0.8)
+        self._add_randomized_weight()
         self._init_playable()
         self._reset_phy_config()
 
@@ -139,7 +140,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         achieved_goals = []
         desired_goals = []
         for agent in self.agents:
-            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict, site_pos_quat)
+            obs = agent.get_obs(sensor_data, self.data.qpos, self.data.qvel, self.data.qacc, contact_dict, site_pos_quat, self._height_map)
             achieved_goals.append(obs["achieved_goal"])
             desired_goals.append(obs["desired_goal"])
             env_obs_list.append(obs["observation"])
@@ -219,19 +220,15 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self._reset_agent_joint_qpos(agents)
         self._reset_command_indicators(agents)
 
-    def _generate_contact_dict(self) -> dict[str, list[str]]:
+    def _generate_contact_dict(self) -> dict[str, set[str]]:
         contacts = self.query_contact_simple()
 
-        contact_dict : dict[str, list[str]] = {}
+        contact_dict: dict[str, set[str]] = defaultdict(set)
         for contact in contacts:
             body_name1 = self.model.get_geom_body_name(contact["Geom1"])
             body_name2 = self.model.get_geom_body_name(contact["Geom2"])
-            if body_name1 not in contact_dict:
-                contact_dict[body_name1] = []
-            if body_name2 not in contact_dict:
-                contact_dict[body_name2] = []
-            contact_dict[body_name1].append(body_name2)
-            contact_dict[body_name2].append(body_name1)
+            contact_dict[body_name1].add(body_name2)
+            contact_dict[body_name2].add(body_name1)
 
         # print("Contact dict: ", contact_dict)
 
@@ -252,20 +249,25 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # print("Set geom friction: ", geom_friction_dict)
         self.set_geom_friction(geom_friction_dict)
 
-    def _add_randomized_weight(self, pos_scale, weight_delta_max) -> None:
+    def _add_randomized_weight(self) -> None:
+        print("Add randomized weight")
         if self._run_mode == "testing" or self._run_mode == "play":
             print("Skip randomized weight load in testing or play mode")
             return   
 
-        random_weight = [self.np_random.uniform(0, weight_delta_max) for _ in range(len(self.agents))]
-        random_weight_pos = [[self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0] for _ in range(len(self.agents))]
+        pos_scale = 0.01
         weight_load_dict = {}
+        all_joint_dict = self.model.get_joint_dict()        
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
-            weight_load_tmp = agent.generate_randomized_weight_on_base(random_weight[i], random_weight_pos[i], self.model.get_body_dict())
+            random_weight = self.np_random.uniform(agent.added_mass_range[0], agent.added_mass_range[1])
+            random_weight_pos = [self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0]
+
+            base_body_id = all_joint_dict[agent.base_joint_name]["BodyID"]
+            weight_load_tmp = {base_body_id : {"weight": random_weight, "pos": random_weight_pos}}
             weight_load_dict.update(weight_load_tmp)
 
-        print("Set weight load: ", weight_load_dict)
+        # print("Set weight load: ", weight_load_dict)
         self.add_extra_weight(weight_load_dict)
         
     def _init_height_map(self, height_map_file: str) -> None:
