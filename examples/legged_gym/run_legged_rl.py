@@ -13,7 +13,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 
-from envs.legged_gym.legged_config import LeggedEnvConfig
+from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 import orca_gym.scripts.multi_agent_rl as rl
 from orca_gym.utils.dir_utils import create_tmp_dir
 
@@ -88,6 +88,7 @@ if __name__ == "__main__":
             subenv_num=subenv_num, 
             agent_num=agent_num, 
             agent_name=agent_name, 
+            agent_config=LeggedRobotConfig[agent_name],
             task=task, 
             entry_point=entry_point, 
             time_step=TIME_STEP, 

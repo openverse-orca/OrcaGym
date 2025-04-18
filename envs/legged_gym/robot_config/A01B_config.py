@@ -153,5 +153,10 @@ A01BConfig = {
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 32,  # 每个环境采样步数
-        "batch_size" : 1024  # 批次大小             
+        "batch_size" : 1024,  # 批次大小            
+        "learning_rate" : 0.0003,  # 学习率
+        "gamma" : 0.99,  # 折扣因子
+        "clip_range" : 0.2,  # PPO剪切范围
+        "ent_coef" : 0.01,  # 熵系数         
+        "max_grad_norm" : 0.5,  # 最大梯度范数
     }

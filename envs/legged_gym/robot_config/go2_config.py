@@ -114,12 +114,9 @@ Go2Config = {
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
         ],
         "curriculum_commands" : {
             "flat_plane" : {
@@ -162,5 +159,10 @@ Go2Config = {
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 32,  # 每个环境采样步数
-        "batch_size" : 1024  # 批次大小             
+        "batch_size" : 1024,  # 批次大小            
+        "learning_rate" : 0.001,  # 学习率
+        "gamma" : 0.99,  # 折扣因子
+        "clip_range" : 0.2,  # PPO剪切范围
+        "ent_coef" : 0.01,  # 熵系数
+        "max_grad_norm" : 0.5,  # 最大梯度范数
     }

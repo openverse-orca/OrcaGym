@@ -14,7 +14,6 @@ import numpy as np
 import os
 import sys
 import time
-from envs.legged_gym.legged_config import LeggedRobotConfig
 
 from stable_baselines3.common.callbacks import BaseCallback
 class SnapshotCallback(BaseCallback):
@@ -148,7 +147,7 @@ def setup_model_ppo(
     env: SubprocVecEnvMA, 
     env_num: int, 
     agent_num: int, 
-    agent_name: str,
+    agent_config : dict,
     model_file: str, 
     load_existing_model: bool
 ) -> PPO:
@@ -175,12 +174,10 @@ def setup_model_ppo(
         print("初始化新模型")
         # 定义自定义策略网络
         
-        robot_config = LeggedRobotConfig[agent_name]
-
         policy_kwargs = dict(
             net_arch=dict(
-                pi=robot_config["pi"],  # 策略网络结构
-                vf=robot_config["vf"]   # 值函数网络结构
+                pi=agent_config["pi"],  # 策略网络结构
+                vf=agent_config["vf"]   # 值函数网络结构
             ),
             ortho_init=True,       # 正交初始化
             activation_fn=nn.ELU,  # 激活函数
@@ -188,10 +185,8 @@ def setup_model_ppo(
 
         # 根据环境数量和智能体数量计算批次大小和采样步数
         total_envs = env_num * agent_num
-
-        n_steps = robot_config["n_steps"]  # 每个环境采样步数
-
-        batch_size = robot_config["batch_size"]  # 批次大小
+        n_steps = agent_config["n_steps"]  # 每个环境采样步数
+        batch_size = agent_config["batch_size"]  # 批次大小
 
         # 确保 batch_size 是 total_envs * n_steps 的因数
         if (total_envs * n_steps) % batch_size != 0:
@@ -203,12 +198,13 @@ def setup_model_ppo(
             policy="MultiInputPolicy",  # 多输入策略
             env=env, 
             verbose=1, 
-            learning_rate=3e-4, 
+            learning_rate=agent_config["learning_rate"], 
             n_steps=n_steps, 
             batch_size=batch_size, 
-            gamma=0.99, 
-            clip_range=0.2, 
-            ent_coef=0.01, 
+            gamma=agent_config["gamma"], 
+            clip_range=agent_config["clip_range"], 
+            ent_coef=agent_config["ent_coef"], 
+            max_grad_norm=agent_config["max_grad_norm"],
             policy_kwargs=policy_kwargs, 
             device=device,
             tensorboard_log="./ppo_tensorboard/",  # TensorBoard 日志目录
@@ -240,6 +236,7 @@ def train_model(
     subenv_num: int,
     agent_num: int,
     agent_name: str,
+    agent_config: dict,
     task: str,
     entry_point: str,
     time_step: float,
@@ -286,7 +283,7 @@ def train_model(
                 env=env,
                 env_num=env_num,
                 agent_num=agent_num,
-                agent_name=agent_name,
+                agent_config=agent_config,
                 model_file=model_file,
                 load_existing_model=load_existing_model,
             )
