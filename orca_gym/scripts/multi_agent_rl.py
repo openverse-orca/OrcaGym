@@ -165,7 +165,15 @@ def setup_model_ppo(
     - model: 初始化的或加载的 PPO 模型
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    # 根据环境数量和智能体数量计算批次大小和采样步数
+    total_envs = env_num * agent_num
+    n_steps = agent_config["n_steps"]  # 每个环境采样步数
+    batch_size = agent_config["batch_size"]  # 批次大小
+    # 确保 batch_size 是 total_envs * n_steps 的因数
+    if (total_envs * n_steps) % batch_size != 0:
+        Warning(f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
+        batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
+        
     # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}") and load_existing_model:
         print(f"加载现有模型：{model_file}")
@@ -182,17 +190,6 @@ def setup_model_ppo(
             ortho_init=True,       # 正交初始化
             activation_fn=nn.ELU,  # 激活函数
         )
-
-        # 根据环境数量和智能体数量计算批次大小和采样步数
-        total_envs = env_num * agent_num
-        n_steps = agent_config["n_steps"]  # 每个环境采样步数
-        batch_size = agent_config["batch_size"]  # 批次大小
-
-        # 确保 batch_size 是 total_envs * n_steps 的因数
-        if (total_envs * n_steps) % batch_size != 0:
-            Warning(f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
-            batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
-            
 
         model = PPO(
             policy="MultiInputPolicy",  # 多输入策略

@@ -9,10 +9,10 @@ Go2Config = {
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
-        "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.7, "FL_calf_joint": -1.5,
-                                "FR_hip_joint": 0.0, "FR_thigh_joint": 0.7, "FR_calf_joint": -1.5,
-                                "RL_hip_joint": 0.0, "RL_thigh_joint": 0.7, "RL_calf_joint": -1.5,
-                                "RR_hip_joint": 0.0, "RR_thigh_joint": 0.7, "RR_calf_joint": -1.5},
+        "neutral_joint_angles" : {"FL_hip_joint": 0.1, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.5,
+                                "FR_hip_joint": -0.1, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.5,
+                                "RL_hip_joint": 0.1, "RL_thigh_joint": 1.0, "RL_calf_joint": -1.5,
+                                "RR_hip_joint": -0.1, "RR_thigh_joint": 1.0, "RR_calf_joint": -1.5},
         
         "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -160,9 +160,9 @@ Go2Config = {
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 32,  # 每个环境采样步数
         "batch_size" : 1024,  # 批次大小            
-        "learning_rate" : 0.001,  # 学习率
+        "learning_rate" : 0.0005,  # 学习率
         "gamma" : 0.99,  # 折扣因子
         "clip_range" : 0.2,  # PPO剪切范围
         "ent_coef" : 0.01,  # 熵系数
-        "max_grad_norm" : 0.5,  # 最大梯度范数
+        "max_grad_norm" : 1,  # 最大梯度范数
     }
