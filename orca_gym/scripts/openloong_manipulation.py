@@ -283,18 +283,24 @@ def playback_episode(env : OpenLoongEnv,
     
     print("Episode tunkated!")
 
-def reset_playback_env(env : OpenLoongEnv, demo_data, sample_range=0.0):
+
+def reset_playback_env(env: OpenLoongEnv, demo_data, sample_range=0.0):
+    """
+    Reset 环境，然后把 demo_data['objects'] 恢复到场景里。
+    """
+    # 1) 先走一次基本 reset，让 self.objects 被赋值
     obs, info = env.reset(seed=42)
-    
-    object_data = demo_data['objects']
-    init_obj_xpos = object_data[0][0:3]
-    init_obj_xquat = object_data[0][3:7]
-    
-    goal_data = demo_data['goals']
-    init_goal_xpos = goal_data[0][0:3]
-    init_goal_xquat = goal_data[0][3:7]
-    
-    # print("Resetting object position: ", obj_xpos, obj_xquat)
+
+    # 2) 拿出 demo_data 里第 0 帧的 objects
+    #    无论 demo_data['objects'] 是结构化还是纯数值数组，我们都直接传给 replace_objects
+    recorded_objs = demo_data['objects']
+    env.unwrapped.replace_objects(recorded_objs)
+
+    # 3) 重置完毕后再拿一次 obs 和 info，带回 objects
+    obs = env.unwrapped._get_obs().copy()
+    return obs, {"objects": recorded_objs}
+
+
     
 def do_playback(env : OpenLoongEnv, 
                 dataset_reader : DatasetReader, 
@@ -317,6 +323,7 @@ def do_playback(env : OpenLoongEnv,
         print("Playing back episode: ", demo_names[i], " with ", len(action_list), " steps.")
         # for i, action in enumerate(action_list):
         #     print(f"Playback Action ({i}): ", action)
+        env.unwrapped.objects = demo_data['objects']
         reset_playback_env(env, demo_data)
         playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
@@ -380,7 +387,7 @@ def augment_episode(env : OpenLoongEnv,
             obs_list[obs_key].append(obs_data)
             
         reward_list.append(reward)
-        done_list.append(0 if not terminated else 1)
+        done_list.append(1)
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
         timestep_list.append(env.unwrapped.gym.data.time)
@@ -428,6 +435,8 @@ def do_augmentation(env : OpenLoongEnv,
         done_demo_count = 0
             
         demo_names = dataset_reader.get_demo_names()
+        env.unwrapped.objects = demo_data['objects']
+        obs, info = reset_playback_env(env, demo_data, sample_range)
         for original_demo_name in demo_names:
             done = False
             while not done:
