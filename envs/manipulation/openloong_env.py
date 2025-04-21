@@ -392,7 +392,7 @@ class OpenLoongEnv(RobomimicEnv):
         [agent.on_reset_model(self) for agent in self._agents.values()]
 
         # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
-        if self._run_mode in [RunMode.POLICY_NORMALIZED, RunMode.POLICY_RAW]:
+        if self._run_mode in [RunMode.POLICY_NORMALIZED]:
             # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
             self.replace_objects(self.objects)
 

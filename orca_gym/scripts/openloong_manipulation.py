@@ -419,13 +419,7 @@ def do_augmentation(env : OpenLoongEnv,
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
-    demo_names = dataset_reader.get_demo_names()
-    for demo_name in demo_names:
-        demo_data = dataset_reader.get_demo_data(demo_name)
-        dataset_writer.add_demo_data(demo_data)
-        
-    # Use the augmented dataset as the new dataset reader
-    dataset_reader = DatasetReader(file_path=augmented_dataset_path)
+
 
     for camera in cameras:
         camera.start()
@@ -435,12 +429,13 @@ def do_augmentation(env : OpenLoongEnv,
         done_demo_count = 0
             
         demo_names = dataset_reader.get_demo_names()
-        env.unwrapped.objects = demo_data['objects']
-        obs, info = reset_playback_env(env, demo_data, sample_range)
+
         for original_demo_name in demo_names:
             done = False
             while not done:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
+                env.unwrapped.objects = demo_data['objects']
+                obs, info = reset_playback_env(env, demo_data, sample_range)
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 
@@ -645,7 +640,7 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            do_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, action_step)
+            do_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
