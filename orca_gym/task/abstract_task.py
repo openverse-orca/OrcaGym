@@ -15,7 +15,7 @@ class AbstractTask:
         self.goal_bodys = []
         self.goal_sites = []
         self.goal_joints = []
-
+        self.randomized_object_positions = []
         self.level_name = None
         self.load_config(config)
         self.task_dict = {}
@@ -105,6 +105,7 @@ class AbstractTask:
 
         for i in range(len(goal_ids)):
             env.set_mocap_pos_and_quat({goal_bodys_env_names[i]: {'pos': random_goal_pos[i], 'quat': random_goal_xquat[i]}})
+        self.randomized_object_positions = env.query_joint_qpos(object_joints_env_names)
     def get_task(self, env: RobomimicEnv):
         pass
 

@@ -49,6 +49,7 @@ class OpenLoongTask(AbstractTask):
     def __init__(self, config: dict):
 
         super().__init__(config)
+        self.task_list: list = []
 
     def get_task(self, env: RobomimicEnv):
         """ 从object,goal中选择数量最少的
@@ -59,7 +60,7 @@ class OpenLoongTask(AbstractTask):
         self.random_objs_and_goals(env, bounds=0.1)
     
         object_len = len(self.object_bodys)
-        min_len = min(1, object_len)
+        min_len = min(4, object_len)
         
         if min_len == 0:
             return self.task_list  # 返回空列表
@@ -91,7 +92,7 @@ class OpenLoongTask(AbstractTask):
         
         language_instruction = f"level: {self.level_name}"
         language_instruction += f"{object_str} to basket"
-        
+
         return language_instruction
 
 class TaskStatus:
@@ -306,12 +307,15 @@ class OpenLoongEnv(RobomimicEnv):
 
         obs = self._get_obs().copy()
 
-        info = {"state": self.get_state(), "action": scaled_action, "object" : np.zeros(3), "goal": np.zeros(3),
-                "task_status": self._task_status, "language_instruction": self._task.get_language_instruction()}
+        info = {"state": self.get_state(),
+                "action": scaled_action,
+                "object": self.objects,  # 提取第一个对象的位置
+                "goal": np.zeros(3),
+                "task_status": self._task_status,
+                "language_instruction": self._task.get_language_instruction()}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)
-
         return obs, reward, terminated, truncated, info
 
     def _split_agent_action(self, action) -> dict:
@@ -383,26 +387,90 @@ class OpenLoongEnv(RobomimicEnv):
         return obs
 
     def reset_model(self) -> tuple[dict, dict]:
-        """
-        Reset the environment, return observation
-        """
-        # self.reset_simulation()
-        # print("Reset model")
-        
+        # 1) 恢复初始状态、重置 controller/mechanism
         self._set_init_state()
-        
         [agent.on_reset_model(self) for agent in self._agents.values()]
 
-        self._task.get_task(self)
+        # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
+        if self._run_mode in [RunMode.POLICY_NORMALIZED]:
+            # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
+            self.replace_objects(self.objects)
 
-        # Tips for the operator
+            # 得到观测并返回
+            obs = self._get_obs().copy()
+
+            return obs, {"objects": self.objects}
+
+        # 3) 否则走原先的“遥操作”初始化逻辑
+        self._task.get_task(self)
+        randomized_positions = self._task.randomized_object_positions
         print(self._task.get_language_instruction())
         print("Press left hand grip button to start recording task......")
+        objects = []
+        for joint_name, qpos in randomized_positions.items():
+            objects.append({
+                "joint_name": joint_name,
+                "position": qpos[:3].tolist(),
+                "orientation": qpos[3:].tolist()
+            })
+        # 构造 numpy structured array
+        dtype = np.dtype([
+            ('joint_name', 'U50'),
+            ('position',    'f4', (3,)),
+            ('orientation', 'f4', (4,))
+        ])
+        objects_array = np.array(
+            [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
+            dtype=dtype
+        )
+        self.objects = objects_array
 
         self.mj_forward()
-
         obs = self._get_obs().copy()
-        return obs, {}
+        return obs, {"objects": objects_array}
+    def replace_objects(self, objects_data):
+        """
+        将 demo 里记录的 objects_data 写回到仿真。
+        objects_data 可能是：
+          1) 结构化 numpy array：dtype=[('joint_name',U50),('position',f4,3),('orientation',f4,4)]
+          2) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
+        """
+        qpos_dict = {}
+
+        arr = objects_data
+        # —— 情况 A：结构化数组（走原逻辑） ——
+        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
+            # arr.shape = (num_objects,)
+            for entry in arr:
+                name = entry['joint_name']
+                pos  = entry['position']
+                quat = entry['orientation']
+                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+
+        else:
+            # —— 情况 B：纯数值数组 ——
+            flat = np.asarray(arr, dtype=np.float32)
+            # 如果是一维 (num_objects*7,)
+            if flat.ndim == 1:
+                flat = flat.reshape(-1, 7)
+            # 如果是二维 (timesteps, num_objects*7)，取首帧
+            if flat.ndim == 2 and flat.shape[0] > 1:
+                flat = flat[0].reshape(-1, 7)
+
+            # 名字列表：从上一次 reset_model 里保存的 self.objects 拿 joint_name
+            # （确保在遥操作模式里执行过一次 reset_model，使 self.objects 存在）
+            names = [ent['joint_name'] for ent in self.objects]
+
+            for idx, row in enumerate(flat):
+                name = names[idx]
+                pos  = row[0:3]
+                quat = row[3:7]
+                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+
+        # 一次性写入所有自由关节 qpos
+        self.set_joint_qpos(qpos_dict)
+        # 推进仿真
+        self.mj_forward()
 
     def get_observation(self, obs=None):
         if obs is not None:

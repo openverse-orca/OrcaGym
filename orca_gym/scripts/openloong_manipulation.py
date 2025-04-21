@@ -9,6 +9,8 @@ from typing import Any, Dict
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
+
+import h5py
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
@@ -170,10 +172,34 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         timestep_list, 
                         language_instruction):
         
+    # 只处理第一个info对象（初始状态）
+    first_info = info_list[0]
+    
+    dtype = np.dtype([
+        ('joint_name', h5py.special_dtype(vlen=str)),
+        ('position', 'f4', (3,)),
+        ('orientation', 'f4', (4,))
+    ])
+    
+    # 只提取第一个对象的关节信息
+    objects_array = np.array([
+        (
+            joint_name,
+            position,
+            orientation
+        )
+        for joint_name, position, orientation in zip(
+            first_info['object']['joint_name'],
+            first_info['object']['position'],
+            first_info['object']['orientation']
+        )
+    ], dtype=dtype)
+
+        
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-        'objects': np.array([info["object"] for info in info_list], dtype=np.float32),
+        'objects': objects_array,
         'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
@@ -257,18 +283,24 @@ def playback_episode(env : OpenLoongEnv,
     
     print("Episode tunkated!")
 
-def reset_playback_env(env : OpenLoongEnv, demo_data, sample_range=0.0):
+
+def reset_playback_env(env: OpenLoongEnv, demo_data, sample_range=0.0):
+    """
+    Reset 环境，然后把 demo_data['objects'] 恢复到场景里。
+    """
+    # 1) 先走一次基本 reset，让 self.objects 被赋值
     obs, info = env.reset(seed=42)
-    
-    object_data = demo_data['objects']
-    init_obj_xpos = object_data[0][0:3]
-    init_obj_xquat = object_data[0][3:7]
-    
-    goal_data = demo_data['goals']
-    init_goal_xpos = goal_data[0][0:3]
-    init_goal_xquat = goal_data[0][3:7]
-    
-    # print("Resetting object position: ", obj_xpos, obj_xquat)
+
+    # 2) 拿出 demo_data 里第 0 帧的 objects
+    #    无论 demo_data['objects'] 是结构化还是纯数值数组，我们都直接传给 replace_objects
+    recorded_objs = demo_data['objects']
+    env.unwrapped.replace_objects(recorded_objs)
+
+    # 3) 重置完毕后再拿一次 obs 和 info，带回 objects
+    obs = env.unwrapped._get_obs().copy()
+    return obs, {"objects": recorded_objs}
+
+
     
 def do_playback(env : OpenLoongEnv, 
                 dataset_reader : DatasetReader, 
@@ -291,6 +323,7 @@ def do_playback(env : OpenLoongEnv,
         print("Playing back episode: ", demo_names[i], " with ", len(action_list), " steps.")
         # for i, action in enumerate(action_list):
         #     print(f"Playback Action ({i}): ", action)
+        env.unwrapped.objects = demo_data['objects']
         reset_playback_env(env, demo_data)
         playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
@@ -354,7 +387,7 @@ def augment_episode(env : OpenLoongEnv,
             obs_list[obs_key].append(obs_data)
             
         reward_list.append(reward)
-        done_list.append(0 if not terminated else 1)
+        done_list.append(1)
         info_list.append(info)
         terminated_times = terminated_times + 1 if terminated else 0
         timestep_list.append(env.unwrapped.gym.data.time)
@@ -386,13 +419,7 @@ def do_augmentation(env : OpenLoongEnv,
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
-    demo_names = dataset_reader.get_demo_names()
-    for demo_name in demo_names:
-        demo_data = dataset_reader.get_demo_data(demo_name)
-        dataset_writer.add_demo_data(demo_data)
-        
-    # Use the augmented dataset as the new dataset reader
-    dataset_reader = DatasetReader(file_path=augmented_dataset_path)
+
 
     for camera in cameras:
         camera.start()
@@ -402,10 +429,13 @@ def do_augmentation(env : OpenLoongEnv,
         done_demo_count = 0
             
         demo_names = dataset_reader.get_demo_names()
+
         for original_demo_name in demo_names:
             done = False
             while not done:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
+                env.unwrapped.objects = demo_data['objects']
+                obs, info = reset_playback_env(env, demo_data, sample_range)
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 
@@ -610,7 +640,7 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            do_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, action_step)
+            do_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
