@@ -9,11 +9,21 @@ Go2Config = {
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
+        # "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 0.7, "FL_calf_joint": -1.5,
+        #                         "FR_hip_joint": 0.0, "FR_thigh_joint": 0.7, "FR_calf_joint": -1.5,
+        #                         "RL_hip_joint": 0.0, "RL_thigh_joint": 0.7, "RL_calf_joint": -1.5,
+        #                         "RR_hip_joint": 0.0, "RR_thigh_joint": 0.7, "RR_calf_joint": -1.5},
+
         "neutral_joint_angles" : {"FL_hip_joint": 0.1, "FL_thigh_joint": 0.8, "FL_calf_joint": -1.5,
                                 "FR_hip_joint": -0.1, "FR_thigh_joint": 0.8, "FR_calf_joint": -1.5,
                                 "RL_hip_joint": 0.1, "RL_thigh_joint": 1.0, "RL_calf_joint": -1.5,
                                 "RR_hip_joint": -0.1, "RR_thigh_joint": 1.0, "RR_calf_joint": -1.5},
-        
+
+        # "neutral_joint_angles" : {"FL_hip_joint": 0.0, "FL_thigh_joint": 1.0, "FL_calf_joint": -1.8,
+        #                         "FR_hip_joint": 0.0, "FR_thigh_joint": 1.0, "FR_calf_joint": -1.8,
+        #                         "RL_hip_joint": 0.0, "RL_thigh_joint": 1.0, "RL_calf_joint": -1.8,
+        #                         "RR_hip_joint": 0.0, "RR_thigh_joint": 1.0, "RR_calf_joint": -1.8},
+
         "base_neutral_height_offset" : 0.12,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
 
@@ -26,7 +36,7 @@ Go2Config = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
+        "action_scale" :         0.25,
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
