@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument('--rollout_times', type=int, default=10, help='The times to rollout the policy')
     parser.add_argument('--augmented_sacle', type=float, default=0.01, help='The scale to augment the dataset')
     parser.add_argument('--augmented_rounds', type=int, default=3, help='The times to augment the dataset')
-    parser.add_argument('--teleoperation_rounds', type=int, default=20, help='The rounds to do teleoperation')
+    parser.add_argument('--teleoperation_rounds', type=int, default=100, help='The rounds to do teleoperation')
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
     parser.add_argument('--realtime_playback', type=bool, default=True, help='The flag to enable the real-time playback or rollout')
     

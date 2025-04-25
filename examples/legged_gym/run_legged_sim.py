@@ -169,14 +169,14 @@ def run_simulation(env: gym.Env,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addr', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_names', type=str, default='go2', help='The name list of the agent to control, separated by space')
+    parser.add_argument('--agent_name', type=str, default='go2', help='The name list of the agent to control, separated by space')
     parser.add_argument('--model_file', type=str, help='The model file to load')
     parser.add_argument('--ctrl_device', type=str, default='keyboard', help='The control device to use ')
     args = parser.parse_args()
 
     main(
         orcagym_addr=args.orcagym_addr, 
-        agent_names=args.agent_names, 
+        agent_names=args.agent_name, 
         model_file=args.model_file,
         ctrl_device=args.ctrl_device
     )    

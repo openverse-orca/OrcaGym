@@ -1,0 +1,9 @@
+# 任务配置文件
+
+level_name: "shop"
+object_bodys: ["Bottle20", "Bottle01", "Cap01", "can04"]
+object_sites: ["Bottle20site", "Bottle01site", "Cap01site", "can04site"]
+object_joints: ["Bottle20_joint", "Bottle01_joint", "Cap01_joint", "can04_joint"]
+
+goal_bodys: []
+goal_sites: []

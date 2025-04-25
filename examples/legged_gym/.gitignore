@@ -1,2 +1,5 @@
 # model files
 trained_models_tmp/
+play.sh
+*.txt
+*.png

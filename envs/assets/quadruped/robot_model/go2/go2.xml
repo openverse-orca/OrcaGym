@@ -133,9 +133,14 @@
 
   <worldbody>
     <body name="command_indicator_mocap" pos="0 0 0" mocap="true">
-      <geom conaffinity="0" contype="0" pos="0.3 0 0" rgba="0.7 0 0 0.5" size="0.4 0.005 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0.3 0" rgba="0 0.7 0 0.5" size="0.005 0.4 0.005" type="box" group="1"></geom>
-      <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.4" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0.1 0 0" rgba="0.7 0 0 0.5" size="0.1 0.005 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0.1 0" rgba="0 0.7 0 0.5" size="0.005 0.1 0.005" type="box" group="1"></geom>
+      <geom conaffinity="0" contype="0" pos="0 0 0.1" rgba="0 0 0.7 0.5" size="0.005 0.005 0.1" type="box" group="1"></geom>
+    </body>
+    <body mocap="true" name="mocap" pos="0. 0. 0.78">
+      <site pos="0 0 0.075" size="0.003 0.003 0.1" type="box" name="mocap_left_site1" rgba="0 0 1 1"/>
+      <site pos="0 0.075 0" size="0.003 0.1 0.003" type="box" name="mocap_left_site2" rgba="0 1 0 1"/>
+      <!-- <site pos="0.075 0 0" size="0.1 0.003 0.003" type="box" name="mocap_left_site3" rgba="1 0 0 1"/> -->
     </body>
 
     <body name="base" pos="0 0 0.445" childclass="go2">
@@ -292,46 +297,46 @@
 
   <actuator>
     <!-- 前左腿 -->
-    <position name="FL_hip_actuator" joint="FL_hip_joint" kp="200" kv="20"
+    <position name="FL_hip_actuator" joint="FL_hip_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.0472 1.0472"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="FL_thigh_actuator" joint="FL_thigh_joint" kp="400" kv="40"
+    <position name="FL_thigh_actuator" joint="FL_thigh_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.5708 3.4907"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="FL_calf_actuator" joint="FL_calf_joint" kp="300" kv="30"
+    <position name="FL_calf_actuator" joint="FL_calf_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-2.7227 -0.83776"
               forcelimited="true" forcerange="-45.43 45.43"/>
 
     <!-- 前右腿 -->
-    <position name="FR_hip_actuator" joint="FR_hip_joint" kp="200" kv="20"
+    <position name="FR_hip_actuator" joint="FR_hip_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.0472 1.0472"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="FR_thigh_actuator" joint="FR_thigh_joint" kp="400" kv="40"
+    <position name="FR_thigh_actuator" joint="FR_thigh_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.5708 3.4907"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="FR_calf_actuator" joint="FR_calf_joint" kp="300" kv="30"
+    <position name="FR_calf_actuator" joint="FR_calf_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-2.7227 -0.83776"
               forcelimited="true" forcerange="-45.43 45.43"/>
 
     <!-- 后左腿 -->
-    <position name="RL_hip_actuator" joint="RL_hip_joint" kp="200" kv="20"
+    <position name="RL_hip_actuator" joint="RL_hip_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.0472 1.0472"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="RL_thigh_actuator" joint="RL_thigh_joint" kp="400" kv="40"
+    <position name="RL_thigh_actuator" joint="RL_thigh_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-0.5236 4.5379"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="RL_calf_actuator" joint="RL_calf_joint" kp="300" kv="30"
+    <position name="RL_calf_actuator" joint="RL_calf_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-2.7227 -0.83776"
               forcelimited="true" forcerange="-45.43 45.43"/>
 
     <!-- 后右腿 -->
-    <position name="RR_hip_actuator" joint="RR_hip_joint" kp="200" kv="20"
+    <position name="RR_hip_actuator" joint="RR_hip_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-1.0472 1.0472"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="RR_thigh_actuator" joint="RR_thigh_joint" kp="400" kv="40"
+    <position name="RR_thigh_actuator" joint="RR_thigh_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-0.5236 4.5379"
               forcelimited="true" forcerange="-23.7 23.7"/>
-    <position name="RR_calf_actuator" joint="RR_calf_joint" kp="300" kv="30"
+    <position name="RR_calf_actuator" joint="RR_calf_joint" kp="20" kv="0.5"
               ctrllimited="true" ctrlrange="-2.7227 -0.83776"
               forcelimited="true" forcerange="-45.43 45.43"/>
   </actuator>
