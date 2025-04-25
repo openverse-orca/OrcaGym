@@ -265,11 +265,11 @@ class LeggedRobot(OrcaGymAgent):
 
         obs = np.concatenate(
                 [
-                    self._body_lin_vel,
+                    # self._body_lin_vel,
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
-                    np.array([square_wave]),
+                    # np.array([square_wave]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
@@ -851,6 +851,7 @@ class LeggedRobot(OrcaGymAgent):
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
         body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
         body_orientation = rotations.quat2euler(body_orientation_quat)
+        print(body_orientation)
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
     
@@ -874,15 +875,16 @@ class LeggedRobot(OrcaGymAgent):
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
         # scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
 
-        scale_vec = np.concatenate([scale_lin_vel, 
-                                    scale_ang_vel, 
-                                    scale_orientation, 
-                                    scale_command, 
-                                    scale_square_wave,
-                                    scale_leg_joint_qpos, 
-                                    scale_leg_joint_qvel, 
-                                    scale_action, 
-                                    # scale_height
+        scale_vec = np.concatenate([
+            # scale_lin_vel, 
+            scale_ang_vel, 
+            scale_orientation, 
+            scale_command, 
+            # scale_square_wave,
+            scale_leg_joint_qpos, 
+            scale_leg_joint_qvel, 
+            scale_action, 
+            # scale_height
                                     ]).flatten()
         
         return scale_vec.astype(np.float32)
@@ -908,15 +910,16 @@ class LeggedRobot(OrcaGymAgent):
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
         noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
 
-        noise_vec = np.concatenate([noise_lin_vel, 
-                                    noise_ang_vel, 
-                                    noise_orientation, 
-                                    noise_command, 
-                                    noise_square_wave,
-                                    noise_leg_joint_qpos, 
-                                    noise_leg_joint_qvel, 
-                                    noise_action, 
-                                    # noise_height
+        noise_vec = np.concatenate([
+            # noise_lin_vel, 
+            noise_ang_vel, 
+            noise_orientation, 
+            noise_command, 
+            # noise_square_wave,
+            noise_leg_joint_qpos, 
+            noise_leg_joint_qvel, 
+            noise_action, 
+            # noise_height
                                     ]).flatten()
         
         # print("noise vec: ", noise_vec)

@@ -354,7 +354,7 @@ class Lite3Agent(AgentBase):
 
         actuator_ctrl = self._action2ctrl(action)
         self.set_acatuator_ctrl(env, actuator_ctrl)
-        
+        print("actuatorctrl",actuator_ctrl)
 
         self.agent.update_command(env.data.qpos)
         agent_ctrl, agent_mocap = self.agent.step(action, update_mocap=True)
@@ -427,8 +427,15 @@ class Lite3Agent(AgentBase):
         )
 
         actuator_ctrl = self._neutral_joint_values + ctrl_delta
-        
-        return actuator_ctrl    
+        self._print_action_ctrl(actuator_ctrl)
+        return actuator_ctrl  
+
+    def _print_action_ctrl(self, action: np.ndarray) -> None:
+        radian2degree = 180 / np.pi
+        print(f"fl_leg: {action[0:3]*radian2degree}")  
+        print(f"fr_leg: {action[3:6]*radian2degree}")
+        print(f"hl_leg: {action[6:9]*radian2degree}")
+        print(f"hr_leg: {action[9:12]*radian2degree}")
     
     def generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)

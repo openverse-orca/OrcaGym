@@ -140,6 +140,7 @@ def run_simulation(env: gym.Env,
                 # print("agent_obs: ", agent_obs)
                 # predict_start = datetime.now()
                 action, _states = model.predict(agent_obs, deterministic=True)
+                # print("action: ", action)
                 action_list.append(action)
                 # predict_time = datetime.now() - predict_start
                 # print("Predict Time: ", predict_time.total_seconds(), flush=True)

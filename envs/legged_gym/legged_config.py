@@ -124,7 +124,7 @@ LeggedRobotConfig = {
             "joint_angles" : 0.1,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
-            "action_rate" : 0.01,
+            "action_rate" : 0.03,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
             "follow_command_linvel" : 1,
@@ -132,13 +132,13 @@ LeggedRobotConfig = {
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
-            "body_orientation" : 0,
-            "feet_air_time" : 1,
+            "body_orientation" : 0.05,  # 0
+            "feet_air_time" : 0.05,
             "feet_self_contact" : 0,
             "feet_slip" : 0.05,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.1,
-            "fly" : 0.1,
+            "fly" : 0.8,
             "stepping" : 0.1,            
         },
 
@@ -149,10 +149,10 @@ LeggedRobotConfig = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
-        "foot_touch_air_time_ideal" : 0.1,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_air_time_ideal" : 0.5,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
-            "phase_freq" :  0.8,
+            "phase_freq" :  1,   # 0.8
             "eps" :         0.2,
         },
 
