@@ -671,7 +671,7 @@ class OpenLoongAgent(AgentBase):
         else:
             env.disable_actuators(self._r_arm_motor_names, dummy_joint_id)
             self._r_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
-        self._r_neutral_joint_values = np.array([0.905, -0.735, -2.733, 1.405, -1.191, 0.012, -0.517])
+        self._r_neutral_joint_values = np.array([0.706, -0.594, -2.03, 1.65, -2.131, -0.316, -0.705])
         
 
         
@@ -693,7 +693,7 @@ class OpenLoongAgent(AgentBase):
         else:
             env.disable_actuators(self._l_arm_moto_names, dummy_joint_id)
             self._l_arm_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
-        self._l_neutral_joint_values = np.array([-0.905, 0.735, 2.733, 1.405, 1.191, 0.012, 0.517])
+        self._l_neutral_joint_values = np.array([-1.041, 0.721, 2.52, 1.291, 2.112, 0.063, 0.92])
         # self._l_neutral_joint_values = np.zeros(7)            
         print("arm_actuator_id: ", self._r_arm_actuator_id, self._l_arm_actuator_id)
 
