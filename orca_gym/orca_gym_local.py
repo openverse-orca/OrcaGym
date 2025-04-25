@@ -369,57 +369,52 @@ class OrcaGymLocal(OrcaGymBase):
             }
         return actuator_dict
     def get_goal_bounding_box(self, goal_body_name):
-
-        min_corner = np.array([float('inf'), float('inf'), float('inf')])  # 初始设置为正无穷
-        max_corner = np.array([-float('inf'), -float('inf'), -float('inf')])  # 初始设置为负无穷
-        sizes = {}  # 存储所有几何体的尺寸
-        geom_names = []  # 存储几何体的名称
-    
-        # 遍历模型中的所有几何体，获取目标物体相关的几何体信息
+        """
+        计算目标物体（goal_body_name）在世界坐标系下的轴对齐包围盒。
+        支持 BOX、SPHERE 类型，BOX 会考虑 geom 的旋转。
+        """
+        inf = float('inf')
+        min_corner = np.array([ inf,  inf,  inf])
+        max_corner = np.array([-inf, -inf, -inf])
         for geom_id in range(self._mjModel.ngeom):
-            geom_name = self._mjModel.geom(geom_id).name  # 获取几何体名称
-            body_id = self._mjModel.geom(geom_id).bodyid  # 获取几何体所在的 body 的 ID
-            body_name = self._mjModel.body(body_id).name  # 获取对应的 body 名称
-    
-            if goal_body_name in body_name:  # 如果该几何体属于目标物体
-                geom_names.append(geom_name)
-                geom_type = self._mjModel.geom(geom_id).type  # 获取几何体类型
-    
-                if geom_type == mujoco.mjtGeom.mjGEOM_BOX:  # 如果是长方体
-                    size = self._mjModel.geom(geom_id).size  # 获取长方体的尺寸 [length, width, height]
-                    sizes[geom_name] = {'type': 'box', 'size': size}
-    
-                    # 获取每个 box 的边界：根据其中心位置和尺寸，计算最小和最大边界
-                    xpos = self._mjData.xpos[body_id]  # 获取物体的中心位置
-                    half_size = np.array(size) / 2  # 获取半尺寸（从中心到边界的距离）
-                    
-                    # 计算 box 的边界
-                    box_min = xpos - half_size
-                    box_max = xpos + half_size
-    
-                    # 更新整体边界
-                    min_corner = np.minimum(min_corner, box_min)
-                    max_corner = np.maximum(max_corner, box_max)
-    
-                # 如果是其他类型的几何体，类似处理
-                elif geom_type == mujoco.mjtGeom.mjGEOM_SPHERE:  # 如果是球体
-                    radius = self._mjModel.geom(geom_id).size[0]  # 获取球体的半径
-                    sizes[geom_name] = {'type': 'sphere', 'radius': radius}
-                    # 对于球体，可以计算其边界（球体的范围就是其半径的正负）
-                    xpos = self._mjData.xpos[body_id]
-                    sphere_min = xpos - radius
-                    sphere_max = xpos + radius
-                    min_corner = np.minimum(min_corner, sphere_min)
-                    max_corner = np.maximum(max_corner, sphere_max)
-    
-        # 最终返回目标物体（例如 basket）的整体边界
+            body_id = self._mjModel.geom(geom_id).bodyid
+            body_name = self._mjModel.body(body_id).name
+            if goal_body_name not in body_name:
+                continue
+
+            geom = self._mjModel.geom(geom_id)
+            geom_type = geom.type
+            # 世界坐标下的几何中心
+            center = self._mjData.geom_xpos[geom_id]
+
+            if geom_type == mujoco.mjtGeom.mjGEOM_BOX:
+                # MuJoCo 中 size 已经是 half-extents (local frame)
+                half_local = np.array(geom.size)
+                # 获取世界坐标下的旋转矩阵
+                xmat = self._mjData.geom_xmat[geom_id].reshape(3, 3)
+                # 计算旋转后沿世界轴的半尺寸
+                half_world = np.abs(xmat) @ half_local
+                box_min = center - half_world
+                box_max = center + half_world
+
+            elif geom_type == mujoco.mjtGeom.mjGEOM_SPHERE:
+                # 球体只需考虑半径
+                r = geom.size[0]
+                box_min = center - r
+                box_max = center + r
+
+            else:
+                # 其他类型暂不处理
+                continue
+
+            min_corner = np.minimum(min_corner, box_min)
+            max_corner = np.maximum(max_corner, box_max)
+
         bounding_box = {
             'min': min_corner,
             'max': max_corner,
-            'size': max_corner - min_corner  # 计算整体尺寸
+            'size': max_corner - min_corner
         }
-        print(f"Bounding box for {goal_body_name}: min {min_corner}, max {max_corner}, size {bounding_box['size']}")
-        
         return bounding_box
     def set_actuator_trnid(self, actuator_id, trnid):
         model = self._mjModel
