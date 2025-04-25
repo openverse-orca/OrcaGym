@@ -31,6 +31,6 @@ python convert_orca_data_to_lerobot.py --data_dir /YOUR/HDF5/FILE/PATH
 server:进入`OrcaGym_Openpi/3rd_party/openpi` 目录，运行`python scripts/serve_policy.py policy:checkpoint --policy.config=pi0_orca_azureloong_lora --policy.dir=checkpoints/pi0_orca_azureloong_lora/my_experiment/<train epochs>`命令，启动服务器
 
 client:运行`python run_openloong_openpi_client.py --agent_names <robot name>`
-
+   
 ### 评估
 
