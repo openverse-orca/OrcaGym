@@ -1,4 +1,6 @@
 from datetime import datetime
+from shlex import join
+import mujoco
 import numpy as np
 from gymnasium.core import ObsType
 from orca_gym.robomimic.dataset_util import DatasetWriter
@@ -51,49 +53,83 @@ class OpenLoongTask(AbstractTask):
         super().__init__(config)
         self.task_list: list = []
 
-    def get_task(self, env: RobomimicEnv):
-        """ 从object,goal中选择数量最少的
-            在生成一个随机整数x，在挑选x个object, goal
-        """
-        # 使用列表替代字典
-        self.task_list = []
-        self.random_objs_and_goals(env, bounds=0.1)
+    # def get_task(self, env: RobomimicEnv):
+    #     """ 从object,goal中选择数量最少的
+    #         在生成一个随机整数x，在挑选x个object, goal
+    #     """
+    #     # 使用列表替代字典
+    #     self.task_list = []
+    #     self.random_objs_and_goals(env, bounds=0.1)
     
-        object_len = len(self.object_bodys)
-        min_len = min(4, object_len)
+    #     object_len = len(self.object_bodys)
+    #     min_len = min(4, object_len)
         
-        if min_len == 0:
-            return self.task_list  # 返回空列表
+    #     if min_len == 0:
+    #         return self.task_list  # 返回空列表
         
-        random_x = random.randint(1, min_len)
+    #     random_x = random.randint(1, min_len)
         
-        # 随机选择索引时保证object和goal一一对应
-        ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
+    #     # 随机选择索引时保证object和goal一一对应
+    #     ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
         
-        for ind in ind_list:
-            # 以元组形式存储object-goal对
-            self.task_list.append(
-                (self.object_bodys[ind])
-            )
+    #     for ind in ind_list:
+    #         # 以元组形式存储object-goal对
+    #         self.task_list.append(
+    #             (self.object_bodys[ind])
+    #         )
         
-        return self.task_list
+    #     return self.task_list
     
-    def get_language_instruction(self) -> str:
-        if len(self.task_list) == 0:
-            return "Do something."
+    # def get_language_instruction(self) -> str:
+    #     if len(self.task_list) == 0:
+    #         return "Do something."
     
-        object_str = "object: "
-        goal_str = "goal: "
+    #     object_str = "object: "
+    #     goal_str = "goal: "
         
-        # 遍历列表中的元组元素
-        for obj in self.task_list:
-            object_str += obj + " "
+    #     # 遍历列表中的元组元素
+    #     for obj in self.task_list:
+    #         object_str += obj + " "
  
         
-        language_instruction = f"level: {self.level_name}"
-        language_instruction += f"{object_str} to basket"
+    #     language_instruction = f"level: {self.level_name}"
+    #     language_instruction += f"{object_str} to basket"
 
-        return language_instruction
+    #     return language_instruction
+
+    def get_task(self, env: RobomimicEnv) -> dict[str, str]:
+        """
+        从 object_bodys 和 goal_bodys 中随机配对，index 绝对不会越界。
+        """
+        self.task_dict.clear()
+        self.random_objs_and_goals(env, bounds=0.1)
+
+        object_len = len(self.object_bodys)
+        goal_len   = len(self.goal_bodys)
+        min_len    = min(object_len, goal_len)
+
+        # 如果任意一方长度为 0，则无法配对
+        if min_len == 0:
+            return self.task_dict
+
+        # 随机选择 1 到 min_len 个索引
+        n_select = random.randint(1, min_len)
+        # 只在 [0, min_len) 范围内取样
+        idxs = random.sample(range(min_len), n_select)
+
+        for i in idxs:
+            obj_name  = self.object_bodys[i]
+            goal_name = self.goal_bodys[i]
+            self.task_dict[obj_name] = goal_name
+
+        return self.task_dict
+
+    def get_language_instruction(self) -> str:
+        if not self.task_dict:
+            return "Do something."
+        obj_str = "object: " + " ".join(self.task_dict.keys())
+        goal_str = "goal: " + " ".join(self.task_dict.values())
+        return f"level: {self.level_name}  {obj_str} to {goal_str}"
 
 class TaskStatus:
     """
@@ -310,7 +346,7 @@ class OpenLoongEnv(RobomimicEnv):
         info = {"state": self.get_state(),
                 "action": scaled_action,
                 "object": self.objects,  # 提取第一个对象的位置
-                "goal": np.zeros(3),
+                "goal": self.goals,
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction()}
         terminated = self._is_success()
@@ -395,17 +431,26 @@ class OpenLoongEnv(RobomimicEnv):
         if self._run_mode in [RunMode.POLICY_NORMALIZED]:
             # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
             self.replace_objects(self.objects)
-
             # 得到观测并返回
             obs = self._get_obs().copy()
-
             return obs, {"objects": self.objects}
 
         # 3) 否则走原先的“遥操作”初始化逻辑
         self._task.get_task(self)
         randomized_positions = self._task.randomized_object_positions
+        goal_positions = self._task.randomized_goal_positions
+
         print(self._task.get_language_instruction())
         print("Press left hand grip button to start recording task......")
+
+        # 构造 numpy structured array
+        dtype = np.dtype([
+            ('joint_name', 'U50'),
+            ('position', 'f4', (3,)),
+            ('orientation', 'f4', (4,))
+        ])
+
+        # 处理物体数据
         objects = []
         for joint_name, qpos in randomized_positions.items():
             objects.append({
@@ -413,21 +458,88 @@ class OpenLoongEnv(RobomimicEnv):
                 "position": qpos[:3].tolist(),
                 "orientation": qpos[3:].tolist()
             })
-        # 构造 numpy structured array
-        dtype = np.dtype([
-            ('joint_name', 'U50'),
-            ('position',    'f4', (3,)),
-            ('orientation', 'f4', (4,))
-        ])
         objects_array = np.array(
             [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
             dtype=dtype
         )
         self.objects = objects_array
+        goal_dtype = np.dtype([
+            ('joint_name',  'U50'),
+            ('position',    'f4', (3,)),
+            ('orientation', 'f4', (4,)),
+            ('min',         'f4', (3,)),
+            ('max',         'f4', (3,)),
+            ('size',        'f4', (3,))
+        ])
+        # 处理目标数据并计算bounding box
+        goal_entries, _ = self.process_goals(goal_positions)
 
+        goals = []
+        for e in goal_entries:
+            goals.append((
+                e["joint_name"],
+                e["position"],
+                e["orientation"],
+                e["min"],
+                e["max"],
+                e["size"]
+            ))
+        goals_array = np.array(goals, dtype=goal_dtype)
+        self.goals = goals_array
+
+        # 执行仿真步骤
         self.mj_forward()
+
+        # 获取观测信息并返回
         obs = self._get_obs().copy()
-        return obs, {"objects": objects_array}
+
+        # 返回目标bounding box信息
+        return obs, {"objects": objects_array, "goals": goals_array}
+
+
+    def process_goals(self, goal_positions):
+        """
+        处理目标（goals）的信息，返回目标的bounding box（最大最小坐标）。
+        :param goal_positions: 目标位置字典
+        :return: 目标信息的条目，目标位置数组，和bounding box数据
+        """
+        goal_entries = []
+        goal_positions_list = []
+        goal_bounding_boxes = {}  # 用于存储目标的bounding box信息
+
+        for goal_joint_name, qpos in goal_positions.items():
+            # 获取目标的尺寸
+            goal_name = goal_joint_name.replace("_joint", "")
+            info = self.get_goal_bounding_box(goal_name)
+
+            # 如果没有尺寸信息，跳过目标
+            if not info:
+                print(f"Error: No geometry size information found for goal {goal_name}")
+                continue
+
+            mn = np.array(info["min"]).flatten()
+            mx = np.array(info["max"]).flatten()
+            sz = mx - mn
+
+
+            # 添加目标位置信息
+            goal_entries.append({
+                "joint_name":  goal_name,
+                "position":    qpos[:3].tolist(),
+                "orientation": qpos[3:].tolist(),
+                "min":         mn.tolist(),
+                "max":         mx.tolist(),
+                "size":        sz.tolist()
+            })
+
+            goal_positions_list.append(qpos[:3])  # 仅记录目标位置
+
+        goal_positions_array = np.array(goal_positions_list)
+
+        # 返回目标数据及bounding box信息
+        return goal_entries, goal_positions_array,
+
+    
     def replace_objects(self, objects_data):
         """
         将 demo 里记录的 objects_data 写回到仿真。
@@ -542,9 +654,9 @@ class OpenLoongEnv(RobomimicEnv):
         [agent.on_close() for agent in self._agents.values()]
 
 
-    def set_goal_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
-        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+    # def set_goal_mocap(self, position, orientation) -> None:
+    #     mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
+    #     self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
 
         # print("set init joint state: " , arm_joint_qpos_list)

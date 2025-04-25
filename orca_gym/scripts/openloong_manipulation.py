@@ -6,6 +6,7 @@ import signal
 
 
 from typing import Any, Dict
+from flask import g
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
@@ -180,6 +181,14 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         ('position', 'f4', (3,)),
         ('orientation', 'f4', (4,))
     ])
+    gdtype = np.dtype([
+        ('joint_name', h5py.special_dtype(vlen=str)),
+        ('position', 'f4', (3,)),
+        ('orientation', 'f4', (4,)),
+        ('min', 'f4', (3,)),
+        ('max', 'f4', (3,)),
+        ('size', 'f4', (3,))
+    ])
     
     # 只提取第一个对象的关节信息
     objects_array = np.array([
@@ -194,13 +203,31 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
             first_info['object']['orientation']
         )
     ], dtype=dtype)
+    goals_array = np.array([
+        (
+            joint_name,
+            position,
+            orientation,
+            min,
+            max,
+            size
+        )
+        for joint_name, position, orientation,max,min,size in zip(
+            first_info['goal']['joint_name'],
+            first_info['goal']['position'],
+            first_info['goal']['orientation'],
+            first_info['goal']['min'],
+            first_info['goal']['max'],
+            first_info['goal']['size']
+        )
+    ], dtype=gdtype)
 
         
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
         'objects': objects_array,
-        'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
+        'goals': goals_array,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
