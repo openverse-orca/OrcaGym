@@ -6,6 +6,7 @@ import signal
 
 
 from typing import Any, Dict
+from flask import g
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
@@ -114,6 +115,7 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
     done_list = []
     info_list = []    
     terminated_times = 0
+    in_goal_list = [] 
     camera_frames = {camera.name: [] for camera in cameras}
     timestep_list = []
     action_step_taken = 0
@@ -122,6 +124,13 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
 
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
+        lang_instr = info.get('language_instruction', '')
+        obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
+        goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
+        target_obj = obj_match.group(1) if obj_match else None
+        target_goal = goal_match.group(1) if goal_match else None
+        if not (target_obj and target_goal):
+            print(f"[Warning] 无法从 language_instruction 中解析 object/goal: '{lang_instr}'")
         env.render()
         task_status = info['task_status']
         
@@ -129,6 +138,37 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
         if action_step_taken >= action_step:        
             action_step_taken = 0
             if task_status in [TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.BEGIN]:
+                if task_status == TaskStatus.SUCCESS:
+                    goal_info = info["goal"]
+                    object_info = info["object"]
+                    object_joint_name = object_info["joint_name"][0]
+                    object_body_name = object_joint_name.replace("_joint", "")
+                    print("object_body_name:",object_body_name)
+                    obj_joints = info['object']['joint_name']
+                    goal_joints = info['goal']['joint_name']
+
+                    # 查找 obj_idx
+                    obj_idx = next((i for i, jn in enumerate(obj_joints) if target_obj in jn), None)
+                    # 查找 goal_idx
+                    goal_idx = next((i for i, gn in enumerate(goal_joints) if target_goal in gn), None)
+                    if obj_idx is None or goal_idx is None:
+                        print(f"[Error] 未找到匹配: object='{target_obj}'，goal='{target_goal}'")
+                    else:
+                        # 获取物体位置
+                        joint_name = obj_joints[obj_idx]
+                        body_name = joint_name.replace('_joint', '')
+                        pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
+                        pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
+                        xy = pos_vec[:2]
+                        # 获取目标区域边界
+                        gmin = info['goal']['min'][goal_idx][:2]
+                        gmax = info['goal']['max'][goal_idx][:2]
+                        in_goal = gmin[0] <= xy[0] <= gmax[0] and gmin[1] <= xy[1] <= gmax[1]
+                        in_goal_list.append(in_goal)
+                        print(f"检查 {target_obj} 在 {target_goal} 区域: {in_goal}")
+                        if not in_goal:
+                            info['task_status'] = TaskStatus.FAILURE
+                            print("⚠️ 标记为 FAILURE: 物体未进入目标区域。")
                 for obs_key, obs_data in obs.items():
                     obs_list[obs_key].append(obs_data)
                     
@@ -145,12 +185,12 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
             timestep_list.append(env.unwrapped.gym.data.time)
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
+            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list
 
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < REALTIME_STEP:
             time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
-            
+                            
 def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
     while True:
         user_input = input(f"Round {currnet_round} / {teleoperation_rounds}, Task is {task_result}! Do you want to save the record? y(save), n(ignore), e(ignore & exit): ")
@@ -180,6 +220,14 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         ('position', 'f4', (3,)),
         ('orientation', 'f4', (4,))
     ])
+    gdtype = np.dtype([
+        ('joint_name', h5py.special_dtype(vlen=str)),
+        ('position', 'f4', (3,)),
+        ('orientation', 'f4', (4,)),
+        ('min', 'f4', (3,)),
+        ('max', 'f4', (3,)),
+        ('size', 'f4', (3,))
+    ])
     
     # 只提取第一个对象的关节信息
     objects_array = np.array([
@@ -194,13 +242,31 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
             first_info['object']['orientation']
         )
     ], dtype=dtype)
+    goals_array = np.array([
+        (
+            joint_name,
+            position,
+            orientation,
+            min,
+            max,
+            size
+        )
+        for joint_name, position, orientation,max,min,size in zip(
+            first_info['goal']['joint_name'],
+            first_info['goal']['position'],
+            first_info['goal']['orientation'],
+            first_info['goal']['min'],
+            first_info['goal']['max'],
+            first_info['goal']['size']
+        )
+    ], dtype=gdtype)
 
         
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
         'objects': objects_array,
-        'goals': np.array([info["goal"] for info in info_list], dtype=np.float32),
+        'goals': goals_array,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
@@ -223,8 +289,11 @@ def do_teleoperation(env,
         camera.start()
     
     while True:
-        obs_list, reward_list, done_list, info_list, camera_frames, timestep_list = teleoperation_episode(env, cameras, rgb_size, action_step)
-        task_result = "Success" if len(done_list) > 0 and done_list[-1] == 1 else "Failed"
+        obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list = teleoperation_episode(env, cameras, rgb_size, action_step)
+        last_done = (len(done_list)>0 and done_list[-1]==1)
+        last_in_goal = (len(in_goal_list)>0 and in_goal_list[-1])
+        save_record = last_done and last_in_goal
+        task_result = "Success" if save_record else "Failed"
         # save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         save_record = task_result == "Success"
         exit_program = False
