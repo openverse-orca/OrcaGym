@@ -2,17 +2,33 @@
 version: "1.0"
 
 default_settings:
-  physics_options:
+  transform_options:
+    scale: 1.0
+
+  collision_options:
     collider_type: "bounding_box"
-    free_joint: false
+
+  physics_options:
+    free_joint: true
+    density: 1000.0
 
 files:
-  - filename: "cup/Cup_of_Coffee.usdz"  
-    physics_options:
-      free_joint: true
+  - filename: "Cup_of_Coffee.usdz"  
+    transform_options:
+      scale: 0.1
 
-  - filename: "table/Office_Desk_7_MB.usdz" 
+  - filename: "Office_Desk_7_MB.usdz" 
+    transform_options:
+      scale: 0.75
 
-  - filename: "table/Round_Table.usdz"
+  - filename: "Round_Table.usdz"
+    transform_options:
+      scale: 0.5
+
+  - filename: "Fully_textured_tank.usdz"
+
+  - filename: "Railway_Signal_Box_-_Bytom_Poland.usdz"
+    transform_options:
+      scale: 10
     physics_options:
-      collider_type: "convex_hull"
+      free_joint: false
