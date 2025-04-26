@@ -26,6 +26,7 @@ if __name__ == "__main__":
     parser.add_argument('--task', type=str, default='follow_command', help='The task to run')
     parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo only now)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training / testing / play / nav)')
+    parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human / none)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
     parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
@@ -52,6 +53,7 @@ if __name__ == "__main__":
     model_type = args.model_type
     height_map_file = args.height_map_file
     run_mode = args.run_mode
+    render_mode = args.render_mode
     load_existing_model = args.load_existing_model
     training_episode = args.training_episode
     start_her_episode = args.start_her_episode
@@ -93,6 +95,7 @@ if __name__ == "__main__":
             entry_point=entry_point, 
             time_step=TIME_STEP, 
             max_episode_steps=max_episode_steps, 
+            render_mode=render_mode,
             frame_skip=frame_skip, 
             model_type=model_type, 
             total_timesteps=total_timesteps, 
@@ -115,6 +118,7 @@ if __name__ == "__main__":
             entry_point=entry_point, 
             time_step=TIME_STEP, 
             max_episode_steps=max_episode_steps, 
+            render_mode="human",
             frame_skip=frame_skip, 
             model_type=model_type, 
             model_file=model_file, 
