@@ -1,28 +1,18 @@
 # config/usdz_processing.yaml
 version: "1.0"
 
-directory_settings:
-  converted_directory: "converted_files"
-  output_directory: "output_xml_files"
-
 default_settings:
-  convert_to_obj: true
   physics_options:
     collider_type: "bounding_box"
     free_joint: false
 
-patterns:
-  - pattern: "cup/*.usdz"  
+files:
+  - filename: "cup/Cup_of_Coffee.usdz"  
     physics_options:
       free_joint: true
 
-  - pattern: "table/*.usdz" 
+  - filename: "table/Office_Desk_7_MB.usdz" 
 
-  - pattern: "chair/*.usdz"
-    physics_options:
-      free_joint: true
-
-  - pattern: "human/*.usdz"
+  - filename: "table/Round_Table.usdz"
     physics_options:
       collider_type: "convex_hull"
-      free_joint: true

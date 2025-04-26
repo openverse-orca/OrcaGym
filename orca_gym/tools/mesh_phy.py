@@ -1,11 +1,13 @@
-from pxr import Usd
 import argparse
 import yaml
+import os
 
-import yaml
 import glob
 from pathlib import Path
 from typing import Dict, List
+from pxr import Usd, UsdGeom, Gf, Sdf
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 
 def _load_yaml(path: str):
@@ -13,83 +15,43 @@ def _load_yaml(path: str):
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-def _find_all_usdz_files(root_dir: Path) -> List[Path]:
-    """查找目录下所有 .usdz 文件"""
-    return list(root_dir.rglob("*.usdz"))
-
-def _match_pattern(pattern: str, files: List[Path]) -> List[Path]:
-    """将 glob 模式转换为实际文件路径"""
-    # 将 * 转换为 glob 语法（支持 ** 递归匹配）
-    glob_pattern = pattern.replace("**", "*").replace("//", "/")
-    return [f for f in files if f.match(glob_pattern)]
-
-def _extract_file_specific_params(file_path: Path, config: Dict) -> Dict:
-    """提取针对特定文件的覆盖参数（可选功能）"""
-    # 如果需要支持文件名特定覆盖，可在此实现
-    return {}
-
 
 def load_file_params(config_path: str):
-    """加载配置并处理通配符模式"""
     config = _load_yaml(config_path)
     file_params = []
-
-    # usdz 文件存放在 yaml  文件同级目录
-    usdz_path = Path(config_path).parent
-    # print(f"Loading config from: {usdz_path}")
-
-    all_usdz_files = _find_all_usdz_files(usdz_path)
+    default = config.get("default_settings", {})
     
-    # 按优先级处理模式：具体文件 > 通配符模式
-    for item in config.get("patterns", []):
-        if "pattern" not in item:
-            continue
-        
-        # 使用 glob 匹配文件
-        matched_files = _match_pattern(item["pattern"], all_usdz_files)
-        
-        for file_path in matched_files:
-            # 合并参数：默认设置 + 当前模式参数
-            params = {
-                **config["default_settings"],
-                **item,
-                **_extract_file_specific_params(file_path, config)
-            }
-            
-            file_params.append({
-                "filename": str(file_path),
-                **params
-            })
+    for file_config in config["files"]:
+        filename = file_config["filename"]
+        file_path = os.path.join(Path(config_path).parent, filename)
+        # 合并默认参数和文件专属参数
+        params = {
+            **default, 
+            **file_config,
+            "filename": file_path,
+        }
+        file_params.append(params)
     
     return file_params
 
-def create_directories(config_path : str):
+def create_converted_dir(config_path : str):
     """
     Create a directory for the USDZ file if it doesn't exist.
     """
-    import os
 
     # Get the directory of the config file
     config_dir = os.path.dirname(config_path)
-    config = _load_yaml(config_path)
 
-    directory_settings = config.get("directory_settings", {})
-    directories = {}
-    
-    for key, directory in directory_settings.items():
-        # Create the directory if it doesn't exist
-        dir_path = os.path.join(config_dir, directory)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-            # print(f"Created directory: {dir_path}")
-        else:
-            # print(f"Directory already exists: {dir_path}")
-            pass
+    # Create the directory if it doesn't exist
+    converted_dir_path = os.path.join(config_dir, "converted_files")
+    if not os.path.exists(converted_dir_path):
+        os.makedirs(converted_dir_path)
+        # print(f"Created directory: {dir_path}")
+    else:
+        # print(f"Directory already exists: {dir_path}")
+        pass
 
-        directories[key] = dir_path
-
-    return directories
-
+    return converted_dir_path
 
 def convert_usdz2usdc(usdz_path, converted_dir):
     """
@@ -130,47 +92,231 @@ def convert_usdz2usdc(usdz_path, converted_dir):
     
     return usdc_file_path
 
-def _get_all_prim(stage):
+def get_all_prim(stage):
     # 遍历所有 Prim
-    def traverse_prims(prim, all_prim):
-        all_prim.append({"Prim": prim.GetPath(), "Type": prim.GetTypeName()})
+    def _traverse_prims(prim, all_prim):
+        all_prim.append({"Path": prim.GetPath(), "Type": prim.GetTypeName(), "Prim": prim})
         for child in prim.GetChildren():
-            traverse_prims(prim=child, all_prim=all_prim)
+            _traverse_prims(prim=child, all_prim=all_prim)
 
     all_prim = []
-    traverse_prims(prim=stage.Load("/"), all_prim=all_prim)  # 遍历 Stage 的根 Prim
+    _traverse_prims(prim=stage.Load("/"), all_prim=all_prim)  # 遍历 Stage 的根 Prim
     return all_prim
 
-def _convert_mesh_to_obj(all_prim, params):
+def get_bounding_box(all_prim, params, bbox_cache):
     for prim in all_prim:
-        if prim["Type"] == "Mesh":
-            # 处理 Mesh 类型的 Prim
-            mesh_path = prim["Prim"]
-            print(f"Processing Mesh: {mesh_path}")
+        prim_path = prim["Path"]
+        bbox = bbox_cache.ComputeWorldBound(prim["Prim"])
+        box_range = bbox.GetRange()
+        if box_range.IsEmpty():
+            print(f"Prim {prim_path} has an empty bounding box.")
+            continue
+        min_point = box_range.GetMin()
+        max_point = box_range.GetMax()
 
-            # 这里可以添加转换为 OBJ 的逻辑
-            # 例如，使用 Open3D 或其他库将 Mesh 转换为 OBJ 格式
-            # obj_file_path = convert_mesh_to_obj(mesh_path, params)
-            # print(f"Converted Mesh to OBJ: {obj_file_path}")
+        # 计算中心点和尺寸
+        center = (min_point + max_point) / 2.0
+        size = box_range.GetSize()
 
+        print(f"Prim Path: {prim_path}, Type: {prim['Type']}")
+        print(f"    Min: {min_point}")
+        print(f"    Max: {max_point}")
+        print(f"    Center: {center}")
+        print(f"    Size: {size}")
 
-def process_usdc_file(usdc_path, params):
-    """
-    Process the USDC file and add mujoco physics geometry.
-    """
-    stage = Usd.Stage.Open(usdc_path)
-    if not stage:
-        print(f"Failed to open {usdc_path}")
-        return
-
-    all_prim = _get_all_prim(stage)
+def export_mesh_to_obj(prim, output_dir):
+    """将 USD Mesh 导出为 OBJ 文件"""
+    mesh = UsdGeom.Mesh(prim)
     
-    if params["convert_to_obj"]:
-        # Convert mesh to OBJ format
-        _convert_mesh_to_obj(all_prim, params)
+    # 获取顶点和面数据
+    points = mesh.GetPointsAttr().Get()
+    face_vertex_indices = mesh.GetFaceVertexIndicesAttr().Get()
+    face_vertex_counts = mesh.GetFaceVertexCountsAttr().Get()
+    
+    # 生成 OBJ 内容
+    obj_content = "# OBJ File\n"
+    for p in points:
+        obj_content += f"v {-p[0]} {p[2]} {p[1]}\n"
+    
+    start_idx = 0
+    for count in face_vertex_counts:
+        face_indices = face_vertex_indices[start_idx:start_idx + count]
+        obj_content += "f " + " ".join([str(i+1) for i in face_indices]) + "\n"
+        start_idx += count
+    
+    # 保存文件
+    obj_name = f"{prim.GetName()}.obj"
+    obj_path = os.path.join(output_dir, obj_name)
+    with open(obj_path, "w") as f:
+        f.write(obj_content)
+    
+    return obj_name
 
-    # 关闭 Stage
-    stage = None
+import numpy as np
+
+# def export_mesh_to_obj(prim, output_dir):
+#     """将 USD Mesh 导出为 OBJ 文件（应用旋转矩阵转换 Y-up → Z-up）"""
+#     mesh = UsdGeom.Mesh(prim)
+    
+#     # 获取顶点和面数据
+#     points = mesh.GetPointsAttr().Get()  # Y-up 原始顶点
+#     face_vertex_indices = mesh.GetFaceVertexIndicesAttr().Get()
+#     face_vertex_counts = mesh.GetFaceVertexCountsAttr().Get()
+    
+#     # --- 定义 Y-up → Z-up 的旋转矩阵（绕X轴-90度）---
+#     # 矩阵形式：
+#     # [1  0   0 ]
+#     # [0  0   1 ]
+#     # [0 -1   0 ]
+#     # 等价于将原坐标 (x,y,z) 转换为 (x, z, -y)
+#     R = np.array([
+#         [1, 0, 0],
+#         [0, 0, 1],
+#         [0, -1, 0]
+#     ])
+    
+#     # 生成 OBJ 内容
+#     obj_content = "# OBJ File\n"
+    
+#     # 应用旋转矩阵到所有顶点
+#     for p in points:
+#         # 将顶点转换为 numpy 数组并应用矩阵变换
+#         v = np.array([p[0], p[1], p[2]])
+#         v_transformed = np.dot(R, v)
+#         # 写入转换后的顶点
+#         obj_content += f"v {v_transformed[0]:.6f} {v_transformed[1]:.6f} {v_transformed[2]:.6f}\n"
+    
+#     # 面数据保持不变（仅顶点位置变换，索引顺序不变）
+#     start_idx = 0
+#     for count in face_vertex_counts:
+#         face_indices = face_vertex_indices[start_idx:start_idx + count]
+#         obj_content += "f " + " ".join([str(i+1) for i in face_indices]) + "\n"
+#         start_idx += count
+    
+#     # 保存文件
+#     obj_name = f"{prim.GetName()}.obj"
+#     obj_path = os.path.join(output_dir, obj_name)
+#     with open(obj_path, "w") as f:
+#         f.write(obj_content)
+    
+#     return obj_name
+
+def matrix_to_pos_quat(matrix: Gf.Matrix4d):
+    """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat"""
+
+    translation = matrix.ExtractTranslation()
+    matrix.Orthonormalize()
+    quat = matrix.ExtractRotationQuat()
+    
+    # TODO: Orca 处理USD导入的时候做了转换，这里要做适配
+    pos = [-translation[0], translation[2], translation[1]]
+    quat = [quat.real, -quat.imaginary[0], quat.imaginary[1], quat.imaginary[2]]
+
+    return pos, quat
+
+# def matrix_to_pos_quat(matrix: Gf.Matrix4d):
+#     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat（使用旋转矩阵方法）"""
+#     # Step 1: 定义 USD → MuJoCo 的坐标系旋转矩阵（绕X轴-90度）
+#     # 这是一个4x4变换矩阵，仅包含旋转，无平移
+#     R = Gf.Matrix4d()
+#     R.SetRotate(Gf.Rotation(Gf.Vec3d(1,0,0), -90))  # 绕X轴旋转-90度
+    
+#     # Step 2: 将USD的矩阵应用坐标系转换
+#     converted_matrix = matrix * R  # 矩阵乘法顺序取决于USD的矩阵定义（通常是列主序）
+    
+#     # Step 3: 提取转换后的位置和四元数
+#     translation = converted_matrix.ExtractTranslation()
+#     rotation = converted_matrix.ExtractRotation()
+    
+#     # 位置直接按新坐标系读取（Y-up → Z-up 已完成转换）
+#     pos = [translation[0], translation[1], translation[2]]
+    
+#     # 四元数需要调整虚部符号以匹配MuJoCo的wxyz格式
+#     usd_quat = rotation.GetQuat()
+#     quat = [usd_quat.real, 
+#             usd_quat.imaginary[0], 
+#             usd_quat.imaginary[1], 
+#             usd_quat.imaginary[2]]  # 直接使用转换后的四元数
+    
+#     return pos, quat
+
+def build_mjcf_xml(usd_file, mjcf_file, output_dir):
+    """主函数：构建 MJCF XML"""
+    
+    # 初始化 MJCF 文档
+    root = ET.Element("mujoco")
+    asset = ET.SubElement(root, "asset")
+    worldbody = ET.SubElement(root, "worldbody")
+    base_body = ET.SubElement(worldbody, "body")
+    base_body.set("name", "base")
+    base_joint = ET.SubElement(base_body, "freejoint")
+    base_joint.set("name", "base_joint")
+    
+    # 打开 USD 文件
+    stage = Usd.Stage.Open(usd_file)
+
+    bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ['default', 'render'])
+    # all_prim = get_all_prim(stage)
+    # get_bounding_box(all_prim, {}, bbox_cache)
+
+    # 递归遍历 USD 节点
+    def _process_prim(prim, parent_elem, bbox_cache):
+        bbox = bbox_cache.ComputeWorldBound(prim)
+        if bbox.GetRange().IsEmpty():
+            print(f"prim {prim.GetPath()} has an empty bounding box.")
+            return
+
+        # 处理变换
+        # 获取当前节点的局部变换矩阵（相对于父节点）
+        xform = UsdGeom.Xformable(prim)
+        local_matrix = xform.GetLocalTransformation()
+        pos, quat = matrix_to_pos_quat(local_matrix)
+
+        body_hash = hash(prim.GetPath())
+
+        # 创建当前 body
+        body = ET.SubElement(parent_elem, "body")
+        body.set("name", f"{prim.GetName()}_{body_hash}")
+        body.set("pos", " ".join(map(str, pos)))
+        body.set("quat", " ".join(map(str, quat)))
+        
+        # ET.SubElement(body, "pos").text = " ".join(map(str, pos))
+        # ET.SubElement(body, "quat").text = " ".join(map(str, quat))
+        
+        # 处理 Mesh
+        if prim.IsA(UsdGeom.Mesh):
+            obj_name = export_mesh_to_obj(prim, output_dir)
+            # 添加 mesh 到 asset
+            mesh_elem = ET.SubElement(asset, "mesh")
+            mesh_elem.set("name", prim.GetName())
+            mesh_elem.set("file", obj_name)
+            
+            # 添加 collision geom
+            collision_geom = ET.SubElement(body, "geom")
+            collision_geom.set("type", "box")
+            collision_geom.set("mesh", prim.GetName())
+            collision_geom.set("group", "3")
+
+            # 添加 visual geom
+            visual_geom = ET.SubElement(body, "geom")
+            visual_geom.set("type", "mesh")
+            visual_geom.set("mesh", prim.GetName())
+            visual_geom.set("contype", "0")
+            visual_geom.set("conaffinity", "0")
+        
+        # 递归处理子节点
+        for child in prim.GetChildren():
+            _process_prim(child, body, bbox_cache)
+    
+    # 从根节点开始处理
+    for prim in stage.GetPseudoRoot().GetChildren():
+        _process_prim(prim, base_body, bbox_cache)
+    
+    # 美化 XML 并保存
+    xml_str = minidom.parseString(ET.tostring(root)).toprettyxml()
+    with open(mjcf_file, "w") as f:
+        f.write(xml_str)
+
 
 def main(config_path):
     """
@@ -182,12 +328,13 @@ def main(config_path):
     # for params in file_params:
     #     print(params)
 
-    directories = create_directories(config_path)
+    converted_dir = create_converted_dir(config_path)
     for params in file_params:
         usdz_path = params["filename"]
-        converted_dir = directories["converted_directory"]
         usdc_path = convert_usdz2usdc(usdz_path, converted_dir)
-        process_usdc_file(usdc_path, params)
+        usdc_dir = os.path.dirname(usdc_path)
+        xml_path = os.path.join(usdc_dir, os.path.basename(usdz_path).replace(".usdz", ".xml"))
+        build_mjcf_xml(usd_file=usdc_path, mjcf_file=xml_path, output_dir=usdc_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Porcess USDZ file and add mujoco physics geometry')
@@ -195,25 +342,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.config)
-
-
-
-
-
-# # 打开 Stage
-# stage = Usd.Stage.Open("/home/superfhwl/workspace/3d_assets/Cup_of_Coffee.usdz")
-
-
-# upAxis = stage.GetMetadata("upAxis")  # 获取 Stage 的 upAxis 元数据
-# print(f"Stage upAxis: {upAxis}")
-
-# # 遍历所有 Prim
-# def traverse_prims(prim):
-#     print(f"Prim: {prim.GetPath()}, Type: {prim.GetTypeName()}")
-#     for child in prim.GetChildren():
-#         traverse_prims(child)
-
-# traverse_prims(stage.Load("/"))  # 遍历 Stage 的根 Prim
-
-# # 关闭 Stage
-# stage = None
