@@ -3,3 +3,6 @@
 *.TXT
 
 texture_processer_tmp/
+decomp.mtl
+decomp.obj
+decomp.stl

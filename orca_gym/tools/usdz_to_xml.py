@@ -10,7 +10,9 @@ from typing import Dict, List
 from pxr import Usd, UsdGeom, Gf, Sdf
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-
+import subprocess
+import trimesh
+import orca_gym.utils.rotations as rotations
 
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
@@ -151,8 +153,22 @@ def export_mesh_to_obj(prim, output_dir):
     obj_path = os.path.join(output_dir, obj_name)
     with open(obj_path, "w") as f:
         f.write(obj_content)
-    
+
     return obj_name
+
+def split_mesh(obj_name, output_dir, max_split_mesh_number):
+    # 调用cpp程序TestVHACD执行分割
+    obj_path = os.path.join(output_dir, obj_name)
+    subprocess.run(["./TestVHACD", obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj"], check=True)
+    obj_name_list = []
+    for i in range(max_split_mesh_number):
+        obj_name_base = obj_name.split(".")[0]
+        splited_obj_name = f"{obj_name_base}{i:03d}.obj"
+        splited_obj_path = os.path.join(output_dir, splited_obj_name)
+        if os.path.exists(splited_obj_path):
+            obj_name_list.append(splited_obj_name)
+    
+    return obj_name_list
 
 
 def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
@@ -190,6 +206,10 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         print("Adding free joint to base body")
         base_joint = ET.SubElement(base_body, "freejoint")
         base_joint.set("name", "base_joint")
+        if params["physics_options"]["mass"] > 0:
+            inertial = ET.SubElement(base_body, "inertial")
+            inertial.set("pos", "0 0 0")
+            inertial.set("mass", str(params["physics_options"]["mass"]))
     
     # 打开 USD 文件
     stage = Usd.Stage.Open(usd_file)
@@ -233,30 +253,85 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         # 处理 Mesh
         if prim.IsA(UsdGeom.Mesh):
             obj_name = export_mesh_to_obj(prim, output_dir)
-            # 添加 mesh 到 asset
-            mesh_elem = ET.SubElement(asset, "mesh")
-            mesh_elem.set("name", prim.GetName())
-            mesh_elem.set("file", obj_name)
-            mesh_elem.set("scale", " ".join(map(str, scale)))
             
-            # 添加 collision geom
-            bbox_range = bbox.GetRange()
-            collision_size = bbox_range.GetSize() * scale / 2.0
-            collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
-            collision_pos = bbox_range.GetMidpoint() * scale - pos
-            collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
-            collision_geom = ET.SubElement(body, "geom")
-            collision_geom.set("type", "box")
-            collision_geom.set("pos", " ".join(map(str, collision_pos)))
-            collision_geom.set("size", " ".join(map(str, collision_size)))
-            collision_geom.set("group", "3")
+            if params["collision_options"]["split_mesh"]:
+                obj_name_list = split_mesh(obj_name, output_dir, params["collision_options"]["max_split_mesh_number"])
+            else:
+                obj_name_list = [obj_name]
 
-            # 添加 visual geom
-            visual_geom = ET.SubElement(body, "geom")
-            visual_geom.set("type", "mesh")
-            visual_geom.set("mesh", prim.GetName())
-            visual_geom.set("contype", "0")
-            visual_geom.set("conaffinity", "0")
+            for obj_name in obj_name_list:
+                # 添加 mesh 到 asset
+                obj_name_base = obj_name.split(".")[0]
+                mesh_elem = ET.SubElement(asset, "mesh")
+                mesh_elem.set("name", obj_name_base)
+                mesh_elem.set("file", obj_name)
+                mesh_elem.set("scale", " ".join(map(str, scale)))
+                
+                # 添加 collision geom
+                if params["collision_options"]["collider_type"] == "bounding_box":
+                    collision_geom = ET.SubElement(body, "geom")
+                    collision_geom.set("type", "box")                    
+                    collision_geom.set("group", "3")
+                    collision_geom.set("density", str(params["physics_options"]["density"]))
+
+                    if not params["collision_options"]["split_mesh"]:
+                        # 不分割mesh，usd中保留有原始的bounding box
+                        bbox_range = bbox.GetRange()
+                        collision_size = bbox_range.GetSize() * scale / 2.0
+                        collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
+                        collision_pos = bbox_range.GetMidpoint() * scale - pos
+                        collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
+                    else:
+                        # 加载 OBJ 文件
+                        obj_path = os.path.join(output_dir, obj_name)
+                        mesh = trimesh.load(obj_path)
+
+                        # 获取 AABB 包围盒对象
+                        aabb = mesh.bounding_box
+
+                        # 提取 AABB 的最小和最大顶点
+                        min_point = aabb.bounds[0]  # 最小值坐标 (x_min, y_min, z_min)
+                        max_point = aabb.bounds[1]  # 最大值坐标 (x_max, y_max, z_max)
+
+                        # 计算包围盒尺寸和中心点
+                        size = aabb.extents         # 尺寸 (dx, dy, dz)
+                        center = aabb.centroid        # 中心点坐标 (x_center, y_center, z_center)
+                        print("AABB 最小值:", min_point)
+                        print("AABB 最大值:", max_point)
+                        print("AABB 尺寸:", size)
+                        print("中心点:", center)
+
+                        collision_pos = center * scale - pos
+                        # collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
+                        collision_size = size * scale / 2.0
+                        # collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
+
+                        # 旋转矩阵绕X轴旋转-90度
+                        # collision_matrix = obb.transform[:3, :3]
+                        # rotation_matrix = rotations.euler2mat([0, -np.pi / 2, 0])
+                        # collision_matrix = np.dot(rotation_matrix, collision_matrix)
+                        # collision_quat = rotations.mat2quat(collision_matrix)
+                        # collision_geom.set("quat", " ".join(map(str, collision_quat)))
+
+                    collision_geom.set("pos", " ".join(map(str, collision_pos)))
+                    collision_geom.set("size", " ".join(map(str, collision_size)))
+
+                elif params["collision_options"]["collider_type"] == "convex_hull":
+                    collision_geom = ET.SubElement(body, "geom")
+                    collision_geom.set("type", "mesh")
+                    collision_geom.set("mesh", obj_name_base)
+                    collision_geom.set("group", "3")
+                    collision_geom.set("density", str(params["physics_options"]["density"]))
+                else:
+                    raise ValueError(f"Unknown collider type: {params['collision_options']['collider_type']}")
+
+                # 添加 visual geom
+                if params["debug_options"]["visualize_obj"]:
+                    visual_geom = ET.SubElement(body, "geom")
+                    visual_geom.set("type", "mesh")
+                    visual_geom.set("mesh", obj_name_base)
+                    visual_geom.set("contype", "0")
+                    visual_geom.set("conaffinity", "0")
         
         # 递归处理子节点
         for child in prim.GetChildren():
