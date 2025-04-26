@@ -201,10 +201,17 @@ import numpy as np
     
 #     return obj_name
 
-def matrix_to_pos_quat(matrix: Gf.Matrix4d):
+def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : float):
     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat"""
 
-    translation = matrix.ExtractTranslation()
+
+    factor = matrix.Factor()
+    assert factor[2][0] == factor[2][1] == factor[2][2], "Matrix is not uniform scale"
+    scale *= factor[2][0]
+    print(f"scale: {scale}")
+
+    translation = matrix.ExtractTranslation() * scale
+
     matrix.Orthonormalize()
     quat = matrix.ExtractRotationQuat()
     
@@ -212,7 +219,7 @@ def matrix_to_pos_quat(matrix: Gf.Matrix4d):
     pos = [-translation[0], translation[2], translation[1]]
     quat = [quat.real, -quat.imaginary[0], quat.imaginary[1], quat.imaginary[2]]
 
-    return pos, quat
+    return pos, quat, scale
 
 # def matrix_to_pos_quat(matrix: Gf.Matrix4d):
 #     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat（使用旋转矩阵方法）"""
@@ -242,7 +249,8 @@ def matrix_to_pos_quat(matrix: Gf.Matrix4d):
 
 def build_mjcf_xml(usd_file, mjcf_file, output_dir):
     """主函数：构建 MJCF XML"""
-    
+    print(f"Processing {usd_file}")
+
     # 初始化 MJCF 文档
     root = ET.Element("mujoco")
     asset = ET.SubElement(root, "asset")
@@ -254,13 +262,16 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir):
     
     # 打开 USD 文件
     stage = Usd.Stage.Open(usd_file)
+    meters_per_unit = stage.GetMetadata('metersPerUnit')
+    print(f"metersPerUnit: {meters_per_unit}")
+    
 
     bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ['default', 'render'])
     # all_prim = get_all_prim(stage)
     # get_bounding_box(all_prim, {}, bbox_cache)
 
     # 递归遍历 USD 节点
-    def _process_prim(prim, parent_elem, bbox_cache):
+    def _process_prim(prim, parent_elem, bbox_cache, scale):
         bbox = bbox_cache.ComputeWorldBound(prim)
         if bbox.GetRange().IsEmpty():
             print(f"prim {prim.GetPath()} has an empty bounding box.")
@@ -270,7 +281,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir):
         # 获取当前节点的局部变换矩阵（相对于父节点）
         xform = UsdGeom.Xformable(prim)
         local_matrix = xform.GetLocalTransformation()
-        pos, quat = matrix_to_pos_quat(local_matrix)
+        pos, quat, scale = matrix_to_pos_quat_scale(local_matrix, scale)
 
         body_hash = hash(prim.GetPath())
 
@@ -290,6 +301,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir):
             mesh_elem = ET.SubElement(asset, "mesh")
             mesh_elem.set("name", prim.GetName())
             mesh_elem.set("file", obj_name)
+            mesh_elem.set("scale", f"{scale} {scale} {scale}")
             
             # 添加 collision geom
             collision_geom = ET.SubElement(body, "geom")
@@ -306,11 +318,11 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir):
         
         # 递归处理子节点
         for child in prim.GetChildren():
-            _process_prim(child, body, bbox_cache)
+            _process_prim(child, body, bbox_cache, scale)
     
     # 从根节点开始处理
     for prim in stage.GetPseudoRoot().GetChildren():
-        _process_prim(prim, base_body, bbox_cache)
+        _process_prim(prim, base_body, bbox_cache, meters_per_unit)
     
     # 美化 XML 并保存
     xml_str = minidom.parseString(ET.tostring(root)).toprettyxml()
