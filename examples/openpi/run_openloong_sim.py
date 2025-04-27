@@ -8,7 +8,6 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 
 
 import orca_gym.scripts.openloong_manipulation as openloong_manipulation
-import examples.openpi.openloong_openpi_env as openloong_openpi_env
 
 import argparse
 

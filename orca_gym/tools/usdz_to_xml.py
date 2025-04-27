@@ -13,12 +13,26 @@ from xml.dom import minidom
 import subprocess
 import trimesh
 import orca_gym.utils.rotations as rotations
+from copy import deepcopy
+import numpy as np
+from sklearn.cluster import KMeans
 
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
     with open(path, "r") as f:
         return yaml.safe_load(f)
-
+    
+def _deep_merge(source, overrides):
+    """
+    递归合并两个字典，处理嵌套的子节点。
+    """
+    merged = deepcopy(source)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
 
 def load_file_params(config_path: str):
     config = _load_yaml(config_path)
@@ -28,13 +42,14 @@ def load_file_params(config_path: str):
     for file_config in config["files"]:
         filename = file_config["filename"]
         file_path = os.path.join(Path(config_path).parent, filename)
-        # 合并默认参数和文件专属参数
-        params = {
-            **default, 
-            **file_config,
-            "filename": file_path,
-        }
-        file_params.append(params)
+        
+        # 深度合并默认配置和文件专属配置
+        merged_params = _deep_merge(default, file_config)
+        
+        # 添加/覆盖文件路径
+        merged_params["filename"] = file_path
+        
+        file_params.append(merged_params)
     
     return file_params
 
@@ -179,7 +194,7 @@ def split_mesh(obj_name, output_dir, max_split_mesh_number):
     # 调用 cpp 程序 TestVHACD 执行分割
     obj_path = os.path.join(output_dir, obj_name)
     subprocess.run(
-        [testvhacd_path, obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj"],
+        [testvhacd_path, obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj", "-g", "true"],
         check=True
     )
     
@@ -227,6 +242,7 @@ def _add_box_geom(body, params, collision_pos, collision_size):
     collision_geom.set("group", "3")
     collision_geom.set("density", str(params["physics_options"]["density"]))
     collision_geom.set("pos", " ".join(map(str, collision_pos)))
+    collision_size = np.clip(collision_size, 0.01, None)   # 限制最小尺寸
     collision_geom.set("size", " ".join(map(str, collision_size)))
 
 def _add_hull_geom(body, params, obj_name):
