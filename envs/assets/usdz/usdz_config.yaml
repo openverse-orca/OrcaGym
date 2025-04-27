@@ -8,6 +8,7 @@ default_settings:
     collider_type: "bounding_box"  # "bounding_box" , "convex_hull"
     split_mesh: false
     max_split_mesh_number: 64
+    merge_threshold: 0.9          # 两个bounding box 之间的重合度
   physics_options:
     free_joint: true
     density: 1000.0
@@ -23,7 +24,9 @@ files:
     collision_options:
       collider_type: "bounding_box"
       split_mesh: true
-      max_split_mesh_number: 32
+      max_split_mesh_number: 64
+      merge_threshold: 0.9
+      merge_iterations: 10
     physics_options:
       free_joint: true
       density: 1000.0
@@ -37,6 +40,8 @@ files:
       collider_type: "bounding_box"
       split_mesh: true
       max_split_mesh_number: 32
+      merge_threshold: 0.9
+      merge_iterations: 10
 
   - filename: "Round_Table.usdz"
     transform_options:
@@ -45,6 +50,8 @@ files:
       collider_type: "bounding_box"
       split_mesh: true
       max_split_mesh_number: 10
+      merge_threshold: 0.9
+      merge_iterations: 10
 
 
   - filename: "Fully_textured_tank.usdz"
@@ -52,6 +59,8 @@ files:
       collider_type: "bounding_box"
       split_mesh: true
       max_split_mesh_number: 64
+      merge_threshold: 0.9
+      merge_iterations: 10
 
 
   - filename: "Railway_Signal_Box_-_Bytom_Poland.usdz"
@@ -65,6 +74,8 @@ files:
       collider_type: "bounding_box"
       split_mesh: true
       max_split_mesh_number: 80
+      merge_threshold: 0.9
+      merge_iterations: 10
 
   - filename: "Cart_Basket.usdz"  
     transform_options:
@@ -73,3 +84,5 @@ files:
       collider_type: "bounding_box"
       split_mesh: true
       max_split_mesh_number: 80
+      merge_threshold: 0.9
+      merge_iterations: 10
