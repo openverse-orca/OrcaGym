@@ -1,9 +1,0 @@
-# 任务配置文件
-
-level_name: "test"
-object_bodys: ["blue_object", "red_object", "green_object", "yellow_object"]
-object_sites: ["blue_object_site", "red_object_site", "green_object_site", "yellow_object_site"]
-object_joints: ["blue_object_joint", "red_object_joint", "green_object_joint", "yellow_object_joint"]
-
-goal_bodys: ["blue_goal", "red_goal", "green_goal", "yellow_goal"]
-goal_sites: ["blue_goal_site", "red_goal_site", "green_goal_site", "yellow_goal_site"]

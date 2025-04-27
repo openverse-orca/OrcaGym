@@ -165,6 +165,8 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             self.render()
         # step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
         
+        # time.sleep(1) # for debug, visualization
+        
         # raise error.Error("Test robot height!")
 
         env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
@@ -227,7 +229,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
 
     def reset_model(self) -> tuple[ObsType, dict[str, np.ndarray]]:
-        print("Reset model")
+        # print("Reset model")
 
         # 依次 reset 每个agent
         self.reset_agents(self._agents)
@@ -313,6 +315,11 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
         self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
 
+        if next(iter(ctrl_info.values()))["action_scale_mask"] is None:
+            self._action_scale_mask = None
+        else:
+            self._action_scale_mask = np.array([ctrl["action_scale_mask"] for key, ctrl in ctrl_info.items()]).flatten() # shape = (agent_num x actor_num)
+            
         self._ctrl_start = np.array([ctrl["ctrl_start"] for key, ctrl in ctrl_info.items()]) # shape = (agent_num)
         self._ctrl_end = np.array([ctrl["ctrl_end"] for key, ctrl in ctrl_info.items()])     # shape = (agent_num)
         self._ctrl_range = np.array([ctrl["ctrl_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)   # shape = (agent_num x actor_num, 2) 
@@ -398,7 +405,10 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
 
     def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
         # 缩放后的 action
-        scaled_action = action * self._action_scale
+        if self._action_scale_mask is None:
+            scaled_action = action * self._action_scale
+        else:
+            scaled_action = action * self._action_scale * self._action_scale_mask
 
         # 限制 scaled_action 在有效范围内
         clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])

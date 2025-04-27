@@ -20,6 +20,7 @@ dependencies = [
     "sb3_contrib>=2.3.0",
     "pygame>=2.6.0",
     "h5py",
+    "pyyaml",
     "websockets",
     "numba",
     "termcolor",
@@ -30,6 +31,9 @@ dependencies = [
     "aiofiles",
     "requests",
     "grpcio"
+    "flask",
+    "tensorboard",
+    "trimesh",
 ]
 
 # 可选依赖，可用于开发调试、测试、格式化代码等用途
