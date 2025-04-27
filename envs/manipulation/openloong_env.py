@@ -430,7 +430,7 @@ class OpenLoongEnv(RobomimicEnv):
         # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
         if self._run_mode in [RunMode.POLICY_NORMALIZED]:
             # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
-            self.replace_objects(self.objects)
+
             # 得到观测并返回
             obs = self._get_obs().copy()
             return obs, {"objects": self.objects}
@@ -495,6 +495,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         # 返回目标bounding box信息
         return obs, {"objects": objects_array, "goals": goals_array}
+        
 
 
     def process_goals(self, goal_positions):
@@ -589,6 +590,56 @@ class OpenLoongEnv(RobomimicEnv):
             return obs
         else:
             return self._get_obs().copy()
+        
+    def replace_goals(self, goals_data):
+        """
+        将 demo 里记录的 goals 写回环境，仅做数据格式转换。
+
+        goals_data 可能是：
+          1) 结构化 numpy array（dtype 包含 joint_name, position, orientation, min, max, size）
+          2) 纯浮点 ndarray：长度 = num_goals * 16，或 shape=(num_goals,16)
+             对应字段顺序 [pos(3), orient(4), min(3), max(3), size(3)]
+        """
+        arr = goals_data
+
+        # 1) 如果已经是结构化数组，直接 copy 给 self.goals
+        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
+            self.goals = arr.copy()
+            return
+
+        # 2) 否则把它变为 (num_goals, 16) 的纯数值数组
+        flat = np.asarray(arr, dtype=np.float32)
+        if flat.ndim == 1:
+            flat = flat.reshape(-1, 16)
+        elif flat.ndim == 2 and flat.shape[0] > 1:
+            # 如果是时序数据，取第一帧
+            flat = flat[0].reshape(-1, 16)
+
+        # joint_name 列表从旧的 self.goals 拿，如果第一次用请先跑一次 reset_model() 初始化它
+        names = [entry['joint_name'] for entry in self.goals]
+
+        # 3) 重建结构化数组
+        goal_dtype = np.dtype([
+            ('joint_name',  'U50'),
+            ('position',    'f4', (3,)),
+            ('orientation', 'f4', (4,)),
+            ('min',         'f4', (3,)),
+            ('max',         'f4', (3,)),
+            ('size',        'f4', (3,))
+        ])
+        entries = []
+        for idx, row in enumerate(flat):
+            name = names[idx]
+            pos  = row[ 0:3].tolist()
+            quat = row[ 3:7].tolist()
+            mn   = row[ 7:10].tolist()
+            mx   = row[10:13].tolist()
+            sz   = row[13:16].tolist()
+            entries.append((name, pos, quat, mn, mx, sz))
+
+        self.goals = np.array(entries, dtype=goal_dtype)
+
+
 
     def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
         if self._reward_printer is not None and self._reward_type == RewardType.DENSE:

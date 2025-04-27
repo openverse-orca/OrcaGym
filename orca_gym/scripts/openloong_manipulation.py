@@ -355,19 +355,34 @@ def playback_episode(env : OpenLoongEnv,
 
 def reset_playback_env(env: OpenLoongEnv, demo_data, sample_range=0.0):
     """
-    Reset 环境，然后把 demo_data['objects'] 恢复到场景里。
+    Reset 环境，然后把 demo_data['objects'] 和 demo_data['goals'] 恢复到场景里。
     """
-    # 1) 先走一次基本 reset，让 self.objects 被赋值
+    # 1) 先走一次基本 reset，让 self.objects 和 self.goals（如果存在）都被清空
     obs, info = env.reset(seed=42)
 
-    # 2) 拿出 demo_data 里第 0 帧的 objects
-    #    无论 demo_data['objects'] 是结构化还是纯数值数组，我们都直接传给 replace_objects
+    # 2) 恢复 objects
     recorded_objs = demo_data['objects']
     env.unwrapped.replace_objects(recorded_objs)
 
-    # 3) 重置完毕后再拿一次 obs 和 info，带回 objects
+    # 3) 恢复 goals
+    recorded_goals = demo_data.get('goals')
+    if recorded_goals is not None:
+        # 调用你之前写的 replace_goals，会将结构化数组或纯数值数组都转换并赋给 self.goals
+        env.unwrapped.replace_goals(recorded_goals)
+    else:
+        print("[Warning] demo_data 中没有 'goals'，无法恢复目标区域信息")
+
+    # 4) 推一步仿真，让新的 objects/goals 生效
+    env.unwrapped.mj_forward()
+
+    # 5) 再取一次 obs，组装 info
     obs = env.unwrapped._get_obs().copy()
-    return obs, {"objects": recorded_objs}
+    info = {
+        "object": recorded_objs,
+        "goal":   recorded_goals
+    }
+    return obs, info
+
 
 
     
@@ -405,16 +420,24 @@ def augment_episode(env : OpenLoongEnv,
                     sample_range : float, 
                     realtime : bool = False,
                     action_step : int = 1):
-    obs, info = env.reset(seed=42)    
-    obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
+    obs, info = reset_playback_env(env, demo_data, sample_range)
+    obs_list    = {k: [] for k in obs}
     reward_list = []
     done_list = []
     info_list = []    
     terminated_times = 0    
     camera_frames = {camera.name: [] for camera in cameras}
     timestep_list = []
-    
-    reset_playback_env(env, demo_data, sample_range)    
+    lang_instr = demo_data.get("language_instruction", b"")
+    if isinstance(lang_instr, (bytes, bytearray)):
+        lang_instr = lang_instr.decode("utf-8")
+    obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
+    goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
+    target_obj = obj_match.group(1) if obj_match else None
+    target_goal = goal_match.group(1) if goal_match else None
+
+    in_goal=False
+  
     action_list = demo_data['actions']
     action_index_list = list(range(len(action_list)))
     holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
@@ -443,11 +466,38 @@ def augment_episode(env : OpenLoongEnv,
                 elapsed_time = datetime.now() - start_time
                 if elapsed_time.total_seconds() < REALTIME_STEP:
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+        if target_obj and target_goal:
+            raw_obj_joints  = info['object']['joint_name']
+            obj_joints = [jn.decode('utf-8') if isinstance(jn, (bytes, bytearray)) else jn
+                       for jn in raw_obj_joints]
+            raw_goal_joints = info['goal']['joint_name']
+            goal_joints = [gn.decode('utf-8') if isinstance(gn, (bytes, bytearray)) else gn
+                       for gn in raw_goal_joints]
+            obj_idx  = next((i for i, jn in enumerate(obj_joints)  if target_obj  in jn), None)
+            goal_idx = next((i for i, gn in enumerate(goal_joints) if target_goal in gn), None)
+
+            if obj_idx is not None and goal_idx is not None:
+                joint_name = obj_joints[obj_idx]
+                body_name = joint_name.replace('_joint', '')
+                pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
+                pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
+                xy = pos_vec[:2]
+                # 读取原始值
+                gmin_raw = info['goal']['min'][goal_idx][:2]
+                gmax_raw = info['goal']['max'][goal_idx][:2]
+                # 排序：
+                gmin = np.minimum(gmin_raw, gmax_raw)
+                gmax = np.maximum(gmin_raw, gmax_raw)
+                # 然后再判定
+                in_goal = (gmin[0] <= xy[0] <= gmax[0]) and (gmin[1] <= xy[1] <= gmax[1])
+                in_goal = gmin[0] <= xy[0] <= gmax[0] and gmin[1] <= xy[1] <= gmax  [1]
+            else:
+                print(f"[Aug Error] 目标匹配失败：{target_obj}, {target_goal}")
                     
         env.render()
                     
         if len(cameras) > 0:
-            time.sleep(0.03)    # wait for camera to get new frame
+            time.sleep(0.01)    # wait for camera to get new frame
             for camera in cameras:
                 camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
@@ -465,7 +515,7 @@ def augment_episode(env : OpenLoongEnv,
         if terminated_times >= 5 or truncated:
             return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
         
-    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
+    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
  
     
 
@@ -509,11 +559,12 @@ def do_augmentation(env : OpenLoongEnv,
                 language_instruction = demo_data['language_instruction']
                 
                 obs_list, reward_list, done_list, info_list\
-                    , camera_frames, timestep_list = augment_episode(env, cameras,rgb_size,
+                    , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_scale, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
-                if done_list[-1] == 1:
+                if  in_goal:
+                    
                     if obs_camera:
                         for camera in cameras:
                             obs_list[camera.name] = camera_frames[camera.name]
