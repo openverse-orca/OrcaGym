@@ -11,6 +11,8 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import pickle
+from orca_gym.devices.keyboard import KeyboardInput
+
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -40,7 +42,7 @@ def smooth_sqr_wave_np(phase, phase_freq, eps):
 
 class Lite3RealAgent:
     def __init__(self,):
-        self.model_file = "/home/superfhwl/桌面/yaoxiang/orcagym/trained_models/trained_models_tmp/Lite3_ppo_1152-agents_200-episodes_2025-04-14_12-34-09_ckp100000000.zip"
+        self.model_file = "/home/superfhwl/repo/yaoxiang/dog_sim2real_0418/trained_models_tmp/Lite3_ppo_1152-agents_200-episodes_2025-04-22_15-02-18.zip"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = PPO.load(self.model_file, device=device)
 
@@ -53,18 +55,24 @@ class Lite3RealAgent:
         self._phase = 0.0 # arbitrary
         self._neutral_joint_values = self._get_neutral_joint_values()
 
+        self._command = np.array([0.0] * 4)
+        self._init_playable()
+
         self.generate_action_scale_array()
 
     def get_action(self, obs):
         """
         Get the action from real observation of Lite3.
         """
+        self._update_playable()
         obs = self.restructure_obs(obs)
         # print("obs: ", obs)
         action, _states = self.model.predict(obs, deterministic=True)
         # return restructure_action(action)
         self._set_action(action)
-        return action
+        return self._action2ctrl(action)
+
+    
     
     def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
         # 缩放后的 action
@@ -152,7 +160,7 @@ class Lite3RealAgent:
             scale_ang_vel, 
             # scale_orientation, 
             scale_command, 
-            scale_square_wave,
+            # scale_square_wave,
             scale_leg_joint_qpos, 
             scale_leg_joint_qvel, 
             scale_action, 
@@ -176,7 +184,6 @@ class Lite3RealAgent:
         # body_lin_vel = np.array([real_format_obs.body_lin_vel[0], real_format_obs.body_lin_vel[1], real_format_obs.body_lin_vel[2]])
         body_ang_vel = np.array([imu_data["angularVelocityRoll"], imu_data["angularVelocityPitch"], imu_data["angularVelocityYaw"]])
         # body_orientation = np.array(real_format_obs.body_orientation)  # Assuming it's a quaternion or similar
-        self._command = np.array([0] * 4)
         leg_joint_qpos = [t["position"] for t in joint_data]
         leg_joint_qvel = [t["velocity"] for t in joint_data]
         # body_height = real_format_obs.body_height  # Uncomment if needed
@@ -191,7 +198,7 @@ class Lite3RealAgent:
             body_ang_vel,
             # body_orientation,
             self._command,
-            np.array([square_wave]),
+            # np.array([square_wave]),
             leg_joint_qpos - self._neutral_joint_values,
             leg_joint_qvel,
             self._action,
@@ -240,5 +247,56 @@ class Lite3RealAgent:
         
         return actuator_ctrl    
 
+    def _init_playable(self) -> None:
+        self._keyboard_controller = KeyboardInput()
+        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
+        
+        # self._player_agent = self.agent
+        # self.agent.init_playable()
+        # self.agent.player_control = True
+            
+        robot_config = LeggedRobotConfig["Lite3"]
+
+            
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
+    
+    def _update_playable(self) -> None:
+        lin_vel, turn_angel, reborn = self._update_keyboard_control()
+        # self._player_agent.update_playable(lin_vel, turn_angel)
+        self._command[0:3] = lin_vel
+        self._command[3] = turn_angel
+
+        # agent_cmd_mocap = self._player_agent.reset_command_indicator(env.data.qpos)
+        # env.set_mocap_pos_and_quat(agent_cmd_mocap)      
+    
+    def _update_keyboard_control(self) -> tuple[np.ndarray, float, bool]:
+        self._keyboard_controller.update()
+        key_status = self._keyboard_controller.get_state()
+        lin_vel = np.zeros(3)
+        turn_angel = 0.0
+        reborn = False
+        print(key_status)
+        if key_status["W"] == 1:
+            lin_vel[0] = self._player_agent_lin_vel_x[1]
+        if key_status["S"] == 1:
+            lin_vel[0] = self._player_agent_lin_vel_x[0]
+        if key_status["Q"] == 1:
+            lin_vel[1] = self._player_agent_lin_vel_y[1]
+        if key_status["E"] == 1:
+            lin_vel[1] = self._player_agent_lin_vel_y[0]
+        if key_status["A"] == 1:
+            turn_angel += np.pi / 2 * self.dt
+        if key_status["D"] == 1:
+            turn_angel += -np.pi / 2 * self.dt
+        if self._key_status["Space"] == 0 and key_status["Space"] == 1:
+            reborn = True
+        if key_status["LShift"] == 1:
+            lin_vel[:2] *= 2
+
+        self._key_status = key_status.copy()
+        print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
+        
+        return lin_vel, turn_angel, reborn     
 
 
