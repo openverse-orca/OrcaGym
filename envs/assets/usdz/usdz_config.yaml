@@ -52,6 +52,14 @@ files:
     collision_options:
       max_split_mesh_number: 64
 
+  - filename: "Factory_Plant.usdz"
+    transform_options:
+      scale: 10
+    physics_options:
+      free_joint: false
+    collision_options:
+      max_split_mesh_number: 256
+
   - filename: "Cart_Basket.usdz"  
     transform_options:
       scale: 0.333

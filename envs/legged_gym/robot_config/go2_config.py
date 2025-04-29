@@ -36,7 +36,7 @@ Go2Config = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.25,
+        "action_scale" :         0.5,
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
@@ -120,6 +120,13 @@ Go2Config = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
+            # basic moving skills
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+
+            # advanced moving skills
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
@@ -127,8 +134,19 @@ Go2Config = {
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
         ],
         "curriculum_commands" : {
+            "move_slowly" : {
+                "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_resample_interval" : 7, # second to resample the command
+            },
+
             "flat_plane" : {
                 "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
@@ -142,7 +160,7 @@ Go2Config = {
                 "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_resample_interval" : 20, # second to resample the command
             },
             
             "stairs" : {
@@ -168,9 +186,9 @@ Go2Config = {
         # Config for nn network training
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
-        "n_steps" : 32,  # 每个环境采样步数
-        "batch_size" : 1024,  # 批次大小            
-        "learning_rate" : 0.0005,  # 学习率
+        "n_steps" : 64,  # 每个环境采样步数
+        "batch_size" : 4096,  # 批次大小            
+        "learning_rate" : 0.0003,  # 学习率
         "gamma" : 0.99,  # 折扣因子
         "clip_range" : 0.2,  # PPO剪切范围
         "ent_coef" : 0.01,  # 熵系数

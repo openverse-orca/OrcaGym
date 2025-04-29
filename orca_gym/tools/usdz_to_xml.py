@@ -365,6 +365,10 @@ def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, para
             if not merged:
                 merged_aabbs.append(current)
         
+        if not merged:
+            # 如果没有合并成功，说明没有更多的包围盒可以合并了
+            break
+
         if itr < params["collision_options"]["merge_iterations"] - 1:
             merged_aabbs = []
 
