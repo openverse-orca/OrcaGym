@@ -329,6 +329,9 @@ class LeggedRobot(OrcaGymAgent):
     def _set_action(self, action) -> None:
         self._last_action[:] = self._action
         self._action[:] = action
+
+    # def _set_ctrl(self, actuator_ctrl) -> None:
+    #     self._ctrl[:] = actuator_ctrl
     
     def set_action_space(self, action_space : spaces) -> None:
         self._action_space_range = np.array([action_space.low[0], action_space.high[0]]) 
@@ -354,6 +357,7 @@ class LeggedRobot(OrcaGymAgent):
         Called after each step in the environment.
         """
         self._set_action(action)
+        # self._set_ctrl(actuator_ctrl)
 
         visualized_command = {}
         if update_mocap and self._visualize_command:        
@@ -728,6 +732,14 @@ class LeggedRobot(OrcaGymAgent):
         self._print_reward("Contact no velocity reward: ", reward, coeff * self.dt)
         return reward
     
+    # def _compute_reward_torque(self, coeff) -> SupportsFloat:
+    #     # Penalize the torque of the joints
+    #     def cal_torque_pid(ctrl, dof, kp):
+    #         return np.sum(np.square((ctrl - dof)*kp))
+    #     reward = -cal_torque_pid(self._ctrl, self._leg_joint_qpos, 45) * coeff * self.dt
+    #     self._print_reward("Torque reward: ", reward, coeff * self.dt)
+    #     return reward
+    
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
             total_reward = 0.0
@@ -930,7 +942,6 @@ class LeggedRobot(OrcaGymAgent):
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
         body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
         body_orientation = rotations.quat2euler(body_orientation_quat)
-        print(body_orientation)
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
     
@@ -1064,6 +1075,8 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["feet_contact"] if "feet_contact" in reward_coeff else 0},
             {"function": self._compute_reward_feet_swing_height, "coeff": reward_coeff["feet_swing_height"] if "feet_swing_height" in reward_coeff else 0},
             {"function": self._compute_reward_contact_no_vel, "coeff": reward_coeff["contact_no_vel"] if "contact_no_vel" in reward_coeff else 0},
+            # {"function": self._compute_reward_torque, "coeff": reward_coeff["torque"] if "torque" in reward_coeff else 0},
+        
         ]
         
     def _setup_curriculum_functions(self):
