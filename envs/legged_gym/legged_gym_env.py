@@ -329,6 +329,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             robot_config = LeggedRobotConfig["AzureLoong"]
         elif "Lite3" in self._player_agent.name:
             robot_config = LeggedRobotConfig["Lite3"]
+        elif "g1" in self._player_agent.name:
+            robot_config = LeggedRobotConfig["g1"]
             
         self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
         self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
