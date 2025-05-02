@@ -29,7 +29,6 @@ if __name__ == "__main__":
     parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human / none)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
-    parser.add_argument('--load_existing_model', type=bool, default=False, help='Load existing model')
     parser.add_argument('--training_episode', type=int, default=200, help='The number of training episodes for each agent')
     parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     parser.add_argument('--nav_ip', type=str, default="localhost", help='The IP address of the navigation server, default is localhost, should be local pc ip address')
@@ -54,7 +53,6 @@ if __name__ == "__main__":
     height_map_file = args.height_map_file
     run_mode = args.run_mode
     render_mode = args.render_mode
-    load_existing_model = args.load_existing_model
     training_episode = args.training_episode
     start_her_episode = args.start_her_episode
     nav_ip = args.nav_ip
@@ -73,13 +71,13 @@ if __name__ == "__main__":
 
     if args.model_file is not None:
         model_file = args.model_file
-    elif run_mode == "training" and not load_existing_model:
+    elif run_mode == "training":
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         model_dir = f"./trained_models_tmp/{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
         os.makedirs(model_dir, exist_ok=True)
         model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
     else:
-        raise ValueError("Invalid model file! Please provide a model file for testing, or set `load_existing_model` to False for training")
+        raise ValueError("Invalid model file! Please provide a model file for testing.")
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
@@ -102,7 +100,6 @@ if __name__ == "__main__":
             start_her_episode=start_her_episode, 
             model_file=model_file, 
             height_map_file=height_map_file, 
-            load_existing_model=load_existing_model
         )
     elif run_mode in ["testing", "play", "nav"]:
         print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)

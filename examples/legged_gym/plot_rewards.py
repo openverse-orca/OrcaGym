@@ -4,6 +4,7 @@ matplotlib.use('Agg')  # 无GUI环境必需
 import matplotlib.pyplot as plt
 from datetime import datetime
 import math
+import os
 
 def parse_rewards(file_path):
     """解析所有奖励项（支持不同长度数据）"""
@@ -12,7 +13,7 @@ def parse_rewards(file_path):
     pattern = re.compile(
         r'^([\w\s]+)\s+reward_\d\.\d+e[+-]?\d+:\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)$'
     )
-    
+
     with open(file_path, 'r') as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
@@ -48,7 +49,7 @@ def auto_subplot_layout(num_plots):
         cols = math.ceil(num_plots / rows)
         return (rows, cols)
 
-def plot_all_rewards(reward_data):
+def plot_all_rewards(reward_data, file_path):
     """绘制所有奖励曲线（独立x轴）"""
     plt.figure(figsize=(24, 16), dpi=100)
     
@@ -99,7 +100,9 @@ def plot_all_rewards(reward_data):
     
     # 保存图片
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f'all_rewards_{timestamp}.png'
+    file_dir = os.path.dirname(file_path)
+    file_prefix = os.path.basename(file_path).split('.')[0]
+    filename = os.path.join(file_dir, f"{file_prefix}.png")
     plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()
     print(f"Saved all rewards plot to {filename}")
@@ -118,9 +121,9 @@ if __name__ == "__main__":
     
     file_path = sys.argv[1]
     try:
-        reward_data = parse_rewards(file_path)
+        reward_data= parse_rewards(file_path)
         print(f"Successfully parsed {len(reward_data)} reward types")
-        plot_all_rewards(reward_data)
+        plot_all_rewards(reward_data, file_path)
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)

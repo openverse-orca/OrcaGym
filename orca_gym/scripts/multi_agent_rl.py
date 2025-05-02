@@ -152,7 +152,6 @@ def setup_model_ppo(
     agent_num: int, 
     agent_config : dict,
     model_file: str, 
-    load_existing_model: bool
 ) -> PPO:
     """
     设置或加载 PPO 模型。
@@ -178,7 +177,7 @@ def setup_model_ppo(
         batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
         
     # 如果存在模型文件且指定加载现有模型，则加载模型
-    if os.path.exists(f"{model_file}") and load_existing_model:
+    if os.path.exists(f"{model_file}"):
         print(f"加载现有模型：{model_file}")
         model = PPO.load(model_file, env=env, device=device)
     else:
@@ -248,7 +247,6 @@ def train_model(
     start_her_episode: int,
     model_file: str,
     height_map_file: str,
-    load_existing_model: bool,
 ):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
@@ -287,7 +285,6 @@ def train_model(
                 agent_num=agent_num,
                 agent_config=agent_config,
                 model_file=model_file,
-                load_existing_model=load_existing_model,
             )
         else:
             raise ValueError("Invalid model type")

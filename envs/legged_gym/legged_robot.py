@@ -415,7 +415,7 @@ class LeggedRobot(OrcaGymAgent):
         # Update the height of the base body
         self._base_neutral_qpos[self._base_joint_name][2] += self._compute_base_height(height_map)
         
-        # print("Base neutral qpos: ", base_neutral_qpos)
+        # print("Base neutral qpos: ", self._base_neutral_qpos)
         joint_neutral_qpos.update(self._base_neutral_qpos)
 
         self._command = self._genarate_command(z_rotation_angle)
@@ -896,6 +896,8 @@ class LeggedRobot(OrcaGymAgent):
         self._command["ang_vel"] = min(max(angle_error, -self._command_ang_vel_range), self._command_ang_vel_range)
         self._command_values[3] = self._command["ang_vel"]
 
+        # print("Command: ", self._command, "Body heading angle: ", body_heading_angle, "Angle error: ", angle_error)
+
 
     def _resample_command(self) -> None:
         self._command_resample_duration += self.dt
@@ -930,6 +932,7 @@ class LeggedRobot(OrcaGymAgent):
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
         body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
         body_orientation = rotations.quat2euler(body_orientation_quat)
+        body_orientation[2] = 0
 
         return body_height, body_lin_vel, body_ang_vel, body_orientation
     

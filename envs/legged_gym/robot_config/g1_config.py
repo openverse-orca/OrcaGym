@@ -239,12 +239,12 @@ g1Config = {
             "action_rate" : 0.01,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 10,
-            "follow_command_angvel" : 5,
+            "follow_command_linvel" : 1,
+            "follow_command_angvel" : 0.5,
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
-            "body_orientation" : 2,
+            "body_orientation" : 1,
             "feet_air_time" : 0,
             "feet_self_contact" : 1,
             "feet_slip" : 0.00,
@@ -256,6 +256,33 @@ g1Config = {
             "feet_swing_height" : 20,
             "contact_no_vel" : 0.2
         },
+        # "reward_coeff" : {
+        #     "alive" : 0.15,
+        #     "success" : 0,
+        #     "failure" : 0,
+        #     "contact" : 1,
+        #     "foot_touch" : 0,
+        #     "joint_angles" : 0.1,
+        #     "joint_accelerations" : 2.5e-7,
+        #     "limit" : 0,
+        #     "action_rate" : 0.01,
+        #     "base_gyro" : 0,
+        #     "base_accelerometer" : 0,
+        #     "follow_command_linvel" : 1,
+        #     "follow_command_angvel" : 0.5,
+        #     "height" : 0,
+        #     "body_lin_vel" : 2,
+        #     "body_ang_vel" : 0.05,
+        #     "body_orientation" : 0,
+        #     "feet_air_time" : 1,
+        #     "feet_self_contact" : 0,
+        #     "feet_slip" : 0.05,
+        #     "feet_wringing" : 0.0,
+        #     "feet_fitted_ground" : 0.1,
+        #     "fly" : 0.1,
+        #     "stepping" : 0.1,         
+        # },
+
 
         # Config from gymloong
         "foot_touch_force_threshold" : 500.0,
@@ -288,12 +315,12 @@ g1Config = {
         "curriculum_learning" :     True,
         "curriculum_levels" : [
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.5, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
 
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
             # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
@@ -317,7 +344,7 @@ g1Config = {
                 "command_lin_vel_range_x" : [0, 1.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 1.0,  # max turning rate
+                "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
@@ -343,7 +370,8 @@ g1Config = {
         "log_agent_names" : ["g1_000"],
         
         # Config for visualization
-        "visualize_command_agent_names" : ["g1_000"],
+        "visualize_command_agent_names" : ["g1_000", "g1_001", "g1_002", "g1_003", "g1_004", "g1_005", "g1_006", "g1_007", 
+                                            "g1_008", "g1_009", "g1_010", "g1_011", "g1_012", "g1_013", "g1_014", "g1_015"],
         "command_indicator_name" : "command_indicator_mocap",
 
         # Config for playable agent

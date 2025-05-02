@@ -1,5 +1,4 @@
 # model files
 trained_models_tmp/
+reward_history/
 play.sh
-*.txt
-*.png
