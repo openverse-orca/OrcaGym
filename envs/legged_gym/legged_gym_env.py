@@ -251,7 +251,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def _add_randomized_weight(self) -> None:
         print("Add randomized weight")
-        if self._run_mode == "testing" or self._run_mode == "play":
+        if self._run_mode == "testing" or self._run_mode == "play" or self._run_mode == "nav":
             print("Skip randomized weight load in testing or play mode")
             return   
 

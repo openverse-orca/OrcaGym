@@ -325,6 +325,8 @@ class LeggedRobot(OrcaGymAgent):
     def set_init_state(self, joint_qpos: dict, init_site_pos_quat: dict) -> None:
         base_joint_qpos = np.array(joint_qpos[self._base_joint_name]).flatten()
         self._init_base_joint_qpos = {self._base_joint_name: base_joint_qpos}
+        init_base_joint_quat = base_joint_qpos[3:]
+        self._init_base_joint_quat_conjugate = rotations.quat_conjugate(init_base_joint_quat)
 
     def _set_action(self, action) -> None:
         self._last_action[:] = self._action
@@ -925,16 +927,17 @@ class LeggedRobot(OrcaGymAgent):
         body_joint_qvel = qvel_buffer[body_qvel_index["offset"] : body_qvel_index["offset"] + body_qvel_index["len"]]
 
         body_height = body_joint_qpos[2]  # 局部坐标高度就是全局坐标高度
-        body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
+        body_orientation_quat_global = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
         body_lin_vel_vec_global = body_joint_qvel[:3].copy()    # 全局坐标系下的线速度
         body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度四元数
         # print("body_ang_vel_quat_global: ", body_ang_vel_vec_global, "body_joint_qvel: ", body_joint_qvel)
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
-        body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
-        body_orientation = rotations.quat2euler(body_orientation_quat)
-        body_orientation[2] = 0
+        body_lin_vel, body_ang_vel = global2local(body_orientation_quat_global, body_lin_vel_vec_global, body_ang_vel_vec_global)
+        body_orientation_quat_local = rotations.quat_mul(body_orientation_quat_global, self._init_base_joint_quat_conjugate)
+        body_orientation_local = rotations.quat2euler(body_orientation_quat_local)
+        body_orientation_local[2] = 0
 
-        return body_height, body_lin_vel, body_ang_vel, body_orientation
+        return body_height, body_lin_vel, body_ang_vel, body_orientation_local
     
     def _get_obs_scale_vec(self):
         """ Sets a vector used to scale the observations.

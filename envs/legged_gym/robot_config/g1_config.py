@@ -228,7 +228,7 @@ g1Config = {
 
         # Config for reward
         "reward_coeff" : {
-            "alive" : 0.15,
+            "alive" : 0.0,
             "success" : 0,
             "failure" : 0,
             "contact" : 1,
@@ -240,7 +240,7 @@ g1Config = {
             "base_gyro" : 0,
             "base_accelerometer" : 0,
             "follow_command_linvel" : 1,
-            "follow_command_angvel" : 0.5,
+            "follow_command_angvel" : 2,
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
@@ -314,11 +314,11 @@ g1Config = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
-            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
-            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.5, "rating": 0.3, "command_type": "move_slowly", },
-
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_slowly", },
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.5, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
+
             # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
@@ -335,16 +335,16 @@ g1Config = {
                 "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.1], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
 
             "flat_plane" : {
-                "command_lin_vel_range_x" : [0, 1.0], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.0, 1.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_lin_vel_threshold" : [-0.0, 0.2], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
