@@ -157,7 +157,7 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
                         # 获取物体位置
                         joint_name = obj_joints[obj_idx]
                         body_name = joint_name.replace('_joint', '')
-                        pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
+                        pos, _, _ = env.unwrapped.get_body_xpos_xmat_xquat([body_name])
                         pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
                         xy = pos_vec[:2]
                         # 获取目标区域边界
@@ -460,6 +460,8 @@ def augment_episode(env : OpenLoongEnv,
                 start_time = datetime.now()
                 
             obs, reward, terminated, truncated, info = env.step(action_chunk[i])
+            terminated_times = terminated_times + 1 if terminated else 0
+            timestep_list.append(env.unwrapped.gym.data.time)
             
             if realtime:
                 env.render()
@@ -479,7 +481,7 @@ def augment_episode(env : OpenLoongEnv,
             if obj_idx is not None and goal_idx is not None:
                 joint_name = obj_joints[obj_idx]
                 body_name = joint_name.replace('_joint', '')
-                pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
+                pos, _, _ = env.unwrapped.get_body_xpos_xmat_xquat([body_name])
                 pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
                 xy = pos_vec[:2]
                 # 读取原始值
@@ -490,7 +492,6 @@ def augment_episode(env : OpenLoongEnv,
                 gmax = np.maximum(gmin_raw, gmax_raw)
                 # 然后再判定
                 in_goal = (gmin[0] <= xy[0] <= gmax[0]) and (gmin[1] <= xy[1] <= gmax[1])
-                in_goal = gmin[0] <= xy[0] <= gmax[0] and gmin[1] <= xy[1] <= gmax  [1]
             else:
                 print(f"[Aug Error] 目标匹配失败：{target_obj}, {target_goal}")
                     
@@ -508,12 +509,11 @@ def augment_episode(env : OpenLoongEnv,
         reward_list.append(reward)
         done_list.append(1)
         info_list.append(info)
-        terminated_times = terminated_times + 1 if terminated else 0
-        timestep_list.append(env.unwrapped.gym.data.time)
+
         
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list
+            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
         
     return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
  
@@ -551,7 +551,9 @@ def do_augmentation(env : OpenLoongEnv,
 
         for original_demo_name in demo_names:
             done = False
-            while not done:
+            trial_count = 0
+            max_trials = 5
+            while not done and trial_count < max_trials:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
                 env.unwrapped.objects = demo_data['objects']
                 obs, info = reset_playback_env(env, demo_data, sample_range)
@@ -577,7 +579,10 @@ def do_augmentation(env : OpenLoongEnv,
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
                 else:
-                    print("Episode failed!")
+                    print("Episode failed! Retrying...")
+                    trial_count += 1
+            if not done:
+                print(f"Failed to augment demo {original_demo_name} after {max_trials} tries. Skipping.")
     
 
     dataset_writer.shuffle_demos()
