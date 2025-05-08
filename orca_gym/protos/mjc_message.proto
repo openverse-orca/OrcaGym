@@ -11,6 +11,10 @@ service GrpcService {
   rpc LoadLocalEnv (LoadLocalEnvRequest) returns (LoadLocalEnvResponse);
   rpc LoadContentFile (LoadContentFileRequest) returns (LoadContentFileResponse);
 
+  // 场景控制
+  rpc AddActor (AddActorRequest) returns (AddActorResponse);
+  rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
+
 
   // 配置查询
   rpc QueryModelInfo (QueryModelInfoRequest) returns (QueryModelInfoResponse);
@@ -984,4 +988,30 @@ message LoadContentFileResponse {
     }
     Status status = 2; // 添加状态码字段
     string error_message = 3; // 错误详情（可选）
+}
+
+message AddActorRequest {
+    string name = 1;              // Actor Entity 的名字
+    string spawnable_name = 2;    // Actor 使用的 spawnable 名字
+    repeated double pos = 3;      // 位置 (3 elements)
+    repeated double quat = 4;     // 旋转四元数 (4 elements)
+    double scale = 5;             // 等比缩放 (1 elements)
+}
+message AddActorResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 添加状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message PublishSceneRequest {}
+message PublishSceneResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
 }
