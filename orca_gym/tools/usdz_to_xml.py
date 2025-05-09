@@ -229,11 +229,11 @@ def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
     return pos, quat, scale
 
 
-def _add_mesh_assets(asset, obj_name, scale):
-    obj_name_base = obj_name.split(".")[0]
+def _add_mesh_assets(asset, mesh_file_name, scale):
+    mesh_name = mesh_file_name.split(".")[0]
     mesh_elem = ET.SubElement(asset, "mesh")
-    mesh_elem.set("name", obj_name_base)
-    mesh_elem.set("file", obj_name)
+    mesh_elem.set("name", mesh_name)
+    mesh_elem.set("file", mesh_file_name)
     mesh_elem.set("scale", " ".join(map(str, scale)))
 
 def _add_box_geom(body, params, collision_pos, collision_size):
@@ -253,11 +253,11 @@ def _add_hull_geom(body, params, obj_name):
     collision_geom.set("group", "3")
     collision_geom.set("density", str(params["physics_options"]["density"]))
 
-def _add_visualize_geom(body, obj_name):
-    obj_name_base = obj_name.split(".")[0]
+def _add_visualize_geom(body, mesh_file_name):
+    mesh_name = mesh_file_name.split(".")[0]
     visual_geom = ET.SubElement(body, "geom")
     visual_geom.set("type", "mesh")
-    visual_geom.set("mesh", obj_name_base)
+    visual_geom.set("mesh", mesh_name)
     visual_geom.set("contype", "0")
     visual_geom.set("conaffinity", "0")
     
@@ -265,7 +265,7 @@ def process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos
     # 如果需要用到obj文件，则添加 mesh 到 asset
     if params["collision_options"]["collider_type"] == "convex_hull" or params["debug_options"]["visualize_obj"]:
         _add_mesh_assets(asset, obj_name, output_dir, scale)
-    
+
     # 添加 collision geom
     if params["collision_options"]["collider_type"] == "bounding_box":
         bbox_range = bbox.GetRange()
@@ -408,10 +408,16 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     print(f"metersPerUnit: {meters_per_unit}")
     config_scale = params["transform_options"]["scale"]
     print(f"config_scale: {config_scale}")
-    scale = np.array([config_scale, config_scale, config_scale], dtype=np.float64)
-    scale = scale * meters_per_unit
+    config_scale = np.array([config_scale, config_scale, config_scale], dtype=np.float64)
+    scale = config_scale * meters_per_unit
     print(f"scale: {scale}")
-    
+
+
+    # 添加usdz文件到asset
+    usd_file_name = os.path.basename(usd_file)
+    _add_mesh_assets(asset, usd_file_name, config_scale)
+    _add_visualize_geom(base_body, usd_file_name)
+
     bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ['default', 'render'])
 
     # 递归遍历 USD 节点
@@ -452,7 +458,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     # 从根节点开始处理
     for prim in stage.GetPseudoRoot().GetChildren():
         _process_prim(prim, base_body, bbox_cache, scale.copy())
-    
+
     # 美化 XML 并保存
     xml_str = minidom.parseString(ET.tostring(root)).toprettyxml()
     with open(mjcf_file, "w") as f:
