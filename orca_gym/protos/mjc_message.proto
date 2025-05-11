@@ -996,6 +996,7 @@ message AddActorRequest {
     repeated double pos = 3;      // 位置 (3 elements)
     repeated double quat = 4;     // 旋转四元数 (4 elements)
     double scale = 5;             // 等比缩放 (1 elements)
+    repeated float base_color = 6; // 增加颜色变化 (4 elements)
 }
 message AddActorResponse {
     enum Status {

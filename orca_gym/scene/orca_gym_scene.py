@@ -14,12 +14,14 @@ class Actor:
                  spawnable_name: str,
                  position: np.ndarray,
                  rotation: np.ndarray,
-                 scale: float,):
+                 scale: float,
+                 base_color: np.ndarray,):
         self.name = name
         self.spawnable_name = spawnable_name
         self.position = position
         self.rotation = rotation
         self.scale = float(scale)
+        self.base_color = base_color
         self._check_actor()
 
     def _check_actor(self):
@@ -87,7 +89,8 @@ class OrcaGymScene:
             spawnable_name = actor.spawnable_name,
             pos = actor.position,
             quat = actor.rotation,
-            scale = actor.scale)
+            scale = actor.scale,
+            base_color = actor.base_color,)
         
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
