@@ -33,34 +33,76 @@ def run_replicator():
     # )
     # scene.add_actor(actor)
 
+    # actor = Actor(
+    #     name="office_desk_7_mb",
+    #     spawnable_name="office_desk_7_mb_usda",
+    #     position=np.array([np.random.uniform(0.0, 0.5), np.random.uniform(0.0, 0.5), 1.2]),
+    #     rotation=rotations.euler2quat(np.array([0.0, 0.0, np.random.uniform(-np.pi, np.pi)])),
+    #     scale=1.0,
+    #     base_color=np.array([
+    #         np.random.uniform(0.0, 1.0),
+    #         np.random.uniform(0.0, 1.0),
+    #         np.random.uniform(0.0, 1.0),
+    #         0.0]),
+    # )
+    # scene.add_actor(actor)
+
+    # actor = Actor(
+    #     name="office_desk_7_mb_2",
+    #     spawnable_name="office_desk_7_mb_usda",
+    #     position=np.array([np.random.uniform(0, 0.5) + 5, np.random.uniform(0.0, 0.5), 1.2]),
+    #     rotation=rotations.euler2quat(np.array([0.0, 0.0, np.random.uniform(-np.pi, np.pi)])),
+    #     scale=1.0,
+    #     base_color=np.array([
+    #         np.random.uniform(0.0, 1.0),
+    #         np.random.uniform(0.0, 1.0),
+    #         np.random.uniform(0.0, 1.0),
+    #         0.0]),
+    # )
+    # scene.add_actor(actor)
+
+
     actor = Actor(
-        name="office_desk_7_mb",
-        spawnable_name="office_desk_7_mb_usda",
-        position=np.array([np.random.uniform(0.0, 0.5), np.random.uniform(0.0, 0.5), 1.2]),
-        rotation=rotations.euler2quat(np.array([0.0, 0.0, np.random.uniform(-np.pi, np.pi)])),
+        name="SpotLight_1",
+        spawnable_name="spotlight",
+        position=np.array([np.random.uniform(0, 0.5), np.random.uniform(0.0, 0.5), 1.2]),
+        rotation=rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi)])),
         scale=1.0,
         base_color=np.array([
             np.random.uniform(0.0, 1.0),
             np.random.uniform(0.0, 1.0),
             np.random.uniform(0.0, 1.0),
-            1.0]),
+            0.0]),
     )
     scene.add_actor(actor)
 
     actor = Actor(
-        name="office_desk_7_mb_2",
-        spawnable_name="office_desk_7_mb_usda",
-        position=np.array([np.random.uniform(0, 0.5) + 5, np.random.uniform(0.0, 0.5), 1.2]),
-        rotation=rotations.euler2quat(np.array([0.0, 0.0, np.random.uniform(-np.pi, np.pi)])),
+        name="SpotLight_2",
+        spawnable_name="spotlight",
+        position=np.array([np.random.uniform(0, 0.5), np.random.uniform(0.0, 0.5), 1.2]),
+        rotation=rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi)])),
         scale=1.0,
         base_color=np.array([
             np.random.uniform(0.0, 1.0),
             np.random.uniform(0.0, 1.0),
             np.random.uniform(0.0, 1.0),
-            1.0]),
+            0.0]),
     )
     scene.add_actor(actor)
 
+    actor = Actor(
+        name="SpotLight_3",
+        spawnable_name="spotlight",
+        position=np.array([np.random.uniform(0, 0.5), np.random.uniform(0.0, 0.5), 1.2]),
+        rotation=rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi)])),
+        scale=1.0,
+        base_color=np.array([
+            np.random.uniform(0.0, 1.0),
+            np.random.uniform(0.0, 1.0),
+            np.random.uniform(0.0, 1.0),
+            0.0]),
+    )
+    scene.add_actor(actor)
 
     scene.publish_scene()
     print("Replicator scene published successfully.")
