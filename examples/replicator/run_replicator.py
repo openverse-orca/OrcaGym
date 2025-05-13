@@ -1,4 +1,4 @@
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo
 import numpy as np
 import orca_gym.utils.rotations as rotations
 import time
@@ -89,7 +89,7 @@ def run_replicator():
             0.0]),
     )
     scene.add_actor(actor)
-
+    
     actor = Actor(
         name="SpotLight_3",
         spawnable_name="spotlight",
@@ -103,8 +103,35 @@ def run_replicator():
             0.0]),
     )
     scene.add_actor(actor)
-
+    
     scene.publish_scene()
+    time.sleep(1.0)
+
+    scene.set_light_info(actor_name="SpotLight_1", 
+                         light_info=LightInfo(
+                             color=np.array([
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0)]),
+                             intensity=100.0,
+                         ))
+    scene.set_light_info(actor_name="SpotLight_2", 
+                         light_info=LightInfo(
+                             color=np.array([
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0)]),
+                             intensity=100.0,
+                         ))
+    scene.set_light_info(actor_name="SpotLight_3", 
+                         light_info=LightInfo(
+                             color=np.array([
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0),
+                                np.random.uniform(0.0, 1.0)]),
+                             intensity=100.0,
+                         ))
+
     print("Replicator scene published successfully.")
 
 

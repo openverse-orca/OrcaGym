@@ -36,7 +36,23 @@ class Actor:
         if self.scale is None or not isinstance(self.scale, float):
             raise ValueError("Actor scale must be a float.")
 
+class LightInfo:
+    """
+    A class to represent light information in the ORCA Gym environment.
+    """
 
+    def __init__(self,
+                 color: np.ndarray,
+                 intensity: float,):
+        self.color = color
+        self.intensity = intensity
+        self._check_light_info()
+
+    def _check_light_info(self):
+        if self.color is None or len(self.color) != 3:
+            raise ValueError("Light color must be a 3D vector.")
+        if self.intensity is None or not isinstance(self.intensity, float):
+            raise ValueError("Light intensity must be a float.")
 
 
 class OrcaGymScene:
@@ -78,6 +94,7 @@ class OrcaGymScene:
         request = mjc_message_pb2.PublishSceneRequest()
         response = await self.stub.PublishScene(request)
         if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
+            print("Publish scene failed: ", response.error_message)
             raise Exception("Publish scene failed.")
 
     def publish_scene(self):
@@ -94,7 +111,22 @@ class OrcaGymScene:
         
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
+            print("Add actor failed: ", response.error_message)
             raise Exception("Add actor failed.")
         
     def add_actor(self, actor: Actor):
         self.loop.run_until_complete(self._add_actor(actor))
+
+    async def _set_light_info(self, actor_name : str, light_info: LightInfo):
+        request = mjc_message_pb2.SetLightInfoRequest(
+            actor_name = actor_name,
+            light_color = light_info.color,
+            light_intensity = light_info.intensity,)
+        
+        response = await self.stub.SetLightInfo(request)
+        if response.status != mjc_message_pb2.SetLightInfoResponse.SUCCESS:
+            print("Set light info failed: ", response.error_message)
+            raise Exception("Set light info failed.")
+        
+    def set_light_info(self, actor_name : str, light_info: LightInfo):
+        self.loop.run_until_complete(self._set_light_info(actor_name, light_info))

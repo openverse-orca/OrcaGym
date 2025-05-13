@@ -14,6 +14,7 @@ service GrpcService {
   // 场景控制
   rpc AddActor (AddActorRequest) returns (AddActorResponse);
   rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
+  rpc SetLightInfo (SetLightInfoRequest) returns (SetLightInfoResponse);
 
 
   // 配置查询
@@ -1009,6 +1010,20 @@ message AddActorResponse {
 
 message PublishSceneRequest {}
 message PublishSceneResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetLightInfoRequest {
+    string actor_name = 1;                  // Actor 名字
+    repeated float light_color = 2;         // 灯光颜色 (3 elements)
+    float light_intensity = 3;              // 灯光强度 (1 element)
+}
+message SetLightInfoResponse {
     enum Status {
         SUCCESS = 0;
         ERROR = 1;
