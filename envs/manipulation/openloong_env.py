@@ -14,7 +14,7 @@ from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment import OrcaGymLocalEnv
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as R, Rotation
 from orca_gym.task.abstract_task import AbstractTask
 import time
 from orca_gym.utils.joint_controller import JointController
@@ -22,6 +22,7 @@ import random
 
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
+from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
 class RunMode:
     """
@@ -60,38 +61,38 @@ class OpenLoongTask(AbstractTask):
     #     # 使用列表替代字典
     #     self.task_list = []
     #     self.random_objs_and_goals(env, bounds=0.1)
-    
+
     #     object_len = len(self.object_bodys)
     #     min_len = min(4, object_len)
-        
+
     #     if min_len == 0:
     #         return self.task_list  # 返回空列表
-        
+
     #     random_x = random.randint(1, min_len)
-        
+
     #     # 随机选择索引时保证object和goal一一对应
     #     ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
-        
+
     #     for ind in ind_list:
     #         # 以元组形式存储object-goal对
     #         self.task_list.append(
     #             (self.object_bodys[ind])
     #         )
-        
+
     #     return self.task_list
-    
+
     # def get_language_instruction(self) -> str:
     #     if len(self.task_list) == 0:
     #         return "Do something."
-    
+
     #     object_str = "object: "
     #     goal_str = "goal: "
-        
+
     #     # 遍历列表中的元组元素
     #     for obj in self.task_list:
     #         object_str += obj + " "
- 
-        
+
+
     #     language_instruction = f"level: {self.level_name}"
     #     language_instruction += f"{object_str} to basket"
 
@@ -305,8 +306,12 @@ class OpenLoongEnv(RobomimicEnv):
         self._task_status = TaskStatus.NOT_STARTED
         [agent.set_joint_neutral(self) for agent in self._agents.values()]
 
-        self.ctrl = np.zeros(self.nu)       
+        self.ctrl = np.zeros(self.nu)
+        for agent in self._agents.values():
+            agent.set_init_ctrl(self)
+
         self.set_ctrl(self.ctrl)
+
         self.mj_forward()
 
     def _is_success(self) -> bool:
@@ -495,7 +500,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         # 返回目标bounding box信息
         return obs, {"objects": objects_array, "goals": goals_array}
-        
+
 
 
     def process_goals(self, goal_positions):
@@ -540,7 +545,7 @@ class OpenLoongEnv(RobomimicEnv):
         # 返回目标数据及bounding box信息
         return goal_entries, goal_positions_array,
 
-    
+
     def replace_objects(self, objects_data):
         """
         将 demo 里记录的 objects_data 写回到仿真。
@@ -590,7 +595,7 @@ class OpenLoongEnv(RobomimicEnv):
             return obs
         else:
             return self._get_obs().copy()
-        
+
     def replace_goals(self, goals_data):
         """
         将 demo 里记录的 goals 写回环境，仅做数据格式转换。
@@ -737,18 +742,14 @@ class OpenLoongEnv(RobomimicEnv):
             return self._get_obs().copy()
 
     def action_use_motor(self):
-        if self._run_mode == RunMode.TELEOPERATION:
-            # 遥操作采用OSC算法，因此采用电机控制
+        if self._action_type == ActionType.END_EFFECTOR:
+            # 回放采用OSC解算末端位姿，因此采用电机控制
             return True
+        elif self._action_type == ActionType.JOINT_POS:
+            # 回放直接采用关节角度，因此采用关节控制
+            return False
         else:
-            if self._action_type == ActionType.END_EFFECTOR:
-                # 回放采用OSC解算末端位姿，因此采用电机控制
-                return True
-            elif self._action_type == ActionType.JOINT_POS:
-                # 回放直接采用关节角度，因此采用关节控制
-                return False
-            else:
-                raise ValueError("Invalid action type: ", self._action_type)
+            raise ValueError("Invalid action type: ", self._action_type)
 
     def disable_actuators(self, actuator_names, trnid):
         for actuator_name in actuator_names:
@@ -797,6 +798,9 @@ class AgentBase:
     def on_reset_model(self, env: OpenLoongEnv) -> None:
         raise NotImplementedError("This method should be overridden by subclasses")
     
+    def set_init_ctrl(self, env: OpenLoongEnv) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
     def on_close(self) -> None:
         pass
     
@@ -822,6 +826,10 @@ class OpenLoongAgent(AgentBase):
         self._r_arm_joint_names = [env.joint("J_arm_r_01", id), env.joint("J_arm_r_02", id), 
                                  env.joint("J_arm_r_03", id), env.joint("J_arm_r_04", id), 
                                  env.joint("J_arm_r_05", id), env.joint("J_arm_r_06", id), env.joint("J_arm_r_07", id)]
+        self._r_arm_joint_id = [env.model.joint_name2id(joint_name) for joint_name in self._r_arm_joint_names]
+        self._r_jnt_address = [env.jnt_qposadr(joint_name) for joint_name in self._r_arm_joint_names]
+        self._r_jnt_dof = [env.jnt_dofadr(joint_name) for joint_name in self._r_arm_joint_names]
+
         self._r_arm_motor_names = [env.actuator("M_arm_r_01", id), env.actuator("M_arm_r_02", id),
                                 env.actuator("M_arm_r_03", id),env.actuator("M_arm_r_04", id),
                                 env.actuator("M_arm_r_05", id),env.actuator("M_arm_r_06", id),env.actuator("M_arm_r_07", id)]
@@ -844,6 +852,10 @@ class OpenLoongAgent(AgentBase):
         self._l_arm_joint_names = [env.joint("J_arm_l_01", id), env.joint("J_arm_l_02", id), 
                                  env.joint("J_arm_l_03", id), env.joint("J_arm_l_04", id), 
                                  env.joint("J_arm_l_05", id), env.joint("J_arm_l_06", id), env.joint("J_arm_l_07", id)]
+        self._l_arm_joint_id = [env.model.joint_name2id(joint_name) for joint_name in self._l_arm_joint_names]
+        self._l_jnt_address = [env.jnt_qposadr(joint_name) for joint_name in self._l_arm_joint_names]
+        self._l_jnt_dof = [env.jnt_dofadr(joint_name) for joint_name in self._l_arm_joint_names]
+
         self._l_arm_moto_names = [env.actuator("M_arm_l_01", id), env.actuator("M_arm_l_02", id),
                                 env.actuator("M_arm_l_03", id),env.actuator("M_arm_l_04", id),
                                 env.actuator("M_arm_l_05", id),env.actuator("M_arm_l_06", id),env.actuator("M_arm_l_07", id)]
@@ -938,64 +950,70 @@ class OpenLoongAgent(AgentBase):
         self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
         self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
 
-        # -----------------------------
-        # Right controller
-        self._r_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
+        if env.action_use_motor():
+            # -----------------------------
+            # OSC controller
+            # Right controller
+            self._r_controller_config = controller_config.load_config("osc_pose")
+            # print("controller_config: ", self.controller_config)
 
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._r_controller_config["robot_name"] = self.name
-        self._r_controller_config["sim"] = env.gym
-        self._r_controller_config["eef_name"] = self._ee_site_r
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._r_arm_joint_names)
-        self._r_controller_config["joint_indexes"] = {
-            "joints": self._r_arm_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._r_controller_config["actuator_range"] = r_ctrl_range
-        self._r_controller_config["policy_freq"] = env.control_freq
-        self._r_controller_config["ndim"] = len(self._r_arm_joint_names)
-        self._r_controller_config["control_delta"] = False
-
-
-        self._r_controller = controller_factory(self._r_controller_config["type"], self._r_controller_config)
-        self._r_controller.update_initial_joints(self._r_neutral_joint_values)
-
-        self._r_gripper_offset_rate_clip = 0.0
+            # Add to the controller dict additional relevant params:
+            #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
+            #   policy (control) freq, and ndim (# joints)
+            self._r_controller_config["robot_name"] = self.name
+            self._r_controller_config["sim"] = env.gym
+            self._r_controller_config["eef_name"] = self._ee_site_r
+            # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+            qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._r_arm_joint_names)
+            self._r_controller_config["joint_indexes"] = {
+                "joints": self._r_arm_joint_names,
+                "qpos": qpos_offsets,
+                "qvel": qvel_offsets,
+            }
+            self._r_controller_config["actuator_range"] = r_ctrl_range
+            self._r_controller_config["policy_freq"] = env.control_freq
+            self._r_controller_config["ndim"] = len(self._r_arm_joint_names)
+            self._r_controller_config["control_delta"] = False
 
 
-        # -----------------------------
-        # Left controller
-        self._l_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
+            self._r_controller = controller_factory(self._r_controller_config["type"], self._r_controller_config)
+            self._r_controller.update_initial_joints(self._r_neutral_joint_values)
 
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._l_controller_config["robot_name"] = self.name
-        self._l_controller_config["sim"] = env.gym
-        self._l_controller_config["eef_name"] = self._ee_site_l
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._l_arm_joint_names)
-        self._l_controller_config["joint_indexes"] = {
-            "joints": self._l_arm_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._l_controller_config["actuator_range"] = l_ctrl_range
-        self._l_controller_config["policy_freq"] = env.control_freq
-        self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
-        self._l_controller_config["control_delta"] = False
+            self._r_gripper_offset_rate_clip = 0.0
 
 
-        self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
-        self._l_controller.update_initial_joints(self._l_neutral_joint_values)
+            # -----------------------------
+            # Left controller
+            self._l_controller_config = controller_config.load_config("osc_pose")
+            # print("controller_config: ", self.controller_config)
 
-        self._l_gripper_offset_rate_clip = 0.0
+            # Add to the controller dict additional relevant params:
+            #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
+            #   policy (control) freq, and ndim (# joints)
+            self._l_controller_config["robot_name"] = self.name
+            self._l_controller_config["sim"] = env.gym
+            self._l_controller_config["eef_name"] = self._ee_site_l
+            # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+            qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._l_arm_joint_names)
+            self._l_controller_config["joint_indexes"] = {
+                "joints": self._l_arm_joint_names,
+                "qpos": qpos_offsets,
+                "qvel": qvel_offsets,
+            }
+            self._l_controller_config["actuator_range"] = l_ctrl_range
+            self._l_controller_config["policy_freq"] = env.control_freq
+            self._l_controller_config["ndim"] = len(self._l_arm_joint_names)
+            self._l_controller_config["control_delta"] = False
+
+            self._l_controller = controller_factory(self._l_controller_config["type"], self._l_controller_config)
+            self._l_controller.update_initial_joints(self._l_neutral_joint_values)
+
+            self._l_gripper_offset_rate_clip = 0.0
+        else:
+            # -----------------------------
+            # Inverse Kinematics controller
+            self._l_inverse_kinematics_controller = InverseKinematicsController(env, env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.1)
+            self._r_inverse_kinematics_controller = InverseKinematicsController(env, env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.1)
 
     def on_close(self):
         if hasattr(self, "_pico_joystick") and self._pico_joystick is not None:
@@ -1011,6 +1029,15 @@ class OpenLoongAgent(AgentBase):
         for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])
         env.set_joint_qpos(arm_joint_qpos)        
+
+    def set_init_ctrl(self, env: OpenLoongEnv) -> None:
+        if env.action_use_motor():
+            return
+        for i in range(len(self._r_arm_actuator_id)):
+            env.ctrl[self._r_arm_actuator_id[i]] = self._r_neutral_joint_values[i]
+
+        for i in range(len(self._l_arm_actuator_id)):
+            env.ctrl[self._l_arm_actuator_id[i]] = self._l_neutral_joint_values[i]
 
     def on_reset_model(self, env: OpenLoongEnv) -> None:
         self._reset_grasp_mocap(env)
@@ -1143,7 +1170,32 @@ class OpenLoongAgent(AgentBase):
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
         
+    def set_l_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat) -> None:
 
+        self._l_inverse_kinematics_controller.set_goal(mocap_xpos, mocap_xquat)
+        delta = self._l_inverse_kinematics_controller.compute_inverse_kinematics()
+        # print("delta: ", delta, "\n", "delta size: ", delta.size)
+        # print("jnt_address: ", self._l_jnt_address)
+
+        for i in range(len(self._l_arm_actuator_id)):
+            env.ctrl[self._l_arm_actuator_id[i]] += delta[self._l_jnt_dof[i]]
+            # print(f"ctrl {i}: ", env.ctrl[self._l_arm_actuator_id[i]], "error: ", delta[self._l_jnt_address[i]])
+
+        env.ctrl = np.clip(env.ctrl, self._all_ctrlrange[:, 0], self._all_ctrlrange[:, 1])
+
+    def set_r_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat) -> None:
+
+        self._r_inverse_kinematics_controller.set_goal(mocap_xpos, mocap_xquat)
+        delta = self._r_inverse_kinematics_controller.compute_inverse_kinematics()
+        # print("delta: ", delta, "\n", "delta size: ", delta.size)
+        # print("jnt_address: ", self._r_jnt_address)
+
+        for i in range(len(self._r_arm_actuator_id)):
+            env.ctrl[self._r_arm_actuator_id[i]] += delta[self._r_jnt_dof[i]]
+            # print(f"ctrl {i}: ", env.ctrl[self._r_arm_actuator_id[i]], "error: ", delta[self._r_arm_joint_address[i]])
+
+        env.ctrl = np.clip(env.ctrl, self._all_ctrlrange[:, 0], self._all_ctrlrange[:, 1])
+        # print("ctrl: ", env.ctrl)
 
     def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
@@ -1165,24 +1217,33 @@ class OpenLoongAgent(AgentBase):
                                                                    mocap_r_xquat[0]]))              
         # mocap_axisangle[1] = -mocap_axisangle[1]
         action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
-        # print("action r:", action_r)
-        self._r_controller.set_goal(action_r)
-        ctrl_r = self._r_controller.run_controller()
-        # print("ctrl r: ", ctrl)
-        self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
+
+        if env.action_use_motor():
+            # print("action r:", action_r)
+            self._r_controller.set_goal(action_r)
+            ctrl_r = self._r_controller.run_controller()
+            # print("ctrl r: ", ctrl)
+            self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
+        else:
+            self.set_r_arm_position_ctrl(env, mocap_r_xpos, mocap_r_xquat)
 
         mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
                                                                    mocap_l_xquat[2], 
                                                                    mocap_l_xquat[3], 
                                                                    mocap_l_xquat[0]]))  
         action_l = np.concatenate([mocap_l_xpos, mocap_l_axisangle])
-        # print("action l:", action_l)        
-        # print(action)
-        self._l_controller.set_goal(action_l)
-        ctrl_l = self._l_controller.run_controller()
-        # print("ctrl l: ", ctrl)
-        self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
-        
+
+        if env.action_use_motor():
+            # print("action l:", action_l)
+            # print(action)
+            self._l_controller.set_goal(action_l)
+            ctrl_l = self._l_controller.run_controller()
+            # print("ctrl l: ", ctrl)
+            self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
+        else:
+            self.set_l_arm_position_ctrl(env, mocap_l_xpos, mocap_l_xquat)
+
+
         action_l_B = self._action_to_action_B(env, action_l)
         action_r_B = self._action_to_action_B(env, action_r)
 
