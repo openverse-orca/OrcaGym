@@ -105,7 +105,7 @@ def run_replicator():
     scene.add_actor(actor)
     
     scene.publish_scene()
-    time.sleep(1.0)
+
 
     scene.set_light_info(actor_name="SpotLight_1", 
                          light_info=LightInfo(

@@ -71,6 +71,7 @@ class OrcaGymScene:
         """
         self.grpc_addr = grpc_addr
         self.loop = asyncio.get_event_loop()
+        self.lock = asyncio.Lock()  # 新增一个异步锁
         self.initialize_grpc()
 
     def initialize_grpc(self):
@@ -91,23 +92,25 @@ class OrcaGymScene:
         self.loop.run_until_complete(self._close_grpc())
 
     async def _publish_scene(self):
-        request = mjc_message_pb2.PublishSceneRequest()
-        response = await self.stub.PublishScene(request)
-        if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
-            print("Publish scene failed: ", response.error_message)
-            raise Exception("Publish scene failed.")
+        async with self.lock:  # 加锁保证串行
+            request = mjc_message_pb2.PublishSceneRequest()
+            response = await self.stub.PublishScene(request)
+            if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
+                print("Publish scene failed: ", response.error_message)
+                raise Exception("Publish scene failed.")
 
     def publish_scene(self):
         self.loop.run_until_complete(self._publish_scene())
 
     async def _add_actor(self, actor : Actor):
-        request = mjc_message_pb2.AddActorRequest(
-            name = actor.name,
-            spawnable_name = actor.spawnable_name,
-            pos = actor.position,
-            quat = actor.rotation,
-            scale = actor.scale,
-            base_color = actor.base_color,)
+        async with self.lock:  # 加锁保证串行
+            request = mjc_message_pb2.AddActorRequest(
+                name = actor.name,
+                spawnable_name = actor.spawnable_name,
+                pos = actor.position,
+                quat = actor.rotation,
+                scale = actor.scale,
+                base_color = actor.base_color,)
         
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
@@ -118,15 +121,16 @@ class OrcaGymScene:
         self.loop.run_until_complete(self._add_actor(actor))
 
     async def _set_light_info(self, actor_name : str, light_info: LightInfo):
-        request = mjc_message_pb2.SetLightInfoRequest(
-            actor_name = actor_name,
-            light_color = light_info.color,
-            light_intensity = light_info.intensity,)
-        
-        response = await self.stub.SetLightInfo(request)
-        if response.status != mjc_message_pb2.SetLightInfoResponse.SUCCESS:
-            print("Set light info failed: ", response.error_message)
-            raise Exception("Set light info failed.")
+        async with self.lock:  # 加锁保证串行
+            request = mjc_message_pb2.SetLightInfoRequest(
+                actor_name = actor_name,
+                light_color = light_info.color,
+                light_intensity = light_info.intensity,)
+            
+            response = await self.stub.SetLightInfo(request)
+            if response.status != mjc_message_pb2.SetLightInfoResponse.SUCCESS:
+                print("Set light info failed: ", response.error_message)
+                raise Exception("Set light info failed.")
         
     def set_light_info(self, actor_name : str, light_info: LightInfo):
         self.loop.run_until_complete(self._set_light_info(actor_name, light_info))
