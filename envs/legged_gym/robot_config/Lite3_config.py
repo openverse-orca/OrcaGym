@@ -48,7 +48,9 @@ Lite3Config = {
                                         "terrain_brics_usda_terrain",                                     
                                         ],
         
-        "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
+        # "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
+        "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP", "FL_THIGH", "FR_THIGH", "HL_THIGH", "HR_THIGH"],
+
         # "leg_contact_body_names" : ["FL_THIGH", "FL_SHANK", 
         #                             "FR_THIGH", "FR_SHANK", 
         #                             "HL_THIGH", "HL_SHANK", 
@@ -61,14 +63,68 @@ Lite3Config = {
         "foot_fitted_ground_pairs" : [[0, 3], [1, 2]],                   # For the quadruped robot, the left front and right rear feet should touch the ground at the same time.
 
         # Config for reward
+        # "reward_coeff" : {
+        #     "alive" : 0,
+        #     "success" : 0,
+        #     "failure" : 3,
+        #     "contact" : 1,
+        #     "foot_touch" : 0,  # 0
+        #     "joint_angles" : 0.1,
+        #     "joint_accelerations" : 0.000001,
+        #     "limit" : 0,
+        #     "action_rate" : 0.05,
+        #     "base_gyro" : 0,
+        #     "base_accelerometer" : 0,
+        #     "follow_command_linvel" : 1,
+        #     "follow_command_angvel" : 0.1,
+        #     "height" : 0.5,
+        #     "body_lin_vel" : 2,
+        #     "body_ang_vel" : 0.1,
+        #     "body_orientation" : 0.3,
+        #     "feet_air_time" : 0.05,
+        #     "feet_self_contact" : 0,
+        #     "feet_slip" : 0,
+        #     "feet_wringing" : 0,
+        #     "feet_fitted_ground" : 0.3,
+        #     "fly" : 0.1,
+        #     "stepping" : 0, 
+        #     "action_obs_diff" : 0,
+        # },
+        # "reward_coeff" : {
+        #     "alive" : 0,
+        #     "success" : 0,
+        #     "failure" : 3,
+        #     "contact" : 0,
+        #     "foot_touch" : 0,  # 0
+        #     "joint_angles" : 0.1,
+        #     "joint_accelerations" : 0,
+        #     "limit" : 0,
+        #     "action_rate" : 0.01,
+        #     "base_gyro" : 0,
+        #     "base_accelerometer" : 0,
+        #     "follow_command_linvel" : 2,
+        #     "follow_command_angvel" : 1,
+        #     "height" : 0,
+        #     "body_lin_vel" : 0,
+        #     "body_ang_vel" : 0,
+        #     "body_orientation" : 0,
+        #     "feet_air_time" : 0.1,
+        #     "feet_self_contact" : 0,
+        #     "feet_slip" : 0,
+        #     "feet_wringing" : 0,
+        #     "feet_fitted_ground" : 0.1,
+        #     "fly" : 0.1,
+        #     "stepping" : 0, 
+        #     "action_obs_diff" : 0,
+        # },
         "reward_coeff" : {
             "alive" : 0,
             "success" : 0,
             "failure" : 0,
             "contact" : 1,
-            "foot_touch" : 0,  # 0
-            "joint_angles" : 0.1,
-            "joint_accelerations" : 2.5e-7,
+            "foot_touch" : 0,
+            "joint_angles" : 0.12, # 0.1,
+            "joint_accelerations" : 2.5e-6,
             "limit" : 0,
             "action_rate" : 0.01,
             "base_gyro" : 0,
@@ -78,14 +134,15 @@ Lite3Config = {
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
-            "body_orientation" : 0,
-            "feet_air_time" : 1,
+            "body_orientation" : 0.01,   # 0
+            "feet_air_time" : 1.2,
             "feet_self_contact" : 0,
             "feet_slip" : 0.05,
             "feet_wringing" : 0.0,
-            "feet_fitted_ground" : 0.1,
+            # "feet_fitted_ground" : 0.12,
             "fly" : 0.1,
-            "stepping" : 0.1,            
+            "stepping" : 0.2, # 0.1   
+            "phase_contact" : 0.005,
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -95,11 +152,16 @@ Lite3Config = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
-        "foot_touch_air_time_ideal" : 0.1,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_air_time_ideal" : 0.5,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
             "phase_freq" :  0.8,
             "eps" :         0.2,
+        },
+        "foot_leg_period" : {
+            "period" : 1.6,
+            "offset" : 0.8,
+            "stance_threshold" : 0.8,
         },
 
         # Config for randomization
@@ -115,20 +177,34 @@ Lite3Config = {
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : [
+            # basic moving skills
+            # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "terrain_stairs_high" ,   "offset" : [-55, 0, 0],    "distance": 2.0, "rating": 0.5, "command_type": "stairs", },
         ],
         "curriculum_commands" : {
+            "move_slowly" : {
+                "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [0, 0.2], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_resample_interval" : 7, # second to resample the command
+            },
+
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.5, 1.0],# x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
@@ -136,8 +212,8 @@ Lite3Config = {
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
-                "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right
+                "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward
+                "command_lin_vel_range_y" : [-0.5, 0.5], # y direction for left/right
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
@@ -171,6 +247,6 @@ Lite3Config = {
         "learning_rate" : 0.0005,  # 学习率
         "gamma" : 0.99,  # 折扣因子
         "clip_range" : 0.2,  # PPO剪切范围
-        "ent_coef" : 0.01,  # 熵系数
+        "ent_coef" : 0.0001,  # 熵系数 0.001
         "max_grad_norm" : 1,  # 最大梯度范数
     }

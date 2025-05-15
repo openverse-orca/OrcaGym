@@ -355,7 +355,7 @@ class AgentBase:
         
 
         self.agent.update_command(env.data.qpos)
-        agent_ctrl, agent_mocap = self.agent.step(action, update_mocap=True)
+        agent_ctrl, agent_mocap = self.agent.step(action, actuator_ctrl, update_mocap=True)
         # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
 
         env.set_mocap_pos_and_quat(agent_mocap)
