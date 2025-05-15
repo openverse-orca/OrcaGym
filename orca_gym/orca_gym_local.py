@@ -647,6 +647,12 @@ class OrcaGymLocal(OrcaGymBase):
         mass_matrix = np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))        
         return mass_matrix
 
+    def mj_jacBody(self, jacp, jacr, body_id):
+        mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, jacr, body_id)
+
+    def mj_jacSite(self, jacp, jacr, site_id):
+        mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, site_id)
+
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
         for joint_name in joint_names:

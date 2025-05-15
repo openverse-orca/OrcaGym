@@ -136,6 +136,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def mj_forward(self):
         self.gym.mj_forward()
 
+    def mj_jacBody(self, jacp, jacr, body_id):
+        self.gym.mj_jacBody(jacp, jacr, body_id)
+
+    def mj_jacSite(self, jacp, jacr, site_name):
+        self.gym.mj_jacSite(jacp, jacr, site_name)
+
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
