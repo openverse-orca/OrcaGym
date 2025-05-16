@@ -79,6 +79,16 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.SetLightInfoRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.SetLightInfoResponse.FromString,
                 _registered_method=True)
+        self.SetCameraSensorInfo = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetCameraSensorInfo',
+                request_serializer=mjc__message__pb2.SetCameraSensorInfoRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetCameraSensorInfoResponse.FromString,
+                _registered_method=True)
+        self.MakeCameraViewportActive = channel.unary_unary(
+                '/MujocoMessage.GrpcService/MakeCameraViewportActive',
+                request_serializer=mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -450,6 +460,18 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetLightInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetCameraSensorInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def MakeCameraViewportActive(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -889,6 +911,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetLightInfo,
                     request_deserializer=mjc__message__pb2.SetLightInfoRequest.FromString,
                     response_serializer=mjc__message__pb2.SetLightInfoResponse.SerializeToString,
+            ),
+            'SetCameraSensorInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetCameraSensorInfo,
+                    request_deserializer=mjc__message__pb2.SetCameraSensorInfoRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetCameraSensorInfoResponse.SerializeToString,
+            ),
+            'MakeCameraViewportActive': grpc.unary_unary_rpc_method_handler(
+                    servicer.MakeCameraViewportActive,
+                    request_deserializer=mjc__message__pb2.MakeCameraViewportActiveRequest.FromString,
+                    response_serializer=mjc__message__pb2.MakeCameraViewportActiveResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1449,6 +1481,60 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/SetLightInfo',
             mjc__message__pb2.SetLightInfoRequest.SerializeToString,
             mjc__message__pb2.SetLightInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetCameraSensorInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetCameraSensorInfo',
+            mjc__message__pb2.SetCameraSensorInfoRequest.SerializeToString,
+            mjc__message__pb2.SetCameraSensorInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def MakeCameraViewportActive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/MakeCameraViewportActive',
+            mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
+            mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
             options,
             channel_credentials,
             insecure,

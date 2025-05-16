@@ -25,7 +25,7 @@ class RewardPrinter:
     def print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1.0):
         if self._reward_data.get(message) is None:
             self._reward_data[message] = np.zeros(self._buffer_size)
-            self._reward_coeff[message] = coeff
+            self._reward_coeff[message] = coeff if coeff is not None else 0.0
             self._buffer_index[message] = 0
             self._reward_data[message][self._buffer_index[message]] = reward
             self._buffer_index[message] += 1

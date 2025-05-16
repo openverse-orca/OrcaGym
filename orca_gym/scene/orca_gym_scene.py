@@ -53,6 +53,32 @@ class LightInfo:
             raise ValueError("Light color must be a 3D vector.")
         if self.intensity is None or not isinstance(self.intensity, float):
             raise ValueError("Light intensity must be a float.")
+        
+class CameraSensorInfo:
+    """
+    A class to represent camera sensor information in the ORCA Gym environment.
+    """
+
+    def __init__(self,
+                 capture_rgb : bool,
+                 capture_depth : bool,
+                 save_mp4_file : bool,
+                 use_dds : bool,):
+        self.capture_rgb = capture_rgb
+        self.capture_depth = capture_depth
+        self.save_mp4_file = save_mp4_file
+        self.use_dds = use_dds
+        self._check_camera_sensor_info()
+
+    def _check_camera_sensor_info(self):
+        if self.capture_rgb is None or not isinstance(self.capture_rgb, bool):
+            raise ValueError("Capture RGB must be a boolean.")
+        if self.capture_depth is None or not isinstance(self.capture_depth, bool):
+            raise ValueError("Capture depth must be a boolean.")
+        if self.save_mp4_file is None or not isinstance(self.save_mp4_file, bool):
+            raise ValueError("Save MP4 file must be a boolean.")
+        if self.use_dds is None or not isinstance(self.use_dds, bool):
+            raise ValueError("Use DDS must be a boolean.")
 
 
 class OrcaGymScene:
@@ -134,3 +160,35 @@ class OrcaGymScene:
         
     def set_light_info(self, actor_name : str, light_info: LightInfo):
         self.loop.run_until_complete(self._set_light_info(actor_name, light_info))
+
+
+    async def _set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
+        async with self.lock:
+            request = mjc_message_pb2.SetCameraSensorInfoRequest(
+                actor_name = actor_name,
+                capture_rgb = camera_sensor_info.capture_rgb,
+                capture_depth = camera_sensor_info.capture_depth,
+                save_mp4_file = camera_sensor_info.save_mp4_file,
+                use_dds = camera_sensor_info.use_dds,)
+            
+            response = await self.stub.SetCameraSensorInfo(request)
+            if response.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
+                print("Set camera sensor info failed: ", response.error_message)
+                raise Exception("Set camera sensor info failed.")
+            
+    def set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
+        self.loop.run_until_complete(self._set_camera_sensor_info(actor_name, camera_sensor_info))
+
+    async def _make_camera_viewport_active(self, actor_name: str, entity_name: str):
+        async with self.lock:
+            request = mjc_message_pb2.MakeCameraViewportActiveRequest(
+                actor_name = actor_name,
+                entity_name = entity_name,)
+            
+            response = await self.stub.MakeCameraViewportActive(request)
+            if response.status != mjc_message_pb2.MakeCameraViewportActiveResponse.SUCCESS:
+                print("Make camera viewport activate failed: ", response.error_message)
+                raise Exception("Make camera viewport activate failed.")
+            
+    def make_camera_viewport_active(self, actor_name: str, entity_name: str):
+        self.loop.run_until_complete(self._make_camera_viewport_active(actor_name, entity_name))

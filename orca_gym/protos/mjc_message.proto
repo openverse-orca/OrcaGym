@@ -15,6 +15,8 @@ service GrpcService {
   rpc AddActor (AddActorRequest) returns (AddActorResponse);
   rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
   rpc SetLightInfo (SetLightInfoRequest) returns (SetLightInfoResponse);
+  rpc SetCameraSensorInfo (SetCameraSensorInfoRequest) returns (SetCameraSensorInfoResponse);
+  rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
 
 
   // 配置查询
@@ -1024,6 +1026,35 @@ message SetLightInfoRequest {
     float light_intensity = 3;              // 灯光强度 (1 element)
 }
 message SetLightInfoResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetCameraSensorInfoRequest {
+    string actor_name = 1;                  // Actor 名字
+    bool capture_rgb = 2;                   // 是否捕获 RGB 图像
+    bool capture_depth = 3;                 // 是否捕获深度图像
+    bool save_mp4_file = 4;                // 是否保存为 MP4 文件
+    bool use_dds = 5;                     // 是否使用 DDS
+}
+message SetCameraSensorInfoResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message MakeCameraViewportActiveRequest {
+    string actor_name = 1;                  // Actor 名字
+    string entity_name = 2;                // Entity 名字
+}
+message MakeCameraViewportActiveResponse {
     enum Status {
         SUCCESS = 0;
         ERROR = 1;
