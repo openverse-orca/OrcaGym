@@ -14,14 +14,12 @@ class Actor:
                  spawnable_name: str,
                  position: np.ndarray,
                  rotation: np.ndarray,
-                 scale: float,
-                 base_color: np.ndarray,):
+                 scale: float,):
         self.name = name
         self.spawnable_name = spawnable_name
         self.position = position
         self.rotation = rotation
         self.scale = float(scale)
-        self.base_color = base_color
         self._check_actor()
 
     def _check_actor(self):
@@ -79,6 +77,20 @@ class CameraSensorInfo:
             raise ValueError("Save MP4 file must be a boolean.")
         if self.use_dds is None or not isinstance(self.use_dds, bool):
             raise ValueError("Use DDS must be a boolean.")
+        
+class MaterialInfo:
+    """
+    A class to represent material information in the ORCA Gym environment.
+    """
+
+    def __init__(self,
+                 base_color: np.ndarray,):
+        self.base_color = base_color
+        self._check_material_info()
+
+    def _check_material_info(self):
+        if self.base_color is None or len(self.base_color) != 4:
+            raise ValueError("Base color must be a 4D vector.")
 
 
 class OrcaGymScene:
@@ -135,8 +147,7 @@ class OrcaGymScene:
                 spawnable_name = actor.spawnable_name,
                 pos = actor.position,
                 quat = actor.rotation,
-                scale = actor.scale,
-                base_color = actor.base_color,)
+                scale = actor.scale,)
         
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
@@ -192,3 +203,17 @@ class OrcaGymScene:
             
     def make_camera_viewport_active(self, actor_name: str, entity_name: str):
         self.loop.run_until_complete(self._make_camera_viewport_active(actor_name, entity_name))
+
+    async def _set_material_info(self, actor_name: str, material_info: MaterialInfo):
+        async with self.lock:
+            request = mjc_message_pb2.SetMaterialInfoRequest(
+                actor_name = actor_name,
+                base_color = material_info.base_color,)
+            
+            response = await self.stub.SetMaterialInfo(request)
+            if response.status != mjc_message_pb2.SetMaterialInfoResponse.SUCCESS:
+                print("Set material info failed: ", response.error_message)
+                raise Exception("Set material info failed.")
+            
+    def set_material_info(self, actor_name: str, material_info: MaterialInfo):
+        self.loop.run_until_complete(self._set_material_info(actor_name, material_info))

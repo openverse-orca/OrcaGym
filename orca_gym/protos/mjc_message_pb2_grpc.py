@@ -89,6 +89,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
                 _registered_method=True)
+        self.SetMaterialInfo = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetMaterialInfo',
+                request_serializer=mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetMaterialInfoResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -472,6 +477,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def MakeCameraViewportActive(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetMaterialInfo(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -921,6 +932,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.MakeCameraViewportActive,
                     request_deserializer=mjc__message__pb2.MakeCameraViewportActiveRequest.FromString,
                     response_serializer=mjc__message__pb2.MakeCameraViewportActiveResponse.SerializeToString,
+            ),
+            'SetMaterialInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetMaterialInfo,
+                    request_deserializer=mjc__message__pb2.SetMaterialInfoRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetMaterialInfoResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1535,6 +1551,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/MakeCameraViewportActive',
             mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
             mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetMaterialInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetMaterialInfo',
+            mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
+            mjc__message__pb2.SetMaterialInfoResponse.FromString,
             options,
             channel_credentials,
             insecure,
