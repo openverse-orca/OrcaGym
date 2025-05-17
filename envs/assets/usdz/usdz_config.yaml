@@ -26,7 +26,8 @@ files:
     transform_options:
       scale: 0.1
     collision_options:
-      max_split_mesh_number: 64
+      # max_split_mesh_number: 64
+      max_split_mesh_number: 16  # for simplified collision
     physics_options:
       mass: 1.0
 
