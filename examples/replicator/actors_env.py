@@ -12,9 +12,7 @@ from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 
 class ActorsEnv(OrcaGymLocalEnv):
     """
-    Gripper Control for Scene Debugging
-    
-    Control by Xbox Joystick or Keyboard
+    A class to represent the ORCA Gym environment for the Replicator scene.
     """
 
     def __init__(
@@ -23,6 +21,7 @@ class ActorsEnv(OrcaGymLocalEnv):
         orcagym_addr: str,
         agent_names: list,
         time_step: float,
+        max_steps: Optional[int] = None,
         **kwargs,
     ):
         
