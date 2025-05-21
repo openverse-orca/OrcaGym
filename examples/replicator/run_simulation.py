@@ -13,6 +13,7 @@ from typing import Optional
 ENV_ENTRY_POINT = {
     "Actors": "examples.replicator.actors_env:ActorsEnv",
     "Cameras": "examples.replicator.cameras_env:CamerasEnv",
+    "Lights": "examples.replicator.lights_env:LightsEnv",
 }
 
 TIME_STEP = 0.005
