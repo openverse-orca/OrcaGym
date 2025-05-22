@@ -336,15 +336,14 @@ class OpenLoongEnv(RobomimicEnv):
         
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         
-        # step the simulation with original action space
-        self.do_simulation(ctrl, self.frame_skip)
-
+        
         if self._run_mode == RunMode.TELEOPERATION:
-            noscaled_action = self._fill_arm_joint_pos(noscaled_action)
             scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
 
             [agent.update_force_feedback(self) for agent in self._agents.values()]
 
+        # step the simulation with original action space
+        self.do_simulation(ctrl, self.frame_skip)
 
         obs = self._get_obs().copy()
 
@@ -378,6 +377,9 @@ class OpenLoongEnv(RobomimicEnv):
         agent_action = self._split_agent_action(action)
         return np.concatenate([agent.fill_arm_joint_pos(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
     
+    def _fill_arm_ctrl(self, action) -> np.ndarray:
+        agent_action = self._split_agent_action(action)
+        return np.concatenate([agent.fill_arm_ctrl(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
     
 
     def get_state(self) -> dict:
@@ -786,6 +788,9 @@ class AgentBase:
     def fill_arm_joint_pos(self, env: OpenLoongEnv, action: np.ndarray) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
     
+    def fill_arm_ctrl(self, env: OpenLoongEnv, action: np.ndarray) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
     def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
     
@@ -886,7 +891,8 @@ class OpenLoongAgent(AgentBase):
 
         arm_qpos_range_l = env.model.get_joint_qposrange(self._l_arm_joint_names)
         arm_qpos_range_r = env.model.get_joint_qposrange(self._r_arm_joint_names)
-        self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
+
+        self._setup_action_range(l_ctrl_range, r_ctrl_range)
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
 
         self.set_joint_neutral(env)
@@ -1151,16 +1157,16 @@ class OpenLoongAgent(AgentBase):
             "grasp_value_r": np.ones(1, dtype=np.float32),       
         }
 
-    def _setup_action_range(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
+    def _setup_action_range(self, arm_ctrl_range_l, arm_ctrl_range_r) -> None:
         # 支持的动作范围空间，遥操作时不能超过这个范围
         # 模型接收的是 [-1, 1] 的动作空间，这里是真实的物理空间，需要进行归一化
         self._action_range =  np.concatenate(
             [
                 [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # left hand ee pos and angle euler
-                arm_qpos_range_l,                                                                           # left arm joint pos
+                arm_ctrl_range_l,                                                                           # left arm auctuator ctrl
                 [[-1.0, 0.0]],                                                                                # left hand grasp value
                 [[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0], [-np.pi, np.pi], [-np.pi, np.pi], [-np.pi, np.pi]], # right hand ee pos and angle euler
-                arm_qpos_range_r,                                                                           # right arm joint pos
+                arm_ctrl_range_r,                                                                           # right arm auctuator ctrl
                 [[-1.0, 0.0]],                                                                                # right hand grasp value
             ],
             dtype=np.float32,
@@ -1182,8 +1188,10 @@ class OpenLoongAgent(AgentBase):
             # print(f"ctrl {i}: ", env.ctrl[self._l_arm_actuator_id[i]], "error: ", delta[self._l_jnt_address[i]])
 
         env.ctrl = np.clip(env.ctrl, self._all_ctrlrange[:, 0], self._all_ctrlrange[:, 1])
+        return env.ctrl[self._l_arm_actuator_id]
 
-    def set_r_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat) -> None:
+
+    def set_r_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat):
 
         self._r_inverse_kinematics_controller.set_goal(mocap_xpos, mocap_xquat)
         delta = self._r_inverse_kinematics_controller.compute_inverse_kinematics()
@@ -1196,6 +1204,7 @@ class OpenLoongAgent(AgentBase):
 
         env.ctrl = np.clip(env.ctrl, self._all_ctrlrange[:, 0], self._all_ctrlrange[:, 1])
         # print("ctrl: ", env.ctrl)
+        return env.ctrl[self._r_arm_actuator_id]
 
     def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
@@ -1225,7 +1234,7 @@ class OpenLoongAgent(AgentBase):
             # print("ctrl r: ", ctrl)
             self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
         else:
-            self.set_r_arm_position_ctrl(env, mocap_r_xpos, mocap_r_xquat)
+            ctrl_r = self.set_r_arm_position_ctrl(env, mocap_r_xpos, mocap_r_xquat)
 
         mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
                                                                    mocap_l_xquat[2], 
@@ -1241,17 +1250,17 @@ class OpenLoongAgent(AgentBase):
             # print("ctrl l: ", ctrl)
             self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
         else:
-            self.set_l_arm_position_ctrl(env, mocap_l_xpos, mocap_l_xquat)
+            ctrl_l = self.set_l_arm_position_ctrl(env, mocap_l_xpos, mocap_l_xquat)
 
 
         action_l_B = self._action_to_action_B(env, action_l)
         action_r_B = self._action_to_action_B(env, action_r)
 
         action = np.concatenate([action_l_B,                # left eef pos and angle, 0-5
-                                 np.zeros(7),               # left arm joint pos, 6-12 (will be fill after do simulation)
+                                 ctrl_l,               # left arm joint pos, 6-12 (will be fill after do simulation)
                                  [self._grasp_value_l],     # left hand grasp value, 13
                                  action_r_B,                # right eef pos and angle, 14-19
-                                 np.zeros(7),               # right arm joint pos, 20-26 (will be fill after do simulation)
+                                 ctrl_r,               # right arm joint pos, 20-26 (will be fill after do simulation)
                                  [self._grasp_value_r]]     # right hand grasp value, 27
                                 ).flatten()
 
@@ -1262,6 +1271,13 @@ class OpenLoongAgent(AgentBase):
         arm_joint_values_r = self._get_arm_joint_values(env, self._r_arm_joint_names)
         action[6:13] = arm_joint_values_l
         action[20:27] = arm_joint_values_r
+        return action
+
+    def fill_arm_ctrl(self, env : OpenLoongEnv, action : np.ndarray) -> np.ndarray:
+        ctrl_l = env.ctrl[self._l_arm_actuator_id]
+        ctrl_r = env.ctrl[self._r_arm_actuator_id]
+        action[6:13] = ctrl_l
+        action[20:27] = ctrl_r
         return action
 
     def _set_arm_ctrl(self, env : OpenLoongEnv, arm_actuator_id, ctrl) -> None:
