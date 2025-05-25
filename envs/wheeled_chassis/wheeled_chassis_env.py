@@ -156,8 +156,8 @@ class WheeledChassisEnv(OrcaGymLocalEnv):
         """
         Process the input from the keyboard and joystick.
         """
-        MOVE_SPEED = 0.1
-        TURN_SPEED = 0.05
+        MOVE_SPEED = 0.2
+        TURN_SPEED = 0.2
 
         self._keyboard.update()
         state = self._keyboard.get_state()

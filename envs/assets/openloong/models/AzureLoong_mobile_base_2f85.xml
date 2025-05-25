@@ -137,13 +137,45 @@
       <default class="wheeled_chassis_big_wheel_spring">
         <geom type="sphere" contype="1" conaffinity="1" group="3" size="0.01 0 0"/>
       </default>
-      <default class="wheeled_chassis_big_wheel_collision">
+      <!-- <default class="wheeled_chassis_big_wheel_collision">
         <geom type="sphere" contype="1" conaffinity="1" group="3" size="0.1 0 0"
               friction="1 0.005 0.0001"  priority="1" solref="0.02 1" solimp="0.9 0.4 0.01" margin="0.01" gap="0.001"/>
       </default>
       <default class="wheeled_chassis_small_wheel_collision">
         <geom type="sphere" contype="1" conaffinity="1" group="3" size="0.04 0 0"
               friction="1 0.005 0.0001"  priority="1" solref="0.02 1" solimp="0.9 0.4 0.01" margin="0.01" gap="0.001"/>
+      </default> -->
+      <default class="wheeled_chassis_big_wheel_collision">
+        <geom 
+          type="capsule" 
+          size="0.1 0.05" 
+          fromto="-0.05 0 0 0.05 0 0" 
+          contype="1" 
+          conaffinity="1" 
+          group="3"
+          friction="1.0 0.5 0.1"
+          priority="1" 
+          solref="0.002 2" 
+          solimp="0.8 0.3 0.01 0.5 2"
+          margin="0.001" 
+          gap="0.0001"
+        />
+      </default>
+
+      <default class="wheeled_chassis_small_wheel_collision">
+        <geom 
+          type="sphere"
+          size="0.04" 
+          contype="1" 
+          conaffinity="1" 
+          group="3"
+          friction="1.0 0.5 0.1"
+          priority="1" 
+          solref="0.002 2" 
+          solimp="0.8 0.3 0.01 0.5 2"
+          margin="0.001" 
+          gap="0.0001"
+        />
       </default>
     </default>
   </default>
@@ -167,7 +199,7 @@
       <geom conaffinity="0" contype="0" pos="0 0 0.3" rgba="0 0 0.7 0.5" size="0.005 0.005 0.3" type="box" group="3"></geom>
     </body>
 
-    <body name="base_link" pos="0 0 1.2">      <!--zero position: posz=1.14   -->
+    <body name="base_link" pos="0 0 1.25">      <!--zero position: posz=1.14   -->
       <freejoint name="float_base" />
       <inertial pos="-0.0056641 -0.0013367 0.23829" mass="22.447" fullinertia="0.3742 0.27691 0.22104 0.0009471 0.004646 0.0040142" />
       <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" mesh="base_link" material="pbr_metal_gray"/>
@@ -182,17 +214,27 @@
         <inertial pos="0 0 0" mass="100" />
         <geom class="wheeled_chassis_visual" mesh="base_link_underpan"/>
         <geom class="wheeled_chassis_visual" mesh="body_base_link"/>
-        <body name="link_right_wheel" pos="-0.148 0.015574 -0.149">
-          <inertial pos="-0.024898 0 0" mass="1.0523" diaginertia="0.0033125 0.0018066 0.0018066"/>
-          <joint name="joint_right_wheel" pos="0 0 0" axis="1 0 0" actuatorfrcrange="-100 100" damping="1.0"/>
-          <geom class="wheeled_chassis_wheel_visual" mesh="link_right_wheel"/>
-          <geom class="wheeled_chassis_big_wheel_collision"/>
+        <body name="link_right_spring" pos="-0.148 0.015574 -0.20">
+          <inertial pos="-0.024898 0 0" mass="10" diaginertia="0.0033125 0.0018066 0.0018066"/>
+          <joint name="joint_right_spring" pos="0 0 0" axis="0 0 1" type="slide" springref="0" range="-0.07 0.07" springdamper="29500 1500"/>
+          <geom class="wheeled_chassis_big_wheel_spring"/>
+          <body name="link_right_wheel">
+            <inertial pos="-0.024898 0 0" mass="30" diaginertia="0.0033125 0.0018066 0.0018066"/>
+            <joint name="joint_right_wheel" pos="0 0 0" axis="1 0 0" actuatorfrcrange="-100 100" damping="1.0"/>
+            <geom class="wheeled_chassis_wheel_visual" mesh="link_right_wheel"/>
+            <geom class="wheeled_chassis_big_wheel_collision"/>
+          </body>
         </body>
-        <body name="link_left_wheel" pos="0.148 0.015574 -0.149">
-          <inertial pos="0.025224 0 0" mass="1.0734" diaginertia="0.0033996 0.0019593 0.0019593"/>
-          <joint name="joint_left_wheel" pos="0 0 0" axis="-1 0 0" actuatorfrcrange="-100 100" damping="1.0"/>
-          <geom class="wheeled_chassis_wheel_visual" mesh="link_left_wheel"/>
-          <geom class="wheeled_chassis_big_wheel_collision"/>
+        <body name="link_left_spring" pos="0.148 0.015574 -0.20">
+          <inertial pos="0.024898 0 0" mass="10" diaginertia="0.0033125 0.0018066 0.0018066"/>
+          <joint name="joint_left_spring" pos="0 0 0" axis="0 0 1" type="slide" springref="0" range="-0.07 0.07" springdamper="29500 1500"/>
+          <geom class="wheeled_chassis_big_wheel_spring"/>
+          <body name="link_left_wheel">
+            <inertial pos="0.025224 0 0" mass="30" diaginertia="0.0033996 0.0019593 0.0019593"/>
+            <joint name="joint_left_wheel" pos="0 0 0" axis="-1 0 0" actuatorfrcrange="-100 100" damping="1.0"/>
+            <geom class="wheeled_chassis_wheel_visual" mesh="link_left_wheel"/>
+            <geom class="wheeled_chassis_big_wheel_collision"/>
+          </body>
         </body>
         <body name="link_swivel_wheel_1_1" pos="0.124 -0.17843 -0.16254">
           <inertial pos="0.00067987 -0.0050012 -0.013414" quat="-0.134505 0.694593 -0.137471 0.693217" mass="0.088835" diaginertia="4.7479e-05 3.81021e-05 3.16789e-05"/>
@@ -534,7 +576,7 @@
     <exclude body1="r_right_coupler" body2="r_right_follower"/>
     <exclude body1="r_left_coupler" body2="r_left_follower"/>
 
-
+    <exclude name="ex_left_wheel_right_wheel" body1="base_link" body2="dummy_body" />
   </contact>
 
   <actuator>
