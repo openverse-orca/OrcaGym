@@ -1,0 +1,165 @@
+<?xml version="1.0" ?>
+<mujoco>
+    <compiler angle="radian"/>
+	<asset>
+        <mesh name="hummer_body" content_type="model/obj" file="usd:body.usdc" scale="1 1 1"/>
+        <mesh name="hummer_wheel" content_type="model/obj" file="usd:wheel.usdc" scale="1 1 1"/>
+    </asset>
+
+    <default>
+        <default class="visual">
+            <geom contype="0" conaffinity="0" group="1" type="mesh"/>
+        </default>
+        <default class="collision">
+            <geom contype="1" conaffinity="1" group="3"/>
+        </default>
+        <default class="wheel_joint">
+            <joint type="hinge" axis="1 0 0" damping="20"/>
+        </default>
+        <default class="wheel_geom">
+            <geom contype="1" conaffinity="1" group="3" type="capsule" 
+            size="0.55 0.1" pos="0 0 0" fromto="-0.12 0 0 0.12 0 0"  density="100"
+            friction="1.5 0.5 0.1" priority="1" solref="0.002 2" solimp="0.8 0.3 0.01 0.5 2" margin="0.001" gap="0.0001"/>
+        </default>
+        <default class="spring_joint">
+            <joint type="slide" pos="0 0 0" axis="0 0 1" springref="0" range="-0.05 0.05" springdamper="100000 20000"/>
+        </default>
+        <default class="spring_geom">
+            <geom contype="1" conaffinity="1" group="3" type="capsule" 
+            size="0.1 0.5" pos="0 0 0" fromto="0 0 -0.4 0 0 0.4" density="1000"/>  
+        </default>
+
+        <default class="steering_joint">
+            <joint type="ball" pos="0 0 0" />
+        </default>
+        <default class="steering_geom">
+            <geom contype="1" conaffinity="1" group="3" type="capsule" 
+            size="0.1 0.5" pos="0 0 0" fromto=" 0 -1.9 0  0 0 0" density="1000"/>
+        </default>
+
+        <default class="steering_connect_geom">
+            <geom contype="1" conaffinity="1" group="3" type="capsule" 
+            size="0.1 0.3" pos="0 0 0" fromto="-0.5 0 0 0 0 0" density="1000"/>
+        </default>
+
+        <default class="steering_turn_joint">
+            <joint type="hinge" pos="0 0 0" axis="0 0 1" springref="0" range="-0.5 0.5" springdamper="1 1"/>
+        </default>
+        <default class="steering_turn_geom">
+            <geom contype="1" conaffinity="1" group="3" type="sphere" 
+            size="0.1 0.3" pos="0 0 0" density="1000"/>
+        </default>
+    </default>
+
+	<worldbody>
+        <body name="base_link">
+            <freejoint name="base_joint"/>
+            <body name="hummer_body" pos="0 0 0" euler="0 0 -1.5708">   
+                <geom class="visual" mesh="hummer_body"/>
+            </body>
+            <geom class="collision" name="chassis_collision" type="box" pos="0 0 0.7" size="2.5 1.1 0.1" density="1000"/>
+            <geom class="collision" name="cockpit_collision" type="box" pos="0 0 1.6" size="2.5 1.1 0.8" density="60"/>
+
+
+            <body name="spring_fl" pos="1.7 0.95 0.6">
+                <joint class="spring_joint" name="spring_1_joint"/>
+                <geom name="spring_1_collision" class="spring_geom"/>
+
+                <body name="steering_turn_fl" pos="0 0 0">
+                    <joint class="steering_turn_joint" name="steering_turn_fl_joint"/>
+                    <geom class="steering_turn_geom" name="steering_turn_fl_geom"/>
+                    <geom class="steering_connect_geom" name="steering_connect_fl_geom"/>
+
+                    <body name="steering_link" pos="-0.5 0 0">
+                        <joint class="steering_joint" name="steering_joint"/>
+                        <geom class="steering_geom" name="steering_geom"/>
+                    </body>
+
+                    <body name="wheel_fl" pos="0 0 0"  euler="0 0 -1.5708">
+                        <joint class="wheel_joint" name="wheel_1_joint"/>
+                        <geom class="visual" mesh="hummer_wheel"/>
+                        <geom name="wheel_1_collision" class="wheel_geom"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="spring_fr" pos="1.7 -0.95 0.6">
+                <joint class="spring_joint" name="spring_2_joint"/>
+                <geom name="spring_2_collision" class="spring_geom"/>
+
+                <body name="steering_turn_fr" pos="0 0 0">
+                    <joint class="steering_turn_joint" name="steering_turn_fr_joint"/>
+                    <geom class="steering_turn_geom" name="steering_turn_fr_geom"/>
+                    <geom class="steering_connect_geom" name="steering_connect_fr_geom"/>
+
+                    <body name="wheel_fr" pos="0 0 0"  euler="0 0 1.5708">
+                        <joint class="wheel_joint" name="wheel_2_joint"/>
+                        <geom class="visual" mesh="hummer_wheel"/>
+                        <geom name="wheel_2_collision" class="wheel_geom"/>
+                    </body>
+                </body>
+            </body>
+
+            <body name="spring_rl" pos="-1.7 0.95 0.6">
+                <joint class="spring_joint" name="spring_3_joint"/>
+                <geom name="spring_3_collision" class="spring_geom"/>
+                <body name="wheel_rl" pos="0 0 0"  euler="0 0 -1.5708">
+                    <joint class="wheel_joint" name="wheel_3_joint"/>
+                    <geom class="visual" mesh="hummer_wheel"/>
+                    <geom name="wheel_3_collision" class="wheel_geom"/>
+                </body>
+            </body>
+
+            <body name="spring_rr" pos="-1.7 -0.95 0.6">
+                <joint class="spring_joint" name="spring_4_joint"/>
+                <geom name="spring_4_collision" class="spring_geom"/>
+                <body name="wheel_rr" pos="0 0 0"  euler="0 0 1.5708">
+                    <joint class="wheel_joint" name="wheel_4_joint"/>
+                    <geom class="visual" mesh="hummer_wheel"/>
+                    <geom name="wheel_4_collision" class="wheel_geom"/>
+                </body>
+            </body>
+
+        </body>
+	</worldbody>
+
+    <contact>
+        <exclude name="ex_base_link_wheel_fl" body1="base_link" body2="wheel_fl"/>
+        <exclude name="ex_base_link_wheel_fr" body1="base_link" body2="wheel_fr"/>
+        <exclude name="ex_base_link_wheel_rl" body1="base_link" body2="wheel_rl"/>
+        <exclude name="ex_base_link_wheel_rr" body1="base_link" body2="wheel_rr"/>
+        <exclude name="ex_base_link_steering" body1="steering_link" body2="base_link"/>
+        <exclude name="ex_base_link_steering_turn_fl" body1="steering_turn_fl" body2="base_link"/>
+        <exclude name="ex_base_link_steering_turn_fr" body1="steering_turn_fr" body2="base_link"/>
+
+        <exclude name="ex_wheel_fl_spring_fl" body1="wheel_fl" body2="spring_fl"/>
+        <exclude name="ex_wheel_fl_steering" body1="wheel_fl" body2="steering_link"/>
+
+        <exclude name="ex_wheel_fr_spring_fr" body1="wheel_fr" body2="spring_fr"/>
+        <exclude name="ex_wheel_fr_steering" body1="wheel_fr" body2="steering_link"/>
+
+        <exclude name="ex_steering_steering_turn_fl" body1="steering_turn_fl" body2="steering_link"/>
+        <exclude name="ex_steering_steering_turn_fr" body1="steering_turn_fr" body2="steering_link"/>
+       
+    </contact>
+
+    <actuator>
+        <motor name="m_wheel_fl" joint="wheel_1_joint" ctrlrange="-1500 1500" ctrllimited="true" gear="1"/>
+        <motor name="m_wheel_fr" joint="wheel_2_joint" ctrlrange="-1500 1500" ctrllimited="true" gear="1"/>
+        <motor name="m_wheel_rl" joint="wheel_3_joint" ctrlrange="-1500 1500" ctrllimited="true" gear="1"/>
+        <motor name="m_wheel_rr" joint="wheel_4_joint" ctrlrange="-1500 1500" ctrllimited="true" gear="1"/>
+
+        <motor name="m_spring_fl" joint="spring_1_joint" ctrlrange="-1000 1000" ctrllimited="true" gear="10"/>
+        <motor name="m_spring_fr" joint="spring_2_joint" ctrlrange="-1000 1000" ctrllimited="true" gear="10"/>
+        <motor name="m_spring_rl" joint="spring_3_joint" ctrlrange="-1000 1000" ctrllimited="true" gear="10"/>
+        <motor name="m_spring_rr" joint="spring_4_joint" ctrlrange="-1000 1000" ctrllimited="true" gear="10"/>
+
+        <position name="p_steering_turn_fl" joint="steering_turn_fl_joint" ctrlrange="-0.5 0.5" ctrllimited="true" forcerange="-5000 5000" kp="5000" kv="500"/>
+        <position name="p_steering_turn_fr" joint="steering_turn_fr_joint" ctrlrange="-0.5 0.5" ctrllimited="true" forcerange="-5000 5000" kp="5000" kv="500"/>
+    </actuator>
+    
+    <equality>
+        <connect anchor="-0.5 0 0" body1="steering_turn_fl" body2="steering_link"/>
+        <connect anchor="-0.5 0 0" body1="steering_turn_fr" body2="steering_link"/>
+    </equality>
+</mujoco>

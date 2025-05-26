@@ -49,9 +49,17 @@ class SimEnv(OrcaGymLocalEnv):
 
     def _set_action_space(self):
         # 归一化到 [-1, 1]区间
-        scaled_action_range = np.concatenate([[[-1.0, 1.0]] for _ in range(self.nu)])
-        print("Scaled action range: ", scaled_action_range)
-        self.action_space = self.generate_action_space(scaled_action_range)
+        if (self.nu > 0):
+            scaled_action_range = np.concatenate([[[-1.0, 1.0]] for _ in range(self.nu)])
+            print("Scaled action range: ", scaled_action_range)
+            self.action_space = self.generate_action_space(scaled_action_range)
+        else:
+            self.action_space = spaces.Box(
+                low=np.array([]),
+                high=np.array([]),
+                dtype=np.float32
+            )
+            print("No action space defined, nu is 0.")
 
     
     def render_callback(self, mode='human') -> None:
