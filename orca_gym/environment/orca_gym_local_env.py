@@ -250,6 +250,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_joint_dofadrs(self, joint_names):
         joint_dofadrs = self.gym.query_joint_dofadrs(joint_names)
         return joint_dofadrs
+    def get_goal_bounding_box(self, geom_name):
+        geom_size = self.gym.get_goal_bounding_box(geom_name)
+        return geom_size
 
     def query_velocity_body_B(self, ee_body, base_body):
         return self.gym.query_velocity_body_B(ee_body, base_body)
