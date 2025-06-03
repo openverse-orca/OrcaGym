@@ -8,3 +8,11 @@ object_joints: ["Bottle20_joint", "Bottle01_joint", "Cap01_joint", "can04_joint"
 goal_bodys: ["Basket"]
 goal_sites: ["Basketsite"]
 goal_joints: ["Basket_joint"]
+
+# random_actor : true
+# random_actor_position: true
+# random_actor_rotation: false
+# actors: ["yellow_bottle", "red_bottle", "coke", "milk", "spotlight"]
+# actors_spawnable: ["yellow_bottle", "red_bottle", "coke", "milk", "spotlight"]
+# center: [-6.0, 2.83, 1.390]
+# bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

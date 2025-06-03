@@ -50,55 +50,14 @@ class ActionType:
 
 class OpenLoongTask(AbstractTask):
     def __init__(self, config: dict):
-
-        super().__init__(config)
+        
+        if config.__len__():
+            super().__init__(config)
+        else:
+            super().__init__()
         self.task_list: list = []
 
-    # def get_task(self, env: RobomimicEnv):
-    #     """ 从object,goal中选择数量最少的
-    #         在生成一个随机整数x，在挑选x个object, goal
-    #     """
-    #     # 使用列表替代字典
-    #     self.task_list = []
-    #     self.random_objs_and_goals(env, bounds=0.1)
-
-    #     object_len = len(self.object_bodys)
-    #     min_len = min(4, object_len)
-
-    #     if min_len == 0:
-    #         return self.task_list  # 返回空列表
-
-    #     random_x = random.randint(1, min_len)
-
-    #     # 随机选择索引时保证object和goal一一对应
-    #     ind_list = random.sample(range(min_len), random_x)  # 注意这里改为min_len
-
-    #     for ind in ind_list:
-    #         # 以元组形式存储object-goal对
-    #         self.task_list.append(
-    #             (self.object_bodys[ind])
-    #         )
-
-    #     return self.task_list
-
-    # def get_language_instruction(self) -> str:
-    #     if len(self.task_list) == 0:
-    #         return "Do something."
-
-    #     object_str = "object: "
-    #     goal_str = "goal: "
-
-    #     # 遍历列表中的元组元素
-    #     for obj in self.task_list:
-    #         object_str += obj + " "
-
-
-    #     language_instruction = f"level: {self.level_name}"
-    #     language_instruction += f"{object_str} to basket"
-
-    #     return language_instruction
-
-    def get_task(self, env: RobomimicEnv) -> dict[str, str]:
+    def get_task(self, env: OrcaGymLocalEnv) -> dict[str, str]:
         """
         从 object_bodys 和 goal_bodys 中随机配对，index 绝对不会越界。
         """
@@ -177,7 +136,6 @@ class OpenLoongEnv(RobomimicEnv):
         self._run_mode = run_mode
         self._action_type = action_type
 
-        self._task = OpenLoongTask(task_config_dict)
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
@@ -197,6 +155,7 @@ class OpenLoongEnv(RobomimicEnv):
 
         self._reward_printer = RewardPrinter()
         
+        kwargs["task"] = OpenLoongTask(task_config_dict)
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -205,6 +164,7 @@ class OpenLoongEnv(RobomimicEnv):
             **kwargs,
         )
 
+        self._task.register_init_env_callback(self.init_env)
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -237,6 +197,24 @@ class OpenLoongEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
+    def init_env(self):
+        self.model, self.data = self.initialize_simulation()
+        self._init_ctrl()
+        self.init_agents()
+
+    def _init_ctrl(self):
+        self.nu = self.model.nu
+        self.nq = self.model.nq
+        self.nv = self.model.nv
+
+        self.gym.opt.iterations = 150
+        self.gym.opt.noslip_tolerance = 50
+        self.gym.opt.ccd_iterations = 100
+        self.gym.opt.sdf_iterations = 50
+        self.gym.set_opt_config()
+
+        self.ctrl = np.zeros(self.nu)
+        self.mj_forward() 
 
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
@@ -429,7 +407,15 @@ class OpenLoongEnv(RobomimicEnv):
                 obs[agent_key] = agent_obs[key]
         return obs
 
+    def init_agents(self):
+        for id, agent_name in enumerate(self._agent_names):
+            self._agents[agent_name].init_agent(self, id)
+
     def reset_model(self) -> tuple[dict, dict]:
+        if self._task.random_actor:
+            self._task.generate_actors()
+            self._task.publish_scene()
+
         # 1) 恢复初始状态、重置 controller/mechanism
         self._set_init_state()
         [agent.on_reset_model(self) for agent in self._agents.values()]
@@ -778,6 +764,9 @@ class AgentBase:
     @property
     def action_range(self) -> np.ndarray:
         return self._action_range
+
+    def init_agent(self, env: OpenLoongEnv, id: int) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
 
     def set_joint_neutral(self, env: OpenLoongEnv) -> None:
         raise NotImplementedError("This method should be overridden by subclasses")
@@ -1504,10 +1493,9 @@ class OpenLoongHandAgent(OpenLoongAgent):
         super().__init__(env, id, name)
         
         self.init_agent(env, id)
-        super().init_agent(env, id)
-
         
     def init_agent(self, env: OpenLoongEnv, id: int):
+        super().init_agent(env, id)
         # print("arm_actuator_id: ", self._l_arm_actuator_id)
         self._l_hand_moto_names = [env.actuator("M_zbll_J1", id), env.actuator("M_zbll_J2", id), env.actuator("M_zbll_J3", id)
                                     ,env.actuator("M_zbll_J4", id),env.actuator("M_zbll_J5", id),env.actuator("M_zbll_J6", id),
@@ -1635,10 +1623,13 @@ class OpenLoongGripperAgent(OpenLoongAgent):
         super().__init__(env, id, name)
         
         self.init_agent(env, id)
-        super().init_agent(env, id)
 
         
     def init_agent(self, env: OpenLoongEnv, id: int):
+        print("OpenLoongGripperAgent init_agent")
+
+        super().init_agent(env, id)
+
         self._l_hand_actuator_names = [env.actuator("l_fingers_actuator", id)]
         
         self._l_hand_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
