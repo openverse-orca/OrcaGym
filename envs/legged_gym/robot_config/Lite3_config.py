@@ -27,7 +27,7 @@ Lite3Config = {
                                 "HR_HipX_actuator", "HR_HipY_actuator", "HR_Knee_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.25,
+        "action_scale" :         0.5,
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "HL_site", "HR_site"],
@@ -67,7 +67,7 @@ Lite3Config = {
             "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 0.31,
+            "joint_angles" : 0.26,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
             "action_rate" : 0.018, # 0.02
@@ -79,13 +79,13 @@ Lite3Config = {
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.08,
             "body_orientation" : 1.7,
-            "feet_air_time" : 0.20,
+            "feet_air_time" : 0.23,
             "feet_self_contact" : 0,
             "feet_slip" : 0.05,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.15,
             "fly" : 0.1,
-            "stepping" : 0.18,  
+            "stepping" : 0.21,  
             "feet_swing_height" : 0.01,
         },
 
