@@ -10,6 +10,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 import torch
 import torch.nn as nn
+import csv
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -121,6 +122,66 @@ def segment_obs(obs: dict[str, np.ndarray], agent_name_list: list[str]) -> dict[
     return segmented_obs
     
 
+def log_observation(obs: dict, action: np.ndarray, filename: str):
+    """
+    Log observations and actions to a CSV file.
+    
+    Args:
+        obs (dict): Observation dictionary containing IMU and joint data
+        action (np.ndarray): Action array
+        filename (str): Path to the CSV file
+    """
+    # Define CSV headers
+    headers = [
+        "timestamp",
+        # IMU data
+        "imu_angle_roll", "imu_angle_pitch", "imu_angle_yaw",
+        "imu_angular_velocity_roll", "imu_angular_velocity_pitch", "imu_angular_velocity_yaw",
+        "imu_acc_x", "imu_acc_y", "imu_acc_z",
+        # Joint data - Front Left Leg
+        "fl_joint1_pos", "fl_joint1_vel", "fl_joint1_torque",
+        "fl_joint2_pos", "fl_joint2_vel", "fl_joint2_torque",
+        "fl_joint3_pos", "fl_joint3_vel", "fl_joint3_torque",
+        # Joint data - Front Right Leg
+        "fr_joint1_pos", "fr_joint1_vel", "fr_joint1_torque",
+        "fr_joint2_pos", "fr_joint2_vel", "fr_joint2_torque",
+        "fr_joint3_pos", "fr_joint3_vel", "fr_joint3_torque",
+        # Joint data - Hind Left Leg
+        "hl_joint1_pos", "hl_joint1_vel", "hl_joint1_torque",
+        "hl_joint2_pos", "hl_joint2_vel", "hl_joint2_torque",
+        "hl_joint3_pos", "hl_joint3_vel", "hl_joint3_torque",
+        # Joint data - Hind Right Leg
+        "hr_joint1_pos", "hr_joint1_vel", "hr_joint1_torque",
+        "hr_joint2_pos", "hr_joint2_vel", "hr_joint2_torque",
+        "hr_joint3_pos", "hr_joint3_vel", "hr_joint3_torque",
+        # Contact forces
+        "fl_force_x", "fl_force_y", "fl_force_z",
+        "fr_force_x", "fr_force_y", "fr_force_z",
+        "hl_force_x", "hl_force_y", "hl_force_z",
+        "hr_force_x", "hr_force_y", "hr_force_z",
+        # Actions
+        "fl_hip_action", "fl_thigh_action", "fl_calf_action",
+        "fr_hip_action", "fr_thigh_action", "fr_calf_action",
+        "hl_hip_action", "hl_thigh_action", "hl_calf_action",
+        "hr_hip_action", "hr_thigh_action", "hr_calf_action"
+    ]
+    
+    # Create file and write headers if it doesn't exist
+    file_exists = os.path.exists(filename)
+    
+    with open(filename, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(headers)
+        
+        # Prepare data row
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                
+        # Combine all data
+        row = [current_time] + list(obs["observation"]) + list(action)
+        
+        writer.writerow(row)
+
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
                  model: nn.Module, 
@@ -129,6 +190,10 @@ def run_simulation(env: gym.Env,
     obs, info = env.reset()
     # print("obs: ", obs)
     dt = time_step * frame_skip
+    if not os.path.exists("./log"):
+        os.makedirs("./log")
+    log_file = f"./log/simulation_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
     try:
         while True:
             start_time = datetime.now()
@@ -147,6 +212,7 @@ def run_simulation(env: gym.Env,
             action = np.concatenate(action_list).flatten()
             # print("action: ", action)
             # setp_start = datetime.now()
+            log_observation(obs, action, log_file)
             obs, reward, terminated, truncated, info = env.step(action)
 
             # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
