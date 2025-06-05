@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 
 class ControlDevice:
     """
@@ -50,7 +50,8 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self.env_id = env_id
         self.max_episode_steps = max_episode_steps
         self._ctrl_device = ctrl_device
-        self._control_freq = control_freq        
+        self._control_freq = control_freq     
+        self._keyboard_addr = orcagym_addr
 
         super().__init__(
             frame_skip = frame_skip,
@@ -320,7 +321,7 @@ class AgentBase:
         print("Action space: ", action_space)
         self.agent.set_action_space(action_space) 
         self.generate_action_scale_array(self._query_ctrl_info())
-        self._init_playable()
+        self._init_playable(env)
 
     @property
     def agent(self) -> LeggedRobot:
@@ -430,8 +431,8 @@ class AgentBase:
         ctrl_info[self.agent.name] = self.agent.get_ctrl_info()
         return ctrl_info    
     
-    def _init_playable(self) -> None:
-        self._keyboard_controller = KeyboardInput()
+    def _init_playable(self, env: LeggedSimEnv) -> None:
+        self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, env._keyboard_addr)
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
         
         self._player_agent = self.agent
@@ -440,7 +441,6 @@ class AgentBase:
             
         robot_config = LeggedRobotConfig[self.config_name]
 
-            
         self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
         self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
     

@@ -4,7 +4,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
@@ -85,7 +85,7 @@ class GripperEnv(OrcaGymLocalEnv):
             if self._joystick is None:
                 raise ValueError("Joystick not found.")
         elif self._ctrl_device == ControlDevice.KEYBOARD:
-            self._keyboard = KeyboardInput()
+            self._keyboard = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
 
         self._set_obs_space()
         self._set_action_space()
@@ -172,8 +172,8 @@ class GripperEnv(OrcaGymLocalEnv):
             self._set_gripper_ctrl(self._joystick.get_state())
         elif self._ctrl_device == ControlDevice.KEYBOARD:
             self._keyboard.update()
-            pos_ctrl_dict = self._keyboard.capture_keyboard_pos_ctrl()
-            rot_ctrl_dict = self._keyboard.capture_keyboard_rot_ctrl()
+            pos_ctrl_dict = self.capture_keyboard_pos_ctrl()
+            rot_ctrl_dict = self.capture_keyboard_rot_ctrl()
             self._set_gripper_ctrl(self._keyboard.get_state())
         pos_ctrl = np.array([pos_ctrl_dict['y'], pos_ctrl_dict['x'], pos_ctrl_dict['z'], ])
         rot_ctrl = np.array([-rot_ctrl_dict['yaw'], -rot_ctrl_dict['pitch'], rot_ctrl_dict['roll']])
@@ -198,7 +198,25 @@ class GripperEnv(OrcaGymLocalEnv):
 
         return mocap_xpos, mocap_xquat
     
+    def capture_keyboard_pos_ctrl(self) -> dict:
+        # Capture positional control based on keyboard input
+        state = self._keyboard.get_state()
+        move_x = state["D"] - state["A"]
+        move_y = state["W"] - state["S"]
+        move_z = state["F"] - state["R"]
+        pos_ctrl = {'x': move_x, 'y': move_y, 'z': move_z}
+        return pos_ctrl
 
+
+    def capture_keyboard_rot_ctrl(self) -> dict:
+        # Capture rotational control based on keyboard input
+        state = self._keyboard.get_state()
+        yaw = all([state["D"], state["LShift"]]) - all([state["A"], state["LShift"]])
+        pitch = all([state["W"], state["LShift"]]) - all([state["S"], state["LShift"]])
+        roll = state["E"] - state["Q"]
+        rot_ctrl = {'yaw': yaw, 'pitch': pitch, 'roll': roll}
+        return rot_ctrl
+    
     def calc_rotate_matrix(self, yaw, pitch, roll) -> np.ndarray:
         # x = yaw, y = pitch, z = roll
         R_yaw = np.array([

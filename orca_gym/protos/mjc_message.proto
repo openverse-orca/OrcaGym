@@ -19,6 +19,10 @@ service GrpcService {
   rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
   rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
 
+  // 键鼠操作
+  rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
+  rpc GetMouseMovementEvents (GetMouseMovementEventsRequest) returns (GetMouseMovementEventsResponse);
+
 
   // 配置查询
   rpc QueryModelInfo (QueryModelInfoRequest) returns (QueryModelInfoResponse);
@@ -1074,4 +1078,21 @@ message SetMaterialInfoResponse {
     }
     Status status = 1; // 状态码字段
     string error_message = 2; // 错误详情（可选）
+}
+
+message GetKeyPressedEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetKeyPressedEventsResponse {
+    repeated string events = 1;  // 按键事件列表
+}
+
+
+message GetMouseMovementEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetMouseMovementEventsResponse {
+    float delta_x = 1;  // 鼠标在 x 轴上的移动距离
+    float delta_y = 2;  // 鼠标在 y 轴上的移动距离
+    float delta_z = 3;  // 鼠标在 z 轴上的移动距离（如果有）
 }

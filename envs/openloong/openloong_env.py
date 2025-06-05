@@ -16,7 +16,7 @@ from orca_gym.utils import rotations
 from orca_gym.environment import OrcaGymRemoteEnv, OrcaGymLocalEnv
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput
+from orca_gym.devices.keyboard import KeyboardClient, KeyboardInput, KeyboardInputSourceType
 
 class OpenLoongEnv(OrcaGymLocalEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -84,7 +84,7 @@ class OpenLoongEnv(OrcaGymLocalEnv):
         # self._openloong_wbc.InitLogger()
 
         if individual_control:
-            self._keyboard_controller = KeyboardInput()
+            self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         else:
             self._keyboard_controller = KeyboardClient()
 

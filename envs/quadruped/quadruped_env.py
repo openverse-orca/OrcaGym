@@ -21,7 +21,7 @@ from envs.quadruped.utils.mujoco.visual import change_robot_appearance, render_g
 from envs.quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
 from orca_gym.environment import OrcaGymRemoteEnv
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
@@ -109,7 +109,7 @@ class QuadrupedEnv(OrcaGymRemoteEnv):
         # Add for OrcaGymEnv
         self._agent_joint_names = None
 
-        self._keyboard_controller = KeyboardInput()
+        self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         self._turning_left = False
         self._turning_right = False
 
