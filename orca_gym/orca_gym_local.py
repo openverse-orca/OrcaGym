@@ -736,6 +736,18 @@ class OrcaGymLocal(OrcaGymBase):
             site_jacs_dict[site_name] = {"jacp": jacp, "jacr": jacr}
         return site_jacs_dict            
     
+
+    def modify_equality_objects(self, old_obj1_id, old_obj2_id, new_obj1_id, new_obj2_id):
+        """
+        Modify the equality constraints in the model.
+        """
+        for i in range(self.model.neq):
+            if self._mjModel.eq_obj1id[i] == old_obj1_id and self._mjModel.eq_obj2id[i] == old_obj2_id:
+                self._mjModel.eq_obj1id[i] = new_obj1_id
+                self._mjModel.eq_obj2id[i] = new_obj2_id
+                print(f"Modified equality constraint {i}: {old_obj1_id}, {old_obj2_id} -> {new_obj1_id}, {new_obj2_id}")
+                break
+
     def update_equality_constraints(self, constraint_list):
         for constraint in constraint_list:
             obj1_id = constraint['obj1_id']
@@ -749,6 +761,10 @@ class OrcaGymLocal(OrcaGymBase):
             # print("eq_data: ", eq_data)
             # self._mjModel.eq_data[obj1_id:obj1_id + len(eq_data)] = eq_data.copy()
             # print("model.eq_data: ", self._mjModel.eq_data)
+            # print("model.eq_obj1id: ", self._mjModel.eq_obj1id)
+            # print("model.eq_obj2id: ", self._mjModel.eq_obj2id)
+            # print("self.model.neq: ", self._mjModel.neq)
+            # print("self.model.eq_type: ", self._mjModel.eq_type)
 
 
     async def _remote_set_mocap_pos_and_quat(self, mocap_data):

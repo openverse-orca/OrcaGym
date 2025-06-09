@@ -13,7 +13,7 @@ import asyncio
 import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
-from orca_gym.utils.rotations import mat2quat, quat2mat
+from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -49,6 +49,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self._render_time_step = time.perf_counter()
         self.mj_forward()
 
+        self._actor_anchored = None
+        self._anchor_body_name = "ActorManipulator_Anchor"
+        self._anchor_dummy_body_name = "ActorManipulator_dummy"
+        body_names = self.model.get_body_names()
+        if (self._anchor_body_name in body_names and self._anchor_dummy_body_name in body_names):
+            self._anchor_body_id = self.model.body_name2id(self._anchor_body_name)
+            self._anchor_dummy_body_id = self.model.body_name2id(self._anchor_dummy_body_name)
+        else:
+            self._anchor_body_id = None
+            self._anchor_dummy_body_id = None
+            Warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
@@ -149,14 +160,138 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             # 只有在渲染模式下才需要处理图形界面交互行为，否则本身也不会有交互数据
             return
         
+        if self._anchor_body_id is None:
+            # 老版本不支持锚点操作
+            return
+
+        time_diff = time.perf_counter() - self._render_time_step
+        if (time_diff < self._render_interval):
+            # 渲染间隔未到，不处理交互数据
+            return
+
         actor_anchored = self.get_actor_manipulation_anchored()
         if actor_anchored is None:
-            # 未选定任何actor进行操作
+            if self._actor_anchored is not None:
+                self.release_actor_anchored()
             return
         
+        if self._actor_anchored is None:
+            self.anchor_actor(actor_anchored)
+        
+        
         delta_pos, delta_quat = self.get_actor_manipulation_movement()
-        print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
+        # print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
+        delta_pos *= self._render_interval
+        delta_euler = quat2euler(delta_quat)
+        delta_euler *= self._render_interval
+        delta_quat = euler2quat(delta_euler)
 
+        # 移动和旋转锚点
+        anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
+        if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
+            Warning(f"Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            return
+
+        # 更新锚点位置
+        anchor_xpos = anchor_xpos + delta_pos
+        # 更新锚点四元数
+        anchor_xquat = quat_mul(
+            anchor_xquat,
+            delta_quat
+        )
+
+        # 更新锚点的位置和四元数
+        self.set_mocap_pos_and_quat({
+            self._anchor_body_name: {
+                "pos": anchor_xpos,
+                "quat": anchor_xquat
+            }
+        })
+        self.mj_forward()
+
+        # print(f"Updated anchor position: {anchor_xpos}, quaternion: {anchor_xquat}")
+
+
+    def release_actor_anchored(self):
+        """
+        Release the currently anchored actor.
+        """
+        if self._actor_anchored is not None:
+            self.update_anchor_equality_constraints(self._anchor_dummy_body_name)
+
+            self.set_mocap_pos_and_quat({
+                self._anchor_body_name: {
+                    "pos": np.array([0.0, 0.0, -1000.0], dtype=np.float64),
+                    "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)  # Reset to a far position
+                }
+            })
+            self.mj_forward()
+
+            print(f"Released actor: {self._actor_anchored}")
+            self._actor_anchored = None
+        else:
+            print("No actor is currently anchored.")
+
+    def anchor_actor(self, actor_name: str):
+        """
+        Anchor an actor for manipulation.
+        """
+        assert self._actor_anchored is None, "An actor is already anchored. Please release it first."
+        
+        # 获取actor的位姿和四元数
+        actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
+        if actor_xpos is None or actor_xmat is None or actor_xquat is None:
+            Warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
+            return
+        
+        # 将锚点位置设置为actor的位姿
+        mocap_pos_and_quat_dict = {
+            self._anchor_body_name: {
+                "pos": actor_xpos,
+                "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)  # 默认四元数
+            }
+        }
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+        self.mj_forward()
+
+        self.update_anchor_equality_constraints(actor_name)
+
+
+        self._actor_anchored = actor_name
+        print(f"Anchored actor: {self._actor_anchored} at position {actor_xpos} with quaternion {actor_xquat}")
+
+    def update_anchor_equality_constraints(self, actor_name: str):
+        # 更新锚点的平衡约束
+        eq_list = self.model.get_eq_list()
+        if eq_list is None or len(eq_list) == 0:
+            raise ValueError("No equality constraints found in the model.")
+        
+        for eq in eq_list:
+            old_obj1_id = eq["obj1_id"]
+            old_obj2_id = eq["obj2_id"]
+            if eq["obj1_id"] == self._anchor_body_id:
+                eq["obj2_id"] = self.model.body_name2id(actor_name)
+                self.gym.modify_equality_objects(
+                    old_obj1_id= old_obj1_id,
+                    old_obj2_id= old_obj2_id,
+                    new_obj1_id= eq["obj1_id"],
+                    new_obj2_id= eq["obj2_id"]
+                )
+                print(f"Anchoring actor {actor_name} to anchor body {self._anchor_body_name}")
+                break
+            elif eq["obj2_id"] == self._anchor_body_id:
+                eq["obj1_id"] = self.model.body_name2id(actor_name)
+                self.gym.modify_equality_objects(
+                    old_obj1_id= old_obj1_id,
+                    old_obj2_id= old_obj2_id,
+                    new_obj1_id= eq["obj1_id"],
+                    new_obj2_id= eq["obj2_id"]
+                )
+                print(f"Anchoring anchor body {self._anchor_body_name} to actor {actor_name}")
+                break
+
+        self.gym.update_equality_constraints(eq_list)
+        self.mj_forward()
 
     def set_ctrl(self, ctrl):
         self.gym.set_ctrl(ctrl)
