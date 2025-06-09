@@ -1,6 +1,7 @@
 # 首先生成 example 要用到的资产，运行
 
 ```bash
+pip install usd-core
 python ../../orca_gym/tools/usdz_to_xml.py --config ../../envs/assets/usdz/usdz_config.yaml 
 ```
 

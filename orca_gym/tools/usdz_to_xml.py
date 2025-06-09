@@ -4,18 +4,14 @@ import os
 
 import numpy as np
 
-import glob
 from pathlib import Path
-from typing import Dict, List
 from pxr import Usd, UsdGeom, Gf, Sdf
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
 import trimesh
-import orca_gym.utils.rotations as rotations
 from copy import deepcopy
 import numpy as np
-from sklearn.cluster import KMeans
 
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
