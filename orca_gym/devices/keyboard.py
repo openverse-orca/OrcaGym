@@ -50,12 +50,10 @@ class KeyboardInputSourcePygame:
 
 class KeyboardInputSourceOrcaStudio:
     def __init__(self,
-                 grpc_addr: str,
-                 skip_free_camera_input: bool = True):
+                 grpc_addr: str,):
         """
         Initialize the OrcaStudio keyboard input source.
         """
-        self.skip_free_camera_input = skip_free_camera_input
         self.grpc_addr = grpc_addr
         self.loop = asyncio.get_event_loop()
         self.initialize_grpc()
@@ -162,14 +160,9 @@ class KeyboardInputSourceOrcaStudio:
     def update_keyboard_state(self, keyboard_state : dict[str, int]):
         key_pressed_events = self.get_key_pressed()
 
-        # print(f"Key pressed events: {key_pressed_events}")
+        print(f"Key pressed events: {key_pressed_events}")
 
         [keyboard_state.update({key: 0}) for key in self.keyboard_map.values()]
-
-        if self.skip_free_camera_input:
-            if "mouse_button_right" in key_pressed_events:
-                # Skip free camera input if right mouse button is pressed
-                return
 
         for event in key_pressed_events:
             if event in self.keyboard_map:

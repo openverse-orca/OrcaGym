@@ -92,6 +92,21 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def close(self):
         self.loop.run_until_complete(self._close_grpc())
 
+    async def _get_actor_manipulation_anchored(self):
+        return await self.gym.get_actor_manipulation_anchored()
+    
+    def get_actor_manipulation_anchored(self):
+        return self.loop.run_until_complete(self._get_actor_manipulation_anchored())
+    
+    async def _get_actor_manipulation_movement(self):
+        return await self.gym.get_actor_manipulation_movement()
+    
+    def get_actor_manipulation_movement(self):
+        actor_movement = self.loop.run_until_complete(self._get_actor_manipulation_movement())
+        delta_pos = actor_movement["delta_pos"]
+        delta_quat = actor_movement["delta_quat"]
+        return delta_pos, delta_quat
+
     def do_simulation(self, ctrl, n_frames) -> None:
         """
         Step the simulation n number of frames and applying a control action.
@@ -120,12 +135,28 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return False
 
     def render(self):
+        if self.render_mode not in ["human", "force"]:
+            # 只有在渲染模式下才需要处理图形界面交互行为，否则本身也不会有交互数据
+            return
+        
         time_diff = time.perf_counter() - self._render_time_step
         if (time_diff > self._render_interval):
             self._render_time_step = time.perf_counter()
-            if self.render_mode == "human" or self.render_mode == "force":
-                self.loop.run_until_complete(self.gym.render())
+            self.loop.run_until_complete(self.gym.render())
             
+    def do_actor_manipulation(self):
+        if self.render_mode not in ["human", "force"]:
+            # 只有在渲染模式下才需要处理图形界面交互行为，否则本身也不会有交互数据
+            return
+        
+        actor_anchored = self.get_actor_manipulation_anchored()
+        if actor_anchored is None:
+            # 未选定任何actor进行操作
+            return
+        
+        delta_pos, delta_quat = self.get_actor_manipulation_movement()
+        print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
+
 
     def set_ctrl(self, ctrl):
         self.gym.set_ctrl(ctrl)
@@ -143,6 +174,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.mj_jacSite(jacp, jacr, site_name)
 
     def _step_orca_sim_simulation(self, ctrl, n_frames):
+        self.do_actor_manipulation()
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
 

@@ -191,6 +191,26 @@ class OrcaGymLocal(OrcaGymBase):
         # 返回绝对路径
         return os.path.abspath(file_path)
 
+    async def get_actor_manipulation_anchored(self):
+        request = mjc_message_pb2.GetActorManipulationAnchoredRequest()
+        response = await self.stub.GetActorManipulationAnchored(request)
+        actor_anchored = response.actor_name
+        if actor_anchored is None or len(actor_anchored) == 0:
+            return None
+        else:
+            return actor_anchored
+
+    async def get_actor_manipulation_movement(self):
+        request = mjc_message_pb2.GetActorManipulationMovementRequest()
+        response = await self.stub.GetActorManipulationMovement(request)
+        delta_pos = np.array(response.delta_pos)
+        delta_quat = np.array(response.delta_quat)
+        actor_movement = {
+            "delta_pos": delta_pos,
+            "delta_quat": delta_quat
+        }
+        return actor_movement
+
     def set_time_step(self, time_step):
         self._timestep = time_step
         self.set_opt_timestep(time_step)
