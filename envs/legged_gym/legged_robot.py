@@ -290,7 +290,6 @@ class LeggedRobot(OrcaGymAgent):
 
         # square_wave = self._compute_square_wave()
         # sin_phase, cos_phase = self._compute_leg_period()
-
         obs = np.concatenate(
                 [
                     # self._body_lin_vel,
@@ -908,7 +907,7 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        if self._np_random.random() < 0.6:            
+        if self._np_random.random() < 1.0:            
             # Forward
             lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
                                 self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),

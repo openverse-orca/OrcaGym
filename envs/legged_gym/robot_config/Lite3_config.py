@@ -27,7 +27,7 @@ Lite3Config = {
                                 "HR_HipX_actuator", "HR_HipY_actuator", "HR_Knee_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
+        "action_scale" :         0.35,
         
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "HL_site", "HR_site"],
@@ -67,26 +67,26 @@ Lite3Config = {
             "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 0.26,
+            "joint_angles" : 0.25,
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
-            "action_rate" : 0.018, # 0.02
+            "action_rate" : 0.015, # 0.02
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 2.8,  # 1.2
-            "follow_command_angvel" : 2.0,  # 0.7
+            "follow_command_linvel" : 3.5,  # 1.2
+            "follow_command_angvel" : 2.5,  # 0.7
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.08,
-            "body_orientation" : 1.7,
+            "body_orientation" : 1.6,
             "feet_air_time" : 0.23,
             "feet_self_contact" : 0,
-            "feet_slip" : 0.05,
+            "feet_slip" : 0.03,
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.15,
             "fly" : 0.1,
-            "stepping" : 0.21,  
-            "feet_swing_height" : 0.01,
+            "stepping" : 0.24,  
+            "feet_swing_height" : 0.00,
         },
 
 
@@ -110,7 +110,8 @@ Lite3Config = {
 
         # Config for randomization
         "randomize_friction" :      True,
-        "friction_range" :          [0.5, 1.25],
+        # "friction_range" :          [0.5, 1.25],
+        "friction_range" :          [1.0, 10.0],
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
@@ -136,7 +137,7 @@ Lite3Config = {
             "flat_plane" : {
                 "command_lin_vel_range_x" : [-1.5, 1.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.8, 0.8], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
@@ -172,7 +173,7 @@ Lite3Config = {
         # Config for nn network training
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
-        "n_steps" : 32,  # 每个环境采样步数
+        "n_steps" : 64,  # 每个环境采样步数
         "batch_size" : 1024,  # 批次大小            
         "learning_rate" : 0.0001,  # 学习率
         "gamma" : 0.99,  # 折扣因子
