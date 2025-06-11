@@ -55,7 +55,7 @@ class AbstractTask:
         self.object_joints = config["object_joints"]
         self.goal_bodys = config["goal_bodys"]
         self.goal_sites = config["goal_sites"]
-        self.goal_joints = config["goal_joints"]
+        #self.goal_joints = config["goal_joints"]
         self.level_name = config["level_name"]
 
     def random_objs_and_goals(self, env: RobomimicEnv, bounds = 0.1):
@@ -75,7 +75,7 @@ class AbstractTask:
         goal_site_dict = env.query_site_pos_and_quat(goal_sites_env_names)
 
         object_joints_env_names = [env.joint(joint_name) for joint_name in self.object_joints]
-        goal_joints_env_names = [env.joint(joint_name) for joint_name in self.goal_joints]
+        #goal_joints_env_names = [env.joint(joint_name) for joint_name in self.goal_joints]
 
         #随机化物体位置
         def generate_random_pos_quat(bounds, site_dict, sites_env_names):
@@ -103,10 +103,9 @@ class AbstractTask:
         for i in range(len(object_ids)):
             env.set_joint_qpos({object_joints_env_names[i]: np.concatenate([random_obj_pos[i], random_obj_xquat[i]])})
 
-        #for i in range(len(goal_ids)):
-            #env.set_mocap_pos_and_quat({goal_bodys_env_names[i]: {'pos': random_goal_pos[i], 'quat': random_goal_xquat[i]}})
+        for i in range(len(goal_ids)):
+            env.set_mocap_pos_and_quat({goal_bodys_env_names[i]: {'pos': random_goal_pos[i], 'quat': random_goal_xquat[i]}})
         self.randomized_object_positions = env.query_joint_qpos(object_joints_env_names)
-        self.randomized_goal_positions = env.query_joint_qpos(goal_joints_env_names)
     def get_task(self, env: RobomimicEnv):
         pass
 

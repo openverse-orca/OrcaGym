@@ -15,8 +15,8 @@ class RewardPrinter:
 
         self.reward_history = {}
         
-        if "reward_history.txt" in os.listdir("."):
-            os.remove("reward_history.txt")
+        # if "reward_history.txt" in os.listdir("."):
+        #     os.remove("reward_history.txt")
 
     def print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1.0):
         if self._reward_data.get(message) is None:

@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import time
+import csv
 import numpy as np
 from datetime import datetime
 import gymnasium as gym
@@ -12,6 +13,8 @@ import torch
 import torch.nn as nn
 import pickle
 from orca_gym.devices.keyboard import KeyboardInput
+
+Degree2Rad = np.pi / 180.0
 
 
 current_file_path = os.path.abspath('')
@@ -42,7 +45,9 @@ def smooth_sqr_wave_np(phase, phase_freq, eps):
 
 class Lite3RealAgent:
     def __init__(self,):
-        self.model_file = "/home/superfhwl/repo/yaoxiang/dog_sim2real_0418/trained_models_tmp/Lite3_ppo_1152-agents_200-episodes_2025-04-22_15-02-18.zip"
+        # self.model_file = "/home/superfhwl/repo/yaoxiang/dog_sim2real_0418/trained_models_tmp/Lite3_ppo_2304-agents_200-episodes_2025-04-28_18-35-03/Lite3_follow_command.zip_iteration_500.zip"
+        # self.model_file = "/home/superfhwl/repo/yaoxiang/dog_sim2real_0418/trained_models_tmp/Lite3_ppo_2304-agents_200-episodes_2025-04-30_11-04-17/Lite3_follow_command.zip"
+        self.model_file = "/home/superfhwl/repo/yaoxiang/dog_sim2real_0418/trained_models_tmp/Lite3_ppo_288-agents_200-episodes_2025-06-11_11-28-43/Lite3_follow_command.zip"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = PPO.load(self.model_file, device=device)
 
@@ -60,16 +65,32 @@ class Lite3RealAgent:
 
         self.generate_action_scale_array()
 
-    def get_action(self, obs):
+        self._init_log()
+
+
+    def _init_log(self):
+        # Create log directory if it doesn't exist
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+            
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.filename = os.path.join(log_dir, f"robot_log_{timestamp}.csv")
+
+
+    def get_action(self, raw_obs):
         """
         Get the action from real observation of Lite3.
         """
         self._update_playable()
-        obs = self.restructure_obs(obs)
+        obs = self.restructure_obs(raw_obs)
         # print("obs: ", obs)
         action, _states = self.model.predict(obs, deterministic=True)
         # return restructure_action(action)
         self._set_action(action)
+        self.log_observation(raw_obs, action)
+        # print(raw_obs)
         return self._action2ctrl(action)
 
     
@@ -95,7 +116,7 @@ class Lite3RealAgent:
 
     def generate_action_scale_array(self):
         with open("ctrl_info.pkl", "rb") as f:
-            ctrl_info = pickle.load(f)["Lite3"]
+            ctrl_info = pickle.load(f)["Lite3_000"]
         # print("ctrl_info: ", ctrl_info)
         self._action_scale = ctrl_info["action_scale"]             # shape = (1)
         self._action_space_range = ctrl_info["action_space_range"] # shape = (2)
@@ -147,7 +168,7 @@ class Lite3RealAgent:
         """
         # scale_lin_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["lin_vel"]
         scale_ang_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["ang_vel"]
-        # scale_orientation = np.array([1, 1, 1])  # No scaling on the orientation
+        scale_orientation = np.array([1, 1, 1])  # No scaling on the orientation
         scale_command = np.array([LeggedObsConfig["scale"]["lin_vel"]]*3 + [LeggedObsConfig["scale"]["ang_vel"]]*1)
         scale_square_wave = np.ones(1)  # No scaling on the square wave
         scale_leg_joint_qpos = np.array([1] * 12) * LeggedObsConfig["scale"]["qpos"]
@@ -158,7 +179,7 @@ class Lite3RealAgent:
         scale_vec = np.concatenate([
             # scale_lin_vel, 
             scale_ang_vel, 
-            # scale_orientation, 
+            scale_orientation, 
             scale_command, 
             # scale_square_wave,
             scale_leg_joint_qpos, 
@@ -182,8 +203,8 @@ class Lite3RealAgent:
             joint_data += real_format_obs["jointData"][leg_name]
 
         # body_lin_vel = np.array([real_format_obs.body_lin_vel[0], real_format_obs.body_lin_vel[1], real_format_obs.body_lin_vel[2]])
-        body_ang_vel = np.array([imu_data["angularVelocityRoll"], imu_data["angularVelocityPitch"], imu_data["angularVelocityYaw"]])
-        # body_orientation = np.array(real_format_obs.body_orientation)  # Assuming it's a quaternion or similar
+        body_ang_vel = np.array([imu_data["angularVelocityRoll"], imu_data["angularVelocityPitch"], imu_data["angularVelocityYaw"]]) * Degree2Rad
+        body_orientation = np.array([imu_data["angleRoll"], imu_data["anglePitch"], imu_data["angleYaw"]]) * Degree2Rad
         leg_joint_qpos = [t["position"] for t in joint_data]
         leg_joint_qvel = [t["velocity"] for t in joint_data]
         # body_height = real_format_obs.body_height  # Uncomment if needed
@@ -196,7 +217,7 @@ class Lite3RealAgent:
         obs = np.concatenate([
             # body_lin_vel
             body_ang_vel,
-            # body_orientation,
+            body_orientation,
             self._command,
             # np.array([square_wave]),
             leg_joint_qpos - self._neutral_joint_values,
@@ -204,7 +225,7 @@ class Lite3RealAgent:
             self._action,
             # np.array([body_height]),  # Uncomment if needed
         ])
-        print("obs: ", obs.shape)
+        # print("obs: ", obs.shape)
         obs *= self._obs_scale_vec
 
         # no noise when inference
@@ -265,7 +286,7 @@ class Lite3RealAgent:
         lin_vel, turn_angel, reborn = self._update_keyboard_control()
         # self._player_agent.update_playable(lin_vel, turn_angel)
         self._command[0:3] = lin_vel
-        self._command[3] = turn_angel
+        self._command[3] = turn_angel * 3   # the code of turning is different from the simulation
 
         # agent_cmd_mocap = self._player_agent.reset_command_indicator(env.data.qpos)
         # env.set_mocap_pos_and_quat(agent_cmd_mocap)      
@@ -276,7 +297,7 @@ class Lite3RealAgent:
         lin_vel = np.zeros(3)
         turn_angel = 0.0
         reborn = False
-        print(key_status)
+        # print(key_status)
         if key_status["W"] == 1:
             lin_vel[0] = self._player_agent_lin_vel_x[1]
         if key_status["S"] == 1:
@@ -295,8 +316,93 @@ class Lite3RealAgent:
             lin_vel[:2] *= 2
 
         self._key_status = key_status.copy()
-        print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
+        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
         
-        return lin_vel, turn_angel, reborn     
+        return lin_vel, turn_angel, reborn    
 
-
+    def log_observation(self, obs, action):
+        """
+        Log observations and actions to a CSV file.
+        
+        Args:
+            obs (dict): Observation dictionary containing IMU and joint data
+            action (np.ndarray): Action array
+        """        # Define CSV headers
+        headers = [
+            "timestamp",
+            # IMU data
+            "imu_angle_roll", "imu_angle_pitch", "imu_angle_yaw",
+            "imu_angular_velocity_roll", "imu_angular_velocity_pitch", "imu_angular_velocity_yaw",
+            "imu_acc_x", "imu_acc_y", "imu_acc_z",
+            # Joint data - Front Left Leg
+            "fl_joint1_pos", "fl_joint1_vel", "fl_joint1_torque",
+            "fl_joint2_pos", "fl_joint2_vel", "fl_joint2_torque",
+            "fl_joint3_pos", "fl_joint3_vel", "fl_joint3_torque",
+            # Joint data - Front Right Leg
+            "fr_joint1_pos", "fr_joint1_vel", "fr_joint1_torque",
+            "fr_joint2_pos", "fr_joint2_vel", "fr_joint2_torque",
+            "fr_joint3_pos", "fr_joint3_vel", "fr_joint3_torque",
+            # Joint data - Hind Left Leg
+            "hl_joint1_pos", "hl_joint1_vel", "hl_joint1_torque",
+            "hl_joint2_pos", "hl_joint2_vel", "hl_joint2_torque",
+            "hl_joint3_pos", "hl_joint3_vel", "hl_joint3_torque",
+            # Joint data - Hind Right Leg
+            "hr_joint1_pos", "hr_joint1_vel", "hr_joint1_torque",
+            "hr_joint2_pos", "hr_joint2_vel", "hr_joint2_torque",
+            "hr_joint3_pos", "hr_joint3_vel", "hr_joint3_torque",
+            # Contact forces
+            "fl_force_x", "fl_force_y", "fl_force_z",
+            "fr_force_x", "fr_force_y", "fr_force_z",
+            "hl_force_x", "hl_force_y", "hl_force_z",
+            "hr_force_x", "hr_force_y", "hr_force_z",
+            # Actions
+            "fl_hip_action", "fl_thigh_action", "fl_calf_action",
+            "fr_hip_action", "fr_thigh_action", "fr_calf_action",
+            "hl_hip_action", "hl_thigh_action", "hl_calf_action",
+            "hr_hip_action", "hr_thigh_action", "hr_calf_action",
+            # command
+            "command_lin_vel_x", "command_lin_vel_y", "command_lin_vel_z", "command_ang_vel"
+        ]
+        
+        # Create file and write headers if it doesn't exist
+        file_exists = os.path.exists(self.filename)
+        
+        with open(self.filename, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(headers)
+            
+            # Prepare data row
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            
+            # Extract IMU data
+            imu_data = obs["imu"]
+            imu_values = [
+                imu_data["angleRoll"], imu_data["anglePitch"], imu_data["angleYaw"],
+                imu_data["angularVelocityRoll"], imu_data["angularVelocityPitch"], imu_data["angularVelocityYaw"],
+                imu_data["accX"], imu_data["accY"], imu_data["accZ"]
+            ]
+            
+            # Extract joint data
+            joint_data = obs["jointData"]
+            joint_values = []
+            for leg in ["flLeg", "frLeg", "hlLeg", "hrLeg"]:
+                for joint in joint_data[leg]:
+                    joint_values.extend([
+                        joint["position"],
+                        joint["velocity"],
+                        joint["torque"],
+                        # joint["temperature"]
+                    ])
+            
+            # Extract contact forces
+            contact_forces = obs.get("contactForce", {})
+            force_values = []
+            for leg in ["flLeg", "frLeg", "hlLeg", "hrLeg"]:
+                forces = contact_forces.get(leg, [0.0, 0.0, 0.0])
+                force_values.extend(forces)
+            
+            # Combine all data
+            row = [current_time] + imu_values + joint_values + force_values + list(action) + list(self._command)
+            
+            writer.writerow(row)

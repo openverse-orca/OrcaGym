@@ -128,8 +128,8 @@ Lite3Config = {
         ],
         "curriculum_commands" : {
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
-                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+                "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.5, 0.5], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command

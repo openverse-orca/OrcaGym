@@ -68,7 +68,7 @@ def create_proto_Action(fl_positions, fr_positions, hl_positions, hr_positions,
 class PolicyService(realenv_pb2_grpc.PolicyServiceServicer):
     def GetAction(self, request, context):
         d = MessageToDict(request)
-        print(d)
+        # print(d)
         action = lite3_real_agent.get_action(d)
         print(action)
         return create_proto_Action(
