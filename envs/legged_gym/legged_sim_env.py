@@ -481,7 +481,6 @@ class AgentBase:
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
-        
         return lin_vel, turn_angel, reborn    
     
 class Lite3Agent(AgentBase):
