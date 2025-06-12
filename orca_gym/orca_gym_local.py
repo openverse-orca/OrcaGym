@@ -53,6 +53,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._timestep = 0.001
         self._mjModel = None
         self._mjData = None
+        self._override_ctrls : dict[int, float] = {}
 
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
@@ -108,8 +109,15 @@ class OrcaGymLocal(OrcaGymBase):
     async def update_local_env(self, qpos, time):
         request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
         response = await self.stub.UpdateLocalEnv(request)
-        return response
-    
+        override_ctrls = response.override_ctrls
+        self._override_ctrls.clear()
+        if override_ctrls is not None and len(override_ctrls) > 0:
+            for ctrl in override_ctrls:
+                if ctrl.index < 0 or ctrl.index >= self._mjModel.nu:
+                    print(f"Invalid control index: {ctrl.index}, skipping.")
+                    continue
+                self._override_ctrls[ctrl.index] = ctrl.value
+
     async def load_content_file(self, content_file_name):
         request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
         response = await self.stub.LoadContentFile(request)
@@ -650,6 +658,10 @@ class OrcaGymLocal(OrcaGymBase):
         return sensor_data_dict    
     
     def set_ctrl(self, ctrl):
+        if len(self._override_ctrls) > 0:
+            # 如果有 override 控制，则使用 override 控制
+            for actuator_id, value in self._override_ctrls.items():
+                ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
 
     def mj_step(self, nstep):

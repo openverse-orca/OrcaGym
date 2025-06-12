@@ -965,7 +965,13 @@ message UpdateLocalEnvRequest{
     double time = 2;
 }
 
-message UpdateLocalEnvResponse{}
+message UpdateLocalEnvResponse{
+    message OverrideCtrlInfo {
+        int32 index = 1; // 控制输入索引
+        double value = 2; // 控制输入值
+    }
+    repeated OverrideCtrlInfo override_ctrls = 1; // 覆盖的控制输入列表
+}
 
 message LoadLocalEnvRequest {
     enum ReqType {
