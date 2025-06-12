@@ -296,6 +296,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_ctrl(self, ctrl):
         self.gym.set_ctrl(ctrl)
 
+    def get_ctrl(self) -> np.ndarray:
+        return self.gym.get_ctrl()
+
     def mj_step(self, nstep):
         self.gym.mj_step(nstep)
 

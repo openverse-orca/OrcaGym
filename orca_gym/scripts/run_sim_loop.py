@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 import os
 from typing import Optional
+from orca_gym.scripts.mujoco_monitor import open_mujoco_monitor
 
 ENV_ENTRY_POINT = {
     "SimulationLoop": "orca_gym.scripts.sim_env:SimEnv",
@@ -60,6 +61,13 @@ def run_simulation(orcagym_addr : str,
 
         env = gym.make(env_id)        
         print("Starting simulation...")
+
+        if isinstance(env, gym.wrappers.TimeLimit):
+            local_env = env.unwrapped
+        else:
+            local_env = env
+
+        open_mujoco_monitor(local_env)
 
         if scene_runtime is not None:
             if hasattr(env, "set_scene_runtime"):
