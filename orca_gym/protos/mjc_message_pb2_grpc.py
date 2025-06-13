@@ -104,15 +104,15 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.GetMouseMovementEventsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.GetMouseMovementEventsResponse.FromString,
                 _registered_method=True)
-        self.GetActorManipulationAnchored = channel.unary_unary(
-                '/MujocoMessage.GrpcService/GetActorManipulationAnchored',
-                request_serializer=mjc__message__pb2.GetActorManipulationAnchoredRequest.SerializeToString,
-                response_deserializer=mjc__message__pb2.GetActorManipulationAnchoredResponse.FromString,
+        self.GetBodyManipulationAnchored = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+                request_serializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
                 _registered_method=True)
-        self.GetActorManipulationMovement = channel.unary_unary(
-                '/MujocoMessage.GrpcService/GetActorManipulationMovement',
-                request_serializer=mjc__message__pb2.GetActorManipulationMovementRequest.SerializeToString,
-                response_deserializer=mjc__message__pb2.GetActorManipulationMovementResponse.FromString,
+        self.GetBodyManipulationMovement = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+                request_serializer=mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
                 _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
@@ -521,13 +521,13 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetActorManipulationAnchored(self, request, context):
+    def GetBodyManipulationAnchored(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetActorManipulationMovement(self, request, context):
+    def GetBodyManipulationMovement(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -993,15 +993,15 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=mjc__message__pb2.GetMouseMovementEventsRequest.FromString,
                     response_serializer=mjc__message__pb2.GetMouseMovementEventsResponse.SerializeToString,
             ),
-            'GetActorManipulationAnchored': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetActorManipulationAnchored,
-                    request_deserializer=mjc__message__pb2.GetActorManipulationAnchoredRequest.FromString,
-                    response_serializer=mjc__message__pb2.GetActorManipulationAnchoredResponse.SerializeToString,
+            'GetBodyManipulationAnchored': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationAnchored,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.SerializeToString,
             ),
-            'GetActorManipulationMovement': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetActorManipulationMovement,
-                    request_deserializer=mjc__message__pb2.GetActorManipulationMovementRequest.FromString,
-                    response_serializer=mjc__message__pb2.GetActorManipulationMovementResponse.SerializeToString,
+            'GetBodyManipulationMovement': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationMovement,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationMovementRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationMovementResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1708,7 +1708,7 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def GetActorManipulationAnchored(request,
+    def GetBodyManipulationAnchored(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1721,9 +1721,9 @@ class GrpcService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/MujocoMessage.GrpcService/GetActorManipulationAnchored',
-            mjc__message__pb2.GetActorManipulationAnchoredRequest.SerializeToString,
-            mjc__message__pb2.GetActorManipulationAnchoredResponse.FromString,
+            '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+            mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1735,7 +1735,7 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def GetActorManipulationMovement(request,
+    def GetBodyManipulationMovement(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1748,9 +1748,9 @@ class GrpcService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/MujocoMessage.GrpcService/GetActorManipulationMovement',
-            mjc__message__pb2.GetActorManipulationMovementRequest.SerializeToString,
-            mjc__message__pb2.GetActorManipulationMovementResponse.FromString,
+            '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+            mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
             options,
             channel_credentials,
             insecure,

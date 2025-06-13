@@ -42,6 +42,31 @@ def get_dof_size(joint_type):
         return 1
     else:
         return 0
+    
+class AnchorType:
+    """
+    Enum for anchor types.
+    """
+    NONE = 0
+    WELD = 1
+    BALL = 2
+
+def get_eq_type(anchor_type: AnchorType):
+    """
+    Get the equality constraint type based on the anchor type.
+    
+    Args:
+        anchor_type (AnchorType): The anchor type.
+        
+    Returns:
+        mujoco.mjtEq: The equality constraint type.
+    """
+    if anchor_type == AnchorType.WELD:
+        return mujoco.mjtEq.mjEQ_WELD
+    elif anchor_type == AnchorType.BALL:
+        return mujoco.mjtEq.mjEQ_CONNECT
+    else:
+        return mujoco.mjtEq.mjEQ_CONNECT
 
 class OrcaGymLocal(OrcaGymBase):
     """
@@ -199,25 +224,26 @@ class OrcaGymLocal(OrcaGymBase):
         # 返回绝对路径
         return os.path.abspath(file_path)
 
-    async def get_actor_manipulation_anchored(self):
-        request = mjc_message_pb2.GetActorManipulationAnchoredRequest()
-        response = await self.stub.GetActorManipulationAnchored(request)
-        actor_anchored = response.actor_name
-        if actor_anchored is None or len(actor_anchored) == 0:
-            return None
+    async def get_body_manipulation_anchored(self):
+        request = mjc_message_pb2.GetBodyManipulationAnchoredRequest()
+        response = await self.stub.GetBodyManipulationAnchored(request)
+        body_anchored = response.body_name
+        anchor_type = response.anchor_type
+        if body_anchored is None or len(body_anchored) == 0:
+            return None, AnchorType.NONE
         else:
-            return actor_anchored
+            return body_anchored, anchor_type
 
-    async def get_actor_manipulation_movement(self):
-        request = mjc_message_pb2.GetActorManipulationMovementRequest()
-        response = await self.stub.GetActorManipulationMovement(request)
+    async def get_body_manipulation_movement(self):
+        request = mjc_message_pb2.GetBodyManipulationMovementRequest()
+        response = await self.stub.GetBodyManipulationMovement(request)
         delta_pos = np.array(response.delta_pos)
         delta_quat = np.array(response.delta_quat)
-        actor_movement = {
+        body_movement = {
             "delta_pos": delta_pos,
             "delta_quat": delta_quat
         }
-        return actor_movement
+        return body_movement
 
     def set_time_step(self, time_step):
         self._timestep = time_step
@@ -757,7 +783,7 @@ class OrcaGymLocal(OrcaGymBase):
             if self._mjModel.eq_obj1id[i] == old_obj1_id and self._mjModel.eq_obj2id[i] == old_obj2_id:
                 self._mjModel.eq_obj1id[i] = new_obj1_id
                 self._mjModel.eq_obj2id[i] = new_obj2_id
-                print(f"Modified equality constraint {i}: {old_obj1_id}, {old_obj2_id} -> {new_obj1_id}, {new_obj2_id}")
+                # print(f"Modified equality constraint {i}: {old_obj1_id}, {old_obj2_id} -> {new_obj1_id}, {new_obj2_id}")
                 break
 
     def update_equality_constraints(self, constraint_list):
@@ -765,9 +791,11 @@ class OrcaGymLocal(OrcaGymBase):
             obj1_id = constraint['obj1_id']
             obj2_id = constraint['obj2_id']
             eq_data = constraint['eq_data']
+            eq_type = constraint['eq_type']
             for i in range(self.model.neq):
                 if self._mjModel.eq_obj1id[i] == obj1_id and self._mjModel.eq_obj2id[i] == obj2_id:
                     self._mjModel.eq_data[i] = eq_data.copy()
+                    self._mjModel.eq_type[i] = eq_type
                     break
 
             # print("eq_data: ", eq_data)

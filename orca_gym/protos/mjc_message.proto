@@ -22,8 +22,8 @@ service GrpcService {
   // 键鼠操作
   rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
   rpc GetMouseMovementEvents (GetMouseMovementEventsRequest) returns (GetMouseMovementEventsResponse);
-  rpc GetActorManipulationAnchored (GetActorManipulationAnchoredRequest) returns (GetActorManipulationAnchoredResponse);
-  rpc GetActorManipulationMovement (GetActorManipulationMovementRequest) returns (GetActorManipulationMovementResponse);
+  rpc GetBodyManipulationAnchored (GetBodyManipulationAnchoredRequest) returns (GetBodyManipulationAnchoredResponse);
+  rpc GetBodyManipulationMovement (GetBodyManipulationMovementRequest) returns (GetBodyManipulationMovementResponse);
 
 
   // 配置查询
@@ -1105,15 +1105,21 @@ message GetMouseMovementEventsResponse {
     float delta_z = 3;  // 鼠标在 z 轴上的移动距离（如果有）
 }
 
-message GetActorManipulationAnchoredRequest {}
+message GetBodyManipulationAnchoredRequest {}
 
-message GetActorManipulationAnchoredResponse {
-    string actor_name = 1;  // 被锚定的 Actor 名字
+message GetBodyManipulationAnchoredResponse {
+    enum AnchorType {
+        NONE = 0; // 无锚定
+        WELD = 1; // 焊接锚定
+        BALL = 2;  // 球形锚定
+    }
+    string body_name = 1;  // 被锚定的 Body 名字
+    AnchorType anchor_type = 2;  // 锚定类型
 }
 
-message GetActorManipulationMovementRequest {}
+message GetBodyManipulationMovementRequest {}
 
-message GetActorManipulationMovementResponse {
+message GetBodyManipulationMovementResponse {
     repeated double delta_pos = 1;  // Actor 在世界坐标系中的位置变化 (3 elements)
     repeated double delta_quat = 2; // Actor 在世界坐标系中的旋转变化 (4 elements)
 }
