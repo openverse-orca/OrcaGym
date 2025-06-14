@@ -160,7 +160,7 @@ class KeyboardInputSourceOrcaStudio:
     def update_keyboard_state(self, keyboard_state : dict[str, int]):
         key_pressed_events = self.get_key_pressed()
 
-        print(f"Key pressed events: {key_pressed_events}")
+        # print(f"Key pressed events: {key_pressed_events}")
 
         [keyboard_state.update({key: 0}) for key in self.keyboard_map.values()]
 

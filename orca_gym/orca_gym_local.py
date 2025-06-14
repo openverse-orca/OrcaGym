@@ -835,13 +835,14 @@ class OrcaGymLocal(OrcaGymBase):
         contact = self._mjData.contact
         contacts = []
         for i in range(self._mjData.ncon):
-            contact_info = {
-                "ID": i,
-                "Dim": contact.dim[i],
-                "Geom1": contact.geom1[i],
-                "Geom2": contact.geom2[i],
-            }
-            contacts.append(contact_info)
+            if contact.geom1[i] >= 0 and contact.geom2[i] >= 0:
+                contact_info = {
+                    "ID": i,
+                    "Dim": contact.dim[i],
+                    "Geom1": contact.geom1[i],
+                    "Geom2": contact.geom2[i],
+                }
+                contacts.append(contact_info)
         
         return contacts            
     
