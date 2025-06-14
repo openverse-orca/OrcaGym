@@ -148,26 +148,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def render(self):
         if self.render_mode not in ["human", "force"]:
-            # 只有在渲染模式下才需要处理图形界面交互行为，否则本身也不会有交互数据
             return
         
         time_diff = time.perf_counter() - self._render_time_step
         if (time_diff > self._render_interval):
             self._render_time_step = time.perf_counter()
             self.loop.run_until_complete(self.gym.render())
-            
+            self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+
     def do_body_manipulation(self):
-        if self.render_mode not in ["human", "force"]:
-            # 只有在渲染模式下才需要处理图形界面交互行为，否则本身也不会有交互数据
-            return
-        
         if self._anchor_body_id is None:
             # 老版本不支持锚点操作
-            return
-
-        time_diff = time.perf_counter() - self._render_time_step
-        if (time_diff < self._render_interval):
-            # 渲染间隔未到，不处理交互数据
             return
 
         actor_anchored, anchor_type = self.get_body_manipulation_anchored()
@@ -307,7 +298,6 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym.mj_jacSite(jacp, jacr, site_name)
 
     def _step_orca_sim_simulation(self, ctrl, n_frames):
-        self.do_body_manipulation()
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
 
