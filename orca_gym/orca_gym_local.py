@@ -690,10 +690,6 @@ class OrcaGymLocal(OrcaGymBase):
                 ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
 
-    def get_ctrl(self) -> np.ndarray:
-        ctrl = np.copy(self._mjData.ctrl)
-        return ctrl
-
     def mj_step(self, nstep):
         mujoco.mj_step(self._mjModel, self._mjData, nstep)
 

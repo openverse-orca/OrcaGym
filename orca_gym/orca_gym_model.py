@@ -21,12 +21,12 @@ class OrcaGymModel:
 
     def __init__(self, model_info):
         self.init_model_info(model_info)                
-        self._eq_list = []
-        self._mocap_dict = {}
-        self._actuator_dict = {}
-        self._body_dict = {}
-        self._joint_dict = {}
-        self._site_dict = {}
+        self._eq_list = None
+        self._mocap_dict = None
+        self._actuator_dict = None
+        self._body_dict = None
+        self._joint_dict = None
+        self._site_dict = None
         self._init_time = datetime.now()
         
     def init_model_info(self, model_info):
@@ -126,7 +126,7 @@ class OrcaGymModel:
     def body_id2name(self, body_id):
         return self._body_id2name_map[body_id]
 
-    def init_joint_dict(self, joint_dict : dict):
+    def init_joint_dict(self, joint_dict):
         self._joint_id2name_map = {}
         for i, (joint_name, joint) in enumerate(joint_dict.items()):
             joint["JointId"] = i
@@ -139,7 +139,7 @@ class OrcaGymModel:
             else:
                 print("Joint dict: ", joint_dict)
 
-    def get_joint_dict(self) -> dict:
+    def get_joint_dict(self):
         return self._joint_dict
     
     def get_joint_byid(self, id : int):
