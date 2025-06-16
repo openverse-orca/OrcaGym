@@ -34,8 +34,8 @@ ENV_ENTRY_POINT = {
     "Gripper": "envs.manipulation.gripper_env:GripperEnv"
 }
 
-TIME_STEP = 0.005
-FRAME_SKIP = 1
+TIME_STEP = 0.001
+FRAME_SKIP = 20
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
