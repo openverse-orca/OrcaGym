@@ -305,6 +305,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.time_step = time_step
         self.realtime_step = time_step * self.frame_skip
         self.gym.set_time_step(time_step)
+        self.loop.run_until_complete(self.gym.set_timestep_remote(time_step))
         return
 
     def update_data(self):

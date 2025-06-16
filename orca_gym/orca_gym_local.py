@@ -252,7 +252,12 @@ class OrcaGymLocal(OrcaGymBase):
     def set_opt_timestep(self, timestep):
         if self._mjModel is not None:
             self._mjModel.opt.timestep = timestep
-            
+
+    async def set_timestep_remote(self, timestep):
+        request = mjc_message_pb2.SetOptTimestepRequest(timestep=timestep)
+        response = await self.stub.SetOptTimestep(request)
+        return response
+
     def set_opt_config(self):
         self._mjModel.opt.timestep = self.opt.timestep
         self._mjModel.opt.apirate = self.opt.apirate
