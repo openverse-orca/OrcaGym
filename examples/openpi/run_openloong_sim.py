@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_names', type=str, default='OpenLoongHand', help='The agent names to control, separated by space')
+    parser.add_argument('--agent_names', type=str, default='OpenLoongGripperAgent', help='The agent names to control, separated by space')
     parser.add_argument('--pico_ports', type=str, default='8001', help='The pico server port')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
     parser.add_argument('--action_type', type=str, default='joint_pos', help='The action type of the environment (end_effector / joint_pos)')
