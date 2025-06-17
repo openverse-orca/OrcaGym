@@ -38,7 +38,7 @@ class Task:
     PICK_AND_PLACE = "pick_and_place"
     
 
-class FrankaEnv(RobomimicEnv):
+class SingleArmEnv(RobomimicEnv):
     """
     Franka single arm environment. The environment is used to train a policy to control the Franka robot arm.
     
@@ -202,7 +202,7 @@ class FrankaEnv(RobomimicEnv):
         #     self._set_grasp_mocap(xpos, self._initial_grasp_site_xquat) # set the gripper to a position that is not in the camera view
 
     def get_env_version(self):
-        return FrankaEnv.ENV_VERSION
+        return SingleArmEnv.ENV_VERSION
 
     def check_success(self):
         """

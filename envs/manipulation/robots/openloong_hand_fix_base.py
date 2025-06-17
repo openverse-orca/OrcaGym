@@ -1,0 +1,184 @@
+from datetime import datetime
+from shlex import join
+import mujoco
+import numpy as np
+from gymnasium.core import ObsType
+from orca_gym.robomimic.dataset_util import DatasetWriter
+from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.utils import rotations
+from typing import Optional, Any, SupportsFloat
+from gymnasium import spaces
+from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from orca_gym.devices.pico_joytsick import PicoJoystick
+from orca_gym.robosuite.controllers.controller_factory import controller_factory
+import orca_gym.robosuite.controllers.controller_config as controller_config
+import orca_gym.robosuite.utils.transform_utils as transform_utils
+from orca_gym.environment import OrcaGymLocalEnv
+from scipy.spatial.transform import Rotation as R, Rotation
+from orca_gym.task.abstract_task import AbstractTask
+import time
+from orca_gym.utils.joint_controller import JointController
+import random
+from envs.manipulation.dual_arm_env import DualArmEnv, AgentBase, RunMode, ControlDevice, ActionType, TaskStatus
+from envs.manipulation.dual_arm_robot import DualArmRobot
+
+from orca_gym.environment.orca_gym_env import RewardType
+from orca_gym.utils.reward_printer import RewardPrinter
+from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
+
+
+
+
+
+
+class OpenLoongHandFixBase(DualArmRobot):
+    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
+        super().__init__(env, id, name)
+
+        self.init_agent(id)
+        
+    def init_agent(self, id: int):
+        super().init_agent(id)
+        # print("arm_actuator_id: ", self._l_arm_actuator_id)
+        self._l_hand_moto_names = [self._env.actuator("M_zbll_J1", id), self._env.actuator("M_zbll_J2", id), self._env.actuator("M_zbll_J3", id)
+                                    ,self._env.actuator("M_zbll_J4", id),self._env.actuator("M_zbll_J5", id),self._env.actuator("M_zbll_J6", id),
+                                    self._env.actuator("M_zbll_J7", id),self._env.actuator("M_zbll_J8", id),self._env.actuator("M_zbll_J9", id),
+                                    self._env.actuator("M_zbll_J10", id),self._env.actuator("M_zbll_J11", id)]
+        self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
+        self._l_hand_body_names = [self._env.body("zbll_Link1"), self._env.body("zbll_Link2"), self._env.body("zbll_Link3"),
+                                   self._env.body("zbll_Link4"), self._env.body("zbll_Link5"), self._env.body("zbll_Link6"), 
+                                   self._env.body("zbll_Link7"), self._env.body("zbll_Link8"), self._env.body("zbll_Link9"),
+                                   self._env.body("zbll_Link10"), self._env.body("zbll_Link11")]
+        self._l_hand_gemo_ids = []
+        for geom_info in self._env.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self._l_hand_body_names:
+                self._l_hand_gemo_ids.append(geom_info["GeomId"])
+
+
+        self._r_hand_motor_names = [self._env.actuator("M_zbr_J1", id), self._env.actuator("M_zbr_J2", id), self._env.actuator("M_zbr_J3", id)
+                                   ,self._env.actuator("M_zbr_J4", id),self._env.actuator("M_zbr_J5", id),self._env.actuator("M_zbr_J6", id),
+                                   self._env.actuator("M_zbr_J7", id),self._env.actuator("M_zbr_J8", id),self._env.actuator("M_zbr_J9", id),
+                                   self._env.actuator("M_zbr_J10", id),self._env.actuator("M_zbr_J11", id)]
+        self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
+        self._r_hand_body_names = [self._env.body("zbr_Link1"), self._env.body("zbr_Link2"), self._env.body("zbr_Link3"),
+                                   self._env.body("zbr_Link4"), self._env.body("zbr_Link5"), self._env.body("zbr_Link6"), 
+                                   self._env.body("zbr_Link7"), self._env.body("zbr_Link8"), self._env.body("zbr_Link9"),
+                                   self._env.body("zbr_Link10"), self._env.body("zbr_Link11")]
+        self._r_hand_gemo_ids = []
+        for geom_info in self._env.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self._r_hand_body_names:
+                self._r_hand_gemo_ids.append(geom_info["GeomId"])            
+
+
+    def _set_gripper_ctrl_l(self, joystick_state) -> None:
+        # Press secondary button to set gripper minimal value
+        offset_rate_clip_adjust_rate = 0.1  # 10% per second
+        if joystick_state["leftHand"]["secondaryButtonPressed"]:
+            self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self._env.dt    
+            self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
+        elif joystick_state["leftHand"]["primaryButtonPressed"]:
+            self._l_gripper_offset_rate_clip = 0
+
+        # Press trigger to close gripper
+        # Adjust sensitivity using an exponential function
+        trigger_value = joystick_state["leftHand"]["triggerValue"]  # Value in [0, 1]
+        k = np.e  # Adjust 'k' to change the curvature of the exponential function
+        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
+        offset_rate = -adjusted_value
+        offset_rate = np.clip(offset_rate, -1, self._l_gripper_offset_rate_clip)
+        self._set_l_hand_actuator_ctrl(offset_rate)
+        self._grasp_value_l = offset_rate
+            
+
+    def _set_gripper_ctrl_r(self, joystick_state) -> None:
+        # Press secondary button to set gripper minimal value
+        offset_rate_clip_adjust_rate = 0.1
+        if joystick_state["rightHand"]["secondaryButtonPressed"]:
+            self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self._env.dt
+            self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
+        elif joystick_state["rightHand"]["primaryButtonPressed"]:
+            self._r_gripper_offset_rate_clip = 0
+
+        # Adjust sensitivity using an exponential function
+        trigger_value = joystick_state["rightHand"]["triggerValue"]  # Value in [0, 1]
+        k = np.e  # Adjust 'k' to change the curvature of the exponential function
+        adjusted_value = (np.exp(k * trigger_value) - 1) / (np.exp(k) - 1)  # Maps input from [0, 1] to [0, 1]
+        offset_rate = -adjusted_value
+        offset_rate = np.clip(offset_rate, -1, self._r_gripper_offset_rate_clip)
+        self._set_r_hand_actuator_ctrl(offset_rate)
+        self._grasp_value_r = offset_rate
+                
+    def _set_r_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._r_hand_actuator_id:
+            actuator_name = self._env.model.actuator_id2name(actuator_id)
+            if actuator_name == self._env.actuator("M_zbr_J2", self.id) or actuator_name == self._env.actuator("M_zbr_J3", self.id):
+                offset_dir = -1
+            else:
+                offset_dir = 1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = np.clip(
+                self._env.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
+            
+    def _set_l_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._l_hand_actuator_id:
+            actuator_name = self._env.model.actuator_id2name(actuator_id)
+            if actuator_name == self._env.actuator("M_zbll_J3", self.id):
+                offset_dir = -1
+            else:
+                offset_dir = 1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = np.clip(
+                self._env.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])            
+            
+    def update_force_feedback(self) -> None:class OpenLoongHandFixbase(OpenLoongBase):
+    def __init__(self, id: int, name: str) -> None:
+        super().__init__(id, name)
+        
+        self.init_agent(id)
+        
+    def init_agent(self, id: int):
+        super().init_agent(id)
+        # print("arm_actuator_id: ", self._l_arm_actuator_id)
+        self._l_hand_moto_names = [self._env.actuator("M_zbll_J1", id), self._env.actuator("M_zbll_J2", id), self._env.actuator("M_zbll_J3", id)
+                                    ,self._env.actuator("M_zbll_J4", id),self._env.actuator("M_zbll_J5", id),self._env.actuator("M_zbll_J6", id),
+                                    self._env.actuator("M_zbll_J7", id),self._env.actuator("M_zbll_J8", id),self._env.actuator("M_zbll_J9", id),
+                                    self._env.actuator("M_zbll_J10", id),self._env.actuator("M_zbll_J11", id)]
+        self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
+        self._l_hand_body_names = [self._env.body("zbll_Link1"), self._env.body("zbll_Link2"), self._env.body("zbll_Link3"),
+                                   self._env.body("zbll_Link4"), self._env.body("zbll_Link5"), self._env.body("zbll_Link6"), 
+                                   self._env.body("zbll_Link7"), self._env.body("zbll_Link8"), self._env.body("zbll_Link9"),
+                                   self._env.body("zbll_Link10"), self._env.body("zbll_Link11")]
+        self._l_hand_gemo_ids = []
+        for geom_info in self._env.model.get_geom_dict().values():
+            if geom_info["BodyName"] in self._l_hand_body_names:
+                self._l_hand_gemo_ids.append(geom_info["GeomId"])
+
+        if self._pico_joystick is not None:
+            r_hand_force = self._query_hand_force(self._r_hand_gemo_ids)
+            l_hand_force = self._query_hand_force(self._l_hand_gemo_ids)
+            self._pico_joystick.send_force_message(l_hand_force, r_hand_force)            
+            
+
+    def _query_hand_force(self, hand_geom_ids):
+        contact_simple_list = self._env.query_contact_simple()
+        contact_force_query_ids = []
+        for contact_simple in contact_simple_list:
+            if contact_simple["Geom1"] in hand_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+            if contact_simple["Geom2"] in hand_geom_ids:
+                contact_force_query_ids.append(contact_simple["ID"])
+
+        contact_force_dict = self._env.query_contact_force(contact_force_query_ids)
+        compose_force = 0
+        for force in contact_force_dict.values():
+            compose_force += np.linalg.norm(force[:3])
+        return compose_force
+    
