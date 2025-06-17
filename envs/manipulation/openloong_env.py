@@ -24,6 +24,27 @@ from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
+def get_transform_matrix(rot: R, pos: np.ndarray) -> np.ndarray:
+    T = np.eye(4)
+    T[:3, :3] = rot.as_matrix()
+    T[:3, 3] = pos
+    return T
+
+def fast_inverse_transform(T: np.ndarray) -> np.ndarray:
+    Rm = T[:3, :3]; tm = T[:3, 3]
+    T_inv = np.eye(4)
+    T_inv[:3, :3] = Rm.T
+    T_inv[:3, 3] = -Rm.T @ tm
+    return T_inv
+
+def local_to_global_pose(local_pos, local_rot: R, T_init_base: np.ndarray, T_base_link: np.ndarray):
+    T_local = get_transform_matrix(local_rot, local_pos)
+    T_global = T_base_link @ fast_inverse_transform(T_init_base) @ T_local
+    gpos = T_global[:3, 3]
+    grot = R.from_matrix(T_global[:3, :3])
+    return gpos, grot
+
+
 class RunMode:
     """
     Enum class for control type
@@ -803,6 +824,8 @@ class OpenLoongAgent(AgentBase):
         super().__init__(env, id, name)
 
     def init_agent(self, env: OpenLoongEnv, id: int):
+        self._inited = False
+        self._T_init_base = None
         self._base_body_name = [env.body("base_link", id)]
         self._base_body_xpos, _, self._base_body_xquat = env.get_body_xpos_xmat_xquat(self._base_body_name)
         print("base_body_xpos: ", self._base_body_xpos)
@@ -815,6 +838,15 @@ class OpenLoongAgent(AgentBase):
         self._neck_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
         self._neck_neutral_joint_values = np.array([0, -0.7854])
         self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
+        try:
+            wheel_r_name = env.actuator("M_wheel_r", id)
+            wheel_l_name = env.actuator("M_wheel_l", id)
+            self._wheel_r_id = env.model.actuator_name2id(wheel_r_name)
+            self._wheel_l_id = env.model.actuator_name2id(wheel_l_name)
+            self._has_wheels = True
+        except KeyError:
+            # 模型里没有轮子 actuator
+            self._has_wheels = False
 
         # index used to distinguish arm and gripper joints
         self._r_arm_joint_names = [env.joint("J_arm_r_01", id), env.joint("J_arm_r_02", id), 
@@ -1035,6 +1067,8 @@ class OpenLoongAgent(AgentBase):
             env.ctrl[self._l_arm_actuator_id[i]] = self._l_neutral_joint_values[i]
 
     def on_reset_model(self, env: OpenLoongEnv) -> None:
+        self._inited = False
+        self._T_init_base = None
         self._reset_grasp_mocap(env)
         self._reset_gripper()
         self._reset_neck_mocap(env)
@@ -1196,6 +1230,15 @@ class OpenLoongAgent(AgentBase):
         return env.ctrl[self._r_arm_actuator_id]
 
     def on_teleoperation_action(self, env: OpenLoongEnv) -> np.ndarray:
+        # 1) 先拿当前 base_link 的全局位姿
+        base_pos, _, base_quat = env.get_body_xpos_xmat_xquat(self._base_body_name)
+        base_rot = R.from_quat(base_quat[[1,2,3,0]])
+        T_base_link = get_transform_matrix(base_rot, base_pos)
+        # 2) 如果还没记录过，就把这帧当作初始基座变换
+        if not self._inited:
+            self._T_init_base = T_base_link.copy()
+            self._inited = True
+        # 3) 读 mocap，补偿到世界系，再下发给 OSC 控制器
         mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
 
         if self._pico_joystick is not None:
@@ -1206,61 +1249,56 @@ class OpenLoongAgent(AgentBase):
             # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
         else:
             return np.zeros(14)
+        # 构造 local→global
+        local_rot_l = R.from_quat(transform_utils.axisangle2quat(
+            transform_utils.quat2axisangle(mocap_l_xquat[[1,2,3,0]])
+        ))
+        ee_pos_l_g, ee_rot_l_g = local_to_global_pose(
+            mocap_l_xpos, local_rot_l, self._T_init_base, T_base_link
+        )
+        action_l = np.concatenate([ee_pos_l_g, transform_utils.quat2axisangle(ee_rot_l_g.as_quat())])
 
+        # 同理右臂……
+        local_rot_r = R.from_quat(transform_utils.axisangle2quat(
+            transform_utils.quat2axisangle(mocap_r_xquat[[1,2,3,0]])
+        ))
+        ee_pos_r_g, ee_rot_r_g = local_to_global_pose(
+            mocap_r_xpos, local_rot_r, self._T_init_base, T_base_link
+        )
+        action_r = np.concatenate([ee_pos_r_g, transform_utils.quat2axisangle(ee_rot_r_g.as_quat())])
 
-        # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
-        mocap_r_axisangle = transform_utils.quat2axisangle(np.array([mocap_r_xquat[1], 
-                                                                   mocap_r_xquat[2], 
-                                                                   mocap_r_xquat[3], 
-                                                                   mocap_r_xquat[0]]))              
-        # mocap_axisangle[1] = -mocap_axisangle[1]
-        action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
-
-        if env.action_use_motor():
-            # print("action r:", action_r)
-            self._r_controller.set_goal(action_r)
-            ctrl_r = self._r_controller.run_controller()
-            # print("ctrl r: ", ctrl)
-            self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
-        else:
-            ctrl_r = self.set_r_arm_position_ctrl(env, mocap_r_xpos, mocap_r_xquat)
-
-        mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
-                                                                   mocap_l_xquat[2], 
-                                                                   mocap_l_xquat[3], 
-                                                                   mocap_l_xquat[0]]))  
-        action_l = np.concatenate([mocap_l_xpos, mocap_l_axisangle])
+        # 4) 下发给两个 OSC 控制器
+        ctrl_l = np.zeros(len(getattr(self, "_l_arm_actuator_id", [])), dtype=np.float32)
+        ctrl_r = np.zeros(len(getattr(self, "_r_arm_actuator_id", [])), dtype=np.float32)
 
         if env.action_use_motor():
-            # print("action l:", action_l)
-            # print(action)
+            # OSC 控制器
             self._l_controller.set_goal(action_l)
             ctrl_l = self._l_controller.run_controller()
-            # print("ctrl l: ", ctrl)
             self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
+        
+            self._r_controller.set_goal(action_r)
+            ctrl_r = self._r_controller.run_controller()
+            self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
         else:
+            # 非 motor 模式下，调用 IK 控制
             ctrl_l = self.set_l_arm_position_ctrl(env, mocap_l_xpos, mocap_l_xquat)
-
-
-        action_l_B = self._action_to_action_B(env, action_l)
-        action_r_B = self._action_to_action_B(env, action_r)
-
-        action = np.concatenate([action_l_B,                # left eef pos and angle, 0-5
-                                 ctrl_l,               # left arm joint pos, 6-12 (will be fill after do simulation)
-                                 [self._grasp_value_l],     # left hand grasp value, 13
-                                 action_r_B,                # right eef pos and angle, 14-19
-                                 ctrl_r,               # right arm joint pos, 20-26 (will be fill after do simulation)
-                                 [self._grasp_value_r]]     # right hand grasp value, 27
-                                ).flatten()
-
-        return action
-
-    def fill_arm_joint_pos(self, env : OpenLoongEnv, action : np.ndarray) -> np.ndarray:
-        arm_joint_values_l = self._get_arm_joint_values(env, self._l_arm_joint_names)
-        arm_joint_values_r = self._get_arm_joint_values(env, self._r_arm_joint_names)
-        action[6:13] = arm_joint_values_l
-        action[20:27] = arm_joint_values_r
-        return action
+            ctrl_r = self.set_r_arm_position_ctrl(env, mocap_r_xpos, mocap_r_xquat)
+        if hasattr(self, "_l_controller"):
+            self._l_controller.set_goal(action_l)
+            ctrl_l = self._l_controller.run_controller()
+            self._set_arm_ctrl(env, self._l_arm_actuator_id, ctrl_l)
+        if hasattr(self, "_r_controller"):
+            self._r_controller.set_goal(action_r)
+            ctrl_r = self._r_controller.run_controller()
+            self._set_arm_ctrl(env, self._r_arm_actuator_id, ctrl_r)
+        # 5) 拼装最终环境动作并返回
+        action_B_l = self._action_to_action_B(env, action_l)
+        action_B_r = self._action_to_action_B(env, action_r)
+        return np.concatenate([
+            action_B_l, ctrl_l, [self._grasp_value_l],
+            action_B_r, ctrl_r, [self._grasp_value_r],
+        ], axis=0)
 
     def fill_arm_ctrl(self, env : OpenLoongEnv, action : np.ndarray) -> np.ndarray:
         ctrl_l = env.ctrl[self._l_arm_actuator_id]
@@ -1284,6 +1322,7 @@ class OpenLoongAgent(AgentBase):
         self._set_gripper_ctrl_r(env, joystick_state)
         self._set_gripper_ctrl_l(env, joystick_state)
         self._set_head_ctrl(env, joystick_state)
+        self._set_wheel_ctrl(env, joystick_state)
         self._set_task_status(env, joystick_state)
 
 
@@ -1301,60 +1340,74 @@ class OpenLoongAgent(AgentBase):
             env.set_task_status(TaskStatus.FAILURE)
         elif env.task_status == TaskStatus.BEGIN and joystick_state["rightHand"]["gripButtonPressed"]:
             env.set_task_status(TaskStatus.SUCCESS)
+    
+    def _set_wheel_ctrl(self, env: OpenLoongEnv, joystick_state) -> None:
+        # 从左手摇杆获取值
+        if not getattr(self, "_has_wheels", False):
+            return
+        # 读取摇杆
+        lx = joystick_state["leftHand"]["joystickPosition"][0]
+        ly = joystick_state["leftHand"]["joystickPosition"][1]
 
-    def _set_head_ctrl(self, env : OpenLoongEnv, joystick_state) -> None:
-        x_axis = joystick_state["rightHand"]["joystickPosition"][0]
-        if x_axis == 0:
-            x_axis = joystick_state["leftHand"]["joystickPosition"][0]
+        forward = -ly
+        turn = lx
 
-        y_axis = joystick_state["rightHand"]["joystickPosition"][1]
-        if y_axis == 0:
-            y_axis = joystick_state["leftHand"]["joystickPosition"][1]
-            
-        mocap_neck_xpos, mocap_neck_xquat = self._mocap_neck_xpos, self._mocap_neck_xquat
+        v_r = np.clip(forward + turn, -1, 1)
+        v_l = np.clip(forward - turn, -1, 1)
 
-        # 将 x_axis 和 y_axis 输入转换为旋转角度，按需要调节比例系数
-        angle_x = -x_axis * np.pi / 180  # 转换为弧度，模拟绕 X 轴的旋转
-        angle_y = -y_axis * np.pi / 180  # 转换为弧度，模拟绕 Y 轴的旋转
+        # 用之前保存的 id
+        idx_r = self._wheel_r_id
+        idx_l = self._wheel_l_id
+        ctrlranges = env.model.get_actuator_ctrlrange()  # shape: (nu, 2)
+        max_r = ctrlranges[idx_r, 1]
+        max_l = ctrlranges[idx_l, 1]
 
-        # 设置旋转角度的限制
-        self._neck_angle_x += angle_x
-        if self._neck_angle_x > np.pi / 3 or self._neck_angle_x < -np.pi / 3:
-            self._neck_angle_x = np.clip(self._neck_angle_x, -np.pi / 3, np.pi / 3)
-            angle_x = 0
-        
-        self._neck_angle_y += angle_y
-        if self._neck_angle_y > np.pi / 3 or self._neck_angle_y < -np.pi / 3:
-            self._neck_angle_y = np.clip(self._neck_angle_y, -np.pi / 3, np.pi / 3)
-            angle_y = 0
+        env.ctrl[idx_r] = v_r * max_r
+        env.ctrl[idx_l] = v_l * max_l
 
-        new_neck_quat_local = rotations.euler2quat(np.array([0.0, angle_y, angle_x]))
 
-        # 将局部坐标系的旋转转换为全局坐标系，乘以当前全局旋转四元数
-        new_neck_quat_global = rotations.quat_mul(mocap_neck_xquat, new_neck_quat_local)
+    def _set_head_ctrl(self, env, joystick_state):
+        x = joystick_state["rightHand"]["joystickPosition"][0]
+        y = joystick_state["rightHand"]["joystickPosition"][1]
 
-        # 将新的全局旋转四元数转换为轴角表示
-        mocap_neck_axisangle = transform_utils.quat2axisangle(np.array([new_neck_quat_global[1], 
-                                                                        new_neck_quat_global[2],
-                                                                        new_neck_quat_global[3],
-                                                                        new_neck_quat_global[0]]))
+        # 1) Dead‑zone：小幅抖动直接忽略
+        dead = 0.05
+        if abs(x) < dead: x = 0.0
+        if abs(y) < dead: y = 0.0
 
-        # 可选：将轴角重新转换回四元数进行夹紧或其他操作
-        new_neck_quat_cliped = transform_utils.axisangle2quat(mocap_neck_axisangle)
+        # 2) 低通滤波：先做个 EMA
+        alpha = 0.2  # [0,1]，越小越平滑越滞后
+        self._neck_input_x = alpha * x + (1-alpha) * getattr(self, "_neck_input_x", 0.0)
+        self._neck_input_y = alpha * y + (1-alpha) * getattr(self, "_neck_input_y", 0.0)
 
-        # 将动作信息打包并发送到控制器
-        action_neck = np.concatenate([mocap_neck_xpos, mocap_neck_axisangle])
+        # 3) 增量量程
+        dt = 1.0 / env.control_freq
+        gain = np.pi    # rad/s per full‑tilt
+        delta_pitch =  self._neck_input_y * gain * dt
+        delta_yaw   = -self._neck_input_x * gain * dt
 
-        # # 更新 _mocap_neck_xquat 为新的全局旋转值
-        self._mocap_neck_xquat = new_neck_quat_global
+        # 4) 限幅累加
+        self._neck_angle_x = np.clip(self._neck_angle_x + delta_yaw, -np.pi/3, np.pi/3)
+        self._neck_angle_y = np.clip(self._neck_angle_y + delta_pitch, -np.pi/3, np.pi/3)
 
-        self._neck_controller.set_goal(action_neck)
-        ctrl = self._neck_controller.run_controller()
-        for i in range(len(self._neck_actuator_id)):
-            env.ctrl[self._neck_actuator_id[i]] = ctrl[i]
+        # 5) 下发给 OSC（和之前完全一样）
+        dead = 0.1
+        x = joystick_state["rightHand"]["joystickPosition"][0]
+        y = joystick_state["rightHand"]["joystickPosition"][1]
+        dx = -x * np.pi/180 if abs(x)>dead else 0
+        dy = -y * np.pi/180 if abs(y)>dead else 0
 
-        # 更新头部位置
-        self.set_neck_mocap(env, mocap_neck_xpos, self._mocap_neck_xquat)
+        self._neck_angle_x = np.clip(self._neck_angle_x + dx, -np.pi/2, np.pi/2)
+        self._neck_angle_y = np.clip(self._neck_angle_y + dy, -np.pi/4, np.pi/4)
+
+        # 直接下发 yaw, pitch
+        for i, act_id in enumerate(self._neck_actuator_id):
+            env.ctrl[act_id] = [self._neck_angle_x, self._neck_angle_y][i]
+
+        # 同步 mocap（可选，只为视觉对齐）
+        self.set_neck_mocap(env,self._mocap_neck_xpos, self._mocap_neck_xquat)
+
+
 
     def _processe_pico_joystick_move(self, env : OpenLoongEnv) -> tuple:
         if self._pico_joystick.is_reset_pos():

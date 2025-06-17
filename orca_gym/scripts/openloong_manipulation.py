@@ -129,8 +129,8 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
         goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
         target_obj = obj_match.group(1) if obj_match else None
         target_goal = goal_match.group(1) if goal_match else None
-        if not (target_obj and target_goal):
-            print(f"[Warning] 无法从 language_instruction 中解析 object/goal: '{lang_instr}'")
+        # if not (target_obj and target_goal):
+        #     print(f"[Warning] 无法从 language_instruction 中解析 object/goal: '{lang_instr}'")
         env.render()
         task_status = info['task_status']
         
@@ -653,7 +653,7 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, {})
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
