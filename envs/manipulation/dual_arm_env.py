@@ -1,28 +1,11 @@
-from datetime import datetime
-from shlex import join
-import mujoco
 import numpy as np
-from gymnasium.core import ObsType
-from orca_gym.robomimic.dataset_util import DatasetWriter
 from orca_gym.robomimic.robomimic_env import RobomimicEnv
-from orca_gym.utils import rotations
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
-from orca_gym.robosuite.controllers.controller_factory import controller_factory
-import orca_gym.robosuite.controllers.controller_config as controller_config
-import orca_gym.robosuite.utils.transform_utils as transform_utils
-from orca_gym.environment import OrcaGymLocalEnv
-from scipy.spatial.transform import Rotation as R, Rotation
-from orca_gym.task.abstract_task import AbstractTask
-import time
-from orca_gym.utils.joint_controller import JointController
-import random
-
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
+from orca_gym.task.pick_place_task import PickPlaceTask, TaskStatus
+import importlib
 
 class RunMode:
     """
@@ -49,59 +32,19 @@ class ActionType:
     END_EFFECTOR_IK = "end_effector_ik"
     JOINT_POS = "joint_pos"
 
-class OpenLoongTask(AbstractTask):
-    def __init__(self, config: dict):
+
+robot_entries = {
+    "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
+    "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
+    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripper2F85MobileBase",
+}
+
+def get_robot_entry(name: str):
+    for robot_name, entry in robot_entries.items():
+        if name.startswith(robot_name):
+            return entry
         
-        if config.__len__():
-            super().__init__(config)
-        else:
-            super().__init__()
-        self.task_list: list = []
-
-    def get_task(self, env: OrcaGymLocalEnv) -> dict[str, str]:
-        """
-        从 object_bodys 和 goal_bodys 中随机配对，index 绝对不会越界。
-        """
-        self.task_dict.clear()
-        self.random_objs_and_goals(env, bounds=0.1)
-
-        object_len = len(self.object_bodys)
-        goal_len   = len(self.goal_bodys)
-        min_len    = min(object_len, goal_len)
-
-        # 如果任意一方长度为 0，则无法配对
-        if min_len == 0:
-            return self.task_dict
-
-        # 随机选择 1 到 min_len 个索引
-        n_select = random.randint(1, min_len)
-        # 只在 [0, min_len) 范围内取样
-        idxs = random.sample(range(min_len), n_select)
-
-        for i in idxs:
-            obj_name  = self.object_bodys[i]
-            goal_name = self.goal_bodys[i]
-            self.task_dict[obj_name] = goal_name
-
-        return self.task_dict
-
-    def get_language_instruction(self) -> str:
-        if not self.task_dict:
-            return "Do something."
-        obj_str = "object: " + " ".join(self.task_dict.keys())
-        goal_str = "goal: " + " ".join(self.task_dict.values())
-        return f"level: {self.level_name}  {obj_str} to {goal_str}"
-
-class TaskStatus:
-    """
-    Enum class for task status
-    """
-    NOT_STARTED = "not_started"
-    GET_READY = "get_ready"
-    BEGIN = "begin"
-    SUCCESS = "success"
-    FAILURE = "failure"
-    END = "end"
+    raise ValueError(f"Robot entry for {name} not found in robot_entries.")
 
 class DualArmEnv(RobomimicEnv):
     """
@@ -156,7 +99,7 @@ class DualArmEnv(RobomimicEnv):
 
         self._reward_printer = RewardPrinter()
         
-        kwargs["task"] = OpenLoongTask(task_config_dict)
+        kwargs["task"] = PickPlaceTask(task_config_dict)
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -186,10 +129,7 @@ class DualArmEnv(RobomimicEnv):
 
         self._agents : dict[str, AgentBase] = {}
         for id, agent_name in enumerate(self._agent_names):
-            if agent_name.startswith("OpenLoongHand"):
-                self._agents[agent_name] = OpenLoongHandAgent(self, id=id, name=agent_name)
-            elif agent_name.startswith("OpenLoongGripper"):
-                self._agents[agent_name] = OpenLoongGripperAgent(self, id=id, name=agent_name)
+            self._agents[agent_name] = self.create_agent(id, agent_name)
         
         assert len(self._agents) > 0, "At least one agent should be created."
         self._set_init_state()
@@ -202,6 +142,14 @@ class DualArmEnv(RobomimicEnv):
         self.model, self.data = self.initialize_simulation()
         self._init_ctrl()
         self.init_agents()
+
+    def create_agent(self, id, name):
+        entry = get_robot_entry(name)
+        module_name, class_name = entry.rsplit(":", 1)
+        module = importlib.import_module(module_name)
+        class_type = getattr(module, class_name)
+        agent = class_type(self, id, name)
+        return agent
 
     def _init_ctrl(self):
         self.nu = self.model.nu
@@ -283,11 +231,11 @@ class DualArmEnv(RobomimicEnv):
     def _set_init_state(self) -> None:
         # print("Set initial state")
         self._task_status = TaskStatus.NOT_STARTED
-        [agent.set_joint_neutral(self) for agent in self._agents.values()]
+        [agent.set_joint_neutral() for agent in self._agents.values()]
 
         self.ctrl = np.zeros(self.nu)
         for agent in self._agents.values():
-            agent.set_init_ctrl(self)
+            agent.set_init_ctrl()
 
         self.set_ctrl(self.ctrl)
 
@@ -319,7 +267,7 @@ class DualArmEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
 
-            [agent.update_force_feedback(self) for agent in self._agents.values()]
+            [agent.update_force_feedback() for agent in self._agents.values()]
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
@@ -374,7 +322,7 @@ class DualArmEnv(RobomimicEnv):
     def _teleoperation_action(self) -> tuple:
         agent_action = []
         for agent in self._agents.values():
-            agent_action.append(agent.on_teleoperation_action(self))
+            agent_action.append(agent.on_teleoperation_action())
 
         return self.ctrl.copy(), np.concatenate(agent_action).flatten()
 
@@ -393,14 +341,14 @@ class DualArmEnv(RobomimicEnv):
     def _get_obs(self) -> dict:
         if len(self._agents) == 1:
             # Use original observation if only one agent
-            return self._agents[self._agent_names[0]].get_obs(self)
+            return self._agents[self._agent_names[0]].get_obs()
 
         # 将所有的agent obs 合并到一起，其中每个agent obs key 加上前缀 agent_name，确保不重复
         # 注意：这里需要兼容 gymnasium 的 obs dict 范式，因此不引入多级字典
         # 同理多agent的action采用拼接np.array方式，不采用字典分隔
         obs = {}
         for agent in self._agents.values():
-            agent_obs = agent.get_obs(self)
+            agent_obs = agent.get_obs()
             for key in agent_obs.keys():
                 agent_key = f"{agent.name}_{key}"
                 if agent_key in obs:
@@ -410,7 +358,7 @@ class DualArmEnv(RobomimicEnv):
 
     def init_agents(self):
         for id, agent_name in enumerate(self._agent_names):
-            self._agents[agent_name].init_agent(self, id)
+            self._agents[agent_name].init_agent(id)
 
     def reset_model(self) -> tuple[dict, dict]:
         if self._task.random_actor:
@@ -419,7 +367,7 @@ class DualArmEnv(RobomimicEnv):
 
         # 1) 恢复初始状态、重置 controller/mechanism
         self._set_init_state()
-        [agent.on_reset_model(self) for agent in self._agents.values()]
+        [agent.on_reset_model() for agent in self._agents.values()]
 
         # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
         if self._run_mode in [RunMode.POLICY_NORMALIZED]:

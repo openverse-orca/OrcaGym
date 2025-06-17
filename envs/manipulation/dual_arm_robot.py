@@ -1,43 +1,32 @@
-from datetime import datetime
-from shlex import join
-import mujoco
 import numpy as np
-from gymnasium.core import ObsType
-from orca_gym.robomimic.dataset_util import DatasetWriter
-from orca_gym.robomimic.robomimic_env import RobomimicEnv
 from orca_gym.utils import rotations
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
-from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.robosuite.controllers.controller_factory import controller_factory
 import orca_gym.robosuite.controllers.controller_config as controller_config
 import orca_gym.robosuite.utils.transform_utils as transform_utils
-from orca_gym.environment import OrcaGymLocalEnv
 from scipy.spatial.transform import Rotation as R, Rotation
-from orca_gym.task.abstract_task import AbstractTask
-import time
-from orca_gym.utils.joint_controller import JointController
-import random
 from envs.manipulation.dual_arm_env import DualArmEnv, AgentBase, RunMode, ControlDevice, ActionType, TaskStatus
 
-from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
 from envs.manipulation.robots.configs.openloong_config import openloong_config
 robot_config = {
     "openloong_hand_fix_base" : openloong_config,
+    "openloong_gripper_2f85_fix_base" : openloong_config,
+    "openloong_gripper_2f85_mobile_base" : openloong_config,
 }
-
-
+def get_robot_config(robot_name: str):
+    for key in robot_config.keys():
+        if key in robot_name:
+            return robot_config[key]
+        
+    raise ValueError(f"Robot configuration for {robot_name} not found in robot_config dictionary.")
 
 class DualArmRobot(AgentBase):
     def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)
 
     def init_agent(self, id: int):
-        config = robot_config[self._name]
+        config = get_robot_config(self._name)
 
         self._base_body_name = [self._env.body(config["base"]["base_body_name"], id)]
         self._base_body_xpos, _, self._base_body_xquat = self._env.get_body_xpos_xmat_xquat(self._base_body_name)
@@ -84,6 +73,22 @@ class DualArmRobot(AgentBase):
         # self._l_neutral_joint_values = np.zeros(7)            
         # print("arm_actuator_id: ", self._r_arm_actuator_id, self._l_arm_actuator_id)
 
+        if config.get("neck", None) is None:
+            self._neck_joint_names = [self._env.joint(config["neck"]["yaw_joint_name"], id), self._env.joint(config["neck"]["pitch_joint_name"], id)]
+            self._neck_actuator_names = [self._env.actuator(config["neck"]["yaw_actuator_name"], id), self._env.actuator(config["neck"]["pitch_actuator_name"], id)]
+            self._neck_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
+            self._neck_neutral_joint_values = np.array([0, -0.7854])
+            self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
+
+            NECK_NAME  = self._env.site(config["neck"]["neck_center_site_name"], id)
+            site_dict = self._env.query_site_pos_and_quat([NECK_NAME])
+            self._initial_neck_site_xpos = site_dict[NECK_NAME]['xpos']
+            self._initial_neck_site_xquat = site_dict[NECK_NAME]['xquat']
+        else:
+            self._neck_joint_names = []
+            self._neck_actuator_names = []
+            self._neck_neutral_joint_values = np.array([0, 0])
+
         # control range
         self._all_ctrlrange = self._env.model.get_actuator_ctrlrange()
 
@@ -111,7 +116,7 @@ class DualArmRobot(AgentBase):
         self._initial_grasp_site_xquat = site_dict[self._ee_site_l]['xquat']
         self._grasp_value_l = 0.0
 
-        self.set_grasp_mocap(self._env, self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
+        self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
         self._ee_site_r  = self._env.site(config["right_arm"]["ee_center_site_name"], id)
         site_dict = self._env.query_site_pos_and_quat([self._ee_site_r])
@@ -119,7 +124,7 @@ class DualArmRobot(AgentBase):
         self._initial_grasp_site_xquat_r = site_dict[self._ee_site_r]['xquat']
         self._grasp_value_r = 0.0
 
-        self.set_grasp_mocap_r(self._env, self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
+        self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
 
         if self._env.run_mode == RunMode.TELEOPERATION:
             if self._env.ctrl_device == ControlDevice.VR:
@@ -130,18 +135,7 @@ class DualArmRobot(AgentBase):
         # -----------------------------
         # Neck controller
         if config.get("neck", None) is None:
-            self._neck_joint_names = [self._env.joint(config["neck"]["yaw_joint_name"], id), self._env.joint(config["neck"]["pitch_joint_name"], id)]
-            self._neck_actuator_names = [self._env.actuator(config["neck"]["yaw_actuator_name"], id), self._env.actuator(config["neck"]["pitch_actuator_name"], id)]
-            self._neck_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-            self._neck_neutral_joint_values = np.array([0, -0.7854])
-            self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
-
-            NECK_NAME  = self._env.site(config["neck"]["neck_center_site_name"], id)
-            site_dict = self._env.query_site_pos_and_quat([NECK_NAME])
-            self._initial_neck_site_xpos = site_dict[NECK_NAME]['xpos']
-            self._initial_neck_site_xquat = site_dict[NECK_NAME]['xquat']
-
-            self.set_neck_mocap(self._env, self._initial_neck_site_xpos, self._initial_neck_site_xquat)
+            self.set_neck_mocap(self._initial_neck_site_xpos, self._initial_neck_site_xquat)
             self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
             self._neck_angle_x, self._neck_angle_y = 0, 0
 
@@ -174,16 +168,13 @@ class DualArmRobot(AgentBase):
             self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
         else:
             self._neck_controller = None
-            self._neck_joint_names = []
-            self._neck_actuator_names = []
-            self._neck_neutral_joint_values = np.array([0, 0])
 
         if self._env.action_use_motor():
             # -----------------------------
             # OSC controller
             # Right controller
             self._r_controller_config = controller_config.load_config("osc_pose")
-            # print("controller_config: ", self.controller_config)
+            # print("controller_config: ", self._r_controller_config)
 
             # Add to the controller dict additional relevant params:
             #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
@@ -240,8 +231,8 @@ class DualArmRobot(AgentBase):
         else:
             # -----------------------------
             # Inverse Kinematics controller
-            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.1)
-            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.1)
+            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.1)
+            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.1)
 
     
     def on_close(self):
@@ -306,10 +297,10 @@ class DualArmRobot(AgentBase):
         ee_sites = self._env.query_site_pos_and_quat_B([self._ee_site_l, self._ee_site_r], self._base_body_name)
         ee_xvalp, ee_xvalr = self._env.query_site_xvalp_xvalr_B([self._ee_site_l, self._ee_site_r], self._base_body_name)
 
-        arm_joint_values_l = self._get_arm_joint_values(self._env, self._l_arm_joint_names)
-        arm_joint_values_r = self._get_arm_joint_values(self._env, self._r_arm_joint_names)
-        arm_joint_velocities_l = self._get_arm_joint_velocities(self._env, self._l_arm_joint_names)
-        arm_joint_velocities_r = self._get_arm_joint_velocities(self._env, self._r_arm_joint_names)
+        arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
+        arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
+        arm_joint_velocities_l = self._get_arm_joint_velocities(self._l_arm_joint_names)
+        arm_joint_velocities_r = self._get_arm_joint_velocities(self._r_arm_joint_names)
 
         self._obs = {
             "ee_pos_l": ee_sites[self._ee_site_l]["xpos"].flatten().astype(np.float32),
