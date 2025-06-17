@@ -26,5 +26,4 @@ openloong_config = {
         "position_names": ["P_arm_l_01", "P_arm_l_02", "P_arm_l_03", "P_arm_l_04", "P_arm_l_05", "P_arm_l_06", "P_arm_l_07"],
         "ee_center_site_name": "ee_center_site",
     },
-
 }

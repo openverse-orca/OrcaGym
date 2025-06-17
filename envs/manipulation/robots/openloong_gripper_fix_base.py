@@ -26,42 +26,54 @@ from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
-from envs.manipulation.robots.configs.hand_config import hand_config as config
+from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as config
 
 
-class OpenLoongHandFixBase(DualArmRobot):
-    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
-        super().__init__(env, id, name)
-
+class OpenLoongGripperAgent(DualArmRobot):
+    def __init__(self, id: int, name: str) -> None:
+        super().__init__(id, name)
+        
         self.init_agent(id)
+
         
     def init_agent(self, id: int):
+        print("OpenLoongGripperAgent init_agent")
+
         super().init_agent(id)
-        # print("arm_actuator_id: ", self._l_arm_actuator_id)
-        self._l_hand_motor_names = [self._env.actuator(config["left_hand"]["motor_names"][i], id) for i in range(len(config["left_hand"]["motor_names"]))]
-        self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_motor_names]
-        self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][i], id) for i in range(len(config["left_hand"]["body_names"]))]
+
+        self._l_hand_actuator_names = [self._env.actuator(config["left_hand"]["actuator_names"][0], id)]
+        
+        self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
+        self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][0], id), self._env.body(config["left_hand"]["body_names"][1], id)]
         self._l_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._l_hand_body_names:
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
+        self._r_hand_actuator_names = [self._env.actuator(config["right_hand"]["actuator_names"][0], id)]
 
-        self._r_hand_motor_names = [self._env.actuator(config["right_hand"]["motor_names"][i], id) for i in range(len(config["right_hand"]["motor_names"]))]
-        self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
-        self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][i], id) for i in range(len(config["right_hand"]["body_names"]))]
+        self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
+        self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][0], id), self._env.body(config["right_hand"]["body_names"][1], id)]
         self._r_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._r_hand_body_names:
-                self._r_hand_gemo_ids.append(geom_info["GeomId"])            
-
-        self._finger_reverse_motor_names = [self._env.actuator(config["left_hand"]["fingers_reverse_motor"][i], id) for i in range(len(config["left_hand"]["fingers_reverse_motor"]))]
-        self._finger_reverse_motor_names += [self._env.actuator(config["right_hand"]["fingers_reverse_motor"][i], id) for i in range(len(config["right_hand"]["fingers_reverse_motor"]))]
+                self._r_hand_gemo_ids.append(geom_info["GeomId"])  
 
 
+    def set_l_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._l_hand_actuator_id:
+            offset_dir = -1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = np.clip(
+                self._env.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
+            
     def set_gripper_ctrl_l(self, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1  # 10% per second
+        offset_rate_clip_adjust_rate = 0.5  # 10% per second
         if joystick_state["leftHand"]["secondaryButtonPressed"]:
             self._l_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self._env.dt    
             self._l_gripper_offset_rate_clip = np.clip(self._l_gripper_offset_rate_clip, -1, 0)
@@ -78,10 +90,20 @@ class OpenLoongHandFixBase(DualArmRobot):
         self.set_l_hand_actuator_ctrl(offset_rate)
         self._grasp_value_l = offset_rate
             
+    def set_r_hand_actuator_ctrl(self, offset_rate) -> None:
+        for actuator_id in self._r_hand_actuator_id:
+            offset_dir = -1
+
+            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
+            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = np.clip(
+                self._env.ctrl[actuator_id],
+                self._all_ctrlrange[actuator_id][0],
+                self._all_ctrlrange[actuator_id][1])
 
     def set_gripper_ctrl_r(self, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
-        offset_rate_clip_adjust_rate = 0.1
+        offset_rate_clip_adjust_rate = 0.5
         if joystick_state["rightHand"]["secondaryButtonPressed"]:
             self._r_gripper_offset_rate_clip -= offset_rate_clip_adjust_rate * self._env.dt
             self._r_gripper_offset_rate_clip = np.clip(self._r_gripper_offset_rate_clip, -1, 0)
@@ -95,37 +117,7 @@ class OpenLoongHandFixBase(DualArmRobot):
         offset_rate = -adjusted_value
         offset_rate = np.clip(offset_rate, -1, self._r_gripper_offset_rate_clip)
         self.set_r_hand_actuator_ctrl(offset_rate)
-        self._grasp_value_r = offset_rate
-                
-    def set_r_hand_actuator_ctrl(self, offset_rate) -> None:
-        for actuator_id in self._r_hand_actuator_id:
-            actuator_name = self._env.model.actuator_id2name(actuator_id)
-            if actuator_name in self._finger_reverse_motor_names:
-                offset_dir = -1
-            else:
-                offset_dir = 1
-
-            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
-            self._env.ctrl[actuator_id] = np.clip(
-                self._env.ctrl[actuator_id],
-                self._all_ctrlrange[actuator_id][0],
-                self._all_ctrlrange[actuator_id][1])
-            
-    def set_l_hand_actuator_ctrl(self, offset_rate) -> None:
-        for actuator_id in self._l_hand_actuator_id:
-            actuator_name = self._env.model.actuator_id2name(actuator_id)
-            if actuator_name in self._finger_reverse_motor_names:
-                offset_dir = -1
-            else:
-                offset_dir = 1
-
-            abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
-            self._env.ctrl[actuator_id] = np.clip(
-                self._env.ctrl[actuator_id],
-                self._all_ctrlrange[actuator_id][0],
-                self._all_ctrlrange[actuator_id][1])            
+        self._grasp_value_r = offset_rate       
             
     def update_force_feedback(self) -> None:
         if self._pico_joystick is not None:
@@ -147,5 +139,4 @@ class OpenLoongHandFixBase(DualArmRobot):
         compose_force = 0
         for force in contact_force_dict.values():
             compose_force += np.linalg.norm(force[:3])
-        return compose_force
-    
+        return compose_force                
