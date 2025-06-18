@@ -5,7 +5,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import datetime
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
@@ -60,7 +60,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         self._randomize_agent_foot_friction()
         self._add_randomized_weight()
-        self._init_playable()
+        self._init_playable(orcagym_addr)
         self._reset_phy_config()
 
      
@@ -307,11 +307,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             agent.update_curriculum_level(self.data.qpos)
             
     
-    def _init_playable(self) -> None:
+    def _init_playable(self, orcagym_addr) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
             return
         
-        self._keyboard_controller = KeyboardInput()
+        self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
         
         for agent in self.agents:

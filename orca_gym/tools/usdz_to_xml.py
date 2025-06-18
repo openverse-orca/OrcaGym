@@ -4,18 +4,14 @@ import os
 
 import numpy as np
 
-import glob
 from pathlib import Path
-from typing import Dict, List
 from pxr import Usd, UsdGeom, Gf, Sdf
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
 import trimesh
-import orca_gym.utils.rotations as rotations
 from copy import deepcopy
 import numpy as np
-from sklearn.cluster import KMeans
 
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
@@ -233,7 +229,8 @@ def _add_mesh_assets(asset, mesh_file_name, scale):
     mesh_name = mesh_file_name.split(".")[0]
     mesh_elem = ET.SubElement(asset, "mesh")
     mesh_elem.set("name", mesh_name)
-    mesh_elem.set("file", mesh_file_name)
+    mesh_elem.set("content_type", "model/obj")
+    mesh_elem.set("file", f"usd:{mesh_file_name}")
     mesh_elem.set("scale", " ".join(map(str, scale)))
 
 def _add_box_geom(body, params, collision_pos, collision_size):

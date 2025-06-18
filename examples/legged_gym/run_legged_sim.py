@@ -38,8 +38,8 @@ EPISODE_TIME_LONG = LeggedEnvConfig["EPISODE_TIME_LONG"]
 
 FRAME_SKIP = FRAME_SKIP_SHORT # FRAME_SKIP_REALTIME
 
-TIME_STEP = 0.005                       # 200 Hz for physics simulation
-FRAME_SKIP = 4
+TIME_STEP = 0.001                       # 1000 Hz for physics simulation
+FRAME_SKIP = 20
 REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for rendering
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for ppo policy
 

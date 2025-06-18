@@ -4,7 +4,7 @@ from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
@@ -51,7 +51,7 @@ class WheeledChassisEnv(OrcaGymLocalEnv):
         # print("Actuator ctrl range: ", self._actuator_forcerange)
         _, _, self._last_xquat= self.get_body_xpos_xmat_xquat([self._base_name])
 
-        self._keyboard = KeyboardInput()
+        self._keyboard = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
 
         self._set_obs_space()
         self._set_action_space()

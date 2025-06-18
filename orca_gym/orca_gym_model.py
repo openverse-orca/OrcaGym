@@ -202,7 +202,7 @@ class OrcaGymModel:
         ctrlrange = np.array(list(actuator_ctrlrange.values()))
         return ctrlrange
     
-    def get_joint_qposrange(self, joint_names : dict):
+    def get_joint_qposrange(self, joint_names : list):
         joint_range = {}
         for joint_name in joint_names:
             joint = self.get_joint_byname(joint_name)

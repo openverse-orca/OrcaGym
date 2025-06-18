@@ -94,6 +94,26 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.SetMaterialInfoResponse.FromString,
                 _registered_method=True)
+        self.GetKeyPressedEvents = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetKeyPressedEvents',
+                request_serializer=mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetKeyPressedEventsResponse.FromString,
+                _registered_method=True)
+        self.GetMouseMovementEvents = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetMouseMovementEvents',
+                request_serializer=mjc__message__pb2.GetMouseMovementEventsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetMouseMovementEventsResponse.FromString,
+                _registered_method=True)
+        self.GetBodyManipulationAnchored = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+                request_serializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
+                _registered_method=True)
+        self.GetBodyManipulationMovement = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+                request_serializer=mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -483,6 +503,31 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetMaterialInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetKeyPressedEvents(self, request, context):
+        """键鼠操作
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMouseMovementEvents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBodyManipulationAnchored(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBodyManipulationMovement(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -937,6 +982,26 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetMaterialInfo,
                     request_deserializer=mjc__message__pb2.SetMaterialInfoRequest.FromString,
                     response_serializer=mjc__message__pb2.SetMaterialInfoResponse.SerializeToString,
+            ),
+            'GetKeyPressedEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetKeyPressedEvents,
+                    request_deserializer=mjc__message__pb2.GetKeyPressedEventsRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetKeyPressedEventsResponse.SerializeToString,
+            ),
+            'GetMouseMovementEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMouseMovementEvents,
+                    request_deserializer=mjc__message__pb2.GetMouseMovementEventsRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetMouseMovementEventsResponse.SerializeToString,
+            ),
+            'GetBodyManipulationAnchored': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationAnchored,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.SerializeToString,
+            ),
+            'GetBodyManipulationMovement': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationMovement,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationMovementRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationMovementResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1578,6 +1643,114 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/SetMaterialInfo',
             mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
             mjc__message__pb2.SetMaterialInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetKeyPressedEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetKeyPressedEvents',
+            mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
+            mjc__message__pb2.GetKeyPressedEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMouseMovementEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetMouseMovementEvents',
+            mjc__message__pb2.GetMouseMovementEventsRequest.SerializeToString,
+            mjc__message__pb2.GetMouseMovementEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBodyManipulationAnchored(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+            mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBodyManipulationMovement(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+            mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
             options,
             channel_credentials,
             insecure,

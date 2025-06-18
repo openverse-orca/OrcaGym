@@ -15,33 +15,34 @@ import h5py
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.manipulation.openloong_env import OpenLoongEnv, ControlDevice
+from envs.manipulation.dual_arm_env import DualArmEnv, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
 from robomimic.utils.file_utils import maybe_dict_from_checkpoint
 from robomimic.utils.train_utils import run_rollout
 import orca_gym.utils.rotations as rotations
-from envs.manipulation.openloong_env import TaskStatus
-from envs.manipulation.openloong_env import ActionType
+from envs.manipulation.dual_arm_env import TaskStatus
+from envs.manipulation.dual_arm_env import ActionType
 import re
 import gymnasium as gym
-from envs.manipulation.openloong_env import ControlDevice, RunMode, OpenLoongEnv
+from envs.manipulation.dual_arm_env import ControlDevice, RunMode, DualArmEnv
 import numpy as np
 import yaml
 
+ENV_NAME = "DualArmEnv"
 ENV_ENTRY_POINT = {
-    "OpenLoong": "envs.manipulation.openloong_env:OpenLoongEnv"
+    "DualArmEnv": "envs.manipulation.dual_arm_env:DualArmEnv"
 }
 
-TIME_STEP = 0.005                       # 200 Hz for physics simulation
-FRAME_SKIP = 4
-REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for rendering
+TIME_STEP = 0.001                       # 1000 Hz for physics simulation
+FRAME_SKIP = 20                         
+REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for python program loop
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for OSC controller computation
 
 RGB_SIZE = (256, 256)
 CAMERA_CONFIG = {
-    "camera_head": 7070,
+    # "camera_head": 7070,
     # "camera_wrist_r": 7080,
     # "camera_wrist_l": 7090,
 }
@@ -90,11 +91,11 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 
-def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb_size : tuple = (256, 256), action_step : int = 1):
+def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], rgb_size : tuple = (256, 256), action_step : int = 1):
     """_summary_
 
     Args:
-        env (OpenLoongEnv): envairoment instance for franka robot manipulation task
+        env (DualArmEnv): envairoment instance for franka robot manipulation task
         cameras (list[CameraWrapper]): list of camera instances, (primary, secondary, wrist)
         rgb_size (tuple, optional): image size for rgb camera. Defaults to (256, 256).
         action_step (int, optional): 
@@ -315,7 +316,7 @@ def do_teleoperation(env,
     for camera in cameras:
         camera.stop()
 
-def playback_episode(env : OpenLoongEnv, 
+def playback_episode(env : DualArmEnv, 
                      action_list : list[np.ndarray], 
                      done_list : list[int],
                      action_step : int = 1,
@@ -353,7 +354,7 @@ def playback_episode(env : OpenLoongEnv,
     print("Episode tunkated!")
 
 
-def reset_playback_env(env: OpenLoongEnv, demo_data, sample_range=0.0):
+def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     """
     Reset 环境，然后把 demo_data['objects'] 和 demo_data['goals'] 恢复到场景里。
     """
@@ -386,7 +387,7 @@ def reset_playback_env(env: OpenLoongEnv, demo_data, sample_range=0.0):
 
 
     
-def do_playback(env : OpenLoongEnv, 
+def do_playback(env : DualArmEnv, 
                 dataset_reader : DatasetReader, 
                 playback_mode : str,
                 action_step : int = 1,
@@ -412,7 +413,7 @@ def do_playback(env : OpenLoongEnv,
         playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
 
-def augment_episode(env : OpenLoongEnv, 
+def augment_episode(env : DualArmEnv, 
                     cameras : list[CameraWrapper], 
                     rgb_size : tuple,
                     demo_data : dict, 
@@ -519,7 +520,7 @@ def augment_episode(env : OpenLoongEnv,
  
     
 
-def do_augmentation(env : OpenLoongEnv, 
+def do_augmentation(env : DualArmEnv, 
                     cameras : list[CameraWrapper], 
                     obs_camera : bool,
                     rgb_size : tuple,                    
@@ -635,7 +636,7 @@ def run_example(orcagym_addr : str,
                 playback_mode : str,
                 rollout_times : int,
                 ckpt_path : str,
-                augmented_sacle : float,
+                augmented_scale : float,
                 augmented_rounds : int,
                 teleoperation_rounds : int,
                 sample_range : float,
@@ -661,7 +662,7 @@ def run_example(orcagym_addr : str,
             do_playback(env, dataset_reader, playback_mode, action_step, realtime_playback)
 
         elif run_mode == "teleoperation":
-            env_name = "OpenLoong"
+            env_name = ENV_NAME
             env_index = 0
             camera_config = CAMERA_CONFIG
 
@@ -765,7 +766,7 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            do_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, action_step)
+            do_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -793,7 +794,7 @@ def _get_algo_config(algo_name):
         raise ValueError(f"Invalid algorithm name: {algo_name}")
 
 
-def run_openloong_sim(args, project_root : str = None, current_file_path : str = None):
+def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = None):
     orcagym_addr = args.orcagym_address
     agent_names = args.agent_names
     pico_ports = args.pico_ports
@@ -807,7 +808,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     algo = args.algo
     rollout_times = args.rollout_times
     ckpt_path = args.model_file
-    augmented_sacle = args.augmented_sacle
+    augmented_scale = args.augmented_scale
     augmented_rounds = args.augmented_rounds
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
@@ -816,7 +817,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
     assert sample_range >= 0.0, "The sample range should be greater than or equal to 0."
-    assert augmented_sacle >= 0.0, "The augmented scale should be greater than or equal to 0."
+    assert augmented_scale >= 0.0, "The augmented scale should be greater than or equal to 0."
     assert augmented_rounds > 0, "The augmented times should be greater than 0."
 
     create_tmp_dir("records_tmp")
@@ -829,7 +830,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"{current_file_path}/records_tmp/OpenLoong_{formatted_now}.hdf5"
+            record_path = f"{current_file_path}/records_tmp/dual_arm_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
@@ -853,7 +854,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
 
     # 启动 Monitor 子进程
     ports = [
-        7070, 7080, 7090,        # Agent1
+        # 7070, 7080, 7090,        # Agent1
         # 8070, 8080, 8090,        # Agent2
     ]
     monitor_processes = []
@@ -875,7 +876,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
                     playback_mode,
                     rollout_times,
                     ckpt_path,
-                    augmented_sacle,
+                    augmented_scale,
                     augmented_rounds,
                     teleoperation_rounds,
                     sample_range,

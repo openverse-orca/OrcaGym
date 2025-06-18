@@ -11,9 +11,7 @@ if project_root not in sys.path:
 
 from orca_gym.utils import rotations
 from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
 import numpy as np
 import gymnasium as gym
 import time

@@ -1,0 +1,751 @@
+import numpy as np
+from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from typing import Optional
+from orca_gym.devices.pico_joytsick import PicoJoystick
+from orca_gym.environment.orca_gym_env import RewardType
+from orca_gym.utils.reward_printer import RewardPrinter
+from orca_gym.task.pick_place_task import PickPlaceTask, TaskStatus
+import importlib
+
+class RunMode:
+    """
+    Enum class for control type
+    Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
+    Policy normalized: control the robot with a policy. Use the normalized action passed to the step function.
+    Policy raw: control the robot with a policy. Use the raw action passed to the step function.
+    """
+    TELEOPERATION = "teleoperation"
+    POLICY_NORMALIZED = "policy_normalized"
+    POLICY_RAW = "policy_raw"
+
+class ControlDevice:
+    """
+    Enum class for control
+    """
+    VR = "vr"
+
+class ActionType:
+    """
+    Enum class for action type
+    """
+    END_EFFECTOR_OSC = "end_effector_osc"
+    END_EFFECTOR_IK = "end_effector_ik"
+    JOINT_POS = "joint_pos"
+
+
+robot_entries = {
+    "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
+    "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
+    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripper2F85MobileBase",
+}
+
+def get_robot_entry(name: str):
+    for robot_name, entry in robot_entries.items():
+        if name.startswith(robot_name):
+            return entry
+        
+    raise ValueError(f"Robot entry for {name} not found in robot_entries.")
+
+class DualArmEnv(RobomimicEnv):
+    """
+    OpenLoong Humandroid environment for manipulation tasks.
+    
+    Task types: 
+    - pick_and_place: pick the object and place it to a box
+    
+    Control types: 
+    - Teleoperation: control the robot with a teleoperation device. Ignore the action passed to the step function.
+    - Policy Normalized: control the robot with a policy. Use the normalized action passed to the step function.
+    - Policy Raw: control the robot with a policy. Use the raw action passed to the step function.
+    """
+    ENV_VERSION = "1.0.0"
+
+    def __init__(
+        self,
+        frame_skip: int,        
+        reward_type: str,
+        orcagym_addr: str,
+        agent_names: list,
+        pico_ports: list,
+        time_step: float,
+        run_mode: RunMode,
+        action_type: ActionType,
+        ctrl_device: ControlDevice,
+        control_freq: int,
+        sample_range: float,
+        task_config_dict: dict,
+        **kwargs,
+    ):
+
+        self._run_mode = run_mode
+        self._action_type = action_type
+
+
+        self._ctrl_device = ctrl_device
+        self._control_freq = control_freq
+
+        if self._ctrl_device == ControlDevice.VR:
+            self._joystick = {}
+            pico_joystick = []
+            for i in range(len(pico_ports)):
+                pico_joystick.append(PicoJoystick(int(pico_ports[i])))
+            for i in range(len(agent_names)):
+                # 当agent数量大于pico数量时，使用最后一个pico
+                self._joystick[agent_names[i]] = pico_joystick[min(i, len(pico_joystick) - 1)]
+        
+        self._sample_range = sample_range
+        self._reward_type = reward_type
+        self._setup_reward_functions(reward_type)
+
+        self._reward_printer = RewardPrinter()
+        
+        kwargs["task"] = PickPlaceTask(task_config_dict)
+        super().__init__(
+            frame_skip = frame_skip,
+            orcagym_addr = orcagym_addr,
+            agent_names = agent_names,
+            time_step = time_step,            
+            **kwargs,
+        )
+
+        self._task.register_init_env_callback(self.init_env)
+
+        # Three auxiliary variables to understand the component of the xml document but will not be used
+        # number of actuators/controls: 7 arm joints and 2 gripper joints
+        self.nu = self.model.nu
+        # 16 generalized coordinates: 9 (arm + gripper) + 7 (object free joint: 3 position and 4 quaternion coordinates)
+        self.nq = self.model.nq
+        # 9 arm joints and 6 free joints
+        self.nv = self.model.nv
+
+        self.gym.opt.iterations = 150
+        self.gym.opt.noslip_tolerance = 50
+        self.gym.opt.ccd_iterations = 100
+        self.gym.opt.sdf_iterations = 50
+        self.gym.set_opt_config()
+
+        self.ctrl = np.zeros(self.nu)
+        self.mj_forward()   # Do this before initializing the controller, joints, sites, bodies, to avoid NaN error.
+
+        self._agents : dict[str, AgentBase] = {}
+        for id, agent_name in enumerate(self._agent_names):
+            self._agents[agent_name] = self.create_agent(id, agent_name)
+        
+        assert len(self._agents) > 0, "At least one agent should be created."
+        self._set_init_state()
+        
+        # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
+        self._set_obs_space()
+        self._set_action_space()
+
+    def init_env(self):
+        self.model, self.data = self.initialize_simulation()
+        self._init_ctrl()
+        self.init_agents()
+
+    def create_agent(self, id, name):
+        entry = get_robot_entry(name)
+        module_name, class_name = entry.rsplit(":", 1)
+        module = importlib.import_module(module_name)
+        class_type = getattr(module, class_name)
+        agent = class_type(self, id, name)
+        return agent
+
+    def _init_ctrl(self):
+        self.nu = self.model.nu
+        self.nq = self.model.nq
+        self.nv = self.model.nv
+
+        self.gym.opt.iterations = 150
+        self.gym.opt.noslip_tolerance = 50
+        self.gym.opt.ccd_iterations = 100
+        self.gym.opt.sdf_iterations = 50
+        self.gym.set_opt_config()
+
+        self.ctrl = np.zeros(self.nu)
+        self.mj_forward() 
+
+    def _set_obs_space(self):
+        self.observation_space = self.generate_observation_space(self._get_obs().copy())
+
+    def _set_action_space(self):
+        env_action_range = np.concatenate([agent.action_range for agent in self._agents.values()], axis=0)
+        self.env_action_range_min = env_action_range[:, 0]
+        self.env_action_range_max = env_action_range[:, 1]
+        # print("env action range: ", action_range)
+        scaled_action_range = np.ones(env_action_range.shape, dtype=np.float32)
+        self.action_space = self.generate_action_space(scaled_action_range)
+
+    def get_env_version(self):
+        return DualArmEnv.ENV_VERSION
+
+    @property
+    def run_mode(self) -> RunMode:
+        return self._run_mode
+    
+    @property
+    def ctrl_device(self) -> ControlDevice:  
+        return self._ctrl_device
+    
+    @property
+    def control_freq(self) -> int:
+        return self._control_freq
+    
+    @property
+    def task_status(self) -> TaskStatus:
+        return self._task_status
+    
+    @property
+    def action_type(self) -> ActionType:
+        return self._action_type
+    
+    @property
+    def joystick(self) -> Optional[PicoJoystick]:
+        if self._ctrl_device == ControlDevice.VR:
+            return self._joystick
+    
+    def set_task_status(self, status: TaskStatus):
+        if status == TaskStatus.SUCCESS:
+            print("Task success!")
+        elif status == TaskStatus.FAILURE:
+            print("Task failure!")
+        elif status == TaskStatus.BEGIN:
+            print("Start to record task....... Press left hand grip if task failed, press right hand grip if task success.")            
+        self._task_status = status
+    
+    def check_success(self):
+        """
+        Check if the task condition(s) is reached. Should return a dictionary
+        { str: bool } with at least a "task" key for the overall task success,
+        and additional optional keys corresponding to other task criteria.
+        """        
+        success = self._is_success()
+        return {"task": success}
+    
+    def render_callback(self, mode='human') -> None:
+        if mode == "human":
+            self.render()
+        else:
+            raise ValueError("Invalid render mode")
+
+    def _set_init_state(self) -> None:
+        # print("Set initial state")
+        self._task_status = TaskStatus.NOT_STARTED
+        [agent.set_joint_neutral() for agent in self._agents.values()]
+
+        self.ctrl = np.zeros(self.nu)
+        for agent in self._agents.values():
+            agent.set_init_ctrl()
+
+        self.set_ctrl(self.ctrl)
+
+        self.mj_forward()
+
+    def _is_success(self) -> bool:
+        return self._task_status == TaskStatus.SUCCESS
+    
+    def _is_truncated(self) -> bool:
+        return self._task_status == TaskStatus.FAILURE
+
+    def step(self, action) -> tuple:
+        if self._run_mode == RunMode.TELEOPERATION:
+            ctrl, noscaled_action = self._teleoperation_action()
+        elif self._run_mode == RunMode.POLICY_NORMALIZED:
+            scaled_action = action
+            noscaled_action = self.denormalize_action(action, self.env_action_range_min, self.env_action_range_max)
+            ctrl = self._playback_action(noscaled_action)
+        elif self._run_mode == RunMode.POLICY_RAW:
+            noscaled_action = np.clip(action, self.env_action_range_min, self.env_action_range_max)
+            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
+            ctrl = self._playback_action(noscaled_action)
+        else:
+            raise ValueError("Invalid run mode : ", self._run_mode)
+        
+        # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
+        
+        
+        if self._run_mode == RunMode.TELEOPERATION:
+            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
+
+            [agent.update_force_feedback() for agent in self._agents.values()]
+
+        # step the simulation with original action space
+        self.do_simulation(ctrl, self.frame_skip)
+
+        obs = self._get_obs().copy()
+
+        info = {"state": self.get_state(),
+                "action": scaled_action,
+                "object": self.objects,  # 提取第一个对象的位置
+                "goal": self.goals,
+                "task_status": self._task_status,
+                "language_instruction": self._task.get_language_instruction()}
+        terminated = self._is_success()
+        truncated = self._is_truncated()
+        reward = self._compute_reward(info)
+        return obs, reward, terminated, truncated, info
+
+    def _split_agent_action(self, action) -> dict:
+        """
+        Split the action into agent actions.
+        """
+        start = 0
+        end = 0
+        agent_action = {}
+        for agent in self._agents.values():
+            end += agent.action_range.shape[0]
+            agent_action[agent.name] = action[start:end].copy()
+            start = end
+            # print(agent.name, "action: ", agent_action[agent.name])
+        
+        return agent_action
+
+    def _fill_arm_joint_pos(self, action) -> np.ndarray:
+        agent_action = self._split_agent_action(action)
+        return np.concatenate([agent.fill_arm_joint_pos(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
+    
+    def _fill_arm_ctrl(self, action) -> np.ndarray:
+        agent_action = self._split_agent_action(action)
+        return np.concatenate([agent.fill_arm_ctrl(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
+    
+
+    def get_state(self) -> dict:
+        state = {
+            "time": self.data.time,
+            "qpos": self.data.qpos.copy(),
+            "qvel": self.data.qvel.copy(),
+            "qacc": self.data.qacc.copy(),
+            "ctrl": self.ctrl.copy(),
+        }
+        return state
+
+    def _teleoperation_action(self) -> tuple:
+        agent_action = []
+        for agent in self._agents.values():
+            agent_action.append(agent.on_teleoperation_action())
+
+        return self.ctrl.copy(), np.concatenate(agent_action).flatten()
+
+
+    def _playback_action(self, action) -> np.ndarray:
+        assert(len(action) == self.action_space.shape[0])
+        
+        # 将动作分配给每个agent
+        agent_action = self._split_agent_action(action)
+        for agent in self._agents.values():
+            agent.on_playback_action(self, agent_action[agent.name])
+        
+        return self.ctrl.copy()
+    
+
+    def _get_obs(self) -> dict:
+        if len(self._agents) == 1:
+            # Use original observation if only one agent
+            return self._agents[self._agent_names[0]].get_obs()
+
+        # 将所有的agent obs 合并到一起，其中每个agent obs key 加上前缀 agent_name，确保不重复
+        # 注意：这里需要兼容 gymnasium 的 obs dict 范式，因此不引入多级字典
+        # 同理多agent的action采用拼接np.array方式，不采用字典分隔
+        obs = {}
+        for agent in self._agents.values():
+            agent_obs = agent.get_obs()
+            for key in agent_obs.keys():
+                agent_key = f"{agent.name}_{key}"
+                if agent_key in obs:
+                    raise ValueError(f"Duplicate observation key: {agent_key}")
+                obs[agent_key] = agent_obs[key]
+        return obs
+
+    def init_agents(self):
+        for id, agent_name in enumerate(self._agent_names):
+            self._agents[agent_name].init_agent(id)
+
+    def reset_model(self) -> tuple[dict, dict]:
+        if self._task.random_actor:
+            self._task.generate_actors()
+            self._task.publish_scene()
+
+        # 1) 恢复初始状态、重置 controller/mechanism
+        self._set_init_state()
+        [agent.on_reset_model() for agent in self._agents.values()]
+
+        # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
+        if self._run_mode in [RunMode.POLICY_NORMALIZED]:
+            # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
+
+            # 得到观测并返回
+            obs = self._get_obs().copy()
+            return obs, {"objects": self.objects}
+
+        # 3) 否则走原先的“遥操作”初始化逻辑
+        self._task.get_task(self)
+        randomized_positions = self._task.randomized_object_positions
+        goal_positions = self._task.randomized_goal_positions
+
+        print(self._task.get_language_instruction())
+        print("Press left hand grip button to start recording task......")
+
+        # 构造 numpy structured array
+        dtype = np.dtype([
+            ('joint_name', 'U50'),
+            ('position', 'f4', (3,)),
+            ('orientation', 'f4', (4,))
+        ])
+
+        # 处理物体数据
+        objects = []
+        for joint_name, qpos in randomized_positions.items():
+            objects.append({
+                "joint_name": joint_name,
+                "position": qpos[:3].tolist(),
+                "orientation": qpos[3:].tolist()
+            })
+        objects_array = np.array(
+            [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
+            dtype=dtype
+        )
+        self.objects = objects_array
+        goal_dtype = np.dtype([
+            ('joint_name',  'U50'),
+            ('position',    'f4', (3,)),
+            ('orientation', 'f4', (4,)),
+            ('min',         'f4', (3,)),
+            ('max',         'f4', (3,)),
+            ('size',        'f4', (3,))
+        ])
+        # 处理目标数据并计算bounding box
+        goal_entries, _ = self.process_goals(goal_positions)
+
+        goals = []
+        for e in goal_entries:
+            goals.append((
+                e["joint_name"],
+                e["position"],
+                e["orientation"],
+                e["min"],
+                e["max"],
+                e["size"]
+            ))
+        goals_array = np.array(goals, dtype=goal_dtype)
+        self.goals = goals_array
+
+        # 执行仿真步骤
+        self.mj_forward()
+
+        # 获取观测信息并返回
+        obs = self._get_obs().copy()
+
+        # 返回目标bounding box信息
+        return obs, {"objects": objects_array, "goals": goals_array}
+
+
+
+    def process_goals(self, goal_positions):
+        """
+        处理目标（goals）的信息，返回目标的bounding box（最大最小坐标）。
+        :param goal_positions: 目标位置字典
+        :return: 目标信息的条目，目标位置数组，和bounding box数据
+        """
+        goal_entries = []
+        goal_positions_list = []
+        goal_bounding_boxes = {}  # 用于存储目标的bounding box信息
+
+        for goal_joint_name, qpos in goal_positions.items():
+            # 获取目标的尺寸
+            goal_name = goal_joint_name.replace("_joint", "")
+            info = self.get_goal_bounding_box(goal_name)
+
+            # 如果没有尺寸信息，跳过目标
+            if not info:
+                print(f"Error: No geometry size information found for goal {goal_name}")
+                continue
+
+            mn = np.array(info["min"]).flatten()
+            mx = np.array(info["max"]).flatten()
+            sz = mx - mn
+
+
+            # 添加目标位置信息
+            goal_entries.append({
+                "joint_name":  goal_name,
+                "position":    qpos[:3].tolist(),
+                "orientation": qpos[3:].tolist(),
+                "min":         mn.tolist(),
+                "max":         mx.tolist(),
+                "size":        sz.tolist()
+            })
+
+            goal_positions_list.append(qpos[:3])  # 仅记录目标位置
+
+        goal_positions_array = np.array(goal_positions_list)
+
+        # 返回目标数据及bounding box信息
+        return goal_entries, goal_positions_array,
+
+
+    def replace_objects(self, objects_data):
+        """
+        将 demo 里记录的 objects_data 写回到仿真。
+        objects_data 可能是：
+          1) 结构化 numpy array：dtype=[('joint_name',U50),('position',f4,3),('orientation',f4,4)]
+          2) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
+        """
+        qpos_dict = {}
+
+        arr = objects_data
+        # —— 情况 A：结构化数组（走原逻辑） ——
+        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
+            # arr.shape = (num_objects,)
+            for entry in arr:
+                name = entry['joint_name']
+                pos  = entry['position']
+                quat = entry['orientation']
+                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+
+        else:
+            # —— 情况 B：纯数值数组 ——
+            flat = np.asarray(arr, dtype=np.float32)
+            # 如果是一维 (num_objects*7,)
+            if flat.ndim == 1:
+                flat = flat.reshape(-1, 7)
+            # 如果是二维 (timesteps, num_objects*7)，取首帧
+            if flat.ndim == 2 and flat.shape[0] > 1:
+                flat = flat[0].reshape(-1, 7)
+
+            # 名字列表：从上一次 reset_model 里保存的 self.objects 拿 joint_name
+            # （确保在遥操作模式里执行过一次 reset_model，使 self.objects 存在）
+            names = [ent['joint_name'] for ent in self.objects]
+
+            for idx, row in enumerate(flat):
+                name = names[idx]
+                pos  = row[0:3]
+                quat = row[3:7]
+                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+
+        # 一次性写入所有自由关节 qpos
+        self.set_joint_qpos(qpos_dict)
+        # 推进仿真
+        self.mj_forward()
+
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()
+
+    def replace_goals(self, goals_data):
+        """
+        将 demo 里记录的 goals 写回环境，仅做数据格式转换。
+
+        goals_data 可能是：
+          1) 结构化 numpy array（dtype 包含 joint_name, position, orientation, min, max, size）
+          2) 纯浮点 ndarray：长度 = num_goals * 16，或 shape=(num_goals,16)
+             对应字段顺序 [pos(3), orient(4), min(3), max(3), size(3)]
+        """
+        arr = goals_data
+
+        # 1) 如果已经是结构化数组，直接 copy 给 self.goals
+        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
+            self.goals = arr.copy()
+            return
+
+        # 2) 否则把它变为 (num_goals, 16) 的纯数值数组
+        flat = np.asarray(arr, dtype=np.float32)
+        if flat.ndim == 1:
+            flat = flat.reshape(-1, 16)
+        elif flat.ndim == 2 and flat.shape[0] > 1:
+            # 如果是时序数据，取第一帧
+            flat = flat[0].reshape(-1, 16)
+
+        # joint_name 列表从旧的 self.goals 拿，如果第一次用请先跑一次 reset_model() 初始化它
+        names = [entry['joint_name'] for entry in self.goals]
+
+        # 3) 重建结构化数组
+        goal_dtype = np.dtype([
+            ('joint_name',  'U50'),
+            ('position',    'f4', (3,)),
+            ('orientation', 'f4', (4,)),
+            ('min',         'f4', (3,)),
+            ('max',         'f4', (3,)),
+            ('size',        'f4', (3,))
+        ])
+        entries = []
+        for idx, row in enumerate(flat):
+            name = names[idx]
+            pos  = row[ 0:3].tolist()
+            quat = row[ 3:7].tolist()
+            mn   = row[ 7:10].tolist()
+            mx   = row[10:13].tolist()
+            sz   = row[13:16].tolist()
+            entries.append((name, pos, quat, mn, mx, sz))
+
+        self.goals = np.array(entries, dtype=goal_dtype)
+
+
+
+    def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
+        if self._reward_printer is not None and self._reward_type == RewardType.DENSE:
+            self._reward_printer.print_reward(message, reward, coeff)
+        
+    def _compute_reward_obj_goal_distance(self) -> float:
+        tracking_sigma = 0.025  # 奖励的衰减因子
+        
+        obj_xpos = self._obs["object"][:3]
+        goal_xpos = self._obs["goal"][:3]
+        distance_squared = np.sum((obj_xpos - goal_xpos)**2)
+        distance_squared = np.clip(distance_squared, 0.01, distance_squared)   # 当距离足够近的时候，避免从错误的方向靠近
+        
+        # 计算指数衰减奖励
+        reward = np.exp(-distance_squared / tracking_sigma)
+        return reward
+    
+    def _compute_reward_obj_grasp_distance(self) -> float:
+        tracking_sigma = 0.025
+        
+        obj_xpos = self._obs["object"][:3]
+        ee_xpos = self._obs["ee_pos"]
+        distance_squared = np.sum((obj_xpos - ee_xpos)**2)
+        
+        # 计算指数衰减奖励
+        reward = np.exp(-distance_squared / tracking_sigma)
+        return reward
+    
+    def _compute_reward_success(self) -> float:
+        return 1 if self._is_success() else 0
+
+    def _setup_reward_functions(self, reward_type : RewardType) -> None:
+        if reward_type == RewardType.SPARSE:
+            self._reward_functions = [
+                {"function": self._compute_reward_success, "coeff": 1.0}
+            ]
+        elif reward_type == RewardType.DENSE:
+            self._reward_functions = [
+                {"function": self._compute_reward_obj_goal_distance, "coeff": 0.1},
+                {"function": self._compute_reward_obj_grasp_distance, "coeff": 0.1},
+                {"function": self._compute_reward_success, "coeff": 1.0},
+            ]
+        else:
+            raise ValueError("Invalid reward type: ", reward_type)
+        
+    def _compute_reward(self, info) -> float:
+        total_reward = 0.0
+
+        for reward_function in self._reward_functions:
+            if reward_function["coeff"] == 0:
+                continue
+            else:    
+                reward = reward_function["function"]() * reward_function["coeff"]
+                total_reward += reward
+                self._print_reward(reward_function["function"].__name__, reward, reward_function["coeff"])
+
+        self._print_reward("Total reward: ", total_reward)
+        return total_reward
+        
+
+
+    def close(self):
+        [agent.on_close() for agent in self._agents.values()]
+
+
+    # def set_goal_mocap(self, position, orientation) -> None:
+    #     mocap_pos_and_quat_dict = {"goal_goal": {'pos': position, 'quat': orientation}}
+    #     self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+
+
+        # print("set init joint state: " , arm_joint_qpos_list)
+        # assign value to finger joints
+        # gripper_joint_qpos_list = {}
+        # for name, value in zip(self._gripper_joint_names, self._neutral_joint_values[7:9]):
+        #     gripper_joint_qpos_list[name] = np.array([value])
+        # self.set_joint_qpos(gripper_joint_qpos_list)
+
+    def _sample_goal(self) -> np.ndarray:
+        # 训练reach时，任务是移动抓夹，goal以抓夹为原点采样
+        goal = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        return goal
+
+
+    # def get_ee_xform(self) -> np.ndarray:
+    #     pos_dict = self.query_site_pos_and_mat([self.site("ee_center_site", id)])
+    #     xpos = pos_dict[self.site("ee_center_site", id)]['xpos'].copy()
+    #     xmat = pos_dict[self.site("ee_center_site", id)]['xmat'].copy().reshape(3, 3)
+    #     return xpos, xmat
+
+
+    def get_observation(self, obs=None):
+        if obs is not None:
+            return obs
+        else:
+            return self._get_obs().copy()
+
+    def action_use_motor(self):
+        if self._action_type == ActionType.END_EFFECTOR_OSC:
+            # OSC控制器需要使用电机
+            return True
+        elif self._action_type in [ActionType.JOINT_POS, ActionType.END_EFFECTOR_IK]:
+            # 关节位置控制和逆运动学控制不需要使用电机
+            return False
+        else:
+            raise ValueError("Invalid action type: ", self._action_type)
+
+    def disable_actuators(self, actuator_names, trnid):
+        for actuator_name in actuator_names:
+            actuator_id = self.model.actuator_name2id(actuator_name)
+            self.set_actuator_trnid(actuator_id, trnid)
+
+
+## --------------------------------            
+## Agent Class
+## --------------------------------            
+class AgentBase:
+    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
+        self._id = id
+        self._name = name
+        self._env = env
+        self._action_range = np.zeros(0, dtype=np.float32)
+
+    @property
+    def id(self) -> int:
+        return self._id
+    
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def action_range(self) -> np.ndarray:
+        return self._action_range
+
+    def init_agent(self, id: int) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def set_joint_neutral(self) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def update_force_feedback(self) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def fill_arm_joint_pos(self, action: np.ndarray) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def fill_arm_ctrl(self, action: np.ndarray) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def on_teleoperation_action(self) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def on_playback_action(self, action: np.ndarray) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def get_obs(self) -> dict:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def on_reset_model(self) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def set_init_ctrl(self) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def on_close(self) -> None:
+        pass
+    

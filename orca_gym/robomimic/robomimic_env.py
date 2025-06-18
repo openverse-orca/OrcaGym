@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.environment import OrcaGymLocalEnv
+from orca_gym.task.abstract_task import AbstractTask
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 
@@ -99,7 +100,11 @@ class RobomimicEnv(OrcaGymLocalEnv):
     ):
         self._action_step = action_step
         self._camera_config = camera_config
-                
+        self._task = None
+        task = kwargs["task"]
+        if isinstance(task, AbstractTask):
+            self._task = task
+
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,

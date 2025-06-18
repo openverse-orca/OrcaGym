@@ -42,6 +42,31 @@ def get_dof_size(joint_type):
         return 1
     else:
         return 0
+    
+class AnchorType:
+    """
+    Enum for anchor types.
+    """
+    NONE = 0
+    WELD = 1
+    BALL = 2
+
+def get_eq_type(anchor_type: AnchorType):
+    """
+    Get the equality constraint type based on the anchor type.
+    
+    Args:
+        anchor_type (AnchorType): The anchor type.
+        
+    Returns:
+        mujoco.mjtEq: The equality constraint type.
+    """
+    if anchor_type == AnchorType.WELD:
+        return mujoco.mjtEq.mjEQ_WELD
+    elif anchor_type == AnchorType.BALL:
+        return mujoco.mjtEq.mjEQ_CONNECT
+    else:
+        return mujoco.mjtEq.mjEQ_CONNECT
 
 class OrcaGymLocal(OrcaGymBase):
     """
@@ -53,6 +78,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._timestep = 0.001
         self._mjModel = None
         self._mjData = None
+        self._override_ctrls : dict[int, float] = {}
 
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
@@ -108,8 +134,15 @@ class OrcaGymLocal(OrcaGymBase):
     async def update_local_env(self, qpos, time):
         request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
         response = await self.stub.UpdateLocalEnv(request)
-        return response
-    
+        override_ctrls = response.override_ctrls
+        self._override_ctrls.clear()
+        if override_ctrls is not None and len(override_ctrls) > 0:
+            for ctrl in override_ctrls:
+                if ctrl.index < 0 or ctrl.index >= self._mjModel.nu:
+                    print(f"Invalid control index: {ctrl.index}, skipping.")
+                    continue
+                self._override_ctrls[ctrl.index] = ctrl.value
+
     async def load_content_file(self, content_file_name):
         request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
         response = await self.stub.LoadContentFile(request)
@@ -191,6 +224,27 @@ class OrcaGymLocal(OrcaGymBase):
         # 返回绝对路径
         return os.path.abspath(file_path)
 
+    async def get_body_manipulation_anchored(self):
+        request = mjc_message_pb2.GetBodyManipulationAnchoredRequest()
+        response = await self.stub.GetBodyManipulationAnchored(request)
+        body_anchored = response.body_name
+        anchor_type = response.anchor_type
+        if body_anchored is None or len(body_anchored) == 0:
+            return None, AnchorType.NONE
+        else:
+            return body_anchored, anchor_type
+
+    async def get_body_manipulation_movement(self):
+        request = mjc_message_pb2.GetBodyManipulationMovementRequest()
+        response = await self.stub.GetBodyManipulationMovement(request)
+        delta_pos = np.array(response.delta_pos)
+        delta_quat = np.array(response.delta_quat)
+        body_movement = {
+            "delta_pos": delta_pos,
+            "delta_quat": delta_quat
+        }
+        return body_movement
+
     def set_time_step(self, time_step):
         self._timestep = time_step
         self.set_opt_timestep(time_step)
@@ -198,7 +252,12 @@ class OrcaGymLocal(OrcaGymBase):
     def set_opt_timestep(self, timestep):
         if self._mjModel is not None:
             self._mjModel.opt.timestep = timestep
-            
+
+    async def set_timestep_remote(self, timestep):
+        request = mjc_message_pb2.SetOptTimestepRequest(timestep=timestep)
+        response = await self.stub.SetOptTimestep(request)
+        return response
+
     def set_opt_config(self):
         self._mjModel.opt.timestep = self.opt.timestep
         self._mjModel.opt.apirate = self.opt.apirate
@@ -630,6 +689,10 @@ class OrcaGymLocal(OrcaGymBase):
         return sensor_data_dict    
     
     def set_ctrl(self, ctrl):
+        if len(self._override_ctrls) > 0:
+            # 如果有 override 控制，则使用 override 控制
+            for actuator_id, value in self._override_ctrls.items():
+                ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
 
     def mj_step(self, nstep):
@@ -716,19 +779,37 @@ class OrcaGymLocal(OrcaGymBase):
             site_jacs_dict[site_name] = {"jacp": jacp, "jacr": jacr}
         return site_jacs_dict            
     
+
+    def modify_equality_objects(self, old_obj1_id, old_obj2_id, new_obj1_id, new_obj2_id):
+        """
+        Modify the equality constraints in the model.
+        """
+        for i in range(self.model.neq):
+            if self._mjModel.eq_obj1id[i] == old_obj1_id and self._mjModel.eq_obj2id[i] == old_obj2_id:
+                self._mjModel.eq_obj1id[i] = new_obj1_id
+                self._mjModel.eq_obj2id[i] = new_obj2_id
+                # print(f"Modified equality constraint {i}: {old_obj1_id}, {old_obj2_id} -> {new_obj1_id}, {new_obj2_id}")
+                break
+
     def update_equality_constraints(self, constraint_list):
         for constraint in constraint_list:
             obj1_id = constraint['obj1_id']
             obj2_id = constraint['obj2_id']
             eq_data = constraint['eq_data']
+            eq_type = constraint['eq_type']
             for i in range(self.model.neq):
                 if self._mjModel.eq_obj1id[i] == obj1_id and self._mjModel.eq_obj2id[i] == obj2_id:
                     self._mjModel.eq_data[i] = eq_data.copy()
+                    self._mjModel.eq_type[i] = eq_type
                     break
 
             # print("eq_data: ", eq_data)
             # self._mjModel.eq_data[obj1_id:obj1_id + len(eq_data)] = eq_data.copy()
             # print("model.eq_data: ", self._mjModel.eq_data)
+            # print("model.eq_obj1id: ", self._mjModel.eq_obj1id)
+            # print("model.eq_obj2id: ", self._mjModel.eq_obj2id)
+            # print("self.model.neq: ", self._mjModel.neq)
+            # print("self.model.eq_type: ", self._mjModel.eq_type)
 
 
     async def _remote_set_mocap_pos_and_quat(self, mocap_data):
@@ -759,13 +840,14 @@ class OrcaGymLocal(OrcaGymBase):
         contact = self._mjData.contact
         contacts = []
         for i in range(self._mjData.ncon):
-            contact_info = {
-                "ID": i,
-                "Dim": contact.dim[i],
-                "Geom1": contact.geom1[i],
-                "Geom2": contact.geom2[i],
-            }
-            contacts.append(contact_info)
+            if contact.geom1[i] >= 0 and contact.geom2[i] >= 0:
+                contact_info = {
+                    "ID": i,
+                    "Dim": contact.dim[i],
+                    "Geom1": contact.geom1[i],
+                    "Geom2": contact.geom2[i],
+                }
+                contacts.append(contact_info)
         
         return contacts            
     

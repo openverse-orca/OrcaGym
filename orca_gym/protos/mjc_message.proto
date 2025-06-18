@@ -19,6 +19,12 @@ service GrpcService {
   rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
   rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
 
+  // 键鼠操作
+  rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
+  rpc GetMouseMovementEvents (GetMouseMovementEventsRequest) returns (GetMouseMovementEventsResponse);
+  rpc GetBodyManipulationAnchored (GetBodyManipulationAnchoredRequest) returns (GetBodyManipulationAnchoredResponse);
+  rpc GetBodyManipulationMovement (GetBodyManipulationMovementRequest) returns (GetBodyManipulationMovementResponse);
+
 
   // 配置查询
   rpc QueryModelInfo (QueryModelInfoRequest) returns (QueryModelInfoResponse);
@@ -959,7 +965,13 @@ message UpdateLocalEnvRequest{
     double time = 2;
 }
 
-message UpdateLocalEnvResponse{}
+message UpdateLocalEnvResponse{
+    message OverrideCtrlInfo {
+        int32 index = 1; // 控制输入索引
+        double value = 2; // 控制输入值
+    }
+    repeated OverrideCtrlInfo override_ctrls = 1; // 覆盖的控制输入列表
+}
 
 message LoadLocalEnvRequest {
     enum ReqType {
@@ -1074,4 +1086,40 @@ message SetMaterialInfoResponse {
     }
     Status status = 1; // 状态码字段
     string error_message = 2; // 错误详情（可选）
+}
+
+message GetKeyPressedEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetKeyPressedEventsResponse {
+    repeated string events = 1;  // 按键事件列表
+}
+
+
+message GetMouseMovementEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetMouseMovementEventsResponse {
+    float delta_x = 1;  // 鼠标在 x 轴上的移动距离
+    float delta_y = 2;  // 鼠标在 y 轴上的移动距离
+    float delta_z = 3;  // 鼠标在 z 轴上的移动距离（如果有）
+}
+
+message GetBodyManipulationAnchoredRequest {}
+
+message GetBodyManipulationAnchoredResponse {
+    enum AnchorType {
+        NONE = 0; // 无锚定
+        WELD = 1; // 焊接锚定
+        BALL = 2;  // 球形锚定
+    }
+    string body_name = 1;  // 被锚定的 Body 名字
+    AnchorType anchor_type = 2;  // 锚定类型
+}
+
+message GetBodyManipulationMovementRequest {}
+
+message GetBodyManipulationMovementResponse {
+    repeated double delta_pos = 1;  // Actor 在世界坐标系中的位置变化 (3 elements)
+    repeated double delta_quat = 2; // Actor 在世界坐标系中的旋转变化 (4 elements)
 }

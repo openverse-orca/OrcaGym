@@ -3,10 +3,6 @@ from gymnasium.core import ObsType
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
-from orca_gym.devices.keyboard import KeyboardInput
-import orca_gym.robosuite.utils.transform_utils as transform_utils
-from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 
 
