@@ -601,35 +601,13 @@ class DualArmRobot(AgentBase):
         left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform_list)
         right_relative_position, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
 
-        # left_relative_position_org, left_relative_rotation_org = self._pico_joystick.get_left_relative_move_org(transform_list)
-        # right_relative_position_org, right_relative_rotation_org = self._pico_joystick.get_right_relative_move_org(transform_list)
-
-        # print("left_relative_position: ", left_relative_position)
-        # print("left_relative_rotation: ", rotations.quat2euler(left_relative_rotation) * 180 / np.pi)
-        # print("right_relative_position: ", right_relative_position)
-        # print("right_relative_rotation: ", R.from_quat(right_relative_rotation, scalar_first=True).as_euler('xzy', degrees=True))
-        # print("right_relative_rotation_org: ", R.from_quat(right_relative_rotation_org, scalar_first=True).as_euler('xzy', degrees=True))
-
-        # def decompose(quat):
-        #     v = R.from_quat(quat, scalar_first=True).as_rotvec(degrees=True)
-        #     l = np.linalg.norm(v)
-        #     v = v / l
-        #     return [f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}', l]
-        
-
-            # v = R.from_quat(quat, scalar_first=True).as_euler('zxy', degrees=True)
-            # return f'{v[0]:>12.6f} {v[1]:>12.6f} {v[2]:>12.6f}'
-
-        # print("rotation_org: ", decompose(right_relative_rotation_org))
-        # print("rotation_mujo:", decompose(right_relative_rotation))
-
         mocap_l_xpos = self._initial_grasp_site_xpos + rotations.quat_rot_vec(self._base_body_xquat, left_relative_position)
         mocap_r_xpos = self._initial_grasp_site_xpos_r + rotations.quat_rot_vec(self._base_body_xquat, right_relative_position)
 
         mocap_l_xquat = rotations.quat_mul(self._initial_grasp_site_xquat, left_relative_rotation)
-        # mocap_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
-        mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r, scalar_first=True) * 
-                         R.from_quat(right_relative_rotation, scalar_first=True)).as_quat(scalar_first=True, canonical=True)
+        mocap_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
+        # mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r, scalar_first=True) * 
+        #                  R.from_quat(right_relative_rotation, scalar_first=True)).as_quat(scalar_first=True, canonical=True)
         
         return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
 
