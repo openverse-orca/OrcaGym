@@ -382,8 +382,20 @@ class OpenLoongEnv(RobomimicEnv):
     
 
     def get_state(self) -> dict:
+        # qpos, qvel, qacc, joint_names = [], [], [], []
+        # for agent in self._agents.values():
+        #     state = agent.get_state(self)
+        #     qpos.append(state["qpos"])
+        #     qvel.append(state["qvel"])
+        #     qacc.append(state["qacc"])
+        #     joint_names.append(state["joint_names"])
+
         state = {
             "time": self.data.time,
+            # "qpos": np.array(qpos).flatten(),
+            # "qvel": np.array(qvel).flatten(),
+            # "qacc": np.array(qacc).flatten(),
+            # "joint_names": joint_names,
             "qpos": self.data.qpos.copy(),
             "qvel": self.data.qvel.copy(),
             "qacc": self.data.qacc.copy(),
@@ -434,9 +446,21 @@ class OpenLoongEnv(RobomimicEnv):
 
     def reset_model(self) -> tuple[dict, dict]:
         if self._task.random_actor:
-            self._task.generate_actors()
+            actor_idxs = self._task.generate_actors()
+
+        if self._task.random_light:
+            idxs = self._task.generate_lights()
+
+        if self._task.random_actor or self._task.random_light:
             self._task.publish_scene()
 
+        if self._task.random_light:
+            for idx in idxs:
+                self._task.set_light_info(self._task.lights[idx])
+        if self._task.random_actor:
+            for idx in actor_idxs:
+                self._task.set_actor_material(self._task.actors[idx])
+                
         # 1) 恢复初始状态、重置 controller/mechanism
         self._set_init_state()
         [agent.on_reset_model(self) for agent in self._agents.values()]
@@ -785,7 +809,7 @@ class AgentBase:
     @property
     def action_range(self) -> np.ndarray:
         return self._action_range
-
+ 
     def init_agent(self, env: OpenLoongEnv, id: int) -> None:
         raise NotImplementedError("This method should be overridden by subclasses")
 
@@ -814,6 +838,13 @@ class AgentBase:
         raise NotImplementedError("This method should be overridden by subclasses")
     
     def set_init_ctrl(self, env: OpenLoongEnv) -> None:
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def get_state(self, env: OpenLoongEnv) -> dict:
+        """
+        Get the state of the agent.
+        This method should be overridden by subclasses to return the agent's state.
+        """
         raise NotImplementedError("This method should be overridden by subclasses")
 
     def on_close(self) -> None:
@@ -1144,6 +1175,10 @@ class OpenLoongAgent(AgentBase):
         qvel_dict = env.query_joint_qvel(joint_names)
         return np.array([qvel_dict[joint_name] for joint_name in joint_names]).flatten()
 
+    def _get_arm_joint_acc(self, env: OpenLoongEnv, joint_names) -> np.ndarray:
+        qacc_dict = env.query_joint_qacc(joint_names)
+        return np.array([qacc_dict[joint_name] for joint_name in joint_names]).flatten()
+
     def _setup_obs_scale(self, arm_qpos_range_l, arm_qpos_range_r) -> None:
         # 观测空间范围
         ee_xpos_scale = np.array([max(abs(act_range[0]), abs(act_range[1])) for act_range in self._action_range[:3]], dtype=np.float32)   # 末端位置范围
@@ -1199,7 +1234,7 @@ class OpenLoongAgent(AgentBase):
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
         
-    def set_l_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat) -> None:
+    def set_l_arm_position_ctrl(self, env: OpenLoongEnv, mocap_xpos, mocap_xquat) :
 
         self._l_inverse_kinematics_controller.set_goal(mocap_xpos, mocap_xquat)
         delta = self._l_inverse_kinematics_controller.compute_inverse_kinematics()
@@ -1554,6 +1589,10 @@ class OpenLoongHandAgent(OpenLoongAgent):
                                     ,env.actuator("M_zbll_J4", id),env.actuator("M_zbll_J5", id),env.actuator("M_zbll_J6", id),
                                     env.actuator("M_zbll_J7", id),env.actuator("M_zbll_J8", id),env.actuator("M_zbll_J9", id),
                                     env.actuator("M_zbll_J10", id),env.actuator("M_zbll_J11", id)]
+        self._l_hand_joint_names = [env.joint("zbll_J1", id), env.joint("zbll_J2", id), env.joint("zbll_J3", id),
+                                    env.joint("zbll_J4", id), env.joint("zbll_J5", id), env.joint("zbll_J6", id),
+                                    env.joint("zbll_J7", id), env.joint("zbll_J8", id), env.joint("zbll_J9", id),
+                                    env.joint("zbll_J10", id), env.joint("zbll_J11", id)]
         self._l_hand_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_moto_names]        
         self._l_hand_body_names = [env.body("zbll_Link1"), env.body("zbll_Link2"), env.body("zbll_Link3"),
                                    env.body("zbll_Link4"), env.body("zbll_Link5"), env.body("zbll_Link6"), 
@@ -1569,6 +1608,10 @@ class OpenLoongHandAgent(OpenLoongAgent):
                                    ,env.actuator("M_zbr_J4", id),env.actuator("M_zbr_J5", id),env.actuator("M_zbr_J6", id),
                                    env.actuator("M_zbr_J7", id),env.actuator("M_zbr_J8", id),env.actuator("M_zbr_J9", id),
                                    env.actuator("M_zbr_J10", id),env.actuator("M_zbr_J11", id)]
+        self._r_hand_joint_names = [env.joint("zbr_J1", id), env.joint("zbr_J2", id), env.joint("zbr_J3", id),
+                                    env.joint("zbr_J4", id), env.joint("zbr_J5", id), env.joint("zbr_J6", id),
+                                    env.joint("zbr_J7", id), env.joint("zbr_J8", id), env.joint("zbr_J9", id),
+                                    env.joint("zbr_J10", id), env.joint("zbr_J11", id)]
         self._r_hand_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_motor_names]
         self._r_hand_body_names = [env.body("zbr_Link1"), env.body("zbr_Link2"), env.body("zbr_Link3"),
                                    env.body("zbr_Link4"), env.body("zbr_Link5"), env.body("zbr_Link6"), 
@@ -1579,6 +1622,20 @@ class OpenLoongHandAgent(OpenLoongAgent):
             if geom_info["BodyName"] in self._r_hand_body_names:
                 self._r_hand_gemo_ids.append(geom_info["GeomId"])            
 
+    def get_state(self, env: OpenLoongEnv) -> dict:
+        joint_names = self._l_arm_joint_names + self._l_hand_joint_names + self._r_arm_joint_names + self._r_hand_joint_names
+        
+
+        qpos = self._get_arm_joint_values(env, joint_names)
+
+        qvel = self._get_arm_joint_velocities(env, joint_names)
+
+        qacc = self._get_arm_joint_acc(env, joint_names)
+
+        return {"joint_names": joint_names,
+                "qpos": qpos,
+                "qvel": qvel,
+                "qacc": qacc}
 
     def _set_gripper_ctrl_l(self, env : OpenLoongEnv, joystick_state) -> None:
         # Press secondary button to set gripper minimal value
@@ -1684,7 +1741,9 @@ class OpenLoongGripperAgent(OpenLoongAgent):
         super().init_agent(env, id)
 
         self._l_hand_actuator_names = [env.actuator("l_fingers_actuator", id)]
-        
+        self._l_hand_joint_names = [env.joint("l_left_driver_joint", id), env.joint("l_left_spring_link_joint", id),
+                                    env.joint("l_left_follower", id), env.joint("l_right_driver_joint", id),
+                                    env.joint("l_right_spring_link_joint", id), env.joint("l_right_follower_joint", id)]
         self._l_hand_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
         self._l_hand_body_names = [env.body("l_left_pad", id), env.body("l_right_pad", id)]
         self._l_hand_gemo_ids = []
@@ -1693,7 +1752,9 @@ class OpenLoongGripperAgent(OpenLoongAgent):
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
         self._r_hand_actuator_names = [env.actuator("r_fingers_actuator", id)]
-
+        self._r_hand_joint_names = [env.joint("r_left_driver_joint", id), env.joint("r_left_spring_link_joint", id),
+                                    env.joint("r_left_follower", id), env.joint("r_right_driver_joint", id),
+                                    env.joint("r_right_spring_link_joint", id), env.joint("r_right_follower_joint", id)]
         self._r_hand_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
         self._r_hand_body_names = [env.body("r_left_pad", id), env.body("r_right_pad", id)]
         self._r_hand_gemo_ids = []
@@ -1701,6 +1762,20 @@ class OpenLoongGripperAgent(OpenLoongAgent):
             if geom_info["BodyName"] in self._r_hand_body_names:
                 self._r_hand_gemo_ids.append(geom_info["GeomId"])  
 
+    def get_state(self, env: OpenLoongEnv) -> dict:
+        joint_names = self._l_arm_joint_names + self._l_hand_joint_names + self._r_arm_joint_names + self._r_hand_joint_names
+        
+
+        qpos = self._get_arm_joint_values(env, joint_names)
+
+        qvel = self._get_arm_joint_velocities(env, joint_names)
+
+        qacc = self._get_arm_joint_acc(env, joint_names)
+
+        return {"joint_names": joint_names,
+                "qpos": qpos,
+                "qvel": qvel,
+                "qacc": qacc}
 
     def _set_l_hand_actuator_ctrl(self, env: OpenLoongEnv, offset_rate) -> None:
         for actuator_id in self._l_hand_actuator_id:
