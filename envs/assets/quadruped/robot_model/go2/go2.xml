@@ -138,11 +138,11 @@
       <geom conaffinity="0" contype="0" pos="0 0.1 0" rgba="0 0.7 0 0.5" size="0.005 0.1 0.005" type="box" group="1"></geom>
       <geom conaffinity="0" contype="0" pos="0 0 0.1" rgba="0 0 0.7 0.5" size="0.005 0.005 0.1" type="box" group="1"></geom>
     </body>
-    <!-- <body mocap="true" name="mocap" pos="0. 0. 0.78"> -->
-      <!-- <site pos="0 0 0.075" size="0.003 0.003 0.1" type="box" name="mocap_left_site1" rgba="0 0 1 1"/> -->
-      <!-- <site pos="0 0.075 0" size="0.003 0.1 0.003" type="box" name="mocap_left_site2" rgba="0 1 0 1"/> -->
-      <!-- <site pos="0.075 0 0" size="0.1 0.003 0.003" type="box" name="mocap_left_site3" rgba="1 0 0 1"/> -->
-    <!-- </body> -->
+    <body mocap="true" name="mocap" pos="0. 0. 0.78">
+      <site pos="0 0 0.075" size="0.003 0.003 0.1" type="box" name="mocap_left_site1" rgba="0 0 1 1"/>
+      <site pos="0 0.075 0" size="0.003 0.1 0.003" type="box" name="mocap_left_site2" rgba="0 1 0 1"/>
+      <site pos="0.075 0 0" size="0.1 0.003 0.003" type="box" name="mocap_left_site3" rgba="1 0 0 1"/>
+    </body>
 
     <body name="base" pos="0 0 0.445" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719" mass="6.921"
