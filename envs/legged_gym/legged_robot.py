@@ -272,8 +272,10 @@ class LeggedRobot(OrcaGymAgent):
         self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
         self._leg_joint_qacc[:] = qacc_buffer[self._qacc_index["leg_start"] : self._qacc_index["leg_start"] + self._qacc_index["leg_length"]]
 
+        self._last_leg_joint_qpos[:] = self._leg_joint_qpos
+
         self._body_height, self._body_lin_vel, self._body_ang_vel, \
-            self._body_orientation = self._get_body_local(qpos_buffer, qvel_buffer)
+            self._body_orientation, self._body_pos = self._get_body_local(qpos_buffer, qvel_buffer)
 
         self._foot_height = self._get_foot_height(site_pos_quat, height_map)  # Foot position in the local frame
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
@@ -286,18 +288,16 @@ class LeggedRobot(OrcaGymAgent):
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
-        square_wave = self._compute_square_wave()
-        sin_phase, cos_phase = self._compute_leg_period()
-        
-
+        # square_wave = self._compute_square_wave()
+        # sin_phase, cos_phase = self._compute_leg_period()
         obs = np.concatenate(
                 [
-                    self._body_lin_vel,
+                    # self._body_lin_vel,
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
-                    np.array([square_wave]),
-                    np.array([sin_phase, cos_phase]),
+                    # np.array([square_wave]),
+                    # np.array([sin_phase, cos_phase]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
@@ -317,7 +317,6 @@ class LeggedRobot(OrcaGymAgent):
         }
 
         self._is_obs_updated = True
-
         # print("Agent Obs: ", result)
 
         return result
@@ -338,6 +337,7 @@ class LeggedRobot(OrcaGymAgent):
         assert "leg_start" not in self._qpos_index and "leg_length" not in self._qpos_index, "qpos_index: joint_name 'leg_start' or 'leg_length' already exists"
         self._qpos_index["leg_start"], self._qpos_index["leg_length"] = self._calc_agent_leg_buffer_index(self._qpos_index)
         self._leg_joint_qpos = np.zeros(self._qpos_index["leg_length"])
+        self._last_leg_joint_qpos = np.zeros(self._qpos_index["leg_length"])
 
         self._qvel_index = {joint_name: {"offset": qvel_offset[i], "len": qvel_length[i]} for i, joint_name in enumerate(self.joint_names)}
         assert "leg_start" not in self._qvel_index and "leg_length" not in self._qvel_index, "qvel_index: joint_name 'leg_start' or 'leg_length' already exists"
@@ -354,6 +354,7 @@ class LeggedRobot(OrcaGymAgent):
         Called after each step in the environment.
         """
         self._set_action(action)
+        # self._set_action_ctrl(action_ctrl)
 
         visualized_command = {}
         if update_mocap and self._visualize_command:        
@@ -367,6 +368,13 @@ class LeggedRobot(OrcaGymAgent):
         
         return visualized_command
 
+    def step(self, action, **kwargs):
+        self._current_episode_step += 1
+        step_info = self.on_step(action, **kwargs)
+        return self._ctrl, step_info
+
+    def _set_action_ctrl(self, action_ctrl):
+        self._ctrl = action_ctrl
 
     def on_reset(self, height_map : np.ndarray) -> dict[str, np.ndarray]:
         # Reset ctrl to default values.
@@ -640,6 +648,9 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_feet_air_time(self, coeff) -> SupportsFloat:
+        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+            return 0.0
+        
         reward = 0.0
         # Penalty if the feet touch the ground too fast.
         # If air time is longer than the ideal air time, reward is still 0. 
@@ -648,14 +659,18 @@ class LeggedRobot(OrcaGymAgent):
         
         # print("feet air time: ", self._foot_touch_air_time)
         for i in range(len(self._foot_touch_air_time)):
+            if self._foot_in_air_time[i] > self._foot_touch_air_time_ideal:
+                reward -= (self._foot_in_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
             if self._foot_touch_air_time[i] > 0:
-                reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
-                    
+                # reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
+                reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
+                # reward += -(self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal)**2  * coeff * self.dt
+
         self._print_reward("Feet air time reward: ", reward, coeff * self.dt)
         return reward
 
     def _compute_reward_feet_self_contact(self, coeff) -> SupportsFloat:
-        reward = (-np.sum(self._feet_self_contact)) * coeff * self.dt
+        reward = (-np.sum(self._feet_self_contact)) * coeff * self.dtcompute_reward_symmetry
         self._print_reward("Foot self contact reward: ", reward, coeff * self.dt)
         return reward
     
@@ -670,6 +685,10 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_feet_fitted_ground(self, coeff) -> SupportsFloat:
+        # avoid stepping when no command is given
+        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+            return 0.0
+        
         reward = 0.0
         for i in range(len(self._foot_fitted_ground_pairs)):
             foot_front_index = self._foot_fitted_ground_pairs[i][0]
@@ -687,7 +706,8 @@ class LeggedRobot(OrcaGymAgent):
     def _compute_reward_stepping(self, coeff) -> SupportsFloat:
         reward = 0.0
         
-        if self._command["lin_vel"][0] == 0.0:
+        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+        # if self._command["lin_vel"][0] == 0.0:
             # Penalty if the robot is stepping when no command is given
             reward = np.sum(self._feet_contact - np.ones(len(self._feet_contact))) * coeff * self.dt
         
@@ -706,6 +726,9 @@ class LeggedRobot(OrcaGymAgent):
         return reward
     
     def _compute_reward_feet_swing_height(self, coeff) -> SupportsFloat:
+        # avoid stepping when no command is given
+        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+            return 0.0
         # Penalize the feet swing in error height
         swing_height = self._foot_leg_period["swing_height"]
         contact = self._feet_contact[:] > 0
@@ -716,7 +739,53 @@ class LeggedRobot(OrcaGymAgent):
         reward = -np.sum(pos_error) * coeff * self.dt
         self._print_reward("Feet swing height reward: ", reward, coeff * self.dt)
         return reward
-            
+
+    def _compute_reward_feet_swing_height_v2(self, coeff) -> SupportsFloat:
+        # avoid stepping when no command is given
+        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+            return 0.0
+
+        # Get target swing height from config
+        swing_height = self._foot_leg_period["swing_height"]
+        
+        # Get foot positions in world frame
+        foot_site_pos = [self._last_contact_site_xpos[foot_site_name] for foot_site_name in self._contact_site_names]
+        
+        # Get base position and orientation
+        # body_qpos_index = self._qpos_index[self._base_joint_name]
+        # body_joint_qpos = self._qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
+        body_pos = self._body_pos[0:3]
+        body_quat = self._body_pos[3:7]
+        
+        # Transform foot positions to body frame using global2local
+        foot_pos_local = []
+        for foot_pos in foot_site_pos:
+            # Get relative position in global frame
+            pos_relative = foot_pos - body_pos
+            # Convert to local frame using global2local
+            # We pass zero angular velocity since we only care about position
+            local_pos, _ = global2local(body_quat, pos_relative, np.zeros(3))
+            foot_pos_local.append(local_pos)
+        
+        # Calculate height error in body frame for each foot
+        contact = self._feet_contact[:] > 0
+        pos_error = np.zeros(len(foot_pos_local))
+        
+        for i, local_pos in enumerate(foot_pos_local):
+            if not contact[i]:  # Only penalize feet in swing phase
+                # Use z-coordinate in body frame
+                current_height = local_pos[2]
+                # Square error from desired swing height
+                pos_error[i] = (current_height - swing_height) ** 2
+                
+                # # Additional penalty for negative height (foot above body)
+                # if current_height < 0:
+                #     pos_error[i] *= 2.0
+        
+        reward = -np.sum(pos_error) * coeff * self.dt
+        self._print_reward("Feet swing height v2 reward: ", reward, coeff * self.dt)
+        return reward
+    
     def _compute_reward_contact_no_vel(self, coeff) -> SupportsFloat:
         # Penalize contact with no velocity
         contact = self._feet_contact[:] > 0
@@ -727,6 +796,27 @@ class LeggedRobot(OrcaGymAgent):
         reward = -np.sum(np.square(contact_feet_vel)) * coeff * self.dt
         self._print_reward("Contact no velocity reward: ", reward, coeff * self.dt)
         return reward
+    
+    ## useless
+    # def _compute_reward_action_obs_diff(self, coeff) -> SupportsFloat:
+    #     reward = -np.sum(np.square(self._last_leg_joint_qpos - self._ctrl)) * coeff * self.dt
+    #     self._print_reward("Action obs diff reward: ", reward, coeff * self.dt)
+    #     return reward
+    
+    # def compute_reward_symmetry(self, coeff) -> SupportsFloat:
+    #     front_left_joint_qpos = self._leg_joint_qpos[0:3] - self._neutral_joint_values[0:3]
+    #     front_right_joint_qpos = self._leg_joint_qpos[3:6] - self._neutral_joint_values[3:6]
+    #     back_left_joint_qpos = self._leg_joint_qpos[6:9] - self._neutral_joint_values[6:9]
+    #     back_right_joint_qpos = self._leg_joint_qpos[9:12] - self._neutral_joint_values[9:12]
+
+    #     symmetry_diagonal_1 = np.square(front_left_joint_qpos - back_right_joint_qpos)
+    #     symmetry_diagonal_2 = np.square(front_right_joint_qpos - back_left_joint_qpos)
+    #     symmetry_front = np.square(front_left_joint_qpos + front_right_joint_qpos)
+    #     symmetry_vertical = np.square(back_left_joint_qpos + back_right_joint_qpos)
+        
+    #     reward = -np.sum([symmetry_diagonal_1, symmetry_diagonal_2, symmetry_front, symmetry_vertical]) * coeff * self.dt
+    #     self._print_reward("Symmetry reward: ", reward, coeff * self.dt)
+    #     return reward
     
     def compute_reward(self, achieved_goal, desired_goal) -> SupportsFloat:
         if self._is_obs_updated:
@@ -863,7 +953,7 @@ class LeggedRobot(OrcaGymAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        if self._np_random.random() < 0.8:            
+        if self._np_random.random() < 1.0:            
             # Forward
             lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
                                 self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
@@ -877,6 +967,11 @@ class LeggedRobot(OrcaGymAgent):
         # Avoiding the robot to move tremble when the linear velocity is too small
         if lin_vel[0] < self._command_lin_vel_threshold[1] and lin_vel[0] > self._command_lin_vel_threshold[0]:
             lin_vel = np.array([0, 0, 0])
+        # if lin_vel[0] < self._command_lin_vel_threshold[1] and lin_vel[0] > self._command_lin_vel_threshold[0]:
+        #     # lin_vel = np.array([0, 0, 0])
+        #     lin_vel = np.array([0, lin_vel[1], 0])
+        # if lin_vel[1] < self._command_lin_vel_threshold[1] and lin_vel[1] > -self._command_lin_vel_threshold[1]:
+        #     lin_vel = np.array([lin_vel[0], 0, 0])
 
         return {"lin_vel": lin_vel, "ang_vel": 0, "heading_angle": heading_angle}
     
@@ -934,7 +1029,7 @@ class LeggedRobot(OrcaGymAgent):
         body_orientation = rotations.quat2euler(body_orientation_quat)
         body_orientation[2] = 0
 
-        return body_height, body_lin_vel, body_ang_vel, body_orientation
+        return body_height, body_lin_vel, body_ang_vel, body_orientation, body_joint_qpos
     
     def _get_obs_scale_vec(self):
         """ Sets a vector used to scale the observations.
@@ -957,17 +1052,18 @@ class LeggedRobot(OrcaGymAgent):
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
         # scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
 
-        scale_vec = np.concatenate([scale_lin_vel, 
-                                    scale_ang_vel, 
-                                    scale_orientation, 
-                                    scale_command, 
-                                    scale_square_wave,
-                                    scale_leg_phase,
-                                    scale_leg_joint_qpos, 
-                                    scale_leg_joint_qvel, 
-                                    scale_action, 
-                                    # scale_height
-                                    ]).flatten()
+        scale_vec = np.concatenate([
+            # scale_lin_vel, 
+            scale_ang_vel, 
+            scale_orientation, 
+            scale_command, 
+            # scale_square_wave,
+            # scale_leg_phase,
+            scale_leg_joint_qpos, 
+            scale_leg_joint_qvel, 
+            scale_action, 
+            # scale_height
+            ]).flatten()
         
         return scale_vec.astype(np.float32)
 
@@ -993,17 +1089,18 @@ class LeggedRobot(OrcaGymAgent):
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
         noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
 
-        noise_vec = np.concatenate([noise_lin_vel, 
-                                    noise_ang_vel, 
-                                    noise_orientation, 
-                                    noise_command, 
-                                    noise_square_wave,
-                                    scale_leg_phase,
-                                    noise_leg_joint_qpos, 
-                                    noise_leg_joint_qvel, 
-                                    noise_action, 
-                                    # noise_height
-                                    ]).flatten()
+        noise_vec = np.concatenate([
+            # noise_lin_vel, 
+            noise_ang_vel, 
+            noise_orientation, 
+            noise_command, 
+            # noise_square_wave,
+            # scale_leg_phase,
+            noise_leg_joint_qpos, 
+            noise_leg_joint_qvel, 
+            noise_action, 
+            # noise_height
+            ]).flatten()
         
         # print("noise vec: ", noise_vec)
 
@@ -1062,8 +1159,9 @@ class LeggedRobot(OrcaGymAgent):
             {"function": self._compute_reward_fly, "coeff": reward_coeff["fly"] if "fly" in reward_coeff else 0},
             {"function": self._compute_reward_stepping, "coeff": reward_coeff["stepping"] if "stepping" in reward_coeff else 0},
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["feet_contact"] if "feet_contact" in reward_coeff else 0},
-            {"function": self._compute_reward_feet_swing_height, "coeff": reward_coeff["feet_swing_height"] if "feet_swing_height" in reward_coeff else 0},
+            {"function": self._compute_reward_feet_swing_height_v2, "coeff": reward_coeff["feet_swing_height"] if "feet_swing_height" in reward_coeff else 0},
             {"function": self._compute_reward_contact_no_vel, "coeff": reward_coeff["contact_no_vel"] if "contact_no_vel" in reward_coeff else 0},
+            {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["phase_contact"] if "phase_contact" in reward_coeff else 0},  
         ]
         
     def _setup_curriculum_functions(self):
@@ -1193,7 +1291,7 @@ class LeggedRobot(OrcaGymAgent):
         leg_period_phase = (self._current_episode_step * self.dt) % period / period
         leg_period_phase_left = leg_period_phase
         leg_period_phase_right = (leg_period_phase + offset) % 1
-        self._leg_phase = np.concatenate([[leg_period_phase_left, leg_period_phase_left], [leg_period_phase_right, leg_period_phase_right]]).flatten()
+        self._leg_phase = np.concatenate([[leg_period_phase_left, leg_period_phase_right], [leg_period_phase_right, leg_period_phase_left]]).flatten()
         
         # print("Leg period phase: ", leg_period_phase, "Leg period phase left: ", leg_period_phase_left, "Leg period phase right: ", leg_period_phase_right, " _leg_phase: ", self._leg_phase)
         
