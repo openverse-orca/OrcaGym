@@ -27,13 +27,13 @@ class DualArmRobot(AgentBase):
 
     def init_agent(self, id: int):
         config = get_robot_config(self._name)
-        self._read_config(config)
+        self._read_config(config, id)
         self._setup_initial_info()
         self._setup_device()
         self._setup_controller()
 
 
-    def _read_config(self, config: dict) -> None:
+    def _read_config(self, config: dict, id: int) -> None:
         """
         根据配置初始化访问环境需要的名字和 ID
         注意：xpos, xquat 不能在这里读取，因为还没有执行 mj_forward，读到的是不正确的
