@@ -751,7 +751,7 @@ def run_example(orcagym_addr : str,
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config,{})
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)

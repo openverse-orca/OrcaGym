@@ -333,7 +333,7 @@ class DualArmEnv(RobomimicEnv):
         # 将动作分配给每个agent
         agent_action = self._split_agent_action(action)
         for agent in self._agents.values():
-            agent.on_playback_action(self, agent_action[agent.name])
+            agent.on_playback_action( agent_action[agent.name])
         
         return self.ctrl.copy()
     
