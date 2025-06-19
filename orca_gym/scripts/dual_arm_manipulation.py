@@ -854,7 +854,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
 
     # 启动 Monitor 子进程
     ports = [
-        # 7070, 7080, 7090,        # Agent1
+        7070, 7080, 7090,        # Agent1
         # 8070, 8080, 8090,        # Agent2
     ]
     monitor_processes = []

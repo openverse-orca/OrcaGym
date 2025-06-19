@@ -387,7 +387,7 @@ class DualArmEnv(RobomimicEnv):
 
         # 构造 numpy structured array
         dtype = np.dtype([
-            ('joint_name', 'U50'),
+            ('joint_name', 'U100'),
             ('position', 'f4', (3,)),
             ('orientation', 'f4', (4,))
         ])
@@ -406,7 +406,7 @@ class DualArmEnv(RobomimicEnv):
         )
         self.objects = objects_array
         goal_dtype = np.dtype([
-            ('joint_name',  'U50'),
+            ('joint_name',  'U100'),
             ('position',    'f4', (3,)),
             ('orientation', 'f4', (4,)),
             ('min',         'f4', (3,)),
@@ -487,7 +487,7 @@ class DualArmEnv(RobomimicEnv):
         """
         将 demo 里记录的 objects_data 写回到仿真。
         objects_data 可能是：
-          1) 结构化 numpy array：dtype=[('joint_name',U50),('position',f4,3),('orientation',f4,4)]
+          1) 结构化 numpy array：dtype=[('joint_name',U100),('position',f4,3),('orientation',f4,4)]
           2) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
         """
         qpos_dict = {}
@@ -562,7 +562,7 @@ class DualArmEnv(RobomimicEnv):
 
         # 3) 重建结构化数组
         goal_dtype = np.dtype([
-            ('joint_name',  'U50'),
+            ('joint_name',  'U100'),
             ('position',    'f4', (3,)),
             ('orientation', 'f4', (4,)),
             ('min',         'f4', (3,)),
