@@ -30,8 +30,8 @@ DEFAULT_CONFIG = {
     "random_light": False, # 是否随机添加光源
     "random_light_position": False, # 是否随机光源的位置
     "random_light_rotation": False, # 是否随机光源的旋转
-    "light": [], # 光源的命名
-    "light_spawnable": [], # 光源的spawnable name, spawnable在Asset/Prefabs下面
+    "lights": [], # 光源的命名
+    "lights_spawnable": [], # 光源的spawnable name, spawnable在Asset/Prefabs下面
     "light_center": [0, 0, 0], # 光源的中心位置
     "light_bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "light_description": [],
