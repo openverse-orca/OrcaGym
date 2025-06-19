@@ -200,11 +200,11 @@ class DualArmEnv(RobomimicEnv):
         return self._action_type
     
     @property
-    def joystick(self) -> Optional[PicoJoystick]:
+    def joystick(self):
         if self._ctrl_device == ControlDevice.VR:
             return self._joystick
     
-    def set_task_status(self, status: TaskStatus):
+    def set_task_status(self, status):
         if status == TaskStatus.SUCCESS:
             print("Task success!")
         elif status == TaskStatus.FAILURE:

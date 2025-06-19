@@ -41,9 +41,6 @@ class DualArmRobot(AgentBase):
         ######## Base body and joint setup ########
         self._base_body_name = [self._env.body(config["base"]["base_body_name"], id)]
 
-        # print("base_body_xpos: ", self._base_body_xpos)
-        # print("base_body_xquat: ", self._base_body_xquat)
-
         dummy_joint_id = self._env.model.joint_name2id(self._env.joint(config["base"]["dummy_joint_name"], id))
 
         # ######## Right Arm ########
@@ -80,20 +77,6 @@ class DualArmRobot(AgentBase):
         self._l_neutral_joint_values = np.array(config["left_arm"]["neutral_joint_values"])
         self._ee_site_l  = self._env.site(config["left_arm"]["ee_center_site_name"], id)
 
-        # ######## neck setup ########
-        if config.get("neck", None) is None:
-            self._neck_joint_names = [self._env.joint(config["neck"]["yaw_joint_name"], id), self._env.joint(config["neck"]["pitch_joint_name"], id)]
-            self._neck_actuator_names = [self._env.actuator(config["neck"]["yaw_actuator_name"], id), self._env.actuator(config["neck"]["pitch_actuator_name"], id)]
-            self._neck_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-            self._neck_neutral_joint_values = np.array([0, -0.7854])
-            self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
-            self._neck_site_name  = self._env.site(config["neck"]["neck_center_site_name"], id)
-        else:
-            self._neck_site_name = None
-            self._neck_joint_names = []
-            self._neck_actuator_names = []
-            self._neck_neutral_joint_values = np.array([0, 0])
-
     def _setup_initial_info(self):
         """
         读取系统初始化状态
@@ -102,16 +85,11 @@ class DualArmRobot(AgentBase):
         self._env.mj_forward()
         self.set_joint_neutral()
         self._env.mj_forward()
-
-        self._base_body_xpos, _, self._base_body_xquat = self._env.get_body_xpos_xmat_xquat(self._base_body_name)        
+   
         # control range
         self._all_ctrlrange = self._env.model.get_actuator_ctrlrange()
-
         r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
-        # print("ctrl_range: ", r_ctrl_range)
-
         l_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
-        # print("ctrl_range: ", l_ctrl_range)
 
         arm_qpos_range_l = self._env.model.get_joint_qposrange(self._l_arm_joint_names)
         arm_qpos_range_r = self._env.model.get_joint_qposrange(self._r_arm_joint_names)
@@ -132,59 +110,23 @@ class DualArmRobot(AgentBase):
         self._grasp_value_r = 0.0
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
 
-        if self._neck_site_name is not None:
-            site_dict = self._env.query_site_pos_and_quat([self._neck_site_name])
-            self._initial_neck_site_xpos = site_dict[self._neck_site_name]['xpos']
-            self._initial_neck_site_xquat = site_dict[self._neck_site_name]['xquat']
-            self.set_neck_mocap(self._initial_neck_site_xpos, self._initial_neck_site_xquat)
-            self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-            self._neck_angle_x, self._neck_angle_y = 0, 0
-
         # 设置各部位初始位置
         self._env.mj_forward()
 
     def _setup_device(self):
         if self._env.run_mode == RunMode.TELEOPERATION:
             if self._env.ctrl_device == ControlDevice.VR:
+                if self._env.joystick is None:
+                    raise ValueError("VR controller is not initialized.")
                 self._pico_joystick = self._env.joystick[self.name]
             else:
                 raise ValueError("Invalid control device: ", self._env.ctrl_device)
             
     def _setup_controller(self):
-        # -----------------------------
-        # Neck controller
-        if self._neck_site_name is not None:
-            neck_ctrl_range = [self._all_ctrlrange[actuator_id] for actuator_id in self._neck_actuator_id]
-            # print("ctrl_range: ", neck_ctrl_range)
-
-            self._neck_controller_config = controller_config.load_config("osc_pose")
-            # print("controller_config: ", self.controller_config)
-
-            # Add to the controller dict additional relevant params:
-            #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-            #   policy (control) freq, and ndim (# joints)
-            self._neck_controller_config["robot_name"] = self.name
-            self._neck_controller_config["sim"] = self._env.gym
-            self._neck_controller_config["eef_name"] = self._neck_site_name
-            # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-            qpos_offsets, qvel_offsets, _ = self._env.query_joint_offsets(self._neck_joint_names)
-            self._neck_controller_config["joint_indexes"] = {
-                "joints": self._neck_joint_names,
-                "qpos": qpos_offsets,
-                "qvel": qvel_offsets,
-            }
-            self._neck_controller_config["actuator_range"] = neck_ctrl_range
-            self._neck_controller_config["policy_freq"] = self._env.control_freq
-            self._neck_controller_config["ndim"] = len(self._neck_joint_names)
-            self._neck_controller_config["control_delta"] = False
-
-
-            self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
-            self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
-        else:
-            self._neck_controller = None
-
         if self._env.action_use_motor():
+            r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
+            l_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._l_arm_actuator_id]
+
             # -----------------------------
             # OSC controller
             # Right controller
@@ -261,8 +203,6 @@ class DualArmRobot(AgentBase):
             arm_joint_qpos[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])     
-        for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
-            arm_joint_qpos[name] = np.array([value])
         self._env.set_joint_qpos(arm_joint_qpos)        
 
     def set_init_ctrl(self) -> None:
@@ -277,11 +217,6 @@ class DualArmRobot(AgentBase):
     def on_reset_model(self) -> None:
         self._reset_grasp_mocap()
         self._reset_gripper()
-        self._reset_neck_mocap()
-
-    def set_neck_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self._env.mocap("neckMocap", self.id): {'pos': position, 'quat': orientation}}
-        self._env.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_grasp_mocap(self, position, orientation) -> None:
         mocap_pos_and_quat_dict = {self._env.mocap("leftHandMocap", self.id): {'pos': position, 'quat': orientation}}
@@ -295,14 +230,6 @@ class DualArmRobot(AgentBase):
     def _reset_gripper(self) -> None:
         self._l_gripper_offset_rate_clip = 0.0
         self._r_gripper_offset_rate_clip = 0.0
-
-    def _reset_neck_mocap(self) -> None:
-        if self._neck_controller is None:
-            return
-        
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self.set_neck_mocap(self._mocap_neck_xpos, self._mocap_neck_xquat)
-        self._neck_angle_x, self._neck_angle_y = 0, 0
 
     def _reset_grasp_mocap(self) -> None:
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
@@ -408,7 +335,7 @@ class DualArmRobot(AgentBase):
         self._action_range_min = self._action_range[:, 0]
         self._action_range_max = self._action_range[:, 1]
         
-    def set_l_arm_position_ctrl(self, mocap_xpos, mocap_xquat) -> None:
+    def set_l_arm_position_ctrl(self, mocap_xpos, mocap_xquat) -> np.ndarray:
 
         self._l_inverse_kinematics_controller.set_goal(mocap_xpos, mocap_xquat)
         delta = self._l_inverse_kinematics_controller.compute_inverse_kinematics()
@@ -439,62 +366,65 @@ class DualArmRobot(AgentBase):
         return self._env.ctrl[self._r_arm_actuator_id]
 
     def on_teleoperation_action(self) -> np.ndarray:
-        mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = None, None, None, None
-
         if self._pico_joystick is not None:
-            mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat = self._processe_pico_joystick_move()
-            self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
-            self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
+            grasp_l_xpos, grasp_l_xquat, grasp_r_xpos, grasp_r_xquat = self._processe_pico_joystick_move()
             self._process_pico_joystick_operation()
             # print("base_body_euler: ", self._base_body_euler / np.pi * 180)
         else:
             return np.zeros(14)
+        
+        # transform_utils 和 rotations 的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
+        grasp_r_axisangle = transform_utils.quat2axisangle(
+            np.array(
+                [grasp_r_xquat[1], 
+                 grasp_r_xquat[2], 
+                 grasp_r_xquat[3], 
+                 grasp_r_xquat[0]]
+            )
+        )    
+        grasp_l_axisangle = transform_utils.quat2axisangle(
+            np.array(
+                [grasp_l_xquat[1], 
+                 grasp_l_xquat[2], 
+                 grasp_l_xquat[3], 
+                 grasp_l_xquat[0]]
+            )
+        )
 
-
-        # 两个工具的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
-        mocap_r_axisangle = transform_utils.quat2axisangle(np.array([mocap_r_xquat[1], 
-                                                                   mocap_r_xquat[2], 
-                                                                   mocap_r_xquat[3], 
-                                                                   mocap_r_xquat[0]]))              
-        # mocap_axisangle[1] = -mocap_axisangle[1]
-        action_r = np.concatenate([mocap_r_xpos, mocap_r_axisangle])
-
+        # 手部控制器使用局部坐标系
         if self._env.action_use_motor():
-            # print("action r:", action_r)
+            action_r = np.concatenate([grasp_r_xpos, grasp_r_axisangle])
             self._r_controller.set_goal(action_r)
             ctrl_r = self._r_controller.run_controller()
-            # print("ctrl r: ", ctrl)
             self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
-        else:
-            ctrl_r = self.set_r_arm_position_ctrl(mocap_r_xpos, mocap_r_xquat)
 
-        mocap_l_axisangle = transform_utils.quat2axisangle(np.array([mocap_l_xquat[1], 
-                                                                   mocap_l_xquat[2], 
-                                                                   mocap_l_xquat[3], 
-                                                                   mocap_l_xquat[0]]))  
-        action_l = np.concatenate([mocap_l_xpos, mocap_l_axisangle])
-
-        if self._env.action_use_motor():
-            # print("action l:", action_l)
-            # print(action)
+            action_l = np.concatenate([grasp_l_xpos, grasp_l_axisangle])
             self._l_controller.set_goal(action_l)
             ctrl_l = self._l_controller.run_controller()
-            # print("ctrl l: ", ctrl)
             self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
         else:
-            ctrl_l = self.set_l_arm_position_ctrl(mocap_l_xpos, mocap_l_xquat)
+            ctrl_r = self.set_r_arm_position_ctrl(grasp_r_xpos, grasp_r_xquat)
+            ctrl_l = self.set_l_arm_position_ctrl(grasp_l_xpos, grasp_l_xquat)
 
+        # 数据采集保存局部坐标系
+        action_l_B = np.concatenate([grasp_l_xpos, grasp_l_axisangle])
+        action_r_B = np.concatenate([grasp_r_xpos, grasp_r_axisangle])
+        ctrl_l = np.asarray(ctrl_l, dtype=np.float32)
+        ctrl_r = np.asarray(ctrl_r, dtype=np.float32)
+        action = np.concatenate([
+            np.asarray(action_l_B, dtype=np.float32),                # left eef pos and angle, 0-5
+            ctrl_l,                                                  # left arm joint pos, 6-12
+            np.array([self._grasp_value_l], dtype=np.float32),       # left hand grasp value, 13
+            np.asarray(action_r_B, dtype=np.float32),                # right eef pos and angle, 14-19
+            ctrl_r,                                                  # right arm joint pos, 20-26
+            np.array([self._grasp_value_r], dtype=np.float32)        # right hand grasp value, 27
+        ]).flatten()
 
-        action_l_B = self._action_to_action_B(action_l)
-        action_r_B = self._action_to_action_B(action_r)
-
-        action = np.concatenate([action_l_B,                # left eef pos and angle, 0-5
-                                 ctrl_l,               # left arm joint pos, 6-12 (will be fill after do simulation)
-                                 [self._grasp_value_l],     # left hand grasp value, 13
-                                 action_r_B,                # right eef pos and angle, 14-19
-                                 ctrl_r,               # right arm joint pos, 20-26 (will be fill after do simulation)
-                                 [self._grasp_value_r]]     # right hand grasp value, 27
-                                ).flatten()
+        # Mocap 调试标记采用全局坐标系
+        mocap_l_xpos, mocap_l_xquat = self._local_to_global(grasp_l_xpos, grasp_l_xquat)
+        mocap_r_xpos, mocap_r_xquat = self._local_to_global(grasp_r_xpos, grasp_r_xquat)
+        self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
+        self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
 
         return action
 
@@ -526,7 +456,6 @@ class DualArmRobot(AgentBase):
 
         self.set_gripper_ctrl_r(joystick_state)
         self.set_gripper_ctrl_l(joystick_state)
-        self._set_head_ctrl(joystick_state)
         self._set_task_status(joystick_state)
 
 
@@ -545,69 +474,12 @@ class DualArmRobot(AgentBase):
         elif self._env.task_status == TaskStatus.BEGIN and joystick_state["rightHand"]["gripButtonPressed"]:
             self._env.set_task_status(TaskStatus.SUCCESS)
 
-    def _set_head_ctrl(self, joystick_state) -> None:
-        if self._neck_controller is None:
-            return
-
-        x_axis = joystick_state["rightHand"]["joystickPosition"][0]
-        if x_axis == 0:
-            x_axis = joystick_state["leftHand"]["joystickPosition"][0]
-
-        y_axis = joystick_state["rightHand"]["joystickPosition"][1]
-        if y_axis == 0:
-            y_axis = joystick_state["leftHand"]["joystickPosition"][1]
-            
-        mocap_neck_xpos, mocap_neck_xquat = self._mocap_neck_xpos, self._mocap_neck_xquat
-
-        # 将 x_axis 和 y_axis 输入转换为旋转角度，按需要调节比例系数
-        angle_x = -x_axis * np.pi / 180  # 转换为弧度，模拟绕 X 轴的旋转
-        angle_y = -y_axis * np.pi / 180  # 转换为弧度，模拟绕 Y 轴的旋转
-
-        # 设置旋转角度的限制
-        self._neck_angle_x += angle_x
-        if self._neck_angle_x > np.pi / 3 or self._neck_angle_x < -np.pi / 3:
-            self._neck_angle_x = np.clip(self._neck_angle_x, -np.pi / 3, np.pi / 3)
-            angle_x = 0
-        
-        self._neck_angle_y += angle_y
-        if self._neck_angle_y > np.pi / 3 or self._neck_angle_y < -np.pi / 3:
-            self._neck_angle_y = np.clip(self._neck_angle_y, -np.pi / 3, np.pi / 3)
-            angle_y = 0
-
-        new_neck_quat_local = rotations.euler2quat(np.array([0.0, angle_y, angle_x]))
-
-        # 将局部坐标系的旋转转换为全局坐标系，乘以当前全局旋转四元数
-        new_neck_quat_global = rotations.quat_mul(mocap_neck_xquat, new_neck_quat_local)
-
-        # 将新的全局旋转四元数转换为轴角表示
-        mocap_neck_axisangle = transform_utils.quat2axisangle(np.array([new_neck_quat_global[1], 
-                                                                        new_neck_quat_global[2],
-                                                                        new_neck_quat_global[3],
-                                                                        new_neck_quat_global[0]]))
-
-        # 可选：将轴角重新转换回四元数进行夹紧或其他操作
-        new_neck_quat_cliped = transform_utils.axisangle2quat(mocap_neck_axisangle)
-
-        # 将动作信息打包并发送到控制器
-        action_neck = np.concatenate([mocap_neck_xpos, mocap_neck_axisangle])
-
-        # # 更新 _mocap_neck_xquat 为新的全局旋转值
-        self._mocap_neck_xquat = new_neck_quat_global
-
-        self._neck_controller.set_goal(action_neck)
-        ctrl = self._neck_controller.run_controller()
-        for i in range(len(self._neck_actuator_id)):
-            self._env.ctrl[self._neck_actuator_id[i]] = ctrl[i]
-
-        # 更新头部位置
-        self.set_neck_mocap(mocap_neck_xpos, self._mocap_neck_xquat)
 
     def _processe_pico_joystick_move(self) -> tuple:
         if self._pico_joystick.is_reset_pos():
             self._pico_joystick.set_reset_pos(False)
             # self._set_init_state()
             self._reset_gripper()
-            self._reset_neck_mocap()
 
         transform_list = self._pico_joystick.get_transform_list()
         if transform_list is None:
@@ -616,15 +488,13 @@ class DualArmRobot(AgentBase):
         left_relative_position, left_relative_rotation = self._pico_joystick.get_left_relative_move(transform_list)
         right_relative_position, right_relative_rotation = self._pico_joystick.get_right_relative_move(transform_list)
 
-        mocap_l_xpos = self._initial_grasp_site_xpos + rotations.quat_rot_vec(self._base_body_xquat, left_relative_position)
-        mocap_r_xpos = self._initial_grasp_site_xpos_r + rotations.quat_rot_vec(self._base_body_xquat, right_relative_position)
+        grasp_l_xpos = self._initial_grasp_site_xpos + left_relative_position
+        grasp_r_xpos = self._initial_grasp_site_xpos_r + right_relative_position
 
-        mocap_l_xquat = rotations.quat_mul(self._initial_grasp_site_xquat, left_relative_rotation)
-        mocap_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
-        # mocap_r_xquat = (R.from_quat(self._initial_grasp_site_xquat_r, scalar_first=True) * 
-        #                  R.from_quat(right_relative_rotation, scalar_first=True)).as_quat(scalar_first=True, canonical=True)
-        
-        return mocap_l_xpos, mocap_l_xquat, mocap_r_xpos, mocap_r_xquat
+        grasp_l_xquat = rotations.quat_mul(self._initial_grasp_site_xquat, left_relative_rotation)
+        grasp_r_xquat = rotations.quat_mul(self._initial_grasp_site_xquat_r, right_relative_rotation)
+
+        return grasp_l_xpos, grasp_l_xquat, grasp_r_xpos, grasp_r_xquat
 
     def on_playback_action(self, action) -> None:
         assert(len(action) == self.action_range.shape[0])
@@ -656,6 +526,34 @@ class DualArmRobot(AgentBase):
         
         return
     
+
+    def _local_to_global(self, local_pos: np.ndarray, local_quat: np.ndarray) -> tuple:
+        """
+        将局部坐标系的位姿转换为全局坐标系
+        :param local_pos: 局部位置
+        :param local_quat: 局部四元数
+        :return: 全局位置和全局四元数
+        """
+        base_link_pos, _, base_link_quat = self._env.get_body_xpos_xmat_xquat(self._base_body_name)
+
+        global_pos = base_link_pos + rotations.quat_rot_vec(base_link_quat, local_pos)
+        global_quat = rotations.quat_mul(base_link_quat, local_quat)
+        return global_pos, global_quat
+    
+    def _global_to_local(self, global_pos: np.ndarray, global_quat: np.ndarray) -> tuple:
+        """
+        将全局坐标系的位姿转换为局部坐标系
+        :param global_pos: 全局位置
+        :param global_quat: 全局四元数
+        :return: 局部位置和局部四元数
+        """
+        base_link_pos, _, base_link_quat = self._env.get_body_xpos_xmat_xquat(self._base_body_name)
+
+        base_link_quat_inv = rotations.quat_conjugate(base_link_quat)
+        local_pos = rotations.quat_rot_vec(base_link_quat_inv, global_pos - base_link_pos)
+        local_quat = rotations.quat_mul(base_link_quat_inv, global_quat)
+        return local_pos, local_quat
+
     def _action_B_to_action(self, action_B: np.ndarray) -> np.ndarray:
         ee_pos = action_B[:3]
         ee_axisangle = action_B[3:6]
