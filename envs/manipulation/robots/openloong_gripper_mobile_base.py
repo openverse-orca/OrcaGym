@@ -2,9 +2,10 @@ import numpy as np
 from envs.manipulation.dual_arm_env import DualArmEnv
 from envs.manipulation.dual_arm_robot import DualArmRobot
 from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as config
+from envs.manipulation.robots.configs.differential_drive_chassis import differential_drive_chassis_config as chassis_config
 
 
-class OpenLoongGripperFixBase(DualArmRobot):
+class OpenLoongGripperMobileBase(DualArmRobot):
     def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)
 
@@ -12,7 +13,7 @@ class OpenLoongGripperFixBase(DualArmRobot):
 
         
     def init_agent(self, id: int):
-        print("OpenLoongGripperFixBase init_agent")
+        print("OpenLoongGripperMobileBase init_agent")
 
         super().init_agent(id)
 
@@ -34,6 +35,13 @@ class OpenLoongGripperFixBase(DualArmRobot):
             if geom_info["BodyName"] in self._r_hand_body_names:
                 self._r_hand_gemo_ids.append(geom_info["GeomId"])  
 
+        wheel_r_name = self._env.actuator(chassis_config["right_wheel"]["actuator_name"], id)
+        wheel_l_name = self._env.actuator(chassis_config["left_wheel"]["actuator_name"], id)
+        self._wheel_r_id = self._env.model.actuator_name2id(wheel_r_name)
+        self._wheel_l_id = self._env.model.actuator_name2id(wheel_l_name)
+        all_ctrlranges = self._env.model.get_actuator_ctrlrange()
+        self._wheel_ctrl_max_r = all_ctrlranges[self._wheel_r_id, 1]
+        self._wheel_ctrl_max_l = all_ctrlranges[self._wheel_l_id, 1]
 
     def set_l_hand_actuator_ctrl(self, offset_rate) -> None:
         for actuator_id in self._l_hand_actuator_id:
@@ -117,4 +125,30 @@ class OpenLoongGripperFixBase(DualArmRobot):
         return compose_force                
     
     def set_wheel_ctrl(self, joystick_state) -> None:
-        return
+        # 从左手摇杆获取值
+        # 读取摇杆
+        lx = joystick_state["leftHand"]["joystickPosition"][0]
+        ly = joystick_state["leftHand"]["joystickPosition"][1]
+
+        # 设置摇杆死区
+        if abs(lx) < 0.2:
+            lx = 0
+        if abs(ly) < 0.2:
+            ly = 0
+
+        forward = -lx
+        turn = ly
+
+        SPEED_SCALE = 0.2
+
+        v_r = np.clip(forward + turn, -1, 1) * SPEED_SCALE
+        v_l = np.clip(forward - turn, -1, 1) * SPEED_SCALE
+        offset_rate = np.array([v_r, v_l])
+
+        # 设置轮子控制
+        self.set_wheel_actuator_ctrl(offset_rate)
+
+
+    def set_wheel_actuator_ctrl(self, offset_rate) -> None:
+        self._env.ctrl[self._wheel_r_id] = offset_rate[0] * self._wheel_ctrl_max_r
+        self._env.ctrl[self._wheel_l_id] = offset_rate[1] * self._wheel_ctrl_max_l

@@ -82,7 +82,6 @@ class DualArmRobot(AgentBase):
         读取系统初始化状态
         """
         # mujoco 模型初始化
-        self._env.mj_forward()
         self.set_joint_neutral()
         self._env.mj_forward()
    
@@ -98,15 +97,13 @@ class DualArmRobot(AgentBase):
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
 
         site_dict = self._env.query_site_pos_and_quat([self._ee_site_l])
-        self._initial_grasp_site_xpos = site_dict[self._ee_site_l]['xpos']
-        self._initial_grasp_site_xquat = site_dict[self._ee_site_l]['xquat']
+        self._initial_grasp_site_xpos, self._initial_grasp_site_xquat = self._global_to_local(site_dict[self._ee_site_l]['xpos'], site_dict[self._ee_site_l]['xquat'])
         self._grasp_value_l = 0.0
         self.set_grasp_mocap(self._initial_grasp_site_xpos, self._initial_grasp_site_xquat)
 
 
         site_dict = self._env.query_site_pos_and_quat([self._ee_site_r])
-        self._initial_grasp_site_xpos_r = site_dict[self._ee_site_r]['xpos']
-        self._initial_grasp_site_xquat_r = site_dict[self._ee_site_r]['xquat']
+        self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r = self._global_to_local(site_dict[self._ee_site_r]['xpos'], site_dict[self._ee_site_r]['xquat'])
         self._grasp_value_r = 0.0
         self.set_grasp_mocap_r(self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r)
 
@@ -374,37 +371,28 @@ class DualArmRobot(AgentBase):
             return np.zeros(14)
         
         # transform_utils 和 rotations 的quat不一样，这里将 qw, qx, qy, qz 转为 qx, qy, qz, qw
-        grasp_r_axisangle = transform_utils.quat2axisangle(
-            np.array(
-                [grasp_r_xquat[1], 
-                 grasp_r_xquat[2], 
-                 grasp_r_xquat[3], 
-                 grasp_r_xquat[0]]
-            )
-        )    
-        grasp_l_axisangle = transform_utils.quat2axisangle(
-            np.array(
-                [grasp_l_xquat[1], 
-                 grasp_l_xquat[2], 
-                 grasp_l_xquat[3], 
-                 grasp_l_xquat[0]]
-            )
-        )
+        grasp_r_axisangle = transform_utils.quat2axisangle(np.array([grasp_r_xquat[1], grasp_r_xquat[2], grasp_r_xquat[3], grasp_r_xquat[0]]))
+        grasp_l_axisangle = transform_utils.quat2axisangle(np.array([grasp_l_xquat[1], grasp_l_xquat[2], grasp_l_xquat[3], grasp_l_xquat[0]]))
+
+        grasp_l_xpos_global, grasp_l_xquat_global = self._local_to_global(grasp_l_xpos, grasp_l_xquat)
+        grasp_r_xpos_global, grasp_r_xquat_global = self._local_to_global(grasp_r_xpos, grasp_r_xquat)
+        grasp_r_axisangle_global = transform_utils.quat2axisangle(np.array([grasp_r_xquat_global[1], grasp_r_xquat_global[2], grasp_r_xquat_global[3], grasp_r_xquat_global[0]]))
+        grasp_l_axisangle_global = transform_utils.quat2axisangle(np.array([grasp_l_xquat_global[1], grasp_l_xquat_global[2], grasp_l_xquat_global[3], grasp_l_xquat_global[0]]))
 
         # 手部控制器使用局部坐标系
         if self._env.action_use_motor():
-            action_r = np.concatenate([grasp_r_xpos, grasp_r_axisangle])
+            action_r = np.concatenate([grasp_r_xpos_global, grasp_r_axisangle_global])
             self._r_controller.set_goal(action_r)
             ctrl_r = self._r_controller.run_controller()
             self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
 
-            action_l = np.concatenate([grasp_l_xpos, grasp_l_axisangle])
+            action_l = np.concatenate([grasp_l_xpos_global, grasp_l_axisangle_global])
             self._l_controller.set_goal(action_l)
             ctrl_l = self._l_controller.run_controller()
             self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
         else:
-            ctrl_r = self.set_r_arm_position_ctrl(grasp_r_xpos, grasp_r_xquat)
-            ctrl_l = self.set_l_arm_position_ctrl(grasp_l_xpos, grasp_l_xquat)
+            ctrl_r = self.set_r_arm_position_ctrl(grasp_r_xpos_global, grasp_r_xquat_global)
+            ctrl_l = self.set_l_arm_position_ctrl(grasp_l_xpos_global, grasp_l_xquat_global)
 
         # 数据采集保存局部坐标系
         action_l_B = np.concatenate([grasp_l_xpos, grasp_l_axisangle])
@@ -421,10 +409,8 @@ class DualArmRobot(AgentBase):
         ]).flatten()
 
         # Mocap 调试标记采用全局坐标系
-        mocap_l_xpos, mocap_l_xquat = self._local_to_global(grasp_l_xpos, grasp_l_xquat)
-        mocap_r_xpos, mocap_r_xquat = self._local_to_global(grasp_r_xpos, grasp_r_xquat)
-        self.set_grasp_mocap(mocap_l_xpos, mocap_l_xquat)
-        self.set_grasp_mocap_r(mocap_r_xpos, mocap_r_xquat)
+        self.set_grasp_mocap(grasp_l_xpos_global, grasp_l_xquat_global)
+        self.set_grasp_mocap_r(grasp_r_xpos_global, grasp_r_xquat_global)
 
         return action
 
@@ -456,6 +442,7 @@ class DualArmRobot(AgentBase):
 
         self.set_gripper_ctrl_r(joystick_state)
         self.set_gripper_ctrl_l(joystick_state)
+        self.set_wheel_ctrl(joystick_state)
         self._set_task_status(joystick_state)
 
 
@@ -608,6 +595,12 @@ class DualArmRobot(AgentBase):
         raise NotImplementedError("This method should be implemented in the derived class.")
     
     def set_r_hand_actuator_ctrl(self, offset_rate) -> None:
+        raise NotImplementedError("This method should be implemented in the derived class.")    
+    
+    def set_wheel_ctrl(self, joystick_state) -> None:
+        raise NotImplementedError("This method should be implemented in the derived class.")
+
+    def set_wheel_actuator_ctrl(self, offset_rate) -> None:
         raise NotImplementedError("This method should be implemented in the derived class.")    
 
 

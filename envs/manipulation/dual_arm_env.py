@@ -36,7 +36,7 @@ class ActionType:
 robot_entries = {
     "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
     "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
-    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripper2F85MobileBase",
+    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
 def get_robot_entry(name: str):

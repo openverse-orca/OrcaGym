@@ -5,13 +5,6 @@ openloong_config = {
         "base_joint_name": "base_joint",
         "dummy_joint_name": "dummy_joint",
     },
-    "neck": {
-        "yaw_joint_name": "J_head_yaw",
-        "pitch_joint_name": "J_head_pitch",
-        "yaw_actuator_name": "M_head_yaw",
-        "pitch_actuator_name": "M_head_pitch",
-        "neck_center_site_name": "neck_center_site"
-    },
     "right_arm": {
         "joint_names": ["J_arm_r_01", "J_arm_r_02", "J_arm_r_03", "J_arm_r_04", "J_arm_r_05", "J_arm_r_06", "J_arm_r_07"],
         "neutral_joint_values": [-1.9, 0.5, 0, 2.0, -1.5708, 0, 0],
