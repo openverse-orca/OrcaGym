@@ -5,6 +5,8 @@ import json
 import numpy as np
 import logging as log
 import glob
+import os
+from datetime import datetime
 
 from orca_gym.robomimic.dataset_util import DatasetReader, DatasetWriter
 
@@ -197,6 +199,56 @@ def process_update_kwargs(dataset_files, kwargs):
         writer.set_env_kwargs(env_kwargs)
         writer.finalize()
 
+def split_demos(dataset_file, output_dir):
+    """
+    将一个 HDF5 文件中的所有 demonstrations 拆分为单独的 HDF5 文件，
+    并使用自定义文件名格式：demo_<时间>。
+
+    Args:
+        dataset_file (str): 输入的 HDF5 文件路径。
+        output_dir (str): 输出目录，用于保存拆分后的单个 demonstration 文件。
+    """
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    with h5py.File(dataset_file, "r") as f:
+
+        demos = sorted(list(f["data"].keys()))
+
+        if len(demos) == 0:
+            print(f"Dataset {dataset_file} has no demonstrations.")
+            return
+        file_name = os.path.basename(dataset_file)
+        file_name_without_extension = os.path.splitext(file_name)[0]
+        try:
+            timestamp_str = file_name_without_extension.split("_")[-2] + "_" + file_name_without_extension.split("_")[-1]
+            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d_%H-%M-%S")
+        except Exception as e:
+            print(f"Warning: Could not extract timestamp from file name '{file_name}'. Using current time instead.")
+            timestamp = datetime.now()
+
+        timestamp_str_for_filename = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+
+        for demo in demos:
+            output_file = os.path.join(output_dir, f"demo_{timestamp_str_for_filename}.hdf5")
+            output_file = os.path.join(output_dir, f"demo_{timestamp_str_for_filename}_{demos.index(demo)}.hdf5")
+
+            with h5py.File(output_file, "w") as out_f:
+                out_data = out_f.create_group("data")
+                demo_group = f["data"][demo]
+                for key in demo_group.keys():
+                    if isinstance(demo_group[key], h5py.Dataset):
+                        out_data.create_dataset(key, data=demo_group[key][()])
+                    else:
+                        print(f"Skipping non-dataset key: {key}")
+
+                for attr_key in demo_group.attrs.keys():
+                    out_data.attrs[attr_key] = demo_group.attrs[attr_key]
+
+            print(f"Saved demonstration {demo} to {output_file}")
+
+    print(f"All demonstrations from {dataset_file} have been saved to {output_dir}.")
+
     
 if __name__ == "__main__":
     import argparse
@@ -219,8 +271,17 @@ if __name__ == "__main__":
     parser_update.add_argument("datasets", nargs="+", help="Dataset files to update")
     parser_update.add_argument("--set", nargs=2, action="append", metavar=("KEY", "VALUE"),
                                help="Set key to value in env_kwargs")
+    
+    # === split command ===
+    parser_split = subparsers.add_parser("split", help="Split a dataset into individual demonstrations")
+    parser_split.add_argument("dataset", help="Dataset file to split (relative to the base directory)")
+    parser_split.add_argument("-o", "--output_dir", required=True, help="Output directory name (relative to the base directory)")
 
     args = parser.parse_args()
+
+    # 定义输入和输出的基目录
+    BASE_INPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
+    BASE_OUTPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
 
     if args.command == "check":
         files = glob_dataset_filenames(args.datasets)
@@ -237,3 +298,7 @@ if __name__ == "__main__":
             process_update_kwargs(files, kwargs)
         else:
             print("No key-value pairs provided for update.")
+    elif args.command == "split":
+            input_file = os.path.join(BASE_INPUT_DIR, args.dataset)
+            output_dir = os.path.join(BASE_OUTPUT_DIR, args.output_dir)
+            split_demos(input_file, output_dir)
