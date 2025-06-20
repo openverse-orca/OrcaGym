@@ -127,22 +127,19 @@ class OpenLoongGripperMobileBase(DualArmRobot):
     def set_wheel_ctrl(self, joystick_state) -> None:
         # 从左手摇杆获取值
         # 读取摇杆
-        lx = joystick_state["leftHand"]["joystickPosition"][0]
-        ly = joystick_state["leftHand"]["joystickPosition"][1]
+        turn = joystick_state["rightHand"]["joystickPosition"][0]
+        forward = joystick_state["leftHand"]["joystickPosition"][1]
 
         # 设置摇杆死区
-        if abs(lx) < 0.2:
-            lx = 0
-        if abs(ly) < 0.2:
-            ly = 0
-
-        forward = -lx
-        turn = ly
+        if abs(turn) < 0.2:
+            turn = 0
+        if abs(forward) < 0.2:
+            forward = 0
 
         SPEED_SCALE = 0.2
 
-        v_r = np.clip(forward + turn, -1, 1) * SPEED_SCALE
-        v_l = np.clip(forward - turn, -1, 1) * SPEED_SCALE
+        v_r = np.clip(forward - turn, -1, 1) * SPEED_SCALE
+        v_l = -np.clip(forward + turn, -1, 1) * SPEED_SCALE
         offset_rate = np.array([v_r, v_l])
 
         # 设置轮子控制
