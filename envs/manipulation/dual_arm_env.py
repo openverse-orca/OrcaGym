@@ -100,6 +100,7 @@ class DualArmEnv(RobomimicEnv):
         self._reward_printer = RewardPrinter()
         
         kwargs["task"] = PickPlaceTask(task_config_dict)
+
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -107,7 +108,7 @@ class DualArmEnv(RobomimicEnv):
             time_step = time_step,            
             **kwargs,
         )
-
+        self._config = task_config_dict
         self._task.register_init_env_callback(self.init_env)
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
@@ -360,83 +361,185 @@ class DualArmEnv(RobomimicEnv):
         for id, agent_name in enumerate(self._agent_names):
             self._agents[agent_name].init_agent(id)
 
+    # def reset_model(self) -> tuple[dict, dict]:
+    #     if self._task.random_actor:
+    #         self._task.generate_actors()
+    #         self._task.publish_scene()
+
+    #     if self._task.random_light:
+    #         idxs = self._task.generate_lights()
+
+    #     if self._task.random_actor or self._task.random_light:
+    #         self._task.publish_scene()
+
+    #     if self._task.random_light:
+    #         for idx in idxs:
+    #             self._task.set_light_info(self._task.lights[idx])
+
+    #     # 1) 恢复初始状态、重置 controller/mechanism
+    #     self._set_init_state()
+    #     [agent.on_reset_model() for agent in self._agents.values()]
+
+    #     # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
+    #     if self._run_mode in [RunMode.POLICY_NORMALIZED]:
+    #         # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
+
+    #         # 得到观测并返回
+    #         obs = self._get_obs().copy()
+    #         return obs, {"objects": self.objects}
+
+    #     # 3) 否则走原先的“遥操作”初始化逻辑
+    #     self._task.get_task(self)
+    #     randomized_positions = self._task.randomized_object_positions
+    #     goal_positions = self._task.randomized_goal_positions
+
+    #     print(self._task.get_language_instruction())
+    #     print("Press left hand grip button to start recording task......")
+
+    #     # 构造 numpy structured array
+    #     dtype = np.dtype([
+    #         ('joint_name', 'U100'),
+    #         ('position', 'f4', (3,)),
+    #         ('orientation', 'f4', (4,))
+    #     ])
+
+    #     # 处理物体数据
+    #     objects = []
+    #     for joint_name, qpos in randomized_positions.items():
+    #         objects.append({
+    #             "joint_name": joint_name,
+    #             "position": qpos[:3].tolist(),
+    #             "orientation": qpos[3:].tolist()
+    #         })
+    #     objects_array = np.array(
+    #         [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
+    #         dtype=dtype
+    #     )
+    #     self.objects = objects_array
+    #     goal_dtype = np.dtype([
+    #         ('joint_name',  'U100'),
+    #         ('position',    'f4', (3,)),
+    #         ('orientation', 'f4', (4,)),
+    #         ('min',         'f4', (3,)),
+    #         ('max',         'f4', (3,)),
+    #         ('size',        'f4', (3,))
+    #     ])
+    #     # 处理目标数据并计算bounding box
+    #     goal_entries, _ = self.process_goals(goal_positions)
+
+    #     goals = []
+    #     for e in goal_entries:
+    #         goals.append((
+    #             e["joint_name"],
+    #             e["position"],
+    #             e["orientation"],
+    #             e["min"],
+    #             e["max"],
+    #             e["size"]
+    #         ))
+    #     goals_array = np.array(goals, dtype=goal_dtype)
+    #     self.goals = goals_array
+
+    #     # 执行仿真步骤
+    #     self.mj_forward()
+
+    #     # 获取观测信息并返回
+    #     obs = self._get_obs().copy()
+
+    #     # 返回目标bounding box信息
+    #     return obs, {"objects": objects_array, "goals": goals_array}
+    
+
     def reset_model(self) -> tuple[dict, dict]:
-        if self._task.random_actor:
-            self._task.generate_actors()
+        cfg = self._config  # 从 __init__ 中保存的 yaml 配置 dict
+        print(f"[Debug] run_mode={self._run_mode}, random_light={cfg.get('random_light')}")
+
+        # —— 0) 按配置随机生成 actor / light —— #
+        # 只有在随机 actor 时才调用 generate_actors
+        if cfg.get("random_actor", False):
+            actor_idxs = self._task.generate_actors()
+        else:
+            actor_idxs = []
+
+        # # 只有在随机 light 时才调用 generate_lights
+        # if cfg.get("random_light", False):
+        #     print("[ResetModel] 生成灯光 generate_lights()")
+        #     light_idxs = self._task.generate_lights()
+        #     print(f"[ResetModel] generate_lights 返回 idxs = {light_idxs}")
+        # else:
+        light_idxs = []
+
+        # 如果任一生成了，就 publish
+        if actor_idxs or light_idxs:
             self._task.publish_scene()
 
-        # 1) 恢复初始状态、重置 controller/mechanism
+        # 对于 light，需要额外 set_light_info
+        if light_idxs:
+            for idx in light_idxs:
+                self._task.set_light_info(self._task.lights[idx])
+
+        # —— 1) 重置控制和 agent —— #
         self._set_init_state()
-        [agent.on_reset_model() for agent in self._agents.values()]
+        for agent in self._agents.values():
+            agent.on_reset_model()
 
-        # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
-        if self._run_mode in [RunMode.POLICY_NORMALIZED]:
-            # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
-
-            # 得到观测并返回
+        # —— 2) 如果是“增广/回放”模式：直接恢复 demo_data 中的 objects —— #
+        if self._run_mode == RunMode.POLICY_NORMALIZED:
+            # reset_playback_env 已经把 demo_data['objects'] 写入 self.objects
             obs = self._get_obs().copy()
             return obs, {"objects": self.objects}
 
-        # 3) 否则走原先的“遥操作”初始化逻辑
+        # —— 3) 否则（Teleoperation 或 POLICY_RAW 等），走原有的“随机/录制”逻辑 —— #
+        # 3.1) 根据配置初始化 Task（物体与目标）
+        self._task = PickPlaceTask(cfg)
         self._task.get_task(self)
         randomized_positions = self._task.randomized_object_positions
-        goal_positions = self._task.randomized_goal_positions
+        goal_positions       = self._task.randomized_goal_positions
 
+        # 提示语
         print(self._task.get_language_instruction())
         print("Press left hand grip button to start recording task......")
 
-        # 构造 numpy structured array
-        dtype = np.dtype([
-            ('joint_name', 'U100'),
-            ('position', 'f4', (3,)),
-            ('orientation', 'f4', (4,))
+        # 3.2) 构造 objects structured array
+        obj_dtype = np.dtype([
+            ("joint_name",  "U100"),
+            ("position",    "f4", (3,)),
+            ("orientation", "f4", (4,))
         ])
+        objects = [
+            (jn, pos[:3].tolist(), pos[3:].tolist())
+            for jn, pos in randomized_positions.items()
+        ]
+        self.objects = np.array(objects, dtype=obj_dtype)
 
-        # 处理物体数据
-        objects = []
-        for joint_name, qpos in randomized_positions.items():
-            objects.append({
-                "joint_name": joint_name,
-                "position": qpos[:3].tolist(),
-                "orientation": qpos[3:].tolist()
-            })
-        objects_array = np.array(
-            [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
-            dtype=dtype
-        )
-        self.objects = objects_array
+        # 3.3) 构造 goals structured array
         goal_dtype = np.dtype([
-            ('joint_name',  'U100'),
-            ('position',    'f4', (3,)),
-            ('orientation', 'f4', (4,)),
-            ('min',         'f4', (3,)),
-            ('max',         'f4', (3,)),
-            ('size',        'f4', (3,))
+            ("joint_name",  "U100"),
+            ("position",    "f4", (3,)),
+            ("orientation", "f4", (4,)),
+            ("min",         "f4", (3,)),
+            ("max",         "f4", (3,)),
+            ("size",        "f4", (3,))
         ])
-        # 处理目标数据并计算bounding box
         goal_entries, _ = self.process_goals(goal_positions)
+        goals = [
+            (e["joint_name"],
+             e["position"],
+             e["orientation"],
+             e["min"],
+             e["max"],
+             e["size"])
+            for e in goal_entries
+        ]
+        self.goals = np.array(goals, dtype=goal_dtype)
 
-        goals = []
-        for e in goal_entries:
-            goals.append((
-                e["joint_name"],
-                e["position"],
-                e["orientation"],
-                e["min"],
-                e["max"],
-                e["size"]
-            ))
-        goals_array = np.array(goals, dtype=goal_dtype)
-        self.goals = goals_array
-
-        # 执行仿真步骤
+        # 3.4) 生效并返回
         self.mj_forward()
-
-        # 获取观测信息并返回
         obs = self._get_obs().copy()
+        return obs, {"objects": self.objects, "goals": self.goals}
 
-        # 返回目标bounding box信息
-        return obs, {"objects": objects_array, "goals": goals_array}
+
+
 
 
 

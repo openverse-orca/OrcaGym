@@ -7,7 +7,7 @@ import random
 import warnings, time
 
 DEFAULT_CONFIG = {
-    "random_object": False, # 是否随机Object的位置，object应该在Agent下面
+    "random_object": True, # 是否随机Object的位置，object应该在Agent下面
     "object_bodys": [],
     "object_sites": [],
     "object_joints": [],
@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "light_center": [0, 0, 0], # 光源的中心位置
     "light_bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "light_description": [],
-
+    "num_lights": 1,
     "task_element": [], # 任务元素，包含object, actor
 
     "grpc_addr": "localhost:50051"
@@ -136,7 +136,7 @@ class AbstractTask:
         self.random_light_position = self.__get_config_setting__("random_light_position", config)
         self.random_light_rotation = self.__get_config_setting__("random_light_rotation", config)
         self.light_description = self.__get_config_setting__("light_description", config)
-
+        self.num_lights = self.__get_config_setting__("num_lights", config)
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds = 0.1):
@@ -190,26 +190,34 @@ class AbstractTask:
         self.randomized_goal_positions = env.query_joint_qpos(goal_joints_env_names)
 
     def generate_actors(self):
+        idxs = []
         if self.random_actor:
-            len = self.actors.__len__()
-            n_select = random.randint(3, len)
-            # 只在 [0, len) 范围内取样
-            idxs = random.sample(range(len), n_select)
-
-            for i in range(n_select):
-                self.add_actor(self.actors[idxs[i]], self.actors_spawnable[idxs[i]])
+            total = len(self.actors)
+            n_select = random.randint(1, total)
+            idxs = random.sample(range(total), n_select)
+            for i in idxs:
+                self.add_actor(self.actors[i], self.actors_spawnable[i])
         return idxs
     
     def generate_lights(self):
-        if self.random_light:
-            len = self.lights.__len__()
-            n_select = random.randint(3, len)
-            # 只在 [0, len) 范围内取样
-            idxs = random.sample(range(len), n_select)
+        """
+        只在 random_light=True 时运行，
+        并且固定选 self.num_lights 盏，生成朝下的灯。
+        """
+        idxs = []
+        if not self.random_light:
+            return idxs
 
-            for i in range(n_select):
-                self.add_light(self.lights[idxs[i]], self.lights_spawnable[idxs[i]])
+        total = len(self.lights)
+        # 限制不超过总数
+        n = min(self.num_lights, total)
+        idxs = random.sample(range(total), n)
 
+        for i in idxs:
+            name      = self.lights[i]
+            spawnable = self.lights_spawnable[i]
+            print(f"[Debug-Light] add_light → {name} at spawnable {spawnable}")
+            self.add_light(name, spawnable)
         return idxs
 
     def set_actors(self, actors, actors_spawnable, position, rotation):
@@ -233,18 +241,24 @@ class AbstractTask:
         self.scene.add_actor(actor)
 
     def add_light(self, light_name, spawnable_name):
-        random_pos, random_xquat = self._random_position_and_rotation(self.center, self.bound)
-        if self.random_actor_position:
-            position = random_pos
-        else:
-            position = self.light_center
+        # 1) 位置：要么随机，要么固定在 center
+        rand_pos, rand_quat = self._random_position_and_rotation(self.light_center, self.light_bound)
+        position = rand_pos   if self.random_light_position else np.array(self.light_center)
 
-        if self.random_actor_rotation:
-            rotation = random_xquat
+        # 2) 旋转：要么随机，要么固定“竖直向下”
+        if self.random_light_rotation:
+            rotation = rand_quat
         else:
-            rotation = rotations.euler2quat([0, 0, 0])
+            # 绕 X 轴 -90° → 光照沿 −Z 方向（竖直向下）
+            rotation = rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
 
-        actor = orca_gym_scene.Actor(light_name, spawnable_name, position, rotation, scale=1.0)
+        actor = orca_gym_scene.Actor(
+            name=light_name,
+            spawnable_name=spawnable_name,
+            position=position,
+            rotation=rotation,
+            scale=1.0
+        )
         self.scene.add_actor(actor)
 
     def set_light_info(self, light_name, color=None, intensity=None):
@@ -254,12 +268,13 @@ class AbstractTask:
         :param color: The color of the light (optional).
         :param intensity: The intensity of the light (optional).
         """
+        print(f"[Debug-Light] set_light_info → {light_name}, color={color}, intensity={intensity}")
         if color is None:
             color = np.array([np.random.uniform(0.0, 1.0),
                               np.random.uniform(0.0, 1.0),
                               np.random.uniform(0.0, 1.0)])
         if intensity is None:
-            intensity = np.random.uniform(500.0, 2000.0)
+            intensity = np.random.uniform(1000, 2000.0)
 
         light_info = orca_gym_scene.LightInfo(color=color, intensity=intensity)
         self.scene.set_light_info(light_name, light_info)
