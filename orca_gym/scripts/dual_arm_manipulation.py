@@ -820,6 +820,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
     realtime_playback = args.realtime_playback
+    level = args.level
 
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
@@ -837,7 +838,10 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
         if record_path is None:
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            record_path = f"{current_file_path}/records_tmp/dual_arm_{formatted_now}.hdf5"
+            level_dir = os.path.join(current_file_path, "records_tmp", level)
+            os.makedirs(level_dir, exist_ok=True)
+            record_path = os.path.join(level_dir, f"dual_arm_{formatted_now}.hdf5")
+            print(f"Auto-generated record path: {record_path}")
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             print("Please input the record file path.")
