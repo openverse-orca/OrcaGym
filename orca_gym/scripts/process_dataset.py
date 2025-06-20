@@ -1,4 +1,5 @@
 
+from ast import main
 import h5py
 import json
 import numpy as np
@@ -195,4 +196,44 @@ def process_update_kwargs(dataset_files, kwargs):
         writer = DatasetWriter(dataset, env_name, env_version, env_kwargs)
         writer.set_env_kwargs(env_kwargs)
         writer.finalize()
+
     
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Dataset processing utility")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # === check command ===
+    parser_check = subparsers.add_parser("check", help="Check dataset validity")
+    parser_check.add_argument("datasets", nargs="+", help="Dataset file(s) to check")
+    parser_check.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+
+    # === combine command ===
+    parser_combine = subparsers.add_parser("combine", help="Combine multiple datasets")
+    parser_combine.add_argument("datasets", nargs="+", help="Dataset files to combine")
+    parser_combine.add_argument("-o", "--output", required=True, help="Output file for combined dataset")
+
+    # === update-kwargs command ===
+    parser_update = subparsers.add_parser("update-kwargs", help="Update environment kwargs")
+    parser_update.add_argument("datasets", nargs="+", help="Dataset files to update")
+    parser_update.add_argument("--set", nargs=2, action="append", metavar=("KEY", "VALUE"),
+                               help="Set key to value in env_kwargs")
+
+    args = parser.parse_args()
+
+    if args.command == "check":
+        files = glob_dataset_filenames(args.datasets)
+        process_check(files, verbose=args.verbose)
+
+    elif args.command == "combine":
+        files = glob_dataset_filenames(args.datasets)
+        process_combine(files, output_file=args.output)
+
+    elif args.command == "update-kwargs":
+        files = glob_dataset_filenames(args.datasets)
+        if args.set:
+            kwargs = {k: json.loads(v) for k, v in args.set}
+            process_update_kwargs(files, kwargs)
+        else:
+            print("No key-value pairs provided for update.")
