@@ -46,7 +46,8 @@ CAMERA_CONFIG = {
     # "camera_wrist_r": 7080,
     # "camera_wrist_l": 7090,
 }
-
+_light_counter = 0
+_LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
 
 def register_env(orcagym_addr : str, 
                  env_name : str, 
@@ -354,35 +355,75 @@ def playback_episode(env : DualArmEnv,
     print("Episode tunkated!")
 
 
+# def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
+#     """
+#     Reset 环境，然后把 demo_data['objects'] 和 demo_data['goals'] 恢复到场景里。
+#     """
+#     # 1) 先走一次基本 reset，让 self.objects 和 self.goals（如果存在）都被清空
+#     obs, info = env.reset(seed=42)
+
+#     # 2) 恢复 objects
+#     recorded_objs = demo_data['objects']
+#     env.unwrapped.replace_objects(recorded_objs)
+
+#     # 3) 恢复 goals
+#     recorded_goals = demo_data.get('goals')
+#     if recorded_goals is not None:
+#         # 调用你之前写的 replace_goals，会将结构化数组或纯数值数组都转换并赋给 self.goals
+#         env.unwrapped.replace_goals(recorded_goals)
+#     else:
+#         print("[Warning] demo_data 中没有 'goals'，无法恢复目标区域信息")
+
+#     # 4) 推一步仿真，让新的 objects/goals 生效
+#     env.unwrapped.mj_forward()
+
+#     # 5) 再取一次 obs，组装 info
+#     obs = env.unwrapped._get_obs().copy()
+#     info = {
+#         "object": recorded_objs,
+#         "goal":   recorded_goals
+#     }
+#     return obs, info
+
 def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
-    """
-    Reset 环境，然后把 demo_data['objects'] 和 demo_data['goals'] 恢复到场景里。
-    """
-    # 1) 先走一次基本 reset，让 self.objects 和 self.goals（如果存在）都被清空
+    global _light_counter
+
+    # 1) 普通 reset，走 wrappers 和底层 reset_model（此时已经不会再自动发布灯了）
     obs, info = env.reset(seed=42)
+    core = env.unwrapped
 
-    # 2) 恢复 objects
-    recorded_objs = demo_data['objects']
-    env.unwrapped.replace_objects(recorded_objs)
+    # 2) 恢复录制好的 objects/goals
+    core.replace_objects(demo_data['objects'])
+    if 'goals' in demo_data and demo_data['goals'] is not None:
+        core.replace_goals(demo_data['goals'])
+    core.mj_forward()
 
-    # 3) 恢复 goals
-    recorded_goals = demo_data.get('goals')
-    if recorded_goals is not None:
-        # 调用你之前写的 replace_goals，会将结构化数组或纯数值数组都转换并赋给 self.goals
-        env.unwrapped.replace_goals(recorded_goals)
-    else:
-        print("[Warning] demo_data 中没有 'goals'，无法恢复目标区域信息")
+    # 3) 周期性地注入光效
+    cfg = core._config
+    if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
+        light_idxs = core._task.generate_lights()
+        core._task.publish_scene()
+        for idx in light_idxs:
+            core._task.set_light_info(core._task.lights[idx])
+        # 推一步、渲染，确保灯生效
+        core.mj_forward()
+        core.render()
+        time.sleep(0.05)
 
-    # 4) 推一步仿真，让新的 objects/goals 生效
-    env.unwrapped.mj_forward()
+    _light_counter += 1
 
-    # 5) 再取一次 obs，组装 info
-    obs = env.unwrapped._get_obs().copy()
+    # 4) 返回新的 obs/info
+    obs = core._get_obs().copy()
     info = {
-        "object": recorded_objs,
-        "goal":   recorded_goals
+        "object": demo_data['objects'],
+        "goal":   demo_data.get('goals')
     }
     return obs, info
+
+
+
+
+
 
 
 
@@ -661,7 +702,12 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, {})
+            if task_config is None:
+               task_config_dict = {}
+            else:
+                with open(task_config, 'r') as f:
+                    task_config_dict = yaml.safe_load(f)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -758,7 +804,12 @@ def run_example(orcagym_addr : str,
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config,{})
+            if task_config is None:
+               task_config_dict = {}
+            else:
+                with open(task_config, 'r') as f:
+                    task_config_dict = yaml.safe_load(f)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config,task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -865,7 +916,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
 
     # 启动 Monitor 子进程
     ports = [
-        7070, 7080, 7090,        # Agent1
+        # 7070, 7080, 7090,        # Agent1
         # 8070, 8080, 8090,        # Agent2
     ]
     monitor_processes = []
