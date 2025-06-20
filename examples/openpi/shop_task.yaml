@@ -1,9 +1,9 @@
-# 任务配置文件
+# shop1任务配置文件
 
 level_name: "shop"
-object_bodys: [ "Bottle_01", "Cap_02", "Bottle_02"]
-object_sites: ["Bottle_01site", "Cap_02site", "Bottle_02site"]
-object_joints: ["Bottle_01_joint", "Cap_02_joint", "Bottle_02_joint"]
+object_bodys: [ "Bottle_red", "Jar_01", "Bottle_blue"]
+object_sites: ["Bottle_redsite", "Jar_01site", "Bottle_bluesite"]
+object_joints: ["Bottle_red_joint", "Jar_01_joint", "Bottle_blue_joint"]
 
 goal_bodys: ["Basket"]
 goal_sites: ["Basketsite"]
