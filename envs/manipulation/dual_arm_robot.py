@@ -379,7 +379,7 @@ class DualArmRobot(AgentBase):
         grasp_r_axisangle_global = transform_utils.quat2axisangle(np.array([grasp_r_xquat_global[1], grasp_r_xquat_global[2], grasp_r_xquat_global[3], grasp_r_xquat_global[0]]))
         grasp_l_axisangle_global = transform_utils.quat2axisangle(np.array([grasp_l_xquat_global[1], grasp_l_xquat_global[2], grasp_l_xquat_global[3], grasp_l_xquat_global[0]]))
 
-        # 手部控制器使用局部坐标系
+        # 手部控制器使用全局坐标系
         if self._env.action_use_motor():
             action_r = np.concatenate([grasp_r_xpos_global, grasp_r_axisangle_global])
             self._r_controller.set_goal(action_r)

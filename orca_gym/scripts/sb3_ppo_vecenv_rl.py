@@ -1,6 +1,6 @@
 
 import gymnasium as gym
-from stable_baselines3 import PPO, SAC, DDPG
+from stable_baselines3 import PPO
 from gymnasium.envs.registration import register
 from datetime import datetime
 import torch
@@ -133,7 +133,6 @@ def training_model(
     total_timesteps: int, 
     model_file: str,
 ):
-    # 训练模型，每10亿步保存一次check point
     try:
         snapshot_callback = SnapshotCallback(save_interval=100, 
                                              save_path=model_file,
@@ -242,9 +241,7 @@ def train_model(
     max_episode_steps: int,
     render_mode: str,
     frame_skip: int,
-    model_type: str,
     total_timesteps: int,
-    start_her_episode: int,
     model_file: str,
     height_map_file: str,
 ):
@@ -278,16 +275,13 @@ def train_model(
         env = SubprocVecEnvMA(env_fns, agent_num)
 
         print("Start Simulation!")
-        if model_type == "ppo":
-            model = setup_model_ppo(
-                env=env,
-                env_num=env_num,
-                agent_num=agent_num,
-                agent_config=agent_config,
-                model_file=model_file,
-            )
-        else:
-            raise ValueError("Invalid model type")
+        model = setup_model_ppo(
+            env=env,
+            env_num=env_num,
+            agent_num=agent_num,
+            agent_config=agent_config,
+            model_file=model_file,
+        )
 
         training_model(model, total_timesteps, model_file)
 
@@ -309,7 +303,6 @@ def test_model(
     max_episode_steps: int,
     render_mode: str,
     frame_skip: int,
-    model_type: str,
     model_file: str,
     height_map_file: str
 ):
@@ -343,11 +336,8 @@ def test_model(
         env = SubprocVecEnvMA(env_fns, agent_num)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        if model_type == "ppo":
-            model: PPO = PPO.load(model_file, env=env, device=device)
-        else:
-            raise ValueError("Invalid model type")
-        
+        model: PPO = PPO.load(model_file, env=env, device=device)
+
         testing_model(
             env=env,
             agent_num=agent_num,
