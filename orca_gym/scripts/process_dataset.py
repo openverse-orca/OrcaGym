@@ -6,6 +6,7 @@ import numpy as np
 import logging as log
 import glob
 import os
+import shutil
 from datetime import datetime
 
 from orca_gym.robomimic.dataset_util import DatasetReader, DatasetWriter
@@ -198,57 +199,189 @@ def process_update_kwargs(dataset_files, kwargs):
         writer = DatasetWriter(dataset, env_name, env_version, env_kwargs)
         writer.set_env_kwargs(env_kwargs)
         writer.finalize()
-
-def split_demos(dataset_file, output_dir):
+def split_demos(dataset_file, output_dir, custom_name="demo"):
     """
     将一个 HDF5 文件中的所有 demonstrations 拆分为单独的 HDF5 文件，
-    并使用自定义文件名格式：demo_<时间>。
-
-    Args:
-        dataset_file (str): 输入的 HDF5 文件路径。
-        output_dir (str): 输出目录，用于保存拆分后的单个 demonstration 文件。
+    并自动重命名输出目录为：
+    自定义名字_原始文件大小GB_文件数量_所有obs/camera_head视频时长总和秒
     """
+    original_file_size = os.path.getsize(dataset_file)
+    original_file_size_gb = f"{original_file_size/1024/1024/1024:.2f}GB"
 
-    os.makedirs(output_dir, exist_ok=True)
+    temp_dir = output_dir + "_temp"
+    os.makedirs(temp_dir, exist_ok=True)
 
     with h5py.File(dataset_file, "r") as f:
-
         demos = sorted(list(f["data"].keys()))
 
         if len(demos) == 0:
             print(f"Dataset {dataset_file} has no demonstrations.")
             return
-        file_name = os.path.basename(dataset_file)
-        file_name_without_extension = os.path.splitext(file_name)[0]
-        try:
-            timestamp_str = file_name_without_extension.split("_")[-2] + "_" + file_name_without_extension.split("_")[-1]
-            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d_%H-%M-%S")
-        except Exception as e:
-            print(f"Warning: Could not extract timestamp from file name '{file_name}'. Using current time instead.")
-            timestamp = datetime.now()
 
-        timestamp_str_for_filename = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-
-        for demo in demos:
-            output_file = os.path.join(output_dir, f"demo_{timestamp_str_for_filename}.hdf5")
-            output_file = os.path.join(output_dir, f"demo_{timestamp_str_for_filename}_{demos.index(demo)}.hdf5")
-
+        for i, demo in enumerate(demos):
+            output_file = os.path.join(temp_dir, f"{demo}.hdf5")
+            
             with h5py.File(output_file, "w") as out_f:
                 out_data = out_f.create_group("data")
                 demo_group = f["data"][demo]
-                for key in demo_group.keys():
-                    if isinstance(demo_group[key], h5py.Dataset):
-                        out_data.create_dataset(key, data=demo_group[key][()])
+                
+                def copy_all(name, obj):
+                    if isinstance(obj, h5py.Dataset):
+                        out_data.create_dataset(name, data=obj[()])
                     else:
-                        print(f"Skipping non-dataset key: {key}")
-
+                        print(f"Skipping non-dataset key: {name}")
+                
+                demo_group.visititems(copy_all)
                 for attr_key in demo_group.attrs.keys():
                     out_data.attrs[attr_key] = demo_group.attrs[attr_key]
 
             print(f"Saved demonstration {demo} to {output_file}")
 
-    print(f"All demonstrations from {dataset_file} have been saved to {output_dir}.")
+    print(f"All demonstrations from {dataset_file} have been saved to temporary directory {temp_dir}")
 
+    total_files = len(demos)
+    total_video_duration_s = 0.0  # 改为累计视频时长(秒)
+   
+    if os.path.exists(temp_dir):
+        for filename in os.listdir(temp_dir):
+            if filename.endswith(".hdf5"):
+                filepath = os.path.join(temp_dir, filename)
+                with h5py.File(filepath, "r") as f:
+                    if "data" in f and "obs" in f["data"] and "camera_head" in f["data"]["obs"]:
+                        dataset = f["data"]["obs"]["camera_head"]
+                        # 计算视频时长(秒) = 帧数 / 帧率(假设30fps)
+                        fps = 30.0  # 默认帧率
+                        video_duration_s = dataset.shape[0] / fps
+                        total_video_duration_s += video_duration_s  # 累计时长(秒)
+
+    timestamp_str = "_".join(os.path.basename(dataset_file).split("_")[-2:])
+    # 修改目录名格式: 将camera_head_size_gb改为video_duration_s
+    final_dir_name = f"{custom_name}_{original_file_size_gb}_{total_files}_{total_video_duration_s:.2f}s"
+    final_dir = os.path.join(os.path.dirname(output_dir), final_dir_name)
+    counter = 1
+    while os.path.exists(final_dir):
+        final_dir = os.path.join(os.path.dirname(output_dir), f"{final_dir_name}_{counter}")
+        counter += 1
+    shutil.move(temp_dir, final_dir)
+    print(f"Renamed directory to: {final_dir}")
+
+def merge_splits(base_dir, custom_name="demo"):
+    """
+    合并相同custom_name的所有拆分结果，生成一个总目录
+    格式与之前相同：自定义名字_原始文件大小GB_文件数量_所有obs/camera_head视频时长总和秒
+    """
+    # 1. 查找所有匹配的拆分目录
+    split_dirs = []
+    for dirname in os.listdir(base_dir):
+        if dirname.startswith(custom_name + "_") and not dirname.endswith("_merged_"):
+            split_dirs.append(os.path.join(base_dir, dirname))
+
+    if not split_dirs:
+        print(f"No split directories found for {custom_name}")
+        return
+
+    # 2. 解析每个目录的元数据并累计
+    accumulated_size_gb = 0.0  # 仍然累计原始文件大小GB
+    accumulated_files = 0
+    accumulated_video_duration_s = 0.0  # 改为累计视频时长(秒)
+
+    for split_dir in split_dirs:
+        # 首先尝试从metadata.json读取数据
+        metadata_file = os.path.join(split_dir, "metadata.json")
+        if os.path.exists(metadata_file):
+            with open(metadata_file, "r") as f:
+                metadata = json.load(f)
+                accumulated_size_gb += metadata["original_file_size_gb"]
+                accumulated_files += metadata["total_files"]
+                # 注意: 原始metadata中没有video_duration_s，需要从目录名解析
+        else:
+            # 从目录名解析数据
+            dir_basename = os.path.basename(split_dir)
+            parts = [p for p in dir_basename.split("_") if p]
+            
+            try:
+                name_index = parts.index(custom_name)
+                if name_index + 2 >= len(parts):
+                    print(f"Warning: Directory name {dir_basename} has insufficient parts, skipping")
+                    continue
+                
+                size_part = parts[name_index+1]
+                size_gb = float(size_part[:-2])
+                
+                files_part = parts[name_index+2]
+                files = int(files_part)
+                
+                accumulated_size_gb += size_gb
+                accumulated_files += files
+            except (ValueError, IndexError) as e:
+                print(f"Warning: Could not parse directory name {dir_basename}, skipping. Error: {str(e)}")
+                continue
+
+        # 重新计算video_duration_s(从文件计算，因为metadata中没有)
+        if os.path.exists(split_dir):
+            for filename in os.listdir(split_dir):
+                if filename.endswith(".hdf5"):
+                    filepath = os.path.join(split_dir, filename)
+                    with h5py.File(filepath, "r") as f:
+                        if "data" in f and "obs" in f["data"] and "camera_head" in f["data"]["obs"]:
+                            dataset = f["data"]["obs"]["camera_head"]
+                            # 计算视频时长(秒) = 帧数 / 帧率(假设30fps)
+                            fps = 30.0  # 默认帧率
+                            video_duration_s = dataset.shape[0] / fps
+                            accumulated_video_duration_s += video_duration_s  # 累计时长(秒)
+
+    # 3. 创建合并目录
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 修改目录名格式: 将camera_head_size_gb改为video_duration_s
+    merged_dir_name = f"{custom_name}_{accumulated_size_gb:.2f}GB_{accumulated_files}_files_{accumulated_video_duration_s:.2f}s"
+    merged_dir = os.path.join(base_dir, merged_dir_name)
+    os.makedirs(merged_dir, exist_ok=True)
+
+    # 4. 合并所有文件 - 解决同名demo文件冲突
+    demo_file_counter = {}  # 记录每个demo文件名出现的次数
+
+    for split_dir in split_dirs:
+        for filename in os.listdir(split_dir):
+            src = os.path.join(split_dir, filename)
+            
+            if os.path.isdir(src):
+                # 直接复制整个目录
+                dst = os.path.join(merged_dir, filename)
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                # 如果是文件
+                if filename.endswith(".hdf5"):
+                    # 处理可能的同名demo文件
+                    if filename in demo_file_counter:
+                        # 文件名已存在，添加计数器后缀
+                        base_name = filename[:-5]
+                        ext = ".hdf5"
+                        new_filename = f"{base_name}_{demo_file_counter[filename]}{ext}"
+                        demo_file_counter[filename] += 1
+                        dst = os.path.join(merged_dir, new_filename)
+                    else:
+                        # 第一次遇到这个文件名
+                        demo_file_counter[filename] = 1
+                        dst = os.path.join(merged_dir, filename)
+                    
+                    # 复制文件
+                    shutil.copy2(src, dst)
+                else:
+                    # 其他文件直接复制
+                    dst = os.path.join(merged_dir, filename)
+                    shutil.copy2(src, dst)
+
+    # 5. 在合并目录中创建metadata.json
+    metadata = {
+        "original_file_size_gb": round(accumulated_size_gb, 2),
+        "total_files": accumulated_files,
+        "total_video_duration_s": round(accumulated_video_duration_s, 2),  # 修改为视频时长(秒)
+        "timestamp": timestamp_str
+    }
+    with open(os.path.join(merged_dir, "metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"Merged {len(split_dirs)} splits into: {merged_dir}")
     
 if __name__ == "__main__":
     import argparse
@@ -271,12 +404,16 @@ if __name__ == "__main__":
     parser_update.add_argument("datasets", nargs="+", help="Dataset files to update")
     parser_update.add_argument("--set", nargs=2, action="append", metavar=("KEY", "VALUE"),
                                help="Set key to value in env_kwargs")
-    
-    # === split command ===
+     # === split command ===
     parser_split = subparsers.add_parser("split", help="Split a dataset into individual demonstrations")
     parser_split.add_argument("dataset", help="Dataset file to split (relative to the base directory)")
     parser_split.add_argument("-o", "--output_dir", required=True, help="Output directory name (relative to the base directory)")
+    parser_split.add_argument("--name", default="demo", help="Custom name prefix for output")
 
+    # === merge command ===
+    parser_merge = subparsers.add_parser("merge", help="Merge split directories")
+    parser_merge.add_argument("output_dir", help="Base output directory containing splits")
+    parser_merge.add_argument("--name", default="demo", help="Custom name prefix of splits to merge")
     args = parser.parse_args()
 
     # 定义输入和输出的基目录
@@ -299,6 +436,9 @@ if __name__ == "__main__":
         else:
             print("No key-value pairs provided for update.")
     elif args.command == "split":
-            input_file = os.path.join(BASE_INPUT_DIR, args.dataset)
-            output_dir = os.path.join(BASE_OUTPUT_DIR, args.output_dir)
-            split_demos(input_file, output_dir)
+        input_file = os.path.join(BASE_INPUT_DIR, args.dataset)
+        output_dir = os.path.join(BASE_OUTPUT_DIR, args.output_dir)
+        split_demos(input_file, output_dir, args.name)
+
+    elif args.command == "merge":
+        merge_splits(args.output_dir, args.name)
