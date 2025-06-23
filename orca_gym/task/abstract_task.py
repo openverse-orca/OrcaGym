@@ -27,6 +27,15 @@ DEFAULT_CONFIG = {
     "bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "description": [],
 
+    "random_light": False, # 是否随机添加光源
+    "random_light_position": False, # 是否随机光源的位置
+    "random_light_rotation": False, # 是否随机光源的旋转
+    "lights": [], # 光源的命名
+    "lights_spawnable": [], # 光源的spawnable name, spawnable在Asset/Prefabs下面
+    "light_center": [0, 0, 0], # 光源的中心位置
+    "light_bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
+    "light_description": [],
+
     "task_element": [], # 任务元素，包含object, actor
 
     "grpc_addr": "localhost:50051"
@@ -53,8 +62,17 @@ class AbstractTask:
         self.actors_spawnable = []
         self.center = []
         self.bound = []
-        self.actor_description = []
+        self.description = []
         self.grpc_addr = None
+
+        self.random_light = False
+        self.random_light_position = False
+        self.random_actor_rotation = False
+        self.lights = []
+        self.lights_spawnable = []
+        self.light_center = []
+        self.light_bound = []
+        self.light_description = []
 
         self.load_config(config)
         self.task_dict = {}
@@ -99,6 +117,7 @@ class AbstractTask:
         self.goal_bodys = self.__get_config_setting__("goal_bodys", config)
         self.goal_sites = self.__get_config_setting__("goal_sites", config)
         self.goal_joints = self.__get_config_setting__("goal_joints", config)
+
         self.level_name = self.__get_config_setting__("level_name", config)
         self.random_actor = self.__get_config_setting__("random_actor", config)
         self.random_actor_position = self.__get_config_setting__("random_actor_position", config)
@@ -107,6 +126,17 @@ class AbstractTask:
         self.bound = self.__get_config_setting__("bound", config)
         self.actors = self.__get_config_setting__("actors", config)
         self.actors_spawnable = self.__get_config_setting__("actors_spawnable", config)
+        self.actor_description = self.__get_config_setting__("description", config)
+
+        self.lights = self.__get_config_setting__("lights", config)
+        self.lights_spawnable = self.__get_config_setting__("lights_spawnable", config)
+        self.light_center = self.__get_config_setting__("light_center", config)
+        self.light_bound = self.__get_config_setting__("light_bound", config)
+        self.random_light = self.__get_config_setting__("random_light", config)
+        self.random_light_position = self.__get_config_setting__("random_light_position", config)
+        self.random_light_rotation = self.__get_config_setting__("random_light_rotation", config)
+        self.light_description = self.__get_config_setting__("light_description", config)
+
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds = 0.1):
@@ -162,35 +192,91 @@ class AbstractTask:
     def generate_actors(self):
         if self.random_actor:
             len = self.actors.__len__()
-            n_select = random.randint(1, len)
+            n_select = random.randint(3, len)
             # 只在 [0, len) 范围内取样
             idxs = random.sample(range(len), n_select)
 
             for i in range(n_select):
                 self.add_actor(self.actors[idxs[i]], self.actors_spawnable[idxs[i]])
+        return idxs
+    
+    def generate_lights(self):
+        if self.random_light:
+            len = self.lights.__len__()
+            n_select = random.randint(3, len)
+            # 只在 [0, len) 范围内取样
+            idxs = random.sample(range(len), n_select)
+
+            for i in range(n_select):
+                self.add_light(self.lights[idxs[i]], self.lights_spawnable[idxs[i]])
+
+        return idxs
 
     def set_actors(self, actors, actors_spawnable, position, rotation):
         for i in range(actors):
             self.add_actor_with_pose(actors[i], actors_spawnable[i], position[i], rotation[i])
 
     def add_actor(self, actor_name, spawnable_name):
+        random_pos, random_xquat = self._random_position_and_rotation(self.center, self.bound)
+
         if self.random_actor_position:
-            position = np.array([np.random.uniform(self.center[0] + self.bound[0][0], self.center[0] + self.bound[0][1]),
-                                 np.random.uniform(self.center[1] + self.bound[1][0], self.center[1] + self.bound[1][1]),
-                                 np.random.uniform(self.center[2] + self.bound[2][0], self.center[2] + self.bound[2][1])])
+            position = random_pos
         else:
             position = self.center
 
         if self.random_actor_rotation:
-            rotation = rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), 
-                                                      np.random.uniform(-np.pi, np.pi), 
-                                                      np.random.uniform(-np.pi, np.pi)]))
+            rotation = random_xquat
         else:
             rotation = rotations.euler2quat([0, 0, 0])
 
         actor = orca_gym_scene.Actor(actor_name, spawnable_name, position, rotation, scale=1.0)
-
         self.scene.add_actor(actor)
+
+    def add_light(self, light_name, spawnable_name):
+        random_pos, random_xquat = self._random_position_and_rotation(self.center, self.bound)
+        if self.random_actor_position:
+            position = random_pos
+        else:
+            position = self.light_center
+
+        if self.random_actor_rotation:
+            rotation = random_xquat
+        else:
+            rotation = rotations.euler2quat([0, 0, 0])
+
+        actor = orca_gym_scene.Actor(light_name, spawnable_name, position, rotation, scale=1.0)
+        self.scene.add_actor(actor)
+
+    def set_light_info(self, light_name, color=None, intensity=None):
+        """
+        Set the light information for a specific light actor.
+        :param light_name: The name of the light actor.
+        :param color: The color of the light (optional).
+        :param intensity: The intensity of the light (optional).
+        """
+        if color is None:
+            color = np.array([np.random.uniform(0.0, 1.0),
+                              np.random.uniform(0.0, 1.0),
+                              np.random.uniform(0.0, 1.0)])
+        if intensity is None:
+            intensity = np.random.uniform(500.0, 2000.0)
+
+        light_info = orca_gym_scene.LightInfo(color=color, intensity=intensity)
+        self.scene.set_light_info(light_name, light_info)
+
+    def set_actor_material(self, actor_name, base_color=None):
+        """
+        Set the material information for a specific actor.
+        :param actor_name: The name of the actor.
+        :param base_color: The base color of the material (optional).
+        """
+        if base_color is None:
+            base_color = np.array([np.random.uniform(0.0, 1.0),
+                                   np.random.uniform(0.0, 1.0),
+                                   np.random.uniform(0.0, 1.0),
+                                   1.0])
+        material_info = orca_gym_scene.MaterialInfo(base_color=base_color)
+        self.scene.set_material_info(actor_name, material_info)
 
     def add_actor_with_pose(self, actor_name, spawnable_name, position, rotation):
         actor = orca_gym_scene.Actor(actor_name, spawnable_name, position, rotation, scale = 1.0)
@@ -238,4 +324,14 @@ class AbstractTask:
         goal_joint_len = self.goal_joints.__len__()
         goal_site_len = self.goal_sites.__len__()
 
-        
+    def _random_position_and_rotation(self, center, bound):
+        """
+        Generate a random position and rotation within the specified bounds.
+        """
+        position = np.array([np.random.uniform(center[0] + bound[0][0], center[0] + bound[0][1]),
+                             np.random.uniform(center[1] + bound[1][0], center[1] + bound[1][1]),
+                             np.random.uniform(center[2] + bound[2][0], center[2] + bound[2][1])])
+        rotation = rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), 
+                                                  np.random.uniform(-np.pi, np.pi), 
+                                                  np.random.uniform(-np.pi, np.pi)]))
+        return position, rotation

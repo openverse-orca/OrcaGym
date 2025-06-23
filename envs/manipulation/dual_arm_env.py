@@ -36,7 +36,7 @@ class ActionType:
 robot_entries = {
     "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
     "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
-    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripper2F85MobileBase",
+    "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
 def get_robot_entry(name: str):
@@ -200,11 +200,11 @@ class DualArmEnv(RobomimicEnv):
         return self._action_type
     
     @property
-    def joystick(self) -> Optional[PicoJoystick]:
+    def joystick(self):
         if self._ctrl_device == ControlDevice.VR:
             return self._joystick
     
-    def set_task_status(self, status: TaskStatus):
+    def set_task_status(self, status):
         if status == TaskStatus.SUCCESS:
             print("Task success!")
         elif status == TaskStatus.FAILURE:
@@ -333,7 +333,7 @@ class DualArmEnv(RobomimicEnv):
         # 将动作分配给每个agent
         agent_action = self._split_agent_action(action)
         for agent in self._agents.values():
-            agent.on_playback_action(self, agent_action[agent.name])
+            agent.on_playback_action( agent_action[agent.name])
         
         return self.ctrl.copy()
     
@@ -387,7 +387,7 @@ class DualArmEnv(RobomimicEnv):
 
         # 构造 numpy structured array
         dtype = np.dtype([
-            ('joint_name', 'U50'),
+            ('joint_name', 'U100'),
             ('position', 'f4', (3,)),
             ('orientation', 'f4', (4,))
         ])
@@ -406,7 +406,7 @@ class DualArmEnv(RobomimicEnv):
         )
         self.objects = objects_array
         goal_dtype = np.dtype([
-            ('joint_name',  'U50'),
+            ('joint_name',  'U100'),
             ('position',    'f4', (3,)),
             ('orientation', 'f4', (4,)),
             ('min',         'f4', (3,)),
@@ -487,7 +487,7 @@ class DualArmEnv(RobomimicEnv):
         """
         将 demo 里记录的 objects_data 写回到仿真。
         objects_data 可能是：
-          1) 结构化 numpy array：dtype=[('joint_name',U50),('position',f4,3),('orientation',f4,4)]
+          1) 结构化 numpy array：dtype=[('joint_name',U100),('position',f4,3),('orientation',f4,4)]
           2) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
         """
         qpos_dict = {}
@@ -562,7 +562,7 @@ class DualArmEnv(RobomimicEnv):
 
         # 3) 重建结构化数组
         goal_dtype = np.dtype([
-            ('joint_name',  'U50'),
+            ('joint_name',  'U100'),
             ('position',    'f4', (3,)),
             ('orientation', 'f4', (4,)),
             ('min',         'f4', (3,)),

@@ -443,32 +443,39 @@ def augment_episode(env : DualArmEnv,
     action_index_list = list(range(len(action_list)))
     holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
     action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
+    original_dones = np.array(demo_data['dones'], dtype=int)
+    T = len(original_dones)
     
     for i in action_index_list:
         action = action_list[i]
         last_action = action_list[i - 1] if i > 0 else action
-        # 插值生成一组动作序列，长度为 action_step
-        action_chunk = np.array([last_action + (action - last_action) * (i / action_step) for i in range(action_step)])
-        # print("Playback Action: ", action_chunk)
-
+    
+        action_chunk = np.array([
+            last_action + (action - last_action) * (j / action_step)
+            for j in range(action_step)
+        ], dtype=np.float32)
+    
         if noise_scale > 0.0:
-            noise = np.random.normal(0, noise_scale, len(action))
-            action += noise * np.abs(action)
-            action = np.clip(action, -1.0, 1.0)
-        
-        for i in range(action_step):
+            noise = np.random.normal(0, noise_scale, action_chunk.shape)
+            action_chunk += noise * np.abs(action_chunk)
+    
+        action_chunk = np.clip(action_chunk, -1.0, 1.0)
+    
+        for j in range(action_step):
             if realtime:
                 start_time = datetime.now()
-                
-            obs, reward, terminated, truncated, info = env.step(action_chunk[i])
+    
+            obs, reward, terminated, truncated, info = env.step(action_chunk[j])
+            info["action"] = action_chunk[j]  # ✅ 记录合法动作
             terminated_times = terminated_times + 1 if terminated else 0
             timestep_list.append(env.unwrapped.gym.data.time)
-            
+    
             if realtime:
                 env.render()
                 elapsed_time = datetime.now() - start_time
                 if elapsed_time.total_seconds() < REALTIME_STEP:
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+
         if target_obj and target_goal:
             raw_obj_joints  = info['object']['joint_name']
             obj_joints = [jn.decode('utf-8') if isinstance(jn, (bytes, bytearray)) else jn
@@ -508,7 +515,7 @@ def augment_episode(env : DualArmEnv,
             obs_list[obs_key].append(obs_data)
             
         reward_list.append(reward)
-        done_list.append(1)
+        done_list.append(int(original_dones[i]) if i < T else 1)
         info_list.append(info)
 
         
@@ -751,7 +758,7 @@ def run_example(orcagym_addr : str,
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config,{})
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -854,7 +861,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
 
     # 启动 Monitor 子进程
     ports = [
-        # 7070, 7080, 7090,        # Agent1
+        7070, 7080, 7090,        # Agent1
         # 8070, 8080, 8090,        # Agent2
     ]
     monitor_processes = []
