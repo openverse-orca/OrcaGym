@@ -13,23 +13,28 @@ class PickPlaceTask(AbstractTask):
         self.task_list: list = []
 
     def get_task(self, env: OrcaGymLocalEnv) -> dict[str, str]:
+        """
+        随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
+        """
+        # 每次都清空旧任务
         self.task_dict.clear()
+        # 随机摆放
         self.random_objs_and_goals(env, bounds=0.1)
     
-        object_len = len(self.object_bodys)
-        goal_len   = len(self.goal_bodys)
-    
-        if object_len == 0 or goal_len == 0:
+        # 如果没有可用的物体或目标，直接返回空
+        if not self.object_bodys or not self.goal_bodys:
             return self.task_dict
     
-        # 随机选一个 object，goal 总是 goal_bodys[0]
-        obj_idx = random.randint(0, object_len - 1)
-        obj_name = self.object_bodys[obj_idx]
+        # 从 object_bodys 随机选一个
+        obj_name = random.choice(self.object_bodys)
+        # 只取第一个 goal
         goal_name = self.goal_bodys[0]
     
+        # 记录到 task_dict 并返回
         self.task_dict[obj_name] = goal_name
-    
         return self.task_dict
+
+
 
 
     def get_language_instruction(self) -> str:
