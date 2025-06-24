@@ -1,185 +1,237 @@
-"""Example of how to write a custom APPO that uses a global shared data actor.
-
-The actor is custom code and its remote APIs can be designed as the user requires.
-It is created inside the Algorithm's `setup` method and then shared through its
-reference with all of the Algorithm's other actors, like EnvRunners, Learners, and
-aggregator actors.
-
-During sampling and through using callbacks, each EnvRunner assigns a unique ID
-to each sampled episode chunk, then sends manipulated reward data for each sampled
-episode chunk to the shared data actor. In particular, the manipulation consists of
-each individual reward being multiplied by the EnvRunner's index (from 1 to ...).
-Note that the actual reward in the episode is not altered and thus the metrics
-reporting continues to show the original reward.
-
-In the learner connector, which creates the train batch from episode data, a custom
-connector piece then gets the manipulated rewards from the shared data actor using
-the episode chunk's unique ID (see above) and uses the manipulated reward for training.
-Note that because of this, different EnvRunners provide different reward signals, which
-should make it slightly harder for the value function to learn consistently.
-Nevertheless, because the default config here only uses 2 EnvRunners, each multiplying
-their rewards by 1 and 2, respectively, this effect is negligible here and the example
-should learn how to solve the CartPole-1 env either way.
-
-This example shows:
-
-    - how to write a custom, global shared data actor class with a custom remote API.
-    - how an instance of this shared data actor is created upon algorithm
-    initialization.
-    - how to distribute the actor reference of the shared actor to all other actors
-    in the Algorithm, for example EnvRunners, AggregatorActors, and Learners
-    - how to subclass an existing algorithm class (APPO) to implement a custom
-    Algorithm, overriding the `setup` method to control, which additional actors
-    should be created (and shared) by the algo, the `get_state/set_state` methods
-    to include the state of the new actor.
-    - how - through custom callbacks - the new actor can be written to and queried
-    from anywhere within the algorithm, for example its EnvRunner actors or Learners.
-
-
-How to run this script
-----------------------
-`python [script file name].py --enable-new-api-stack`
-
-For debugging, use the following additional command line options
-`--no-tune --num-env-runners=0`
-which should allow you to set breakpoints anywhere in the RLlib code and
-have the execution stop there for inspection and debugging.
-
-For logging to your WandB account, use:
-`--wandb-key=[your WandB API key] --wandb-project=[some project name]
---wandb-run-name=[optional: WandB run name (within the defined project)]`
-
-
-Results to expect
------------------
-The experiment should work regardless of whether you are using aggregator
-actors or not. By default, the experiment provides one agg. actor per Learner,
-but you can set `--num-aggregator-actors-per-learner=0` to have the learner
-connector pipeline work directly inside the Learner actor(s).
-
-+-------------------------------------------------+------------+--------+
-| Trial name                                      | status     |   iter |
-|                                                 |            |        |
-|-------------------------------------------------+------------+--------+
-| APPOWithSharedDataActor_CartPole-v1_4e860_00000 | TERMINATED |      7 |
-+-------------------------------------------------+------------+--------+
-+------------------+------------------------+
-|   total time (s) |    episode_return_mean |
-|                  |                        |
-|------------------+------------------------+
-|          70.0315 |                 468.42 |
-+------------------+------------------------+
-"""
-
-import uuid
-
 import ray
+from ray import air
+from ray import tune
 from ray.rllib.algorithms.appo import APPOConfig
-from ray.rllib.connectors.connector_v2 import ConnectorV2
-from ray.rllib.core import Columns
-from ray.rllib.env.single_agent_episode import SingleAgentEpisode
-from ray.rllib.examples.algorithms.classes.appo_w_shared_data_actor import (
-    APPOWithSharedDataActor,
-)
-from ray.rllib.utils.test_utils import (
-    add_rllib_example_script_args,
-    run_rllib_example_script_experiment,
-)
+from ray.tune.registry import register_env
+import numpy as np
+from ray.rllib.algorithms.algorithm import Algorithm
+import numpy as np
+import gymnasium as gym
+import threading
+import os
+
+ENV_ENTRY_POINT = {
+    "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
+}
+
+TIME_STEP = 0.001
+FRAME_SKIP = 20
+REALTIME_STEP = TIME_STEP * FRAME_SKIP
+CONTROL_FREQ = 1 / REALTIME_STEP
+
+def get_orca_gym_register_info(
+        orcagym_addr : str,
+        env_name : str, 
+        agent_name : str, 
+        render_mode: str,
+    ) -> tuple[ str, dict ]:
+    orcagym_addr_str = orcagym_addr.replace(":", "-")
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str
+    agent_names = [f"{agent_name}"]
+    kwargs = {
+        'frame_skip': FRAME_SKIP,
+        'orcagym_addr': orcagym_addr,
+        'agent_names': agent_names,
+        'time_step': TIME_STEP,
+        'render_mode': render_mode,
+    }
+
+    return env_id, kwargs
 
 
-parser = add_rllib_example_script_args(
-    default_reward=450.0,
-    default_iters=200,
-    default_timesteps=2000000,
-)
-parser.set_defaults(
-    enable_new_api_stack=True,
-    num_aggregator_actors_per_learner=1,
-)
+def env_creator(
+        env_context,
+        orcagym_addr: str,
+        env_name: str,
+        agent_name: str,
+        max_episode_steps: int,
+    ):
 
-SPECIAL_REWARDS_KEY = "special_(double)_rewards"
-ENV_RUNNER_IDX_KEY = "env_runner_index"
-UNIQUE_EPISODE_CHUNK_KEY = "unique_eps_chunk"
+    if env_context is None:
+        worker_idx = 1
+        vector_idx = 0
+        print("Creating environment in main thread, no env_context provided.")
+    else:
+        worker_idx = env_context.worker_index
+        vector_idx = env_context.vector_index
+        print(f"Creating environment in worker {worker_idx}, vector {vector_idx}.")
 
-
-# Define 2 simple EnvRunner-based callbacks:
-
-
-def on_episode_step(*, episode, env_runner, **kwargs):
-    # Multiplies the received reward by the env runner index.
-    if SPECIAL_REWARDS_KEY not in episode.custom_data:
-        episode.custom_data[SPECIAL_REWARDS_KEY] = []
-    episode.custom_data[SPECIAL_REWARDS_KEY].append(
-        episode.get_rewards(-1) * env_runner.worker_index
+    # 只有第一个worker的第一个环境渲染
+    render_mode = 'human' if worker_idx == 1 and vector_idx == 0 else 'none'
+    
+    env_id, kwargs = get_orca_gym_register_info(
+        orcagym_addr=orcagym_addr,
+        env_name=env_name,
+        agent_name=agent_name,
+        render_mode=render_mode
     )
 
-
-def on_sample_end(*, samples, env_runner, **kwargs):
-    # Sends the (manipulated) reward sequence to the shared data actor for "pickup" by
-    # a Learner. Alternatively, one could also just store the information in the
-    # `custom_data` property.
-    for episode in samples:
-        # Provide a unique key for both episode AND record in the shared
-        # data actor.
-        unique_key = str(uuid.uuid4())
-
-        # Store the EnvRunner index and unique key in the episode.
-        episode.custom_data[ENV_RUNNER_IDX_KEY] = env_runner.worker_index
-        episode.custom_data[UNIQUE_EPISODE_CHUNK_KEY] = unique_key
-
-        # Get the manipulated rewards from the episode ..
-        special_rewards = episode.custom_data.pop(SPECIAL_REWARDS_KEY)
-        # .. and send them under the unique key to the shared data actor.
-        env_runner._shared_data_actor.put.remote(
-            key=unique_key,
-            value=special_rewards,
+    if vector_idx == 0:
+        gym.register(
+            id=env_id,
+            entry_point=ENV_ENTRY_POINT[env_name],
+            kwargs=kwargs,
+            max_episode_steps=max_episode_steps,
+            reward_threshold=0.0,
         )
+        print(f"Registered environment: {env_id} with kwargs: {kwargs}, in thread {threading.get_ident()}")
 
+    env = gym.make(env_id, **kwargs)
+    print(f"Creating environment: {env_name} with kwargs: {kwargs}, in thread {threading.get_ident()}")
 
-class ManipulatedRewardConnector(ConnectorV2):
-    def __call__(self, *, episodes, batch, metrics, **kwargs):
-        if not isinstance(episodes[0], SingleAgentEpisode):
-            raise ValueError("This connector only works on `SingleAgentEpisodes`.")
-        # Get the manipulated rewards from the shared actor and add them to the train
-        # batch.
-        for sa_episode in self.single_agent_episode_iterator(episodes):
-            unique_key = sa_episode.custom_data[UNIQUE_EPISODE_CHUNK_KEY]
-            special_rewards = ray.get(
-                self._shared_data_actor.get.remote(unique_key, delete=True)
-            )
-            if special_rewards is None:
-                continue
+    return env
 
-            assert int(special_rewards[0]) == sa_episode.custom_data[ENV_RUNNER_IDX_KEY]
+def test_model(
+        checkpoint_path,
+        orcagym_addr: str,
+        env_name: str,
+        agent_name: str,
+        max_episode_steps: int
+    ):
 
-            # Add one more fake reward, b/c all episodes will be extended
-            # (in PPO-style algos) by one artificial timestep for GAE/v-trace
-            # computation purposes.
-            special_rewards += [0.0]
-            self.add_n_batch_items(
-                batch=batch,
-                column=Columns.REWARDS,
-                items_to_add=special_rewards[-len(sa_episode) :],
-                num_items=len(sa_episode),
-                single_agent_episode=sa_episode,
-            )
+    
+    algo = Algorithm.from_checkpoint(checkpoint_path)
+    _, kwargs = get_orca_gym_register_info(
+        orcagym_addr=orcagym_addr,
+        env_name=env_name,
+        agent_name=agent_name,
+        render_mode='human'  # 测试时渲染
+    )
+    env = env_creator(
+        env_context=None,  # 测试时不需要env_context
+        orcagym_addr=orcagym_addr,
+        env_name=env_name,
+        agent_name=agent_name,
+        max_episode_steps=max_episode_steps,
+    )
 
-        return batch
+    for _ in range(5):  # 运行5个测试episode
+        state, _ = env.reset()
+        episode_reward = 0
+        done = False
+        
+        while not done:
+            action = algo.compute_single_action(state, explore=False)
+            state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            episode_reward += reward
+            env.render()  # 渲染环境
+        
+        print(f"Test episode reward: {episode_reward}")
+    
+    env.close()
 
-
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    base_config = (
-        APPOConfig(algo_class=APPOWithSharedDataActor)
-        .environment("CartPole-v1")
-        .callbacks(
-            on_episode_step=on_episode_step,
-            on_sample_end=on_sample_end,
+def config_appo_tunner() -> tune.Tuner:
+    # 完全修正的APPO配置
+    config = (
+        APPOConfig()
+        .environment(
+            env="OrcaGymEnv",
+            env_config={},
+            disable_env_checking=True  # 跳过环境检查，解决dtype警告问题
+        )
+        .env_runners(
+            num_env_runners=30,          
+            num_envs_per_env_runner=32,   
+            num_cpus_per_env_runner=1,  
+            rollout_fragment_length=64,
+            create_env_on_local_worker=True
         )
         .training(
-            learner_connector=(lambda obs_sp, act_sp: ManipulatedRewardConnector()),
+            train_batch_size=4096,
+            gamma=0.99,
+            lr=0.0003,
+            model={
+                "fcnet_hiddens": [256, 256],  # 两层256神经元的网络
+                "fcnet_activation": "relu",
+                "post_fcnet_hiddens": [128],
+                "post_fcnet_activation": "relu",
+                "free_log_std": True,
+            }
+        )
+        .resources(
+            num_cpus_for_main_process=1,
+            num_gpus=1,                # 启用GPU
+        )
+        .api_stack(
+            enable_rl_module_and_learner=False,
+            enable_env_runner_and_connector_v2=False
+        )
+    )
+    
+    print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
+    print(f"总CPU需求: {config.num_cpus_for_main_process + config.num_env_runners * config.num_cpus_per_env_runner}")
+    
+    return tune.Tuner(
+        "APPO",
+        param_space=config.to_dict(),
+        run_config=air.RunConfig(
+            name="APPO_OrcaGym_Training",
+            stop={"training_iteration": 100},
+            checkpoint_config=air.CheckpointConfig(
+                num_to_keep=1,
+                checkpoint_score_attribute="episode_reward_mean",
+                checkpoint_at_end=True
+            ),
+            verbose=3,  # 更详细输出
+        ),
+    )
+
+
+
+def main(
+        orcagym_addr: str,
+        env_name: str,
+        agent_name: str,
+        max_episode_steps: int
+    ):
+    import numpy as np
+
+    register_env(
+        "OrcaGymEnv", 
+        lambda env_context: env_creator(
+            env_context=env_context,
+            orcagym_addr=orcagym_addr,
+            env_name=env_name,
+            agent_name=agent_name,
+            max_episode_steps=max_episode_steps,
         )
     )
 
-    run_rllib_example_script_experiment(base_config, args)
+    # 优化Ray初始化参数
+    ray.init(
+        num_cpus=32,  # 减少到实际可用资源
+        num_gpus=1,   # 启用GPU
+        object_store_memory=20 * 1024**3,  # 20GB
+        include_dashboard=False,  # 启用仪表盘
+        ignore_reinit_error=True
+    )
+
+    print("\nStarting training...")
+    tuner = config_appo_tunner()
+    results = tuner.fit()
+    
+    # if results:
+    #     print("\nTraining completed. Best results:")
+    #     best_result = results.get_best_result()
+    #     if best_result.checkpoint:
+    #         print(f"Best checkpoint: {best_result.checkpoint}")
+    #         print("Starting testing...")
+    #         test_model(
+    #             best_result.checkpoint,
+    #             orcagym_addr=orcagym_addr,
+    #             env_name=env_name,
+    #             agent_name=agent_name,
+    #             max_episode_steps=max_episode_steps
+    #         )
+
+    ray.shutdown()
+    print("Process completed.")
+
+if __name__ == "__main__":
+    main(
+        orcagym_addr="localhost:50051",
+        env_name="Ant_OrcaGymEnv",
+        agent_name="ant_usda",
+        max_episode_steps=1000
+    )

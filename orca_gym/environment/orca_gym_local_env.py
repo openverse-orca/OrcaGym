@@ -482,6 +482,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
+    
+    def get_cfrc_ext(self):
+        cfrc_ext = self.gym.get_cfrc_ext()
+        return cfrc_ext
 
     def query_actuator_torques(self, actuator_names):
         actuator_torques = self.gym.query_actuator_torques(actuator_names)

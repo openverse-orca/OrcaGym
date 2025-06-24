@@ -215,7 +215,7 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.LoadLocalEnv(request)
 
         if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
-            raise Exception("Load local env failed.")
+            raise Exception("Load local env failed. error code: {}".format(response.status), "error message: {}".format(response.error_message))
 
         # 文件存储在指定路径
         file_name = response.file_name
@@ -893,6 +893,9 @@ class OrcaGymLocal(OrcaGymBase):
             contact_force_dict[contact_id] = contact_force
         
         return contact_force_dict
+    
+    def get_cfrc_ext(self):
+        return self._mjData.cfrc_ext.copy()
 
     def query_actuator_torques(self, actuator_names):
         actuator_torques = {}
