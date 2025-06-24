@@ -1,18 +1,18 @@
 # shop1任务配置文件
 
 level_name: "shop"
-object_bodys: [ "Bottle_red", "Jar_01", "Bottle_blue"]
-object_sites: ["Bottle_redsite", "Jar_01site", "Bottle_bluesite"]
-object_joints: ["Bottle_red_joint", "Jar_01_joint", "Bottle_blue_joint"]
+# object_bodys: [ "bottle_red", "jar_01", "bottle_blue"]
+# object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite"]
+# object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint"]
 
-goal_bodys: ["Basket"]
-goal_sites: ["Basketsite"]
-goal_joints: ["Basket_joint"]
+goal_bodys: ["basket"]
+goal_sites: ["basketsite"]
+goal_joints: ["basket_joint"]
 
-# random_actor : true
-# random_actor_position: true
-# random_actor_rotation: false
-# actors: ["yellow_bottle", "red_bottle", "coke", "milk", "spotlight"]
-# actors_spawnable: ["yellow_bottle", "red_bottle", "coke", "milk", "spotlight"]
-# center: [-6.0, 2.83, 1.390]
-# bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+actors_spawnable: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+center: [-6.35, 2.56, 2.32]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

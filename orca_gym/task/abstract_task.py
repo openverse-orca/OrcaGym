@@ -139,55 +139,73 @@ class AbstractTask:
         self.num_lights = self.__get_config_setting__("num_lights", config)
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
-    def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds = 0.1):
-        """
-        Randomly select objects and goals.
-        """
-        object_bodys_env_names = [env.body(body_name) for body_name in self.object_bodys]
-        goal_bodys_env_names = [env.body(body_name) for body_name in self.goal_bodys]
 
-        object_ids = [env.model.body_name2id(body_name) for body_name in object_bodys_env_names]
-        goal_ids = [env.model.body_name2id(body_name) for body_name in goal_bodys_env_names]
+    def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds=None):
+        # 1) joint 句柄
+        obj_joints  = [env.joint(jn) for jn in self.object_joints]
+        goal_joints = [env.joint(jn) for jn in self.goal_joints]
 
-        object_sites_env_names = [env.site(site_name) for site_name in self.object_sites]
-        goal_sites_env_names = [env.site(site_name) for site_name in self.goal_sites]
 
-        object_site_dict = env.query_site_pos_and_quat(object_sites_env_names)
-        goal_site_dict = env.query_site_pos_and_quat(goal_sites_env_names)
+        # 2) dummy_site 世界坐标
+        dummy = env.site("dummy_site")
+        info  = env.query_site_pos_and_quat([dummy])[dummy]
+        print("[Debug] dummy_site base_pos =", info["xpos"])
+        base_pos, base_quat = info["xpos"], info["xquat"]
 
-        object_joints_env_names = [env.joint(joint_name) for joint_name in self.object_joints]
-        goal_joints_env_names = [env.joint(joint_name) for joint_name in self.goal_joints]
+        placed = []
+        max_trials = 100
 
-        #随机化物体位置
-        def generate_random_pos_quat(bounds, site_dict, sites_env_names):
-            random_pos, random_xquat = [], []
-            for i in range(len(sites_env_names)):
-                site_pos = site_dict[sites_env_names[i]]['xpos']
-                site_quat = site_dict[sites_env_names[i]]['xquat']
-                site_rotation = rotations.quat2euler(site_quat)
+        for joint in obj_joints:
+            for _ in range(max_trials):
+                # 在 dummy 前方的 local 空间里采样
+                lx = np.random.uniform(0.2, 0.612)
+                ly = np.random.uniform(-0.4,  0.4)
+                lz = np.random.uniform(-0.2,  0.0)
+                local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
-                pos, xquat, rotation = site_pos, site_quat, site_rotation
+                # 转到世界坐标
+                world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
 
-                pos[0] = np.random.uniform(-bounds, bounds) + pos[0]
-                pos[1] = np.random.uniform(-bounds, bounds) + pos[1]
-                rotation[2] = np.random.uniform(-bounds * np.pi, bounds * np.pi)
-                xquat = rotations.euler2quat(rotation)
+                # 随机水平 yaw
+                yaw = np.random.uniform(-np.pi, np.pi)
+                world_quat = rotations.euler2quat([0.0, 0.0, yaw])
 
-                random_pos.append(pos)
-                random_xquat.append(xquat)
+                # 暂时放一下
+                trial_qpos = np.concatenate([world_pos, world_quat])
+                env.set_joint_qpos({joint: trial_qpos})
+                env.mj_forward()
 
-            return random_pos, random_xquat
+                # 检查是否落入 goal 区域
+                goal_qpos = env.query_joint_qpos(goal_joints)
+                goal0_pos = goal_qpos[goal_joints[0]][:3]
+                if np.linalg.norm(world_pos - goal0_pos) < 0.1:
+                    continue
 
-        random_obj_pos, random_obj_xquat = generate_random_pos_quat(bounds, object_site_dict, object_sites_env_names)
-        random_goal_pos, random_goal_xquat = generate_random_pos_quat(bounds, goal_site_dict, goal_sites_env_names)
+                # **正确调用**碰撞检测
+                contacts = env.query_contact_force([])
+                collision = False
+                for (g1, g2), f in contacts.items():
+                    # 如果 joint 对应的 geom id 在碰撞对里，就算碰撞
+                    if joint in (g1, g2):
+                        collision = True
+                        break
+                if collision:
+                    continue
 
-        for i in range(len(object_ids)):
-            env.set_joint_qpos({object_joints_env_names[i]: np.concatenate([random_obj_pos[i], random_obj_xquat[i]])})
+                placed.append((joint, trial_qpos))
+                break
+            else:
+                raise RuntimeError(f"无法为 joint {joint} 找到非碰撞位置")
 
-        #for i in range(len(goal_ids)):
-            #env.set_mocap_pos_and_quat({goal_bodys_env_names[i]: {'pos': random_goal_pos[i], 'quat': random_goal_xquat[i]}})
-        self.randomized_object_positions = env.query_joint_qpos(object_joints_env_names)
-        self.randomized_goal_positions = env.query_joint_qpos(goal_joints_env_names)
+        # 一次写回并记录
+        qpos_dict = {jn: q for jn, q in placed}
+        env.set_joint_qpos(qpos_dict)
+        env.mj_forward()
+
+        self.randomized_object_positions = env.query_joint_qpos(obj_joints)
+        self.randomized_goal_positions   = env.query_joint_qpos(goal_joints)
+
+
 
     def generate_actors(self):
         idxs = []
@@ -305,7 +323,7 @@ class AbstractTask:
         if self._init_env_callback is None:
             warnings.warn("Not register init_env_callback\n")
 
-        time.sleep(2)
+        time.sleep(3)
         self._init_env_callback()
 
     def destory_scene(self):
