@@ -8,8 +8,7 @@ from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import orca_gym.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
-
-
+import time
 class AntOrcaGymEnv(OrcaGymLocalEnv):
     """
     A class to represent the ORCA Gym environment for the Replicator scene.
@@ -22,10 +21,12 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         agent_names: list,
         time_step: float,
         render_mode: str,
+        env_id: Optional[str] = None,
         max_steps: Optional[int] = None,
         **kwargs,
     ):
         self._render_mode = render_mode
+        self._env_id = env_id
 
         super().__init__(
             frame_skip=frame_skip,
@@ -115,7 +116,6 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         return control_cost
 
     def step(self, action) -> tuple:
-
         action_dict = {self._actuator_names[i]: action[i] for i in range(len(self._actuator_names))}
         ctrl = self._action2ctrl(action_dict)
 
@@ -146,7 +146,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         # print("x_velocity: ", x_velocity, " y_velocity: ", y_velocity, " reward: ", reward, "reward info", reward_info, " terminated: ", terminated)
 
         # 正常来说不需要在这里调用render函数，但是由于APPO没有内置渲染回掉，如果需要在训练时查看，就需要在这里调用
-        # self.render()
+        self.render()
 
         return obs, reward, terminated, False, info
     

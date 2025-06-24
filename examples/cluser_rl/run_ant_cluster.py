@@ -10,6 +10,7 @@ import gymnasium as gym
 import threading
 import os
 
+
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
 }
@@ -24,9 +25,11 @@ def get_orca_gym_register_info(
         env_name : str, 
         agent_name : str, 
         render_mode: str,
+        worker_idx: int,
+        vector_idx: int,
     ) -> tuple[ str, dict ]:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
-    env_id = env_name + "-OrcaGym-" + orcagym_addr_str
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{worker_idx:03d}-{vector_idx:03d}"
     agent_names = [f"{agent_name}"]
     kwargs = {
         'frame_skip': FRAME_SKIP,
@@ -34,6 +37,7 @@ def get_orca_gym_register_info(
         'agent_names': agent_names,
         'time_step': TIME_STEP,
         'render_mode': render_mode,
+        'env_id': env_id,
     }
 
     return env_id, kwargs
@@ -63,18 +67,20 @@ def env_creator(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        render_mode=render_mode
+        render_mode=render_mode,
+        worker_idx=worker_idx,
+        vector_idx=vector_idx,
     )
 
-    if vector_idx == 0:
-        gym.register(
-            id=env_id,
-            entry_point=ENV_ENTRY_POINT[env_name],
-            kwargs=kwargs,
-            max_episode_steps=max_episode_steps,
-            reward_threshold=0.0,
-        )
-        print(f"Registered environment: {env_id} with kwargs: {kwargs}, in thread {threading.get_ident()}")
+    # if vector_idx == 0:
+    gym.register(
+        id=env_id,
+        entry_point=ENV_ENTRY_POINT[env_name],
+        kwargs=kwargs,
+        max_episode_steps=max_episode_steps,
+        reward_threshold=0.0,
+    )
+    print(f"Registered environment: {env_id} with kwargs: {kwargs}, in thread {threading.get_ident()}")
 
     env = gym.make(env_id, **kwargs)
     print(f"Creating environment: {env_name} with kwargs: {kwargs}, in thread {threading.get_ident()}")
@@ -95,7 +101,9 @@ def test_model(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        render_mode='human'  # 测试时渲染
+        render_mode='human',  # 测试时渲染
+        worker_idx=1,  # 测试时只使用一个worker
+        vector_idx=0,  # 测试时只使用一个vector
     )
     env = env_creator(
         env_context=None,  # 测试时不需要env_context
@@ -128,21 +136,22 @@ def config_appo_tunner() -> tune.Tuner:
         .environment(
             env="OrcaGymEnv",
             env_config={},
-            disable_env_checking=True  # 跳过环境检查，解决dtype警告问题
+            disable_env_checking=True 
         )
         .env_runners(
             num_env_runners=30,          
-            num_envs_per_env_runner=32,   
+            num_envs_per_env_runner=64,   
             num_cpus_per_env_runner=1,  
             rollout_fragment_length=64,
-            create_env_on_local_worker=True
+            create_env_on_local_worker=True,
+            gym_env_vectorize_mode="ASYNC"
         )
         .training(
             train_batch_size=4096,
             gamma=0.99,
             lr=0.0003,
             model={
-                "fcnet_hiddens": [256, 256],  # 两层256神经元的网络
+                "fcnet_hiddens": [256, 256],  
                 "fcnet_activation": "relu",
                 "post_fcnet_hiddens": [128],
                 "post_fcnet_activation": "relu",
@@ -151,7 +160,7 @@ def config_appo_tunner() -> tune.Tuner:
         )
         .resources(
             num_cpus_for_main_process=1,
-            num_gpus=1,                # 启用GPU
+            num_gpus=1, 
         )
         .api_stack(
             enable_rl_module_and_learner=False,
