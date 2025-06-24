@@ -410,18 +410,15 @@ class DualArmEnv(RobomimicEnv):
             min_xy = bbox['min'][:2]
             max_xy = bbox['max'][:2]
 
-            print(f"[safe_get_task] 尝试 {attempt}/{max_retries}，用 XY 包围盒判断")
             bad = False
             for joint_name, qpos in objs.items():
                 obj_xy = qpos[:2]
                 # 如果在 min_xy—max_xy 区间内，就算“在目标区域”
                 if (min_xy <= obj_xy).all() and (obj_xy <= max_xy).all():
-                    print(f"  [⚠️] {joint_name} 的 XY={obj_xy} 落入目标包围盒 {min_xy}–{max_xy}，重试")
                     bad = True
                     break
 
             if not bad:
-                print("[safe_get_task] 生成成功，所有物体都在目标包围盒外")
                 return
 
         raise RuntimeError("safe_get_task 多次重试失败，始终有物体落在目标包围盒内")
@@ -470,18 +467,12 @@ class DualArmEnv(RobomimicEnv):
 
                 updated_actors = True
                 #self._debug_list_loaded_objects()
-            else:
-                print("[ResetModel][A] skip spawn this frame")
-
         # —— B) 重置 robot & agents 内部状态 —— #
-        print("[ResetModel][B] reset robot & agents")
         self._set_init_state()
         for ag in self._agents.values():
             ag.on_reset_model()
-        print(f"[ResetModel][C] should we call get_task? got_task={self._got_task}, updated_actors={updated_actors}")
         # —— C) 如果是第一次 reset（非回放），执行一次 get_task —— #
         if self._run_mode == RunMode.TELEOPERATION:
-            print("[ResetModel][C] calling get_task() (always in TELEOP)")
             self.safe_get_task(self)
             print(self._task.get_language_instruction())
         elif (not self._got_task) or updated_actors:
@@ -503,7 +494,6 @@ class DualArmEnv(RobomimicEnv):
         # —— E) 构造本轮的 objects/goals 信息，推进模拟，返回 obs/info —— #
         rand_objs = self._task.randomized_object_positions
         rand_goals = self._task.randomized_goal_positions
-        print("[ResetModel][E] building objects/goals")
         print("object_joints:", self._task.object_joints)
         print("randomized_object_positions:", self._task.randomized_object_positions)
 

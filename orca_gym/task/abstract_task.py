@@ -149,7 +149,6 @@ class AbstractTask:
         # 2) dummy_site 世界坐标
         dummy = env.site("dummy_site")
         info  = env.query_site_pos_and_quat([dummy])[dummy]
-        print("[Debug] dummy_site base_pos =", info["xpos"])
         base_pos, base_quat = info["xpos"], info["xquat"]
 
         placed = []
@@ -158,9 +157,9 @@ class AbstractTask:
         for joint in obj_joints:
             for _ in range(max_trials):
                 # 在 dummy 前方的 local 空间里采样
-                lx = np.random.uniform(0.2, 0.612)
-                ly = np.random.uniform(-0.4,  0.4)
-                lz = np.random.uniform(-0.2,  0.0)
+                lx = np.random.uniform(0.3, 0.612)
+                ly = np.random.uniform(-0.4,0.4)
+                lz = np.random.uniform(-0.2, -0.1)
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
                 # 转到世界坐标
