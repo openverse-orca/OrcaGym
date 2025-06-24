@@ -495,7 +495,6 @@ class DualArmEnv(RobomimicEnv):
         rand_objs = self._task.randomized_object_positions
         rand_goals = self._task.randomized_goal_positions
         print("object_joints:", self._task.object_joints)
-        print("randomized_object_positions:", self._task.randomized_object_positions)
 
         # objects structured array
         obj_dtype = np.dtype([("joint_name","U100"),("position","f4",3),("orientation","f4",4)])
