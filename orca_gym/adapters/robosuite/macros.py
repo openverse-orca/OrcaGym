@@ -48,7 +48,7 @@ try:
     from orca_gym.adapters.robosuite.macros_private import *
 except ImportError:
     import orca_gym.adapters.robosuite
-    from orca_gym.adapters.robosuite.utils.log_utils import robosuite_DEFAULT_LOGGER
+    from orca_gym.adapters.robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
 
     ROBOSUITE_DEFAULT_LOGGER.warn("No private macro file found!")
     ROBOSUITE_DEFAULT_LOGGER.warn("It is recommended to use a private macro file")

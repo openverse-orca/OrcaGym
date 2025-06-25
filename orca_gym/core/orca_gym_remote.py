@@ -2,8 +2,8 @@ import sys
 import os
 import grpc
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-proto_path = os.path.abspath(os.path.join(current_dir, "protos"))
+proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
 sys.path.append(proto_path)
 import mjc_message_pb2
 import mjc_message_pb2_grpc
@@ -13,10 +13,10 @@ import numpy as np
 import scipy.linalg
 from datetime import datetime
 
-from orca_gym.orca_gym_model import OrcaGymModel
-from orca_gym.orca_gym_data import OrcaGymData
-from orca_gym.orca_gym_opt_config import OrcaGymOptConfig
-from orca_gym.orca_gym import OrcaGymBase
+from orca_gym.core.orca_gym_model import OrcaGymModel
+from orca_gym.core.orca_gym_data import OrcaGymData
+from orca_gym.core.orca_gym_opt_config import OrcaGymOptConfig
+from orca_gym.core.orca_gym import OrcaGymBase
 
 class OrcaGymRemote(OrcaGymBase):
     """

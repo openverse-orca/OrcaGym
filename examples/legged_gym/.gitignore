@@ -2,3 +2,4 @@
 trained_models_tmp/
 reward_history/
 play.sh
+log/

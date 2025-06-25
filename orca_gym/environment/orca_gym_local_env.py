@@ -14,7 +14,7 @@ import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.orca_gym_local import AnchorType, get_eq_type
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData

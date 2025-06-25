@@ -6,7 +6,7 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 # from stable_baselines3.common.vec_env import SubprocVecEnv
-from orca_gym.multi_agent import SubprocVecEnvMA
+from orca_gym.environment.multi_agent import SubprocVecEnvMA
 from sb3_contrib import TQC
 from stable_baselines3.her import GoalSelectionStrategy, HerReplayBuffer
 from stable_baselines3.common.noise import NormalActionNoise

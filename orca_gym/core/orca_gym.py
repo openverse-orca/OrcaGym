@@ -2,11 +2,12 @@ import sys
 import os
 import grpc
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-proto_path = os.path.abspath(os.path.join(current_dir, "protos"))
+proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
 sys.path.append(proto_path)
 import mjc_message_pb2
 import mjc_message_pb2_grpc
+
 
 
 import numpy as np

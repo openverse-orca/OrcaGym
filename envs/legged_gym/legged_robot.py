@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime
 import math
 from gymnasium.core import ObsType
-from orca_gym.multi_agent import OrcaGymAgent
+from orca_gym.environment.multi_agent import OrcaGymAgent
 from orca_gym.utils import rotations
 from orca_gym.utils.reward_printer import RewardPrinter
 from typing import Optional, Any, SupportsFloat
