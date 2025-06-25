@@ -6,6 +6,20 @@ import numpy as np
 import random
 import warnings, time
 
+
+LEVEL_RANGES = {
+        "shop": {
+            "x": (0.2, 0.612),
+            "y": (-0.4, 0.4),
+            "z": (-0.2, 0.0),
+        },
+        "yaodian": {
+            "x": (0.718, 0.818),
+            "y": (-0.4, 0.4),
+            "z": (0.21, 0.31),
+        },
+        # 新关卡直接加一条
+    }
 DEFAULT_CONFIG = {
     "random_object": True, # 是否随机Object的位置，object应该在Agent下面
     "object_bodys": [],
@@ -141,68 +155,59 @@ class AbstractTask:
 
 
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds=None):
-        # 1) joint 句柄
         obj_joints  = [env.joint(jn) for jn in self.object_joints]
         goal_joints = [env.joint(jn) for jn in self.goal_joints]
 
-
-        # 2) dummy_site 世界坐标
         dummy = env.site("dummy_site")
         info  = env.query_site_pos_and_quat([dummy])[dummy]
         base_pos, base_quat = info["xpos"], info["xquat"]
+
+        # 根据 level_name 去读取模块级常量
+        if self.level_name not in LEVEL_RANGES:
+            raise KeyError(f"Unknown level '{self.level_name}', please add to LEVEL_RANGES")
+        ranges = LEVEL_RANGES[self.level_name]
 
         placed = []
         max_trials = 100
 
         for joint in obj_joints:
             for _ in range(max_trials):
-                # 在 dummy 前方的 local 空间里采样
-                lx = np.random.uniform(0.3, 0.612)
-                ly = np.random.uniform(-0.4,0.4)
-                lz = np.random.uniform(-0.2, -0.1)
+                lx = np.random.uniform(*ranges["x"])
+                ly = np.random.uniform(*ranges["y"])
+                lz = np.random.uniform(*ranges["z"])
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
-                # 转到世界坐标
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
-
-                # 随机水平 yaw
                 yaw = np.random.uniform(-np.pi, np.pi)
                 world_quat = rotations.euler2quat([0.0, 0.0, yaw])
-
-                # 暂时放一下
                 trial_qpos = np.concatenate([world_pos, world_quat])
+
                 env.set_joint_qpos({joint: trial_qpos})
                 env.mj_forward()
 
-                # 检查是否落入 goal 区域
-                goal_qpos = env.query_joint_qpos(goal_joints)
-                goal0_pos = goal_qpos[goal_joints[0]][:3]
+                # 跳过落进目标的
+                goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
                 if np.linalg.norm(world_pos - goal0_pos) < 0.1:
                     continue
 
-                # **正确调用**碰撞检测
+                # 跳过有碰撞的
                 contacts = env.query_contact_force([])
-                collision = False
-                for (g1, g2), f in contacts.items():
-                    # 如果 joint 对应的 geom id 在碰撞对里，就算碰撞
-                    if joint in (g1, g2):
-                        collision = True
-                        break
-                if collision:
+                if any(joint in (g1, g2) for (g1, g2), _ in contacts.items()):
                     continue
 
                 placed.append((joint, trial_qpos))
                 break
             else:
-                raise RuntimeError(f"无法为 joint {joint} 找到非碰撞位置")
+                raise RuntimeError(f"Cannot place joint {joint} in level '{self.level_name}'")
 
-        # 一次写回并记录
+        # 一次性写回
         qpos_dict = {jn: q for jn, q in placed}
         env.set_joint_qpos(qpos_dict)
         env.mj_forward()
 
         self.randomized_object_positions = env.query_joint_qpos(obj_joints)
         self.randomized_goal_positions   = env.query_joint_qpos(goal_joints)
+
 
 
 
