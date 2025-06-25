@@ -1,3 +1,4 @@
+from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.task.abstract_task import AbstractTask
 import random
@@ -40,9 +41,21 @@ class PickPlaceTask(AbstractTask):
     def get_language_instruction(self) -> str:
         if not self.task_dict:
             return "Do something."
-        obj_str = "object: " + " ".join(self.task_dict.keys())
-        goal_str = "goal: " + " ".join(self.task_dict.values())
-        return f"level: {self.level_name}  {obj_str} to {goal_str}"
+
+        # 拆出 objects 和 goals
+        objs  = list(self.task_dict.keys())
+        goals = list(self.task_dict.values())
+
+        # 给每个 object 名和 goal 名上色
+        colored_objs  = " ".join(f"{Fore.CYAN}{Style.BRIGHT}{o}{Style.RESET_ALL}" for o in objs)
+        colored_goals = " ".join(f"{Fore.MAGENTA}{Style.BRIGHT}{g}{Style.RESET_ALL}" for g in goals)
+
+        # 拼回整句
+        return (
+            f"{Fore.WHITE}level: {self.level_name}{Style.RESET_ALL}  "
+            f"object: {colored_objs}  to  "
+            f"goal: {colored_goals}"
+        )
 
 class TaskStatus:
     """

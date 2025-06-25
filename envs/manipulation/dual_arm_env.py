@@ -393,9 +393,9 @@ class DualArmEnv(RobomimicEnv):
                 continue
             full_jn = matches[0]
             
-            print(f"[Loaded OBJ JOINT] {short_jn:25s} → {full_jn}")
+            #print(f"[Loaded OBJ JOINT] {short_jn:25s} → {full_jn}")
         self._task.object_joints = full_jn
-        print("[Debug] after correction:", self._task.object_joints)
+        #print("[Debug] after correction:", self._task.object_joints)
     
     def safe_get_task(self, env, max_retries=100):
         for attempt in range(1, max_retries+1):
@@ -458,7 +458,7 @@ class DualArmEnv(RobomimicEnv):
                 for _ in range(100):
                     try:
                         self.joint(cfg["object_joints"][0])
-                        print("object_joints:", cfg["object_joints"][0])
+                        #print("object_joints:", cfg["object_joints"][0])
                         break
                     except Exception:
                             time.sleep(0.05)
@@ -494,7 +494,7 @@ class DualArmEnv(RobomimicEnv):
         # —— E) 构造本轮的 objects/goals 信息，推进模拟，返回 obs/info —— #
         rand_objs = self._task.randomized_object_positions
         rand_goals = self._task.randomized_goal_positions
-        print("object_joints:", self._task.object_joints)
+        #print("object_joints:", self._task.object_joints)
 
         # objects structured array
         obj_dtype = np.dtype([("joint_name","U100"),("position","f4",3),("orientation","f4",4)])
