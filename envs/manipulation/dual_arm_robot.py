@@ -1,8 +1,8 @@
 import numpy as np
 from orca_gym.utils import rotations
-from orca_gym.robosuite.controllers.controller_factory import controller_factory
-import orca_gym.robosuite.controllers.controller_config as controller_config
-import orca_gym.robosuite.utils.transform_utils as transform_utils
+from orca_gym.adapters.robosuite.controllers.controller_factory import controller_factory
+import orca_gym.adapters.robosuite.controllers.controller_config as controller_config
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 from scipy.spatial.transform import Rotation as R, Rotation
 from envs.manipulation.dual_arm_env import DualArmEnv, AgentBase, RunMode, ControlDevice, ActionType, TaskStatus
 

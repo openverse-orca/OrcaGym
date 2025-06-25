@@ -6,7 +6,7 @@ import numpy as np
 import logging as log
 import glob
 
-from orca_gym.robomimic.dataset_util import DatasetReader, DatasetWriter
+from orca_gym.adapters.robomimic.dataset_util import DatasetReader, DatasetWriter
 
 
 def _check_dataset(dataset_file, verbose=False) -> bool:

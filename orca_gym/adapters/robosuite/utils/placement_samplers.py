@@ -3,9 +3,9 @@ from copy import copy
 
 import numpy as np
 
-from orca_gym.robosuite.models.objects import MujocoObject
-from orca_gym.robosuite.utils import RandomizationError
-from orca_gym.robosuite.utils.transform_utils import quat_multiply
+from orca_gym.adapters.robosuite.models.objects import MujocoObject
+from orca_gym.adapters.robosuite.utils import RandomizationError
+from orca_gym.adapters.robosuite.utils.transform_utils import quat_multiply
 
 
 class ObjectPositionSampler:

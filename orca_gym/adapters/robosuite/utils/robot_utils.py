@@ -1,6 +1,6 @@
 # Utilities functions for working with robots
 
-from orca_gym.robosuite.robots import BIMANUAL_ROBOTS
+from orca_gym.adapters.robosuite.robots import BIMANUAL_ROBOTS
 
 
 def check_bimanual(robot_name):

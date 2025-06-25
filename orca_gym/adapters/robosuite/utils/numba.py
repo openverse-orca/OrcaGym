@@ -3,7 +3,7 @@ Numba utils.
 """
 import numba
 
-import orca_gym.robosuite.macros as macros
+import orca_gym.adapters.robosuite.macros as macros
 
 
 def jit_decorator(func):

@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from orca_gym import OrcaGymLocal
 import numpy as np
 
-import orca_gym.robosuite.macros as macros
+import orca_gym.adapters.robosuite.macros as macros
 import asyncio
 
 

@@ -377,7 +377,7 @@ class Observable:
             self._data_shape = np.array(self._sensor({})).shape
             self._is_number = len(self._data_shape) == 1 and self._data_shape[0] == 1
         except Exception as e:
-            from orca_gym.robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
+            from orca_gym.adapters.robosuite.utils.log_utils import robosuite_DEFAULT_LOGGER
 
             ROBOSUITE_DEFAULT_LOGGER.error(e)
             raise ValueError("Current sensor for observable {} is invalid.".format(self.name))

@@ -122,7 +122,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
                 finite_max = np.finfo(np.float32).max
                 low = np.full(obs_data.shape, -finite_max, dtype=np.float32)
                 high = np.full(obs_data.shape, finite_max, dtype=np.float32)
-                # print(f"low.dtype: {low.dtype}, high.dtype: {high.dtype}")  # 调试信息
+                print(f"low.dtype: {low.dtype}, high.dtype: {high.dtype}")  # 调试信息
                 
                 obs_space_dict[obs_key] = spaces.Box(
                     low=low,

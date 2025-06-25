@@ -13,8 +13,8 @@ import numpy as np
 from PIL import Image
 
 import robosuite
-import orca_gym.robosuite.utils.transform_utils as trans
-from orca_gym.robosuite.utils.binding_utils import MjRenderContextOffscreen
+import orca_gym.adapters.robosuite.utils.transform_utils as trans
+from orca_gym.adapters.robosuite.utils.binding_utils import MjRenderContextOffscreen
 
 
 class BaseModder:

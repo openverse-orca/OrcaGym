@@ -4,7 +4,7 @@ for determining core functionality.
 
 To make sure global reference is maintained, should import these settings as:
 
-`import orca_gym.robosuite.macros as macros`
+`import orca_gym.adapters.robosuite.macros as macros`
 """
 
 # Global Mujoco Simulation Parameters
@@ -34,7 +34,7 @@ CONCATENATE_IMAGES = False
 
 MUJOCO_GPU_RENDERING = True
 
-# Spacemouse settings. Used by SpaceMouse class in orca_gym.robosuite.devices/spacemouse.py
+# Spacemouse settings. Used by SpaceMouse class in orca_gym.adapters.robosuite.devices/spacemouse.py
 SPACEMOUSE_VENDOR_ID = 9583
 SPACEMOUSE_PRODUCT_ID = 50734
 
@@ -45,11 +45,11 @@ FILE_LOGGING_LEVEL = None
 
 # Override with macros from macros_private.py file, if it exists
 try:
-    from orca_gym.robosuite.macros_private import *
+    from orca_gym.adapters.robosuite.macros_private import *
 except ImportError:
-    import orca_gym.robosuite
-    from orca_gym.robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
+    import orca_gym.adapters.robosuite
+    from orca_gym.adapters.robosuite.utils.log_utils import robosuite_DEFAULT_LOGGER
 
     ROBOSUITE_DEFAULT_LOGGER.warn("No private macro file found!")
     ROBOSUITE_DEFAULT_LOGGER.warn("It is recommended to use a private macro file")
-    ROBOSUITE_DEFAULT_LOGGER.warn("To setup, run: python {}/scripts/setup_macros.py".format(orca_gym.robosuite.__path__[0]))
+    ROBOSUITE_DEFAULT_LOGGER.warn("To setup, run: python {}/scripts/setup_macros.py".format(orca_gym.adapters.robosuite.__path__[0]))

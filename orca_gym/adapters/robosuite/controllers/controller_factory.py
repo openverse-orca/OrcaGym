@@ -64,7 +64,7 @@ def load_controller_config(custom_fpath=None, default_controller=None):
     if default_controller is not None:
 
         # Assert that requested default controller is in the available default controllers
-        from orca_gym.robosuite.controllers import ALL_CONTROLLERS
+        from orca_gym.adapters.robosuite.controllers import ALL_CONTROLLERS
 
         assert (
             default_controller in ALL_CONTROLLERS
@@ -146,7 +146,7 @@ def controller_factory(name, params):
         from .ik import InverseKinematicsController
 
         if pybullet_server is None:
-            from orca_gym.robosuite.controllers.ik import PyBulletServer
+            from orca_gym.adapters.robosuite.controllers.ik import PyBulletServer
 
             pybullet_server = PyBulletServer()
         return InverseKinematicsController(

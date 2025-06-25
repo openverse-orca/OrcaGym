@@ -8,7 +8,7 @@ import time
 
 from termcolor import colored
 
-import orca_gym.robosuite.macros as macros
+import orca_gym.adapters.robosuite.macros as macros
 
 LEVEL_COLORS = {
     logging.DEBUG: "green",
@@ -57,7 +57,7 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class DefaultLogger:
-    """Default logger class in orca_gym.robosuite.codebase."""
+    """Default logger class in orca_gym.adapters.robosuite.codebase."""
 
     def __init__(self, logger_name="robosuite_logs", console_logging_level="INFO", file_logging_level=None):
         """

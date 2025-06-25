@@ -5,7 +5,7 @@ from typing import Optional, Any, SupportsFloat, Tuple, Union
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
-import orca_gym.robosuite.utils.transform_utils as transform_utils
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 import time

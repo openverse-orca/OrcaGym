@@ -26,9 +26,9 @@ from os.path import join as pjoin
 import numpy as np
 
 import robosuite
-import orca_gym.robosuite.utils.transform_utils as T
-from orca_gym.robosuite.controllers.joint_vel import JointVelocityController
-from orca_gym.robosuite.utils.control_utils import *
+import orca_gym.adapters.robosuite.utils.transform_utils as T
+from orca_gym.adapters.robosuite.controllers.joint_vel import JointVelocityController
+from orca_gym.adapters.robosuite.utils.control_utils import *
 
 # Dict of supported ik robots
 SUPPORTED_IK_ROBOTS = {"Baxter", "Sawyer", "Panda"}
@@ -243,7 +243,7 @@ class InverseKinematicsController(JointVelocityController):
         )
 
         # import reference to the global pybullet server and load the urdfs
-        from orca_gym.robosuite.controllers import get_pybullet_server
+        from orca_gym.adapters.robosuite.controllers import get_pybullet_server
 
         if load_urdf:
             self.ik_robot = p.loadURDF(fileName=self.robot_urdf, useFixedBase=1, physicsClientId=self.bullet_server_id)

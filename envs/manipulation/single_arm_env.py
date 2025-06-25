@@ -5,10 +5,10 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
-from orca_gym.robosuite.controllers.controller_factory import controller_factory
-import orca_gym.robosuite.controllers.controller_config as controller_config
-import orca_gym.robosuite.utils.transform_utils as transform_utils
-from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.adapters.robosuite.controllers.controller_factory import controller_factory
+import orca_gym.adapters.robosuite.controllers.controller_config as controller_config
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
+from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
 

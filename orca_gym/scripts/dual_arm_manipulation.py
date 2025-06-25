@@ -13,7 +13,7 @@ from datetime import datetime
 
 import h5py
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
 from envs.manipulation.dual_arm_env import DualArmEnv, ControlDevice
 from examples.imitation.train_policy import train_policy

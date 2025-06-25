@@ -13,8 +13,8 @@ import h5py
 import numpy as np
 
 import robosuite
-import orca_gym.robosuite.utils.transform_utils as T
-from orca_gym.robosuite.wrappers import DomainRandomizationWrapper, VisualizationWrapper
+import orca_gym.adapters.robosuite.utils.transform_utils as T
+from orca_gym.adapters.robosuite.wrappers import DomainRandomizationWrapper, VisualizationWrapper
 
 
 def get_camera_intrinsic_matrix(sim, camera_name, camera_height, camera_width):
@@ -494,7 +494,7 @@ class DemoPlaybackCameraMover(CameraMover):
         env_info.update(default_args)
 
         # Create env
-        env = orca_gym.robosuite.make(**env_info)
+        env = orca_gym.adapters.robosuite.make(**env_info)
 
         # Optionally wrap with visualization wrapper
         if visualize_sites:
