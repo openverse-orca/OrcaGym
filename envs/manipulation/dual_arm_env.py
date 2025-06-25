@@ -1,5 +1,7 @@
 import random
+import re
 import time
+from colorama import Fore, Style
 import numpy as np
 
 from orca_gym.robomimic.robomimic_env import RobomimicEnv
@@ -474,7 +476,18 @@ class DualArmEnv(RobomimicEnv):
         # —— C) 如果是第一次 reset（非回放），执行一次 get_task —— #
         if self._run_mode == RunMode.TELEOPERATION:
             self.safe_get_task(self)
-            print(self._task.get_language_instruction())
+            instr = self._task.get_language_instruction()
+            m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
+            if m:
+                level, obj, goal = m.groups()
+                print(
+                    f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
+                    f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
+                    f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
+                )
+            else:
+                # 万一格式不符，回退到无色输出
+                print(instr)
         elif (not self._got_task) or updated_actors:
             if self._run_mode != RunMode.POLICY_NORMALIZED:
                 print("[ResetModel][C] calling get_task()")
