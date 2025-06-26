@@ -109,7 +109,7 @@ class DualArmEnv(RobomimicEnv):
         kwargs["task"] = self._task
         self._teleop_counter = 0
         self._got_task = False
-
+        self._spawned_object_list: list[str] = []
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -431,6 +431,13 @@ class DualArmEnv(RobomimicEnv):
 
 
     def reset_model(self) -> tuple[dict, dict]:
+        if not isinstance(self._spawned_object_list, list):
+            print("[Warn] _spawned_object_list was not list, resetting")
+            self._spawned_object_list = []
+        if not isinstance(self._playback_demo_bodies, list):
+            self._playback_demo_bodies = []
+        print("[Debug][reset_model] run_mode =", self._run_mode)
+        print("[Debug][reset_model] before anything, _spawned_object_list =", self._spawned_object_list)
         cfg = self._config
         updated_actors = False
         if self._run_mode == RunMode.TELEOPERATION and cfg.get("random_actor", False):
@@ -468,8 +475,67 @@ class DualArmEnv(RobomimicEnv):
                         raise RuntimeError("generate_actors 后 joint 未注册成功")
 
                 updated_actors = True
-                #self._debug_list_loaded_objects()
-        # —— B) 重置 robot & agents 内部状态 —— #
+        # —— A′) POLICY_NORMALIZED 下：如果 demo objects 变了，就 spawn 一次 —— #
+        elif self._run_mode == RunMode.POLICY_NORMALIZED:
+            # 1) 优先用 _playback_demo_bodies（录制时的物体名）
+            
+            if hasattr(self, "_playback_demo_bodies") and self._playback_demo_bodies:
+                def extract_short_name(full_name: str) -> str:
+                    if "_usda_" in full_name:
+                        return full_name.split("_usda_")[1]
+                    return full_name
+
+                current = [extract_short_name(name) for name in self._playback_demo_bodies]
+            else:
+                # 否则退化为从 self.objects 中解析
+                current = []
+                if hasattr(self, "objects") and len(self.objects) > 0:
+                    for e in self.objects:
+                        jn = e["joint_name"]
+                        if isinstance(jn, (bytes, bytearray)):
+                            jn = jn.decode("utf-8")
+                        current.append(jn.replace("_joint", ""))
+
+            # 2) 只有物体变化才重新spawn
+            if sorted(current) != sorted(self._spawned_object_list):
+                updated_actors = True
+
+                # 3) 写入配置，调用 load_config
+                cfg["object_bodys"]  = current.copy()
+                cfg["object_sites"]  = [f"{n}site"   for n in current]
+                cfg["object_joints"] = [f"{n}_joint" for n in current]
+                self._task.load_config(cfg)
+
+                # 4) 逐个 spawn，actor 和 spawnable 名字相同
+                for name in current:
+                    if name in cfg["actors"]:
+                        idx = cfg["actors"].index(name)
+                        spawnable_name = cfg["actors_spawnable"][idx]
+                        self._task.add_actor(name, spawnable_name)
+                    else:
+                        raise RuntimeError(f"[reset_model] name '{name}' not found in cfg['actors']")
+
+
+                # 5) 发布场景
+                self._task.publish_scene()
+
+                # 6) 等待第一个joint注册
+                first_joint = cfg["object_joints"][0]
+                for _ in range(100):
+                    try:
+                        self.joint(first_joint)
+                        break
+                    except:
+                        time.sleep(0.05)
+                else:
+                    raise RuntimeError("POLICY_NORMALIZED spawn 后 joint 未注册")
+
+                # 7) 记录已spawn的列表
+                self._spawned_object_list = current.copy()
+
+
+
+
         self._set_init_state()
         for ag in self._agents.values():
             ag.on_reset_model()
@@ -489,17 +555,12 @@ class DualArmEnv(RobomimicEnv):
                 # 万一格式不符，回退到无色输出
                 print(instr)
         elif (not self._got_task) or updated_actors:
-            if self._run_mode != RunMode.POLICY_NORMALIZED:
-                print("[ResetModel][C] calling get_task()")
-            self.safe_get_task(self)
-            self._got_task = True
-            print(self._task.get_language_instruction())
-            
-        else:
             print("[ResetModel][C] no get_task()")
 
         # —— D) 回放模式直接返回 —— #
         if self._run_mode == RunMode.POLICY_NORMALIZED:
+            # 把这次真正 spawn（或 replace_objects）后的 object 列表记下来
+            self._spawned_object_list = current.copy()
             print("[ResetModel][D] POLICY_NORMALIZED return early")
             obs = self._get_obs().copy()
             return obs, {"objects": self.objects}

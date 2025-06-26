@@ -1,0 +1,19 @@
+# shop1灯光配置文件
+level_name: "shop"
+random_light : true
+num_lights: 3
+random_light_position: false
+random_light_rotation: false
+lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
+lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
+light_center: [-6.35, 2.56, 2.32]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+actors_spawnable: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+center: [-6.35, 2.56, 2.32]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
