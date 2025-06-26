@@ -355,70 +355,56 @@ def playback_episode(env : DualArmEnv,
     print("Episode tunkated!")
 
 
-# def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
-#     """
-#     Reset 环境，然后把 demo_data['objects'] 和 demo_data['goals'] 恢复到场景里。
-#     """
-#     # 1) 先走一次基本 reset，让 self.objects 和 self.goals（如果存在）都被清空
-#     obs, info = env.reset(seed=42)
-
-#     # 2) 恢复 objects
-#     recorded_objs = demo_data['objects']
-#     env.unwrapped.replace_objects(recorded_objs)
-
-#     # 3) 恢复 goals
-#     recorded_goals = demo_data.get('goals')
-#     if recorded_goals is not None:
-#         # 调用你之前写的 replace_goals，会将结构化数组或纯数值数组都转换并赋给 self.goals
-#         env.unwrapped.replace_goals(recorded_goals)
-#     else:
-#         print("[Warning] demo_data 中没有 'goals'，无法恢复目标区域信息")
-
-#     # 4) 推一步仿真，让新的 objects/goals 生效
-#     env.unwrapped.mj_forward()
-
-#     # 5) 再取一次 obs，组装 info
-#     obs = env.unwrapped._get_obs().copy()
-#     info = {
-#         "object": recorded_objs,
-#         "goal":   recorded_goals
-#     }
-#     return obs, info
 
 def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     global _light_counter
-
-    # 1) 普通 reset，走 wrappers 和底层 reset_model（此时已经不会再自动发布灯了）
-    obs, info = env.reset(seed=42)
     core = env.unwrapped
 
-    # 2) 恢复录制好的 objects/goals
+    # 0) 先从demo_data取物体名写入，确保reset_model里能拿到
+    if "objects" in demo_data:
+        object_names = []
+        for e in demo_data["objects"]:
+            jn = e["joint_name"]
+            if isinstance(jn, (bytes, bytearray)):
+                jn = jn.decode("utf-8")
+            object_names.append(jn.replace("_joint", ""))
+        core._playback_demo_bodies = object_names  # 录制物体名列表
+        core.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
+
+    # 1) 清空spawned列表，确保reset_model重新spawn
+    core._spawned_object_list = []
+
+    # 2) 重置环境（会调用reset_model）
+    obs, info = env.reset(seed=42)
+
+    # 3) 恢复录制好的 objects/goals (用于场景替换)
     core.replace_objects(demo_data['objects'])
     if 'goals' in demo_data and demo_data['goals'] is not None:
         core.replace_goals(demo_data['goals'])
     core.mj_forward()
 
-    # 3) 周期性地注入光效
+    # 4) 光照和渲染等逻辑不变
     cfg = core._config
     if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
         light_idxs = core._task.generate_lights()
         core._task.publish_scene()
         for idx in light_idxs:
             core._task.set_light_info(core._task.lights[idx])
-        # 推一步、渲染，确保灯生效
         core.mj_forward()
         core.render()
         time.sleep(0.05)
 
     _light_counter += 1
 
-    # 4) 返回新的 obs/info
+    # 5) 返回观察和信息
     obs = core._get_obs().copy()
     info = {
         "object": demo_data['objects'],
         "goal":   demo_data.get('goals')
     }
     return obs, info
+
+
 
 
 
