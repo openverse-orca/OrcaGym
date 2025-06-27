@@ -240,7 +240,7 @@ def split_demos(dataset_file, output_dir, custom_name="demo"):
     print(f"All demonstrations from {dataset_file} have been saved to temporary directory {temp_dir}")
 
     total_files = len(demos)
-    total_video_duration_s = 0.0  # 改为累计视频时长(秒)
+    total_video_duration_s = 0.0
    
     if os.path.exists(temp_dir):
         for filename in os.listdir(temp_dir):
@@ -249,13 +249,11 @@ def split_demos(dataset_file, output_dir, custom_name="demo"):
                 with h5py.File(filepath, "r") as f:
                     if "data" in f and "obs" in f["data"] and "camera_head" in f["data"]["obs"]:
                         dataset = f["data"]["obs"]["camera_head"]
-                        # 计算视频时长(秒) = 帧数 / 帧率(假设30fps)
-                        fps = 30.0  # 默认帧率
+                        fps = 30.0
                         video_duration_s = dataset.shape[0] / fps
-                        total_video_duration_s += video_duration_s  # 累计时长(秒)
+                        total_video_duration_s += video_duration_s
 
     timestamp_str = "_".join(os.path.basename(dataset_file).split("_")[-2:])
-    # 修改目录名格式: 将camera_head_size_gb改为video_duration_s
     final_dir_name = f"{custom_name}_{original_file_size_gb}_{total_files}_{total_video_duration_s:.2f}s"
     final_dir = os.path.join(os.path.dirname(output_dir), final_dir_name)
     counter = 1
@@ -270,7 +268,6 @@ def merge_splits(base_dir, custom_name="demo"):
     合并相同custom_name的所有拆分结果，生成一个总目录
     格式与之前相同：自定义名字_原始文件大小GB_文件数量_所有obs/camera_head视频时长总和秒
     """
-    # 1. 查找所有匹配的拆分目录
     split_dirs = []
     for dirname in os.listdir(base_dir):
         if dirname.startswith(custom_name + "_") and not dirname.endswith("_merged_"):
@@ -279,23 +276,18 @@ def merge_splits(base_dir, custom_name="demo"):
     if not split_dirs:
         print(f"No split directories found for {custom_name}")
         return
-
-    # 2. 解析每个目录的元数据并累计
-    accumulated_size_gb = 0.0  # 仍然累计原始文件大小GB
+    accumulated_size_gb = 0.0
     accumulated_files = 0
-    accumulated_video_duration_s = 0.0  # 改为累计视频时长(秒)
+    accumulated_video_duration_s = 0.0
 
     for split_dir in split_dirs:
-        # 首先尝试从metadata.json读取数据
         metadata_file = os.path.join(split_dir, "metadata.json")
         if os.path.exists(metadata_file):
             with open(metadata_file, "r") as f:
                 metadata = json.load(f)
                 accumulated_size_gb += metadata["original_file_size_gb"]
                 accumulated_files += metadata["total_files"]
-                # 注意: 原始metadata中没有video_duration_s，需要从目录名解析
         else:
-            # 从目录名解析数据
             dir_basename = os.path.basename(split_dir)
             parts = [p for p in dir_basename.split("_") if p]
             
@@ -316,8 +308,6 @@ def merge_splits(base_dir, custom_name="demo"):
             except (ValueError, IndexError) as e:
                 print(f"Warning: Could not parse directory name {dir_basename}, skipping. Error: {str(e)}")
                 continue
-
-        # 重新计算video_duration_s(从文件计算，因为metadata中没有)
         if os.path.exists(split_dir):
             for filename in os.listdir(split_dir):
                 if filename.endswith(".hdf5"):
@@ -325,57 +315,43 @@ def merge_splits(base_dir, custom_name="demo"):
                     with h5py.File(filepath, "r") as f:
                         if "data" in f and "obs" in f["data"] and "camera_head" in f["data"]["obs"]:
                             dataset = f["data"]["obs"]["camera_head"]
-                            # 计算视频时长(秒) = 帧数 / 帧率(假设30fps)
-                            fps = 30.0  # 默认帧率
+                            fps = 30.0
                             video_duration_s = dataset.shape[0] / fps
-                            accumulated_video_duration_s += video_duration_s  # 累计时长(秒)
-
-    # 3. 创建合并目录
+                            accumulated_video_duration_s += video_duration_s
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # 修改目录名格式: 将camera_head_size_gb改为video_duration_s
     merged_dir_name = f"{custom_name}_{accumulated_size_gb:.2f}GB_{accumulated_files}_files_{accumulated_video_duration_s:.2f}s"
     merged_dir = os.path.join(base_dir, merged_dir_name)
     os.makedirs(merged_dir, exist_ok=True)
 
-    # 4. 合并所有文件 - 解决同名demo文件冲突
-    demo_file_counter = {}  # 记录每个demo文件名出现的次数
+    demo_file_counter = {}
 
     for split_dir in split_dirs:
         for filename in os.listdir(split_dir):
             src = os.path.join(split_dir, filename)
             
             if os.path.isdir(src):
-                # 直接复制整个目录
                 dst = os.path.join(merged_dir, filename)
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
-                # 如果是文件
                 if filename.endswith(".hdf5"):
-                    # 处理可能的同名demo文件
                     if filename in demo_file_counter:
-                        # 文件名已存在，添加计数器后缀
                         base_name = filename[:-5]
                         ext = ".hdf5"
                         new_filename = f"{base_name}_{demo_file_counter[filename]}{ext}"
                         demo_file_counter[filename] += 1
                         dst = os.path.join(merged_dir, new_filename)
                     else:
-                        # 第一次遇到这个文件名
                         demo_file_counter[filename] = 1
                         dst = os.path.join(merged_dir, filename)
-                    
-                    # 复制文件
+
                     shutil.copy2(src, dst)
                 else:
-                    # 其他文件直接复制
                     dst = os.path.join(merged_dir, filename)
                     shutil.copy2(src, dst)
-
-    # 5. 在合并目录中创建metadata.json
     metadata = {
         "original_file_size_gb": round(accumulated_size_gb, 2),
         "total_files": accumulated_files,
-        "total_video_duration_s": round(accumulated_video_duration_s, 2),  # 修改为视频时长(秒)
+        "total_video_duration_s": round(accumulated_video_duration_s, 2),
         "timestamp": timestamp_str
     }
     with open(os.path.join(merged_dir, "metadata.json"), "w") as f:

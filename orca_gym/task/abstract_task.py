@@ -12,12 +12,26 @@ LEVEL_RANGES = {
             "x": (0.2, 0.612),
             "y": (-0.4, 0.4),
             "z": (-0.2, 0.0),
+            "r": 0.1,
         },
         "yaodian": {
             "x": (0.44, 0.54),
             "y": (-0.4, 0.4),
             "z": (0.1, 0.15),
+            "r": 0.1,
         },
+        "kitchen": {
+            "x": (0.25, 0.5),
+            "y": (-0.4, 0.4),
+            "z": (-0.25, 0.0),
+            "r": 0.28,
+        },
+        "jiazi": {
+            "x": (0.55, 0.65),
+            "y": (-0.4, 0.4),
+            "z": (0.0, 0.1),
+            "r": 0.01,
+        }
         # 新关卡直接加一条
     }
 DEFAULT_CONFIG = {
@@ -175,6 +189,7 @@ class AbstractTask:
                 lx = np.random.uniform(*ranges["x"])
                 ly = np.random.uniform(*ranges["y"])
                 lz = np.random.uniform(*ranges["z"])
+                lr = ranges["r"]
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
@@ -187,7 +202,8 @@ class AbstractTask:
 
                 # 跳过落进目标的
                 goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
-                if np.linalg.norm(world_pos - goal0_pos) < 0.1:
+                # if np.linalg.norm(world_pos - goal0_pos) < 0.1:
+                if np.linalg.norm(world_pos - goal0_pos) < lr:
                     continue
 
                 # 跳过有碰撞的
