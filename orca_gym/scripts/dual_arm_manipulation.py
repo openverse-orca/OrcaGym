@@ -42,7 +42,7 @@ CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for OSC controller computation
 
 RGB_SIZE = (256, 256)
 CAMERA_CONFIG = {
-    # "camera_head": 7070,
+    "camera_head": 7070,
     # "camera_wrist_r": 7080,
     # "camera_wrist_l": 7090,
 }
