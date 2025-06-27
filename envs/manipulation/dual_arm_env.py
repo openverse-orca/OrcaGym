@@ -471,21 +471,23 @@ class DualArmEnv(RobomimicEnv):
     
         # ------------- POLICY_NORMALIZED 分支：直接早退 -------------
         if self._run_mode == RunMode.POLICY_NORMALIZED:
-            # （外部 reset_playback_env 已经通过 replace_objects/replace_goals
-            #  和 publish_scene/mj_forward 把场景恢复到 demo 状态）
-            # 再做一次状态初始化和 mj_forward，确保所有 site/joint 都有效。
+            # （此时 reset_playback_env 已经通过 safe_spawn + replace_objects/replace_goals
+            #  **把场景恢复到录制状态** 并 mj_forward() 过一遍）
+            # 再做一次 agent.on_reset_model + mj_forward 保证观察正常：
             self._set_init_state()
             for ag in self._agents.values():
                 ag.on_reset_model()
             self.mj_forward()
     
-            # 记录 spawned 列表 对齐 demo_bodies（可选）
+            # 对齐 spawned list
             self._spawned_object_list = list(getattr(self, "_playback_demo_bodies", []))
     
             print("[ResetModel][D] POLICY_NORMALIZED early return")
             obs = self._get_obs().copy()
-            # self.objects/self.goals 由 reset_playback_env 预先写好
-            return obs, {"objects": self.objects, "goals": self.goals}
+            return obs, {
+                "objects": getattr(self, "objects", None),
+                "goals":   getattr(self, "goals",   None),
+            }
     
         # ------------------ 其余分支 ------------------
         # （比如 TELEOPERATION 第一次或升级后需要走 get_task）
