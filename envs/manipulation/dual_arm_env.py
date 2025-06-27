@@ -110,6 +110,7 @@ class DualArmEnv(RobomimicEnv):
         self._teleop_counter = 0
         self._got_task = False
         self._spawned_object_list: list[str] = []
+        self._playback_demo_bodies = []
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -399,31 +400,31 @@ class DualArmEnv(RobomimicEnv):
         self._task.object_joints = full_jn
         #print("[Debug] after correction:", self._task.object_joints)
     
-    def safe_get_task(self, env, max_retries=100):
-        for attempt in range(1, max_retries+1):
+    def safe_get_task(self, env):
+        while True:
             # 1) 生成一次 task（包括随机摆放）
             self._task.get_task(env)
-
-            objs   = self._task.randomized_object_positions
-            # 假设只有一个 goal body，取第一个
+    
+            objs = self._task.randomized_object_positions
             goal_body = self._task.goal_bodys[0]
+    
             # 2) 拿它的轴对齐包围盒
             bbox = self.get_goal_bounding_box(goal_body)
             min_xy = bbox['min'][:2]
             max_xy = bbox['max'][:2]
-
+    
             bad = False
             for joint_name, qpos in objs.items():
                 obj_xy = qpos[:2]
-                # 如果在 min_xy—max_xy 区间内，就算“在目标区域”
                 if (min_xy <= obj_xy).all() and (obj_xy <= max_xy).all():
                     bad = True
                     break
-
+                
             if not bad:
-                return
-
-        raise RuntimeError("safe_get_task 多次重试失败，始终有物体落在目标包围盒内")
+                return  # 成功退出
+    
+            # 否则继续尝试
+    
 
 
 
@@ -431,169 +432,111 @@ class DualArmEnv(RobomimicEnv):
 
 
     def reset_model(self) -> tuple[dict, dict]:
-        if not isinstance(self._spawned_object_list, list):
-            print("[Warn] _spawned_object_list was not list, resetting")
-            self._spawned_object_list = []
-        if not isinstance(self._playback_demo_bodies, list):
-            self._playback_demo_bodies = []
-        print("[Debug][reset_model] run_mode =", self._run_mode)
-        print("[Debug][reset_model] before anything, _spawned_object_list =", self._spawned_object_list)
         cfg = self._config
         updated_actors = False
+    
+        # ---------------- TELEOPERATION 分支 ----------------
         if self._run_mode == RunMode.TELEOPERATION and cfg.get("random_actor", False):
             self._teleop_counter += 1
             if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
-                # 随机挑 3-5 个 prefab 的 short name（如 "salt","jar_01"……）
-                full      = cfg["actors"]
-                spawn     = cfg["actors_spawnable"]
-                total     = len(spawn)
-                n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
-                idxs      = random.sample(range(total), k=n_select)
-
-                # 根据索引分别取 actor_name 与 spawn_name
-                short_names = [full[i]  for i in idxs]
-                spawns      = [spawn[i] for i in idxs]
+                # 随机挑几个 actors
+                full   = cfg["actors"]
+                spawn  = cfg["actors_spawnable"]
+                idxs   = random.sample(range(len(spawn)), k=random.randint(3,5))
+                short_names = [ full[i] for i in idxs ]
+                spawns      = [ spawn[i] for i in idxs ]
     
-                # 只改 object_bodys/sites/joints 三项，保持 actors 原样
-                cfg["object_bodys"]  = list(short_names)
+                # 写回 cfg
+                cfg["object_bodys"]  = short_names
                 cfg["object_sites"]  = [f"{n}site"   for n in short_names]
                 cfg["object_joints"] = [f"{n}_joint" for n in short_names]
     
-                # 重新构 Task 并 spawn 出来
+                # spawn
                 self._task.load_config(cfg)
-                for actor_name, spawnable_name in zip(short_names, spawns):
-                    self._task.add_actor(actor_name, spawnable_name)
+                for a, s in zip(short_names, spawns):
+                    self._task.add_actor(a, s)
                 self._task.publish_scene()
+                # 等第一个 joint 注册
+                first = cfg["object_joints"][0]
                 for _ in range(100):
                     try:
-                        self.joint(cfg["object_joints"][0])
-                        #print("object_joints:", cfg["object_joints"][0])
-                        break
-                    except Exception:
-                            time.sleep(0.05)
-                else:
-                        raise RuntimeError("generate_actors 后 joint 未注册成功")
-
-                updated_actors = True
-        # —— A′) POLICY_NORMALIZED 下：如果 demo objects 变了，就 spawn 一次 —— #
-        elif self._run_mode == RunMode.POLICY_NORMALIZED:
-            # 1) 优先用 _playback_demo_bodies（录制时的物体名）
-            
-            if hasattr(self, "_playback_demo_bodies") and self._playback_demo_bodies:
-                def extract_short_name(full_name: str) -> str:
-                    if "_usda_" in full_name:
-                        return full_name.split("_usda_")[1]
-                    return full_name
-
-                current = [extract_short_name(name) for name in self._playback_demo_bodies]
-            else:
-                # 否则退化为从 self.objects 中解析
-                current = []
-                if hasattr(self, "objects") and len(self.objects) > 0:
-                    for e in self.objects:
-                        jn = e["joint_name"]
-                        if isinstance(jn, (bytes, bytearray)):
-                            jn = jn.decode("utf-8")
-                        current.append(jn.replace("_joint", ""))
-
-            # 2) 只有物体变化才重新spawn
-            if sorted(current) != sorted(self._spawned_object_list):
-                updated_actors = True
-
-                # 3) 写入配置，调用 load_config
-                cfg["object_bodys"]  = current.copy()
-                cfg["object_sites"]  = [f"{n}site"   for n in current]
-                cfg["object_joints"] = [f"{n}_joint" for n in current]
-                self._task.load_config(cfg)
-
-                # 4) 逐个 spawn，actor 和 spawnable 名字相同
-                for name in current:
-                    if name in cfg["actors"]:
-                        idx = cfg["actors"].index(name)
-                        spawnable_name = cfg["actors_spawnable"][idx]
-                        self._task.add_actor(name, spawnable_name)
-                    else:
-                        raise RuntimeError(f"[reset_model] name '{name}' not found in cfg['actors']")
-
-
-                # 5) 发布场景
-                self._task.publish_scene()
-
-                # 6) 等待第一个joint注册
-                first_joint = cfg["object_joints"][0]
-                for _ in range(100):
-                    try:
-                        self.joint(first_joint)
+                        self.joint(first)
                         break
                     except:
                         time.sleep(0.05)
                 else:
-                    raise RuntimeError("POLICY_NORMALIZED spawn 后 joint 未注册")
-
-                # 7) 记录已spawn的列表
-                self._spawned_object_list = current.copy()
-
-
-
-
-        self._set_init_state()
-        for ag in self._agents.values():
-            ag.on_reset_model()
-        # —— C) 如果是第一次 reset（非回放），执行一次 get_task —— #
-        if self._run_mode == RunMode.TELEOPERATION:
-            self.safe_get_task(self)
-            instr = self._task.get_language_instruction()
-            m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
-            if m:
-                level, obj, goal = m.groups()
-                print(
-                    f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
-                    f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
-                    f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
-                )
-            else:
-                # 万一格式不符，回退到无色输出
-                print(instr)
-        elif (not self._got_task) or updated_actors:
-            print("[ResetModel][C] no get_task()")
-
-        # —— D) 回放模式直接返回 —— #
+                    raise RuntimeError("generate_actors 后 joint 未注册成功")
+    
+                updated_actors = True
+    
+        # ------------- POLICY_NORMALIZED 分支：直接早退 -------------
         if self._run_mode == RunMode.POLICY_NORMALIZED:
-            # 把这次真正 spawn（或 replace_objects）后的 object 列表记下来
-            self._spawned_object_list = current.copy()
-            print("[ResetModel][D] POLICY_NORMALIZED return early")
+            # （外部 reset_playback_env 已经通过 replace_objects/replace_goals
+            #  和 publish_scene/mj_forward 把场景恢复到 demo 状态）
+            # 再做一次状态初始化和 mj_forward，确保所有 site/joint 都有效。
+            self._set_init_state()
+            for ag in self._agents.values():
+                ag.on_reset_model()
+            self.mj_forward()
+    
+            # 记录 spawned 列表 对齐 demo_bodies（可选）
+            self._spawned_object_list = list(getattr(self, "_playback_demo_bodies", []))
+    
+            print("[ResetModel][D] POLICY_NORMALIZED early return")
             obs = self._get_obs().copy()
-            return obs, {"objects": self.objects}
-
-        # —— E) 构造本轮的 objects/goals 信息，推进模拟，返回 obs/info —— #
-        rand_objs = self._task.randomized_object_positions
+            # self.objects/self.goals 由 reset_playback_env 预先写好
+            return obs, {"objects": self.objects, "goals": self.goals}
+    
+        # ------------------ 其余分支 ------------------
+        # （比如 TELEOPERATION 第一次或升级后需要走 get_task）
+    
+        if self._run_mode == RunMode.TELEOPERATION:
+            # TELEOPERATION 模式下第一次或 spawn 后，调用一次 get_task
+            self.safe_get_task(self)
+            print(self._task.get_language_instruction())
+            updated_actors = True
+    
+        # —— 最后对“正常”模式构造 objects/goals —— #
+        rand_objs  = self._task.randomized_object_positions
         rand_goals = self._task.randomized_goal_positions
-        #print("object_joints:", self._task.object_joints)
-
+    
         # objects structured array
-        obj_dtype = np.dtype([("joint_name","U100"),("position","f4",3),("orientation","f4",4)])
+        obj_dtype = np.dtype([
+            ("joint_name",  "U100"),
+            ("position",    "f4", 3),
+            ("orientation", "f4", 4),
+        ])
         self.objects = np.array(
-            [(jn, pos[:3].tolist(), pos[3:].tolist()) for jn,pos in rand_objs.items()],
-            dtype=obj_dtype
+            [(jn, pos[:3].tolist(), pos[3:].tolist())
+             for jn, pos in rand_objs.items()],
+            dtype=obj_dtype,
         )
-
+    
         # goals structured array
         goal_dtype = np.dtype([
-            ("joint_name","U100"),("position","f4",3),("orientation","f4",4),
-            ("min","f4",3),("max","f4",3),("size","f4",3)
+            ("joint_name",  "U100"),
+            ("position",    "f4", 3),
+            ("orientation", "f4", 4),
+            ("min",         "f4", 3),
+            ("max",         "f4", 3),
+            ("size",        "f4", 3),
         ])
         entries, _ = self.process_goals(rand_goals)
         self.goals = np.array(
-            [(
-                e["joint_name"], e["position"], e["orientation"],
-                e["min"], e["max"], e["size"]
-            ) for e in entries],
-            dtype=goal_dtype
+            [
+                (e["joint_name"], e["position"], e["orientation"],
+                 e["min"], e["max"], e["size"])
+                for e in entries
+            ],
+            dtype=goal_dtype,
         )
-
+    
+        # 推进一步仿真，返回 obs/info
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {"objects": self.objects, "goals": self.goals}
+    
+
 
 
 

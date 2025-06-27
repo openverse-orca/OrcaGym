@@ -12,6 +12,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime
 
 import h5py
+import scipy as sp
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
@@ -40,7 +41,7 @@ FRAME_SKIP = 20
 REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for python program loop
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for OSC controller computation
 
-RGB_SIZE = (256, 256)
+RGB_SIZE = (1280, 720)
 CAMERA_CONFIG = {
     "camera_head": 7070,
     # "camera_wrist_r": 7080,
@@ -354,55 +355,195 @@ def playback_episode(env : DualArmEnv,
     
     print("Episode tunkated!")
 
+def all_object_joints_exist(cfg, model) -> bool:
+    """
+    检查 cfg 中定义的 object_joints 是否都存在于 model 的 joint 字典中。
+    """
+    expected_joints = cfg.get("object_joints", [])
+    model_joints = model.get_joint_dict().keys()
 
+    missing = [j for j in expected_joints if not any(j in mj for mj in model_joints)]
+    
+    if missing:
+        print("[Check] Missing joints:")
+        for j in missing:
+            print(f"  - {j} (expected but not found in model)")
+        return False
+
+    return True
+
+
+# --------------------------------------------------
+# safe_spawn：一次性 spawn demo 里所有物体
+# --------------------------------------------------
+# 最开始定义
+def safe_spawn(core: DualArmEnv,
+               full_joints: list[str],
+               short_names: list[str],
+               spawnables: list[str],
+               max_retries: int = 3):
+    cfg = core._config
+    print("Spawn config:", cfg)
+
+
+    cfg["object_bodys"]  = short_names.copy()
+    cfg["object_sites"]  = [f"{n}site"   for n in short_names]
+    cfg["object_joints"] = [f"{n}_joint" for n in short_names]
+
+    print(f"[Spawn] Will spawn {len(short_names)} objects:")
+    for n in short_names:
+        print(f"  - {n}")
+
+    # 检查是否可以跳过 spawn
+    if all_object_joints_exist(cfg, core.model) and core._spawned_object_list == short_names:
+        print("[Info] skip spawn: object list not changed and joints exist in model.")
+        return
+
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            core._task.load_config(cfg)
+            for full, spawnable in zip(full_joints, spawnables):
+                # print("→ final full_joint_names:", full_joints)
+                # print("→ final spawnables:", spawnables)
+                # print(f"------- full: {full}\n-------spawnable: {spawnable}")
+                core._task.add_actor(spawnable, spawnable)
+            core._task.publish_scene()
+            if cfg.get("random_light", False):
+                light_idxs = core._task.generate_lights()
+                for idx in light_idxs:
+                    core._task.set_light_info(core._task.lights[idx])
+                # 推进模拟并渲染一次，保证灯光生效
+                core.mj_forward()
+                core.render()
+
+            core._spawned_object_list = short_names.copy()
+
+            # Debug 打印
+            print("[Debug] Joints after spawn:")
+            joint_names = core.model.get_joint_dict().keys()  # 获取所有关节名
+            for j in joint_names:
+                try:
+                    jid = core.model.joint_name2id(j)  # 通过名称获取关节ID
+                    print(f"  - {j} (id: {jid})")
+                except KeyError:
+                    print(f"  - {j} (id not found)")
+
+
+
+
+            return
+        except Exception as e:
+            print(f"[Warn] safe_spawn attempt {attempt} failed: {e}")
+            time.sleep(0.1)
+
+    raise RuntimeError("safe_spawn: all retries failed")
+
+
+
+
+
+
+
+
+
+# --------------------------------------------------
+# reset_playback_env：增广时的 reset 流程
+# --------------------------------------------------
+# 在文件顶部引入 safe_spawn
+# from ... import safe_spawn
 
 def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     global _light_counter
     core = env.unwrapped
 
-    # 0) 先从demo_data取物体名写入，确保reset_model里能拿到
-    if "objects" in demo_data:
-        object_names = []
-        for e in demo_data["objects"]:
-            jn = e["joint_name"]
-            if isinstance(jn, (bytes, bytearray)):
-                jn = jn.decode("utf-8")
-            object_names.append(jn.replace("_joint", ""))
-        core._playback_demo_bodies = object_names  # 录制物体名列表
-        core.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
+    # 0) 提取 joint 全名和短名
+    demo_full_joints = []
+    demo_bodies = []
+    for e in demo_data["objects"]:
+        jn = e["joint_name"]
+        if isinstance(jn, (bytes, bytearray)):
+            jn = jn.decode("utf-8")
+        demo_full_joints.append(jn)
+        demo_bodies.append(jn.split("_usda_")[-1].replace("_joint", ""))
 
-    # 1) 清空spawned列表，确保reset_model重新spawn
-    core._spawned_object_list = []
+    # 1) 存入 playback 路径
+    core._playback_demo_full_joints = demo_full_joints
+    core._playback_demo_bodies = demo_bodies
+    core._spawned_object_list = []  # 触发 spawn
 
-    # 2) 重置环境（会调用reset_model）
+    # 3) 执行一次环境 reset（用于 mj_model 刷新）
     obs, info = env.reset(seed=42)
 
-    # 3) 恢复录制好的 objects/goals (用于场景替换)
-    core.replace_objects(demo_data['objects'])
-    if 'goals' in demo_data and demo_data['goals'] is not None:
-        core.replace_goals(demo_data['goals'])
+    # 4) Spawn 所有物体
+    spawnables = core._config.get("actors_spawnable", [])  # or another safe source
+    demo_bodies = [jn.split("_usda_")[-1].replace("_joint", "") for jn in demo_full_joints]
+    actual_spawnables = [s for s in spawnables if s in demo_bodies]
+
+    safe_spawn(core, demo_full_joints, demo_bodies, actual_spawnables)
+
+    # 5) 写回 qpos 和 goal
+    core.replace_objects(demo_data["objects"])
+    if demo_data.get("goals"):
+        core.replace_goals(demo_data["goals"])
+        core.goals = demo_data["goals"]
     core.mj_forward()
 
-    # 4) 光照和渲染等逻辑不变
-    cfg = core._config
-    if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
-        light_idxs = core._task.generate_lights()
-        core._task.publish_scene()
-        for idx in light_idxs:
-            core._task.set_light_info(core._task.lights[idx])
-        core.mj_forward()
-        core.render()
-        time.sleep(0.05)
-
-    _light_counter += 1
-
-    # 5) 返回观察和信息
-    obs = core._get_obs().copy()
-    info = {
-        "object": demo_data['objects'],
-        "goal":   demo_data.get('goals')
+    # 6) 返回
+    return core._get_obs().copy(), {
+        "object": demo_data["objects"],
+        "goal": demo_data.get("goals"),
     }
-    return obs, info
+
+
+
+# def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
+#     global _light_counter
+#     core = env.unwrapped
+
+#     # 0) 先从demo_data取物体名写入，确保reset_model里能拿到
+#     if "objects" in demo_data:
+#         object_names = []
+#         for e in demo_data["objects"]:
+#             jn = e["joint_name"]
+#             if isinstance(jn, (bytes, bytearray)):
+#                 jn = jn.decode("utf-8")
+#             object_names.append(jn.replace("_joint", ""))
+#         core._playback_demo_bodies = object_names  # 录制物体名列表
+#         core.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
+
+#     # 1) 清空spawned列表，确保reset_model重新spawn
+#     core._spawned_object_list = []
+
+#     # 2) 重置环境（会调用reset_model）
+#     obs, info = env.reset(seed=42)
+
+#     # 3) 恢复录制好的 objects/goals (用于场景替换)
+#     core.replace_objects(demo_data['objects'])
+#     if 'goals' in demo_data and demo_data['goals'] is not None:
+#         core.replace_goals(demo_data['goals'])
+#     core.mj_forward()
+
+#     # 4) 光照和渲染等逻辑不变
+#     cfg = core._config
+#     if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
+#         light_idxs = core._task.generate_lights()
+#         core._task.publish_scene()
+#         for idx in light_idxs:
+#             core._task.set_light_info(core._task.lights[idx])
+#         core.mj_forward()
+#         core.render()
+#         time.sleep(0.05)
+
+#     _light_counter += 1
+
+#     # 5) 返回观察和信息
+#     obs = core._get_obs().copy()
+#     info = {
+#         "object": demo_data['objects'],
+#         "goal":   demo_data.get('goals')
+#     }
+#     return obs, info
 
 
 
