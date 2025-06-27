@@ -113,6 +113,24 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     async def _get_body_manipulation_movement(self):
         return await self.gym.get_body_manipulation_movement()
     
+    def begin_save_video(self, file_path: str):
+        return self.loop.run_until_complete(self._begin_save_video(file_path))
+
+    async def _begin_save_video(self, file_path):
+        return await self.gym.begin_save_video(file_path)
+
+    def stop_save_video(self):
+        return self.loop.run_until_complete(self._stop_save_video())
+
+    async def _stop_save_video(self):
+        return await self.gym.stop_save_video()
+
+    def get_current_frame(self) -> int:
+        return self.loop.run_until_complete(self._get_current_frame())
+
+    async def _get_current_frame(self):
+        return await self.gym.get_current_frame()
+
     def get_body_manipulation_movement(self):
         actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
         delta_pos = actor_movement["delta_pos"]

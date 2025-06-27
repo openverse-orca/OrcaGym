@@ -1,3 +1,4 @@
+import cv2
 import robomimic.envs.env_base as EB
 
 import h5py
@@ -23,6 +24,9 @@ class DatasetWriter:
             reader = DatasetReader(self.file_path)
             self._env_args = reader._get_env_args()
             return
+
+        self.mp4_save_path : str = None
+
 
         self._env_args = {
             "env_name": env_name,
@@ -52,6 +56,17 @@ class DatasetWriter:
             data_group = f['data']
             data_group.attrs['env_args'] = json.dumps(self._env_args)
 
+    def get_cur_demo_name(self) -> str:
+        with h5py.File(self.file_path, 'r') as f:
+            data_group = f['data']
+            demo_count = data_group.attrs['demo_count']
+
+        return f'demo_{demo_count:05d}'  # 返回当前演示的名称格式
+    
+    def get_mp4_save_path(self) -> str:
+        self.mp4_save_path = os.path.join(self.file_path.removesuffix('.hdf5'), self.get_cur_demo_name())
+        return self.mp4_save_path
+
     def add_demo_data(self, demo_data, model_file=None):
         """
         添加一个新的演示（trajectory）。
@@ -78,10 +93,12 @@ class DatasetWriter:
             data_group = f['data']
 
             # 获取当前的演示计数和总样本数
-            demo_count = data_group.attrs['demo_count']
             total_samples = data_group.attrs['total']
 
-            demo_name = f'demo_{demo_count:05d}'   # 保存10万个演示
+            demo_name = self.get_cur_demo_name()   # 保存10万个演示
+
+            demo_count = data_group.attrs['demo_count']  # 获取当前演示计数
+
             demo_group = data_group.create_group(demo_name)
             num_samples = demo_data['actions'].shape[0]
             demo_group.attrs['num_samples'] = num_samples
@@ -89,23 +106,20 @@ class DatasetWriter:
             if model_file:
                 demo_group.attrs['model_file'] = model_file
 
-            # 存储数据集
-            for key in ['states', 'actions', 'rewards', 'dones', 'goals', 'timesteps', 'language_instruction', 'objects']:
-                data = demo_data.get(key)
-                if data is not None:
-                    demo_group.create_dataset(key, data=data)
+
+            for key in ['states', 'actions', 'camera_frames', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps']:
+                if key in demo_data:
+                    demo_group.create_dataset(key, data=demo_data[key])
 
             # 处理 obs
             obs_group = demo_group.create_group('obs')
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data, compression="gzip", compression_opts=4)
 
-            if 'camera_frames' in demo_data:
-                camera_frames = demo_data['camera_frames']
-                for camera_name, frames in camera_frames.items():
-                    camera_group = demo_group.create_group(camera_name)
-                    for i, frame in enumerate(frames):
-                        camera_group.create_dataset(f'frame_{i:05d}', data=frame, compression="gzip", compression_opts=4)
+            # 处理 camera_frames
+            # fps = demo_data['timesteps'].shape[0] // (demo_data['timesteps'][-1] - demo_data['timesteps'][0])
+            # print("fps: ", fps)
+            # self.save_camera_video(demo_data['camera_frames'], demo_name, fps)
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
@@ -190,6 +204,34 @@ class DatasetWriter:
         由于每次操作都已保存并关闭文件，因此此方法可为空或用于其他清理操作。
         """
         pass  # 在此示例中，无需执行任何操作
+    
+    def save_camera_video(self, camera_frames, demo_name, fps):
+        """
+        保存相机视频帧到指定演示的相机组中。
+
+        参数：
+        - demo_name: 演示名称。
+        - camera_name: 相机名称。
+        - video_frames: 视频帧列表，每帧为 numpy 数组。
+        """
+
+        # mp4 save path: ${h5file_path}/demo_name/camera_name.mp4
+    
+        for camera_name, frames in camera_frames.items():
+            mp4_save_path = os.path.join(self.file_path.removesuffix('.hdf5'), demo_name)
+            if not os.path.exists(mp4_save_path):
+                os.makedirs(mp4_save_path, exist_ok=True)
+            video_save_path = os.path.join(mp4_save_path, f"{camera_name}.mp4")
+            print(f"Saving video for {camera_name} at {video_save_path}")
+            frame_height, frame_width = frames[0].shape[:2]
+            isColor = (frames[0].ndim == 3)
+            
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_save_path, fourcc, fps, (frame_width, frame_height), isColor=isColor)
+            for frame in frames:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                out.write(frame)
+            out.release()
 
 class DatasetReader:
     def __init__(self, file_path):

@@ -94,6 +94,21 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.SetMaterialInfoResponse.FromString,
                 _registered_method=True)
+        self.BeginSaveMp4File = channel.unary_unary(
+                '/MujocoMessage.GrpcService/BeginSaveMp4File',
+                request_serializer=mjc__message__pb2.BeginSaveMp4FileRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.BeginSaveMp4FileResponse.FromString,
+                _registered_method=True)
+        self.StopSaveMp4File = channel.unary_unary(
+                '/MujocoMessage.GrpcService/StopSaveMp4File',
+                request_serializer=mjc__message__pb2.StopSaveMp4FileRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.StopSaveMp4FileResponse.FromString,
+                _registered_method=True)
+        self.GetCurrentFrameIndex = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetCurrentFrameIndex',
+                request_serializer=mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
+                _registered_method=True)
         self.GetKeyPressedEvents = channel.unary_unary(
                 '/MujocoMessage.GrpcService/GetKeyPressedEvents',
                 request_serializer=mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
@@ -503,6 +518,24 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetMaterialInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BeginSaveMp4File(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StopSaveMp4File(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCurrentFrameIndex(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -982,6 +1015,21 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetMaterialInfo,
                     request_deserializer=mjc__message__pb2.SetMaterialInfoRequest.FromString,
                     response_serializer=mjc__message__pb2.SetMaterialInfoResponse.SerializeToString,
+            ),
+            'BeginSaveMp4File': grpc.unary_unary_rpc_method_handler(
+                    servicer.BeginSaveMp4File,
+                    request_deserializer=mjc__message__pb2.BeginSaveMp4FileRequest.FromString,
+                    response_serializer=mjc__message__pb2.BeginSaveMp4FileResponse.SerializeToString,
+            ),
+            'StopSaveMp4File': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopSaveMp4File,
+                    request_deserializer=mjc__message__pb2.StopSaveMp4FileRequest.FromString,
+                    response_serializer=mjc__message__pb2.StopSaveMp4FileResponse.SerializeToString,
+            ),
+            'GetCurrentFrameIndex': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCurrentFrameIndex,
+                    request_deserializer=mjc__message__pb2.GetCurrentFrameIndexRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetCurrentFrameIndexResponse.SerializeToString,
             ),
             'GetKeyPressedEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.GetKeyPressedEvents,
@@ -1643,6 +1691,87 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/SetMaterialInfo',
             mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
             mjc__message__pb2.SetMaterialInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BeginSaveMp4File(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/BeginSaveMp4File',
+            mjc__message__pb2.BeginSaveMp4FileRequest.SerializeToString,
+            mjc__message__pb2.BeginSaveMp4FileResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StopSaveMp4File(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/StopSaveMp4File',
+            mjc__message__pb2.StopSaveMp4FileRequest.SerializeToString,
+            mjc__message__pb2.StopSaveMp4FileResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetCurrentFrameIndex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetCurrentFrameIndex',
+            mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
+            mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
             options,
             channel_credentials,
             insecure,
