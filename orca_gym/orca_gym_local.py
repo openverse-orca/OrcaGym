@@ -173,6 +173,23 @@ class OrcaGymLocal(OrcaGymBase):
             for child in node:
                 await self.process_xml_node(child)
         return
+    
+    async def begin_save_video(self, file_path):
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
+        response = await self.stub.BeginSaveMp4File(request)
+        if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
+            print(f"Video saving started at {file_path}")
+        else:
+            print(f"Failed to start video saving: {response.error_message}")
+
+    async def stop_save_video(self):
+        request =  mjc_message_pb2.StopSaveMp4FileRequest()
+        await self.stub.StopSaveMp4File(request)
+
+    async def get_current_frame(self)-> int:
+        request = mjc_message_pb2.GetCurrentFrameIndexRequest()
+        response = await self.stub.GetCurrentFrameIndex(request)
+        return response.current_frame
 
     @property
     def xml_file_dir(self):
@@ -1023,3 +1040,4 @@ class OrcaGymLocal(OrcaGymBase):
         quat_odom = rot.as_quat()
 
         return quat_odom.astype(np.float32)
+

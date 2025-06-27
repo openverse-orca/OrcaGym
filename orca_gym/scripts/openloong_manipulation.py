@@ -90,7 +90,7 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 
-def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb_size : tuple = (256, 256), action_step : int = 1):
+def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], dataset_writer : DatasetWriter,  rgb_size : tuple = (256, 256), action_step : int = 1):
     """_summary_
 
     Args:
@@ -116,9 +116,10 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
     info_list = []    
     terminated_times = 0
     in_goal_list = [] 
-    camera_frames = {camera.name: [] for camera in cameras}
+    camera_frame_index = []
     timestep_list = []
     action_step_taken = 0
+    saving_mp4 = False
     while True:
         start_time = datetime.now()
 
@@ -138,6 +139,16 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
         if action_step_taken >= action_step:        
             action_step_taken = 0
             if task_status in [TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.BEGIN]:
+                if task_status == TaskStatus.BEGIN:
+                    if saving_mp4 == False:
+                        mp4_save_path = dataset_writer.get_mp4_save_path()
+                        env.unwrapped.begin_save_video(mp4_save_path)
+                        saving_mp4 = True
+                        camera_frame_index.append(env.unwrapped.get_current_frame())
+                        
+                    else:
+                        camera_frame_index.append(env.unwrapped.get_current_frame())
+
                 if task_status == TaskStatus.SUCCESS:
                     goal_info = info["goal"]
                     object_info = info["object"]
@@ -169,6 +180,15 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
                         if not in_goal:
                             info['task_status'] = TaskStatus.FAILURE
                             print("⚠️ 标记为 FAILURE: 物体未进入目标区域。")
+                    
+                    env.unwrapped.stop_save_video()
+                    saving_mp4 = False
+                elif task_status == TaskStatus.FAILURE:
+                    env.unwrapped.stop_save_video()
+                    saving_mp4 = False
+
+
+
                 for obs_key, obs_data in obs.items():
                     obs_list[obs_key].append(obs_data)
                     
@@ -176,16 +196,10 @@ def teleoperation_episode(env : OpenLoongEnv, cameras : list[CameraWrapper], rgb
                 done_list.append(0 if not terminated else 1)
                 info_list.append(info)
                 terminated_times = terminated_times + 1 if terminated else 0
+                timestep_list.append(info['time_step'])
                 
-                for camera in cameras:
-                    camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
-                    camera_frames[camera.name].append(camera_frame)
-                
-            # print("Timestep: ", env.unwrapped.gym.data.time)
-            timestep_list.append(env.unwrapped.gym.data.time)
-
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list
 
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < REALTIME_STEP:
@@ -289,7 +303,7 @@ def do_teleoperation(env,
         camera.start()
     
     while True:
-        obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list = teleoperation_episode(env, cameras, rgb_size, action_step)
+        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list = teleoperation_episode(env, cameras, dataset_writer, rgb_size, action_step)
         last_done = (len(done_list)>0 and done_list[-1]==1)
         last_in_goal = (len(in_goal_list)>0 and in_goal_list[-1])
         save_record = last_done and last_in_goal
@@ -301,14 +315,7 @@ def do_teleoperation(env,
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
             
-            if obs_camera:
-                for camera in cameras:
-                    obs_list[camera.name] = camera_frames[camera.name]
-                    camera_frames[camera.name] = []         
-                empty_camera_frames = {}
-                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, info_list[0]["language_instruction"])
-            else:
-                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, info_list[0]["language_instruction"])
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"])
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -853,7 +860,7 @@ def run_openloong_sim(args, project_root : str = None, current_file_path : str =
 
     # 启动 Monitor 子进程
     ports = [
-        7070, 7080, 7090,        # Agent1
+        7070, 7090,        # Agent1
         # 8070, 8080, 8090,        # Agent2
     ]
     monitor_processes = []

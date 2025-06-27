@@ -346,12 +346,14 @@ class OpenLoongEnv(RobomimicEnv):
 
         obs = self._get_obs().copy()
 
+        time_step = self.data.time
         info = {"state": self.get_state(),
                 "action": scaled_action,
                 "object": self.objects,  # 提取第一个对象的位置
                 "goal": self.goals,
                 "task_status": self._task_status,
-                "language_instruction": self._task.get_language_instruction()}
+                "language_instruction": self._task.get_language_instruction(),
+                "time_step": time_step,}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)
@@ -864,11 +866,11 @@ class OpenLoongAgent(AgentBase):
         
         dummy_joint_id = env.model.joint_name2id(env.joint("dummy_joint", id))
 
-        self._neck_joint_names = [env.joint("J_head_yaw", id), env.joint("J_head_pitch", id)]
-        self._neck_actuator_names = [env.actuator("M_head_yaw", id), env.actuator("M_head_pitch", id)]
-        self._neck_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
-        self._neck_neutral_joint_values = np.array([0, -0.7854])
-        self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
+        # self._neck_joint_names = [env.joint("J_head_yaw", id), env.joint("J_head_pitch", id)]
+        # self._neck_actuator_names = [env.actuator("M_head_yaw", id), env.actuator("M_head_pitch", id)]
+        # self._neck_actuator_id = [env.model.actuator_name2id(actuator_name) for actuator_name in self._neck_actuator_names]
+        # self._neck_neutral_joint_values = np.array([0, -0.7854])
+        # self._neck_ctrl_values = {"yaw": 0.0, "pitch": -0.7854}
         try:
             wheel_r_name = env.actuator("M_wheel_r", id)
             wheel_l_name = env.actuator("M_wheel_l", id)
@@ -931,7 +933,7 @@ class OpenLoongAgent(AgentBase):
 
         # control range
         self._all_ctrlrange = env.model.get_actuator_ctrlrange()
-        neck_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._neck_actuator_id]
+        # neck_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._neck_actuator_id]
         # print("ctrl_range: ", neck_ctrl_range)
 
         r_ctrl_range = [self._all_ctrlrange[actoator_id] for actoator_id in self._r_arm_actuator_id]
@@ -955,9 +957,9 @@ class OpenLoongAgent(AgentBase):
         self._initial_neck_site_xpos = site_dict[NECK_NAME]['xpos']
         self._initial_neck_site_xquat = site_dict[NECK_NAME]['xquat']
 
-        self.set_neck_mocap(env, self._initial_neck_site_xpos, self._initial_neck_site_xquat)
-        self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
-        self._neck_angle_x, self._neck_angle_y = 0, 0
+        # self.set_neck_mocap(env, self._initial_neck_site_xpos, self._initial_neck_site_xquat)
+        # self._mocap_neck_xpos, self._mocap_neck_xquat = self._initial_neck_site_xpos, self._initial_neck_site_xquat
+        # self._neck_angle_x, self._neck_angle_y = 0, 0
 
         self._ee_site_l  = env.site("ee_center_site", id)
         site_dict = env.query_site_pos_and_quat([self._ee_site_l])
@@ -983,30 +985,30 @@ class OpenLoongAgent(AgentBase):
 
         # -----------------------------
         # Neck controller
-        self._neck_controller_config = controller_config.load_config("osc_pose")
-        # print("controller_config: ", self.controller_config)
+        # self._neck_controller_config = controller_config.load_config("osc_pose")
+        # # print("controller_config: ", self.controller_config)
 
-        # Add to the controller dict additional relevant params:
-        #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
-        #   policy (control) freq, and ndim (# joints)
-        self._neck_controller_config["robot_name"] = self.name
-        self._neck_controller_config["sim"] = env.gym
-        self._neck_controller_config["eef_name"] = NECK_NAME
-        # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
-        qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._neck_joint_names)
-        self._neck_controller_config["joint_indexes"] = {
-            "joints": self._neck_joint_names,
-            "qpos": qpos_offsets,
-            "qvel": qvel_offsets,
-        }
-        self._neck_controller_config["actuator_range"] = neck_ctrl_range
-        self._neck_controller_config["policy_freq"] = env.control_freq
-        self._neck_controller_config["ndim"] = len(self._neck_joint_names)
-        self._neck_controller_config["control_delta"] = False
+        # # Add to the controller dict additional relevant params:
+        # #   the robot name, mujoco sim, eef_name, joint_indexes, timestep (model) freq,
+        # #   policy (control) freq, and ndim (# joints)
+        # self._neck_controller_config["robot_name"] = self.name
+        # self._neck_controller_config["sim"] = env.gym
+        # self._neck_controller_config["eef_name"] = NECK_NAME
+        # # self.controller_config["eef_rot_offset"] = self.eef_rot_offset
+        # qpos_offsets, qvel_offsets, _ = env.query_joint_offsets(self._neck_joint_names)
+        # self._neck_controller_config["joint_indexes"] = {
+        #     "joints": self._neck_joint_names,
+        #     "qpos": qpos_offsets,
+        #     "qvel": qvel_offsets,
+        # }
+        # self._neck_controller_config["actuator_range"] = neck_ctrl_range
+        # self._neck_controller_config["policy_freq"] = env.control_freq
+        # self._neck_controller_config["ndim"] = len(self._neck_joint_names)
+        # self._neck_controller_config["control_delta"] = False
 
 
-        self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
-        self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
+        # self._neck_controller = controller_factory(self._neck_controller_config["type"], self._neck_controller_config)
+        # self._neck_controller.update_initial_joints(self._neck_neutral_joint_values)
 
         if env.action_use_motor():
             # -----------------------------
@@ -1084,8 +1086,8 @@ class OpenLoongAgent(AgentBase):
             arm_joint_qpos[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])     
-        for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
-            arm_joint_qpos[name] = np.array([value])
+        # for name, value in zip(self._neck_joint_names, self._neck_neutral_joint_values):
+        #     arm_joint_qpos[name] = np.array([value])
         env.set_joint_qpos(arm_joint_qpos)        
 
     def set_init_ctrl(self, env: OpenLoongEnv) -> None:
@@ -1102,7 +1104,7 @@ class OpenLoongAgent(AgentBase):
         self._T_init_base = None
         self._reset_grasp_mocap(env)
         self._reset_gripper()
-        self._reset_neck_mocap(env)
+        # self._reset_neck_mocap(env)
 
     def set_neck_mocap(self, env: OpenLoongEnv, position, orientation) -> None:
         mocap_pos_and_quat_dict = {env.mocap("neckMocap", self.id): {'pos': position, 'quat': orientation}}
@@ -1356,7 +1358,7 @@ class OpenLoongAgent(AgentBase):
 
         self._set_gripper_ctrl_r(env, joystick_state)
         self._set_gripper_ctrl_l(env, joystick_state)
-        self._set_head_ctrl(env, joystick_state)
+        # self._set_head_ctrl(env, joystick_state)
         self._set_wheel_ctrl(env, joystick_state)
         self._set_task_status(env, joystick_state)
 

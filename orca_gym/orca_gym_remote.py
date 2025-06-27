@@ -807,3 +807,20 @@ class OrcaGymRemote(OrcaGymBase):
             for site in response.site_info
         }
         return site_dict    
+    
+    async def begin_save_video(self, file_path):
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
+        response = await self.stub.BeginSaveMp4File(request)
+        if response.success:
+            print(f"Video saving started at {file_path}")
+        else:
+            print(f"Failed to start video saving: {response.error_message}")
+
+    async def stop_save_video(self):
+        request = mjc_message_pb2.StopSaveMp4FileRequest()
+        await self.stub.StopSaveMp4File(request)
+        
+    async def get_current_frame(self):
+        request = mjc_message_pb2.GetCurrentFrameIndexRequest()
+        response = await self.stub.GetCurrentFrameIndex(request)
+        return response.current_frame
