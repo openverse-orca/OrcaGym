@@ -9,6 +9,7 @@ import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 import time
+import gymnasium as gym
 class AntOrcaGymEnv(OrcaGymLocalEnv):
     """
     A class to represent the ORCA Gym environment for the Replicator scene.
@@ -151,7 +152,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         return obs, reward, terminated, False, info
     
 
-    def _get_obs(self) -> dict:
+    def _get_obs(self) -> np.ndarray:
         base_qpos = self.query_joint_qpos([self._base_joint_name])[self._base_joint_name]
         joint_qpos_dict = self.query_joint_qpos(self._leg_joint_names)
         joint_qpos = np.concatenate([joint_qpos_dict[joint] for joint in self._leg_joint_names]).flatten()
@@ -159,13 +160,24 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         base_qvel = self.query_joint_qvel([self._base_joint_name])[self._base_joint_name]
         joint_qvel_dict = self.query_joint_qvel(self._leg_joint_names)
         joint_qvel = np.concatenate([joint_qvel_dict[joint] for joint in self._leg_joint_names]).flatten()
-        obs = {
-            "position": base_qpos[2:].copy(),
-            "velocity": base_qvel.copy(),
-            "joint_position": joint_qpos.copy(),
-            "joint_velocity": joint_qvel.copy(),
-            # "contact_force": self.contact_forces[1:].flatten(),
-        }
+        # obs = {
+        #     "position": base_qpos[2:].copy(),
+        #     "velocity": base_qvel.copy(),
+        #     "joint_position": joint_qpos.copy(),
+        #     "joint_velocity": joint_qvel.copy(),
+        #     # "contact_force": self.contact_forces[1:].flatten(),
+        # }
+
+        obs = np.concatenate(
+            [
+                base_qpos[2:].copy(),  # x, y position
+                base_qvel.copy(),  # x, y velocity
+                joint_qpos.copy(),  # joint positions
+                joint_qvel.copy(),  # joint velocities
+            ],
+            dtype=np.float32,
+        ).flatten()
+
         return obs
 
     def reset_model(self) -> tuple[dict, dict]:

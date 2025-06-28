@@ -105,13 +105,19 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         action_space = spaces.Box(low=low, high=high, dtype=np.float32)
         return action_space
 
-    def generate_observation_space(self, obs: Dict[str, Any] = None) -> spaces.Space:
+    def generate_observation_space(self, obs: Union[Dict[str, Any], np.ndarray]) -> spaces.Space:
         """
         Generate the observation space for the environment.
         """
         if obs is None:
             raise ValueError("obs dictionary is None")
-            
+
+        if isinstance(obs, np.ndarray):
+            # If obs is a numpy array, create a box space for it
+            low = np.full(obs.shape, -np.finfo(np.float32).max, dtype=np.float32)
+            high = np.full(obs.shape, np.finfo(np.float32).max, dtype=np.float32)
+            return spaces.Box(low=low, high=high, dtype=np.float32)
+
         obs_space_dict = {}
         for obs_key, obs_data in obs.items():
             if isinstance(obs_data, np.ndarray):
