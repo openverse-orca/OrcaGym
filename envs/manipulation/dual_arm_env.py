@@ -434,40 +434,37 @@ class DualArmEnv(RobomimicEnv):
     def reset_model(self) -> tuple[dict, dict]:
         cfg = self._config
         updated_actors = False
-    
-        # ---------------- TELEOPERATION 分支 ----------------
         if self._run_mode == RunMode.TELEOPERATION and cfg.get("random_actor", False):
             self._teleop_counter += 1
             if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
-                # 随机挑几个 actors
-                full   = cfg["actors"]
-                spawn  = cfg["actors_spawnable"]
-                idxs   = random.sample(range(len(spawn)), k=random.randint(3,5))
-                short_names = [ full[i] for i in idxs ]
-                spawns      = [ spawn[i] for i in idxs ]
-    
-                # 写回 cfg
-                cfg["object_bodys"]  = short_names
+                # 随机挑 3-5 个 prefab 的 short name（如 "salt","jar_01"……）
+                full      = cfg["actors"]
+                spawn     = cfg["actors_spawnable"]
+                total     = len(spawn)
+                n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
+                idxs      = random.sample(range(total), k=n_select)
+                # 根据索引分别取 actor_name 与 spawn_name
+                short_names = [full[i]  for i in idxs]
+                spawns      = [spawn[i] for i in idxs]
+                # 只改 object_bodys/sites/joints 三项，保持 actors 原样
+                cfg["object_bodys"]  = list(short_names)
                 cfg["object_sites"]  = [f"{n}site"   for n in short_names]
                 cfg["object_joints"] = [f"{n}_joint" for n in short_names]
-    
-                # spawn
+                # 重新构 Task 并 spawn 出来
                 self._task.load_config(cfg)
-                for a, s in zip(short_names, spawns):
-                    self._task.add_actor(a, s)
+                for actor_name, spawnable_name in zip(short_names, spawns):
+                    self._task.add_actor(actor_name, spawnable_name)
                 self._task.publish_scene()
-                # 等第一个 joint 注册
-                first = cfg["object_joints"][0]
-                for _ in range(100):
-                    try:
-                        self.joint(first)
-                        break
-                    except:
-                        time.sleep(0.05)
-                else:
-                    raise RuntimeError("generate_actors 后 joint 未注册成功")
-    
                 updated_actors = True
+                #self._debug_list_loaded_objects()
+
+        # —— B) 重置 robot & agents 内部状态 —— #
+
+        self._set_init_state()
+
+        for ag in self._agents.values():
+
+            ag.on_reset_model()
     
         # ------------- POLICY_NORMALIZED 分支：直接早退 -------------
         if self._run_mode == RunMode.POLICY_NORMALIZED:
@@ -493,11 +490,19 @@ class DualArmEnv(RobomimicEnv):
         # （比如 TELEOPERATION 第一次或升级后需要走 get_task）
     
         if self._run_mode == RunMode.TELEOPERATION:
-            # TELEOPERATION 模式下第一次或 spawn 后，调用一次 get_task
             self.safe_get_task(self)
-            print(self._task.get_language_instruction())
-            updated_actors = True
-    
+            instr = self._task.get_language_instruction()
+            m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
+            if m:
+                level, obj, goal = m.groups()
+                print(
+                    f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
+                    f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
+                    f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
+                )
+            else:
+                # 万一格式不符，回退到无色输出
+                print(instr)
         # —— 最后对“正常”模式构造 objects/goals —— #
         rand_objs  = self._task.randomized_object_positions
         rand_goals = self._task.randomized_goal_positions
