@@ -290,7 +290,8 @@ class DualArmEnv(RobomimicEnv):
                 "object": self.objects,  # 提取第一个对象的位置
                 "goal": self.goals,
                 "task_status": self._task_status,
-                "language_instruction": self._task.get_language_instruction()}
+                "language_instruction": self._task.get_language_instruction(),
+                "time_step": self.data.time}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)

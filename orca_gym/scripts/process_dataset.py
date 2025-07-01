@@ -218,6 +218,24 @@ def split_demos(dataset_file, output_dir, custom_name="demo"):
             print(f"Dataset {dataset_file} has no demonstrations.")
             return
 
+        # for i, demo in enumerate(demos):
+        #     output_file = os.path.join(temp_dir, f"{demo}.hdf5")
+            
+        #     with h5py.File(output_file, "w") as out_f:
+        #         out_data = out_f.create_group("data")
+        #         demo_group = f["data"][demo]
+                
+        #         def copy_all(name, obj):
+        #             if isinstance(obj, h5py.Dataset):
+        #                 out_data.create_dataset(name, data=obj[()],)
+        #             else:
+        #                 print(f"Skipping non-dataset key: {name}")
+                
+        #         demo_group.visititems(copy_all)
+        #         for attr_key in demo_group.attrs.keys():
+        #             out_data.attrs[attr_key] = demo_group.attrs[attr_key]
+
+        #     print(f"Saved demonstration {demo} to {output_file}")
         for i, demo in enumerate(demos):
             output_file = os.path.join(temp_dir, f"{demo}.hdf5")
             
@@ -225,13 +243,37 @@ def split_demos(dataset_file, output_dir, custom_name="demo"):
                 out_data = out_f.create_group("data")
                 demo_group = f["data"][demo]
                 
-                def copy_all(name, obj):
+                # 1. 先创建所有必要的组结构
+                if "obs" in demo_group:
+                    out_data.create_group('obs')
+                if "next_obs" in demo_group:
+                    out_data.create_group('next_obs')
+                
+                # 2. 显式复制obs数据并压缩
+                if "obs" in demo_group:
+                    for obs_key in demo_group["obs"].keys():
+                        obs_data = demo_group["obs"][obs_key]
+                        out_data["obs"].create_dataset(obs_key, data=obs_data, compression="gzip", compression_opts=4)
+                
+                # 3. 显式复制next_obs数据并压缩
+                if "next_obs" in demo_group:
+                    for next_obs_key in demo_group["next_obs"].keys():
+                        next_obs_data = demo_group["next_obs"][next_obs_key]
+                        out_data["next_obs"].create_dataset(next_obs_key, data=next_obs_data, compression="gzip", compression_opts=4)
+                
+                # 4. 使用visititems复制其他数据集
+                def copy_other_datasets(name, obj):
                     if isinstance(obj, h5py.Dataset):
+                        # 跳过已经处理过的obs和next_obs数据集
+                        if name.startswith("obs/") or name.startswith("next_obs/"):
+                            return
                         out_data.create_dataset(name, data=obj[()])
                     else:
                         print(f"Skipping non-dataset key: {name}")
                 
-                demo_group.visititems(copy_all)
+                demo_group.visititems(copy_other_datasets)
+                
+                # 5. 复制所有属性
                 for attr_key in demo_group.attrs.keys():
                     out_data.attrs[attr_key] = demo_group.attrs[attr_key]
 
@@ -393,8 +435,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 定义输入和输出的基目录
-    BASE_INPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
-    BASE_OUTPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
+    # BASE_INPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
+    # BASE_OUTPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
+    SCRIPT_PATH = os.path.abspath(__file__)
+    # 向上递归查找 OrcaGym 根目录（假设脚本在 orca_gym/scripts 下，根目录是 OrcaGym 的父目录）
+    ORCA_GYM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_PATH)))
+
+    # 拼接绝对路径（最终输入输出目录）
+    BASE_INPUT_DIR = os.path.join(ORCA_GYM_ROOT)
+    BASE_OUTPUT_DIR = os.path.join(ORCA_GYM_ROOT)
 
     if args.command == "check":
         files = glob_dataset_filenames(args.datasets)
