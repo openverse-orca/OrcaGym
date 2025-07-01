@@ -504,10 +504,16 @@ class DualArmEnv(RobomimicEnv):
             else:
                 # 万一格式不符，回退到无色输出
                 print(instr)
+
         # —— 最后对“正常”模式构造 objects/goals —— #
-        rand_objs  = self._task.randomized_object_positions
-        rand_goals = self._task.randomized_goal_positions
+        self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
+
+        # 推进一步仿真，返回 obs/info
+        self.mj_forward()
+        obs = self._get_obs().copy()
+        return obs, {"objects": self.objects, "goals": self.goals}
     
+    def update_objects_goals(self, object_positions, goal_positions):
         # objects structured array
         obj_dtype = np.dtype([
             ("joint_name",  "U100"),
@@ -516,10 +522,10 @@ class DualArmEnv(RobomimicEnv):
         ])
         self.objects = np.array(
             [(jn, pos[:3].tolist(), pos[3:].tolist())
-             for jn, pos in rand_objs.items()],
+             for jn, pos in object_positions.items()],
             dtype=obj_dtype,
         )
-    
+
         # goals structured array
         goal_dtype = np.dtype([
             ("joint_name",  "U100"),
@@ -529,7 +535,7 @@ class DualArmEnv(RobomimicEnv):
             ("max",         "f4", 3),
             ("size",        "f4", 3),
         ])
-        entries, _ = self.process_goals(rand_goals)
+        entries, _ = self.process_goals(goal_positions)
         self.goals = np.array(
             [
                 (e["joint_name"], e["position"], e["orientation"],
@@ -538,17 +544,6 @@ class DualArmEnv(RobomimicEnv):
             ],
             dtype=goal_dtype,
         )
-    
-        # 推进一步仿真，返回 obs/info
-        self.mj_forward()
-        obs = self._get_obs().copy()
-        return obs, {"objects": self.objects, "goals": self.goals}
-    
-
-
-
-
-
 
 
     def process_goals(self, goal_positions):

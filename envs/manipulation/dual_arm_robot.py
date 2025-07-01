@@ -491,7 +491,7 @@ class DualArmRobot(AgentBase):
         self._grasp_value_r = action[27]
         self.set_r_hand_actuator_ctrl(self._grasp_value_r)
 
-        if self._env.action_type in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK]:
+        if self._env.action_type == ActionType.END_EFFECTOR_OSC:
             action_l = self._action_B_to_action(action[:6])
             self._l_controller.set_goal(action_l)
             ctrl = self._l_controller.run_controller()
@@ -501,7 +501,19 @@ class DualArmRobot(AgentBase):
             self._r_controller.set_goal(action_r)
             ctrl = self._r_controller.run_controller()
             self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
+        elif self._env.action_type == ActionType.END_EFFECTOR_IK:
+            action_l = self._action_B_to_action(action[:6])
+            quat = transform_utils.axisangle2quat(action_l[3:6])
+            action_l_xquat = np.array([quat[1], quat[2], quat[3], quat[0]])  # 转换为 wxyz 格式
+            ctrl_l = self.set_l_arm_position_ctrl(action_l[:3], action_l_xquat)
 
+            action_r = self._action_B_to_action(action[14:20])
+            quat = transform_utils.axisangle2quat(action_r[3:6])
+            action_r_xquat = np.array([quat[1], quat[2], quat[3], quat[0]])
+            ctrl_r = self.set_r_arm_position_ctrl(action_r[:3], action_r_xquat)
+
+            self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
+            self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
         elif self._env.action_type == ActionType.JOINT_POS:
             l_arm_joint_action = action[6:13]
             self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_joint_action)

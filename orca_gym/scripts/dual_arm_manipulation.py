@@ -142,12 +142,12 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                 if task_status == TaskStatus.BEGIN:
                     if saving_mp4 == False:
                         mp4_save_path = dataset_writer.get_mp4_save_path()
-                        env.unwrapped.begin_save_video(mp4_save_path)
+                        env.begin_save_video(mp4_save_path)
                         saving_mp4 = True
-                        camera_frame_index.append(env.unwrapped.get_current_frame())
+                        camera_frame_index.append(env.get_current_frame())
                         
                     else:
-                        camera_frame_index.append(env.unwrapped.get_current_frame())
+                        camera_frame_index.append(env.get_current_frame())
                 
                 if task_status == TaskStatus.SUCCESS:
                     goal_info = info["goal"]
@@ -180,11 +180,11 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         if not in_goal:
                             info['task_status'] = TaskStatus.FAILURE
                             print("⚠️ 标记为 FAILURE: 物体未进入目标区域。")
-                    env.unwrapped.stop_save_video()
+                    env.stop_save_video()
                     saving_mp4 = False
                 elif task_status == TaskStatus.FAILURE:
-                    env.unwrapped.stop_save_video()
-                    saving_mp4 = False              
+                    env.stop_save_video()
+                    saving_mp4 = False
                 for obs_key, obs_data in obs.items():
                     obs_list[obs_key].append(obs_data)
                     
@@ -194,12 +194,6 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                 terminated_times = terminated_times + 1 if terminated else 0
                 timestep_list.append(info['time_step'])
                 
-            #     for camera in cameras:
-            #         camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
-            #         camera_frames[camera.name].append(camera_frame)
-                
-            # # print("Timestep: ", env.unwrapped.gym.data.time)
-            # timestep_list.append(env.unwrapped.gym.data.time)
 
         if terminated_times >= 5 or truncated:
             # return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list
@@ -288,7 +282,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
-        'camera_frames': camera_frames,
+        # 'camera_frames': camera_frames,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'language_instruction': language_instruction
     })
@@ -385,36 +379,40 @@ def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
             if isinstance(jn, (bytes, bytearray)):
                 jn = jn.decode("utf-8")
             object_names.append(jn.replace("_joint", ""))
-        core._playback_demo_bodies = object_names  # 录制物体名列表
-        core.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
+        env._playback_demo_bodies = object_names  # 录制物体名列表
+        env.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
 
     # 1) 清空spawned列表，确保reset_model重新spawn
-    core._spawned_object_list = []
+    env._spawned_object_list = []
 
     # 2) 重置环境（会调用reset_model）
     obs, info = env.reset(seed=42)
 
     # 3) 恢复录制好的 objects/goals (用于场景替换)
-    core.replace_objects(demo_data['objects'])
+    env.replace_objects(demo_data['objects'])
     if 'goals' in demo_data and demo_data['goals'] is not None:
-        core.replace_goals(demo_data['goals'])
-    core.mj_forward()
+        env.replace_goals(demo_data['goals'])
+    env.mj_forward()
 
     # 4) 光照和渲染等逻辑不变
-    cfg = core._config
+    cfg = env._config
     if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
-        light_idxs = core._task.generate_lights()
-        core._task.publish_scene()
+        light_idxs = env._task.generate_lights()
+        env._task.publish_scene()
         for idx in light_idxs:
-            core._task.set_light_info(core._task.lights[idx])
-        core.mj_forward()
-        core.render()
+            env._task.set_light_info(env._task.lights[idx])
+        env.mj_forward()
+        env.render()
         time.sleep(0.05)
 
     _light_counter += 1
 
-    # 5) 返回观察和信息
-    obs = core._get_obs().copy()
+    # 5) 重新采样目标物体
+    if sample_range > 0.0:
+        resample_target_object(env, demo_data, sample_range)
+
+    # 6) 返回观察和信息
+    obs = env._get_obs().copy()
     info = {
         "object": demo_data['objects'],
         "goal":   demo_data.get('goals')
@@ -422,13 +420,47 @@ def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     return obs, info
 
 
+def get_target_object_and_goal(demo: dict) -> tuple:
+    lang_instr = demo.get("language_instruction", b"")
+    if isinstance(lang_instr, (bytes, bytearray)):
+        lang_instr = lang_instr.decode("utf-8")
+    obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
+    goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
+    target_obj = obj_match.group(1) if obj_match else None
+    target_goal = goal_match.group(1) if goal_match else None
 
+    return target_obj, target_goal
 
+def resample_target_object(env: DualArmEnv, demo: dict, sample_range: float) -> None:
+    env._task.load_config(env._config)
+    target_obj, _ = get_target_object_and_goal(demo)
+    if target_obj:
+        target_obj_joint_name = ""
+        target_obj_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        demo_objects = demo.get("objects", [])
+        for obj in demo_objects:
+            joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else obj["joint_name"]
+            if target_obj in joint_name:
+                target_obj_joint_name = joint_name
+                target_obj_position = np.array(obj["position"], dtype=np.float32)
+                break
 
+        # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
+        # env._task.random_objs_and_goals(env)
+        # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
 
+        while True:
+            env._task.random_objs_and_goals(env)
+            target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
+            target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
+            # print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
+            if target_obj_position_delta < sample_range:
+                break
+        
+        env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
-
-
+        print("[Info] Resampling target object and goal positions.", target_obj, target_obj_joint_name, target_obj_position)
+        pass
 
     
 def do_playback(env : DualArmEnv, 
@@ -571,7 +603,7 @@ def do_trajectory_augmentation(
         rgb_size : tuple,                    
         original_dataset_path : str, 
         augmented_dataset_path : str, 
-        augmented_scale : float, 
+        augmented_noise : float, 
         sample_range : float,
         augmented_rounds : int,
         action_step : int = 1
@@ -601,7 +633,7 @@ def do_trajectory_augmentation(
             
             obs_list, reward_list, done_list, info_list\
                 , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
-                                                                demo_data, noise_scale=augmented_scale, 
+                                                                demo_data, noise_scale=augmented_noise, 
                                                                 sample_range=sample_range, realtime=realtime, 
                                                                 action_step=action_step)
             if  in_goal:
@@ -633,7 +665,7 @@ def do_vision_augmentation(
         rgb_size : tuple,                    
         original_dataset_path : str, 
         augmented_dataset_path : str, 
-        augmented_scale : float, 
+        augmented_noise : float, 
         sample_range : float,
         augmented_rounds : int,
         action_step : int = 1
@@ -671,7 +703,7 @@ def do_vision_augmentation(
                 
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
-                                                                    demo_data, noise_scale=augmented_scale, 
+                                                                    demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if  in_goal:
@@ -744,7 +776,7 @@ def run_example(orcagym_addr : str,
                 playback_mode : str,
                 rollout_times : int,
                 ckpt_path : str,
-                augmented_scale : float,
+                augmented_noise : float,
                 augmented_rounds : int,
                 teleoperation_rounds : int,
                 sample_range : float,
@@ -771,8 +803,9 @@ def run_example(orcagym_addr : str,
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
+            env = env.unwrapped
             print("Starting simulation...")
-            do_playback(env.unwrapped, dataset_reader, playback_mode, action_step, realtime_playback)
+            do_playback(env, dataset_reader, playback_mode, action_step, realtime_playback)
 
         elif run_mode == "teleoperation":
             env_name = ENV_NAME
@@ -863,6 +896,11 @@ def run_example(orcagym_addr : str,
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
+            
+            # 轨迹增广采用ik方式
+            if sample_range > 0.0:
+                action_type = ActionType.END_EFFECTOR_OSC
+
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
             if task_config is None:
@@ -887,9 +925,9 @@ def run_example(orcagym_addr : str,
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
             if (sample_range > 0.0):
-                do_trajectory_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
+                do_trajectory_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
             else:
-                do_vision_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
+                do_vision_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -931,7 +969,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     algo = args.algo
     rollout_times = args.rollout_times
     ckpt_path = args.model_file
-    augmented_scale = args.augmented_scale
+    augmented_noise = args.augmented_noise
     augmented_rounds = args.augmented_rounds
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
@@ -941,7 +979,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
     assert sample_range >= 0.0, "The sample range should be greater than or equal to 0."
-    assert augmented_scale >= 0.0, "The augmented scale should be greater than or equal to 0."
+    assert augmented_noise >= 0.0, "The augmented noise should be greater than or equal to 0."
     assert augmented_rounds > 0, "The augmented times should be greater than 0."
 
     create_tmp_dir("records_tmp")
@@ -1004,7 +1042,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
                     playback_mode,
                     rollout_times,
                     ckpt_path,
-                    augmented_scale,
+                    augmented_noise,
                     augmented_rounds,
                     teleoperation_rounds,
                     sample_range,
