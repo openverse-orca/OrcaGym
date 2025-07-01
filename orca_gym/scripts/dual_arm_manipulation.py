@@ -129,13 +129,9 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
 
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
-        lang_instr = info.get('language_instruction', '')
-        obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
-        goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
-        target_obj = obj_match.group(1) if obj_match else None
-        target_goal = goal_match.group(1) if goal_match else None
-        # if not (target_obj and target_goal):
-        #     print(f"[Warning] 无法从 language_instruction 中解析 object/goal: '{lang_instr}'")
+
+        target_obj, target_goal = get_target_object_and_goal(info)
+    
         env.render()
         task_status = info['task_status']
         
@@ -172,7 +168,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         # 获取物体位置
                         joint_name = obj_joints[obj_idx]
                         body_name = joint_name.replace('_joint', '')
-                        pos, _, _ = env.unwrapped.get_body_xpos_xmat_xquat([body_name])
+                        pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
                         pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
                         xy = pos_vec[:2]
                         # 获取目标区域边界
@@ -380,7 +376,6 @@ def playback_episode(env : DualArmEnv,
 
 def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     global _light_counter
-    core = env.unwrapped
 
     # 0) 先从demo_data取物体名写入，确保reset_model里能拿到
     if "objects" in demo_data:
@@ -457,7 +452,7 @@ def do_playback(env : DualArmEnv,
         print("Playing back episode: ", demo_names[i], " with ", len(action_list), " steps.")
         # for i, action in enumerate(action_list):
         #     print(f"Playback Action ({i}): ", action)
-        env.unwrapped.objects = demo_data['objects']
+        env.objects = demo_data['objects']
         reset_playback_env(env, demo_data)
         playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
@@ -478,13 +473,8 @@ def augment_episode(env : DualArmEnv,
     terminated_times = 0    
     camera_frames = {camera.name: [] for camera in cameras}
     timestep_list = []
-    lang_instr = demo_data.get("language_instruction", b"")
-    if isinstance(lang_instr, (bytes, bytearray)):
-        lang_instr = lang_instr.decode("utf-8")
-    obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
-    goal_match = re.search(r'goal:\s*([^\s]+)', lang_instr)
-    target_obj = obj_match.group(1) if obj_match else None
-    target_goal = goal_match.group(1) if goal_match else None
+
+    target_obj, target_goal = get_target_object_and_goal(demo_data)
 
     in_goal=False
   
@@ -517,7 +507,7 @@ def augment_episode(env : DualArmEnv,
             obs, reward, terminated, truncated, info = env.step(action_chunk[j])
             info["action"] = action_chunk[j]  # ✅ 记录合法动作
             terminated_times = terminated_times + 1 if terminated else 0
-            timestep_list.append(env.unwrapped.gym.data.time)
+            timestep_list.append(env.gym.data.time)
     
             if realtime:
                 env.render()
@@ -538,7 +528,7 @@ def augment_episode(env : DualArmEnv,
             if obj_idx is not None and goal_idx is not None:
                 joint_name = obj_joints[obj_idx]
                 body_name = joint_name.replace('_joint', '')
-                pos, _, _ = env.unwrapped.get_body_xpos_xmat_xquat([body_name])
+                pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
                 pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
                 xy = pos_vec[:2]
                 # 读取原始值
@@ -555,7 +545,7 @@ def augment_episode(env : DualArmEnv,
         env.render()
                     
         if len(cameras) > 0:
-            time.sleep(0.01)    # wait for camera to get new frame
+            # time.sleep(0.01)    # wait for camera to get new frame
             for camera in cameras:
                 camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
                 camera_frames[camera.name].append(camera_frame)
@@ -574,18 +564,80 @@ def augment_episode(env : DualArmEnv,
         
     return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
  
+def do_trajectory_augmentation(
+        env : DualArmEnv, 
+        cameras : list[CameraWrapper], 
+        obs_camera : bool,
+        rgb_size : tuple,                    
+        original_dataset_path : str, 
+        augmented_dataset_path : str, 
+        augmented_scale : float, 
+        sample_range : float,
+        augmented_rounds : int,
+        action_step : int = 1
+    ):
+    realtime = False
+    
+    # Copy the original dataset to the augmented dataset
+    dataset_reader = DatasetReader(file_path=original_dataset_path)
+    dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
+                                    env_name=dataset_reader.get_env_name(),
+                                    env_version=dataset_reader.get_env_version(),
+                                    env_kwargs=dataset_reader.get_env_kwargs())
+    augmented_dataset_reader = DatasetReader(file_path=augmented_dataset_path)
+
+    demo_names = dataset_reader.get_demo_names()
+    for original_demo_name in demo_names:
+        done_demo_count = 0
+        done = False
+        trial_count = 0
+        max_trials = 2
+        demo_data = dataset_reader.get_demo_data(original_demo_name)
+        while not done and trial_count < max_trials:
+            env.objects = demo_data['objects']
+            # obs, info = reset_playback_env(env, demo_data, sample_range)
+            print("Augmenting original demo: ", original_demo_name)
+            language_instruction = demo_data['language_instruction']
+            
+            obs_list, reward_list, done_list, info_list\
+                , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
+                                                                demo_data, noise_scale=augmented_scale, 
+                                                                sample_range=sample_range, realtime=realtime, 
+                                                                action_step=action_step)
+            if  in_goal:
+                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
+                
+                done_demo_count += 1
+                print(f"Episode done! {done_demo_count} / {augmented_rounds} for demo {original_demo_name}")
+                if done_demo_count >= augmented_rounds:
+                    print(f"Augmented {done_demo_count} demos for {original_demo_name}.")
+                    done = True
+                trial_count = 0
+                new_demo_name = augmented_dataset_reader.get_demo_names()[-1]
+                print("New demo name: ", new_demo_name)
+                demo_data = augmented_dataset_reader.get_demo_data(new_demo_name)
+            else:
+                print("Episode failed! Retrying...")
+                trial_count += 1
+        if not done:
+            print(f"Failed to augment demo {original_demo_name} after {max_trials} tries. Skipping.")
+    
+    dataset_writer.shuffle_demos()
+    dataset_writer.finalize()       
     
 
-def do_augmentation(env : DualArmEnv, 
-                    cameras : list[CameraWrapper], 
-                    obs_camera : bool,
-                    rgb_size : tuple,                    
-                    original_dataset_path : str, 
-                    augmented_dataset_path : str, 
-                    augmented_scale : float, 
-                    sample_range : float,
-                    augmented_rounds : int,
-                    action_step : int = 1):
+def do_vision_augmentation(
+        env : DualArmEnv, 
+        cameras : list[CameraWrapper], 
+        obs_camera : bool,
+        rgb_size : tuple,                    
+        original_dataset_path : str, 
+        augmented_dataset_path : str, 
+        augmented_scale : float, 
+        sample_range : float,
+        augmented_rounds : int,
+        action_step : int = 1
+    ):
     
     realtime = False
     
@@ -609,11 +661,11 @@ def do_augmentation(env : DualArmEnv,
         for original_demo_name in demo_names:
             done = False
             trial_count = 0
-            max_trials = 5
+            max_trials = 2
             while not done and trial_count < max_trials:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
-                env.unwrapped.objects = demo_data['objects']
-                obs, info = reset_playback_env(env, demo_data, sample_range)
+                env.objects = demo_data['objects']
+                # obs, info = reset_playback_env(env, demo_data, sample_range)
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 
@@ -720,7 +772,7 @@ def run_example(orcagym_addr : str,
 
             env = gym.make(env_id)
             print("Starting simulation...")
-            do_playback(env, dataset_reader, playback_mode, action_step, realtime_playback)
+            do_playback(env.unwrapped, dataset_reader, playback_mode, action_step, realtime_playback)
 
         elif run_mode == "teleoperation":
             env_name = ENV_NAME
@@ -737,6 +789,7 @@ def run_example(orcagym_addr : str,
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
+            env = env.unwrapped
             print("Starting simulation...")
             kwargs["run_mode"] = RunMode.POLICY_NORMALIZED  # 此处用于训练的时候读取
 
@@ -747,7 +800,7 @@ def run_example(orcagym_addr : str,
 
             dataset_writer = DatasetWriter(file_path=record_path,
                                         env_name=env_id,
-                                        env_version=env.unwrapped.get_env_version(),
+                                        env_version=env.get_env_version(),
                                         env_kwargs=kwargs)
 
 
@@ -821,6 +874,7 @@ def run_example(orcagym_addr : str,
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
+            env = env.unwrapped
             print("Starting simulation...")
 
             now = datetime.now()
@@ -832,7 +886,10 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            do_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
+            if (sample_range > 0.0):
+                do_trajectory_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
+            else:
+                do_vision_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_scale, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
