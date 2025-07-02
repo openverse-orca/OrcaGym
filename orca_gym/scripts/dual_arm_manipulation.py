@@ -790,7 +790,6 @@ def augment_episode(env : DualArmEnv,
                 start_time = datetime.now()
     
             obs, reward, terminated, truncated, info = env.step(action_chunk[j])
-            info["action"] = action_chunk[j]  # ✅ 记录合法动作
             terminated_times = terminated_times + 1 if terminated else 0
             timestep_list.append(env.gym.data.time)
     

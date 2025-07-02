@@ -275,12 +275,18 @@ class DualArmEnv(RobomimicEnv):
         
         
         if self._run_mode == RunMode.TELEOPERATION:
-            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
-
             [agent.update_force_feedback() for agent in self._agents.values()]
+
+        if self.action_use_motor():
+            noscaled_action = self._fill_arm_joint_pos(noscaled_action)
+        else:
+            noscaled_action = self._fill_arm_ctrl(noscaled_action)
+
+        scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
+
 
         obs = self._get_obs().copy()
 
@@ -313,12 +319,12 @@ class DualArmEnv(RobomimicEnv):
 
     def _fill_arm_joint_pos(self, action) -> np.ndarray:
         agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_joint_pos(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
-    
+        return np.concatenate([agent.fill_arm_joint_pos(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+
     def _fill_arm_ctrl(self, action) -> np.ndarray:
         agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_ctrl(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
-    
+        return np.concatenate([agent.fill_arm_ctrl(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+
 
     def get_state(self) -> dict:
         state = {

@@ -93,7 +93,9 @@ class DualArmRobot(AgentBase):
         arm_qpos_range_l = self._env.model.get_joint_qposrange(self._l_arm_joint_names)
         arm_qpos_range_r = self._env.model.get_joint_qposrange(self._r_arm_joint_names)
 
-        self._setup_action_range(l_ctrl_range, r_ctrl_range)
+        # 这里动作范围采用position范围，而不采用力控范围
+        # self._setup_action_range(l_ctrl_range, r_ctrl_range)
+        self._setup_action_range(arm_qpos_range_l, arm_qpos_range_r)
         self._setup_obs_scale(arm_qpos_range_l, arm_qpos_range_r)
 
         site_dict = self._env.query_site_pos_and_quat([self._ee_site_l])
@@ -185,8 +187,8 @@ class DualArmRobot(AgentBase):
         else:
             # -----------------------------
             # Inverse Kinematics controller
-            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.05)
-            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.05)
+            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 2e-1, 0.075)
+            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 2e-1, 0.075)
 
 
     def on_close(self):
