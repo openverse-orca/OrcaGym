@@ -145,7 +145,10 @@ def get_dataset_prefix(dataset_file):
     env_name = reader.get_env_name()
     env_name = env_name.split("-OrcaGym-")[0]
     env_version = reader.get_env_version()
-    env_task = reader.get_env_kwargs()["task"]
+    env_kwargs = reader.get_env_kwargs()
+    if "task" not in env_kwargs:
+        env_kwargs["task"] = "default_task"
+    env_task = env_kwargs["task"]
     prefix = f"{env_name}_{env_version}_{env_task}"
     prefix = prefix.replace(" ", "_")
     prefix = prefix.replace(".", "_")
@@ -164,7 +167,7 @@ def process_combine(dataset_files, output_file):
             env_name = reader.get_env_name()
             env_version = reader.get_env_version()
             env_kwargs = reader.get_env_kwargs()
-            writer = DatasetWriter(output_file, env_name, env_version, env_kwargs)
+            writer = DatasetWriter(output_file, env_name, env_version, env_kwargs, specific_file_path=output_file)
             
         demo_names = reader.get_demo_names()
         for demo_name in demo_names:
@@ -177,8 +180,15 @@ def process_combine(dataset_files, output_file):
 
 def glob_dataset_filenames(dataset_files):
     matched_files = []
-    for dataset_file in dataset_files:
-        matched_files.extend(glob.glob(dataset_file))
+    for pattern in dataset_files:
+        # 构建两种递归模式：匹配任意子目录的.h5和.hdf5文件
+        patterns = [
+            os.path.join(pattern, '**', '*.h5'),    # 递归匹配.h5
+            os.path.join(pattern, '**', '*.hdf5'),  # 递归匹配.hdf5
+        ]
+        for p in patterns:
+            # 使用递归通配符并确保区分大小写
+            matched_files.extend(glob.glob(p, recursive=True))
     return matched_files
 
 def process_update_kwargs(dataset_files, kwargs):

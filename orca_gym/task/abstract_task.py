@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
     "random_actor": False, # 是否随机添加Actor，actor与Agent同级
     "random_actor_position": False, # 是否随机Actor的位置
     "random_actor_rotation": False, # 是否随机Actor的旋转
-    "random_actor_color": True, # 是否随机Actor的颜色
+    "random_actor_color": False, # 是否随机Actor的颜色
     "actors": [], # actor的命名
     "actors_spawnable": [], # actor的spawnable name, spawnable在Asset/Prefabs下面
     "center": [0, 0, 0], # actor的中心位置
@@ -173,6 +173,7 @@ class AbstractTask:
 
 
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds=None):
+        object_bodys = [env.body(bn) for bn in self.object_bodys]
         obj_joints  = [env.joint(jn) for jn in self.object_joints]
         goal_joints = [env.joint(jn) for jn in self.goal_joints]
 
@@ -185,11 +186,8 @@ class AbstractTask:
             raise KeyError(f"Unknown level '{self.level_name}', please add to LEVEL_RANGES")
         ranges = LEVEL_RANGES[self.level_name]
 
-        placed = []
-        max_trials = 100
-
-        for joint in obj_joints:
-            for _ in range(max_trials):
+        def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat):
+            while True:
                 lx = np.random.uniform(*ranges["x"])
                 ly = np.random.uniform(*ranges["y"])
                 lz = ranges["z"]
@@ -199,27 +197,52 @@ class AbstractTask:
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
                 yaw = np.random.uniform(-np.pi, np.pi)
                 world_quat = rotations.euler2quat([0.0, 0.0, yaw])
-                trial_qpos = np.concatenate([world_pos, world_quat])
+                obj_qpos = np.concatenate([world_pos, world_quat])
 
-                env.set_joint_qpos({joint: trial_qpos})
-                env.mj_forward()
+                if np.linalg.norm(world_pos - goal0_pos) > lr:
+                    break
+            
+            return obj_qpos
 
+        def _find_obj_place_on_contact():
+            placed = []
+            goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
+            placed_body = []
+            for joint, body in zip(obj_joints, object_bodys):
                 # 跳过落进目标的
-                goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
-                # print("goal0_pos:", goal0_pos, "wordl_pos:", world_pos)
-                # if np.linalg.norm(world_pos - goal0_pos) < 0.1:
-                if np.linalg.norm(world_pos - goal0_pos) < lr:
-                    continue
+                obj_qpos = _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat)
+                # print("[Debug] Placing object on joint:", joint, "at position:", obj_qpos)
+                env.set_joint_qpos({joint: obj_qpos})
+                env.mj_forward()
+                placed_body.append(body)
 
                 # 跳过有碰撞的
-                contacts = env.query_contact_force([])
-                if any(joint in (g1, g2) for (g1, g2), _ in contacts.items()):
-                    continue
+                contacts = env.query_contact_simple()
+                find_contact = False
+                for contact in contacts:
+                    body1 = env.model.get_geom_body_name(contact["Geom1"])
+                    body2 = env.model.get_geom_body_name(contact["Geom2"])
+                    if body1 in placed_body or body2 in placed_body:
+                        # print(f"[Debug] Found contact between {body1} and {body2}")
+                        find_contact = True
+                        break
+                if find_contact:
+                    return None
 
-                placed.append((joint, trial_qpos))
+                placed.append((joint, obj_qpos))
+            
+            return placed
+
+        placed = None
+        for i in range(100):  # 尝试100次
+            placed = _find_obj_place_on_contact()
+            if placed is not None:
                 break
-            else:
-                raise RuntimeError(f"Cannot place joint {joint} in level '{self.level_name}'")
+
+        # 容错处理
+        if placed is None:
+            Warning("Failed to place objects! Falling back to default positions.")
+            placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回
         qpos_dict = {jn: q for jn, q in placed}
@@ -228,8 +251,6 @@ class AbstractTask:
 
         self.randomized_object_positions = env.query_joint_qpos(obj_joints)
         self.randomized_goal_positions   = env.query_joint_qpos(goal_joints)
-
-
 
 
     def generate_actors(self, random_actor):

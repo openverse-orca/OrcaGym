@@ -185,8 +185,8 @@ class DualArmRobot(AgentBase):
         else:
             # -----------------------------
             # Inverse Kinematics controller
-            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.1)
-            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.1)
+            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.05)
+            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.05)
 
 
     def on_close(self):

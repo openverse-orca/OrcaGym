@@ -39,7 +39,7 @@ class DatasetWriter:
     #         data_group.attrs['total'] = 0  # 初始化总样本数为 0
     #         data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
     #         f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
-    def __init__(self, base_dir, env_name, env_version, env_kwargs=None):  # 修改1: 参数名改为base_dir
+    def __init__(self, base_dir, env_name, env_version, env_kwargs=None, specific_file_path=None):  # 修改1: 参数名改为base_dir
         """
         初始化 DatasetWriter。
 
@@ -49,25 +49,6 @@ class DatasetWriter:
         - env_version: 环境版本。
         - env_kwargs: 环境参数字典（可选）。
         """
-       # print("base_dir..................:", base_dir)
-        self.basedir = base_dir
-        self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-        self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-        self.camera_dir = os.path.join(self.uuid_dir, "camera")
-        self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
-        self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
-        self.depth_dir = os.path.join(self.camera_dir, "depth")
-        self.video_dir = os.path.join(self.camera_dir, "video")
-       # print("self.uuid_dir..............:",self.uuid_dir)
-        self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
-        os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
-        os.makedirs(self.camera_dir, exist_ok=True)
-        os.makedirs(self.parameters_dir, exist_ok=True)
-        os.makedirs(self.proprio_stats_dir, exist_ok=True)
-        os.makedirs(self.depth_dir, exist_ok=True)
-        os.makedirs(self.video_dir, exist_ok=True)
-        self.mp4_save_path : str = None
-        
 
         self._env_args = {
             "env_name": env_name,
@@ -76,8 +57,40 @@ class DatasetWriter:
             "env_kwargs": env_kwargs or {}
         }
 
+       # print("base_dir..................:", base_dir)
+        if specific_file_path is not None:  # 新增: 如果提供了特定文件路径
+            self.hdf5_path = specific_file_path  # 使用特定文件路径
+            self.create_hdf5_file()  # 新增: 创建HDF5文件
+        else:
+            self.basedir = base_dir
+            self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
+            self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+            self.camera_dir = os.path.join(self.uuid_dir, "camera")
+            self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
+            self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
+            self.depth_dir = os.path.join(self.camera_dir, "depth")
+            self.video_dir = os.path.join(self.camera_dir, "video")
+        # print("self.uuid_dir..............:",self.uuid_dir)
+            self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
+
+            os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
+            os.makedirs(self.camera_dir, exist_ok=True)
+            os.makedirs(self.parameters_dir, exist_ok=True)
+            os.makedirs(self.proprio_stats_dir, exist_ok=True)
+            os.makedirs(self.depth_dir, exist_ok=True)
+            os.makedirs(self.video_dir, exist_ok=True)
+            self.mp4_save_path : str = None
+        
 
 
+
+    def create_hdf5_file(self):
+        with h5py.File(self.hdf5_path, 'w') as f:  # 修改4: 使用hdf5_path
+            data_group = f.create_group('data')
+            data_group.attrs['env_args'] = json.dumps(self._env_args)
+            data_group.attrs['total'] = 0  # 初始化总样本数为 0
+            data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
+            f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
 
     def set_UUIDPATH(self):
         self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
@@ -98,12 +111,7 @@ class DatasetWriter:
         self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5")  # 新增: 定义HDF5文件路径
         # self.hdf5_path = os.path.join(self.uuid_dir)
         # print("hdf5_path11112222:",self.hdf5_path)
-        with h5py.File(self.hdf5_path, 'w') as f:  # 修改4: 使用hdf5_path
-            data_group = f.create_group('data')
-            data_group.attrs['env_args'] = json.dumps(self._env_args)
-            data_group.attrs['total'] = 0  # 初始化总样本数为 0
-            data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
-            f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
+        self.create_hdf5_file()  # 新增: 创建HDF5文件
     
     def get_UUIDPath(self):
         return self.uuid_dir

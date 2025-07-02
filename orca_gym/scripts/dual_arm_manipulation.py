@@ -696,13 +696,19 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
         # env._task.random_objs_and_goals(env)
         # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
 
-        while True:
+        resample_success = False
+        for _ in range(1000):  # 尝试1000次
             env._task.random_objs_and_goals(env)
             target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
             target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
-            print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
+            # print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
             if target_obj_position_delta < sample_range:
+                resample_success = True
                 break
+
+        if not resample_success:
+            Warning(f"[Warning] Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
+            print("[Warning] Failed to resample target object within range. Using original position.")
         
         env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
@@ -1027,7 +1033,7 @@ def run_example(orcagym_addr : str,
 
 
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
-                                                 cameras=cameras, obs_camera=True, rgb_size=RGB_SIZE, action_step=action_step,)
+                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=action_step,)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
 
@@ -1088,7 +1094,7 @@ def run_example(orcagym_addr : str,
             
             # 轨迹增广采用ik方式，实现末端位置控制, 视觉增广采用直接读取关节进行回放
             if sample_range > 0.0:
-                action_type = ActionType.END_EFFECTOR_OSC
+                action_type = ActionType.END_EFFECTOR_IK
             else:
                 action_type = ActionType.JOINT_POS
 
