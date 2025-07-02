@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import time
 import subprocess
@@ -142,8 +143,13 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
             if task_status in [TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.BEGIN]:
                 if task_status == TaskStatus.BEGIN:
                     if saving_mp4 == False:
+                        dataset_writer.set_UUIDPATH()
                         mp4_save_path = dataset_writer.get_mp4_save_path()
+
                         env.begin_save_video(mp4_save_path)
+#                       #  print("get_mp4_save_path..........................:",mp4_save_path)
+#                         env.unwrapped.begin_save_video(mp4_save_path)
+
                         saving_mp4 = True
                         camera_frame_index.append(env.get_current_frame())
                         
@@ -184,8 +190,22 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     env.stop_save_video()
                     saving_mp4 = False
                 elif task_status == TaskStatus.FAILURE:
+
+#                     env.stop_save_video()
+#                     saving_mp4 = False
+
+                    # env.unwrapped.stop_save_video()
                     env.stop_save_video()
-                    saving_mp4 = False
+                    #通过os接口删除路径
+
+                    rmpath = dataset_writer.get_UUIDPath()
+                    print(f"删除目录: {rmpath}")
+                    if os.path.exists(rmpath) and os.path.isdir(rmpath):
+                        shutil.rmtree(rmpath)
+                  #      print(f"目录及其内容已删除: {rmpath}")
+           
+                    saving_mp4 = False              
+
                 for obs_key, obs_data in obs.items():
                     obs_list[obs_key].append(obs_data)
                     
@@ -288,6 +308,136 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'language_instruction': language_instruction
     })
 
+
+# def add_demo_to_dataset(dataset_writer: DatasetWriter,
+#                        obs_list,
+#                        reward_list,
+#                        done_list,
+#                        info_list,
+#                        camera_frames,  # 现在可以是混合帧列表
+#                        timestep_list,
+#                        language_instruction):
+#     """
+#     将演示数据添加到数据集写入器中
+    
+#     参数:
+#         dataset_writer: DatasetWriter实例
+#         obs_list: 观测数据列表
+#         reward_list: 奖励列表
+#         done_list: 完成标志列表
+#         info_list: 信息列表
+#         camera_frames: 相机帧数据，可以是:
+#             - 字典格式: {'camera_name': frames_list, ...}
+#             - 列表格式: [frames_list1, frames_list2, ...] (按固定顺序)
+#             - 混合帧列表: 所有相机帧混合在一起(需要分割)
+#         timestep_list: 时间步列表
+#         language_instruction: 语言指令字符串
+#     """
+#     # 只处理第一个info对象(初始状态)
+#     first_info = info_list[0]
+    
+#     # ... [前面的代码保持不变] ...
+    
+#     # 处理camera_frames参数(增强错误处理)
+#     camera_frames_dict = None
+    
+#     # 情况1: camera_frames已经是字典格式
+#     if isinstance(camera_frames, dict):
+#         camera_frames_dict = camera_frames
+        
+#     # 情况2: camera_frames是列表格式(按固定顺序)
+#     elif isinstance(camera_frames, list):
+#         # 定义相机名称顺序
+#         camera_names = [
+#             'camera_head_color',
+#             'camera_head_depth',
+#             'camera_wrist_l_color',
+#             'camera_wrist_l_depth',
+#             'camera_wrist_r_color',
+#             'camera_wrist_r_depth'
+#         ]
+        
+#         # 检查camera_frames[0]是否是列表
+#         if len(camera_frames) > 0 and isinstance(camera_frames[0], (list, np.ndarray)):
+#             # 正常情况: 每个相机一个帧列表
+#             if len(camera_frames) == len(camera_names):
+#                 camera_frames_dict = {
+#                     camera_name: frames 
+#                     for camera_name, frames in zip(camera_names, camera_frames)
+#                 }
+#             else:
+#                 # 可能是所有相机帧混合在一起(单个列表)
+#                 total_frames = camera_frames[0]  # 假设列表中只有一个元素(混合帧列表)
+#                 if not isinstance(total_frames, (list, np.ndarray)):
+#                     raise ValueError(
+#                         f"预期camera_frames[0]是列表或数组, 实际得到{type(total_frames)}"
+#                     )
+                
+#                 num_cameras = len(camera_names)
+#                 frames_per_camera = len(total_frames) // num_cameras
+                
+#                 camera_frames_dict = {
+#                     camera_name: total_frames[i*frames_per_camera : (i+1)*frames_per_camera]
+#                     for i, camera_name in enumerate(camera_names)
+#                 }
+#         else:
+#             raise ValueError(
+#                 f"预期camera_frames[0]是列表或数组, 实际得到{type(camera_frames[0])}"
+#             )
+            
+#     # 情况3: camera_frames是单个帧列表(混合所有相机帧)
+#     elif isinstance(camera_frames, (np.ndarray, list)):
+#         total_frames = camera_frames
+#         if not isinstance(total_frames, (list, np.ndarray)):
+#             raise ValueError(
+#                 f"预期camera_frames是列表或数组, 实际得到{type(total_frames)}"
+#             )
+        
+#         num_cameras = 6  # 假设有6个相机
+#         frames_per_camera = len(total_frames) // num_cameras
+        
+#         camera_names = [
+#             'camera_head_color',
+#             'camera_head_depth',
+#             'camera_wrist_l_color',
+#             'camera_wrist_l_depth',
+#             'camera_wrist_r_color',
+#             'camera_wrist_r_depth'
+#         ]
+        
+#         camera_frames_dict = {
+#             camera_name: total_frames[i*frames_per_camera : (i+1)*frames_per_camera]
+#             for i, camera_name in enumerate(camera_names)
+#         }
+        
+#     else:
+#         raise ValueError(
+#             "camera_frames参数必须是以下类型之一:"
+#             "1. 字典格式: {'camera_name': frames_list, ...}"
+#             "2. 列表格式: [frames_list1, frames_list2, ...] (按固定顺序)"
+#             "3. 单个帧列表(所有相机帧混合在一起)"
+#         )
+
+#     # 构建demo_data字典
+#     demo_data = {
+#         'states': np.array([
+#             np.concatenate([info["state"]["qpos"], info["state"]["qvel"]])
+#             for info in info_list
+#         ], dtype=np.float32),
+#         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
+#         'objects': objects_array,
+#         'goals': goals_array,
+#         'rewards': np.array(reward_list, dtype=np.float32),
+#         'dones': np.array(done_list, dtype=np.int32),
+#         'obs': obs_list,
+#         'camera_frames': camera_frames_dict,  # 使用处理后的字典格式
+#         'timesteps': np.array(timestep_list, dtype=np.float32),
+#         'language_instruction': language_instruction
+#     }
+    
+#     # 添加演示数据到写入器
+#     dataset_writer.add_demo_data(demo_data)
+
 def do_teleoperation(env, 
                      dataset_writer : DatasetWriter, 
                      teleoperation_rounds : int, 
@@ -301,29 +451,65 @@ def do_teleoperation(env,
     for camera in cameras:
         camera.start()
     
+    # while True:
+    #     # obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list = teleoperation_episode(env, cameras, rgb_size, action_step)
+    #     obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list = teleoperation_episode(env, cameras, dataset_writer, rgb_size, action_step)
+    #     last_done = (len(done_list)>0 and done_list[-1]==1)
+    #     last_in_goal = (len(in_goal_list)>0 and in_goal_list[-1])
+    #     save_record = last_done and last_in_goal
+    #     task_result = "Success" if save_record else "Failed"
+    #     # save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
+    #     save_record = task_result == "Success"
+    #     exit_program = False
+    #     if save_record:
+    #         print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
+    #         current_round += 1
+            
+    #         # if obs_camera:
+    #         #     for camera in cameras:
+    #         #         obs_list[camera.name] = camera_frames[camera.name]
+    #         #         camera_frames[camera.name] = []         
+    #         #     empty_camera_frames = {}
+    #         #     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, info_list[0]["language_instruction"])
+    #         # else:
+    #             # add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, info_list[0]["language_instruction"])
+    #         add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"])
+    #         # dataset_writer.set_file_path()
+    #     if exit_program or current_round > teleoperation_rounds:
+    #         break
+        # 初始化基础DatasetWriter（仅一次）
+   # lldir = "records_tmp/" level
+    # base_writer = DatasetWriter(
+    #     base_dir= "records_tmp/shoprpp/", # type: ignore
+    #     env_name="shop",
+    #     env_version="1.0"
+    # )
     while True:
-        # obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list = teleoperation_episode(env, cameras, rgb_size, action_step)
-        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list = teleoperation_episode(env, cameras, dataset_writer, rgb_size, action_step)
-        last_done = (len(done_list)>0 and done_list[-1]==1)
-        last_in_goal = (len(in_goal_list)>0 and in_goal_list[-1])
+        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, in_goal_list = teleoperation_episode(
+        env, cameras, dataset_writer, rgb_size, action_step
+    )
+    
+        last_done = (len(done_list) > 0 and done_list[-1] == 1)
+        last_in_goal = (len(in_goal_list) > 0 and in_goal_list[-1])
         save_record = last_done and last_in_goal
         task_result = "Success" if save_record else "Failed"
-        # save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
         save_record = task_result == "Success"
         exit_program = False
+    
         if save_record:
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
             
-            # if obs_camera:
-            #     for camera in cameras:
-            #         obs_list[camera.name] = camera_frames[camera.name]
-            #         camera_frames[camera.name] = []         
-            #     empty_camera_frames = {}
-            #     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, info_list[0]["language_instruction"])
-            # else:
-                # add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, info_list[0]["language_instruction"])
+            # # 关键修改: 创建全新的DatasetWriter实例(而不是修改现有实例)
+            # dataset_writer = DatasetWriter(
+            #     base_dir="records_tmp/shoprpp",
+            #     env_name="shop",
+            #     env_version="1.0"
+            # )
+            #dataset_writer.set_UUIDPATH()
+            # 以下是您原有的保存代码(保持不变)
             add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"])
+            #dataset_writer.set_()
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -853,10 +1039,22 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            dataset_writer = DatasetWriter(file_path=record_path,
-                                        env_name=env_id,
-                                        env_version=env.get_env_version(),
-                                        env_kwargs=kwargs)
+
+#             dataset_writer = DatasetWriter(file_path=record_path,
+#                                         env_name=env_id,
+#                                         env_version=env.get_env_version(),
+#                                         env_kwargs=kwargs)
+
+
+            # dataset_writer = DatasetWriter(file_path=record_path,
+            #                             env_name=env_id,
+            #                             env_version=env.unwrapped.get_env_version(),
+            #                             env_kwargs=kwargs)
+            dataset_writer = DatasetWriter(
+                                    base_dir=os.path.dirname(record_path),           # 用 record_path 的父目录
+                                    env_name=env_id,
+                                    env_version=env.unwrapped.get_env_version(),
+                                    env_kwargs=kwargs)
 
 
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
@@ -956,7 +1154,8 @@ def run_example(orcagym_addr : str,
 
     finally:
         print("Simulation stopped")
-        if run_mode == "teleoperation":
+        # if run_mode == "teleoperation":
+        if run_mode == "teleoperation" and 'dataset_writer' in locals():
             dataset_writer.finalize()
         env.close()
 
