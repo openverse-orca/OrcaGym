@@ -437,18 +437,11 @@ class DualArmEnv(RobomimicEnv):
                 idxs      = random.sample(range(total), k=n_select)
                 # 根据索引分别取 actor_name 与 spawn_name
                 short_names = [full[i]  for i in idxs]
-                spawns      = [spawn[i] for i in idxs]
                 # 只改 object_bodys/sites/joints 三项，保持 actors 原样
                 self._config["object_bodys"]  = list(short_names)
                 self._config["object_sites"]  = [f"{n}site"   for n in short_names]
                 self._config["object_joints"] = [f"{n}_joint" for n in short_names]
-                # 重新构 Task 并 spawn 出来
-                self._task.load_config(self._config)
-                for actor_name, spawnable_name in zip(short_names, spawns):
-                    self._task.add_actor(actor_name, spawnable_name)
-                self._task.publish_scene()
-                updated_actors = True
-                #self._debug_list_loaded_objects()
+
 
         self._set_init_state()
         for ag in self._agents.values():

@@ -53,6 +53,7 @@ DEFAULT_CONFIG = {
     "actors": [], # actor的命名
     "actors_spawnable": [], # actor的spawnable name, spawnable在Asset/Prefabs下面
     "center": [0, 0, 0], # actor的中心位置
+    "infinity": [1000, 1000, 1], # actor的无限远位置
     "bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "description": [],
 
@@ -153,6 +154,7 @@ class AbstractTask:
         self.random_actor_rotation = self.__get_config_setting__("random_actor_rotation", config)
         self.random_actor_color = self.__get_config_setting__("random_actor_color", config)
         self.center = self.__get_config_setting__("center", config)
+        self.infinity = self.__get_config_setting__("infinity", config)
         self.bound = self.__get_config_setting__("bound", config)
         self.actors = self.__get_config_setting__("actors", config)
         self.actors_spawnable = self.__get_config_setting__("actors_spawnable", config)
@@ -274,7 +276,7 @@ class AbstractTask:
         if self.random_actor_position:
             position = random_pos
         else:
-            position = self.center
+            position = self.infinity    # 初始化到无限远位置
 
         if self.random_actor_rotation:
             rotation = random_xquat

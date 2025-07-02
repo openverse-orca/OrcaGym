@@ -112,6 +112,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
     Returns:
         _type_: _description_
     """
+    spawn_scene(env, env._config)  # 初始化场景
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
@@ -613,9 +614,9 @@ def augment_episode(env : DualArmEnv,
         
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
+            return obs_list, reward_list, done_list, info_list, [], timestep_list,in_goal
         
-    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
+    return obs_list, reward_list, done_list, info_list, [], timestep_list,in_goal
  
 def do_trajectory_augmentation(
         env : DualArmEnv, 
