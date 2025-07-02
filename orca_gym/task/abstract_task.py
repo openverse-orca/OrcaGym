@@ -1,7 +1,7 @@
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
 
-import orca_gym.scene.orca_gym_scene as orca_gym_scene
+from orca_gym.scene.orca_gym_scene import Actor, MaterialInfo, LightInfo, OrcaGymScene
 import numpy as np
 import random
 import warnings, time
@@ -49,6 +49,7 @@ DEFAULT_CONFIG = {
     "random_actor": False, # 是否随机添加Actor，actor与Agent同级
     "random_actor_position": False, # 是否随机Actor的位置
     "random_actor_rotation": False, # 是否随机Actor的旋转
+    "random_actor_color": True, # 是否随机Actor的颜色
     "actors": [], # actor的命名
     "actors_spawnable": [], # actor的spawnable name, spawnable在Asset/Prefabs下面
     "center": [0, 0, 0], # actor的中心位置
@@ -105,7 +106,7 @@ class AbstractTask:
         self.load_config(config)
         self.task_dict = {}
 
-        self.scene = orca_gym_scene.OrcaGymScene(self.grpc_addr)
+        self.scene = OrcaGymScene(self.grpc_addr)
 
         self._init_env_callback = init_env_callback
 
@@ -150,6 +151,7 @@ class AbstractTask:
         self.random_actor = self.__get_config_setting__("random_actor", config)
         self.random_actor_position = self.__get_config_setting__("random_actor_position", config)
         self.random_actor_rotation = self.__get_config_setting__("random_actor_rotation", config)
+        self.random_actor_color = self.__get_config_setting__("random_actor_color", config)
         self.center = self.__get_config_setting__("center", config)
         self.bound = self.__get_config_setting__("bound", config)
         self.actors = self.__get_config_setting__("actors", config)
@@ -227,12 +229,16 @@ class AbstractTask:
 
 
 
-    def generate_actors(self):
-        idxs = []
-        if self.random_actor:
+    def generate_actors(self, random_actor):
+        if random_actor:
+            idxs = []
             total = len(self.actors)
             n_select = random.randint(1, total)
             idxs = random.sample(range(total), n_select)
+            for i in idxs:
+                self.add_actor(self.actors[i], self.actors_spawnable[i])
+        else:
+            idxs = list(range(len(self.actors)))
             for i in idxs:
                 self.add_actor(self.actors[i], self.actors_spawnable[i])
         return idxs
@@ -275,8 +281,9 @@ class AbstractTask:
         else:
             rotation = rotations.euler2quat([0, 0, 0])
 
-        actor = orca_gym_scene.Actor(actor_name, spawnable_name, position, rotation, scale=1.0)
+        actor = Actor(actor_name, spawnable_name, position, rotation, scale=1.0)
         self.scene.add_actor(actor)
+
 
     def add_light(self, light_name, spawnable_name):
         # 1) 位置：要么随机，要么固定在 center
@@ -290,7 +297,7 @@ class AbstractTask:
             # 绕 X 轴 -90° → 光照沿 −Z 方向（竖直向下）
             rotation = rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
 
-        actor = orca_gym_scene.Actor(
+        actor = Actor(
             name=light_name,
             spawnable_name=spawnable_name,
             position=position,
@@ -314,7 +321,7 @@ class AbstractTask:
         if intensity is None:
             intensity = np.random.uniform(1000, 2000.0)
 
-        light_info = orca_gym_scene.LightInfo(color=color, intensity=intensity)
+        light_info = LightInfo(color=color, intensity=intensity)
         self.scene.set_light_info(light_name, light_info)
 
     def set_actor_material(self, actor_name, base_color=None):
@@ -328,11 +335,12 @@ class AbstractTask:
                                    np.random.uniform(0.0, 1.0),
                                    np.random.uniform(0.0, 1.0),
                                    1.0])
-        material_info = orca_gym_scene.MaterialInfo(base_color=base_color)
+        print(f"[Debug-Actor] set_actor_material → {actor_name}, base_color={base_color}")
+        material_info = MaterialInfo(base_color=base_color)
         self.scene.set_material_info(actor_name, material_info)
 
     def add_actor_with_pose(self, actor_name, spawnable_name, position, rotation):
-        actor = orca_gym_scene.Actor(actor_name, spawnable_name, position, rotation, scale = 1.0)
+        actor = Actor(actor_name, spawnable_name, position, rotation, scale = 1.0)
         self.scene.add_actor(actor)
 
     def publish_scene(self):

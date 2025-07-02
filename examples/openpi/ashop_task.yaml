@@ -2,20 +2,25 @@
 level_name: "shop"
 random_light : true
 num_lights: 3
-random_light_position: false
-random_light_rotation: false
+random_light_position: true
+random_light_rotation: true
 lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
 lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
 light_center: [-6.35, 2.56, 2.32]
 light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+
+object_bodys: [ "bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite", "salt_site", "can_site"]
+object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint", "salt_joint", "can_joint"]
 
 goal_bodys: ["basket"]
 goal_sites: ["basketsite"]
 goal_joints: ["basket_joint"]
 
 random_actor : true
-random_actor_position: false
-random_actor_rotation: false
+random_actor_position: true
+random_actor_rotation: true
+random_actor_color: true
 actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 actors_spawnable: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 center: [-6.35, 2.56, 2.32]

@@ -282,7 +282,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
-        # 'camera_frames': camera_frames,
+        'camera_frames': camera_frames,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'language_instruction': language_instruction
     })
@@ -366,52 +366,73 @@ def playback_episode(env : DualArmEnv,
     
     print("Episode tunkated!")
 
+def all_object_joints_exist(cfg, model) -> bool:
+    """
+    检查 cfg 中定义的 object_joints 是否都存在于 model 的 joint 字典中。
+    """
+    expected_joints = cfg.get("object_joints", [])
+    model_joints = model.get_joint_dict().keys()
 
+    missing = [j for j in expected_joints if not any(j in mj for mj in model_joints)]
+    
+    if missing:
+        print("[Check] Missing joints:")
+        for j in missing:
+            print(f"  - {j} (expected but not found in model)")
+        return False
 
-def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
+    return True
+
+def spawn_scene(env: DualArmEnv, task_config: Dict[str, Any]) -> None:
     global _light_counter
 
-    # 0) 先从demo_data取物体名写入，确保reset_model里能拿到
+    env._task.load_config(task_config)
+
+    # 初次初始化，什么都没有，先把object创建出来
+    if not all_object_joints_exist(task_config, env.model):
+        env._task.publish_scene()   # 清空当前缓存
+        env._task.generate_actors(random_actor=False)
+        env._task.publish_scene()
+        time.sleep(1)  # 等待场景加载完成
+
+
+    # 满足light切换条件，从新创建一次场景
+    if env._config.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
+        actor_idxs = env._task.generate_actors(random_actor=False)
+        light_idxs = env._task.generate_lights()
+        env._task.publish_scene()
+
+        # 先publish scene，确保所有actor和light都被创建，然后再设置
+        if env._task.random_actor_color:
+            for idx in actor_idxs:
+                env._task.set_actor_material(env._task.actors[idx])
+
+        for idx in light_idxs:
+            env._task.set_light_info(env._task.lights[idx])
+        env.mj_forward()
+        env.render()
+        time.sleep(1)  # 等待场景加载完成
+
+    _light_counter += 1
+
+def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     if "objects" in demo_data:
-        object_names = []
-        for e in demo_data["objects"]:
-            jn = e["joint_name"]
-            if isinstance(jn, (bytes, bytearray)):
-                jn = jn.decode("utf-8")
-            object_names.append(jn.replace("_joint", ""))
-        env._playback_demo_bodies = object_names  # 录制物体名列表
         env.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
 
-    # 1) 清空spawned列表，确保reset_model重新spawn
-    env._spawned_object_list = []
-
-    # 2) 重置环境（会调用reset_model）
+    # 场景初始化
+    spawn_scene(env, env._config)
     obs, info = env.reset(seed=42)
 
-    # 3) 恢复录制好的 objects/goals (用于场景替换)
+    # 按保存的记录放置物品
     env.replace_objects(demo_data['objects'])
     if 'goals' in demo_data and demo_data['goals'] is not None:
         env.replace_goals(demo_data['goals'])
     env.mj_forward()
 
-    # 4) 光照和渲染等逻辑不变
-    cfg = env._config
-    if cfg.get("random_light", False) and (_light_counter % _LIGHT_SWITCH_PERIOD == 0):
-        light_idxs = env._task.generate_lights()
-        env._task.publish_scene()
-        for idx in light_idxs:
-            env._task.set_light_info(env._task.lights[idx])
-        env.mj_forward()
-        env.render()
-        time.sleep(0.05)
-
-    _light_counter += 1
-
-    # 5) 重新采样目标物体
+    # 如果需要重新采样目标物体位置
     if sample_range > 0.0:
         resample_target_object(env, demo_data, sample_range)
 
-    # 6) 返回观察和信息
     obs = env._get_obs().copy()
     info = {
         "object": demo_data['objects'],

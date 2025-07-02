@@ -109,8 +109,6 @@ class DualArmEnv(RobomimicEnv):
         kwargs["task"] = self._task
         self._teleop_counter = 0
         self._got_task = False
-        self._spawned_object_list: list[str] = []
-        self._playback_demo_bodies = []
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -427,20 +425,13 @@ class DualArmEnv(RobomimicEnv):
             # 否则继续尝试
     
 
-
-
-
-
-
-    def reset_model(self) -> tuple[dict, dict]:
-        cfg = self._config
-        updated_actors = False
-        if self._run_mode == RunMode.TELEOPERATION and cfg.get("random_actor", False):
+    def reset_teleoperation(self) -> tuple[dict, dict]:
+        if self._config.get("random_actor", False):
             self._teleop_counter += 1
             if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
                 # 随机挑 3-5 个 prefab 的 short name（如 "salt","jar_01"……）
-                full      = cfg["actors"]
-                spawn     = cfg["actors_spawnable"]
+                full      = self._config["actors"]
+                spawn     = self._config["actors_spawnable"]
                 total     = len(spawn)
                 n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
                 idxs      = random.sample(range(total), k=n_select)
@@ -448,70 +439,59 @@ class DualArmEnv(RobomimicEnv):
                 short_names = [full[i]  for i in idxs]
                 spawns      = [spawn[i] for i in idxs]
                 # 只改 object_bodys/sites/joints 三项，保持 actors 原样
-                cfg["object_bodys"]  = list(short_names)
-                cfg["object_sites"]  = [f"{n}site"   for n in short_names]
-                cfg["object_joints"] = [f"{n}_joint" for n in short_names]
+                self._config["object_bodys"]  = list(short_names)
+                self._config["object_sites"]  = [f"{n}site"   for n in short_names]
+                self._config["object_joints"] = [f"{n}_joint" for n in short_names]
                 # 重新构 Task 并 spawn 出来
-                self._task.load_config(cfg)
+                self._task.load_config(self._config)
                 for actor_name, spawnable_name in zip(short_names, spawns):
                     self._task.add_actor(actor_name, spawnable_name)
                 self._task.publish_scene()
                 updated_actors = True
                 #self._debug_list_loaded_objects()
 
-        # —— B) 重置 robot & agents 内部状态 —— #
-
         self._set_init_state()
-
         for ag in self._agents.values():
-
             ag.on_reset_model()
-    
-        # ------------- POLICY_NORMALIZED 分支：直接早退 -------------
-        if self._run_mode == RunMode.POLICY_NORMALIZED:
-            # （此时 reset_playback_env 已经通过 safe_spawn + replace_objects/replace_goals
-            #  **把场景恢复到录制状态** 并 mj_forward() 过一遍）
-            # 再做一次 agent.on_reset_model + mj_forward 保证观察正常：
-            self._set_init_state()
-            for ag in self._agents.values():
-                ag.on_reset_model()
-            self.mj_forward()
-    
-            # 对齐 spawned list
-            self._spawned_object_list = list(getattr(self, "_playback_demo_bodies", []))
-    
-            print("[ResetModel][D] POLICY_NORMALIZED early return")
-            obs = self._get_obs().copy()
-            return obs, {
-                "objects": getattr(self, "objects", None),
-                "goals":   getattr(self, "goals",   None),
-            }
-    
-        # ------------------ 其余分支 ------------------
-        # （比如 TELEOPERATION 第一次或升级后需要走 get_task）
-    
-        if self._run_mode == RunMode.TELEOPERATION:
-            self.safe_get_task(self)
-            instr = self._task.get_language_instruction()
-            m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
-            if m:
-                level, obj, goal = m.groups()
-                print(
-                    f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
-                    f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
-                    f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
-                )
-            else:
-                # 万一格式不符，回退到无色输出
-                print(instr)
 
-        # —— 最后对“正常”模式构造 objects/goals —— #
+        self.safe_get_task(self)
+        instr = self._task.get_language_instruction()
+        m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
+        if m:
+            level, obj, goal = m.groups()
+            print(
+                f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
+                f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
+                f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
+            )
+        else:
+            # 万一格式不符，回退到无色输出
+            print(instr)
+
         self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
-
-        # 推进一步仿真，返回 obs/info
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {"objects": self.objects, "goals": self.goals}
+    
+    def reset_normalized(self) -> tuple[dict, dict]:
+        self._set_init_state()
+        for ag in self._agents.values():
+            ag.on_reset_model()
+        self.mj_forward()
+
+        obs = self._get_obs().copy()
+        return obs, {
+            "objects": getattr(self, "objects", None),
+            "goals":   getattr(self, "goals",   None),
+        }
+    
+    def reset_model(self) -> tuple[dict, dict]:
+        if self._run_mode == RunMode.TELEOPERATION:
+            return self.reset_teleoperation()
+        elif self._run_mode == RunMode.POLICY_NORMALIZED:
+            return self.reset_normalized()
+        else:
+            raise ValueError(f"Invalid run mode: {self._run_mode}")
     
     def update_objects_goals(self, object_positions, goal_positions):
         # objects structured array
