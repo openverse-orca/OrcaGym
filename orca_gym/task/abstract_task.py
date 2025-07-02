@@ -11,25 +11,25 @@ LEVEL_RANGES = {
         "shop": {
             "x": (0.2, 0.612),
             "y": (-0.4, 0.4),
-            "z": (-0.2, -0.15),
-            "r": 0.1,
+            "z": -0.4,
+            "r": 0.3,
         },
         "yaodian": {
             "x": (0.44, 0.54),
             "y": (-0.4, 0.4),
-            "z": (0.1, 0.15),
+            "z": 0.15,
             "r": 0.1,
         },
         "kitchen": {
             "x": (0.25, 0.5),
             "y": (-0.4, 0.4),
-            "z": (-0.25, 0.0),
+            "z": -0.25,
             "r": 0.28,
         },
         "jiazi": {
             "x": (0.55, 0.65),
             "y": (-0.4, 0.4),
-            "z": (0.0, 0.1),
+            "z": 0.0,
             "r": 0.01,
         }
         # 新关卡直接加一条
@@ -192,7 +192,7 @@ class AbstractTask:
             for _ in range(max_trials):
                 lx = np.random.uniform(*ranges["x"])
                 ly = np.random.uniform(*ranges["y"])
-                lz = np.random.uniform(*ranges["z"])
+                lz = ranges["z"]
                 lr = ranges["r"]
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
@@ -206,6 +206,7 @@ class AbstractTask:
 
                 # 跳过落进目标的
                 goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
+                # print("goal0_pos:", goal0_pos, "wordl_pos:", world_pos)
                 # if np.linalg.norm(world_pos - goal0_pos) < 0.1:
                 if np.linalg.norm(world_pos - goal0_pos) < lr:
                     continue

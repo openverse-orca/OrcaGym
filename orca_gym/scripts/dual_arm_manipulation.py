@@ -442,7 +442,6 @@ def do_teleoperation(env,
                      dataset_writer : DatasetWriter, 
                      teleoperation_rounds : int, 
                      cameras : list[CameraWrapper], 
-                     obs_camera : bool,
                      rgb_size : tuple = (256, 256),
                      action_step : int = 1,):    
     
@@ -610,15 +609,11 @@ def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     spawn_scene(env, env._config)
     obs, info = env.reset(seed=42)
 
-    # 按保存的记录放置物品
-    env.replace_objects(demo_data['objects'])
-    if 'goals' in demo_data and demo_data['goals'] is not None:
-        env.replace_goals(demo_data['goals'])
-    env.mj_forward()
-
     # 如果需要重新采样目标物体位置
     if sample_range > 0.0:
-        resample_target_object(env, demo_data, sample_range)
+        resample_objects(env, demo_data, sample_range)
+    else:
+        replace_objects(env, demo_data)
 
     obs = env._get_obs().copy()
     info = {
@@ -639,7 +634,13 @@ def get_target_object_and_goal(demo: dict) -> tuple:
 
     return target_obj, target_goal
 
-def resample_target_object(env: DualArmEnv, demo: dict, sample_range: float) -> None:
+def replace_objects(env: DualArmEnv, demo_data: dict) -> None:
+    env.replace_objects(demo_data['objects'])
+    if 'goals' in demo_data and demo_data['goals'] is not None:
+        env.replace_goals(demo_data['goals'])
+    env.mj_forward()
+
+def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
     env._task.load_config(env._config)
     target_obj, _ = get_target_object_and_goal(demo)
     if target_obj:
@@ -661,7 +662,7 @@ def resample_target_object(env: DualArmEnv, demo: dict, sample_range: float) -> 
             env._task.random_objs_and_goals(env)
             target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
             target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
-            # print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
+            print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
             if target_obj_position_delta < sample_range:
                 break
         
@@ -804,72 +805,10 @@ def augment_episode(env : DualArmEnv,
         
     return obs_list, reward_list, done_list, info_list, [], timestep_list,in_goal
  
-def do_trajectory_augmentation(
+
+def do_augmentation(
         env : DualArmEnv, 
         cameras : list[CameraWrapper], 
-        obs_camera : bool,
-        rgb_size : tuple,                    
-        original_dataset_path : str, 
-        augmented_dataset_path : str, 
-        augmented_noise : float, 
-        sample_range : float,
-        augmented_rounds : int,
-        action_step : int = 1
-    ):
-    realtime = False
-    
-    # Copy the original dataset to the augmented dataset
-    dataset_reader = DatasetReader(file_path=original_dataset_path)
-    dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
-                                    env_name=dataset_reader.get_env_name(),
-                                    env_version=dataset_reader.get_env_version(),
-                                    env_kwargs=dataset_reader.get_env_kwargs())
-    augmented_dataset_reader = DatasetReader(file_path=augmented_dataset_path)
-
-    demo_names = dataset_reader.get_demo_names()
-    for original_demo_name in demo_names:
-        done_demo_count = 0
-        done = False
-        trial_count = 0
-        max_trials = 2
-        demo_data = dataset_reader.get_demo_data(original_demo_name)
-        while not done and trial_count < max_trials:
-            env.objects = demo_data['objects']
-            # obs, info = reset_playback_env(env, demo_data, sample_range)
-            print("Augmenting original demo: ", original_demo_name)
-            language_instruction = demo_data['language_instruction']
-            
-            obs_list, reward_list, done_list, info_list\
-                , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
-                                                                demo_data, noise_scale=augmented_noise, 
-                                                                sample_range=sample_range, realtime=realtime, 
-                                                                action_step=action_step)
-            if  in_goal:
-                add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
-                
-                done_demo_count += 1
-                print(f"Episode done! {done_demo_count} / {augmented_rounds} for demo {original_demo_name}")
-                if done_demo_count >= augmented_rounds:
-                    print(f"Augmented {done_demo_count} demos for {original_demo_name}.")
-                    done = True
-                trial_count = 0
-                new_demo_name = augmented_dataset_reader.get_demo_names()[-1]
-                print("New demo name: ", new_demo_name)
-                demo_data = augmented_dataset_reader.get_demo_data(new_demo_name)
-            else:
-                print("Episode failed! Retrying...")
-                trial_count += 1
-        if not done:
-            print(f"Failed to augment demo {original_demo_name} after {max_trials} tries. Skipping.")
-    
-    dataset_writer.shuffle_demos()
-    dataset_writer.finalize()       
-    
-
-def do_vision_augmentation(
-        env : DualArmEnv, 
-        cameras : list[CameraWrapper], 
-        obs_camera : bool,
         rgb_size : tuple,                    
         original_dataset_path : str, 
         augmented_dataset_path : str, 
@@ -883,11 +822,11 @@ def do_vision_augmentation(
     
     # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
-    dataset_writer = DatasetWriter(file_path=augmented_dataset_path,
+    dataset_writer = DatasetWriter(base_dir=os.path.dirname(augmented_dataset_path),
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
-
+    dataset_writer.set_UUIDPATH()
 
     for camera in cameras:
         camera.start()
@@ -905,7 +844,6 @@ def do_vision_augmentation(
             while not done and trial_count < max_trials:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
                 env.objects = demo_data['objects']
-                # obs, info = reset_playback_env(env, demo_data, sample_range)
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 
@@ -915,15 +853,8 @@ def do_vision_augmentation(
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if  in_goal:
-                    
-                    if obs_camera:
-                        for camera in cameras:
-                            obs_list[camera.name] = camera_frames[camera.name]
-                        empty_camera_frames = {}
-                        add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, language_instruction)
-                    else:
-                        add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
-                    
+                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
+                                        camera_frames, timestep_list, language_instruction)
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
@@ -1117,9 +1048,11 @@ def run_example(orcagym_addr : str,
             action_step = dataset_reader.get_env_kwargs()["action_step"]
             action_type = dataset_reader.get_env_kwargs()["action_type"]
             
-            # 轨迹增广采用ik方式
+            # 轨迹增广采用ik方式，实现末端位置控制, 视觉增广采用直接读取关节进行回放
             if sample_range > 0.0:
                 action_type = ActionType.END_EFFECTOR_OSC
+            else:
+                action_type = ActionType.JOINT_POS
 
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
@@ -1144,10 +1077,7 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            if (sample_range > 0.0):
-                do_trajectory_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
-            else:
-                do_vision_augmentation(env, cameras, False, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
+            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")

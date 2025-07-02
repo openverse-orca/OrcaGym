@@ -60,12 +60,12 @@ class DatasetWriter:
         self.video_dir = os.path.join(self.camera_dir, "video")
        # print("self.uuid_dir..............:",self.uuid_dir)
         self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
-       # os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
-        # os.makedirs(self.camera_dir, exist_ok=True)
-        # os.makedirs(self.parameters_dir, exist_ok=True)
-        # os.makedirs(self.proprio_stats_dir, exist_ok=True)
-        # os.makedirs(self.depth_dir, exist_ok=True)
-        # os.makedirs(self.video_dir, exist_ok=True)
+        os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
+        os.makedirs(self.camera_dir, exist_ok=True)
+        os.makedirs(self.parameters_dir, exist_ok=True)
+        os.makedirs(self.proprio_stats_dir, exist_ok=True)
+        os.makedirs(self.depth_dir, exist_ok=True)
+        os.makedirs(self.video_dir, exist_ok=True)
         self.mp4_save_path : str = None
         
 
@@ -453,9 +453,5 @@ class DatasetReader:
                 'timesteps': np.array(demo_group['timesteps']),
                 'language_instruction': demo_group['language_instruction'][()] if 'language_instruction' in demo_group else None,
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
-                'camera_frames': {camera_name: [np.array(frame_data) for _, frame_data in camera_group.items()]
-                                  for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')},  
-#                 'camera_frames': {}  # 修改16: 不再从HDF5中读取视频路径，由调用者根据目录结构处理
-
             }
         return demo_data

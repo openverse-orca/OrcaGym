@@ -504,12 +504,12 @@ class DualArmRobot(AgentBase):
         elif self._env.action_type == ActionType.END_EFFECTOR_IK:
             action_l = self._action_B_to_action(action[:6])
             quat = transform_utils.axisangle2quat(action_l[3:6])
-            action_l_xquat = np.array([quat[1], quat[2], quat[3], quat[0]])  # 转换为 wxyz 格式
+            action_l_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 wxyz 格式
             ctrl_l = self.set_l_arm_position_ctrl(action_l[:3], action_l_xquat)
 
             action_r = self._action_B_to_action(action[14:20])
             quat = transform_utils.axisangle2quat(action_r[3:6])
-            action_r_xquat = np.array([quat[1], quat[2], quat[3], quat[0]])
+            action_r_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 wxyz 格式
             ctrl_r = self.set_r_arm_position_ctrl(action_r[:3], action_r_xquat)
 
             self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
