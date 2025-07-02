@@ -89,7 +89,7 @@ class DualArmEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
 
-        if self._ctrl_device == ControlDevice.VR:
+        if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION:
             self._joystick = {}
             pico_joystick = []
             for i in range(len(pico_ports)):
@@ -104,6 +104,7 @@ class DualArmEnv(RobomimicEnv):
 
         self._reward_printer = RewardPrinter()
         self._config = task_config_dict
+        self._config['grpc_addr'] = orcagym_addr
         self._task = PickPlaceTask(self._config)
         self._task.register_init_env_callback(self.init_env)
         kwargs["task"] = self._task
