@@ -7,10 +7,11 @@ import signal
 
 
 from typing import Any, Dict
-from flask import g
+import uuid
+from flask import g, json
 import gymnasium as gym
 from gymnasium.envs.registration import register
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import h5py
 from orca_gym.environment.orca_gym_env import RewardType
@@ -49,6 +50,77 @@ CAMERA_CONFIG = {
 }
 _light_counter = 0
 _LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
+INIT_SCENE_TEXT = {
+    "shop":    ("一个机器人站在柜台前",  "A robot stands in front of a counter."),
+    "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
+    "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
+    "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
+}
+_light_counter = 0
+_LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
+
+# 顶部：维护一个简单的中英映射
+
+
+OBJ_CN = {
+    "can": "罐子",
+    "bottle_red":"红色瓶子",
+    "bottle_blue":"蓝色瓶子",
+    "jar_01": "罐子",
+    "salt": "盐罐",
+    "basket": "篮子",
+    "medicinechest": "药柜",
+    "niuhuangwan": "牛黄丸",
+    "qinghuopian": "清火片",
+    "orangebox" : "橙色药盒",
+    "pipalu": "枇杷露",
+    "xiaokepian": "消咳片",
+    "bow_yellow_kps": "黄色碗",
+    "coffeecup_white_kps": "白色咖啡杯",
+    "basket_kitchen_01" : "篮子",
+    "shoppingtrolley_01" : "购物手推车"
+}
+
+def normalize_key(key: str) -> str:
+    """去掉多余标点，统一小写"""
+    return re.sub(r'[^\w]', '', key).lower()
+
+def eng2cn(instruction_en: str) -> str:
+    """
+    把类似 "level: shop object: bottle_blue to goal: basket" 或
+    "put bottle_blue into basket" 之类的英文指令，翻成中文。
+    """
+    text = instruction_en.strip().lower()
+    
+    # 1) 先试“object … to goal …” 的结构
+    m = re.search(r'object[:\s]+([\w_]+)\s+to\s+goal[:\s]+([\w_]+)', text)
+    if m:
+        obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(2))
+        obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        return f"将{obj_cn}放入{goal_cn}中"
+    
+    # 2) 再试 put … into … 结构
+    m = re.search(r'put\s+([\w_]+)\s+into\s+([\w_]+)', text)
+    if m:
+        obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(2))
+        obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        return f"将{obj_cn}放入{goal_cn}中"
+    
+    # 3) 再试 move … to … 结构
+    m = re.search(r'move\s+([\w_]+)\s+to\s+([\w_]+)', text)
+    if m:
+        obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(2))
+        obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        return f"将{obj_cn}移动到{goal_cn}前"
+    
+    # 4) 回退：保留原文
+    return instruction_en
 
 def register_env(orcagym_addr : str, 
                  env_name : str, 
@@ -236,6 +308,50 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
         else:
             print("Invalid input! Please input 'y', 'n' or 'e'.")
 
+def append_task_info_json(
+        json_path,
+        episode_id: str,
+        level_name: str,
+        sub_scene_name: str,
+        language_instruction_cn: str,
+        language_instruction_en: str,
+        action_config: list[dict],
+        data_gen_mode: str = "simulation",
+        sn_code: str = "A2D0001AB00029",
+        sn_name: str = "青龙"):
+    """把一条 episode 的元信息追加到同一个 task_info.json 里。"""
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            all_eps = json.load(f)
+    except FileNotFoundError:
+        all_eps = []
+
+    scene_key = "shop" if level_name == "jiazi" else level_name
+    init_cn, init_en = INIT_SCENE_TEXT.get(scene_key, ("", ""))
+
+    episode = {
+        "episode_id": episode_id,
+        "scene_name": scene_key.title(),
+        "sub_scene_name": sub_scene_name,
+        "init_scene_text": init_cn,
+        "english_init_scene_text": init_en,
+        "task_name": language_instruction_cn,
+        "english_task_name": language_instruction_en,
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": data_gen_mode,
+        "sn_code": sn_code,
+        "sn_name": sn_name,
+        "label_info": {
+            "action_config": action_config,
+            "key_frame": []
+        }
+    }
+
+    all_eps.append(episode)
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(all_eps, f, ensure_ascii=False, indent=4)
+
 def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         obs_list, 
                         reward_list, 
@@ -307,136 +423,58 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'language_instruction': language_instruction
     })
+    # ----------------- 新增 JSON 写入 -----------------
+    # 1) HDF5 文件路径 & 场景目录
+    h5_path   = dataset_writer.basedir                      # e.g. "yaodian/dual_arm_XXXX.hdf5"
+    scene_dir = os.path.dirname(h5_path)
+    start_frame = 0
+    max_len = max(len(frames) for frames in (camera_frames.values() if isinstance(camera_frames, dict) else [camera_frames]))
+
+    end_frame = max_len - 1
+
+    CST = timezone(timedelta(hours=8))
+    timestamp_cst = datetime.now(CST).isoformat()
+
+    # 2) 公开接口拿注册进来的 task_config
+    task_cfg   = dataset_writer._env_args.get("task_config", {})
+    text = info_list[0]["language_instruction"]
+    m = re.search(r'level[:\s]+([\w_]+)', text, re.IGNORECASE)
+    level_name = m.group(1).lower() if m else "unknown"
+    # 然后同上，用 level_name 去拿描述、拼文件名……
+    episode_id = dataset_writer.experiment_id
+
+    # 3) 场景名／子场景／初始文本
+    scene_name     = "shop" if level_name == "jiazi" else level_name
+    sub_scene_name = scene_name
+
+    # 4) JSON 文件固定名
+    json_path = os.path.join(scene_dir, "task_info.json")
+
+    # 5) 英文任务名：如果 info_list 里有 en 字段就用它
+    language_instruction = info_list[0].get("language_instruction")
+    lang_cn = eng2cn(language_instruction)
+
+    action_config = [{
+        "start_frame": start_frame,
+        "end_frame": end_frame,
+        "timestamp_cst": timestamp_cst,
+        "skill": "pick and place",                # 或者其他你想用的内部标识
+        "action_text": lang_cn,
+        "english_action_text": language_instruction
+    }]
+    
+    append_task_info_json(
+        json_path=json_path,
+        episode_id=episode_id,
+        level_name=level_name,
+        sub_scene_name=sub_scene_name,
+        language_instruction_cn=lang_cn,
+        language_instruction_en=language_instruction,
+        action_config=action_config,
+        data_gen_mode="simulation",
+    )
 
 
-# def add_demo_to_dataset(dataset_writer: DatasetWriter,
-#                        obs_list,
-#                        reward_list,
-#                        done_list,
-#                        info_list,
-#                        camera_frames,  # 现在可以是混合帧列表
-#                        timestep_list,
-#                        language_instruction):
-#     """
-#     将演示数据添加到数据集写入器中
-    
-#     参数:
-#         dataset_writer: DatasetWriter实例
-#         obs_list: 观测数据列表
-#         reward_list: 奖励列表
-#         done_list: 完成标志列表
-#         info_list: 信息列表
-#         camera_frames: 相机帧数据，可以是:
-#             - 字典格式: {'camera_name': frames_list, ...}
-#             - 列表格式: [frames_list1, frames_list2, ...] (按固定顺序)
-#             - 混合帧列表: 所有相机帧混合在一起(需要分割)
-#         timestep_list: 时间步列表
-#         language_instruction: 语言指令字符串
-#     """
-#     # 只处理第一个info对象(初始状态)
-#     first_info = info_list[0]
-    
-#     # ... [前面的代码保持不变] ...
-    
-#     # 处理camera_frames参数(增强错误处理)
-#     camera_frames_dict = None
-    
-#     # 情况1: camera_frames已经是字典格式
-#     if isinstance(camera_frames, dict):
-#         camera_frames_dict = camera_frames
-        
-#     # 情况2: camera_frames是列表格式(按固定顺序)
-#     elif isinstance(camera_frames, list):
-#         # 定义相机名称顺序
-#         camera_names = [
-#             'camera_head_color',
-#             'camera_head_depth',
-#             'camera_wrist_l_color',
-#             'camera_wrist_l_depth',
-#             'camera_wrist_r_color',
-#             'camera_wrist_r_depth'
-#         ]
-        
-#         # 检查camera_frames[0]是否是列表
-#         if len(camera_frames) > 0 and isinstance(camera_frames[0], (list, np.ndarray)):
-#             # 正常情况: 每个相机一个帧列表
-#             if len(camera_frames) == len(camera_names):
-#                 camera_frames_dict = {
-#                     camera_name: frames 
-#                     for camera_name, frames in zip(camera_names, camera_frames)
-#                 }
-#             else:
-#                 # 可能是所有相机帧混合在一起(单个列表)
-#                 total_frames = camera_frames[0]  # 假设列表中只有一个元素(混合帧列表)
-#                 if not isinstance(total_frames, (list, np.ndarray)):
-#                     raise ValueError(
-#                         f"预期camera_frames[0]是列表或数组, 实际得到{type(total_frames)}"
-#                     )
-                
-#                 num_cameras = len(camera_names)
-#                 frames_per_camera = len(total_frames) // num_cameras
-                
-#                 camera_frames_dict = {
-#                     camera_name: total_frames[i*frames_per_camera : (i+1)*frames_per_camera]
-#                     for i, camera_name in enumerate(camera_names)
-#                 }
-#         else:
-#             raise ValueError(
-#                 f"预期camera_frames[0]是列表或数组, 实际得到{type(camera_frames[0])}"
-#             )
-            
-#     # 情况3: camera_frames是单个帧列表(混合所有相机帧)
-#     elif isinstance(camera_frames, (np.ndarray, list)):
-#         total_frames = camera_frames
-#         if not isinstance(total_frames, (list, np.ndarray)):
-#             raise ValueError(
-#                 f"预期camera_frames是列表或数组, 实际得到{type(total_frames)}"
-#             )
-        
-#         num_cameras = 6  # 假设有6个相机
-#         frames_per_camera = len(total_frames) // num_cameras
-        
-#         camera_names = [
-#             'camera_head_color',
-#             'camera_head_depth',
-#             'camera_wrist_l_color',
-#             'camera_wrist_l_depth',
-#             'camera_wrist_r_color',
-#             'camera_wrist_r_depth'
-#         ]
-        
-#         camera_frames_dict = {
-#             camera_name: total_frames[i*frames_per_camera : (i+1)*frames_per_camera]
-#             for i, camera_name in enumerate(camera_names)
-#         }
-        
-#     else:
-#         raise ValueError(
-#             "camera_frames参数必须是以下类型之一:"
-#             "1. 字典格式: {'camera_name': frames_list, ...}"
-#             "2. 列表格式: [frames_list1, frames_list2, ...] (按固定顺序)"
-#             "3. 单个帧列表(所有相机帧混合在一起)"
-#         )
-
-#     # 构建demo_data字典
-#     demo_data = {
-#         'states': np.array([
-#             np.concatenate([info["state"]["qpos"], info["state"]["qvel"]])
-#             for info in info_list
-#         ], dtype=np.float32),
-#         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-#         'objects': objects_array,
-#         'goals': goals_array,
-#         'rewards': np.array(reward_list, dtype=np.float32),
-#         'dones': np.array(done_list, dtype=np.int32),
-#         'obs': obs_list,
-#         'camera_frames': camera_frames_dict,  # 使用处理后的字典格式
-#         'timesteps': np.array(timestep_list, dtype=np.float32),
-#         'language_instruction': language_instruction
-#     }
-    
-#     # 添加演示数据到写入器
-#     dataset_writer.add_demo_data(demo_data)
 
 def do_teleoperation(env, 
                      dataset_writer : DatasetWriter, 
