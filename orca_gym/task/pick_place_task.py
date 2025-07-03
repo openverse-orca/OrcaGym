@@ -20,7 +20,7 @@ class PickPlaceTask(AbstractTask):
         # 每次都清空旧任务
         self.task_dict.clear()
         # 随机摆放
-        self.random_objs_and_goals(env, bounds=0.1)
+        self.random_objs_and_goals(env, random_rotation=True)
     
         # 如果没有可用的物体或目标，直接返回空
         if not self.object_bodys or not self.goal_bodys:

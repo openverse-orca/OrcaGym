@@ -172,7 +172,7 @@ class AbstractTask:
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
 
-    def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds=None):
+    def random_objs_and_goals(self, env: OrcaGymLocalEnv, random_rotation=True):
         object_bodys = [env.body(bn) for bn in self.object_bodys]
         obj_joints  = [env.joint(jn) for jn in self.object_joints]
         goal_joints = [env.joint(jn) for jn in self.goal_joints]
@@ -212,6 +212,9 @@ class AbstractTask:
                 # 跳过落进目标的
                 obj_qpos = _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat)
                 # print("[Debug] Placing object on joint:", joint, "at position:", obj_qpos)
+                if not random_rotation:
+                    org_qpos = env.query_joint_qpos([joint])[joint]
+                    obj_qpos[3:] = org_qpos[3:]
                 env.set_joint_qpos({joint: obj_qpos})
                 env.mj_forward()
                 placed_body.append(body)

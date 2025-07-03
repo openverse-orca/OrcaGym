@@ -29,6 +29,7 @@ from envs.manipulation.dual_arm_env import ActionType
 import re
 import gymnasium as gym
 from envs.manipulation.dual_arm_env import ControlDevice, RunMode, DualArmEnv
+from envs.manipulation.dual_arm_robot import DualArmRobot
 import numpy as np
 import yaml
 
@@ -649,6 +650,7 @@ def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
 
     # 如果需要重新采样目标物体位置
     if sample_range > 0.0:
+        replace_objects(env, demo_data) # 先还原，获得物品的原始旋转值
         resample_objects(env, demo_data, sample_range)
     else:
         replace_objects(env, demo_data)
@@ -697,8 +699,9 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
         # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
 
         resample_success = False
+        target_obj_position_delta = 0
         for _ in range(1000):  # 尝试1000次
-            env._task.random_objs_and_goals(env)
+            env._task.random_objs_and_goals(env, random_rotation=False)
             target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
             target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
             # print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
@@ -711,9 +714,176 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
         
         env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
-        print("[Info] Resampling target object and goal positions.", target_obj, target_obj_joint_name, target_obj_position)
+        print("[Info] Resampling target object", target_obj, "to delta:", target_obj_position_delta)
         pass
 
+
+def calculate_transform_matrix(a, b, a1, b1):
+    """
+    计算从向量[a, b]到[a1, b1]的变换矩阵
+    返回一个2x2 NumPy数组
+    
+    注意: 当输入向量为零向量时处理特殊情况
+    """
+    # 计算分母 D = a² + b²
+    D = a**2 + b**2
+    
+    if D == 0:  # 输入向量是零向量
+        if a1 == 0 and b1 == 0:
+            # 返回单位矩阵 (但这不是唯一解)
+            return np.eye(2)
+        else:
+            # 线性变换必须保持零向量不变
+            raise ValueError("输入向量是零向量但输出向量非零 - 无效线性变换")
+    
+    # 使用公式计算矩阵元素
+    m11 = (a*a1 + b*b1) / D
+    m12 = (b*a1 - a*b1) / D  # 注意这等同于公式中的 -(a*b1 - b*a1)/D
+    
+    # 简化形式创建矩阵 [m11, m12; -m12, m11]
+    return np.array([[m11, m12], [-m12, m11]])
+
+def apply_transform(matrix, x, y):
+    """
+    应用变换矩阵到向量[x, y]
+    返回变换后的向量[x1, y1]
+    """
+    # 将输入向量转换为列向量
+    vector = np.array([[x], [y]])
+    
+    # 应用矩阵乘法
+    transformed = matrix @ vector
+    
+    # 返回结果为一维数组
+    return transformed.flatten()
+
+def _get_noscale_action_list(env: DualArmEnv, action_list: np.ndarray) -> np.ndarray:
+    noscale_action_list = []
+    for action in action_list:
+        noscale_action = env.denormalize_action(action, env.env_action_range_min, env.env_action_range_max)
+        noscale_action_list.append(noscale_action)
+    return np.array(noscale_action_list)
+
+def _get_scaled_action_list(env: DualArmEnv, noscale_action_list: np.ndarray) -> np.ndarray:
+    scaled_action_list = []
+    for noscale_action in noscale_action_list:
+        scaled_action = env.normalize_action(noscale_action, env.env_action_range_min, env.env_action_range_max)
+        scaled_action_list.append(scaled_action)
+    return np.array(scaled_action_list)
+
+def _get_eef_xy_from_action(env: DualArmEnv, noscale_action_list: np.ndarray) -> np.ndarray:
+    xy_list = np.zeros((0, 4), dtype=np.float32)
+    robot: DualArmRobot = env._agents[env._agent_names[0]]
+    for noscale_action in noscale_action_list:
+        left_eef_action = robot._action_B_to_action(noscale_action[:6])
+        right_eef_action = robot._action_B_to_action(noscale_action[14:20])
+        xy = np.concatenate([left_eef_action[:2], right_eef_action[:2]]).flatten()
+        xy_list = np.concatenate([xy_list, [xy]])
+
+    return xy_list
+
+def _set_eef_xy_to_action(env: DualArmEnv, noscale_action_list: np.ndarray, xy_list: np.ndarray) -> np.ndarray:
+    robot: DualArmRobot = env._agents[env._agent_names[0]]
+    
+    for i, noscale_action in enumerate(noscale_action_list):
+        left_eef_action = robot._action_B_to_action(noscale_action[:6])
+        right_eef_action = robot._action_B_to_action(noscale_action[14:20])
+        left_eef_action[:2] = xy_list[i][:2]
+        right_eef_action[:2] = xy_list[i][2:]
+        noscale_action[:6] = robot._action_to_action_B(left_eef_action)
+        noscale_action[14:20] = robot._action_to_action_B(right_eef_action)
+
+    return noscale_action_list
+
+def _get_target_xy(env: DualArmEnv, demo_data: dict, target_obj: str) -> tuple[np.ndarray, np.ndarray]:
+    target_obj_full_name = env.body(target_obj) + "_joint"
+    env_objects = env.objects
+    demo_objects = demo_data.get("objects", [])
+    
+    # print("Demo Objects: ", demo_objects)
+    # print("Target Object: ", target_obj_full_name)
+    # print("env_objects: ", env_objects)
+
+    def _get_object_info(obj_name: str, objects: list[tuple]) -> dict:
+        for obj in objects:
+            name = obj[0]
+            # print("Checking object name: ", name)
+            if isinstance(name, (bytes, bytearray)):
+                name = name.decode('utf-8')
+            if name == obj_name:
+                return {
+                    "joint_name": name,
+                    "position": np.array(obj[1], dtype=np.float32),
+                    "orientation": np.array(obj[2], dtype=np.float32)
+                }
+            
+        print(f"Warning: Object '{obj_name}' not found in the provided objects list.")
+        return {}
+    
+    target_obj_demo_info = _get_object_info(target_obj_full_name, demo_objects)
+    target_obj_env_info = _get_object_info(target_obj_full_name, env_objects)
+
+    # print("Target Object Demo Info: ", target_obj_demo_info)
+    # print("Target Object Env Info: ", target_obj_env_info)
+
+    demo_xy = target_obj_demo_info.get("position", np.zeros(3, dtype=np.float32))[:2]
+    env_xy = target_obj_env_info.get("position", np.zeros(3, dtype=np.float32))[:2]
+    return demo_xy, env_xy
+
+def resample_actions(
+        env: DualArmEnv, 
+        demo_data: dict,
+    ) -> np.ndarray:
+
+    demo_action_list = demo_data['actions']
+    target_obj, _ = get_target_object_and_goal(demo_data)
+
+    if target_obj is None:
+        print("Warning: No target object found in the demo data.")
+        return demo_action_list
+    
+    noscale_action_list = _get_noscale_action_list(env, demo_action_list)
+    demo_xy_list = _get_eef_xy_from_action(env, noscale_action_list)
+    # print("Get xy_list from demo actions: ", demo_xy_list, "shape: ", demo_xy_list.shape)
+    # sys.exit(0)
+
+    demo_xy, env_xy = _get_target_xy(env, demo_data, target_obj)
+    print("Demo XY: ", demo_xy, "Env XY: ", env_xy)
+
+    # for i, xy in enumerate(demo_xy_list):
+    #     left_eef_xy = xy[:2]
+    #     right_eef_xy = xy[2:]
+    #     delta_left_xy = np.linalg.norm(left_eef_xy - demo_xy)
+    #     delta_right_xy = np.linalg.norm(right_eef_xy - demo_xy)
+    #     if delta_left_xy < 0.05 or delta_right_xy < 0.05:
+    #         print("Demo: close to target object, left: ", delta_left_xy, " right: ", delta_right_xy, "in action: ", i)
+    
+    transform_matrix = calculate_transform_matrix(
+        demo_xy[0], demo_xy[1], env_xy[0], env_xy[1]
+    )
+    print("Transform Matrix: ", transform_matrix)
+
+    env_xy_list = np.zeros_like(demo_xy_list)
+    for i, xy in enumerate(demo_xy_list):
+        left_eef_xy = xy[:2]
+        right_eef_xy = xy[2:]
+        transformed_left_xy = apply_transform(transform_matrix, left_eef_xy[0], left_eef_xy[1])
+        transformed_right_xy = apply_transform(transform_matrix, right_eef_xy[0], right_eef_xy[1])
+        env_xy_list[i] = np.concatenate([transformed_left_xy, transformed_right_xy])
+
+    # for i, xy in enumerate(env_xy_list):
+    #     left_eef_xy = xy[:2]
+    #     right_eef_xy = xy[2:]
+    #     delta_left_xy = np.linalg.norm(left_eef_xy - env_xy)
+    #     delta_right_xy = np.linalg.norm(right_eef_xy - env_xy)
+    #     if delta_left_xy < 0.05 or delta_right_xy < 0.05:
+    #         print("Env: close to target object, left: ", delta_left_xy, " right: ", delta_right_xy, "in action: ", i)
+
+    noscale_action_list = _set_eef_xy_to_action(env, noscale_action_list, env_xy_list)
+
+    scaled_action_list = _get_scaled_action_list(env, noscale_action_list)
+
+    return scaled_action_list
     
 def do_playback(env : DualArmEnv, 
                 dataset_reader : DatasetReader, 
@@ -761,8 +931,14 @@ def augment_episode(env : DualArmEnv,
     target_obj, target_goal = get_target_object_and_goal(demo_data)
 
     in_goal=False
-  
-    action_list = demo_data['actions']
+    
+
+    # 轨迹增广需要重新采样动作
+    if sample_range > 0.0:
+        action_list = resample_actions(env, demo_data)
+    else:
+        action_list = demo_data['actions']
+
     action_index_list = list(range(len(action_list)))
     holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
     action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
@@ -1094,6 +1270,9 @@ def run_example(orcagym_addr : str,
                 raise ValueError(f"Augmentation mode: Action type {action_type} is conflicting with demo action type {demo_action_type}.")
             elif demo_action_type in [ActionType.END_EFFECTOR_IK, ActionType.JOINT_POS] and action_type == ActionType.JOINT_MOTOR:
                 raise ValueError(f"Augmentation mode: Action type {action_type} is conflicting with demo action type {demo_action_type}.")
+            
+            if sample_range > 0.0 and action_type not in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK]:
+                raise ValueError(f"Augmentation mode: Action type {action_type} does not support sample range. Please use 'end_effector_osc' or 'end_effector_ik'.")
 
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
@@ -1189,7 +1368,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
             record_path = os.path.join(level_dir, f"dual_arm_{formatted_now}.hdf5")
             print(f"Auto-generated record path: {record_path}")
         if action_type not in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK]:
-            raise ValueError(f"Action type {action_type} is not supported in teleoperation mode. Defaulting to END_EFFECTOR_OSC.")
+            raise ValueError(f"Action type {action_type} is not supported in teleoperation mode. Please input 'end_effector_osc', 'end_effector_ik'.")
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             raise ValueError("Please input the record file path.")
