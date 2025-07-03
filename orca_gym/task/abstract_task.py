@@ -241,7 +241,7 @@ class AbstractTask:
 
         # 容错处理
         if placed is None:
-            Warning("Failed to place objects! Falling back to default positions.")
+            print(f"Warning: Failed to place objects! Falling back to default positions.")
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回

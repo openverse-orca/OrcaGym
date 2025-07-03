@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument('--agent_names', type=str, default='openloong_gripper_2f85_fix_base_usda', help='The agent names to control, separated by space')
     parser.add_argument('--pico_ports', type=str, default='8001', help='The pico server port')
     parser.add_argument('--run_mode', type=str, default='teleoperation', help='The run mode of the environment (teleoperation / playback / imitation / rollout / augmentation)')
-    parser.add_argument('--action_type', type=str, default='end_effector_osc', help='The action type of the environment (end_effector_ik / end_effector_osc / joint_pos)')
+    parser.add_argument('--action_type', type=str, help='The action type of the environment (end_effector_ik / end_effector_osc / joint_pos / joint_motor)')
     parser.add_argument('--action_step', type=int, default=1, help='How may simulation steps to take for each action. 5 for end_effector, 1 for joint_pos')
     parser.add_argument('--task_config', type=str, help='The task config file to load')
     parser.add_argument('--algo', type=str, default='bc', help='The algorithm to use for training the policy')

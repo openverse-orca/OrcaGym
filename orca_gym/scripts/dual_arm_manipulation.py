@@ -707,8 +707,7 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
                 break
 
         if not resample_success:
-            Warning(f"[Warning] Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
-            print("[Warning] Failed to resample target object within range. Using original position.")
+            print(f"Warning: Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
         
         env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
@@ -972,7 +971,7 @@ def run_example(orcagym_addr : str,
             print("kwargs: ", dataset_reader.get_env_kwargs())
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
-            action_type = dataset_reader.get_env_kwargs()["action_type"]
+            demo_action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = dataset_reader.get_env_name()
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
@@ -981,7 +980,7 @@ def run_example(orcagym_addr : str,
             else:
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -1041,10 +1040,10 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
-            action_type = dataset_reader.get_env_kwargs()["action_type"]
+            demo_action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -1068,9 +1067,9 @@ def run_example(orcagym_addr : str,
             camera_config = env_kwargs["camera_config"]
             sample_range = env_kwargs["sample_range"]
             action_step = env_kwargs["action_step"]
-            action_type = env_kwargs["action_type"]
+            demo_action_type = env_kwargs["action_type"]
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
             print("Registered environment: ", env_id)
 
             env, policy = create_env(ckpt_path)
@@ -1089,13 +1088,12 @@ def run_example(orcagym_addr : str,
             env_name = dataset_reader.get_env_name()
             camera_config = dataset_reader.get_env_kwargs()["camera_config"]
             action_step = dataset_reader.get_env_kwargs()["action_step"]
-            action_type = dataset_reader.get_env_kwargs()["action_type"]
-            
-            # 轨迹增广采用ik方式，实现末端位置控制, 视觉增广采用直接读取关节进行回放
-            if sample_range > 0.0:
-                action_type = ActionType.END_EFFECTOR_IK
-            else:
-                action_type = ActionType.JOINT_POS
+            demo_action_type = dataset_reader.get_env_kwargs()["action_type"]
+
+            if demo_action_type in [ActionType.END_EFFECTOR_OSC, ActionType.JOINT_MOTOR] and action_type == ActionType.JOINT_POS:
+                raise ValueError(f"Augmentation mode: Action type {action_type} is conflicting with demo action type {demo_action_type}.")
+            elif demo_action_type in [ActionType.END_EFFECTOR_IK, ActionType.JOINT_POS] and action_type == ActionType.JOINT_MOTOR:
+                raise ValueError(f"Augmentation mode: Action type {action_type} is conflicting with demo action type {demo_action_type}.")
 
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
@@ -1190,23 +1188,23 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
             os.makedirs(level_dir, exist_ok=True)
             record_path = os.path.join(level_dir, f"dual_arm_{formatted_now}.hdf5")
             print(f"Auto-generated record path: {record_path}")
+        if action_type not in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK]:
+            raise ValueError(f"Action type {action_type} is not supported in teleoperation mode. Defaulting to END_EFFECTOR_OSC.")
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
-            print("Please input the record file path.")
-            sys.exit(1)
+            raise ValueError("Please input the record file path.")
     if run_mode == "rollout":
         if ckpt_path is None:
-            print("Please input the model file path.")
-            sys.exit(1)
+            raise ValueError("Please input the model file path.")
     if run_mode not in ["teleoperation", "playback", "imitation", "rollout", "augmentation"]:
-        print("Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
-        sys.exit(1)
+        raise ValueError("Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
+    if action_type not in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK, ActionType.JOINT_POS, ActionType.JOINT_MOTOR]:
+        raise ValueError(f"Invalid action type! Please input 'end_effector_osc', 'end_effector_ik', 'joint_pos' or 'joint_motor'.")
 
     if args.ctrl_device == 'vr':
         ctrl_device = ControlDevice.VR
     else:
-        print("Invalid control device! Please input 'xbox' or 'keyboard'.")
-        sys.exit(1)
+        raise ValueError("Invalid control device! Please input 'xbox' or 'keyboard'.")
 
     max_episode_steps = int(record_time / REALTIME_STEP)
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")

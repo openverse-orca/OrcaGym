@@ -135,7 +135,7 @@ def _check_combination(dataset_files):
         print("Different env versions in datasets: {}".format(set(env_versions)))
         return False
     if not all(env_kwargs_item == env_kwargs[0] for env_kwargs_item in env_kwargs):
-        print("Different env kwargs in datasets!")
+        print(f"Different env kwargs in datasets: {env_kwargs}")
         return False
     
     return True

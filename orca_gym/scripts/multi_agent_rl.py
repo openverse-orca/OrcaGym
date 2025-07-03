@@ -173,7 +173,7 @@ def setup_model_ppo(
     batch_size = agent_config["batch_size"]  # 批次大小
     # 确保 batch_size 是 total_envs * n_steps 的因数
     if (total_envs * n_steps) % batch_size != 0:
-        Warning(f"batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
+        print(f"Warning: batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
         batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
         
     # 如果存在模型文件且指定加载现有模型，则加载模型
