@@ -700,8 +700,8 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
 
         resample_success = False
         target_obj_position_delta = 0
-        for _ in range(1000):  # 尝试1000次
-            env._task.random_objs_and_goals(env, random_rotation=False)
+        for _ in range(100):  # 尝试100次
+            env._task.random_objs_and_goals(env, random_rotation=False, target_obj_joint_name=target_obj_joint_name)
             target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
             target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
             # print(f"[Info] Resampling target object {target_obj} position: {target_obj_joint_qpos[:2]} (delta: {target_obj_position_delta})")
@@ -830,11 +830,55 @@ def _get_target_xy(env: DualArmEnv, demo_data: dict, target_obj: str) -> tuple[n
     env_xy = target_obj_env_info.get("position", np.zeros(3, dtype=np.float32))[:2]
     return demo_xy, env_xy
 
+def _find_closest_step(xy_list: np.ndarray, target_xy: np.ndarray) -> int:
+    closest_step_id = 0
+    closest_step_delta = float('inf')
+    for i, xy in enumerate(xy_list):
+        left_eef_xy = xy[:2]
+        right_eef_xy = xy[2:]
+        delta_left_xy = np.linalg.norm(left_eef_xy - target_xy)
+        delta_right_xy = np.linalg.norm(right_eef_xy - target_xy)
+        if delta_left_xy < 0.05 or delta_right_xy < 0.05:
+            # print("Env: close to target object, left: ", delta_left_xy, " right: ", delta_right_xy, "in action: ", i)
+            if delta_left_xy < closest_step_delta or delta_right_xy < closest_step_delta:
+                closest_step_delta = min(delta_left_xy, delta_right_xy)
+                closest_step_id = i
+
+    return closest_step_id
+
+def _transform_xy_list(source_xy_list: np.ndarray, source_xy: np.ndarray, target_xy: np.ndarray, skip_steps: int) -> np.ndarray:
+    transform_matrix = calculate_transform_matrix(
+        source_xy[0], source_xy[1], target_xy[0], target_xy[1]
+    )
+    print("Transform Matrix: ", transform_matrix)
+
+    target_xy_list = np.zeros_like(source_xy_list)
+    for i, xy in enumerate(source_xy_list):
+        if i <= skip_steps:
+            target_xy_list[i] = xy
+            continue
+        left_eef_xy = xy[:2]
+        right_eef_xy = xy[2:]
+        transformed_left_xy = apply_transform(transform_matrix, left_eef_xy[0], left_eef_xy[1])
+        transformed_right_xy = apply_transform(transform_matrix, right_eef_xy[0], right_eef_xy[1])
+        target_xy_list[i] = np.concatenate([transformed_left_xy, transformed_right_xy])
+
+    return target_xy_list
+
 def resample_actions(
         env: DualArmEnv, 
         demo_data: dict,
     ) -> np.ndarray:
+    """
+    两个关注点：1. 夹爪与物体最接近的点，是第一个目标点， 2. 样本中最后一个点是第二个目标点
 
+    首先根据第一个目标点重采样后，与原始数据之间的变化，建立一个变换矩阵（平移+缩放）
+    对所有轨迹应用变换矩阵，则夹爪可以移动到新的目标位置
+    这时最终目标点也会有变化。因此计算第二个目标点的变换矩阵，
+    然后对分界点后的轨迹，再次应用变换矩阵，获得第二段轨迹
+
+    最终效果：夹爪到达新物体位置，然后再到达原轨迹中的最终位置
+    """
     demo_action_list = demo_data['actions']
     target_obj, _ = get_target_object_and_goal(demo_data)
 
@@ -848,36 +892,23 @@ def resample_actions(
     # sys.exit(0)
 
     demo_xy, env_xy = _get_target_xy(env, demo_data, target_obj)
-    print("Demo XY: ", demo_xy, "Env XY: ", env_xy)
+    final_demo_xy = demo_xy_list[-1]
+    print("Demo XY: ", demo_xy, "Env XY: ", env_xy, "Final Demo XY: ", final_demo_xy)
 
-    # for i, xy in enumerate(demo_xy_list):
-    #     left_eef_xy = xy[:2]
-    #     right_eef_xy = xy[2:]
-    #     delta_left_xy = np.linalg.norm(left_eef_xy - demo_xy)
-    #     delta_right_xy = np.linalg.norm(right_eef_xy - demo_xy)
-    #     if delta_left_xy < 0.05 or delta_right_xy < 0.05:
-    #         print("Demo: close to target object, left: ", delta_left_xy, " right: ", delta_right_xy, "in action: ", i)
+    closest_demo_step_id = _find_closest_step(demo_xy_list, demo_xy)
+    print("Closest Demo Step ID: ", closest_demo_step_id)
+
+    env_xy_list = _transform_xy_list(demo_xy_list, demo_xy, env_xy, 0)
+    final_env_xy = env_xy_list[-1]
+    print("Final Env XY: ", final_env_xy)
+
+    closest_env_step_id = _find_closest_step(env_xy_list, env_xy)
+    print("Closest Env Step ID: ", closest_env_step_id)
+
+    env_xy_list = _transform_xy_list(env_xy_list, final_env_xy, final_demo_xy, closest_demo_step_id)
+    new_final_env_xy = env_xy_list[-1]
+    print("New Final Env XY: ", new_final_env_xy, "Demo XY: ", final_demo_xy, "distance: ", np.linalg.norm(new_final_env_xy - final_demo_xy))
     
-    transform_matrix = calculate_transform_matrix(
-        demo_xy[0], demo_xy[1], env_xy[0], env_xy[1]
-    )
-    print("Transform Matrix: ", transform_matrix)
-
-    env_xy_list = np.zeros_like(demo_xy_list)
-    for i, xy in enumerate(demo_xy_list):
-        left_eef_xy = xy[:2]
-        right_eef_xy = xy[2:]
-        transformed_left_xy = apply_transform(transform_matrix, left_eef_xy[0], left_eef_xy[1])
-        transformed_right_xy = apply_transform(transform_matrix, right_eef_xy[0], right_eef_xy[1])
-        env_xy_list[i] = np.concatenate([transformed_left_xy, transformed_right_xy])
-
-    # for i, xy in enumerate(env_xy_list):
-    #     left_eef_xy = xy[:2]
-    #     right_eef_xy = xy[2:]
-    #     delta_left_xy = np.linalg.norm(left_eef_xy - env_xy)
-    #     delta_right_xy = np.linalg.norm(right_eef_xy - env_xy)
-    #     if delta_left_xy < 0.05 or delta_right_xy < 0.05:
-    #         print("Env: close to target object, left: ", delta_left_xy, " right: ", delta_right_xy, "in action: ", i)
 
     noscale_action_list = _set_eef_xy_to_action(env, noscale_action_list, env_xy_list)
 
