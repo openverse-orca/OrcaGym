@@ -1,9 +1,9 @@
 # yaodian任务配置文件
 
 level_name: "yaodian"
-# object_bodys: [ "bottle_red", "jar_01", "bottle_blue"]
-# object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite"]
-# object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint"]
+object_bodys: [ "niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
+object_sites: ["niuhuangwansite", "qinghuopiansite", "orangeboxsite", "pipalusite", "xiaokepiansite"]
+object_joints: ["niuhuangwan_joint", "qinghuopian_joint", "orangebox_joint", "pipalu_joint", "xiaokepian_joint"]
 
 goal_bodys: ["MedicineChest"]
 goal_sites: ["MedicineChestsite"]

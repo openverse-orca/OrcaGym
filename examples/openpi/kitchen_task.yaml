@@ -1,9 +1,9 @@
 # shop1任务配置文件
 
 level_name: "kitchen"
-# object_bodys: [ "bottle_red", "jar_01", "bottle_blue"]
-# object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite"]
-# object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint"]
+object_bodys: [ "bottle_red", "bow_yellow_kps", "coffeecup_white_kps", "jar_01", "salt"]
+object_sites: ["bottle_redsite", "bow_yellow_kpssite", "coffeecup_white_kpssite", "jar_01site", "salt"]
+object_joints: ["bottle_red_joint", "bow_yellow_kps_joint", "coffeecup_white_kps_joint", "jar_01_joint", "salt_joint"]
 
 goal_bodys: ["Basket_Kitchen_01"]
 goal_sites: ["Basket_Kitchen_01site"]
