@@ -438,7 +438,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         info_list, 
                         camera_frames, 
                         timestep_list, 
-                        language_instruction):
+                        language_instruction,
+                        level_name):
         
     # 只处理第一个info对象（初始状态）
     first_info = info_list[0]
@@ -503,9 +504,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'language_instruction': language_instruction
     })
     # 1) 拿到 level_name
-    text = info_list[0]["language_instruction"]
-    m = re.search(r'level[:\s]+([\w_]+)', text, re.IGNORECASE)
-    lvl = m.group(1).lower() if m else "unknown"
+    lvl = level_name.decode() if isinstance(level_name, (bytes, bytearray)) else level_name
     
     # 2) 映射出 scene_name / sub_scene_name
     scene_name, sub_scene_name = SCENE_SUBSCENE_MAPPING.get(
@@ -630,7 +629,7 @@ def do_teleoperation(env,
             # )
             #dataset_writer.set_UUIDPATH()
             # 以下是您原有的保存代码(保持不变)
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"])
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = info_list[0]["language_instruction"].split()[1])
             #dataset_writer.set_()
         if exit_program or current_round > teleoperation_rounds:
             break
@@ -1160,7 +1159,6 @@ def do_augmentation(
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
     dataset_writer.set_UUIDPATH()
-
     for camera in cameras:
         camera.start()
     
@@ -1179,7 +1177,7 @@ def do_augmentation(
                 env.objects = demo_data['objects']
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
-                
+                level_name = demo_data["language_instruction"].split()[1]
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
@@ -1187,7 +1185,7 @@ def do_augmentation(
                                                                     action_step=action_step)
                 if  in_goal:
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
-                                        camera_frames, timestep_list, language_instruction)
+                                        camera_frames, timestep_list, language_instruction,level_name)
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
