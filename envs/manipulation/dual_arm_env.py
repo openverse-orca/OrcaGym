@@ -35,7 +35,9 @@ class ActionType:
     """
     END_EFFECTOR_OSC = "end_effector_osc"
     END_EFFECTOR_IK = "end_effector_ik"
+    JOINT_MOTOR = "joint_motor"
     JOINT_POS = "joint_pos"
+
 
 
 robot_entries = {
@@ -261,13 +263,8 @@ class DualArmEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
         elif self._run_mode == RunMode.POLICY_NORMALIZED:
-            scaled_action = action
             noscaled_action = self.denormalize_action(action, self.env_action_range_min, self.env_action_range_max)
-            ctrl = self._playback_action(noscaled_action)
-        elif self._run_mode == RunMode.POLICY_RAW:
-            noscaled_action = np.clip(action, self.env_action_range_min, self.env_action_range_max)
-            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
-            ctrl = self._playback_action(noscaled_action)
+            ctrl, noscaled_action = self._playback_action(noscaled_action)
         else:
             raise ValueError("Invalid run mode : ", self._run_mode)
         
@@ -277,16 +274,10 @@ class DualArmEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             [agent.update_force_feedback() for agent in self._agents.values()]
 
-        if self.action_use_motor():
-            noscaled_action = self._fill_arm_joint_pos(noscaled_action)
-        else:
-            noscaled_action = self._fill_arm_ctrl(noscaled_action)
-
         scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
-
 
         obs = self._get_obs().copy()
 
@@ -317,13 +308,13 @@ class DualArmEnv(RobomimicEnv):
         
         return agent_action
 
-    def _fill_arm_joint_pos(self, action) -> np.ndarray:
-        agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_joint_pos(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+    # def _fill_arm_joint_pos(self, action) -> np.ndarray:
+    #     agent_action = self._split_agent_action(action)
+    #     return np.concatenate([agent.fill_arm_joint_pos(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
 
-    def _fill_arm_ctrl(self, action) -> np.ndarray:
-        agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_ctrl(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+    # def _fill_arm_ctrl(self, action) -> np.ndarray:
+    #     agent_action = self._split_agent_action(action)
+    #     return np.concatenate([agent.fill_arm_ctrl(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
 
 
     def get_state(self) -> dict:
@@ -344,16 +335,17 @@ class DualArmEnv(RobomimicEnv):
         return self.ctrl.copy(), np.concatenate(agent_action).flatten()
 
 
-    def _playback_action(self, action) -> np.ndarray:
+    def _playback_action(self, action) -> tuple:
         assert(len(action) == self.action_space.shape[0])
         
         # 将动作分配给每个agent
         agent_action = self._split_agent_action(action)
+        new_agent_action = []
         for agent in self._agents.values():
-            agent.on_playback_action( agent_action[agent.name])
-        
-        return self.ctrl.copy()
-    
+            new_agent_action.append(agent.on_playback_action(agent_action[agent.name]))
+
+        return self.ctrl.copy(), np.concatenate(new_agent_action).flatten()
+
 
     def _get_obs(self) -> dict:
         if len(self._agents) == 1:
@@ -764,8 +756,8 @@ class DualArmEnv(RobomimicEnv):
             return self._get_obs().copy()
 
     def action_use_motor(self):
-        if self._action_type == ActionType.END_EFFECTOR_OSC:
-            # OSC控制器需要使用电机
+        if self._action_type in [ActionType.END_EFFECTOR_OSC, ActionType.JOINT_MOTOR]:
+            # OSC控制器和关节电机控制需要使用电机
             return True
         elif self._action_type in [ActionType.JOINT_POS, ActionType.END_EFFECTOR_IK]:
             # 关节位置控制和逆运动学控制不需要使用电机
@@ -819,7 +811,7 @@ class AgentBase:
     def on_teleoperation_action(self) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
 
-    def on_playback_action(self, action: np.ndarray) -> None:
+    def on_playback_action(self, action: np.ndarray) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
 
     def get_obs(self) -> dict:

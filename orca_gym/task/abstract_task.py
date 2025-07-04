@@ -29,8 +29,8 @@ LEVEL_RANGES = {
         "jiazi": {
             "x": (0.55, 0.65),
             "y": (-0.4, 0.4),
-            "z": 0.0,
-            "r": 0.01,
+            "z": -0.15,
+            "r": 0.3,
         }
         # 新关卡直接加一条
     }
@@ -172,7 +172,7 @@ class AbstractTask:
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
 
-    def random_objs_and_goals(self, env: OrcaGymLocalEnv, bounds=None):
+    def random_objs_and_goals(self, env: OrcaGymLocalEnv, random_rotation=True, target_obj_joint_name=None):
         object_bodys = [env.body(bn) for bn in self.object_bodys]
         obj_joints  = [env.joint(jn) for jn in self.object_joints]
         goal_joints = [env.joint(jn) for jn in self.goal_joints]
@@ -186,7 +186,12 @@ class AbstractTask:
             raise KeyError(f"Unknown level '{self.level_name}', please add to LEVEL_RANGES")
         ranges = LEVEL_RANGES[self.level_name]
 
-        def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat):
+        def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint):
+            if target_obj_joint_name is not None:
+                target_obj_pos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name][:3]
+            else:
+                target_obj_pos = None
+
             while True:
                 lx = np.random.uniform(*ranges["x"])
                 ly = np.random.uniform(*ranges["y"])
@@ -199,19 +204,29 @@ class AbstractTask:
                 world_quat = rotations.euler2quat([0.0, 0.0, yaw])
                 obj_qpos = np.concatenate([world_pos, world_quat])
 
-                if np.linalg.norm(world_pos - goal0_pos) > lr:
+                if np.linalg.norm(world_pos[:2] - goal0_pos[:2]) > lr:
+                    if target_obj_pos is not None and target_obj_joint_name != joint:
+                        if np.linalg.norm(world_pos[:2] - target_obj_pos[:2]) < lr:
+                            # print(f"Too close between {joint} and {target_obj_joint_name}, distance: {np.linalg.norm(world_pos[:2] - target_obj_pos[:2])}")
+                            continue
                     break
             
             return obj_qpos
 
-        def _find_obj_place_on_contact():
+        def _find_obj_place_no_contact(find_target_obj=False):
             placed = []
             goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
             placed_body = []
             for joint, body in zip(obj_joints, object_bodys):
+                if find_target_obj and joint != target_obj_joint_name:
+                    continue
+
                 # 跳过落进目标的
-                obj_qpos = _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat)
+                obj_qpos = _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint)
                 # print("[Debug] Placing object on joint:", joint, "at position:", obj_qpos)
+                if not random_rotation:
+                    org_qpos = env.query_joint_qpos([joint])[joint]
+                    obj_qpos[3:] = org_qpos[3:]
                 env.set_joint_qpos({joint: obj_qpos})
                 env.mj_forward()
                 placed_body.append(body)
@@ -235,13 +250,15 @@ class AbstractTask:
 
         placed = None
         for i in range(100):  # 尝试100次
-            placed = _find_obj_place_on_contact()
-            if placed is not None:
+            placed = _find_obj_place_no_contact(find_target_obj=True)
+            other_placed = _find_obj_place_no_contact(find_target_obj=False)
+            if placed is not None and other_placed is not None:
+                placed.extend(other_placed)
                 break
 
         # 容错处理
         if placed is None:
-            Warning("Failed to place objects! Falling back to default positions.")
+            print(f"Warning: Failed to place objects! Falling back to default positions.")
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回
