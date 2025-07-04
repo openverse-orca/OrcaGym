@@ -1,3 +1,4 @@
+import math
 import os
 import shutil
 import sys
@@ -81,6 +82,77 @@ OBJ_CN = {
     "basket_kitchen_01" : "篮子",
     "shoppingtrolley_01" : "购物手推车"
 }
+
+with open("camera_config.yaml", "r") as f:
+    cam_cfg_all = yaml.safe_load(f)
+default_cfg = cam_cfg_all["default"]
+scene_cfgs = cam_cfg_all["scenes"]
+
+# —— 生成对应场景下的 CAMERA_STATIC_CFG ——
+def get_camera_static_cfg(level_name: str):
+    scene = scene_cfgs.get(level_name)
+    if scene is None:
+        raise KeyError(f"No camera config for scene '{level_name}'")
+    cfg = {}
+    for cam_name, base in default_cfg.items():
+        extr = scene.get(cam_name)
+        if extr is None:
+            raise KeyError(f"No scene extrinsics for camera '{cam_name}' in scene '{level_name}'")
+        cfg[cam_name] = {
+            **base,
+            "translation": base["translation"],       # 原始外参（机器人坐标系）
+            "rotation":    base["rotation"],          # 原始外参（机器人坐标系）
+            "translation_world": extr["translation"], # 对齐外参（世界坐标系）
+            "rotation_world":    extr["rotation"],    # 对齐外参（世界坐标系）
+        }
+    return cfg
+
+# 3) dump_static_camera_params，写出三种 JSON
+
+def dump_static_camera_params(uuid_dir: str,
+                              level_name: str
+                              ):
+    CAMERA_STATIC_CFG = get_camera_static_cfg(level_name)
+    out_dir = os.path.join(uuid_dir, "parameters", "camera")
+    os.makedirs(out_dir, exist_ok=True)
+
+    for name, cfg in CAMERA_STATIC_CFG.items():
+        # —— 内参 ——
+        intrinsic = {
+            "manufacturer": "openverse",
+            "mode":         "Mujoco Camera Capture",
+            "SN":           "CA85BDD5-C631-4C52-853C-06D654AE7E4D",
+            "fps":          30,
+            "width":        cfg["width"],
+            "height":       cfg["height"],
+            "intrinsic": {
+                "fx": (cfg["height"]/2) / math.tan(math.radians(cfg["fovy"]/2)),
+                "fy": (cfg["height"]/2) / math.tan(math.radians(cfg["fovy"]/2)),
+                "ppx": cfg["width"]/2,
+                "ppy": cfg["height"]/2,
+                "distortion_model": "plumb_bob",
+                "k1": 0, "k2": 0, "k3": 0, "p1": 0, "p2": 0
+            }
+        }
+        # —— 原始 extrinsic（机器人坐标系） ——
+        extrinsic = {
+            "translation_vector": cfg["translation"],
+            "rotation_euler":     cfg["rotation"],
+        }
+        # —— 对齐 extrinsic（世界坐标系） ——
+        extrinsic_aligned = {
+            "translation_vector": cfg["translation_world"],
+            "rotation_euler":     cfg["rotation_world"],
+        }
+
+        # 写文件
+        with open(os.path.join(out_dir, f"{name}_intrinsic_params.json"),   "w", encoding="utf-8") as f:
+            json.dump(intrinsic, f, ensure_ascii=False, indent=2)
+        with open(os.path.join(out_dir, f"{name}_extrinsic_params.json"),   "w", encoding="utf-8") as f:
+            json.dump(extrinsic, f, ensure_ascii=False, indent=2)
+        with open(os.path.join(out_dir, f"{name}_extrinsic_params_aligned.json"), "w", encoding="utf-8") as f:
+            json.dump(extrinsic_aligned, f, ensure_ascii=False, indent=2)
+
 
 def normalize_key(key: str) -> str:
     """去掉多余标点，统一小写"""
@@ -474,6 +546,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         action_config=action_config,
         data_gen_mode="simulation",
     )
+    uuid_dir   = dataset_writer.get_UUIDPath()
+    dump_static_camera_params(uuid_dir, level_name)
 
 
 
