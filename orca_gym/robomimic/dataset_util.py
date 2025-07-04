@@ -72,13 +72,6 @@ class DatasetWriter:
             self.video_dir = os.path.join(self.camera_dir, "video")
         # print("self.uuid_dir..............:",self.uuid_dir)
             self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
-
-            os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
-            os.makedirs(self.camera_dir, exist_ok=True)
-            os.makedirs(self.parameters_dir, exist_ok=True)
-            os.makedirs(self.proprio_stats_dir, exist_ok=True)
-            os.makedirs(self.depth_dir, exist_ok=True)
-            os.makedirs(self.video_dir, exist_ok=True)
             self.mp4_save_path : str = None
         
 
