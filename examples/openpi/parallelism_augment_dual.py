@@ -92,14 +92,18 @@ if __name__ == "__main__":
 
     process  = []
     for i in range(parallelism_num):
-
+        adapterIndex = i % 2
         p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
                         "--mj_grpc_server",  orcagym_address_list[i],
+                        "--forceAdapter", " NVIDIA GeForce RTX 4090",
+                        "--adapterIndex", str(adapterIndex),
                         f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         process.append(p)
 
     time.sleep(15)
 
+
+    #调用增广脚本，如果需要额外参数自行添加
     threads = []
     for i in range(parallelism_num):
         p = subprocess.Popen(["python", "run_dual_arm_sim.py", 
