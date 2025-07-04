@@ -82,6 +82,12 @@ OBJ_CN = {
     "basket_kitchen_01" : "篮子",
     "shoppingtrolley_01" : "购物手推车"
 }
+SCENE_SUBSCENE_MAPPING = {
+    "shop":    ("Shop",    "Cashier_Operation"),
+    "jiazi":   ("Shop",    "Shelf_Operation"),
+    "kitchen": ("Kitchen", "Countertop_Operation"),
+    "yaodian": ("Pharmacy","Shelf_Operation"),
+}
 
 with open("camera_config.yaml", "r") as f:
     cam_cfg_all = yaml.safe_load(f)
@@ -496,58 +502,62 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'language_instruction': language_instruction
     })
-    # ----------------- 新增 JSON 写入 -----------------
-    # 1) HDF5 文件路径 & 场景目录
-    h5_path   = dataset_writer.basedir                      # e.g. "yaodian/dual_arm_XXXX.hdf5"
-    scene_dir = os.path.dirname(h5_path)
-    start_frame = 0
-    max_len = max(len(frames) for frames in (camera_frames.values() if isinstance(camera_frames, dict) else [camera_frames]))
-
-    end_frame = max_len - 1
-
-    CST = timezone(timedelta(hours=8))
-    timestamp_cst = datetime.now(CST).isoformat()
-
-    # 2) 公开接口拿注册进来的 task_config
-    task_cfg   = dataset_writer._env_args.get("task_config", {})
+    # 1) 拿到 level_name
     text = info_list[0]["language_instruction"]
     m = re.search(r'level[:\s]+([\w_]+)', text, re.IGNORECASE)
-    level_name = m.group(1).lower() if m else "unknown"
-    # 然后同上，用 level_name 去拿描述、拼文件名……
-    episode_id = dataset_writer.experiment_id
-
-    # 3) 场景名／子场景／初始文本
-    scene_name     = "shop" if level_name == "jiazi" else level_name
-    sub_scene_name = scene_name
-
-    # 4) JSON 文件固定名
-    json_path = os.path.join(scene_dir, "task_info.json")
-
-    # 5) 英文任务名：如果 info_list 里有 en 字段就用它
-    language_instruction = info_list[0].get("language_instruction")
-    lang_cn = eng2cn(language_instruction)
-
+    lvl = m.group(1).lower() if m else "unknown"
+    
+    # 2) 映射出 scene_name / sub_scene_name
+    scene_name, sub_scene_name = SCENE_SUBSCENE_MAPPING.get(
+        lvl, (lvl.title(), lvl.title()+"_Operation")
+    )
+    
+    # 3) 构造 JSON 目录 (放在 scene 目录下)
+    #    假设 dataset_writer.basedir = "records_tmp/yaodian/dual_arm_… .hdf5"
+    scene_dir = os.path.join(
+        os.path.dirname(dataset_writer.basedir),  # parent of HDF5 filename
+        lvl  # 目录名和你的一级 level 保持一致，例如 "shop", "yaodian"…
+    )
+    os.makedirs(scene_dir, exist_ok=True)
+    
+    # 4) JSON 路径
+    json_fname = f"{scene_name}-{sub_scene_name}.json"
+    json_path = os.path.join(scene_dir, json_fname)
+    
+    # 5) 时间戳、帧信息照旧
+    start_frame = 0
+    max_len     = max(len(frames) for frames in camera_frames.values()) if isinstance(camera_frames, dict) else len(camera_frames)
+    end_frame   = max_len - 1
+    from datetime import datetime, timezone, timedelta
+    CST = timezone(timedelta(hours=8))
+    timestamp_cst = datetime.now(CST).isoformat()
+    
+    # 6) 生成中／英文指令
+    lang_en = info_list[0]["language_instruction"]
+    lang_cn = eng2cn(lang_en)
+    
     action_config = [{
         "start_frame": start_frame,
-        "end_frame": end_frame,
-        "timestamp_cst": timestamp_cst,
-        "skill": "pick and place",                # 或者其他你想用的内部标识
-        "action_text": lang_cn,
-        "english_action_text": language_instruction
+        "end_frame":   end_frame,
+        "timestamp_utc": timestamp_cst,
+        "skill": "pick_and_place",
+        "action_text":       lang_cn,
+        "english_action_text": lang_en
     }]
     
+    # 7) 调用追加
     append_task_info_json(
         json_path=json_path,
-        episode_id=episode_id,
-        level_name=level_name,
+        episode_id=dataset_writer.experiment_id,
+        level_name=lvl,
         sub_scene_name=sub_scene_name,
         language_instruction_cn=lang_cn,
-        language_instruction_en=language_instruction,
+        language_instruction_en=lang_en,
         action_config=action_config,
         data_gen_mode="simulation",
     )
     uuid_dir   = dataset_writer.get_UUIDPath()
-    dump_static_camera_params(uuid_dir, level_name)
+    dump_static_camera_params(uuid_dir, lvl)
 
 
 
