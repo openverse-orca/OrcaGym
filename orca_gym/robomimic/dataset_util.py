@@ -6,6 +6,7 @@ import json
 import os
 import uuid  # 新增导入uuid模块
 import time  # 新增导入time模块
+import shutil
 
 class DatasetWriter:
     # def __init__(self, base_dir, env_name, env_version, env_kwargs=None):  # 修改1: 参数名改为base_dir
@@ -56,7 +57,7 @@ class DatasetWriter:
             "env_version": env_version,
             "env_kwargs": env_kwargs or {}
         }
-
+        self.pathremoved = False
        # print("base_dir..................:", base_dir)
         if specific_file_path is not None:  # 新增: 如果提供了特定文件路径
             self.hdf5_path = specific_file_path  # 使用特定文件路径
@@ -73,6 +74,7 @@ class DatasetWriter:
         # print("self.uuid_dir..............:",self.uuid_dir)
             self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
             self.mp4_save_path : str = None
+            
         
 
 
@@ -105,9 +107,18 @@ class DatasetWriter:
         # self.hdf5_path = os.path.join(self.uuid_dir)
         # print("hdf5_path11112222:",self.hdf5_path)
         self.create_hdf5_file()  # 新增: 创建HDF5文件
+        self.pathremoved = False
     
     def get_UUIDPath(self):
         return self.uuid_dir
+
+    def remove_path(self):
+        rmpath = self.uuid_dir
+        print(f"删除目录: {rmpath}")
+        if os.path.exists(rmpath) and os.path.isdir(rmpath):
+            shutil.rmtree(rmpath)
+        self.pathremoved = True
+
 
         
 
@@ -288,6 +299,9 @@ class DatasetWriter:
         """
         将 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
         """
+
+        if self.pathremoved:
+            return
         self.remove_filter_key("train")
         self.remove_filter_key("valid")
         

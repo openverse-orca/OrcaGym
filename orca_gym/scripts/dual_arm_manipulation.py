@@ -119,7 +119,7 @@ def dump_static_camera_params(uuid_dir: str,
                               level_name: str
                               ):
     CAMERA_STATIC_CFG = get_camera_static_cfg(level_name)
-    out_dir = os.path.join(uuid_dir, "parameters", "camera")
+    out_dir = os.path.join(uuid_dir, "parameters")
     os.makedirs(out_dir, exist_ok=True)
 
     for name, cfg in CAMERA_STATIC_CFG.items():
@@ -349,10 +349,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     env.stop_save_video()
                     #通过os接口删除路径
 
-                    rmpath = dataset_writer.get_UUIDPath()
-                    print(f"删除目录: {rmpath}")
-                    if os.path.exists(rmpath) and os.path.isdir(rmpath):
-                        shutil.rmtree(rmpath)
+                    dataset_writer.remove_path()
                   #      print(f"目录及其内容已删除: {rmpath}")
            
                     saving_mp4 = False              
@@ -1158,7 +1155,7 @@ def do_augmentation(
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
-    dataset_writer.set_UUIDPATH()
+   
     for camera in cameras:
         camera.start()
     
@@ -1178,18 +1175,28 @@ def do_augmentation(
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 level_name = demo_data["language_instruction"].split()[1]
+                dataset_writer.set_UUIDPATH()
+                mp4_save_path = dataset_writer.get_mp4_save_path()
+                env.begin_save_video(mp4_save_path)
+                
+                print("augmentation mp4 path:",mp4_save_path)
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if  in_goal:
+                    env.stop_save_video()
+                    print("augmentation mp4 path 111111111.....:",mp4_save_path)
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
                                         camera_frames, timestep_list, language_instruction,level_name)
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
                 else:
+                    env.stop_save_video()
+                    print("augmentation mp4 path 2222222222.....:",mp4_save_path)
+                    dataset_writer.remove_path()
                     print("Episode failed! Retrying...")
                     trial_count += 1
             if not done:
