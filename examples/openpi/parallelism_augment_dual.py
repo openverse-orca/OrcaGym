@@ -97,6 +97,7 @@ if __name__ == "__main__":
                         "--mj_grpc_server",  orcagym_address_list[i],
                         "--forceAdapter", " NVIDIA GeForce RTX 4090",
                         "--adapterIndex", str(adapterIndex),
+                        "--r_width", "128", "--r_height", "128",
                         f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         process.append(p)
 
