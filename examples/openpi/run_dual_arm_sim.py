@@ -46,8 +46,10 @@ if __name__ == "__main__":
     parser.add_argument('--augmented_rounds', type=int, default=10, help='The times to augment the dataset')
     parser.add_argument('--teleoperation_rounds', type=int, default=100, help='The rounds to do teleoperation')
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
-    parser.add_argument('--realtime_playback', type=bool, default=True, help='The flag to enable the real-time playback or rollout')
+    parser.add_argument('--realtime_playback', type=str, default='True', help='The flag to enable the real-time playback or rollout')
     parser.add_argument('--level', type=str, default='shop',  help='The storage level or scenario for file storage (e.g., default, experiment, debug)')
+    parser.add_argument('--withvideo', type=str, default='True',  help='Set Output Video data (e.g., default, experiment, debug)')
+
     
     args = parser.parse_args()
     dual_arm_manipulation.run_dual_arm_sim(args, project_root, current_file_path)

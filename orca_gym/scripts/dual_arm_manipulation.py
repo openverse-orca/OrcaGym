@@ -511,14 +511,15 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     # 3) 构造 JSON 目录 (放在 scene 目录下)
     #    假设 dataset_writer.basedir = "records_tmp/yaodian/dual_arm_… .hdf5"
     scene_dir = os.path.join(
-        os.path.dirname(dataset_writer.basedir),  # parent of HDF5 filename
-        lvl  # 目录名和你的一级 level 保持一致，例如 "shop", "yaodian"…
+        dataset_writer.basedir #,  # parent of HDF5 filename
+         #lvl  # 目录名和你的一级 level 保持一致，例如 "shop", "yaodian"…
     )
     os.makedirs(scene_dir, exist_ok=True)
     
     # 4) JSON 路径
     json_fname = f"{scene_name}-{sub_scene_name}.json"
     json_path = os.path.join(scene_dir, json_fname)
+   
     
     # 5) 时间戳、帧信息照旧
     start_frame = 0
@@ -562,7 +563,8 @@ def do_teleoperation(env,
                      teleoperation_rounds : int, 
                      cameras : list[CameraWrapper], 
                      rgb_size : tuple = (256, 256),
-                     action_step : int = 1,):    
+                     action_step : int = 1,
+                     output_video : bool = True):    
     
     current_round = 1
     
@@ -1145,8 +1147,11 @@ def do_augmentation(
         sample_range : float,
         realtime : bool,
         augmented_rounds : int,
-        action_step : int = 1
+        action_step : int = 1,
+        output_video : bool = True,
     ):
+    
+   # realtime = False
     
     # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
@@ -1154,6 +1159,7 @@ def do_augmentation(
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=dataset_reader.get_env_kwargs())
+
    
     for camera in cameras:
         camera.start()
@@ -1175,26 +1181,26 @@ def do_augmentation(
                 language_instruction = demo_data['language_instruction']
                 level_name = demo_data["language_instruction"].split()[1]
                 dataset_writer.set_UUIDPATH()
-                mp4_save_path = dataset_writer.get_mp4_save_path()
-                env.begin_save_video(mp4_save_path)
-                
-                print("augmentation mp4 path:",mp4_save_path)
+                if output_video == True:
+                    mp4_save_path = dataset_writer.get_mp4_save_path()
+                    env.begin_save_video(mp4_save_path)             
+                    print("augmentation mp4 path:",mp4_save_path)
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if  in_goal:
-                    env.stop_save_video()
-                    print("augmentation mp4 path 111111111.....:",mp4_save_path)
+                    if output_video == True:
+                        env.stop_save_video()
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
                                         camera_frames, timestep_list, language_instruction,level_name)
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
                 else:
-                    env.stop_save_video()
-                    print("augmentation mp4 path 2222222222.....:",mp4_save_path)
+                    if output_video == True:
+                        env.stop_save_video()
                     dataset_writer.remove_path()
                     print("Episode failed! Retrying...")
                     trial_count += 1
@@ -1258,9 +1264,12 @@ def run_example(orcagym_addr : str,
                 sample_range : float,
                 realtime_playback : bool,
                 current_file_path : str,
-                task_config : str,):
+                task_config : str,
+                augmentation_path : str,
+                output_video : bool):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
+
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
             print("kwargs: ", dataset_reader.get_env_kwargs())
@@ -1325,8 +1334,9 @@ def run_example(orcagym_addr : str,
                                     env_kwargs=kwargs)
 
 
+
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
-                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=action_step,)
+                                                 cameras=cameras, rgb_size=RGB_SIZE, action_step=action_step,output_video = output_video)
             dataset_writer.shuffle_demos()
             dataset_writer.finalize()
 
@@ -1409,13 +1419,16 @@ def run_example(orcagym_addr : str,
 
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
-            agumented_dataset_file_path = f"{current_file_path}/augmented_datasets_tmp/augmented_dataset_{formatted_now}.hdf5"
+           # agumented_dataset_file_path = f"{current_file_path}/augmented_datasets_tmp/augmented_dataset_{formatted_now}.hdf5"
+            agumented_dataset_file_path = f"{augmentation_path}/augmented_dataset_{formatted_now}.hdf5"
+
 
             if RGB_SIZE is None:
                 cameras = []
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
+         #   do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step, output_video)
             do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
@@ -1463,8 +1476,11 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     augmented_rounds = args.augmented_rounds
     teleoperation_rounds = args.teleoperation_rounds
     sample_range = args.sample_range
-    realtime_playback = args.realtime_playback
+   # realtime_playback = args.realtime_playback
     level = args.level
+    augmented_path = ''
+    withvideo = True if args.withvideo == 'True' else False
+    realtime_playback = True if args.realtime_playback == 'True' else False
 
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
@@ -1491,6 +1507,9 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
             raise ValueError("Please input the record file path.")
+        else:
+            augmented_path = os.path.join(current_file_path, "augmented_datasets_tmp", level)
+
     if run_mode == "rollout":
         if ckpt_path is None:
             raise ValueError("Please input the model file path.")
@@ -1538,7 +1557,10 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
                     sample_range,
                     realtime_playback,
                     current_file_path,
-                    task_config=task_config)
+                    task_config=task_config,
+                    augmentation_path=augmented_path,
+                    output_video=withvideo
+                    )
 
     # 终止 Monitor 子进程
     for process in monitor_processes:
