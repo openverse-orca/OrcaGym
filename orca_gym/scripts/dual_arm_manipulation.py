@@ -1143,11 +1143,10 @@ def do_augmentation(
         augmented_dataset_path : str, 
         augmented_noise : float, 
         sample_range : float,
+        realtime : bool,
         augmented_rounds : int,
         action_step : int = 1
     ):
-    
-    realtime = False
     
     # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
@@ -1417,7 +1416,7 @@ def run_example(orcagym_addr : str,
             else:
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
-            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step)
+            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
