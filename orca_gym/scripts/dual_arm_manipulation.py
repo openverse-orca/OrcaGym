@@ -530,7 +530,9 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     timestamp_cst = datetime.now(CST).isoformat()
     
     # 6) 生成中／英文指令
-    lang_en = info_list[0]["language_instruction"]
+    lang_en = language_instruction
+    if isinstance(lang_en, (bytes, bytearray)):
+        lang_en = lang_en.decode('utf-8', errors='ignore')
     lang_cn = eng2cn(lang_en)
     
     action_config = [{
