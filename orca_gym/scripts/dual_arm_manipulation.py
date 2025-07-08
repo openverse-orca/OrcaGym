@@ -817,7 +817,8 @@ def calculate_transform_matrix(a, b, a1, b1):
             return np.eye(2)
         else:
             # 线性变换必须保持零向量不变
-            raise ValueError("输入向量是零向量但输出向量非零 - 无效线性变换")
+            # raise ValueError("输入向量是零向量但输出向量非零 - 无效线性变换")
+            return np.eye(2)
     
     # 使用公式计算矩阵元素
     m11 = (a*a1 + b*b1) / D
@@ -1152,6 +1153,7 @@ def do_augmentation(
         realtime : bool,
         augmented_rounds : int,
         action_step : int = 1,
+        action_type : str = "",
         output_video : bool = True,
     ):
     
@@ -1159,10 +1161,13 @@ def do_augmentation(
     
     # Copy the original dataset to the augmented dataset
     dataset_reader = DatasetReader(file_path=original_dataset_path)
+
+    env_kwargs=dataset_reader.get_env_kwargs()
+    env_kwargs["action_type"] = action_type
     dataset_writer = DatasetWriter(base_dir=os.path.dirname(augmented_dataset_path),
                                     env_name=dataset_reader.get_env_name(),
                                     env_version=dataset_reader.get_env_version(),
-                                    env_kwargs=dataset_reader.get_env_kwargs())
+                                    env_kwargs=env_kwargs)
 
    
     for camera in cameras:
@@ -1433,7 +1438,7 @@ def run_example(orcagym_addr : str,
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
          #   do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step, output_video)
-            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step)
+            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step, action_type)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
