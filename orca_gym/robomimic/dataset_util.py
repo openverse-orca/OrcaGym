@@ -468,5 +468,6 @@ class DatasetReader:
                 'timesteps': np.array(demo_group['timesteps']),
                 'language_instruction': demo_group['language_instruction'][()] if 'language_instruction' in demo_group else None,
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
+                'camera_frames': np.array(demo_group['camera_frames'])
             }
         return demo_data
