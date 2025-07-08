@@ -487,7 +487,6 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         )
     ], dtype=gdtype)
 
-        
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
@@ -1040,7 +1039,8 @@ def augment_episode(env : DualArmEnv,
     done_list = []
     info_list = []    
     terminated_times = 0    
-    camera_frames = {camera.name: [] for camera in cameras}
+  # camera_frames = {camera.name: [] for camera in cameras}
+    camera_frame_index = []
     timestep_list = []
 
     target_obj, target_goal = get_target_object_and_goal(demo_data)
@@ -1118,11 +1118,12 @@ def augment_episode(env : DualArmEnv,
                     
         env.render()
                     
-        if len(cameras) > 0:
-            # time.sleep(0.01)    # wait for camera to get new frame
-            for camera in cameras:
-                camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
-                camera_frames[camera.name].append(camera_frame)
+        # if len(cameras) > 0:
+        #     # time.sleep(0.01)    # wait for camera to get new frame
+        #     for camera in cameras:
+        #         camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
+        #         camera_frames[camera.name].append(camera_frame)
+        camera_frame_index.append(env.get_current_frame())
 
         for obs_key, obs_data in obs.items():
             obs_list[obs_key].append(obs_data)
@@ -1134,9 +1135,10 @@ def augment_episode(env : DualArmEnv,
         
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
+            #return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal
         
-    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
+    return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal
  
 
 def do_augmentation(
