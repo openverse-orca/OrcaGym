@@ -62,7 +62,7 @@ class WheeledChassisEnv(OrcaGymLocalEnv):
     def _set_action_space(self):
         # 归一化到 [-1, 1]区间
         scaled_action_range = np.concatenate([[[-1.0, 1.0]] for _ in range(self.nu)])
-        print("Scaled action range: ", scaled_action_range)
+        # print("Scaled action range: ", scaled_action_range)
         self.action_space = self.generate_action_space(scaled_action_range)
 
     

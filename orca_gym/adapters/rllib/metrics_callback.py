@@ -34,10 +34,10 @@ class OrcaMetricsCallback(DefaultCallbacks):
             "total_envs": total_envs,
         })
         
-        print(f"============================= ORCA METRICS =============================")
+        print(f"=========== ORCA METRICS ===========")
         print(f"Total environments: {total_envs}")
         print(f"Steps per second: {steps_per_second}")
-        print("==========================================================================")
+        print("======================================")
         
         self._last_time = time.time()
         self._num_env_steps_sampled_lifetime_pre = num_env_steps_sampled_lifetime

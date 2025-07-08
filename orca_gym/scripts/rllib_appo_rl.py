@@ -53,7 +53,39 @@ def get_orca_gym_register_info(
 
     return env_id, kwargs
 
+def create_demo_env_instance(
+    orcagym_addr: str = "localhost:50051",
+    env_name: str = "Ant_OrcaGymEnv",
+    agent_name: str = "ant",
+    max_episode_steps: int = 1000,
+):
+    """
+    创建一个演示环境实例，主要用于测试和验证。
+    """
+    render_mode = 'human'
 
+    env_id, kwargs = get_orca_gym_register_info(
+        orcagym_addr=orcagym_addr,
+        env_name=env_name,
+        agent_name=agent_name,
+        render_mode=render_mode
+    )
+
+    if env_id not in gym.envs.registry:
+        print(f"Registering environment: {env_id}")
+        gym.register(
+            id=env_id,
+            entry_point=ENV_ENTRY_POINT[env_name],
+            kwargs=kwargs,
+            max_episode_steps=max_episode_steps,
+            reward_threshold=0.0,
+        )
+    
+    print(f"Creating environment {env_id} with kwargs={kwargs}")
+    env = gym.make(env_id, **kwargs)
+    
+    return env
+        
 
 def env_creator(
         env_context,
