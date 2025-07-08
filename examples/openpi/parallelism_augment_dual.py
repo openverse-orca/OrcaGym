@@ -55,6 +55,7 @@ if __name__ == "__main__":
     parser.add_argument('--datalink_auth_config', type=str, required=True, help='The datalink auth config abs path')
     parser.add_argument('--orcasim_path', type=str, required=True, help='The orcasim processor path')
     parser.add_argument('--level', type=str, default='shopscene', required=True,  help='The storage level or scenario for file storage (e.g., default, experiment, debug)')
+    parser.add_argument('--levelorca', type=str, default='shopscene', required=True,  help='The Orcagym data store directory (e.g., default, experiment, debug)')
 
     parser.add_argument('--orcagym_address', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_names', type=str, default='openloong_gripper_2f85_fix_base_usda', help='The agent names to control, separated by space')
@@ -74,7 +75,8 @@ if __name__ == "__main__":
     parser.add_argument('--augmented_rounds', type=int, default=3, help='The times to augment the dataset')
     parser.add_argument('--teleoperation_rounds', type=int, default=100, help='The rounds to do teleoperation')
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
-    parser.add_argument('--realtime_playback', type=bool, default=True, help='The flag to enable the real-time playback or rollout')
+    parser.add_argument('--realtime_playback', type=str, default='True', help='The flag to enable the real-time playback or rollout')
+    parser.add_argument('--withvideo', type=str, default='True', help='The flag to enable the real-time playback or rollout')
 
     args = parser.parse_args()
 
@@ -110,7 +112,17 @@ if __name__ == "__main__":
         p = subprocess.Popen(["python", "run_dual_arm_sim.py", 
                               "--orcagym_address", f"localhost:{port + i}",
                               "--run_mode", "augmentation",
-                              "--dataset", args.dataset
+                              "--dataset", args.dataset,
+                              "--action_type",args.action_type,
+                              "--task_config",args.task_config,
+                              "--sample_range",str(args.sample_range),
+                              "--augmented_noise",str(args.augmented_noise),
+                              "--augmented_rounds",str(args.augmented_rounds),
+                              "--realtime_playback",args.realtime_playback,
+                              "--withvideo",args.withvideo,
+                              "--level",args.levelorca
+
+
                               ], stdout=sys.stdout, stderr=sys.stderr, text=True)
         
         process.append(p)
