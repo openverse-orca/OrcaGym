@@ -1134,9 +1134,9 @@ def augment_episode(env : DualArmEnv,
         
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, [], timestep_list,in_goal
+            return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
         
-    return obs_list, reward_list, done_list, info_list, [], timestep_list,in_goal
+    return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
  
 
 def do_augmentation(
