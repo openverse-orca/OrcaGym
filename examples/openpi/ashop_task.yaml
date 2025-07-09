@@ -21,7 +21,7 @@ goal_joints: ["basket_joint"]
 random_actor : true 
 random_actor_position: false
 random_actor_rotation: false
-random_actor_color: true
+random_actor_color: false
 actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 actors_spawnable: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 center: [-6.35, 2.56, 2.32]
