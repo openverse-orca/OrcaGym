@@ -136,10 +136,12 @@ class OpenLoongGripperMobileBase(DualArmRobot):
         if abs(forward) < 0.2:
             forward = 0
 
-        SPEED_SCALE = 0.2
+        MOVE_SPEED = 0.2
+        TURN_SPEED = 2
+        turn *= TURN_SPEED
 
-        v_r = np.clip(forward - turn, -1, 1) * SPEED_SCALE
-        v_l = -np.clip(forward + turn, -1, 1) * SPEED_SCALE
+        v_r = np.clip(forward - turn, -1, 1) * MOVE_SPEED
+        v_l = -np.clip(forward + turn, -1, 1) * MOVE_SPEED
         offset_rate = np.array([v_r, v_l])
 
         # 设置轮子控制

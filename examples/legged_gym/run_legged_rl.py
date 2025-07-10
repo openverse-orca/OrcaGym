@@ -14,7 +14,7 @@ if project_root not in sys.path:
 
 
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-import orca_gym.scripts.multi_agent_rl as rl
+import orca_gym.scripts.sb3_ppo_vecenv_rl as sb3_ppo_vecenv_rl
 from orca_gym.utils.dir_utils import create_tmp_dir
 
 if __name__ == "__main__":
@@ -24,13 +24,12 @@ if __name__ == "__main__":
     parser.add_argument('--agent_num', type=int, default=1, help='The number of agents for each subenv')
     parser.add_argument('--agent_name', type=str, default='go2', help='The name of the agent')
     parser.add_argument('--task', type=str, default='follow_command', help='The task to run')
-    parser.add_argument('--model_type', type=str, default='ppo', help='The model to use (ppo only now)')
+    parser.add_argument('--algorithm', type=str, default='ppo', help='The algorithm to use (ppo / appo)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training / testing / play / nav)')
     parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human / none)')
     parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
     parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
     parser.add_argument('--training_episode', type=int, default=200, help='The number of training episodes for each agent')
-    parser.add_argument('--start_her_episode', type=float, default=1.0, help='Before start HER training, run each agent for some episodes to get experience')
     parser.add_argument('--nav_ip', type=str, default="localhost", help='The IP address of the navigation server, default is localhost, should be local pc ip address')
     args = parser.parse_args()
 
@@ -49,12 +48,11 @@ if __name__ == "__main__":
     agent_num = args.agent_num
     agent_name = args.agent_name
     task = args.task
-    model_type = args.model_type
+    algorithm = args.algorithm
     height_map_file = args.height_map_file
     run_mode = args.run_mode
     render_mode = args.render_mode
     training_episode = args.training_episode
-    start_her_episode = args.start_her_episode
     nav_ip = args.nav_ip
 
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
@@ -65,7 +63,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Invalid task")
 
-    total_timesteps = training_episode * subenv_num * agent_num * max_episode_steps
+    total_steps = training_episode * subenv_num * agent_num * max_episode_steps
 
     create_tmp_dir("trained_models_tmp")
 
@@ -73,7 +71,7 @@ if __name__ == "__main__":
         model_file = args.model_file
     elif run_mode == "training":
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_dir = f"./trained_models_tmp/{agent_name}_{model_type}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
+        model_dir = f"./trained_models_tmp/{agent_name}_{algorithm}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"
         os.makedirs(model_dir, exist_ok=True)
         model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
     else:
@@ -81,46 +79,44 @@ if __name__ == "__main__":
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
-        print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
-        print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        rl.train_model(
-            orcagym_addresses=orcagym_addresses, 
-            subenv_num=subenv_num, 
-            agent_num=agent_num, 
-            agent_name=agent_name, 
-            agent_config=LeggedRobotConfig[agent_name],
-            task=task, 
-            entry_point=entry_point, 
-            time_step=TIME_STEP, 
-            max_episode_steps=max_episode_steps, 
-            render_mode=render_mode,
-            frame_skip=frame_skip, 
-            model_type=model_type, 
-            total_timesteps=total_timesteps, 
-            start_her_episode=start_her_episode, 
-            model_file=model_file, 
-            height_map_file=height_map_file, 
-        )
+        print("Algorithm: ", algorithm, " Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
+        if algorithm == "ppo":
+            sb3_ppo_vecenv_rl.train_model(
+                orcagym_addresses=orcagym_addresses, 
+                subenv_num=subenv_num, 
+                agent_num=agent_num, 
+                agent_name=agent_name, 
+                agent_config=LeggedRobotConfig[agent_name],
+                task=task, 
+                entry_point=entry_point, 
+                time_step=TIME_STEP, 
+                max_episode_steps=max_episode_steps, 
+                render_mode=render_mode,
+                frame_skip=frame_skip, 
+                total_timesteps=total_steps, 
+                model_file=model_file, 
+                height_map_file=height_map_file, 
+            )
     elif run_mode in ["testing", "play", "nav"]:
         print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
-        print("Model Type: ", model_type, " Total Timesteps: ", total_timesteps, " HER Start Episode: ", start_her_episode)
-        print("Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
-        rl.test_model(
-            orcagym_addresses=orcagym_addresses, 
-            agent_num=agent_num, 
-            agent_name=agent_name, 
-            task=task, 
-            run_mode=run_mode, 
-            nav_ip=nav_ip, 
-            entry_point=entry_point, 
-            time_step=TIME_STEP, 
-            max_episode_steps=max_episode_steps, 
-            render_mode="human",
-            frame_skip=frame_skip, 
-            model_type=model_type, 
-            model_file=model_file, 
-            height_map_file=height_map_file
-        )    
+        print("Algorithm: ", algorithm, " Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", frame_skip)
+        if algorithm == "ppo":
+            sb3_ppo_vecenv_rl.test_model(
+                orcagym_addresses=orcagym_addresses, 
+                agent_num=agent_num, 
+                agent_name=agent_name, 
+                task=task, 
+                run_mode=run_mode, 
+                nav_ip=nav_ip, 
+                entry_point=entry_point, 
+                time_step=TIME_STEP, 
+                max_episode_steps=max_episode_steps, 
+                render_mode="human",
+                frame_skip=frame_skip, 
+                model_file=model_file, 
+                height_map_file=height_map_file
+            )  
+  
     else:
         raise ValueError("Invalid run mode")
 

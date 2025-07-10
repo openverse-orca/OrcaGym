@@ -1,0 +1,18 @@
+# yaodian任务配置文件
+
+level_name: "yaodian"
+object_bodys: [ "niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
+object_sites: ["niuhuangwansite", "qinghuopiansite", "orangeboxsite", "pipalusite", "xiaokepiansite"]
+object_joints: ["niuhuangwan_joint", "qinghuopian_joint", "orangebox_joint", "pipalu_joint", "xiaokepian_joint"]
+
+goal_bodys: ["MedicineChest"]
+goal_sites: ["MedicineChestsite"]
+goal_joints: ["MedicineChest_joint"]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
+actors_spawnable: ["niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
+center: [-6.35, 2.56, 2.32]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

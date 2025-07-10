@@ -5,7 +5,7 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
-import orca_gym.robosuite.utils.transform_utils as transform_utils
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 
@@ -69,7 +69,7 @@ class AckermanEnv(OrcaGymLocalEnv):
     def _set_action_space(self):
         # 归一化到 [-1, 1]区间
         scaled_action_range = np.concatenate([[[-1.0, 1.0]] for _ in range(self.nu)])
-        print("Scaled action range: ", scaled_action_range)
+        # print("Scaled action range: ", scaled_action_range)
         self.action_space = self.generate_action_space(scaled_action_range)
 
     

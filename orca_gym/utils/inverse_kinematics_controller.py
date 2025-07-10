@@ -1,6 +1,6 @@
 
 import numpy as np
-from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from scipy.spatial.transform import Rotation
 
 

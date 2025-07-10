@@ -14,7 +14,7 @@ import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.orca_gym_local import AnchorType, get_eq_type
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -60,7 +60,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
-            Warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
@@ -199,7 +199,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
         if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
-            Warning(f"Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
             return
 
         # 更新锚点位置
@@ -245,7 +245,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 获取actor的位姿和四元数
         actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
         if actor_xpos is None or actor_xmat is None or actor_xquat is None:
-            Warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
+            print(f"Warning: Actor {actor_name} not found in the simulation. Cannot anchor.")
             return
         
         # 将锚点位置设置为actor的位姿
@@ -482,6 +482,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
+    
+    def get_cfrc_ext(self):
+        cfrc_ext = self.gym.get_cfrc_ext()
+        return cfrc_ext
 
     def query_actuator_torques(self, actuator_names):
         actuator_torques = self.gym.query_actuator_torques(actuator_names)

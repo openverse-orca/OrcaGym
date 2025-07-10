@@ -1,5 +1,9 @@
+import random
+import re
+import time
+from colorama import Fore, Style
 import numpy as np
-from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
@@ -30,7 +34,9 @@ class ActionType:
     """
     END_EFFECTOR_OSC = "end_effector_osc"
     END_EFFECTOR_IK = "end_effector_ik"
+    JOINT_MOTOR = "joint_motor"
     JOINT_POS = "joint_pos"
+
 
 
 robot_entries = {
@@ -84,7 +90,7 @@ class DualArmEnv(RobomimicEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
 
-        if self._ctrl_device == ControlDevice.VR:
+        if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION:
             self._joystick = {}
             pico_joystick = []
             for i in range(len(pico_ports)):
@@ -98,8 +104,13 @@ class DualArmEnv(RobomimicEnv):
         self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
-        
-        kwargs["task"] = PickPlaceTask(task_config_dict)
+        self._config = task_config_dict
+        self._config['grpc_addr'] = orcagym_addr
+        self._task = PickPlaceTask(self._config)
+        self._task.register_init_env_callback(self.init_env)
+        kwargs["task"] = self._task
+        self._teleop_counter = 0
+        self._got_task = False
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -108,7 +119,6 @@ class DualArmEnv(RobomimicEnv):
             **kwargs,
         )
 
-        self._task.register_init_env_callback(self.init_env)
 
         # Three auxiliary variables to understand the component of the xml document but will not be used
         # number of actuators/controls: 7 arm joints and 2 gripper joints
@@ -137,6 +147,7 @@ class DualArmEnv(RobomimicEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
 
     def init_env(self):
         self.model, self.data = self.initialize_simulation()
@@ -251,13 +262,8 @@ class DualArmEnv(RobomimicEnv):
         if self._run_mode == RunMode.TELEOPERATION:
             ctrl, noscaled_action = self._teleoperation_action()
         elif self._run_mode == RunMode.POLICY_NORMALIZED:
-            scaled_action = action
             noscaled_action = self.denormalize_action(action, self.env_action_range_min, self.env_action_range_max)
-            ctrl = self._playback_action(noscaled_action)
-        elif self._run_mode == RunMode.POLICY_RAW:
-            noscaled_action = np.clip(action, self.env_action_range_min, self.env_action_range_max)
-            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
-            ctrl = self._playback_action(noscaled_action)
+            ctrl, noscaled_action = self._playback_action(noscaled_action)
         else:
             raise ValueError("Invalid run mode : ", self._run_mode)
         
@@ -265,9 +271,9 @@ class DualArmEnv(RobomimicEnv):
         
         
         if self._run_mode == RunMode.TELEOPERATION:
-            scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
-
             [agent.update_force_feedback() for agent in self._agents.values()]
+
+        scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
@@ -279,7 +285,8 @@ class DualArmEnv(RobomimicEnv):
                 "object": self.objects,  # 提取第一个对象的位置
                 "goal": self.goals,
                 "task_status": self._task_status,
-                "language_instruction": self._task.get_language_instruction()}
+                "language_instruction": self._task.get_language_instruction(),
+                "time_step": self.data.time}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)
@@ -300,14 +307,14 @@ class DualArmEnv(RobomimicEnv):
         
         return agent_action
 
-    def _fill_arm_joint_pos(self, action) -> np.ndarray:
-        agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_joint_pos(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
-    
-    def _fill_arm_ctrl(self, action) -> np.ndarray:
-        agent_action = self._split_agent_action(action)
-        return np.concatenate([agent.fill_arm_ctrl(self, agent_action[agent.name]) for agent in self._agents.values()], axis=0).flatten()
-    
+    # def _fill_arm_joint_pos(self, action) -> np.ndarray:
+    #     agent_action = self._split_agent_action(action)
+    #     return np.concatenate([agent.fill_arm_joint_pos(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+
+    # def _fill_arm_ctrl(self, action) -> np.ndarray:
+    #     agent_action = self._split_agent_action(action)
+    #     return np.concatenate([agent.fill_arm_ctrl(agent_action[agent.name]) for agent in self._agents.values()], axis=0, dtype=np.float32).flatten()
+
 
     def get_state(self) -> dict:
         state = {
@@ -327,16 +334,17 @@ class DualArmEnv(RobomimicEnv):
         return self.ctrl.copy(), np.concatenate(agent_action).flatten()
 
 
-    def _playback_action(self, action) -> np.ndarray:
+    def _playback_action(self, action) -> tuple:
         assert(len(action) == self.action_space.shape[0])
         
         # 将动作分配给每个agent
         agent_action = self._split_agent_action(action)
+        new_agent_action = []
         for agent in self._agents.values():
-            agent.on_playback_action( agent_action[agent.name])
-        
-        return self.ctrl.copy()
-    
+            new_agent_action.append(agent.on_playback_action(agent_action[agent.name]))
+
+        return self.ctrl.copy(), np.concatenate(new_agent_action).flatten()
+
 
     def _get_obs(self) -> dict:
         if len(self._agents) == 1:
@@ -360,84 +368,153 @@ class DualArmEnv(RobomimicEnv):
         for id, agent_name in enumerate(self._agent_names):
             self._agents[agent_name].init_agent(id)
 
-    def reset_model(self) -> tuple[dict, dict]:
-        if self._task.random_actor:
-            self._task.generate_actors()
-            self._task.publish_scene()
 
-        # 1) 恢复初始状态、重置 controller/mechanism
+
+    def _debug_list_loaded_objects(self):
+        all_keys = list(self.model._joint_dict.keys())
+
+        print("=== ALL JOINT KEYS IN MODEL ===")
+        for k in all_keys:
+            print("   ", k)
+        print("================================")
+
+        print("[Debug] before correction:", self._task.object_joints)
+        corrected = []
+        for short_jn in self._task.object_joints:
+            sn_tokens = short_jn.lower().split("_")
+            matches = []
+            for full in all_keys:
+                fn_tokens = full.lower().split("_")
+                # 如果 full 的末尾几个 token 刚好和 short_jn token 一致，就算匹配
+                if fn_tokens[-len(sn_tokens):] == sn_tokens:
+                    matches.append(full)
+            if not matches:
+                print(f"[Debug] joint '{short_jn}' not found → SKIP")
+                continue
+            full_jn = matches[0]
+            
+            #print(f"[Loaded OBJ JOINT] {short_jn:25s} → {full_jn}")
+        self._task.object_joints = full_jn
+        #print("[Debug] after correction:", self._task.object_joints)
+    
+    def safe_get_task(self, env):
+        while True:
+            # 1) 生成一次 task（包括随机摆放）
+            self._task.get_task(env)
+    
+            objs = self._task.randomized_object_positions
+            goal_body = self._task.goal_bodys[0]
+    
+            # 2) 拿它的轴对齐包围盒
+            bbox = self.get_goal_bounding_box(goal_body)
+            min_xy = bbox['min'][:2]
+            max_xy = bbox['max'][:2]
+    
+            bad = False
+            for joint_name, qpos in objs.items():
+                obj_xy = qpos[:2]
+                if (min_xy <= obj_xy).all() and (obj_xy <= max_xy).all():
+                    bad = True
+                    break
+                
+            if not bad:
+                return  # 成功退出
+    
+            # 否则继续尝试
+    
+
+    def reset_teleoperation(self) -> tuple[dict, dict]:
+        if self._config.get("random_actor", False):
+            self._teleop_counter += 1
+            if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
+                # 随机挑 3-5 个 prefab 的 short name（如 "salt","jar_01"……）
+                full      = self._config["actors"]
+                spawn     = self._config["actors_spawnable"]
+                total     = len(spawn)
+                n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
+                idxs      = random.sample(range(total), k=n_select)
+                # 根据索引分别取 actor_name 与 spawn_name
+                short_names = [full[i]  for i in idxs]
+                # 只改 object_bodys/sites/joints 三项，保持 actors 原样
+                self._config["object_bodys"]  = list(short_names)
+                self._config["object_sites"]  = [f"{n}site"   for n in short_names]
+                self._config["object_joints"] = [f"{n}_joint" for n in short_names]
+
+
         self._set_init_state()
-        [agent.on_reset_model() for agent in self._agents.values()]
+        for ag in self._agents.values():
+            ag.on_reset_model()
 
-        # 2) 如果是“回放”或“增广”模式，就把录好的 self.objects 直接放到场景里
-        if self._run_mode in [RunMode.POLICY_NORMALIZED]:
-            # 假设 self.objects 已经在上一次 reset 或外部脚本里被赋值成 demo_data['objects']
+        self.safe_get_task(self)
+        instr = self._task.get_language_instruction()
+        m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
+        if m:
+            level, obj, goal = m.groups()
+            print(
+                f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
+                f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
+                f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
+            )
+        else:
+            # 万一格式不符，回退到无色输出
+            print(instr)
 
-            # 得到观测并返回
-            obs = self._get_obs().copy()
-            return obs, {"objects": self.objects}
-
-        # 3) 否则走原先的“遥操作”初始化逻辑
-        self._task.get_task(self)
-        randomized_positions = self._task.randomized_object_positions
-        goal_positions = self._task.randomized_goal_positions
-
-        print(self._task.get_language_instruction())
-        print("Press left hand grip button to start recording task......")
-
-        # 构造 numpy structured array
-        dtype = np.dtype([
-            ('joint_name', 'U100'),
-            ('position', 'f4', (3,)),
-            ('orientation', 'f4', (4,))
-        ])
-
-        # 处理物体数据
-        objects = []
-        for joint_name, qpos in randomized_positions.items():
-            objects.append({
-                "joint_name": joint_name,
-                "position": qpos[:3].tolist(),
-                "orientation": qpos[3:].tolist()
-            })
-        objects_array = np.array(
-            [(o["joint_name"], o["position"], o["orientation"]) for o in objects],
-            dtype=dtype
-        )
-        self.objects = objects_array
-        goal_dtype = np.dtype([
-            ('joint_name',  'U100'),
-            ('position',    'f4', (3,)),
-            ('orientation', 'f4', (4,)),
-            ('min',         'f4', (3,)),
-            ('max',         'f4', (3,)),
-            ('size',        'f4', (3,))
-        ])
-        # 处理目标数据并计算bounding box
-        goal_entries, _ = self.process_goals(goal_positions)
-
-        goals = []
-        for e in goal_entries:
-            goals.append((
-                e["joint_name"],
-                e["position"],
-                e["orientation"],
-                e["min"],
-                e["max"],
-                e["size"]
-            ))
-        goals_array = np.array(goals, dtype=goal_dtype)
-        self.goals = goals_array
-
-        # 执行仿真步骤
+        self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
+        self.mj_forward()
+        obs = self._get_obs().copy()
+        return obs, {"objects": self.objects, "goals": self.goals}
+    
+    def reset_normalized(self) -> tuple[dict, dict]:
+        self._set_init_state()
+        for ag in self._agents.values():
+            ag.on_reset_model()
         self.mj_forward()
 
-        # 获取观测信息并返回
         obs = self._get_obs().copy()
+        return obs, {
+            "objects": getattr(self, "objects", None),
+            "goals":   getattr(self, "goals",   None),
+        }
+    
+    def reset_model(self) -> tuple[dict, dict]:
+        if self._run_mode == RunMode.TELEOPERATION:
+            return self.reset_teleoperation()
+        elif self._run_mode == RunMode.POLICY_NORMALIZED:
+            return self.reset_normalized()
+        else:
+            raise ValueError(f"Invalid run mode: {self._run_mode}")
+    
+    def update_objects_goals(self, object_positions, goal_positions):
+        # objects structured array
+        obj_dtype = np.dtype([
+            ("joint_name",  "U100"),
+            ("position",    "f4", 3),
+            ("orientation", "f4", 4),
+        ])
+        self.objects = np.array(
+            [(jn, pos[:3].tolist(), pos[3:].tolist())
+             for jn, pos in object_positions.items()],
+            dtype=obj_dtype,
+        )
 
-        # 返回目标bounding box信息
-        return obs, {"objects": objects_array, "goals": goals_array}
-
+        # goals structured array
+        goal_dtype = np.dtype([
+            ("joint_name",  "U100"),
+            ("position",    "f4", 3),
+            ("orientation", "f4", 4),
+            ("min",         "f4", 3),
+            ("max",         "f4", 3),
+            ("size",        "f4", 3),
+        ])
+        entries, _ = self.process_goals(goal_positions)
+        self.goals = np.array(
+            [
+                (e["joint_name"], e["position"], e["orientation"],
+                 e["min"], e["max"], e["size"])
+                for e in entries
+            ],
+            dtype=goal_dtype,
+        )
 
 
     def process_goals(self, goal_positions):
@@ -480,7 +557,7 @@ class DualArmEnv(RobomimicEnv):
         goal_positions_array = np.array(goal_positions_list)
 
         # 返回目标数据及bounding box信息
-        return goal_entries, goal_positions_array,
+        return goal_entries, goal_positions_array
 
 
     def replace_objects(self, objects_data):
@@ -522,7 +599,6 @@ class DualArmEnv(RobomimicEnv):
                 quat = row[3:7]
                 qpos_dict[name] = np.concatenate([pos, quat], axis=0)
 
-        # 一次性写入所有自由关节 qpos
         self.set_joint_qpos(qpos_dict)
         # 推进仿真
         self.mj_forward()
@@ -679,8 +755,8 @@ class DualArmEnv(RobomimicEnv):
             return self._get_obs().copy()
 
     def action_use_motor(self):
-        if self._action_type == ActionType.END_EFFECTOR_OSC:
-            # OSC控制器需要使用电机
+        if self._action_type in [ActionType.END_EFFECTOR_OSC, ActionType.JOINT_MOTOR]:
+            # OSC控制器和关节电机控制需要使用电机
             return True
         elif self._action_type in [ActionType.JOINT_POS, ActionType.END_EFFECTOR_IK]:
             # 关节位置控制和逆运动学控制不需要使用电机
@@ -734,7 +810,7 @@ class AgentBase:
     def on_teleoperation_action(self) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
 
-    def on_playback_action(self, action: np.ndarray) -> None:
+    def on_playback_action(self, action: np.ndarray) -> np.ndarray:
         raise NotImplementedError("This method should be overridden by subclasses")
 
     def get_obs(self) -> dict:
