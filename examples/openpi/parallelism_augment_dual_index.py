@@ -90,45 +90,88 @@ if __name__ == "__main__":
     host, port = orcagym_address.split(':')
     port = int(port)
     orcagym_address_list = []
-    i = args.index
+    
   #  for i in range(parallelism_num):
-    orcagym_address_list.append(f"0.0.0.0:{port + i}")
+    orcagym_address_list.append(f"0.0.0.0:{port + args.index}")
 
     process  = []
 
-    adapterIndex = i % 2
-    p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
-			"--mj_grpc_server",  orcagym_address_list[0],
-			"--forceAdapter", " NVIDIA GeForce RTX 4090",
-			"--adapterIndex", str(adapterIndex),
-			"--r_width", "128", "--r_height", "128",
-			f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
-	                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    process.append(p)
+    def DoStartProcess(args):
+        print("1111111111111111111111111111111111")
+        global process,orcagym_address_list,port, level
+        i = args.index
+        adapterIndex = i % 2
+        p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
+                "--mj_grpc_server",  orcagym_address_list[0],
+                "--forceAdapter", " NVIDIA GeForce RTX 4090",
+                "--adapterIndex", str(adapterIndex),
+                "--r_width", "128", "--r_height", "128",
+                f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process.append(p)
 
-    time.sleep(15)
-
-
-    #调用增广脚本，如果需要额外参数自行添加
-    threads = []
- 
-    p = subprocess.Popen(["python", "run_dual_arm_sim.py", 
-                      "--orcagym_address", f"localhost:{port + i}",
-                      "--run_mode", "augmentation",
-                      "--dataset", args.dataset,
-                      "--action_type",args.action_type,
-                      "--task_config",args.task_config,
-                      "--sample_range",str(args.sample_range),
-                      "--augmented_noise",str(args.augmented_noise),
-                      "--augmented_rounds",str(args.augmented_rounds),
-                      "--realtime_playback",args.realtime_playback,
-                      "--withvideo",args.withvideo,
-                      "--level",args.levelorca
+        time.sleep(15)
 
 
-                      ],  stdout=sys.stdout, stderr=sys.stderr, text=True)
+        #调用增广脚本，如果需要额外参数自行添加
+        threads = []
+    
+        scriptp = subprocess.Popen(["python", "run_dual_arm_sim.py", 
+                        "--orcagym_address", f"localhost:{port + i}",
+                        "--run_mode", "augmentation",
+                        "--dataset", args.dataset,
+                        "--action_type",args.action_type,
+                        "--task_config",args.task_config,
+                        "--sample_range",str(args.sample_range),
+                        "--augmented_noise",str(args.augmented_noise),
+                        "--augmented_rounds",str(args.augmented_rounds),
+                        "--realtime_playback",args.realtime_playback,
+                        "--withvideo",args.withvideo,
+                        "--level",args.levelorca
+
+
+                        ],  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
-    process.append(p)
+
+  
+        output11 = scriptp.stdout.readline()
+            
+        process.append(scriptp)
+        print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        #for p in process:
+           #p.wait()
+
+    DoStartProcess(args)
+
+    scriptp = process[-1]
+    output12 = scriptp.stdout.readline()
+    print("bbbbbbbbbbbbbbbbbbbbbbbbb")
+
+    # 监测scriptp 进程的输出，如果超过30秒没有输出，则认为脚本执行失败
+    start_time = time.time()
+    while True:
+        output = scriptp.stdout.readline()
+        if output == '' and scriptp.poll() is not None:
+            print("ccccccccccccccccccccccccccccc")
+           # break
+        if output:
+            #print(output.strip())
+            start_time = time.time()
+            print(output.strip())
+        if time.time() - start_time > 30:  # 超过30秒没有输出
+            print("Script execution seems to be stuck, terminating...")
+            for p in process:
+                p.stdout.close()
+                p.stderr.close()
+                p.terminate()
+            process.clear()
+
+   
+            print("Restarting the process...")  
+            time.sleep(15) # 等待一会儿以确保进程终止
+            DoStartProcess(args)
+            start_time = time.time()
+
 
     # 等待所有线程完成
     # for t in threads:
@@ -136,5 +179,4 @@ if __name__ == "__main__":
 
     # # dual_arm_manipulation.run_dual_arm_sim(args, project_root, current_file_path)
 
-    for p in process:
-        p.wait()
+ 
