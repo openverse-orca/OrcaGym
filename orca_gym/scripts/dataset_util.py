@@ -1,55 +1,32 @@
 import cv2
 import robomimic.envs.env_base as EB
+
 import h5py
 import numpy as np
 import json
 import os
-import uuid  # 新增导入uuid模块
-import time  # 新增导入time模块
-import shutil
 
 class DatasetWriter:
-    # def __init__(self, base_dir, env_name, env_version, env_kwargs=None):  # 修改1: 参数名改为base_dir
-    #     """
-    #     初始化 DatasetWriter。
-
-    #     参数：
-    #     - base_dir: 基础目录路径，用于创建UUID子目录
-    #     - env_name: 环境名称。
-    #     - env_version: 环境版本。
-    #     - env_kwargs: 环境参数字典（可选）。
-    #     """
-    #     self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-    #     self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-    #     os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
-        
-    #     self.mp4_save_path : str = None
-
-    #     self._env_args = {
-    #         "env_name": env_name,
-    #         "type": EB.EnvType.ORCA_GYM_TYPE,
-    #         "env_version": env_version,
-    #         "env_kwargs": env_kwargs or {}
-    #     }
-
-    #     # 创建新的 HDF5 文件，写入初始数据，然后关闭文件
-    #     self.hdf5_path = os.path.join(self.uuid_dir, "env_data.hdf5")  # 新增: 定义HDF5文件路径
-    #     with h5py.File(self.hdf5_path, 'w') as f:  # 修改4: 使用hdf5_path
-    #         data_group = f.create_group('data')
-    #         data_group.attrs['env_args'] = json.dumps(self._env_args)
-    #         data_group.attrs['total'] = 0  # 初始化总样本数为 0
-    #         data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
-    #         f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
-    def __init__(self, base_dir, env_name, env_version, env_kwargs=None, specific_file_path=None):  # 修改1: 参数名改为base_dir
+    def __init__(self, file_path, env_name, env_version, env_kwargs=None):
         """
         初始化 DatasetWriter。
 
         参数：
-        - base_dir: 基础目录路径，用于创建UUID子目录
+        - file_path: 要创建的 HDF5 文件路径。
         - env_name: 环境名称。
+        - env_type: 环境类型。
         - env_version: 环境版本。
         - env_kwargs: 环境参数字典（可选）。
         """
+        self.file_path = file_path
+        # 如果文件已存在，跳过创建和初始化
+        if os.path.exists(self.file_path):
+            reader = DatasetReader(self.file_path)
+            self._env_args = reader._get_env_args()
+            return
+
+        self.mp4_save_path : str = None
+
 
         self._env_args = {
             "env_name": env_name,
@@ -57,71 +34,15 @@ class DatasetWriter:
             "env_version": env_version,
             "env_kwargs": env_kwargs or {}
         }
-        self.pathremoved = False
-       # print("base_dir..................:", base_dir)
-        if specific_file_path is not None:  # 新增: 如果提供了特定文件路径
-            self.hdf5_path = specific_file_path  # 使用特定文件路径
-            self.create_hdf5_file()  # 新增: 创建HDF5文件
-        else:
-            self.basedir = base_dir
-            self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-            self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-            self.camera_dir = os.path.join(self.uuid_dir, "camera")
-            self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
-            self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
-            self.depth_dir = os.path.join(self.camera_dir, "depth")
-            self.video_dir = os.path.join(self.camera_dir, "video")
-        # print("self.uuid_dir..............:",self.uuid_dir)
-            self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
-            self.mp4_save_path : str = None
-            
-        
 
-
-
-    def create_hdf5_file(self):
-        with h5py.File(self.hdf5_path, 'w') as f:  # 修改4: 使用hdf5_path
+        # 创建新的 HDF5 文件，写入初始数据，然后关闭文件
+        with h5py.File(self.file_path, 'w') as f:
             data_group = f.create_group('data')
             data_group.attrs['env_args'] = json.dumps(self._env_args)
             data_group.attrs['total'] = 0  # 初始化总样本数为 0
             data_group.attrs['demo_count'] = 0  # 初始化演示计数为 0
+
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
-
-    def set_UUIDPATH(self):
-        self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-        self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-        self.camera_dir = os.path.join(self.uuid_dir, "camera")
-        self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
-        self.depth_dir = os.path.join(self.camera_dir, "depth")
-        self.video_dir = os.path.join(self.camera_dir, "video")
-        self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
-       # print("self.uuid_dir:",self.uuid_dir)
-        os.makedirs(self.uuid_dir, exist_ok=True)  # 新增: 创建UUID目录
-        os.makedirs(self.camera_dir, exist_ok=True)
-        os.makedirs(self.parameters_dir, exist_ok=True)
-        os.makedirs(self.proprio_stats_dir, exist_ok=True)
-        os.makedirs(self.depth_dir, exist_ok=True)
-        os.makedirs(self.video_dir, exist_ok=True)
-        # 创建新的 HDF5 文件，写入初始数据，然后关闭文件
-        self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5")  # 新增: 定义HDF5文件路径
-        # self.hdf5_path = os.path.join(self.uuid_dir)
-        # print("hdf5_path11112222:",self.hdf5_path)
-        self.create_hdf5_file()  # 新增: 创建HDF5文件
-        self.pathremoved = False
-    
-    def get_UUIDPath(self):
-        return self.uuid_dir
-
-    def remove_path(self):
-        rmpath = self.uuid_dir
-        print(f"删除目录: {rmpath}")
-        if os.path.exists(rmpath) and os.path.isdir(rmpath):
-            shutil.rmtree(rmpath)
-        self.pathremoved = True
-
-
-        
-
 
     def set_env_kwargs(self, env_kwargs):
         """
@@ -131,42 +52,16 @@ class DatasetWriter:
         - env_kwargs: 环境参数字典。
         """
         self._env_args['env_kwargs'] = env_kwargs
-        with h5py.File(self.hdf5_path, 'r+') as f:  # 修改5: 使用hdf5_path
+        with h5py.File(self.file_path, 'r+') as f:
             data_group = f['data']
             data_group.attrs['env_args'] = json.dumps(self._env_args)
 
     def get_cur_demo_name(self) -> str:
-        with h5py.File(self.hdf5_path, 'r') as f:  # 修改6: 使用hdf5_path
+        with h5py.File(self.file_path, 'r') as f:
             data_group = f['data']
             demo_count = data_group.attrs['demo_count']
+
         return f'demo_{demo_count:05d}'  # 返回当前演示的名称格式
-    
-    
-    def get_mp4_save_path(self):  # 修改7: 增加demo_name和camera_name参数
-        """
-        生成视频保存路径。
-
-        参数：
-        - demo_name: 演示名称，如 'demo_00000'
-        - camera_name: 相机名称，如 'camera_head_color'
-
-        返回：
-        - 视频文件的完整保存路径
-        """
-        # print("file_path:",self.file_path)
-      #  print("uuid_dir 111111111111:",self.uuid_dir)
-
-        # demo_dir = os.path.join(self.uuid_dir)  # 新增: 创建demo子目录
-        demo_dir = os.path.join(self.camera_dir)
-     #   print("Demo dir:",demo_dir)
-        os.makedirs(demo_dir, exist_ok=True)  # 新增: 确保目录存在
-        retpath = os.path.join(demo_dir) 
-        #print("retpath:",retpath)
-        return retpath  # 修改8: 返回demo子目录中的路径
-
-    # def get_mp4_save_path(self) -> str:
-    #     self.mp4_save_path = os.path.join(self.file_path.removesuffix('.hdf5'), self.get_cur_demo_name())
-    #     return self.mp4_save_path
     
     def add_demo_data(self, demo_data, model_file=None):
         """
@@ -185,21 +80,21 @@ class DatasetWriter:
                 'timesteps': np.ndarray (N,)    # 仿真时间，单位为秒
                 'language_instruction': str     # 语言指令（可选）
                 'next_obs'                      # 如果未提供，将自动生成
-                'camera_frames'                 # 可选，用于存储相机帧，格式为字典，键为相机名称，值为帧列表
+                'camera_frames'                 # 可选，用于存储相机帧
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
         """
         # 打开文件进行读写
-        with h5py.File(self.hdf5_path, 'r+') as f:  # 修改9: 使用hdf5_path
+        with h5py.File(self.file_path, 'r+') as f:
             data_group = f['data']
 
             # 获取当前的演示计数和总样本数
             total_samples = data_group.attrs['total']
-            # demo_name_h5 = self.get_cur_demo_name()   # 获取HDF5中的演示名称
-            demo_name = self.get_cur_demo_name()
-            demo_count = data_group.attrs['demo_count']  # 获取当前演示计数
 
-            # demo_group = data_group.create_group(demo_name_h5)
+            demo_name = self.get_cur_demo_name()   # 保存10万个演示
+
+            self.mp4_save_path = os.path.join(self.file_path.removesuffix('.hdf5'), demo_name)
+
             demo_group = data_group.create_group(demo_name)
             num_samples = demo_data['actions'].shape[0]
             demo_group.attrs['num_samples'] = num_samples
@@ -207,7 +102,8 @@ class DatasetWriter:
             if model_file:
                 demo_group.attrs['model_file'] = model_file
 
-            for key in ['states', 'actions', 'camera_frames', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps']:
+
+            for key in ['states', 'actions', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps']:
                 if key in demo_data:
                     demo_group.create_dataset(key, data=demo_data[key])
 
@@ -215,14 +111,11 @@ class DatasetWriter:
             obs_group = demo_group.create_group('obs')
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data, compression="gzip", compression_opts=4)
- 
-            # # 处理 camera_frames
-            # if 'camera_frames' in demo_data:  # 修改10: 添加条件判断
-            #     fps = demo_data['timesteps'].shape[0] // (demo_data['timesteps'][-1] - demo_data['timesteps'][0])
-            #     for camera_name, frames in demo_data['camera_frames'].items():  # 修改11: 遍历所有相机
-            #         # video_path = self.get_mp4_save_path(demo_name_h5, camera_name)  # 使用新方法获取路径
-            #         video_path = self.get_mp4_save_path(demo_name, camera_name)
-            #         self.save_single_camera_video(frames, video_path, fps)  # 修改12: 使用新的保存方法
+
+            # 处理 camera_frames
+            fps = demo_data['timesteps'].shape[0] // (demo_data['timesteps'][-1] - demo_data['timesteps'][0])
+            print("fps: ", fps)
+            self.save_camera_video(demo_data['camera_frames'], demo_name, fps)
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
@@ -239,20 +132,6 @@ class DatasetWriter:
             demo_count += 1
             data_group.attrs['total'] = total_samples
             data_group.attrs['demo_count'] = demo_count
-
-    def save_single_camera_video(self, frames, video_path, fps):  # 新增: 单个相机视频保存方法
-        """保存单个相机视频"""
-        os.makedirs(os.path.dirname(video_path), exist_ok=True)
-        print(f"Saving video at {video_path}")
-        frame_height, frame_width = frames[0].shape[:2]
-        isColor = (frames[0].ndim == 3)
-        
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(video_path, fourcc, fps, (frame_width, frame_height), isColor=isColor)
-        for frame in frames:
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            out.write(frame)
-        out.release()
 
     def _generate_next_obs(self, obs):
         """
@@ -272,7 +151,7 @@ class DatasetWriter:
         return next_obs
 
     def add_filter_key(self, filter_key_name, demo_names):
-        with h5py.File(self.hdf5_path, 'r+') as f:  # 修改13: 使用hdf5_path
+        with h5py.File(self.file_path, 'r+') as f:
             mask_group = f['mask']
             # 将演示名称转换为字节串，适用于 HDF5
             demo_names_bytes = np.array([name.encode('utf-8') for name in demo_names], dtype='S')
@@ -283,14 +162,14 @@ class DatasetWriter:
             print("Added filter key:", filter_key_name, "with", len(demo_names), "demos.")
             
     def remove_filter_key(self, filter_key_name):
-        with h5py.File(self.hdf5_path, 'r+') as f:  # 修改14: 使用hdf5_path
+        with h5py.File(self.file_path, 'r+') as f:
             mask_group = f['mask']
             if filter_key_name in mask_group:
                 del mask_group[filter_key_name]
                 print("Removed filter key:", filter_key_name)
 
     def get_demo_names(self):
-        with h5py.File(self.hdf5_path, 'r') as f:  # 修改15: 使用hdf5_path
+        with h5py.File(self.file_path, 'r') as f:
             data_group = f['data']
             demo_names = [name for name in data_group.keys()]
         return demo_names
@@ -299,9 +178,6 @@ class DatasetWriter:
         """
         将 80% 的演示数据用于训练 (train)，剩余 20% 用于测试(valid)
         """
-
-        if self.pathremoved:
-            return
         self.remove_filter_key("train")
         self.remove_filter_key("valid")
         
@@ -325,7 +201,33 @@ class DatasetWriter:
         """
         pass  # 在此示例中，无需执行任何操作
     
-    # 删除原save_camera_video方法，使用新的save_single_camera_video方法
+    def save_camera_video(self, camera_frames, demo_name, fps):
+        """
+        保存相机视频帧到指定演示的相机组中。
+
+        参数：
+        - demo_name: 演示名称。
+        - camera_name: 相机名称。
+        - video_frames: 视频帧列表，每帧为 numpy 数组。
+        """
+
+        # mp4 save path: ${h5file_path}/demo_name/camera_name.mp4
+    
+        for camera_name, frames in camera_frames.items():
+            mp4_save_path = os.path.join(self.file_path.removesuffix('.hdf5'), demo_name)
+            if not os.path.exists(mp4_save_path):
+                os.makedirs(mp4_save_path, exist_ok=True)
+            video_save_path = os.path.join(mp4_save_path, f"{camera_name}.mp4")
+            print(f"Saving video for {camera_name} at {video_save_path}")
+            frame_height, frame_width = frames[0].shape[:2]
+            isColor = (frames[0].ndim == 3)
+            
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_save_path, fourcc, fps, (frame_width, frame_height), isColor=isColor)
+            for frame in frames:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                out.write(frame)
+            out.release()
 
 class DatasetReader:
     def __init__(self, file_path):
@@ -432,6 +334,10 @@ class DatasetReader:
                 demo_names = [name for name in demo_names if name in filter_key_names]
         return demo_names
             
+        #     data_group = f['data']
+        #     demo_names = [name for name in data_group.keys()]
+        # return demo_names
+
     def get_demo_data(self, demo_name):
         """
         获取指定名称的演示数据。
@@ -468,6 +374,7 @@ class DatasetReader:
                 'timesteps': np.array(demo_group['timesteps']),
                 'language_instruction': demo_group['language_instruction'][()] if 'language_instruction' in demo_group else None,
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
-                'camera_frames': np.array(demo_group['camera_frames'])
+                'camera_frames': {camera_name: [np.array(frame_data) for _, frame_data in camera_group.items()]
+                                  for camera_name, camera_group in demo_group.items() if camera_name.startswith('camera')},  
             }
         return demo_data

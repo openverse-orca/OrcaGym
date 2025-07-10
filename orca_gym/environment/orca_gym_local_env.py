@@ -60,7 +60,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
-            Warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
@@ -199,7 +199,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
         if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
-            Warning(f"Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
             return
 
         # 更新锚点位置
@@ -245,7 +245,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 获取actor的位姿和四元数
         actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
         if actor_xpos is None or actor_xmat is None or actor_xquat is None:
-            Warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
+            print(f"Warning: Actor {actor_name} not found in the simulation. Cannot anchor.")
             return
         
         # 将锚点位置设置为actor的位姿

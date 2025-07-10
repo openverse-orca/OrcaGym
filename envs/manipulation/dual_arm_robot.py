@@ -185,8 +185,8 @@ class DualArmRobot(AgentBase):
         else:
             # -----------------------------
             # Inverse Kinematics controller
-            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 1e-2, 0.1)
-            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 1e-2, 0.1)
+            self._l_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_l), self._l_jnt_dof, 2e-1, 0.075)
+            self._r_inverse_kinematics_controller = InverseKinematicsController(self._env, self._env.model.site_name2id(self._ee_site_r), self._r_jnt_dof, 2e-1, 0.075)
 
 
     def on_close(self):
@@ -400,12 +400,12 @@ class DualArmRobot(AgentBase):
         ctrl_l = np.asarray(ctrl_l, dtype=np.float32)
         ctrl_r = np.asarray(ctrl_r, dtype=np.float32)
         action = np.concatenate([
-            np.asarray(action_l_B, dtype=np.float32),                # left eef pos and angle, 0-5
-            ctrl_l,                                                  # left arm joint pos, 6-12
-            np.array([self._grasp_value_l], dtype=np.float32),       # left hand grasp value, 13
-            np.asarray(action_r_B, dtype=np.float32),                # right eef pos and angle, 14-19
-            ctrl_r,                                                  # right arm joint pos, 20-26
-            np.array([self._grasp_value_r], dtype=np.float32)        # right hand grasp value, 27
+            np.asarray(action_l_B, dtype=np.float32),                # 0-5  : left eef pos and axisangle, normalized to [-1, 1] based on the coordinate action space [-2m, 2m] and rotation action space [-pi, pi]
+            ctrl_l,                                                  # 6-12 : left arm joint pos (ik control mode) or torque (osc control mode) ,  normalized to [-1, 1] based on the pos or torque range
+            np.array([self._grasp_value_l], dtype=np.float32),       # 13   : left hand grasp value, normalized to [-1, 1] based on the pos or torque range
+            np.asarray(action_r_B, dtype=np.float32),                # 14-19: right eef pos and axisangle, normalized to [-1, 1] based on the coordinate action space [-2m, 2m] and rotation action space [-pi, pi]
+            ctrl_r,                                                  # 20-26: right arm joint pos (ik control mode) or torque (osc control mode) ,  normalized to [-1, 1] based on the pos or torque range
+            np.array([self._grasp_value_r], dtype=np.float32)        # 27   : right hand grasp value, normalized to [-1, 1] based on the pos or torque range
         ]).flatten()
 
         # Mocap 调试标记采用全局坐标系
@@ -414,12 +414,12 @@ class DualArmRobot(AgentBase):
 
         return action
 
-    def fill_arm_joint_pos(self, action : np.ndarray) -> np.ndarray:
-        arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
-        arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
-        action[6:13] = arm_joint_values_l
-        action[20:27] = arm_joint_values_r
-        return action
+    # def fill_arm_joint_pos(self, action : np.ndarray) -> np.ndarray:
+    #     arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
+    #     arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
+    #     action[6:13] = arm_joint_values_l
+    #     action[20:27] = arm_joint_values_r
+    #     return action
 
     def fill_arm_ctrl(self, action : np.ndarray) -> np.ndarray:
         ctrl_l = self._env.ctrl[self._l_arm_actuator_id]
@@ -483,7 +483,7 @@ class DualArmRobot(AgentBase):
 
         return grasp_l_xpos, grasp_l_xquat, grasp_r_xpos, grasp_r_xquat
 
-    def on_playback_action(self, action) -> None:
+    def on_playback_action(self, action) -> np.ndarray:
         assert(len(action) == self.action_range.shape[0])
         
         self._grasp_value_l = action[13]
@@ -491,7 +491,7 @@ class DualArmRobot(AgentBase):
         self._grasp_value_r = action[27]
         self.set_r_hand_actuator_ctrl(self._grasp_value_r)
 
-        if self._env.action_type in [ActionType.END_EFFECTOR_OSC, ActionType.END_EFFECTOR_IK]:
+        if self._env.action_type == ActionType.END_EFFECTOR_OSC:
             action_l = self._action_B_to_action(action[:6])
             self._l_controller.set_goal(action_l)
             ctrl = self._l_controller.run_controller()
@@ -502,7 +502,25 @@ class DualArmRobot(AgentBase):
             ctrl = self._r_controller.run_controller()
             self._set_arm_ctrl(self._r_arm_actuator_id, ctrl)
 
-        elif self._env.action_type == ActionType.JOINT_POS:
+            action = self.fill_arm_ctrl(action)
+
+        elif self._env.action_type == ActionType.END_EFFECTOR_IK:
+            action_l = self._action_B_to_action(action[:6])
+            quat = transform_utils.axisangle2quat(action_l[3:6])
+            action_l_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 wxyz 格式
+            ctrl_l = self.set_l_arm_position_ctrl(action_l[:3], action_l_xquat)
+
+            action_r = self._action_B_to_action(action[14:20])
+            quat = transform_utils.axisangle2quat(action_r[3:6])
+            action_r_xquat = np.array([quat[3], quat[0], quat[1], quat[2]])  # 转换为 wxyz 格式
+            ctrl_r = self.set_r_arm_position_ctrl(action_r[:3], action_r_xquat)
+
+            self._set_arm_ctrl(self._l_arm_actuator_id, ctrl_l)
+            self._set_arm_ctrl(self._r_arm_actuator_id, ctrl_r)
+
+            action = self.fill_arm_ctrl(action)
+
+        elif self._env.action_type in [ActionType.JOINT_POS, ActionType.JOINT_MOTOR]:
             l_arm_joint_action = action[6:13]
             self._set_arm_ctrl(self._l_arm_actuator_id, l_arm_joint_action)
 
@@ -511,7 +529,7 @@ class DualArmRobot(AgentBase):
         else:
             raise ValueError("Invalid action type: ", self._env._action_type)
         
-        return
+        return action
     
 
     def _local_to_global(self, local_pos: np.ndarray, local_quat: np.ndarray) -> tuple:

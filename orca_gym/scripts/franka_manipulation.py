@@ -350,7 +350,7 @@ def do_augmentation(env : SingleArmEnv,
                     rgb_size : tuple,                    
                     original_dataset_path : str, 
                     augmented_dataset_path : str, 
-                    augmented_scale : float, 
+                    augmented_noise : float, 
                     sample_range : float,
                     augmented_rounds : int,
                     action_step : int = 1):
@@ -388,7 +388,7 @@ def do_augmentation(env : SingleArmEnv,
                 
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list = augment_episode(env, cameras,rgb_size,
-                                                                    demo_data, noise_scale=augmented_scale, 
+                                                                    demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if done_list[-1] == 1:

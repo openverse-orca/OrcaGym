@@ -1,0 +1,26 @@
+# shop1任务配置文件
+
+level_name: "kitchen"
+object_bodys: [ "bottle_red", "bow_yellow_kps", "coffeecup_white_kps", "jar_01", "salt"]
+object_sites: ["bottle_redsite", "bow_yellow_kpssite", "coffeecup_white_kpssite", "jar_01site", "salt"]
+object_joints: ["bottle_red_joint", "bow_yellow_kps_joint", "coffeecup_white_kps_joint", "jar_01_joint", "salt_joint"]
+
+goal_bodys: ["Basket_Kitchen_01"]
+goal_sites: ["Basket_Kitchen_01site"]
+goal_joints: ["Basket_Kitchen_01_joint"]
+
+# random_actor : true
+# random_actor_position: false
+# random_actor_rotation: false
+# actors: ["bow_glass_kps", "bow_yellow_kps", "coffeecup_white_kps", "cup_blue_kps", "salt"]
+# actors_spawnable: ["bow_glass_kps", "bow_yellow_kps", "coffeecup_white_kps", "cup_blue_kps", "salt"]
+# center: [-6.35, 2.56, 2.32]
+# bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["bottle_red", "bow_yellow_kps", "coffeecup_white_kps", "jar_01", "salt"]
+actors_spawnable: ["bottle_red", "bow_yellow_kps", "coffeecup_white_kps", "jar_01", "salt"]
+center: [-6.35, 2.56, 2.32]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
