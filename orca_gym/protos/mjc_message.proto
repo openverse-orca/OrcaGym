@@ -1098,7 +1098,7 @@ message GetCurrentFrameIndexRequest
 }
 
 message GetCurrentFrameIndexResponse {
-  uint64 current_frame = 1;
+  int64 current_frame = 1;
   string error_message = 2;
 }
 
