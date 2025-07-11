@@ -97,7 +97,7 @@ if __name__ == "__main__":
     process  = []
 
     def DoStartProcess(args):
-        print("1111111111111111111111111111111111")
+        # print("1111111111111111111111111111111111")
         global process,orcagym_address_list,port, level
         i = args.index
         adapterIndex = i % 2
@@ -134,25 +134,23 @@ if __name__ == "__main__":
         
 
   
-        output11 = scriptp.stdout.readline()
             
         process.append(scriptp)
-        print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         #for p in process:
            #p.wait()
 
     DoStartProcess(args)
 
     scriptp = process[-1]
-    output12 = scriptp.stdout.readline()
-    print("bbbbbbbbbbbbbbbbbbbbbbbbb")
+
 
     # 监测scriptp 进程的输出，如果超过30秒没有输出，则认为脚本执行失败
     start_time = time.time()
     while True:
         output = scriptp.stdout.readline()
-        if output == '' and scriptp.poll() is not None:
-            print("ccccccccccccccccccccccccccccc")
+        #if output == '' and scriptp.poll() is not None:
+          #  print("ccccccccccccccccccccccccccccc")
            # break
         if output:
             #print(output.strip())
@@ -165,11 +163,11 @@ if __name__ == "__main__":
                 p.stderr.close()
                 p.terminate()
             process.clear()
-
    
             print("Restarting the process...")  
-            time.sleep(15) # 等待一会儿以确保进程终止
+            time.sleep(5) # 等待一会儿以确保进程终止
             DoStartProcess(args)
+            scriptp = process[-1]
             start_time = time.time()
 
 
