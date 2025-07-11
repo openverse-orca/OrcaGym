@@ -128,8 +128,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def get_next_frame(self) -> int:
         current_frame = self.loop.run_until_complete(self._get_current_frame())
-        if current_frame == 0:
-            # 如果摄像头没有使能，会一直返回0
+        if current_frame < 0:
+            # 如果摄像头没有使能，会一直返回-1
             return current_frame
         
         for _ in range(10):

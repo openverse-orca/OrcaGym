@@ -9,7 +9,7 @@ from filelock import FileLock, Timeout
 
 from typing import Any, Dict
 import uuid
-from flask import g, json
+import json
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime, timedelta, timezone
@@ -1142,13 +1142,13 @@ def augment_episode(env : DualArmEnv,
         #         camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
         #         camera_frames[camera.name].append(camera_frame)
         global g_skip_frame
-        if sync_codec and g_skip_frame >= 1:
+        if sync_codec and g_skip_frame < 2:
             camera_frame_index.append(env.get_next_frame())
-            g_skip_frame = 0
+            g_skip_frame += 1
             # print("Get next frame, sync_codec:", sync_codec, "g_skip_frame:", g_skip_frame)
         else:
             camera_frame_index.append(env.get_current_frame())
-            g_skip_frame += 1
+            g_skip_frame = 0
             # print("Get current frame, sync_codec:", sync_codec, "g_skip_frame:", g_skip_frame)
 
         for obs_key, obs_data in obs.items():
