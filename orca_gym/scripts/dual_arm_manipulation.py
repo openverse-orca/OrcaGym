@@ -5,7 +5,7 @@ import sys
 import time
 import subprocess
 import signal
-
+from filelock import FileLock, Timeout
 
 from typing import Any, Dict
 import uuid
@@ -396,37 +396,52 @@ def append_task_info_json(
         sn_code: str = "A2D0001AB00029",
         sn_name: str = "青龙"):
     """把一条 episode 的元信息追加到同一个 task_info.json 里。"""
+    lock = FileLock(json_path + ".lock", timeout=20)
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            all_eps = json.load(f)
-    except FileNotFoundError:
-        all_eps = []
+        with lock:
+            # 确保目录存在
+            dirpath = os.path.dirname(json_path)
+            if dirpath:
+                os.makedirs(dirpath, exist_ok=True)
 
-    scene_key = "shop" if level_name == "jiazi" else level_name
-    init_cn, init_en = INIT_SCENE_TEXT.get(scene_key, ("", ""))
+            # 读旧数据（文件不存在或损坏都当作空列表）
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    all_eps = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                all_eps = []
 
-    episode = {
-        "episode_id": episode_id,
-        "scene_name": scene_key.title(),
-        "sub_scene_name": sub_scene_name,
-        "init_scene_text": init_cn,
-        "english_init_scene_text": init_en,
-        "task_name": language_instruction_cn,
-        "english_task_name": language_instruction_en,
-        "data_type": "常规",
-        "episode_status": "approved",
-        "data_gen_mode": data_gen_mode,
-        "sn_code": sn_code,
-        "sn_name": sn_name,
-        "label_info": {
-            "action_config": action_config,
-            "key_frame": []
-        }
-    }
+            # 构造新 episode
+            scene_key = "shop" if level_name == "jiazi" else level_name
+            init_cn, init_en = INIT_SCENE_TEXT.get(scene_key, ("", ""))
+            episode = {
+                "episode_id": episode_id,
+                "scene_name": scene_key.title(),
+                "sub_scene_name": sub_scene_name,
+                "init_scene_text": init_cn,
+                "english_init_scene_text": init_en,
+                "task_name": language_instruction_cn,
+                "english_task_name": language_instruction_en,
+                "data_type": "常规",
+                "episode_status": "approved",
+                "data_gen_mode": data_gen_mode,
+                "sn_code": sn_code,
+                "sn_name": sn_name,
+                "label_info": {
+                    "action_config": action_config,
+                    "key_frame": []
+                }
+            }
+            all_eps.append(episode)
 
-    all_eps.append(episode)
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(all_eps, f, ensure_ascii=False, indent=4)
+            # 原子写入
+            tmp_path = json_path + ".tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(all_eps, f, ensure_ascii=False, indent=4)
+            os.replace(tmp_path, json_path)
+
+    except Timeout:
+        raise RuntimeError(f"无法获得文件锁：{json_path}.lock")
 
 def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         obs_list, 
