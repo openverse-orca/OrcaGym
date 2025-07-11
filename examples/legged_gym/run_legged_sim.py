@@ -5,7 +5,7 @@ import time
 import numpy as np
 from datetime import datetime
 import gymnasium as gym
-from stable_baselines3 import PPO, SAC, DDPG
+from stable_baselines3 import PPO
 from gymnasium.envs.registration import register
 from datetime import datetime
 import torch
@@ -21,8 +21,6 @@ if project_root not in sys.path:
 
 
 from envs.legged_gym.legged_config import LeggedEnvConfig
-import orca_gym.scripts.multi_agent_rl as rl
-from orca_gym.utils.dir_utils import create_tmp_dir
 
 TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 

@@ -14,7 +14,7 @@ import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.orca_gym_local import AnchorType, get_eq_type
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -48,6 +48,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
+        self._last_frame_index = -1
         self.mj_forward()
 
         self._body_anchored = None
@@ -124,6 +125,22 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     async def _stop_save_video(self):
         return await self.gym.stop_save_video()
+
+    def get_next_frame(self) -> int:
+        current_frame = self.loop.run_until_complete(self._get_current_frame())
+        if current_frame == 0:
+            # 如果摄像头没有使能，会一直返回0
+            return current_frame
+        
+        for _ in range(10):
+            if current_frame == self._last_frame_index:
+                time.sleep(self.realtime_step)
+            else:
+                self._last_frame_index = current_frame
+                return current_frame
+        
+        return current_frame
+            
 
     def get_current_frame(self) -> int:
         return self.loop.run_until_complete(self._get_current_frame())
@@ -482,6 +499,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
+    
+    def get_cfrc_ext(self):
+        cfrc_ext = self.gym.get_cfrc_ext()
+        return cfrc_ext
 
     def query_actuator_torques(self, actuator_names):
         actuator_torques = self.gym.query_actuator_torques(actuator_names)

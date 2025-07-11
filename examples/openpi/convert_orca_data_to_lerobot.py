@@ -8,7 +8,7 @@ from lerobot.common.datasets.lerobot_dataset import LEROBOT_HOME
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 import tyro
 
-from orca_gym.robomimic.dataset_util import DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetReader
 import dataclasses
 import argparse
 import numpy as np

@@ -3,8 +3,7 @@ import re
 import time
 from colorama import Fore, Style
 import numpy as np
-
-from orca_gym.robomimic.robomimic_env import RobomimicEnv
+from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType

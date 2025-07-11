@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 import h5py
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
 from envs.manipulation.dual_arm_env import DualArmEnv, ControlDevice
 from examples.imitation.train_policy import train_policy
@@ -60,6 +60,8 @@ INIT_SCENE_TEXT = {
 }
 _light_counter = 0
 _LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
+
+g_skip_frame = 0
 
 # 顶部：维护一个简单的中英映射
 
@@ -306,7 +308,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         
                     else:
                         camera_frame_index.append(env.get_current_frame())
-                
+
                 if task_status == TaskStatus.SUCCESS:
                     goal_info = info["goal"]
                     object_info = info["object"]
@@ -1048,7 +1050,8 @@ def augment_episode(env : DualArmEnv,
                     noise_scale : float, 
                     sample_range : float, 
                     realtime : bool = False,
-                    action_step : int = 1):
+                    action_step : int = 1,
+                    sync_codec: bool = False) -> tuple:
     obs, info = reset_playback_env(env, demo_data, sample_range)
     obs_list    = {k: [] for k in obs}
     reward_list = []
@@ -1062,7 +1065,6 @@ def augment_episode(env : DualArmEnv,
     target_obj, target_goal = get_target_object_and_goal(demo_data)
 
     in_goal=False
-    
 
     # 轨迹增广需要重新采样动作
     if sample_range > 0.0:
@@ -1139,7 +1141,15 @@ def augment_episode(env : DualArmEnv,
         #     for camera in cameras:
         #         camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
         #         camera_frames[camera.name].append(camera_frame)
-        camera_frame_index.append(env.get_current_frame())
+        global g_skip_frame
+        if sync_codec and g_skip_frame >= 1:
+            camera_frame_index.append(env.get_next_frame())
+            g_skip_frame = 0
+            # print("Get next frame, sync_codec:", sync_codec, "g_skip_frame:", g_skip_frame)
+        else:
+            camera_frame_index.append(env.get_current_frame())
+            g_skip_frame += 1
+            # print("Get current frame, sync_codec:", sync_codec, "g_skip_frame:", g_skip_frame)
 
         for obs_key, obs_data in obs.items():
             obs_list[obs_key].append(obs_data)
@@ -1170,8 +1180,10 @@ def do_augmentation(
         action_step : int = 1,
         action_type : str = "",
         output_video : bool = True,
+        sync_codec : bool = False
     ):
     
+    print("=================>sync codec: ", sync_codec)
    # realtime = False
     
     # Copy the original dataset to the augmented dataset
@@ -1213,7 +1225,7 @@ def do_augmentation(
                     , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
-                                                                    action_step=action_step)
+                                                                    action_step=action_step, sync_codec=sync_codec)
                 if  in_goal:
                     if output_video == True:
                         env.stop_save_video()
@@ -1290,7 +1302,8 @@ def run_example(orcagym_addr : str,
                 current_file_path : str,
                 task_config : str,
                 augmentation_path : str,
-                output_video : bool):
+                output_video : bool,
+                sync_codec : bool):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
 
@@ -1453,7 +1466,7 @@ def run_example(orcagym_addr : str,
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
 
          #   do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, augmented_rounds, action_step, output_video)
-            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step, action_type)
+            do_augmentation(env, cameras, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_noise, sample_range, realtime_playback, augmented_rounds, action_step, action_type, output_video, sync_codec)
             print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
         else:
             print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
@@ -1505,6 +1518,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     augmented_path = ''
     withvideo = True if args.withvideo == 'True' else False
     realtime_playback = True if args.realtime_playback == 'True' else False
+    sync_codec = True if args.sync_codec == 'True' else False
 
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
@@ -1583,7 +1597,8 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
                     current_file_path,
                     task_config=task_config,
                     augmentation_path=augmented_path,
-                    output_video=withvideo
+                    output_video=withvideo,
+                    sync_codec=sync_codec
                     )
 
     # 终止 Monitor 子进程

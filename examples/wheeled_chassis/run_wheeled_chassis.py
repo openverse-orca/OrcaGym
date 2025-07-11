@@ -84,6 +84,6 @@ def run_simulation(orcagym_addr : str,
 
 if __name__ == "__main__":
     orcagym_addr = "localhost:50051"
-    agent_name = "AzureLoong_mobile_base_2f85_usda"
+    agent_name = "openloong_gripper_2f85_mobile_base_usda"
     env_name = "WheeledChassis"
     run_simulation(orcagym_addr, agent_name, env_name)
