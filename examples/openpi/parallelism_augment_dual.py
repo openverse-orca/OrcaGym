@@ -77,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
     parser.add_argument('--realtime_playback', type=str, default='True', help='The flag to enable the real-time playback or rollout')
     parser.add_argument('--withvideo', type=str, default='True', help='The flag to enable the real-time playback or rollout')
+    parser.add_argument('--sync_codec', type=str, default='False',  help='Wait for the next frame to be ready before sending the next command (e.g., True, False)')
 
     args = parser.parse_args()
 
@@ -120,7 +121,8 @@ if __name__ == "__main__":
                               "--augmented_rounds",str(args.augmented_rounds),
                               "--realtime_playback",args.realtime_playback,
                               "--withvideo",args.withvideo,
-                              "--level",args.levelorca
+                              "--level",args.levelorca,
+                              "--sync_codec",args.sync_codec
 
 
                               ], stdout=sys.stdout, stderr=sys.stderr, text=True)
