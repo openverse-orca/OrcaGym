@@ -148,6 +148,7 @@ class KPSDataExport:
         self.json_file = json_file
         self.id_to_index = {}
         self.load_json()
+        self.executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 
     def load_json(self):
         json_path = os.path.join(self.dataset_path, self.json_file)
@@ -236,6 +237,7 @@ class KPSDataExport:
             subdir_path = os.path.join(self.dataset_path, subdir)
             if os.path.commonpath([subdir_path, output_filepath]) == os.path.normpath(subdir_path):
                 raise ValueError("Output path must be outside the dataset path to avoid overwriting files.")
+            self.executor.submit(shutil.copytree, (subdir_path, os.path.join(output_filepath, subdir)))
             shutil.copytree(subdir_path, os.path.join(output_filepath, subdir))
 
     def _generate_output_json_list_(self, paths: list) -> list:
