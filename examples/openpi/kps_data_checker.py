@@ -228,7 +228,7 @@ class KPSDataExport:
         counts = len(source_paths)
         duration = MP4DurationTime / (60 * 60)  # Duration in hours
 
-        new_output_filepath = f"{total_GB:.2f}GB_{counts}counts_{duration:.2f}h".replace(".", "p")
+        new_output_filepath = f"{type}_{total_GB:.2f}GB_{counts}counts_{duration:.2f}h".replace(".", "p")
         os.rename(output_type_path, os.path.join(output_filepath, new_output_filepath))
 
     def _export_mp4_files(self, output_filepath: str, source_paths: list):
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
     json_file = args.json_file
 
-    kpsDataChecker = KPSDataChecker(dataset_path.__str__(), camera_name_list=["camera_head"], proprio_stats="proprio_stats.hdf5")
+    kpsDataChecker = KPSDataChecker(dataset_path.__str__(), camera_name_list=["camera_head", "camera_wrist_l", "camera_wrist_r"], proprio_stats="proprio_stats.hdf5")
     kpsDataChecker.check()
 
     kpsDataExport = KPSDataExport(dataset_path.__str__(), json_file)
