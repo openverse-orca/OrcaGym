@@ -1,16 +1,12 @@
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
-import numpy as np
-import orca_gym.utils.rotations as rotations
 import time
-import random
 import gymnasium as gym
 import sys
 from datetime import datetime
-import os
 from typing import Optional
 
 ENV_ENTRY_POINT = {
-    "WheeledChassis": "envs.wheeled_chassis.wheeled_chassis_env:WheeledChassisEnv",
+    "Character": "envs.character.character_env:CharacterEnv",
 }
 
 TIME_STEP = 0.001
@@ -83,6 +79,6 @@ def run_simulation(orcagym_addr : str,
 
 if __name__ == "__main__":
     orcagym_addr = "localhost:50051"
-    agent_name = "openloong_gripper_2f85_mobile_base_usda"
-    env_name = "WheeledChassis"
+    agent_name = "Remy"
+    env_name = "Character"
     run_simulation(orcagym_addr, agent_name, env_name)

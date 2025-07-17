@@ -1,0 +1,11 @@
+actor_name: "remy"
+body_name: "Animation"
+joint_names: {"Move_X" : "Slide_X", "Move_Y" : "Slide_Y", "Move_Z" : "Slide_Z", "Rotate_Z" : "Rotate_Z"}
+speed: 
+  Forward: 1.7
+  Backward: -1.2
+  TurnLeft: 1.5707963
+  TurnRight: -1.5707963   # 90 degree per second
+
+
+
