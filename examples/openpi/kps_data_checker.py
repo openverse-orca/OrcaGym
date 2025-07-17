@@ -1,6 +1,7 @@
 import argparse
 import json
 import os, sys, shutil
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pymediainfo import MediaInfo
 from enum import Enum
@@ -112,7 +113,7 @@ class KPSDataChecker:
                     self.subdirectories.append(entry.name)
 
     def check_subdirectory(self, subdirectory):
-        basicChecker =  BasicUnitChecker(os.path.join(dataset_path, subdirectory), self.camera_name_list, self.proprio_stats)
+        basicChecker =  BasicUnitChecker(os.path.join(self.dataset_path, subdirectory), self.camera_name_list, self.proprio_stats)
         error_type, duration = basicChecker.check()
         return error_type, duration, subdirectory
 
@@ -204,8 +205,21 @@ class KPSDataExport:
                     unqualified_path: list = [],
                     MP4DurationTime: float = 0.0
                     ):
+        now = time.time()
         self._export_data(output_filepath, qualified_path, "qualified", MP4DurationTime)
-        self._export_data(output_filepath, unqualified_path, "unqualified")
+        # self._export_data(output_filepath, unqualified_path, "unqualified")
+        end = time.time()
+        print(f"{self.dataset_path}: Data export completed in {end - now:.2f} seconds.")
+
+    def filter_data(self, qualified_path: list, unqualified_path: list, MP4DurationTime: float = 0.0):
+        now = time.time()
+        filter_json_path = os.path.join(self.dataset_path, self.json_file)
+        filter_json_list = self._generate_output_json_list_(qualified_path)
+        self._filter_data(unqualified_path)
+        with open(filter_json_path, 'w', encoding='utf-8') as f:
+            json.dump(filter_json_list, f, ensure_ascii=False, indent=4)
+        end = time.time()
+        print(f"{self.dataset_path}: Filtered data completed in {end - now:.2f} seconds.")
 
     def _export_data(self, output_filepath: str, source_paths: list, type: str, MP4DurationTime: float = 0.0):
         output_type_path = os.path.join(output_filepath, type)
@@ -236,6 +250,15 @@ class KPSDataExport:
         new_output_filepath = f"{type}_{total_GB:.2f}GB_{counts}counts_{duration:.2f}h".replace(".", "p")
         os.rename(output_type_path, os.path.join(output_filepath, new_output_filepath))
 
+    def _filter_data(self, unqualified_path: list):
+        if not unqualified_path:
+            print("No unqualified data to filter.")
+            return
+        for subdir in unqualified_path:
+            subir_path = os.path.join(self.dataset_path, subdir)
+            future = self.executor.submit(shutil.rmtree, subir_path)
+            self.futures.append(future)
+
     def _export_mp4_files(self, output_filepath: str, source_paths: list):
         for subdir in source_paths:
             subdir_path = os.path.join(self.dataset_path, subdir)
@@ -254,35 +277,108 @@ class KPSDataExport:
                 output_json_list.append(data)
         return output_json_list
 
+
+def export_data(dataset_path_list: list, json_file: str, output_filepath: str):
+    for dataset_path in dataset_path_list:
+        kpsDataChecker = KPSDataChecker(dataset_path,
+                                        camera_name_list=["camera_head", "camera_wrist_l", "camera_wrist_r"],
+                                        proprio_stats="proprio_stats.hdf5")
+        kpsDataChecker.check()
+
+        kpsDataExport = KPSDataExport(dataset_path, json_file)
+        kpsDataExport.export_reporter(kpsDataChecker.subdirectories, kpsDataChecker.qualified_path,
+                                      kpsDataChecker.mp4_fps_error_path,
+                                      kpsDataChecker.mp4_duration_error_path,
+                                      kpsDataChecker.mp4_tracks_error_path,
+                                      kpsDataChecker.mp4_not_exist_error_path,
+                                      kpsDataChecker.parameters_error_path,
+                                      kpsDataChecker.proprio_stats_error_path,
+                                      output_file="reporter.md")
+        unqualified_path = kpsDataChecker.mp4_fps_error_path + kpsDataChecker.mp4_duration_error_path + \
+                           kpsDataChecker.mp4_tracks_error_path + kpsDataChecker.mp4_not_exist_error_path + \
+                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path
+        kpsDataExport.export_data(output_filepath, kpsDataChecker.qualified_path, unqualified_path,
+                                  kpsDataChecker.duration_total)
+
+def filter_data(dataset_path_list: list, json_file: str):
+    for dataset_path in dataset_path_list:
+        kpsDataChecker = KPSDataChecker(dataset_path,
+                                        camera_name_list=["camera_head", "camera_wrist_l", "camera_wrist_r"],
+                                        proprio_stats="proprio_stats.hdf5")
+        kpsDataChecker.check()
+
+        kpsDataExport = KPSDataExport(dataset_path, json_file)
+        kpsDataExport.export_reporter(kpsDataChecker.subdirectories, kpsDataChecker.qualified_path,
+                                      kpsDataChecker.mp4_fps_error_path,
+                                      kpsDataChecker.mp4_duration_error_path,
+                                      kpsDataChecker.mp4_tracks_error_path,
+                                      kpsDataChecker.mp4_not_exist_error_path,
+                                      kpsDataChecker.parameters_error_path,
+                                      kpsDataChecker.proprio_stats_error_path,
+                                      output_file="reporter.md")
+        unqualified_path = kpsDataChecker.mp4_fps_error_path + kpsDataChecker.mp4_duration_error_path + \
+                           kpsDataChecker.mp4_tracks_error_path + kpsDataChecker.mp4_not_exist_error_path + \
+                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path
+        kpsDataExport.filter_data(kpsDataChecker.qualified_path, unqualified_path, kpsDataChecker.duration_total)
+
+
 if __name__ == "__main__":
     # 示例参数 --dataset_path augmented_datasets_tmp/shop --json_file Shop-Cashier_Operation.json --output_filepath /home/orca/dataset
     # 会在augmented_datasets_tmp/shop目录下生成一个名为reporter.md的报告文件，并将合格和不合格的数据分别导出到指定的output_filepath目录下
 
     parser = argparse.ArgumentParser(description='KPS Data Checker')
     parser.add_argument('--dataset_path', type=str, required=True, help='The dataset path to check')
-    parser.add_argument('--json_file', type=str, required=True, help='The JSON file to check')
-    parser.add_argument('--output_filepath', type=str, required=True, help='The output filepath')
+    parser.add_argument('--output_filepath', type=str, help='The output filepath')
+    parser.add_argument('--mode', type=str, required=True, choices=['export', 'filter'], help='The mode to run' )
 
     args = parser.parse_args()
+    output_filepath = args.output_filepath
+    mode = args.mode
+    if mode == "export":
+        if not output_filepath:
+            raise ValueError("Output filepath is required in export mode.")
+        output_filepath = Path(args.output_filepath).resolve()
+        print("output_filepath: ", output_filepath.__str__())
+
     dataset_path = Path(args.dataset_path).resolve()
-    output_filepath = Path(args.output_filepath).resolve()
-    print("output_filepath: ", output_filepath.__str__())
 
-    json_file = args.json_file
+    json_file_list = ["Shop-Cashier_Operation.json", "Shop-Shelf_Operation.json", "Kitchen-Countertop_Operation.json", "Pharmacy-Shelf_Operation.json"]
 
-    kpsDataChecker = KPSDataChecker(dataset_path.__str__(), camera_name_list=["camera_head", "camera_wrist_l", "camera_wrist_r"], proprio_stats="proprio_stats.hdf5")
-    kpsDataChecker.check()
+    sub_dataset_directory = []
+    with os.scandir(dataset_path) as entries:
+        for entry in entries:
+            if entry.is_dir():
+                sub_dataset_directory.append(entry.path)
 
-    kpsDataExport = KPSDataExport(dataset_path.__str__(), json_file)
-    kpsDataExport.export_reporter(kpsDataChecker.subdirectories, kpsDataChecker.qualified_path,
-                                  kpsDataChecker.mp4_fps_error_path,
-                                    kpsDataChecker.mp4_duration_error_path,
-                                    kpsDataChecker.mp4_tracks_error_path,
-                                    kpsDataChecker.mp4_not_exist_error_path,
-                                    kpsDataChecker.parameters_error_path,
-                                    kpsDataChecker.proprio_stats_error_path,
-                                    output_file="reporter.md")
-    unqualified_path = kpsDataChecker.mp4_fps_error_path + kpsDataChecker.mp4_duration_error_path + \
-                        kpsDataChecker.mp4_tracks_error_path + kpsDataChecker.mp4_not_exist_error_path + \
-                        kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path
-    kpsDataExport.export_data(output_filepath.__str__(), kpsDataChecker.qualified_path, unqualified_path, kpsDataChecker.duration_total)
+    shop_cashier_operation_directory = []
+    shop_shelf_operation_directory = []
+    kitchen_countertop_operation_directory = []
+    pharmacy_shelf_operation_directory = []
+
+    # 遍历子目录，查找包含特定JSON文件的目录
+    for subdir in sub_dataset_directory:
+        print("subdir: ", subdir)
+        with os.scandir(subdir) as entries:
+            for entry in entries:
+                if entry.is_file() and entry.name.endswith('.json'):
+                    print("Found JSON file:", entry.name, "in directory:", subdir)
+                if entry.name in json_file_list:
+                    if entry.name == "Shop-Cashier_Operation.json":
+                        shop_cashier_operation_directory.append(subdir)
+                    elif entry.name == "Shop-Shelf_Operation.json":
+                        shop_shelf_operation_directory.append(subdir)
+                    elif entry.name == "Kitchen-Countertop_Operation.json":
+                        kitchen_countertop_operation_directory.append(subdir)
+                    elif entry.name == "Pharmacy-Shelf_Operation.json":
+                        pharmacy_shelf_operation_directory.append(subdir)
+
+    if mode == "export":
+        export_data(shop_cashier_operation_directory, "Shop-Cashier_Operation.json", os.path.join(output_filepath, "shop-cashier_operation"))
+        export_data(shop_shelf_operation_directory, "Shop-Shelf_Operation.json", os.path.join(output_filepath, "shop-shelf_operation"))
+        export_data(kitchen_countertop_operation_directory, "Kitchen-Countertop_Operation.json", os.path.join(output_filepath, "kitchen-countertop_operation"))
+        export_data(pharmacy_shelf_operation_directory, "Pharmacy-Shelf_Operation.json", os.path.join(output_filepath, "pharmacy-shelf_operation"))
+    elif mode == "filter":
+        filter_data(shop_cashier_operation_directory, "Shop-Cashier_Operation.json")
+        filter_data(shop_shelf_operation_directory, "Shop-Shelf_Operation.json")
+        filter_data(kitchen_countertop_operation_directory, "Kitchen-Countertop_Operation.json")
+        filter_data(pharmacy_shelf_operation_directory, "Pharmacy-Shelf_Operation.json")
