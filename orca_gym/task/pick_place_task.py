@@ -1,3 +1,4 @@
+from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.task.abstract_task import AbstractTask
 import random
@@ -14,31 +15,27 @@ class PickPlaceTask(AbstractTask):
 
     def get_task(self, env: OrcaGymLocalEnv) -> dict[str, str]:
         """
-        从 object_bodys 和 goal_bodys 中随机配对，index 绝对不会越界。
+        随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
         """
+        # 每次都清空旧任务
         self.task_dict.clear()
-        self.random_objs_and_goals(env, bounds=0.1)
-
-        object_len = len(self.object_bodys)
-        goal_len   = len(self.goal_bodys)
-        min_len    = min(object_len, goal_len)
-
-        # 如果任意一方长度为 0，则无法配对
-        if min_len == 0:
+        # 随机摆放
+        self.random_objs_and_goals(env, random_rotation=True)
+    
+        # 如果没有可用的物体或目标，直接返回空
+        if not self.object_bodys or not self.goal_bodys:
             return self.task_dict
-
-        # 随机选择 1 到 min_len 个索引
-        n_select = random.randint(1, min_len)
-        # 只在 [0, min_len) 范围内取样
-        idxs = random.sample(range(min_len), n_select)
-
-        for i in idxs:
-            obj_name  = self.object_bodys[i]
-            goal_name = self.goal_bodys[i]
-            self.task_dict[obj_name] = goal_name
-
+    
+        # 从 object_bodys 随机选一个
+        obj_name = random.choice(self.object_bodys)
+        # 只取第一个 goal
+        goal_name = self.goal_bodys[0]
+    
+        # 记录到 task_dict 并返回
+        self.task_dict[obj_name] = goal_name
         return self.task_dict
 
+    
     def get_language_instruction(self) -> str:
         if not self.task_dict:
             return "Do something."

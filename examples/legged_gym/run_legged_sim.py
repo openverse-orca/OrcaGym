@@ -5,11 +5,12 @@ import time
 import numpy as np
 from datetime import datetime
 import gymnasium as gym
-from stable_baselines3 import PPO, SAC, DDPG
+from stable_baselines3 import PPO
 from gymnasium.envs.registration import register
 from datetime import datetime
 import torch
 import torch.nn as nn
+import csv
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -20,8 +21,6 @@ if project_root not in sys.path:
 
 
 from envs.legged_gym.legged_config import LeggedEnvConfig
-import orca_gym.scripts.multi_agent_rl as rl
-from orca_gym.utils.dir_utils import create_tmp_dir
 
 TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 
@@ -121,44 +120,113 @@ def segment_obs(obs: dict[str, np.ndarray], agent_name_list: list[str]) -> dict[
     return segmented_obs
     
 
+def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: int, control_step: int, sim_time: float):
+    """
+    Log observations and actions to a CSV file.
+    
+    Args:
+        obs (dict): Observation dictionary containing IMU and joint data
+        action (np.ndarray): Action array
+        filename (str): Path to the CSV file
+        physics_step (int): Current physics simulation step count
+        control_step (int): Current control/policy step count
+        sim_time (float): Current simulation time in seconds
+    """
+    # Define CSV headers
+    headers = [
+        "timestamp",
+        "sim_time",
+        "physics_step",
+        "control_step",
+        # IMU data
+        "imu_angle_roll", "imu_angle_pitch", "imu_angle_yaw",
+        "imu_angular_velocity_roll", "imu_angular_velocity_pitch", "imu_angular_velocity_yaw",
+        "imu_acc_x", "imu_acc_y", "imu_acc_z",
+        # Joint data - Front Left Leg
+        "fl_joint1_pos", "fl_joint1_vel", "fl_joint1_torque",
+        "fl_joint2_pos", "fl_joint2_vel", "fl_joint2_torque",
+        "fl_joint3_pos", "fl_joint3_vel", "fl_joint3_torque",
+        # Joint data - Front Right Leg
+        "fr_joint1_pos", "fr_joint1_vel", "fr_joint1_torque",
+        "fr_joint2_pos", "fr_joint2_vel", "fr_joint2_torque",
+        "fr_joint3_pos", "fr_joint3_vel", "fr_joint3_torque",
+        # Joint data - Hind Left Leg
+        "hl_joint1_pos", "hl_joint1_vel", "hl_joint1_torque",
+        "hl_joint2_pos", "hl_joint2_vel", "hl_joint2_torque",
+        "hl_joint3_pos", "hl_joint3_vel", "hl_joint3_torque",
+        # Joint data - Hind Right Leg
+        "hr_joint1_pos", "hr_joint1_vel", "hr_joint1_torque",
+        "hr_joint2_pos", "hr_joint2_vel", "hr_joint2_torque",
+        "hr_joint3_pos", "hr_joint3_vel", "hr_joint3_torque",
+        # Contact forces
+        "fl_force_x", "fl_force_y", "fl_force_z",
+        "fr_force_x", "fr_force_y", "fr_force_z",
+        "hl_force_x", "hl_force_y", "hl_force_z",
+        "hr_force_x", "hr_force_y", "hr_force_z",
+        # Actions
+        "fl_hip_action", "fl_thigh_action", "fl_calf_action",
+        "fr_hip_action", "fr_thigh_action", "fr_calf_action",
+        "hl_hip_action", "hl_thigh_action", "hl_calf_action",
+        "hr_hip_action", "hr_thigh_action", "hr_calf_action"
+    ]
+    
+    # Create file and write headers if it doesn't exist
+    file_exists = os.path.exists(filename)
+    
+    with open(filename, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(headers)
+        
+        # Prepare data row
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        
+        # Combine all data
+        row = [current_time, sim_time, physics_step, control_step] + list(obs["observation"]) + list(action)
+        
+        writer.writerow(row)
+
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
                  model: nn.Module, 
                  time_step: float, 
                  frame_skip: int):
     obs, info = env.reset()
-    # print("obs: ", obs)
     dt = time_step * frame_skip
+    if not os.path.exists("./log"):
+        os.makedirs("./log")
+    log_file = f"./log/simulation_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    # Add step counting
+    physics_step = 0
+    control_step = 0
+    sim_time = 0.0
+    
     try:
         while True:
             start_time = datetime.now()
 
             segmented_obs = segment_obs(obs, agent_name_list)
-            # print("segmented_obs: ", segmented_obs)
             action_list = []
             for agent_obs in segmented_obs.values():
-                # print("agent_obs: ", agent_obs)
-                # predict_start = datetime.now()
                 action, _states = model.predict(agent_obs, deterministic=True)
                 action_list.append(action)
-                # predict_time = datetime.now() - predict_start
-                # print("Predict Time: ", predict_time.total_seconds(), flush=True)
 
             action = np.concatenate(action_list).flatten()
-            # print("action: ", action)
-            # setp_start = datetime.now()
+            
+            # Log with step information
+            log_observation(obs, action, log_file, physics_step, control_step, sim_time)
+            
+            # Update step counters before next step
+            physics_step += frame_skip  # Each control step includes frame_skip physics steps
+            control_step += 1
+            sim_time += dt
+            
             obs, reward, terminated, truncated, info = env.step(action)
-
-            # print("obs, reward, terminated, truncated, info: ", observation, reward, terminated, truncated, info)
-
-
             env.render()
-            # step_time = datetime.now() - setp_start
-            # print("Step Time: ", step_time.total_seconds(), flush=True)
 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:
-                # print("Sleep for ", dt - elapsed_time.total_seconds())
                 time.sleep(dt - elapsed_time.total_seconds())
             
     finally:

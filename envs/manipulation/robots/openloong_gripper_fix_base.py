@@ -115,3 +115,6 @@ class OpenLoongGripperFixBase(DualArmRobot):
         for force in contact_force_dict.values():
             compose_force += np.linalg.norm(force[:3])
         return compose_force                
+    
+    def set_wheel_ctrl(self, joystick_state) -> None:
+        return

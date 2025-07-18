@@ -311,7 +311,7 @@ class AgentBase:
         )
         
         action_size = self.agent.get_action_size()
-        self._action_range = np.array([[-1.0, 1.0]] * action_size, dtype=np.float32)
+        self._action_range = np.array([[-3.0, 3.0]] * action_size, dtype=np.float32)
         action_space = spaces.Box(
             low=self._action_range[:, 0],
             high=self._action_range[:, 1],
@@ -429,6 +429,11 @@ class AgentBase:
     def _query_ctrl_info(self):
         ctrl_info = {}
         ctrl_info[self.agent.name] = self.agent.get_ctrl_info()
+        # # store ctrl_info to pkl file, whichn is used for 2real; commented otherwise
+        # import pickle
+        # with open(f"ctrl_info.pkl", "wb") as f:
+        #     pickle.dump(ctrl_info, f)
+        # exit()
         return ctrl_info    
     
     def _init_playable(self, env: LeggedSimEnv) -> None:
@@ -476,7 +481,6 @@ class AgentBase:
 
         self._key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
-        
         return lin_vel, turn_angel, reborn    
     
 class Lite3Agent(AgentBase):

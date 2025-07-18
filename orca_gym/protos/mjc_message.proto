@@ -18,6 +18,9 @@ service GrpcService {
   rpc SetCameraSensorInfo (SetCameraSensorInfoRequest) returns (SetCameraSensorInfoResponse);
   rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
   rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
+  rpc BeginSaveMp4File(BeginSaveMp4FileRequest) returns (BeginSaveMp4FileResponse);
+  rpc StopSaveMp4File(StopSaveMp4FileRequest) returns (StopSaveMp4FileResponse);
+  rpc GetCurrentFrameIndex(GetCurrentFrameIndexRequest) returns (GetCurrentFrameIndexResponse);
 
   // 键鼠操作
   rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
@@ -1053,6 +1056,7 @@ message SetCameraSensorInfoRequest {
     bool save_mp4_file = 4;                // 是否保存为 MP4 文件
     bool use_dds = 5;                     // 是否使用 DDS
 }
+
 message SetCameraSensorInfoResponse {
     enum Status {
         SUCCESS = 0;
@@ -1060,6 +1064,42 @@ message SetCameraSensorInfoResponse {
     }
     Status status = 1; // 状态码字段
     string error_message = 2; // 错误详情（可选）
+}
+
+message BeginSaveMp4FileRequest {
+  string file_path = 1; // 保存 MP4 文件的路径
+
+}
+
+message BeginSaveMp4FileResponse {
+  enum Status {
+    SUCCESS = 0;
+    ERROR = 1;
+  }
+  Status status = 1; // 状态码字段
+  string error_message = 2; // 错误详情（可选）
+}
+
+message StopSaveMp4FileRequest {
+    enum Status {
+        SUCCESS = 0;
+        FAILED = 1;
+    }
+    Status status = 1; // 状态码字段
+}
+
+message StopSaveMp4FileResponse {
+  // 该请求不需要任何参数
+}
+
+message GetCurrentFrameIndexRequest
+{
+  // 该请求不需要任何参数
+}
+
+message GetCurrentFrameIndexResponse {
+  uint64 current_frame = 1;
+  string error_message = 2;
 }
 
 message MakeCameraViewportActiveRequest {
