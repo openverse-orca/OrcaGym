@@ -48,6 +48,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
+        self._last_frame_index = -1
         self.mj_forward()
 
         self._body_anchored = None
@@ -124,6 +125,22 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     async def _stop_save_video(self):
         return await self.gym.stop_save_video()
+
+    def get_next_frame(self) -> int:
+        current_frame = self.loop.run_until_complete(self._get_current_frame())
+        if current_frame == 0:
+            # 如果摄像头没有使能，会一直返回0
+            return current_frame
+        
+        for _ in range(10):
+            if current_frame == self._last_frame_index:
+                time.sleep(self.realtime_step)
+            else:
+                self._last_frame_index = current_frame
+                return current_frame
+        
+        return current_frame
+            
 
     def get_current_frame(self) -> int:
         return self.loop.run_until_complete(self._get_current_frame())

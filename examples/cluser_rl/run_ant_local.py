@@ -23,7 +23,9 @@ import sys
 import subprocess
 from ray.runtime_env import RuntimeEnv
 import glob
+from ray.rllib.policy.torch_policy import TorchPolicy
 
+            
 def setup_cuda_environment():
     """设置并验证 CUDA 环境"""
     # 获取 Conda 环境路径
@@ -123,18 +125,12 @@ def worker_env_check():
     }
 
 
-def config_appo_tuner(
-        num_env_runners: int, 
-        num_envs_per_env_runner: int,
-        iter: int,
-        env: gym.Env
-    ) -> tune.Tuner:
-    # 重要：获取系统的实际GPU数量
-    num_gpus_available = torch.cuda.device_count()
-
-    os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
-    print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
-
+def get_config(
+    num_env_runners: int, 
+    num_envs_per_env_runner: int,
+    env: gym.Env,
+    num_gpus_available: int
+):
     config = (
         APPOConfig()
         .environment(
@@ -181,6 +177,26 @@ def config_appo_tuner(
         .callbacks(
             OrcaMetricsCallback
         )
+    )
+    return config
+
+def config_appo_tuner(
+        num_env_runners: int, 
+        num_envs_per_env_runner: int,
+        iter: int,
+        env: gym.Env
+    ) -> tune.Tuner:
+    # 重要：获取系统的实际GPU数量
+    num_gpus_available = torch.cuda.device_count()
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    
+    config = get_config(
+        num_env_runners=num_env_runners,
+        num_envs_per_env_runner=num_envs_per_env_runner,
+        env=env,
+        num_gpus_available=num_gpus_available
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -314,7 +330,54 @@ def run_training(
         print("\nTraining completed. Best results:")
         best_result = results.get_best_result()
         if best_result.checkpoint:
-            print(f"Best checkpoint: {best_result.checkpoint}")
+            checkpoint_path = best_result.checkpoint.path
+            print(f"Best checkpoint directory: {checkpoint_path}")
+            
+            from ray.rllib.algorithms import Algorithm
+            
+            try:
+                # 尝试使用正确的新API加载算法
+                algo = Algorithm(
+                    config=get_config(
+                        num_env_runners=num_env_runners,
+                        num_envs_per_env_runner=num_envs_per_env_runner,
+                        env=demo_env,
+                        num_gpus_available=torch.cuda.device_count()
+                    ),
+                ).load_checkpoint(checkpoint_path)
+                
+                # 验证策略加载
+                print(f"Algorithm restored. Available policies: {list(algo.policy_map.keys())}")
+                
+                # 默认策略ID通常是"default_policy"
+                policy_id = "default_policy"
+                
+                # 从算法的policy_map中获取策略
+                policy = algo.policy_map[policy_id]
+                
+                # 确保我们获取到了策略对象
+                if not hasattr(policy, "model"):
+                    print("Warning: Loaded object is not a recognized Policy type.")
+                    print(f"Object type: {type(policy)}")
+                else:
+                    # 提取模型
+                    torch_model = policy.model
+                    
+                    # 保存为通用格式
+                    export_path = "./standalone_model.pth"
+                    torch.save({
+                        'model_state_dict': torch_model.state_dict(),
+                        'obs_space': demo_env.observation_space,
+                        'act_space': demo_env.action_space
+                    }, export_path)
+                    print(f"✅ 已导出通用模型: {export_path}")
+                    
+            except Exception as e:
+                print(f"Error loading checkpoint: {e}")
+                import traceback
+                traceback.print_exc()
+
+    demo_env.close()
 
     ray.shutdown()
     print("Process completed.")
