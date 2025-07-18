@@ -183,7 +183,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             # print(infofeedback['go2_000_base']['Quat'].dtype)
             # print("------------")
             try:
-                remy_pos = self.query_joint_qpos(["Remy3_usda_base_joint"])["Remy3_usda_base_joint"][0:2].tolist()
+                # remy_pos = self.query_joint_qpos(["Remy_base_joint"])["Remy_base_joint"][0:2].tolist()
+                remy_pos = self.gym.query_body_xpos_xmat_xquat(["Remy_Animation"])["Remy_Animation"]["Pos"][0:2]
             except:
                 remy_pos = None
             
@@ -191,7 +192,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 "pos": pos.tolist(),
                 "yaw": yaw_degrees.tolist(),
                 "mat": mat.flatten().tolist(),
-                "person_pos_xy": remy_pos
+                "person_pos_xy": remy_pos.tolist()
             }
             try:
                 response = requests.post(self.url, json=data)
@@ -350,8 +351,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             # turn_angel=turn_angel/2
             
             # get coordinate of Remy
-            remy_pos = self.query_joint_qpos(["Remy3_usda_base_joint"])["Remy3_usda_base_joint"][0:2]
-            print("remy_pos_xy: ", remy_pos)
+            # remy_pos = self.gym.query_body_xpos_xmat_xquat(["Remy_Animation"])["Remy_Animation"]["Pos"][0:2]
 
             step = self.rec_action.get_step()
             mode = self.rec_action.get_mode()
