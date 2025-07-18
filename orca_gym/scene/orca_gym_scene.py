@@ -217,3 +217,49 @@ class OrcaGymScene:
             
     def set_material_info(self, actor_name: str, material_info: MaterialInfo):
         self.loop.run_until_complete(self._set_material_info(actor_name, material_info))
+
+
+    async def _set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamNumberRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamNumber(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamNumberResponse.SUCCESS:
+                print("Set actor anim param number failed: ", response.error_message)
+                raise Exception("Set actor anim param number failed.")
+            
+    def set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
+        self.loop.run_until_complete(self._set_actor_anim_param_number(actor_name, param_name, value))
+
+    async def _set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamBoolRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamBool(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamBoolResponse.SUCCESS:
+                print("Set actor anim param bool failed: ", response.error_message)
+                raise Exception("Set actor anim param bool failed.")
+            
+    def set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
+        self.loop.run_until_complete(self._set_actor_anim_param_bool(actor_name, param_name, value))
+
+    async def _set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamStringRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamString(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamStringResponse.SUCCESS:
+                print("Set actor anim param string failed: ", response.error_message)
+                raise Exception("Set actor anim param string failed.")
+            
+    def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
+        self.loop.run_until_complete(self._set_actor_anim_param_string(actor_name, param_name, value))
