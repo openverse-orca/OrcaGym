@@ -1,0 +1,33 @@
+# config/usdz_processing.yaml
+version: "1.0"
+
+default_settings:
+  transform_options:
+    scale: 1.0
+
+  collision_options:
+    collider_type: "bounding_box"  # "bounding_box" , "convex_hull"
+    split_mesh: true
+    max_split_mesh_number: 16
+    merge_threshold: 0.5          # 两个bounding box 之间的重合度
+    merge_iterations: 10
+
+  physics_options:
+    free_joint: true
+    density: 1000.0
+    mass: 0.0
+
+  debug_options:
+    visualize_obj: false
+
+
+files:
+  - filename: "/home/yao/Desktop/Tasks/navigation/Remy/conv/usd/asset/Remy.usdc"  
+    transform_options:
+      scale: 0.005
+    collision_options:
+      # max_split_mesh_number: 64
+      split_mesh: false
+      max_split_mesh_number: 16  # for simplified collision
+    physics_options:
+      mass: 1.0

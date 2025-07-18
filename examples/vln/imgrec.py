@@ -43,6 +43,7 @@ class RecAction:
     def set_route(self):
         @self.app.route('/rec', methods=['POST'])
         def receive_data():
+            print("receive_data")
             data = request.json
             if not data:
                 return jsonify({"error": "No data received"}), 400
@@ -54,6 +55,7 @@ class RecAction:
             self.trigger = True
 
             self.cnt+=1
+            # print(self.action)
             return jsonify({"status": "success"}), 200
 
     def run(self):

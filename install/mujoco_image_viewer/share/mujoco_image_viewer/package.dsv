@@ -1,0 +1,6 @@
+source;share/mujoco_image_viewer/hook/pythonpath.ps1
+source;share/mujoco_image_viewer/hook/pythonpath.dsv
+source;share/mujoco_image_viewer/hook/pythonpath.sh
+source;share/mujoco_image_viewer/hook/ament_prefix_path.ps1
+source;share/mujoco_image_viewer/hook/ament_prefix_path.dsv
+source;share/mujoco_image_viewer/hook/ament_prefix_path.sh

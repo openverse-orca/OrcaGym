@@ -27,6 +27,7 @@ class RecFromOrcaMsg:
         self.pos = None
         self.yaw = None
         self.mat = None
+        self.person_pos_xy = None
         self.app = Flask(__name__)
         self.port=port
         self.ip=ip
@@ -47,6 +48,8 @@ class RecFromOrcaMsg:
             self.yaw = np.array(data["yaw"], dtype=np.float32)
             self.pos = np.array(data["pos"], dtype=np.float32)
             self.mat = np.array(data["mat"], dtype=np.float32)
+            self.person_pos_xy = np.array(data["person_pos_xy"], dtype=np.float32)
+
             # print(f"Received yaw: {self.yaw}")
             # print(f"Received pos: {self.pos}")
             self.cnt+=1
@@ -72,6 +75,10 @@ class RecFromOrcaMsg:
     def get_mat(self):
         with self.lock:
             return self.mat if self.mat is not None else None
+        
+    def get_person_pos_xy(self):
+        with self.lock:
+            return self.person_pos_xy if self.person_pos_xy is not None else None
 if __name__ == "__main__":
     server = RecFromOrcaMsg()  # 启动服务器
 

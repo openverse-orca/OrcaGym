@@ -182,11 +182,16 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             # print(infofeedback['go2_000_base']['Mat'].dtype)
             # print(infofeedback['go2_000_base']['Quat'].dtype)
             # print("------------")
-                
+            try:
+                remy_pos = self.query_joint_qpos(["Remy3_usda_base_joint"])["Remy3_usda_base_joint"][0:2].tolist()
+            except:
+                remy_pos = None
+            
             data = {
                 "pos": pos.tolist(),
                 "yaw": yaw_degrees.tolist(),
-                "mat": mat.flatten().tolist()
+                "mat": mat.flatten().tolist(),
+                "person_pos_xy": remy_pos
             }
             try:
                 response = requests.post(self.url, json=data)
@@ -343,33 +348,60 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         if self._run_mode == "nav":
             # lin_vel=lin_vel/1.3
             # turn_angel=turn_angel/2
+            
+            # get coordinate of Remy
+            remy_pos = self.query_joint_qpos(["Remy3_usda_base_joint"])["Remy3_usda_base_joint"][0:2]
+            print("remy_pos_xy: ", remy_pos)
+
             step = self.rec_action.get_step()
             mode = self.rec_action.get_mode()
             action = self.rec_action.get_action()
-            # print(f"step:{step} | mode:{mode} | action:{action} ")
+            print(f"step:{step} | mode:{mode} | action:{action} ")
             if lin_vel.any() == 0.0 and turn_angel == 0.0:
                 # mode = initialize / explore / navigate
                 if mode == "initialize" and self.rec_action.trigger:
                     self.rec_action.trigger = False
                     # turn_angel += np.pi / 2 * self.dt
-                    turn_angel += np.deg2rad(15)
+                    turn_angel += np.deg2rad(6)
+                    print("turn_angel: ", turn_angel)
                     # print("action: ", action,mode)
 
-                if (mode == "navigate" or mode == "explore") :
-                    self.rec_action.trigger = False
-                    if action is not None:
-                        change_angel = 15
-                        if action == 1:#前進
-                            # 在realtimeGI时候，处以3
-                            lin_vel[0] = self._player_agent_lin_vel_x[1]/1.6
-                        elif action == 3:#右轉
-                            # 在realtimeGI时候，除以12
-                            turn_angel -= np.pi / 10 * self.dt
-                            # turn_angel -= np.deg2rad(change_angel)
-                        elif action == 2:#左轉
-                            turn_angel += np.pi / 10 * self.dt
-                            # turn_angel += np.deg2rad(change_angel)
-                    # print("action: ", action,mode)
+                if mode == "straight":
+                    lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+                    turn_angel = 0.0
+                if mode == "left":
+                    turn_angel -= np.pi / 30 * self.dt * action
+                    lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+                if mode == "right":
+                    turn_angel += np.pi / 30 * self.dt * action
+                    lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+
+                if mode == "pid":
+                    def sigmoid_v(x):
+                        return (1 / (1 + np.exp(-x)) - 0.5) * 2
+                    
+                    turn_angel += sigmoid_v(action[1])/1.5 * self.dt
+                    lin_vel[0] = sigmoid_v(action[0]/2) * self._player_agent_lin_vel_x[1]
+
+                    print("+++++ pid, turn_angel:{:.2f}, lin_vel[0]:{:.2f}".format(sigmoid_v(action[1]), lin_vel[0]))
+
+                # if (mode == "navigate" or mode == "explore") :
+                #     self.rec_action.trigger = False
+                #     if action is not None:
+                #         change_angel = 15
+                #         if action == 1:#前進
+                #             # 在realtimeGI时候，处以3
+                #             lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+                #         elif action == 3:#右轉
+                #             # 在realtimeGI时候，除以12
+                #             lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+                #             turn_angel -= np.pi / 30 * self.dt
+                #             # turn_angel -= np.deg2rad(change_angel)
+                #         elif action == 2:#左轉
+                #             turn_angel += np.pi / 30 * self.dt
+                #             lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
+                #             # turn_angel += np.deg2rad(change_angel)
+                print("action: ", action,mode)
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
 
         self._player_agent.update_playable(lin_vel, turn_angel)

@@ -1,0 +1,16 @@
+<mujoco>
+  <compiler autolimits="true" assetdir="asset" />
+
+  <asset>
+    <mesh name="usd_box" content_type="model/obj" file="usd:box.usda" scale="100 100 100">
+    </mesh>
+  </asset>
+
+  <worldbody>
+    <light pos=".2 .2 .8" exponent="1"/>
+    <body>
+      <geom  type="mesh" mesh="usd_box"/>
+    </body>
+  </worldbody>
+
+</mujoco>

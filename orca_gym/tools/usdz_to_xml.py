@@ -458,6 +458,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
 
     # 美化 XML 并保存
     xml_str = minidom.parseString(ET.tostring(root)).toprettyxml()
+    print(mjcf_file)
     with open(mjcf_file, "w") as f:
         f.write(xml_str)
 
@@ -475,9 +476,10 @@ def main(config_path):
     converted_dir = create_converted_dir(config_path)
     for params in file_params:
         usdz_path = params["filename"]
-        usdc_path = convert_usdz2usdc(usdz_path, converted_dir)
+        # usdc_path = convert_usdz2usdc(usdz_path, converted_dir)
+        usdc_path = usdz_path
         usdc_dir = os.path.dirname(usdc_path)
-        xml_path = os.path.join(usdc_dir, os.path.basename(usdz_path).replace(".usdz", ".xml"))
+        xml_path = os.path.join(usdc_dir, os.path.basename(usdz_path).replace(".usdc", ".xml"))
         build_mjcf_xml(usd_file=usdc_path, mjcf_file=xml_path, output_dir=usdc_dir, params=params)
 
 if __name__ == "__main__":
