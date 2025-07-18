@@ -4,6 +4,7 @@ import gymnasium as gym
 import sys
 from datetime import datetime
 from typing import Optional
+from orca_gym.scene.orca_gym_scene import OrcaGymScene
 
 ENV_ENTRY_POINT = {
     "Character": "envs.character.character_env:CharacterEnv",
@@ -56,6 +57,19 @@ def run_simulation(orcagym_addr : str,
         env = gym.make(env_id)        
         print("Starting simulation...")
 
+        if scene_runtime is not None:
+            if hasattr(env, "set_scene_runtime"):
+                env.set_scene_runtime(scene_runtime)
+                print("Scene runtime is set.")
+            else:
+                env_unwarpped = env.unwrapped
+                if hasattr(env_unwarpped, "set_scene_runtime"):
+                    env_unwarpped.set_scene_runtime(scene_runtime)
+                    print("Scene runtime is set.")
+                else:
+                    print("Scene runtime is not set. env: ", env)
+                    print("Scene runtime is not set. env_unwarpped: ", env_unwarpped)
+
         obs = env.reset()
         while True:
             start_time = datetime.now()
@@ -81,4 +95,7 @@ if __name__ == "__main__":
     orcagym_addr = "localhost:50051"
     agent_name = "Remy"
     env_name = "Character"
-    run_simulation(orcagym_addr, agent_name, env_name)
+
+    scene = OrcaGymScene(orcagym_addr)
+    scene_runtime = OrcaGymSceneRuntime(scene)
+    run_simulation(orcagym_addr, agent_name, env_name, scene_runtime)

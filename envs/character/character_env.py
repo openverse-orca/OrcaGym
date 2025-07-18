@@ -5,6 +5,7 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from envs.character.character import Character
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 
 class CharacterEnv(OrcaGymLocalEnv):
     """
@@ -101,7 +102,12 @@ class CharacterEnv(OrcaGymLocalEnv):
         Reset the environment, return observation
         """
 
+        print("Reset model====================>")
+
         self.ctrl = np.zeros(self.nu, dtype=np.float32)
+
+        self._character_remy.on_reset()
+        self.mj_forward()
 
         obs = self._get_obs().copy()
         return obs, {}
@@ -113,3 +119,7 @@ class CharacterEnv(OrcaGymLocalEnv):
             return obs
         else:
             return self._get_obs().copy()
+
+    def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
+        self.scene_runtime = scene_runtime
+        print("Scene runtime is set.")

@@ -34,3 +34,21 @@ class OrcaGymSceneRuntime():
             self.scene.make_camera_viewport_active(actor_name, entity_name)
         except Exception as e:
             print(f"Failed to make camera viewport active for {actor_name}: {e}")
+
+    def set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
+        try:
+            self.scene.set_actor_anim_param_number(actor_name, param_name, value)
+        except Exception as e:
+            print(f"Failed to set actor anim param number for {actor_name}: {e}")
+
+    def set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
+        try:
+            self.scene.set_actor_anim_param_bool(actor_name, param_name, value)
+        except Exception as e:
+            print(f"Failed to set actor anim param bool for {actor_name}: {e}")
+
+    def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
+        try:
+            self.scene.set_actor_anim_param_string(actor_name, param_name, value)
+        except Exception as e:
+            print(f"Failed to set actor anim param string for {actor_name}: {e}")

@@ -129,6 +129,21 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
                 _registered_method=True)
+        self.SetActorAnimParamNumber = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamNumber',
+                request_serializer=mjc__message__pb2.SetActorAnimParamNumberRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamNumberResponse.FromString,
+                _registered_method=True)
+        self.SetActorAnimParamBool = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamBool',
+                request_serializer=mjc__message__pb2.SetActorAnimParamBoolRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamBoolResponse.FromString,
+                _registered_method=True)
+        self.SetActorAnimParamString = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamString',
+                request_serializer=mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -561,6 +576,25 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetBodyManipulationMovement(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamNumber(self, request, context):
+        """动画控制
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamBool(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamString(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1050,6 +1084,21 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.GetBodyManipulationMovement,
                     request_deserializer=mjc__message__pb2.GetBodyManipulationMovementRequest.FromString,
                     response_serializer=mjc__message__pb2.GetBodyManipulationMovementResponse.SerializeToString,
+            ),
+            'SetActorAnimParamNumber': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamNumber,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamNumberRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamNumberResponse.SerializeToString,
+            ),
+            'SetActorAnimParamBool': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamBool,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamBoolRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamBoolResponse.SerializeToString,
+            ),
+            'SetActorAnimParamString': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamString,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamStringRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamStringResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1880,6 +1929,87 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
             mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
             mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamNumber(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamNumber',
+            mjc__message__pb2.SetActorAnimParamNumberRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamNumberResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamBool(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamBool',
+            mjc__message__pb2.SetActorAnimParamBoolRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamBoolResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamString(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamString',
+            mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
             options,
             channel_credentials,
             insecure,
