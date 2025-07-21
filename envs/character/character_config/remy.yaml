@@ -6,11 +6,22 @@ speed:
   Backward: -1.2
   TurnLeft: 1.5707963
   TurnRight: -1.5707963   # 90 degree per second
+  Acceleration: 0.1       # from standing to moving
 
-use_keyboard_control: true
+control_type: "waypoint"    # keyboard, waypoint
+
 keyboard_control:
   move_forward: "W"
   move_backward: "S"
   turn_left: "A"
   turn_right: "D"
 
+waypoint_control: [
+  {"Coordinates" : [0, 5], "Idle Action" : "Standing", "Duration" : 5.0},
+  {"Coordinates" : [5, 5], "Idle Action" : "Standing", "Duration" : 5.0},
+  {"Coordinates" : [5, 0], "Idle Action" : "Standing", "Duration" : 5.0},
+  {"Coordinates" : [0, 0], "Idle Action" : "Standing", "Duration" : 5.0},
+]
+
+waypoint_distance_threshold: 0.1
+waypoint_angle_threshold: 0.1
