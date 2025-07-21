@@ -100,7 +100,6 @@ class ImageSender(Node):
 
 
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-
         self.gray_shape = cv_image.shape
         display_grayscale(cv_image)
         # 将float32数组转为二进制字节流

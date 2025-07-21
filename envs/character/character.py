@@ -115,7 +115,7 @@ class Character():
             self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "TurnRight", False)
             self._turn_speed = 0
 
-        # print("heading: ", heading, "move_speed: ", self._move_speed, "turn_speed: ", self._turn_speed)
+        print("heading: ", heading, "move_speed: ", self._move_speed, "turn_speed: ", self._turn_speed)
         move_y_vel = self._move_speed * np.cos(heading)
         move_x_vel = self._move_speed * -np.sin(heading)
 
