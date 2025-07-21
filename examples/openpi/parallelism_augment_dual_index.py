@@ -78,7 +78,8 @@ if __name__ == "__main__":
     parser.add_argument('--realtime_playback', type=str, default='True', help='The flag to enable the real-time playback or rollout')
     parser.add_argument('--withvideo', type=str, default='True', help='The flag to enable the real-time playback or rollout')
     parser.add_argument('--index', type=int, default=0, help='The flag to enable the real-time playback or rollout')
-    parser.add_argument('--sync_codec', type=str, default='False',  help='Wait for the next frame to be ready before sending the next command (e.g., True, False)')
+    parser.add_argument('--sync_codec', type=str, default='True',  help='Wait for the next frame to be ready before sending the next command (e.g., True, False)')
+    parser.add_argument('--useNvenc', type=int, default=1,  help='Wait for the next frame to be ready before sending the next command (e.g., True, False)')
 
     args = parser.parse_args()
 
@@ -102,14 +103,25 @@ if __name__ == "__main__":
         global process,orcagym_address_list,port, level
         i = args.index
         adapterIndex = i % 2
-        p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
-                "--mj_grpc_server",  orcagym_address_list[0],
-                "--forceAdapter", " NVIDIA GeForce RTX 4090",
-                "--adapterIndex", str(adapterIndex),
-                "--r_width", "128", "--r_height", "128",
-                "--useNvenc","1",
-                f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print("adapterIndex:...........", adapterIndex)
+        if args.useNvenc == 1:
+            p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
+                    "--mj_grpc_server",  orcagym_address_list[0],
+                    "--forceAdapter", " NVIDIA GeForce RTX 4090",
+                    "--adapterIndex", str(adapterIndex),
+                    # "--r_width", "128", "--r_height", "128",
+                    "--useNvenc", "1",
+                    f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        else:
+            p = subprocess.Popen([orcasim_path, "--datalink_auth_config", datalink_auth_config,
+                    "--mj_grpc_server",  orcagym_address_list[0],
+                    "--forceAdapter", " NVIDIA GeForce RTX 4090",
+                    "--adapterIndex", str(adapterIndex),
+                    "--r_width", "128", "--r_height", "128",
+                    f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
         process.append(p)
 
         time.sleep(15)
@@ -149,6 +161,7 @@ if __name__ == "__main__":
 
 
     # 监测scriptp 进程的输出，如果超过30秒没有输出，则认为脚本执行失败
+    
     start_time = time.time()
     while True:
         output = scriptp.stdout.readline()
