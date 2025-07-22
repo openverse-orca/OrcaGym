@@ -102,8 +102,6 @@ class CharacterEnv(OrcaGymLocalEnv):
         Reset the environment, return observation
         """
 
-        print("Reset model====================>")
-
         self.ctrl = np.zeros(self.nu, dtype=np.float32)
 
         self._character_remy.on_reset()
