@@ -8,7 +8,11 @@ speed:
   TurnRight: -1.5707963   # 90 degree per second
   Acceleration: 0.1       # from standing to moving
 
-control_type: "waypoint"    # keyboard, waypoint
+control_type:             # press key to switch control type, default is waypoint
+  active_type: "waypoint"
+  switch_key:
+    waypoint: "1"
+    keyboard: "2"
 
 keyboard_control:
   move_forward: "W"
@@ -23,5 +27,5 @@ waypoint_control: [
   {"Coordinates" : [0, 0], "Idle Action" : "Standing", "Duration" : 5.0},
 ]
 
-waypoint_distance_threshold: 0.1
-waypoint_angle_threshold: 0.1
+waypoint_distance_threshold: 0.2
+waypoint_angle_threshold: 5   # degree

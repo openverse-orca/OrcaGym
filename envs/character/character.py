@@ -4,6 +4,7 @@ from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import os
 import numpy as np
 import time
+import orca_gym.utils.rotations as rotations
 
 class Character():
     def __init__(self, 
@@ -55,14 +56,12 @@ class Character():
         self._move_speed = 0.0
         self._turn_speed = 0.0
 
-        self._use_keyboard_control = self._config['control_type'] == "keyboard"
+        self._control_type = self._config['control_type']
+
         self._keyboard_control = self._config['keyboard_control']
-
-
-        self._use_waypoint_control = self._config['control_type'] == "waypoint"
         self._waypoint_control = self._config['waypoint_control']
         self._waypoint_distance_threshold = self._config['waypoint_distance_threshold']
-        self._waypoint_angle_threshold = self._config['waypoint_angle_threshold']
+        self._waypoint_angle_threshold = np.deg2rad(self._config['waypoint_angle_threshold'])
 
         body_xpos, _, _ = self._env.get_body_xpos_xmat_xquat([self._body_name])
         self._original_coordinates = body_xpos[:2]
@@ -73,25 +72,17 @@ class Character():
         rotate_z_pos = self._env.query_joint_qpos([self._joint_names["Rotate_Z"]])[self._joint_names["Rotate_Z"]][0]
         heading = rotate_z_pos % (2 * np.pi)
 
-        if self._use_keyboard_control:
+        self._process_control_type_switch()
+
+        if self._control_type['active_type'] == 'keyboard':
             self._process_keyboard_input(heading)
-        elif self._use_waypoint_control:
+        elif self._control_type['active_type'] == 'waypoint':
             self._process_waypoint_input(heading)
 
         self._env.set_joint_qvel(self._ctrl_joint_qvel)
 
     def on_reset(self):
-        self._move_speed = 0
-        self._turn_speed = 0
-        self._waypoint_time = 0
-        self._waypoint_index = -1
-        self._moving_to_waypoint = False
-        self._next_waypoint_coord = None
-        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "Forward", False)
-        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "Backward", False)
-        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "TurnLeft", False)
-        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "TurnRight", False)
-
+        self._reset_move_and_turn()
         ctrl_qpos = {
             self._joint_names["Rotate_Z"] : [0],
         }
@@ -140,13 +131,35 @@ class Character():
         self._ctrl_joint_qvel[self._joint_names["Move_Y"]][0] = move_y_vel
         self._ctrl_joint_qvel[self._joint_names["Rotate_Z"]][0] = self._turn_speed
 
-    def _process_keyboard_input(self, heading : float):
-        if not self._use_keyboard_control:
-            return
-        
+    def _reset_move_and_turn(self):
+        self._move_speed = 0
+        self._turn_speed = 0
+        self._waypoint_time = 0
+        self._waypoint_index = -1
+        self._moving_to_waypoint = False
+        self._next_waypoint_coord = None
+        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "Forward", False)
+        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "Backward", False)
+        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "TurnLeft", False)
+        self._env.scene_runtime.set_actor_anim_param_bool(self._agent_name, "TurnRight", False)
+
+
+    def _process_control_type_switch(self):
         self._keyboard.update()
         keyboard_state = self._keyboard.get_state()
+        if self._control_type['active_type'] != 'waypoint' and keyboard_state[self._control_type['switch_key']['waypoint']] == 1:
+            self._control_type['active_type'] = 'waypoint'
+            self._reset_move_and_turn()
+            print("Switch to waypoint control")
+        elif self._control_type['active_type'] != 'keyboard' and keyboard_state[self._control_type['switch_key']['keyboard']] == 1:
+            self._control_type['active_type'] = 'keyboard'
+            self._reset_move_and_turn()
+            print("Switch to keyboard control")
+        
 
+    def _process_keyboard_input(self, heading : float):
+        self._keyboard.update()
+        keyboard_state = self._keyboard.get_state()
 
         # print("Speed: ", self._speed)
 
@@ -168,9 +181,6 @@ class Character():
         self._process_move(self._move_speed, heading)
 
     def _process_waypoint_input(self, heading : float):
-        if not self._use_waypoint_control:
-            return
-
         current_time = time.time()
         time_delta = current_time - self._waypoint_time
 
@@ -186,13 +196,14 @@ class Character():
             self._next_waypoint_coord = next_waypoint_coord
 
         if self._next_waypoint_coord is not None and self._moving_to_waypoint:
-            body_xpos, _, _ = self._env.get_body_xpos_xmat_xquat([self._body_name])
+            body_xpos, _, body_xquat = self._env.get_body_xpos_xmat_xquat([self._body_name])
             current_coordinates = body_xpos[:2] 
+            current_body_heading = rotations.quat2euler(body_xquat[:4])[2] % (2 * np.pi)
 
             # calculate the distance to the next waypoint, and the direction
             distance = np.linalg.norm(self._next_waypoint_coord - current_coordinates)
             direction = (self._next_waypoint_coord - current_coordinates) / distance
-            # print("Distance: ", distance, "Direction: ", direction)
+            # print("Distance: ", distance, "Direction: ", direction, "Body Xquat: ", body_xquat, "Current Body Heading: ", current_body_heading)
                 
             # check if the character has reached the waypoint
             if distance < self._waypoint_distance_threshold:
@@ -205,14 +216,20 @@ class Character():
                 return
 
             # check the direction of the character, if not facing the waypoint, turn to the waypoint
-            angle_error = np.dot(direction, [np.cos(heading), np.sin(heading)])
-            if angle_error < -self._waypoint_angle_threshold:
-                self._turn_left()
-            elif angle_error > self._waypoint_angle_threshold:
+            # 计算目标方向角度
+            target_angle = np.arctan2(direction[0], -direction[1])   
+            # 计算角度差值（考虑圆周率）
+            angle_diff = (target_angle - current_body_heading + np.pi) % (2*np.pi)
+            if angle_diff > np.pi:
+                angle_diff -= 2 * np.pi
+            # print("Angle Error: ", angle_diff)
+            if angle_diff < -self._waypoint_angle_threshold:
                 self._turn_right()
+            elif angle_diff > self._waypoint_angle_threshold:
+                self._turn_left()
             else:
-                self._stop_turning()
                 self._move_forward()
+                self._stop_turning()
                 
             self._process_move(self._move_speed, heading)
 
