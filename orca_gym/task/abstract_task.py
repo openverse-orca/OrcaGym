@@ -1,6 +1,6 @@
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
-
+from scipy.spatial.transform import Rotation as R
 from orca_gym.scene.orca_gym_scene import Actor, MaterialInfo, LightInfo, OrcaGymScene
 import numpy as np
 import random
@@ -103,7 +103,7 @@ class AbstractTask:
         self.light_center = []
         self.light_bound = []
         self.light_description = []
-
+        self._added_top_light = False
         self.load_config(config)
         self.task_dict = {}
 
@@ -327,17 +327,40 @@ class AbstractTask:
 
 
     def add_light(self, light_name, spawnable_name):
-        # 1) 位置：要么随机，要么固定在 center
+        # 1) 先随机一个位置和朝向
         rand_pos, rand_quat = self._random_position_and_rotation(self.light_center, self.light_bound)
-        position = rand_pos   if self.random_light_position else np.array(self.light_center)
+        position = rand_pos if self.random_light_position else np.array(self.light_center)
+        rotation = rand_quat if self.random_light_rotation else R.from_euler('xyz', [-90, 0, 0], degrees=True).as_quat()
 
-        # 2) 旋转：要么随机，要么固定“竖直向下”
-        if self.random_light_rotation:
-            rotation = rand_quat
-        else:
-            # 绕 X 轴 -90° → 光照沿 −Z 方向（竖直向下）
-            rotation = rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
+        # —— 强制第一盏顶光 —— 
+        if not self._added_top_light:
+            # 用一个小角度抖动保证 ≤5°
+            jitter_x = np.random.uniform(-5, 5)
+            jitter_y = np.random.uniform(-5, 5)
+            rotation = R.from_euler('xyz', [-90 + jitter_x, jitter_y, 0], degrees=True).as_quat()
+            self._added_top_light = True
 
+        # 2) 如果是斜光，且偏离竖直超过阈值，就推到边缘
+        elif self.random_light_rotation:
+            dir_vec = R.from_quat(rotation).apply([0, 0, -1])
+            angle_deg = np.degrees(np.arccos(np.clip(np.dot(dir_vec, [0, 0, -1]), -1, 1)))
+            if angle_deg > 15.0:
+                x0, y0, z0 = self.light_center
+                x_min, x_max = x0 + self.light_bound[0][0], x0 + self.light_bound[0][1]
+                y_min, y_max = y0 + self.light_bound[1][0], y0 + self.light_bound[1][1]
+                corners = [
+                    np.array([x_min, y_min, position[2]]),
+                    np.array([x_min, y_max, position[2]]),
+                    np.array([x_max, y_min, position[2]]),
+                    np.array([x_max, y_max, position[2]]),
+                ]
+                position = corners[np.random.randint(0, 4)]
+
+        # 3) （可选）提高 z 轴避免过近
+        if hasattr(self, 'light_min_z'):
+            position[2] = max(position[2], self.light_min_z)
+
+        # 4) 最终添加
         actor = Actor(
             name=light_name,
             spawnable_name=spawnable_name,

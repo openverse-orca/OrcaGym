@@ -59,7 +59,6 @@ INIT_SCENE_TEXT = {
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
 }
 _light_counter = 0
-_LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
 
 g_skip_frame = 0
 
