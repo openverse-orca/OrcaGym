@@ -288,16 +288,29 @@ class LeggedRobot(OrcaGymAgent):
         self._achieved_goal = self._get_base_contact(contact_dict).astype(np.float32)         # task failed if the base is in contact with the ground
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
-        # square_wave = self._compute_square_wave()
-        # sin_phase, cos_phase = self._compute_leg_period()
+        square_wave = self._compute_square_wave()
+        sin_phase, cos_phase = self._compute_leg_period()
+        # obs = np.concatenate(
+        #         [
+        #             # self._body_lin_vel,
+        #             self._body_ang_vel,
+        #             self._body_orientation,
+        #             self._command_values,
+        #             # np.array([square_wave]),
+        #             # np.array([sin_phase, cos_phase]),
+        #             (self._leg_joint_qpos - self._neutral_joint_values),
+        #             self._leg_joint_qvel,
+        #             self._action,
+        #             # np.array([self._body_height]),
+        #         ]).reshape(-1).astype(np.float32)
         obs = np.concatenate(
                 [
-                    # self._body_lin_vel,
+                    self._body_lin_vel,
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
-                    # np.array([square_wave]),
-                    # np.array([sin_phase, cos_phase]),
+                    np.array([square_wave]),
+                    np.array([sin_phase, cos_phase]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
@@ -1050,15 +1063,27 @@ class LeggedRobot(OrcaGymAgent):
         scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
         scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
-        # scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
+        scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
 
+        # scale_vec = np.concatenate([
+        #     # scale_lin_vel, 
+        #     scale_ang_vel, 
+        #     scale_orientation, 
+        #     scale_command, 
+        #     # scale_square_wave,
+        #     # scale_leg_phase,
+        #     scale_leg_joint_qpos, 
+        #     scale_leg_joint_qvel, 
+        #     scale_action, 
+        #     # scale_height
+        #     ]).flatten()
         scale_vec = np.concatenate([
-            # scale_lin_vel, 
+            scale_lin_vel, 
             scale_ang_vel, 
             scale_orientation, 
             scale_command, 
-            # scale_square_wave,
-            # scale_leg_phase,
+            scale_square_wave,
+            scale_leg_phase,
             scale_leg_joint_qpos, 
             scale_leg_joint_qvel, 
             scale_action, 
@@ -1089,13 +1114,25 @@ class LeggedRobot(OrcaGymAgent):
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
         noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
 
+        # noise_vec = np.concatenate([
+        #     # noise_lin_vel, 
+        #     noise_ang_vel, 
+        #     noise_orientation, 
+        #     noise_command, 
+        #     # noise_square_wave,
+        #     # scale_leg_phase,
+        #     noise_leg_joint_qpos, 
+        #     noise_leg_joint_qvel, 
+        #     noise_action, 
+        #     # noise_height
+        #     ]).flatten()
         noise_vec = np.concatenate([
-            # noise_lin_vel, 
+            noise_lin_vel, 
             noise_ang_vel, 
             noise_orientation, 
             noise_command, 
-            # noise_square_wave,
-            # scale_leg_phase,
+            noise_square_wave,
+            scale_leg_phase,
             noise_leg_joint_qpos, 
             noise_leg_joint_qvel, 
             noise_action, 

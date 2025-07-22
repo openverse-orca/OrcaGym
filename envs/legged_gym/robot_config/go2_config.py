@@ -72,14 +72,14 @@ Go2Config = {
             "failure" : 0,
             "contact" : 1,
             "foot_touch" : 0,
-            "joint_angles" : 0.12, # 0.1
+            "joint_angles" : 0.1, # 0.1
             "joint_accelerations" : 2.5e-7,
             "limit" : 0,
             "action_rate" : 0.01,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 1.3, # 1.0
-            "follow_command_angvel" : 0.8, # 0.5
+            "follow_command_linvel" : 1.0, # 1.0
+            "follow_command_angvel" : 0.5, # 0.5
             "height" : 0,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
@@ -90,7 +90,7 @@ Go2Config = {
             "feet_wringing" : 0.0,
             "feet_fitted_ground" : 0.1,
             "fly" : 0.1,
-            "stepping" : 0.12,  # 0.1            
+            "stepping" : 0.1,  # 0.1            
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -148,7 +148,7 @@ Go2Config = {
             },
 
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.5, 2.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate

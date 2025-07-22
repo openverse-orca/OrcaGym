@@ -21,7 +21,7 @@ def display_img(image, waittime: int, windowname: str):
 class RecAction:
     def __init__(self,
                  port:int = 15533,
-                 ip:str = "localhost" # 替换为本机IP地址
+                 ip:str = "192.168.1.184" # 替换为本机IP地址
                  ):
         logging.getLogger("werkzeug").setLevel(logging.ERROR)  # 仅输出错误日志
         self.step = None

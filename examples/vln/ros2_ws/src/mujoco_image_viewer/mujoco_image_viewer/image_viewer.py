@@ -44,7 +44,7 @@ class ImageSender(Node):
         self.img_base64 = None
         self.depth_base64 = None
         self.init_time=time.time()
-        self.server_get_pos_yaw = RecFromOrcaMsg(port=port+1, ip=ip)  # 15532
+        self.server_get_pos_yaw = RecFromOrcaMsg(port=port+1, ip="localhost")  # 15532
 
 
     def image_callback(self, msg):
@@ -85,7 +85,6 @@ class ImageSender(Node):
             "array": self.current_array,  # 数组需要转换为列表或JSON兼容格式
             "shape": self.gray_shape
         }
-
         # 发送HTTP POST请求
         try:
             response = requests.post(self.url, json=data)
@@ -93,7 +92,7 @@ class ImageSender(Node):
 
         except Exception as e:
             # self.get_logger().error(f"Failed to send data: {str(e)}")
-            # print(e)
+            print(e)
             pass
     
     def depth_callback(self, msg):
@@ -149,7 +148,7 @@ class ImageViewer(Node):
 def main(args=None):
     rclpy.init(args=args)
     # node = ImageViewer()
-    node = ImageSender(vln_ip="192.168.1.123", ip="192.168.1.184")
+    node = ImageSender(vln_ip="192.168.1.123", ip="127.0.0.1")
     # node = VideoPublisher()
     
     try:

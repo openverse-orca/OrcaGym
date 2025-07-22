@@ -40,9 +40,9 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         
         if self._run_mode == "nav":
             self.url = "http://"+ip+f":{port}/posyaw"  
-            self.rec_action = RecAction(ip=ip)
-        print("------------------------------")
-        print("ip:", ip, "port:", port)
+            self.rec_action = RecAction(ip="0.0.0.0")
+            print("------------------------------")
+            print("ip:", ip, "port:", port)
         
         super().__init__(
             frame_skip = frame_skip,
@@ -197,6 +197,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             try:
                 response = requests.post(self.url, json=data)
             except Exception as e:
+                print(e)
                 pass
                 
         achieved_goals = np.array(achieved_goals)
@@ -356,7 +357,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             step = self.rec_action.get_step()
             mode = self.rec_action.get_mode()
             action = self.rec_action.get_action()
-            print(f"step:{step} | mode:{mode} | action:{action} ")
+            # print(f"step:{step} | mode:{mode} | action:{action} ")
             if lin_vel.any() == 0.0 and turn_angel == 0.0:
                 # mode = initialize / explore / navigate
                 if mode == "initialize" and self.rec_action.trigger:
@@ -381,7 +382,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                         return (1 / (1 + np.exp(-x)) - 0.5) * 2
                     
                     turn_angel += sigmoid_v(action[1])/1.5 * self.dt
-                    lin_vel[0] = sigmoid_v(action[0]/2) * self._player_agent_lin_vel_x[1]
+                    lin_vel[0] = sigmoid_v(action[0]*0.5) * self._player_agent_lin_vel_x[1] * 1.5
 
                     print("+++++ pid, turn_angel:{:.2f}, lin_vel[0]:{:.2f}".format(sigmoid_v(action[1]), lin_vel[0]))
 
@@ -401,7 +402,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 #             turn_angel += np.pi / 30 * self.dt
                 #             lin_vel[0] = self._player_agent_lin_vel_x[1]/1.8
                 #             # turn_angel += np.deg2rad(change_angel)
-                print("action: ", action,mode)
+                # print("action: ", action,mode)
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
 
         self._player_agent.update_playable(lin_vel, turn_angel)

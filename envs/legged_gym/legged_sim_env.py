@@ -311,7 +311,7 @@ class AgentBase:
         )
         
         action_size = self.agent.get_action_size()
-        self._action_range = np.array([[-3.0, 3.0]] * action_size, dtype=np.float32)
+        self._action_range = np.array([[-1.0, 1.0]] * action_size, dtype=np.float32)
         action_space = spaces.Box(
             low=self._action_range[:, 0],
             high=self._action_range[:, 1],
