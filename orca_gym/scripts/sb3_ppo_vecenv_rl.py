@@ -338,6 +338,20 @@ def test_model(
         
         model: PPO = PPO.load(model_file, env=env, device=device)
 
+        if run_mode == "nav":
+            if hasattr(env, "set_scene_runtime"):
+
+                from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+                from orca_gym.scene.orca_gym_scene import OrcaGymScene
+                from envs.character.character import Character
+
+
+                scene = OrcaGymScene(orcagym_addresses)
+                scene_runtime = OrcaGymSceneRuntime(scene)
+                env.set_scene_runtime(scene_runtime)
+                print("Scene runtime is set.")
+
+
         testing_model(
             env=env,
             agent_num=agent_num,

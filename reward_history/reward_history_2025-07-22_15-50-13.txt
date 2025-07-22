@@ -1,0 +1,162 @@
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0033442466
+Joint accelerations reward_5.00e-09:-0.0000343717
+Action rate reward_2.00e-04:-0.0026744318
+Follow command linvel reward_2.00e-02:0.0183369825
+Follow command angvel reward_1.00e-02:0.0046976735
+Body linear velocity reward_4.00e-02:-0.0011761997
+Body angular velocity reward_1.00e-03:-0.0034998775
+Body orientation reward_2.00e-02:-0.0002908815
+Foot slip reward_1.00e-03:-0.0011433628
+Fly reward_2.00e-03:-0.0001000000
+Stepping reward_2.00e-03:-0.0044800000
+Total reward_1.00e+00:0.0062912845
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0035744691
+Joint accelerations reward_5.00e-09:-0.0000356159
+Action rate reward_2.00e-04:-0.0026840766
+Follow command linvel reward_2.00e-02:0.0182479438
+Follow command angvel reward_1.00e-02:0.0052832599
+Body linear velocity reward_4.00e-02:-0.0012221890
+Body angular velocity reward_1.00e-03:-0.0032263634
+Body orientation reward_2.00e-02:-0.0003470601
+Foot slip reward_1.00e-03:-0.0010271126
+Fly reward_2.00e-03:-0.0002600000
+Stepping reward_2.00e-03:-0.0046200000
+Total reward_1.00e+00:0.0065343171
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0035326716
+Joint accelerations reward_5.00e-09:-0.0000344335
+Action rate reward_2.00e-04:-0.0025077223
+Follow command linvel reward_2.00e-02:0.0185569269
+Follow command angvel reward_1.00e-02:0.0049459082
+Body linear velocity reward_4.00e-02:-0.0012915034
+Body angular velocity reward_1.00e-03:-0.0034889889
+Body orientation reward_2.00e-02:-0.0002699932
+Foot slip reward_1.00e-03:-0.0010194209
+Fly reward_2.00e-03:-0.0001200000
+Stepping reward_2.00e-03:-0.0043800000
+Total reward_1.00e+00:0.0068458317
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0032722059
+Joint accelerations reward_5.00e-09:-0.0000344241
+Action rate reward_2.00e-04:-0.0024122974
+Follow command linvel reward_2.00e-02:0.0184905365
+Follow command angvel reward_1.00e-02:0.0046062982
+Body linear velocity reward_4.00e-02:-0.0007213797
+Body angular velocity reward_1.00e-03:-0.0036709884
+Body orientation reward_2.00e-02:-0.0002861724
+Foot slip reward_1.00e-03:-0.0010189946
+Fly reward_2.00e-03:-0.0001800000
+Stepping reward_2.00e-03:-0.0046800000
+Total reward_1.00e+00:0.0068232062
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0032924435
+Joint accelerations reward_5.00e-09:-0.0000347585
+Action rate reward_2.00e-04:-0.0025175252
+Follow command linvel reward_2.00e-02:0.0182291401
+Follow command angvel reward_1.00e-02:0.0052209167
+Body linear velocity reward_4.00e-02:-0.0021545219
+Body angular velocity reward_1.00e-03:-0.0039914378
+Body orientation reward_2.00e-02:-0.0002082748
+Foot slip reward_1.00e-03:-0.0009856071
+Fly reward_2.00e-03:-0.0002000000
+Stepping reward_2.00e-03:-0.0046000000
+Total reward_1.00e+00:0.0054836812
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0034232362
+Joint accelerations reward_5.00e-09:-0.0000328911
+Action rate reward_2.00e-04:-0.0025381019
+Follow command linvel reward_2.00e-02:0.0175324706
+Follow command angvel reward_1.00e-02:0.0053203223
+Body linear velocity reward_4.00e-02:-0.0009767696
+Body angular velocity reward_1.00e-03:-0.0037314162
+Body orientation reward_2.00e-02:-0.0005889213
+Foot slip reward_1.00e-03:-0.0010278932
+Fly reward_2.00e-03:-0.0000400000
+Stepping reward_2.00e-03:-0.0044600000
+Total reward_1.00e+00:0.0059910489
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0036172865
+Joint accelerations reward_5.00e-09:-0.0000345410
+Action rate reward_2.00e-04:-0.0023053249
+Follow command linvel reward_2.00e-02:0.0183561573
+Follow command angvel reward_1.00e-02:0.0045567398
+Body linear velocity reward_4.00e-02:-0.0013831241
+Body angular velocity reward_1.00e-03:-0.0035371198
+Body orientation reward_2.00e-02:-0.0002298152
+Foot slip reward_1.00e-03:-0.0010015169
+Fly reward_2.00e-03:-0.0001600000
+Stepping reward_2.00e-03:-0.0046600000
+Total reward_1.00e+00:0.0060700481
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0033141403
+Joint accelerations reward_5.00e-09:-0.0000337724
+Action rate reward_2.00e-04:-0.0025650671
+Follow command linvel reward_2.00e-02:0.0172359393
+Follow command angvel reward_1.00e-02:0.0048356746
+Body linear velocity reward_4.00e-02:-0.0009799024
+Body angular velocity reward_1.00e-03:-0.0023852968
+Body orientation reward_2.00e-02:-0.0001323726
+Foot slip reward_1.00e-03:-0.0010271801
+Fly reward_2.00e-03:-0.0001200000
+Stepping reward_2.00e-03:-0.0045400000
+Total reward_1.00e+00:0.0070041089
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0039166095
+Joint accelerations reward_5.00e-09:-0.0000318858
+Action rate reward_2.00e-04:-0.0023275109
+Follow command linvel reward_2.00e-02:0.0181750554
+Follow command angvel reward_1.00e-02:0.0048751113
+Body linear velocity reward_4.00e-02:-0.0011296472
+Body angular velocity reward_1.00e-03:-0.0034499826
+Body orientation reward_2.00e-02:-0.0002387990
+Foot slip reward_1.00e-03:-0.0010873739
+Fly reward_2.00e-03:-0.0002200000
+Stepping reward_2.00e-03:-0.0043600000
+Total reward_1.00e+00:0.0064906002
+Contact reward_2.00e-02:0.0000000000
+Joint angles reward_2.00e-03:-0.0060606832
+Joint accelerations reward_5.00e-09:-0.0000332577
+Action rate reward_2.00e-04:-0.0019430622
+Follow command linvel reward_2.00e-02:0.0068445028
+Follow command angvel reward_1.00e-02:0.0045236105
+Body linear velocity reward_4.00e-02:-0.0021642373
+Body angular velocity reward_1.00e-03:-0.0055186912
+Body orientation reward_2.00e-02:-0.0047045542
+Foot slip reward_1.00e-03:-0.0009248795
+Fly reward_2.00e-03:-0.0005200000
+Stepping reward_2.00e-03:0.0000000000
+Total reward_1.00e+00:-0.0139365540
+Feet air time reward_2.00e-02:-0.0023280000
+Foot fitted ground reward_2.00e-03:-0.0013200000
+Contact reward_2.00e-02:-0.0048000000
+Joint angles reward_2.00e-03:-0.0126948226
+Joint accelerations reward_5.00e-09:-0.0000247296
+Action rate reward_2.00e-04:-0.0020068732
+Follow command linvel reward_2.00e-02:0.0030145086
+Follow command angvel reward_1.00e-02:0.0027913709
+Body linear velocity reward_4.00e-02:-0.0008510479
+Body angular velocity reward_1.00e-03:-0.0012618047
+Body orientation reward_2.00e-02:-0.0452501499
+Foot slip reward_1.00e-03:-0.0001764793
+Fly reward_2.00e-03:-0.0009200000
+Stepping reward_2.00e-03:0.0000000000
+Total reward_1.00e+00:-0.1052761417
+Feet air time reward_2.00e-02:-0.0431520000
+Foot fitted ground reward_2.00e-03:-0.0011400000
+Contact reward_2.00e-02:-0.0084000000
+Joint angles reward_2.00e-03:-0.0121536417
+Joint accelerations reward_5.00e-09:-0.0000267171
+Action rate reward_2.00e-04:-0.0023634310
+Follow command linvel reward_2.00e-02:0.0035361969
+Follow command angvel reward_1.00e-02:0.0033709520
+Body linear velocity reward_4.00e-02:-0.0002253290
+Body angular velocity reward_1.00e-03:-0.0003155838
+Body orientation reward_2.00e-02:-0.0320636520
+Foot slip reward_1.00e-03:-0.0001557378
+Fly reward_2.00e-03:-0.0011200000
+Stepping reward_2.00e-03:0.0000000000
+Total reward_1.00e+00:-0.2060354173
+Feet air time reward_2.00e-02:-0.1562120000
+Foot fitted ground reward_2.00e-03:-0.0008800000

@@ -17,6 +17,8 @@ from gymnasium.core import ObsType
 from orca_gym.environment import OrcaGymLocalEnv
 from .orca_gym_agent import OrcaGymAgent
 
+from envs.character.character import Character
+
 class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
     def __init__(
         self,
@@ -38,6 +40,9 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         self._env_id = env_id
         self._task = task
         
+        if self._run_mode == "nav":
+            agent_names.append("Remy")
+
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -45,6 +50,11 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             time_step = time_step,            
             **kwargs
         )
+
+
+        if self._run_mode == "nav":
+            self._character_remy = Character(self, agent_names[1], 1, "remy")
+            agent_names.remove("Remy")
 
         self._agents : list[OrcaGymAgent] = []
 

@@ -14,6 +14,8 @@ from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+
 class ControlDevice:
     """
     Enum class for control

@@ -15,6 +15,9 @@ from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
 
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+from envs.character.character import Character
+
 class LeggedGymEnv(OrcaGymMultiAgentEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
 
@@ -43,6 +46,18 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             self.rec_action = RecAction(ip="0.0.0.0")
             print("------------------------------")
             print("ip:", ip, "port:", port)
+
+
+            from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+            from orca_gym.scene.orca_gym_scene import OrcaGymScene
+            from envs.character.character import Character
+
+
+            scene = OrcaGymScene(orcagym_addr)
+            scene_runtime = OrcaGymSceneRuntime(scene)
+            self.set_scene_runtime(scene_runtime)
+            print("Scene runtime is set.")
+
         
         super().__init__(
             frame_skip = frame_skip,
@@ -63,12 +78,19 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self._init_playable(orcagym_addr)
         self._reset_phy_config()
 
+    def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
+        self.scene_runtime = scene_runtime
+        print("Scene runtime is set.")
+
      
     @property
     def agents(self) -> list[LeggedRobot]:
         return self._agents
 
     def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
+        if self._run_mode == "nav":
+            self._character_remy.on_step()
+
         if self._task == "no_action":
             self._update_no_action_ctrl()
             return
@@ -221,8 +243,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         return env_obs, agent_obs, achieved_goals, desired_goals
         
     def reset_agents(self, agents : list[LeggedRobot]) -> None:
+
+
         if len(agents) == 0:
             return
+        
+        if self._run_mode == "nav":
+            self._character_remy.on_reset()
         self._update_curriculum_level(agents)
         self._reset_agent_joint_qpos(agents)
         self._reset_command_indicators(agents)
@@ -363,7 +390,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 if mode == "initialize" and self.rec_action.trigger:
                     self.rec_action.trigger = False
                     # turn_angel += np.pi / 2 * self.dt
-                    turn_angel += np.deg2rad(6)
+                    turn_angel += np.deg2rad(5)
                     print("turn_angel: ", turn_angel)
                     # print("action: ", action,mode)
 
@@ -381,8 +408,8 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                     def sigmoid_v(x):
                         return (1 / (1 + np.exp(-x)) - 0.5) * 2
                     
-                    turn_angel += sigmoid_v(action[1])/1.5 * self.dt
-                    lin_vel[0] = sigmoid_v(action[0]*0.5) * self._player_agent_lin_vel_x[1] * 1.5
+                    turn_angel += sigmoid_v(action[1])/2 * self.dt
+                    lin_vel[0] = sigmoid_v(action[0]*0.5) * self._player_agent_lin_vel_x[1]
 
                     print("+++++ pid, turn_angel:{:.2f}, lin_vel[0]:{:.2f}".format(sigmoid_v(action[1]), lin_vel[0]))
 
@@ -405,7 +432,10 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 # print("action: ", action,mode)
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
 
-        self._player_agent.update_playable(lin_vel, turn_angel)
+        self._player_agent.update_playable(lin_vel, turn_angel, reborn)
+        if reborn is True:
+            print("reborn is True")
+            exit()
         agent_cmd_mocap = self._player_agent.reset_command_indicator(self.data.qpos)
         self.set_mocap_pos_and_quat(agent_cmd_mocap)      
         
@@ -431,6 +461,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             turn_angel += np.pi / 2 * self.dt
         if key_status["D"] == 1:
             turn_angel += -np.pi / 2 * self.dt
+
         if self._key_status["Space"] == 0 and key_status["Space"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
@@ -478,3 +509,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 self._agent_contact_site_names = [site_name for agent in self.agents for site_name in agent._contact_site_names]
             
             return self.query_site_pos_and_quat(self._agent_contact_site_names)
+        
+    def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
+        self.scene_runtime = scene_runtime
+        print("Scene runtime is set.")

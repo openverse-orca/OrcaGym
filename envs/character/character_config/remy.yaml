@@ -2,7 +2,7 @@ spawnable_name: "Remy"
 body_name: "Animation"
 joint_names: {"Move_X" : "Slide_X", "Move_Y" : "Slide_Y", "Move_Z" : "Slide_Z", "Rotate_Z" : "Rotate_Z"}
 speed: 
-  Forward: 1.7
+  Forward: 0.7
   Backward: -1.2
   TurnLeft: 1.5707963
   TurnRight: -1.5707963   # 90 degree per second
@@ -21,10 +21,12 @@ keyboard_control:
   turn_right: "D"
 
 waypoint_control: [
-  {"Coordinates" : [0, 5], "Idle Action" : "Standing", "Duration" : 5.0},
-  {"Coordinates" : [5, 5], "Idle Action" : "Standing", "Duration" : 5.0},
-  {"Coordinates" : [5, 0], "Idle Action" : "Standing", "Duration" : 5.0},
-  {"Coordinates" : [0, 0], "Idle Action" : "Standing", "Duration" : 5.0},
+  {"Coordinates" : [0.0, 0], "Idle Action" : "Standing", "Duration" : 8.0},
+  {"Coordinates" : [0.0, 4.5], "Idle Action" : "Standing", "Duration" : 3.0},
+  {"Coordinates" : [-1, 5.5], "Idle Action" : "Standing", "Duration" : 3.0},
+  {"Coordinates" : [-5.5, 5.5], "Idle Action" : "Standing", "Duration" : 3.5},
+  {"Coordinates" : [-5.5, 1.5], "Idle Action" : "Standing", "Duration" : 3.0},
+  {"Coordinates" : [-5.0, 0], "Idle Action" : "Standing", "Duration" : 5.0},
 ]
 
 waypoint_distance_threshold: 0.2

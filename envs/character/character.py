@@ -82,6 +82,7 @@ class Character():
         self._env.set_joint_qvel(self._ctrl_joint_qvel)
 
     def on_reset(self):
+        print("Resetting character")    
         self._reset_move_and_turn()
         ctrl_qpos = {
             self._joint_names["Rotate_Z"] : [0],
