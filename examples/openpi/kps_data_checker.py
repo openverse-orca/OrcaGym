@@ -51,12 +51,13 @@ class BasicUnitChecker:
             print("media file does not have a video track: ", media_path)
             return ErrorType.MP4TrackError
 
-        fps = video_track.frame_rate
         duration = video_track.duration / 1000.0
-        if duration < 8 or duration > 30:
-           return ErrorType.MP4DurationError
+        fps = float(video_track.frame_count) / duration
         if float(fps) < 30:
             return ErrorType.MP4FPSError
+        if duration < 8 or duration > 30:
+           return ErrorType.MP4DurationError
+
 
         self.duration = duration
         return ErrorType.Qualified
