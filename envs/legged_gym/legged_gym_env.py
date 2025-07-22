@@ -344,7 +344,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def _init_playable(self, orcagym_addr) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
             return
-        
+
         self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
         
@@ -433,9 +433,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
 
         self._player_agent.update_playable(lin_vel, turn_angel, reborn)
-        if reborn is True:
-            print("reborn is True")
-            exit()
+
         agent_cmd_mocap = self._player_agent.reset_command_indicator(self.data.qpos)
         self.set_mocap_pos_and_quat(agent_cmd_mocap)      
         
