@@ -6,7 +6,7 @@ random_light_position: true
 random_light_rotation: true
 lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
 lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
-light_center: [2.59, -2.78, 1.298]
+light_center: [2.518, -2.956, 2.017]
 light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
 
 object_bodys: [ "niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
