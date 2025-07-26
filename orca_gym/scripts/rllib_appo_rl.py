@@ -1,22 +1,35 @@
-
 import ray
-from ray import air
 from ray import tune
 from ray.tune import RunConfig, CheckpointConfig
+from ray.train import ScalingConfig
+from ray.train.torch import TorchTrainer
 from ray.rllib.algorithms.appo import APPOConfig
 from ray.tune.registry import register_env
-import numpy as np
-from ray.rllib.algorithms.algorithm import Algorithm
-from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
-import numpy as np
-import gymnasium as gym
-import threading
 import argparse
-from ray.rllib.algorithms.callbacks import DefaultCallbacks
-import time
-from ray.rllib.policy.policy import Policy
-from orca_gym.adapters.rllib.metrics_callback import OrcaMetricsCallback
 
+import torch.version
+from orca_gym.adapters.rllib.metrics_callback import OrcaMetricsCallback
+from orca_gym.adapters.rllib.appo_catalog import DictAPPOTorchRLModule, DictAPPOCatalog
+from ray.rllib.algorithms.appo.appo_learner import APPOLearner
+from ray.rllib.core.rl_module.rl_module import RLModuleSpec
+from ray.rllib.algorithms.ppo.torch.default_ppo_torch_rl_module import DefaultPPOTorchRLModule
+from ray.rllib.algorithms.ppo.ppo_catalog import PPOCatalog
+import gymnasium as gym
+import torch
+from ray.rllib.algorithms.appo.torch.default_appo_torch_rl_module import DefaultAPPOTorchRLModule
+import os
+import sys
+import subprocess
+from ray.runtime_env import RuntimeEnv
+import glob
+from ray.rllib.policy.torch_policy import TorchPolicy
+from ray.rllib.core.rl_module.rl_module import RLModule
+from ray.rllib.core import DEFAULT_MODULE_ID
+from ray.rllib.core.columns import Columns
+import numpy as np
+from ray.rllib.utils.numpy import convert_to_numpy, softmax
+import tree
+import time
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
@@ -85,7 +98,117 @@ def create_demo_env_instance(
     env = gym.make(env_id, **kwargs)
     
     return env
-        
+
+
+def get_config(
+    num_env_runners: int, 
+    num_envs_per_env_runner: int,
+    env: gym.Env,
+    num_gpus_available: int
+):
+    config = (
+        APPOConfig()
+        .environment(
+            env="OrcaGymEnv",
+            env_config={"worker_index": 1},
+            disable_env_checking=False,
+        )
+        .env_runners(
+            num_env_runners=num_env_runners,          
+            num_envs_per_env_runner=num_envs_per_env_runner,
+            num_cpus_per_env_runner=1,
+            num_gpus_per_env_runner=(num_gpus_available - 0.1) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
+            rollout_fragment_length=64,
+        )
+        .rl_module(
+            rl_module_spec=RLModuleSpec(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                module_class=DefaultAPPOTorchRLModule,
+                model_config={
+                    "fcnet_hiddens": [256, 256],
+                    "fcnet_activation": "relu",
+                    "post_fcnet_activation": None,
+                    "vf_share_layers": True,
+                    "use_gpu": num_gpus_available > 0,
+                },
+            )
+        )
+        .learners(
+            num_learners=0,
+            num_gpus_per_learner=num_gpus_available * 0.1,
+        )
+        .training(
+            train_batch_size_per_learner=4096,
+        )
+        .resources(
+            num_cpus_for_main_process=1,
+            num_gpus=num_gpus_available,
+        )
+        .api_stack(
+            enable_rl_module_and_learner=True,
+            enable_env_runner_and_connector_v2=True
+        )
+        .callbacks(
+            OrcaMetricsCallback
+        )
+    )
+    return config
+
+def config_appo_tuner(
+        num_env_runners: int, 
+        num_envs_per_env_runner: int,
+        iter: int,
+        env: gym.Env
+    ) -> tune.Tuner:
+    # 重要：获取系统的实际GPU数量
+    num_gpus_available = torch.cuda.device_count()
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    
+    config = get_config(
+        num_env_runners=num_env_runners,
+        num_envs_per_env_runner=num_envs_per_env_runner,
+        env=env,
+        num_gpus_available=num_gpus_available
+    )
+    
+    print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
+    print(f"总CPU需求: {config.num_cpus_for_main_process + config.num_env_runners * config.num_cpus_per_env_runner}")
+    # 重要：添加GPU资源报告
+    print(f"总GPU需求: {num_gpus_available} (实际检测到 {num_gpus_available} 个GPU)")
+    print(f"Learner GPU配置: {config.num_gpus_per_learner}")
+    print(f"模型是否使用GPU: {config.rl_module_spec.model_config['use_gpu']}")
+    
+
+    # scaling_config = ScalingConfig(num_workers=2, use_gpu=True)
+    # trainer = TorchTrainer(train_func, scaling_config=scaling_config)
+    # result = trainer.fit()
+
+    return tune.Tuner(
+        "APPO",
+        param_space=config.to_dict(),
+        run_config=RunConfig(
+            name="APPO_OrcaGym_Training",
+            stop={"training_iteration": iter},
+            checkpoint_config=CheckpointConfig(
+                num_to_keep=3,
+                checkpoint_frequency=1,
+                checkpoint_score_attribute="env_runners/episode_return_mean",
+                checkpoint_score_order="max",
+                checkpoint_at_end=True
+            ),
+            verbose=3,
+        ),
+        # scaling_config=ScalingConfig(
+        #     num_workers=num_env_runners,
+        #     use_gpu=True
+        # )
+    )
+
+
+
 
 def env_creator(
         env_context,
@@ -166,15 +289,121 @@ def env_creator(
         raise
 
 
-def test_model(
-        checkpoint_path,
+def setup_cuda_environment():
+    """设置并验证 CUDA 环境"""
+    # 获取 Conda 环境路径
+    conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    if not conda_prefix:
+        print("警告: 未检测到 Conda 环境")
+        return False
+    
+    # 设置环境变量
+    os.environ["CUDA_HOME"] = conda_prefix
+    os.environ["LD_LIBRARY_PATH"] = f"{conda_prefix}/lib:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    
+    # 验证 CUDA 和 cuDNN
+    cuda_available = torch.cuda.is_available()
+    cudnn_version = torch.backends.cudnn.version() if cuda_available else 0
+    
+    print("="*50)
+    print("CUDA 环境验证")
+    print(f"CUDA_HOME: {conda_prefix}")
+    print(f"CUDA 可用: {cuda_available}")
+    if cuda_available:
+        print(f"GPU 设备: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA 版本: {torch.version.cuda}")
+        print(f"cuDNN 版本: {cudnn_version}")
+    print("="*50)
+    
+    return cuda_available
+
+
+def verify_pytorch_cuda():
+    """验证 PyTorch 是否能正确使用 CUDA"""
+    print("="*50)
+    print("PyTorch CUDA 验证")
+    print(f"PyTorch 版本: {torch.__version__}")
+    print(f"CUDA 可用: {torch.cuda.is_available()}")
+    
+    if torch.cuda.is_available():
+        print(f"GPU 设备: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA 版本: {torch.version.cuda}")
+        print(f"cuDNN 版本: {torch.backends.cudnn.version()}")
+        
+        # 运行简单的 CUDA 计算
+        try:
+            a = torch.tensor([1.0], device="cuda")
+            b = torch.tensor([2.0], device="cuda")
+            c = a + b
+            print(f"CUDA 计算测试成功: 1.0 + 2.0 = {c.item()}")
+        except Exception as e:
+            print(f"CUDA 计算测试失败: {str(e)}")
+    else:
+        print("PyTorch 无法访问 CUDA")
+    
+    print("="*50)
+
+
+def worker_env_check():
+    import os
+    import torch
+    import traceback
+    
+    # 确保使用正确的库路径
+    conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    if conda_prefix:
+        os.environ["LD_LIBRARY_PATH"] = f"{conda_prefix}/lib:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    
+    # 尝试初始化 CUDA
+    try:
+        torch.cuda.init()
+        available = torch.cuda.is_available()
+        device_name = torch.cuda.get_device_name(0) if available else "N/A"
+        cudnn_version = torch.backends.cudnn.version() if available else "N/A"
+        
+        # 运行简单的 CUDA 计算
+        if available:
+            a = torch.tensor([1.0], device="cuda")
+            b = torch.tensor([2.0], device="cuda")
+            c = a + b
+            calc_test = f"计算成功: {c.item()}"
+        else:
+            calc_test = "未测试"
+    except Exception as e:
+        available = False
+        device_name = f"初始化失败: {str(e)}"
+        cudnn_version = "N/A"
+        calc_test = "未测试"
+    
+    return {
+        "pid": os.getpid(),
+        "cuda": available,
+        "device_info": device_name,
+        "cudnn_version": cudnn_version,
+        "calc_test": calc_test,
+        "pytorch_version": torch.__version__,
+        "cuda_version": torch.version.cuda if hasattr(torch.version, "cuda") else "N/A",
+        "ld_path": os.environ.get("LD_LIBRARY_PATH", ""),
+        "cuda_home": os.environ.get("CUDA_HOME", ""),
+    }
+
+
+
+def run_training(
         orcagym_addr: str,
         env_name: str,
         agent_name: str,
-        max_episode_steps: int
+        max_episode_steps: int,
+        num_env_runners: int,
+        num_envs_per_env_runner: int,
+        iter: int,
+        render_mode: str
     ):
-    
-    # 1. 首先注册训练时使用的环境
+
+
+    # 在环境设置后调用
+    verify_pytorch_cuda()
+
     register_env(
         "OrcaGymEnv", 
         lambda env_context: env_creator(
@@ -183,12 +412,103 @@ def test_model(
             env_name=env_name,
             agent_name=agent_name,
             max_episode_steps=max_episode_steps,
-            render_mode='human',
+            render_mode=render_mode,
         )
     )
+
+    # 优化Ray初始化参数
+    ray.init(
+        num_cpus=num_env_runners + 1, 
+        num_gpus=1,
+        object_store_memory=num_env_runners * 1024**3, 
+        include_dashboard=False, 
+        ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "CUDA_VISIBLE_DEVICES": "0,1",
+                "NVIDIA_VISIBLE_DEVICES": "all"
+            }
+        }
+    )
+
+    @ray.remote(num_gpus=0.1)
+    def worker_env_check_remote():
+        return worker_env_check()
+
+
+    # 调用并打印结果
+    results = ray.get([worker_env_check_remote.remote() for _ in range(3)])
+    print("\n" + "="*50)
+    print("工作进程 CUDA 验证结果")
+    print("="*50)
+
+    for i, res in enumerate(results):
+        print(f"\n工作进程 #{i+1} (PID={res['pid']}):")
+        print(f"  CUDA 可用: {res['cuda']}")
+        print(f"  设备信息: {res['device_info']}")
+        print(f"  cuDNN 版本: {res['cudnn_version']}")
+        print(f"  计算测试: {res['calc_test']}")
+        print(f"  CUDA_HOME: {res['cuda_home']}")
+        print(f"  LD_LIBRARY_PATH: {res['ld_path']}")
+        print(f"  PyTorch 版本: {res['pytorch_version']}")
+        print(f"  CUDA 版本: {res['cuda_version']}")
+
+    # 创建一个样本环境实例
+    demo_env = create_demo_env_instance(
+        orcagym_addr="localhost:50051",
+        env_name="Ant_OrcaGymEnv",
+        agent_name="ant_usda",
+        max_episode_steps=max_episode_steps,
+    )
+
+    print("\nStarting training...")
+
+    # scaling_config = ScalingConfig(num_workers=2, use_gpu=True)
+    # trainer = TorchTrainer(train_func, scaling_config=scaling_config)
+    # result = trainer.fit()
+
+    tuner = config_appo_tuner(
+        num_env_runners=num_env_runners,
+        num_envs_per_env_runner=num_envs_per_env_runner,
+        iter=iter,
+        env=demo_env
+    )
+    results = tuner.fit()
+
     
-    # 2. 使用注册的环境创建实例
-    from ray.rllib.env import EnvContext
+
+    # 训练运行后清理
+    if torch.distributed.is_initialized():
+        print("Cleaning up distributed process group...")
+        torch.distributed.destroy_process_group()
+        print("Process group destroyed")
+
+
+    if results:
+        print("\nTraining completed. Best results:")
+        best_result = results.get_best_result()
+        
+        if best_result.checkpoint:
+            checkpoint_path = best_result.checkpoint.path
+            print(f"Best checkpoint directory: {checkpoint_path}")
+            
+
+
+    demo_env.close()
+
+    ray.shutdown()
+    print("Process completed.")
+
+def test_model(
+        checkpoint_path,
+        orcagym_addr: str,
+        env_name: str,
+        agent_name: str,
+        max_episode_steps: int,
+        use_onnx_for_inference: bool = False,
+        explore_during_inference: bool = False
+    ):
+
     env = env_creator(
         env_context=None,  # 空上下文
         orcagym_addr=orcagym_addr,
@@ -198,57 +518,108 @@ def test_model(
         render_mode='human',
     )
     
-    # 加载策略
+    # Create new RLModule and restore its state from the last algo checkpoint.
+    # Note that the checkpoint for the RLModule can be found deeper inside the algo
+    # checkpoint's subdirectories ([algo dir] -> "learner/" -> "module_state/" ->
+    # "[module ID]):
+    print("Restore RLModule from checkpoint ...", end="")
+    rl_module = RLModule.from_checkpoint(
+        os.path.join(
+            checkpoint_path,
+            "learner_group",
+            "learner",
+            "rl_module",
+            DEFAULT_MODULE_ID,
+        )
+    )
+    ort_session = None
+    print(" ok")
 
-    policies = Policy.from_checkpoint(checkpoint_path)
-    default_policy_id = "default_policy"
-    if default_policy_id not in policies:
-        default_policy_id = next(iter(policies.keys()))
-    policy = policies[default_policy_id]
+    # Create an env to do inference in.
+    random_seed = np.random.randint(0, 1000000)
+    obs, info = env.reset(seed=random_seed)
 
+    num_episodes = 0
+    episode_return = 0.0
 
-    # 确保策略支持字典观测
-    if not hasattr(policy.model, "branches"):
-        raise TypeError("Loaded policy does not support dictionary observations")
-    
-    for _ in range(5):  # 运行5个测试episode
-        state_dict, _ = env.reset()
-        
-        # 处理字典观测
-        batch_state = {}
-        for key, value in state_dict.items():
-            if isinstance(value, np.ndarray):
-                value = np.expand_dims(value, axis=0)
-            batch_state[key] = value
-        
-        episode_reward = 0
-        done = False
-        
-        while not done:
-            time_start = time.time()
+    while num_episodes < max_episode_steps:
+        start_time = time.time()
+
+        # Compute an action using a B=1 observation "batch".
+        input_dict = {Columns.OBS: np.expand_dims(obs, 0)}
+        if not use_onnx_for_inference:
+            input_dict = {Columns.OBS: torch.from_numpy(obs).unsqueeze(0)}
+
+        # If ONNX and module has not been exported yet, do thexplore_during_inferenceis here using
+        # the input_dict as example input.
+        elif ort_session is None:
+            tensor_input_dict = {Columns.OBS: torch.from_numpy(obs).unsqueeze(0)}
+            torch.onnx.export(rl_module, {"batch": tensor_input_dict}, f="test.onnx")
+            ort_session = onnxruntime.InferenceSession(
+                "test.onnx", providers=["CPUExecutionProvider"]
+            )
+
+        # No exploration (using ONNX).
+        if ort_session is not None:
+            rl_module_out = ort_session.run(
+                None,
+                {
+                    key.name: val
+                    for key, val in dict(
+                        zip(
+                            tree.flatten(ort_session.get_inputs()),
+                            tree.flatten(input_dict),
+                        )
+                    ).items()
+                },
+            )
+            # [0]=encoder outs; [1]=action logits
+            rl_module_out = {Columns.ACTION_DIST_INPUTS: rl_module_out[1]}
+        # No exploration (using RLModule).
+        elif not explore_during_inference:
+            rl_module_out = rl_module.forward_inference(input_dict)
+        # W/ exploration (using RLModule).
+        else:
+            rl_module_out = rl_module.forward_exploration(input_dict)
+
+        # For discrete action spaces used here, normally, an RLModule "only"
+        # produces action logits, from which we then have to sample.
+        # However, you can also write custom RLModules that output actions
+        # directly, performing the sampling step already inside their
+        # `forward_...()` methods.
+        # print("rl_module_out: ", rl_module_out)
+        logits = convert_to_numpy(rl_module_out[Columns.ACTION_DIST_INPUTS])
+
+        # 最佳方案 (推荐)：显式拆分参数
+        mu = logits[:, :env.action_space.shape[0]]  # 前8个: 动作均值
+        # log_sigma = logits[:, 8:]  # 后8个: 标准差参数 (推理时不需要)
+
+        # 直接使用均值作为最终动作
+        action = mu[0]
+
+        # p=softmax(logits[0])
+        # print(f"logits.shape: {logits.shape}", "env.action_space.shape:", env.action_space.shape, "p.shape:", p.shape)
+        # Perform the sampling step in numpy for simplicity.
+        # action = np.random.choice(a=16, size=p.shape[0], p=p)
+        # print(f"action: {action}")
+        # Send the computed action `a` to the env.
+        obs, reward, terminated, truncated, _ = env.step(action)
+        # print("obs: ", obs)
+
+        end_time = time.time()
+        if end_time - start_time < REALTIME_STEP:
+            # print(f"sleep: {REALTIME_STEP - (end_time - start_time)}")
+            time.sleep(REALTIME_STEP - (end_time - start_time))
             
-            # 计算动作
-            action = policy.compute_single_action(batch_state, explore=False)[0]
-            
-            # 环境步进
-            next_state_dict, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            episode_reward += reward
-            
-            # 准备下一个状态
-            batch_state = {}
-            for key, value in next_state_dict.items():
-                if isinstance(value, np.ndarray):
-                    value = np.expand_dims(value, axis=0)
-                batch_state[key] = value
-                
-            # 渲染和计时控制
-            env.render()
-            time_end = time.time()
-            elapsed_time = time_end - time_start
-            if elapsed_time < REALTIME_STEP:
-                time.sleep(REALTIME_STEP - elapsed_time)
-        
-        print(f"Test episode reward: {episode_reward}")
+        episode_return += reward
+        # Is the episode `done`? -> Reset.
+        if terminated or truncated:
+            print(f"Episode done: Total reward = {episode_return}")
+            random_seed = np.random.randint(0, 1000000)
+            obs, info = env.reset(seed=random_seed)
+            num_episodes += 1
+            episode_return = 0.0
+
+    print(f"Done performing action inference through {num_episodes} Episodes")
     
     env.close()
