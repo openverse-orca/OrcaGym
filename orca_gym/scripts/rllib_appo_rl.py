@@ -25,6 +25,7 @@ import json
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
+    "LeggedGym_OrcaGymEnv": "envs.legged_gym.legged_gym_rllib_env:LeggedGymRLLibEnv",
 }
 
 TIME_STEP = 0.001
@@ -46,7 +47,9 @@ def get_orca_gym_register_info(
         render_mode: str,
         worker_idx: int,
         vector_idx: int,
-        async_env_runner: bool
+        async_env_runner: bool,
+        height_map_file: str,
+        max_episode_steps: int
     ) -> tuple[ str, dict ]:
 
     # 只有第一个worker的第一个环境渲染
@@ -62,7 +65,7 @@ def get_orca_gym_register_info(
 
 
     orcagym_addr_str = orcagym_addr.replace(":", "-")
-    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + "-" + render_mode
+    env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{worker_idx:03d}"
     agent_names = [f"{agent_name}"]
     kwargs = {
         'frame_skip': FRAME_SKIP,
@@ -70,6 +73,9 @@ def get_orca_gym_register_info(
         'agent_names': agent_names,
         'time_step': TIME_STEP,
         'render_mode': render_mode,
+        'height_map_file': height_map_file,
+        'env_id': env_id,
+        'max_episode_steps': max_episode_steps,
     }
 
     return env_id, kwargs
@@ -93,7 +99,9 @@ def create_demo_env_instance(
         render_mode=render_mode,
         worker_idx=1,
         vector_idx=1,
-        async_env_runner=async_env_runner
+        async_env_runner=async_env_runner,
+        height_map_file=None,
+        max_episode_steps=max_episode_steps
     )
 
     if env_id not in gym.envs.registry:
@@ -233,7 +241,8 @@ def env_creator(
         agent_name: str,
         max_episode_steps: int,
         render_mode: str,
-        async_env_runner: bool
+        async_env_runner: bool,
+        height_map_file: str,
     ):
 
     if env_context is None:
@@ -252,7 +261,9 @@ def env_creator(
         render_mode=render_mode,
         worker_idx=worker_idx,
         vector_idx=vector_idx,
-        async_env_runner=async_env_runner
+        async_env_runner=async_env_runner,
+        height_map_file=height_map_file,
+        max_episode_steps=max_episode_steps
     )
 
     # if vector_idx == 0:
@@ -433,7 +444,8 @@ def run_training(
         num_envs_per_env_runner: int,
         async_env_runner: bool,
         iter: int,
-        render_mode: str
+        render_mode: str,
+        height_map_file: str
     ):
 
 
@@ -451,7 +463,8 @@ def run_training(
             agent_name=agent_name,
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
-            async_env_runner=async_env_runner
+            async_env_runner=async_env_runner,
+            height_map_file=height_map_file
         )
     )
     @ray.remote(num_gpus=0.1)
@@ -478,11 +491,11 @@ def run_training(
 
     # 创建一个样本环境实例
     demo_env = create_demo_env_instance(
-        orcagym_addr="localhost:50051",
-        env_name="Ant_OrcaGymEnv",
-        agent_name="ant_usda",
+        orcagym_addr=orcagym_addr,
+        env_name=env_name,
+        agent_name=agent_name,
         max_episode_steps=max_episode_steps,
-        async_env_runner=async_env_runner
+        async_env_runner=async_env_runner,
     )
 
     print("\nStarting training...")
@@ -543,7 +556,8 @@ def test_model(
         agent_name=agent_name,
         max_episode_steps=max_episode_steps,
         render_mode='human',
-        async_env_runner=False
+        async_env_runner=False,
+        height_map_file=None
     )
     
     # Create new RLModule and restore its state from the last algo checkpoint.

@@ -1,0 +1,19 @@
+train_legged_local:
+  orcagym_addr: "localhost:50051"
+  env_name: "LeggedGym_OrcaGymEnv"
+  agent_name: "go2_usda"
+  max_episode_steps: 1000
+  num_env_runners: 1
+  num_envs_per_env_runner: 1
+  async_env_runner: False
+  run_mode: training
+  iter: 100
+  render_mode: human
+  height_map_file: "../../orca_gym/tools/height_map.npy"
+
+test_legged_local:
+  orcagym_addr: "localhost:50051"
+  env_name: "LeggedGym_OrcaGymEnv"
+  agent_name: "go2_usda"
+  max_episode_steps: 1000
+  run_mode: testing
