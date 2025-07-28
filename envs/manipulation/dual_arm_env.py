@@ -7,8 +7,10 @@ from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
+from orca_gym.task.scan_QR_task import ScanQRTask
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.task.pick_place_task import PickPlaceTask, TaskStatus
+from orca_gym.task.abstract_task import TaskStatus
+from orca_gym.task.pick_place_task import PickPlaceTask
 import importlib
 
 class RunMode:
@@ -106,7 +108,11 @@ class DualArmEnv(RobomimicEnv):
         self._reward_printer = RewardPrinter()
         self._config = task_config_dict
         self._config['grpc_addr'] = orcagym_addr
-        self._task = PickPlaceTask(self._config)
+        if self._config["type"] == "pick_and_place":
+            self._task = PickPlaceTask(self._config)
+        elif self._config["type"] == "scan":
+            self._task = ScanQRTask(self._config)
+
         self._task.register_init_env_callback(self.init_env)
         kwargs["task"] = self._task
         self._teleop_counter = 0
@@ -368,8 +374,6 @@ class DualArmEnv(RobomimicEnv):
         for id, agent_name in enumerate(self._agent_names):
             self._agents[agent_name].init_agent(id)
 
-
-
     def _debug_list_loaded_objects(self):
         all_keys = list(self.model._joint_dict.keys())
 
@@ -422,68 +426,21 @@ class DualArmEnv(RobomimicEnv):
     
             # 否则继续尝试
     
-
-    def reset_teleoperation(self) -> tuple[dict, dict]:
-        if self._config.get("random_actor", False):
-            self._teleop_counter += 1
-            if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
-                # 随机挑 3-5 个 prefab 的 short name（如 "salt","jar_01"……）
-                full      = self._config["actors"]
-                spawn     = self._config["actors_spawnable"]
-                total     = len(spawn)
-                n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
-                idxs      = random.sample(range(total), k=n_select)
-                # 根据索引分别取 actor_name 与 spawn_name
-                short_names = [full[i]  for i in idxs]
-                # 只改 object_bodys/sites/joints 三项，保持 actors 原样
-                self._config["object_bodys"]  = list(short_names)
-                self._config["object_sites"]  = [f"{n}site"   for n in short_names]
-                self._config["object_joints"] = [f"{n}_joint" for n in short_names]
-
-
+    def reset_model(self) -> tuple[dict, dict]:
         self._set_init_state()
         for ag in self._agents.values():
             ag.on_reset_model()
 
-        self.safe_get_task(self)
-        instr = self._task.get_language_instruction()
-        m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
-        if m:
-            level, obj, goal = m.groups()
-            print(
-                f"{Fore.WHITE}level: {level}{Style.RESET_ALL}  "
-                f"object: {Fore.CYAN}{Style.BRIGHT}{obj}{Style.RESET_ALL}  to  "
-                f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{goal}{Style.RESET_ALL}"
-            )
-        else:
-            # 万一格式不符，回退到无色输出
-            print(instr)
+        self._task.get_task(self)
 
-        self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
+        self.update_objects_goals(self._task.get_object_joints_xpos(self), self._task.get_goal_joints_xpos(self))
+
         self.mj_forward()
         obs = self._get_obs().copy()
         return obs, {"objects": self.objects, "goals": self.goals}
-    
-    def reset_normalized(self) -> tuple[dict, dict]:
-        self._set_init_state()
-        for ag in self._agents.values():
-            ag.on_reset_model()
-        self.mj_forward()
 
-        obs = self._get_obs().copy()
-        return obs, {
-            "objects": getattr(self, "objects", None),
-            "goals":   getattr(self, "goals",   None),
-        }
-    
-    def reset_model(self) -> tuple[dict, dict]:
-        if self._run_mode == RunMode.TELEOPERATION:
-            return self.reset_teleoperation()
-        elif self._run_mode == RunMode.POLICY_NORMALIZED:
-            return self.reset_normalized()
-        else:
-            raise ValueError(f"Invalid run mode: {self._run_mode}")
-    
+
+    #object  goals 应该从task获取，不应该在env下处理
     def update_objects_goals(self, object_positions, goal_positions):
         # objects structured array
         obj_dtype = np.dtype([

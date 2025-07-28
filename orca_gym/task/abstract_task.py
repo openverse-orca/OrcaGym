@@ -1,47 +1,17 @@
+from mujoco.usd import lights
+
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
-from scipy.spatial.transform import Rotation as R
+from orca_gym.task.scene_manage import SceneManager
+
 from orca_gym.scene.orca_gym_scene import Actor, MaterialInfo, LightInfo, OrcaGymScene
 import numpy as np
 import random
 import warnings, time
 
-
-LEVEL_RANGES = {
-        "shop": {
-            "x": (0.2, 0.612),
-            "y": (-0.4, 0.4),
-            "z": -0.4,
-            "r": 0.3,
-        },
-        "yaodian": {
-            "x": (0.44, 0.54),
-            "y": (-0.4, 0.4),
-            "z": 0.15,
-            "r": 0.1,
-        },
-        "kitchen": {
-            "x": (0.25, 0.5),
-            "y": (-0.4, 0.4),
-            "z": -0.25,
-            "r": 0.28,
-        },
-        "jiazi": {
-            "x": (0.55, 0.65),
-            "y": (-0.4, 0.4),
-            "z": -0.15,
-            "r": 0.3,
-        },
-        "guizi": {
-            "x": (0.55, 0.65),
-            "y": (-0.35, 0.35),
-            "z": -0.15,
-            "r": 0.3,
-        }
-        # 新关卡直接加一条
-    }
 DEFAULT_CONFIG = {
     "random_object": True, # 是否随机Object的位置，object应该在Agent下面
+    "type": "pick_and_place", # 任务类型，默认是pick_and_place
     "object_bodys": [],
     "object_sites": [],
     "object_joints": [],
@@ -52,6 +22,8 @@ DEFAULT_CONFIG = {
     "goal_joints": [],
 
     "level_name": None,
+    "random_cycle": 20,
+    "range": [0.0, 0.0, 0.0, 0.0],
     "random_actor": False, # 是否随机添加Actor，actor与Agent同级
     "random_actor_position": False, # 是否随机Actor的位置
     "random_actor_rotation": False, # 是否随机Actor的旋转
@@ -72,10 +44,20 @@ DEFAULT_CONFIG = {
     "light_bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "light_description": [],
     "num_lights": 1,
-    "task_element": [], # 任务元素，包含object, actor
-
     "grpc_addr": "localhost:50051"
 }
+
+class TaskStatus:
+    """
+    Enum class for task status
+    """
+    NOT_STARTED = "not_started"
+    GET_READY = "get_ready"
+    BEGIN = "begin"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    END = "end"
+
 
 class AbstractTask:
     """
@@ -91,7 +73,11 @@ class AbstractTask:
         self.goal_joints = []
         self.randomized_object_positions = []
         self.level_name = None
+        self.type = "pick_and_place"  # 任务类型，默认是pick_and_place
+        self.range = {}
         self.random_actor = False
+        self.__random_count__ = 0
+        self.random_cycle = 20
         self.random_actor_position = False
         self.random_actor_rotation = False
         self.actors = []
@@ -109,13 +95,14 @@ class AbstractTask:
         self.light_center = []
         self.light_bound = []
         self.light_description = []
-        self._added_top_light = False
         self.load_config(config)
-        self.task_dict = {}
 
-        self.scene = OrcaGymScene(self.grpc_addr)
+        self.scene = SceneManager(grpc_addr=self.grpc_addr, init_env_callback=init_env_callback)
 
-        self._init_env_callback = init_env_callback
+        self.first_spawn = True
+        self.data = {} #来着增广的数据
+        self.sample_range = 0.0 #增广采样范围
+
 
     def get_object_sites(self):
         return self.object_sites
@@ -141,6 +128,33 @@ class AbstractTask:
     def set_goal_sites(self, goal_sites: list[str]):
         self.goal_sites = goal_sites
 
+    def get_object_joints_xpos(self, env: OrcaGymLocalEnv):
+        env_object_joints = [env.joint(joint_name) for joint_name in self.object_joints]
+        return env.query_joint_qpos(env_object_joints)
+
+    def get_goal_joints_xpos(self, env: OrcaGymLocalEnv):
+        env_goal_joints = [env.joint(joint_name) for joint_name in self.goal_joints]
+        return env.query_joint_qpos(env_goal_joints)
+
+    def generate_object(self, env:OrcaGymLocalEnv, pick_min, pick_max):
+        '''
+        从场景中随机挑选actors里的几个
+        '''
+        if self.random_actor:
+            if self.__random_count__ % self.random_cycle == 0:
+                # 将object_bodys放回到无限远处
+                pos = self.infinity + [1, 0, 0, 0]
+                qpos_dict = {env.joint(joint_name): pos for joint_name in self.object_joints}
+                env.set_joint_qpos(qpos_dict)
+
+                n_select  = random.randint(pick_min, pick_max)
+                idxs      = random.sample(range(len(self.actors)), k=n_select)
+                self.object_bodys = [self.actors[idx] for idx in idxs ]
+                self.object_sites = [f"{self.actors[idx]}site" for idx in idxs]
+                self.object_joints = [f"{self.actors[idx]}_joint" for idx in idxs]
+
+            self.__random_count__ += 1
+
     def load_config(self, config: dict):
         """
         Load task configuration from a dictionary.
@@ -155,6 +169,9 @@ class AbstractTask:
         self.goal_joints = self.__get_config_setting__("goal_joints", config)
 
         self.level_name = self.__get_config_setting__("level_name", config)
+        self.range = self.__get_config_setting__("range", config)
+        self.type = self.__get_config_setting__("type", config)
+        self.random_cycle = self.__get_config_setting__("random_cycle", config)
         self.random_actor = self.__get_config_setting__("random_actor", config)
         self.random_actor_position = self.__get_config_setting__("random_actor_position", config)
         self.random_actor_rotation = self.__get_config_setting__("random_actor_rotation", config)
@@ -177,7 +194,27 @@ class AbstractTask:
         self.num_lights = self.__get_config_setting__("num_lights", config)
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
+    def spawn_scene(self, env: OrcaGymLocalEnv):
+        if self.first_spawn and not self.random_light:
+            self.scene.publish_scene_without_init_env()
+            self.generate_actors()
 
+            self.scene.publish_scene()
+            self.first_spawn = False
+        elif self.random_light:
+        # 周期性随机添加灯光
+            if self.random_light and self.__random_count__ % self.random_cycle == 0:
+                self.scene.publish_scene_without_init_env()
+                self.generate_actors()
+                light_idxs = self.generate_lights()
+                self.scene.publish_scene()
+
+                for idx in light_idxs:
+                    self.set_light_info(self.lights[idx])
+                for actor in self.actors:
+                    self.set_actor_material(actor)
+
+    #todo: 需要重写这部分代码， 这里应该只需要做随机位置，位置是否合理应该由具体任务决定
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, random_rotation=True, target_obj_joint_name=None):
         object_bodys = [env.body(bn) for bn in self.object_bodys]
         obj_joints  = [env.joint(jn) for jn in self.object_joints]
@@ -187,11 +224,6 @@ class AbstractTask:
         info  = env.query_site_pos_and_quat([dummy])[dummy]
         base_pos, base_quat = info["xpos"], info["xquat"]
 
-        # 根据 level_name 去读取模块级常量
-        if self.level_name not in LEVEL_RANGES:
-            raise KeyError(f"Unknown level '{self.level_name}', please add to LEVEL_RANGES")
-        ranges = LEVEL_RANGES[self.level_name]
-
         def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint):
             if target_obj_joint_name is not None:
                 target_obj_pos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name][:3]
@@ -199,10 +231,10 @@ class AbstractTask:
                 target_obj_pos = None
 
             while True:
-                lx = np.random.uniform(*ranges["x"])
-                ly = np.random.uniform(*ranges["y"])
-                lz = ranges["z"]
-                lr = ranges["r"]
+                lx = np.random.uniform(*self.range["x"])
+                ly = np.random.uniform(*self.range["y"])
+                lz = self.range["z"]
+                lr = self.range["r"]
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
@@ -243,7 +275,7 @@ class AbstractTask:
                 for contact in contacts:
                     body1 = env.model.get_geom_body_name(contact["Geom1"])
                     body2 = env.model.get_geom_body_name(contact["Geom2"])
-                    if body1 in placed_body or body2 in placed_body:
+                    if body1 in placed_body and body2 in placed_body:
                         # print(f"[Debug] Found contact between {body1} and {body2}")
                         find_contact = True
                         break
@@ -268,6 +300,7 @@ class AbstractTask:
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回
+        print(f"[Debug] Placed objects: {placed}")
         qpos_dict = {jn: q for jn, q in placed}
         env.set_joint_qpos(qpos_dict)
         env.mj_forward()
@@ -276,19 +309,13 @@ class AbstractTask:
         self.randomized_goal_positions   = env.query_joint_qpos(goal_joints)
 
 
-    def generate_actors(self, random_actor):
-        if random_actor:
-            idxs = []
-            total = len(self.actors)
-            n_select = random.randint(1, total)
-            idxs = random.sample(range(total), n_select)
-            for i in idxs:
-                self.add_actor(self.actors[i], self.actors_spawnable[i])
-        else:
-            idxs = list(range(len(self.actors)))
-            for i in idxs:
-                self.add_actor(self.actors[i], self.actors_spawnable[i])
-        return idxs
+    def generate_actors(self):
+        '''
+        将所有的 actors 添加到场景中, 初始化到infinity位置
+        '''
+        for i in range(len(self.actors)):
+            self.scene.add_actor(actor_name=self.actors[i], spawnable_name=self.actors_spawnable[i],
+                                 position=np.array(self.infinity), rotation = rotations.euler2quat([0, 0, 0]))
     
     def generate_lights(self):
         """
@@ -328,53 +355,22 @@ class AbstractTask:
         else:
             rotation = rotations.euler2quat([0, 0, 0])
 
-        actor = Actor(actor_name, spawnable_name, position, rotation, scale=1.0)
-        self.scene.add_actor(actor)
+        self.scene.add_actor(actor_name, spawnable_name, position, rotation, scale=1.0)
 
 
     def add_light(self, light_name, spawnable_name):
-        # 1) 先随机一个位置和朝向
+        # 1) 位置：要么随机，要么固定在 center
         rand_pos, rand_quat = self._random_position_and_rotation(self.light_center, self.light_bound)
-        position = rand_pos if self.random_light_position else np.array(self.light_center)
-        rotation = rand_quat if self.random_light_rotation else R.from_euler('xyz', [-90, 0, 0], degrees=True).as_quat()
+        position = rand_pos   if self.random_light_position else np.array(self.light_center)
 
-        # —— 强制第一盏顶光 —— 
-        if not self._added_top_light:
-            # 用一个小角度抖动保证 ≤5°
-            jitter_x = np.random.uniform(-5, 5)
-            jitter_y = np.random.uniform(-5, 5)
-            rotation = R.from_euler('xyz', [-90 + jitter_x, jitter_y, 0], degrees=True).as_quat()
-            self._added_top_light = True
+        # 2) 旋转：要么随机，要么固定“竖直向下”
+        if self.random_light_rotation:
+            rotation = rand_quat
+        else:
+            # 绕 X 轴 -90° → 光照沿 −Z 方向（竖直向下）
+            rotation = rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
 
-        # 2) 如果是斜光，且偏离竖直超过阈值，就推到边缘
-        elif self.random_light_rotation:
-            dir_vec = R.from_quat(rotation).apply([0, 0, -1])
-            angle_deg = np.degrees(np.arccos(np.clip(np.dot(dir_vec, [0, 0, -1]), -1, 1)))
-            if angle_deg > 15.0:
-                x0, y0, z0 = self.light_center
-                x_min, x_max = x0 + self.light_bound[0][0], x0 + self.light_bound[0][1]
-                y_min, y_max = y0 + self.light_bound[1][0], y0 + self.light_bound[1][1]
-                corners = [
-                    np.array([x_min, y_min, position[2]]),
-                    np.array([x_min, y_max, position[2]]),
-                    np.array([x_max, y_min, position[2]]),
-                    np.array([x_max, y_max, position[2]]),
-                ]
-                position = corners[np.random.randint(0, 4)]
-
-        # 3) （可选）提高 z 轴避免过近
-        if hasattr(self, 'light_min_z'):
-            position[2] = max(position[2], self.light_min_z)
-
-        # 4) 最终添加
-        actor = Actor(
-            name=light_name,
-            spawnable_name=spawnable_name,
-            position=position,
-            rotation=rotation,
-            scale=1.0
-        )
-        self.scene.add_actor(actor)
+        self.scene.add_light(light_name, spawnable_name, position, rotation, scale=1.0)
 
     def set_light_info(self, light_name, color=None, intensity=None):
         """
@@ -391,8 +387,7 @@ class AbstractTask:
         if intensity is None:
             intensity = np.random.uniform(1000, 2000.0)
 
-        light_info = LightInfo(color=color, intensity=intensity)
-        self.scene.set_light_info(light_name, light_info)
+        self.scene.set_light_info(light_name, color, intensity)
 
     def set_actor_material(self, actor_name, base_color=None):
         """
@@ -406,36 +401,26 @@ class AbstractTask:
                                    np.random.uniform(0.0, 1.0),
                                    1.0])
         print(f"[Debug-Actor] set_actor_material → {actor_name}, base_color={base_color}")
-        material_info = MaterialInfo(base_color=base_color)
-        self.scene.set_material_info(actor_name, material_info)
+        self.scene.set_material_info(actor_name, base_color)
 
     def add_actor_with_pose(self, actor_name, spawnable_name, position, rotation):
-        actor = Actor(actor_name, spawnable_name, position, rotation, scale = 1.0)
-        self.scene.add_actor(actor)
+        self.scene.add_actor(actor_name, spawnable_name, position=position, rotation=rotation, scale=1.0)
 
     def publish_scene(self):
         self.scene.publish_scene()
-
-        #OrcaStudio renew mjcf xml after publish_scene
-        #env should init env because mj_model could change
-        if self._init_env_callback is None:
-            warnings.warn("Not register init_env_callback\n")
-
-        time.sleep(3)
-        self._init_env_callback()
 
     def destory_scene(self):
         self.scene.publish_scene()
         self.scene.close()
 
     def register_init_env_callback(self, init_env_call):
-        self._init_env_callback = init_env_call
+        self.scene.register_init_env_callback(init_env_call)
 
     def get_task(self, env: OrcaGymLocalEnv):
-        pass
+        raise NotImplementedError("This method should be overridden by subclasses")
 
     def is_success(self, env: OrcaGymLocalEnv):
-        pass
+        raise NotImplementedError("This method should be overridden by subclasses")
 
     def get_language_instruction(self) -> str:
         pass

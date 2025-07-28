@@ -6,15 +6,14 @@ from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.task.abstract_task import AbstractTask
 import random
 
-class PickPlaceTask(AbstractTask):
+class ScanQRTask(AbstractTask):
     def __init__(self, config: dict):
-        
+
         if config.__len__():
             super().__init__(config)
         else:
             super().__init__()
         self.target_object = None
-
 
     def get_task(self, env: OrcaGymLocalEnv):
         # 随机灯光说明是增广任务
@@ -22,39 +21,32 @@ class PickPlaceTask(AbstractTask):
             self._get_augmentation_task_(env, self.data, sample_range=self.sample_range)
         else:
             self._get_teleperation_task_(env)
-
         print(
             f"{Fore.WHITE}level: {self.level_name}{Style.RESET_ALL}  "
             f"object: {Fore.CYAN}{Style.BRIGHT}{self.target_object}{Style.RESET_ALL}  to  "
             f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{self.goal_bodys[0]}{Style.RESET_ALL}"
-            )
+        )
+
     def _get_teleperation_task_(self, env: OrcaGymLocalEnv) -> dict[str, str]:
         """
         随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
         """
         self.generate_object(env, 3, 5)
-        while True:
-            # 随机摆放
-            self.random_objs_and_goals(env, random_rotation=True)
+
+        self.random_objs_and_goals(env, random_rotation=True)
 
             # 如果没有可用的物体或目标，直接返回空
-            if not self.object_bodys or not self.goal_bodys:
-                return None
+        if not self.object_bodys or not self.goal_bodys:
+            return None
 
             # 从 object_bodys 随机选一个
-            self.target_object = random.choice(self.object_bodys)
-            print(f"self.target_object: {self.target_object}")
-            # 只取第一个 goal
-            goal_name = self.goal_bodys[0]
+        self.target_object = random.choice(self.object_bodys)
+        print(f"self.target_object: {self.target_object}")
+        # 只取第一个 goal
+        goal_name = self.goal_bodys[0]
+        return self.target_object
 
-            # 记录到 task_dict 并返回
-
-            objs = self.randomized_object_positions
-            goal_body = self.goal_bodys[0]
-
-            return self.target_object
-
-    def _get_augmentation_task_(self, env: OrcaGymLocalEnv, data: dict, sample_range = 0.0) ->dict[str, str]:
+    def _get_augmentation_task_(self, env: OrcaGymLocalEnv, data: dict, sample_range=0.0) -> dict[str, str]:
         '''
         获取一个增广任务
         '''
@@ -74,7 +66,7 @@ class PickPlaceTask(AbstractTask):
         arr = objects_data
         for entry in arr:
             name = entry['joint_name']
-            pos  = entry['position']
+            pos = entry['position']
             quat = entry['orientation']
             qpos_dict[name] = np.concatenate([pos, quat], axis=0)
 
@@ -101,21 +93,21 @@ class PickPlaceTask(AbstractTask):
 
         # 3) 重建结构化数组
         goal_dtype = np.dtype([
-            ('joint_name',  'U100'),
-            ('position',    'f4', (3,)),
+            ('joint_name', 'U100'),
+            ('position', 'f4', (3,)),
             ('orientation', 'f4', (4,)),
-            ('min',         'f4', (3,)),
-            ('max',         'f4', (3,)),
-            ('size',        'f4', (3,))
+            ('min', 'f4', (3,)),
+            ('max', 'f4', (3,)),
+            ('size', 'f4', (3,))
         ])
         entries = []
         for idx, row in enumerate(flat):
             name = names[idx]
-            pos  = row[ 0:3].tolist()
-            quat = row[ 3:7].tolist()
-            mn   = row[ 7:10].tolist()
-            mx   = row[10:13].tolist()
-            sz   = row[13:16].tolist()
+            pos = row[0:3].tolist()
+            quat = row[3:7].tolist()
+            mn = row[7:10].tolist()
+            mx = row[10:13].tolist()
+            sz = row[13:16].tolist()
             entries.append((name, pos, quat, mn, mx, sz))
 
         self.goals = np.array(entries, dtype=goal_dtype)
@@ -132,7 +124,8 @@ class PickPlaceTask(AbstractTask):
         target_obj_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         objects = data.get("objects", [])
         for obj in objects:
-            joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else obj["joint_name"]
+            joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else \
+            obj["joint_name"]
             if target_obj_joint_name == joint_name:
                 target_obj_position = np.array(obj["position"], dtype=np.float32)
                 break
@@ -146,64 +139,79 @@ class PickPlaceTask(AbstractTask):
                 resample_success = True
                 break
 
-    def process_goals(self, env:OrcaGymLocalEnv):
-        """
-        处理目标（goals）的信息，返回目标的bounding box（最大最小坐标）。
-        :param goal_positions: 目标位置字典
-        :return: 目标信息的条目，目标位置数组，和bounding box数据
-        """
-        goal_joints = [env.joint(jn) for jn in self.goal_joints]
-        goal_positions = env.query_joint_qpos(goal_joints)
-
-        goal_entries = []
-        goal_positions_list = []
-        goal_bounding_boxes = {}  # 用于存储目标的bounding box信息
-
-        for goal_joint_name, qpos in goal_positions.items():
-            # 获取目标的尺寸
-            goal_name = goal_joint_name.replace("_joint", "")
-            info = env.get_goal_bounding_box(goal_name)
-
-            # 如果没有尺寸信息，跳过目标
-            if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
-                continue
-
-            mn = np.array(info["min"]).flatten()
-            mx = np.array(info["max"]).flatten()
-            sz = mx - mn
-
-            # 添加目标位置信息
-            goal_entries.append({
-                "joint_name": goal_name,
-                "position": qpos[:3].tolist(),
-                "orientation": qpos[3:].tolist(),
-                "min": mn.tolist(),
-                "max": mx.tolist(),
-                "size": sz.tolist()
-            })
-
-            goal_positions_list.append(qpos[:3])  # 仅记录目标位置
-
-        goal_positions_array = np.array(goal_positions_list)
-
-        # 返回目标数据及bounding box信息
-        return goal_entries, goal_positions_array
 
     def is_success(self, env: OrcaGymLocalEnv):
-        target_pos, _, _ = env.get_body_xpos_xmat_xquat([env.body(self.target_object)])
-        pos_vec = target_pos[0] if hasattr(target_pos, 'ndim') and target_pos.ndim > 1 else target_pos
-        xy = pos_vec[:2]
+        pos, _, quat = env.get_body_xpos_xmat_xquat([env.body(self.target_object), env.body(self.goal_bodys[0])])
+        target_pos, goal_pos = pos[:3], pos[3:6]
+        target_quat, goal_quat = quat[:4], quat[4:8]
+        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 120.0)
+        print(f"task is success: {is_success}")
+        return is_success
 
-        goal_entries, goal_positions = self.process_goals(env)
-        #只有一个goal, 只取第一个
-        goal_entry, goal_position = goal_entries[0], goal_positions[0]
-        # 获取目标区域边界
-        gmin = goal_entry['min'][:2]
-        gmax = goal_entry['max'][:2]
-        if xy[0] < gmin[0] or xy[0] > gmax[0] or xy[1] < gmin[1] or xy[1] > gmax[1]:
-            return False
-        return True
+    def _normalize_quaternion_(self, quat: np.ndarray) -> np.ndarray:
+        """归一化四元数"""
+        w, x, y, z = quat
+        norm = np.sqrt(w ** 2 + x ** 2 + y ** 2 + z ** 2)
+        return np.array([w / norm, x / norm, y / norm, z / norm])
+
+    def _quaternion_forward_vector_(selt, quat: np.ndarray) -> np.ndarray:
+        """计算当前前向向量，基于初始前向 (0, 1, 0)"""
+        w, x, y, z = quat
+        # 直接公式计算
+        forward_x = 2 * (x * y + w * z)
+        forward_y = w * w - x * x + y * y - z * z
+        forward_z = 2 * (y * z - w * x)
+        forward = np.array([forward_x, forward_y, forward_z])
+        # 归一化防止浮点误差
+        norm = np.linalg.norm(forward)
+        if norm < 1e-10:
+            return forward
+        return forward / norm
+
+    def _is_facing_(self, posA, quatA, posB, quatB, tolerance_deg=60.0) -> bool:
+        """
+        检查物体A是否面向物体B
+        :param posA: 物体A的位置
+        :param quatA: 物体A的四元数
+        :param posB: 物体B的位置
+        :param quatB: 物体B的四元数
+        :param tolerance_deg: 面向的角度偏差
+        :return: 是否面向
+        """
+        cos_tolerance = np.cos(np.radians(tolerance_deg))
+        cos_opposite = np.cos(np.radians(180 - tolerance_deg))
+
+        posA = np.array(posA)
+        posB = np.array(posB)
+
+        # 归一化四元数
+        quatA_norm = self._normalize_quaternion_(quatA)
+        quatB_norm = self._normalize_quaternion_(quatB)
+
+        # 计算前向向量
+        forwardA = self._quaternion_forward_vector_(quatA_norm)
+        forwardB = self._quaternion_forward_vector_(quatB_norm)
+
+        # 计算方向向量
+        dir_A_to_B = posB - posA
+        if np.linalg.norm(dir_A_to_B) < 1e-10:
+            return False  # 避免除以零
+        dir_A_to_B_normalized = dir_A_to_B / np.linalg.norm(dir_A_to_B)
+
+        dir_B_to_A = posA - posB
+        dir_B_to_A_normalized = dir_B_to_A / np.linalg.norm(dir_B_to_A)
+
+        # 计算关键点积
+        dot_forward = np.dot(forwardA, forwardB)
+        dot_A_to_B = np.dot(forwardA, dir_A_to_B_normalized)
+        dot_B_to_A = np.dot(forwardB, dir_B_to_A_normalized)
+
+        # 判断对视条件（允许60度偏差）
+        return (
+                dot_forward <= cos_opposite and  # 两个前向向量夹角在120°~180°之间
+                dot_A_to_B >= cos_tolerance and  # A的前向与A到B方向夹角≤60°
+                dot_B_to_A >= cos_tolerance  # B的前向与B到A方向夹角≤60°
+        )
 
     def get_language_instruction(self) -> str:
         if not self.target_object:
@@ -211,5 +219,5 @@ class PickPlaceTask(AbstractTask):
         obj_str = "object: " + self.target_object
         goal_str = "goal: " + self.goal_bodys[0]
 
-        return f"level: {self.level_name}  {obj_str} to {goal_str}"
+        return f"level: {self.level_name}  use {goal_str} scan {obj_str} QR code"
 

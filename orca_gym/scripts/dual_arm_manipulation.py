@@ -272,14 +272,14 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
     Returns:
         _type_: _description_
     """
-    spawn_scene(env, env._config)  # 初始化场景
+    env._task.spawn_scene(env) # 初始化场景
     obs, info = env.reset(seed=42)
     obs_list = {obs_key: list([]) for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
     info_list = []    
     terminated_times = 0
-    in_goal_list = [] 
+    is_success_list = []
     # camera_frames = {camera.name: [] for camera in cameras}
     camera_frame_index = []
     timestep_list = []
@@ -306,8 +306,6 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         mp4_save_path = dataset_writer.get_mp4_save_path()
 
                         env.begin_save_video(mp4_save_path)
-#                       #  print("get_mp4_save_path..........................:",mp4_save_path)
-#                         env.unwrapped.begin_save_video(mp4_save_path)
 
                         saving_mp4 = True
                         camera_frame_index.append(env.get_current_frame())
@@ -316,36 +314,8 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         camera_frame_index.append(env.get_current_frame())
 
                 if task_status == TaskStatus.SUCCESS:
-                    goal_info = info["goal"]
-                    object_info = info["object"]
-                    object_joint_name = object_info["joint_name"][0]
-                    object_body_name = object_joint_name.replace("_joint", "")
-                    print("object_body_name:",object_body_name)
-                    obj_joints = info['object']['joint_name']
-                    goal_joints = info['goal']['joint_name']
-
-                    # 查找 obj_idx
-                    obj_idx = next((i for i, jn in enumerate(obj_joints) if target_obj in jn), None)
-                    # 查找 goal_idx
-                    goal_idx = next((i for i, gn in enumerate(goal_joints) if target_goal in gn), None)
-                    if obj_idx is None or goal_idx is None:
-                        print(f"[Error] 未找到匹配: object='{target_obj}'，goal='{target_goal}'")
-                    else:
-                        # 获取物体位置
-                        joint_name = obj_joints[obj_idx]
-                        body_name = joint_name.replace('_joint', '')
-                        pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
-                        pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
-                        xy = pos_vec[:2]
-                        # 获取目标区域边界
-                        gmin = info['goal']['min'][goal_idx][:2]
-                        gmax = info['goal']['max'][goal_idx][:2]
-                        in_goal = gmin[0] <= xy[0] <= gmax[0] and gmin[1] <= xy[1] <= gmax[1]
-                        in_goal_list.append(in_goal)
-                        print(f"检查 {target_obj} 在 {target_goal} 区域: {in_goal}")
-                        if not in_goal:
-                            info['task_status'] = TaskStatus.FAILURE
-                            print("⚠️ 标记为 FAILURE: 物体未进入目标区域。")
+                    is_success = env._task.is_success(env)
+                    is_success_list.append(is_success)
                     env.stop_save_video()
                     saving_mp4 = False
                 elif task_status == TaskStatus.FAILURE:
@@ -373,8 +343,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                 
 
         if terminated_times >= 5 or truncated:
-            # return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success_list
 
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < REALTIME_STEP:
@@ -594,48 +563,15 @@ def do_teleoperation(env,
     
     for camera in cameras:
         camera.start()
-    
-    # while True:
-    #     # obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal_list = teleoperation_episode(env, cameras, rgb_size, action_step)
-    #     obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal_list = teleoperation_episode(env, cameras, dataset_writer, rgb_size, action_step)
-    #     last_done = (len(done_list)>0 and done_list[-1]==1)
-    #     last_in_goal = (len(in_goal_list)>0 and in_goal_list[-1])
-    #     save_record = last_done and last_in_goal
-    #     task_result = "Success" if save_record else "Failed"
-    #     # save_record, exit_program = user_comfirm_save_record(task_result, current_round, teleoperation_rounds)
-    #     save_record = task_result == "Success"
-    #     exit_program = False
-    #     if save_record:
-    #         print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
-    #         current_round += 1
-            
-    #         # if obs_camera:
-    #         #     for camera in cameras:
-    #         #         obs_list[camera.name] = camera_frames[camera.name]
-    #         #         camera_frames[camera.name] = []         
-    #         #     empty_camera_frames = {}
-    #         #     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, empty_camera_frames, timestep_list, info_list[0]["language_instruction"])
-    #         # else:
-    #             # add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, info_list[0]["language_instruction"])
-    #         add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"])
-    #         # dataset_writer.set_file_path()
-    #     if exit_program or current_round > teleoperation_rounds:
-    #         break
-        # 初始化基础DatasetWriter（仅一次）
-   # lldir = "records_tmp/" level
-    # base_writer = DatasetWriter(
-    #     base_dir= "records_tmp/shoprpp/", # type: ignore
-    #     env_name="shop",
-    #     env_version="1.0"
-    # )
+
     while True:
-        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, in_goal_list = teleoperation_episode(
+        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list = teleoperation_episode(
         env, cameras, dataset_writer, rgb_size, action_step
     )
     
         last_done = (len(done_list) > 0 and done_list[-1] == 1)
-        last_in_goal = (len(in_goal_list) > 0 and in_goal_list[-1])
-        save_record = last_done and last_in_goal
+        last_is_success = (len(is_success_list) > 0 and is_success_list[-1])
+        save_record = last_done and last_is_success
         task_result = "Success" if save_record else "Failed"
         save_record = task_result == "Success"
         exit_program = False
@@ -643,17 +579,8 @@ def do_teleoperation(env,
         if save_record:
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
-            
-            # # 关键修改: 创建全新的DatasetWriter实例(而不是修改现有实例)
-            # dataset_writer = DatasetWriter(
-            #     base_dir="records_tmp/shoprpp",
-            #     env_name="shop",
-            #     env_version="1.0"
-            # )
-            #dataset_writer.set_UUIDPATH()
-            # 以下是您原有的保存代码(保持不变)
+
             add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = info_list[0]["language_instruction"].split()[1])
-            #dataset_writer.set_()
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -751,7 +678,7 @@ def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
         env.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
 
     # 场景初始化
-    spawn_scene(env, env._config)
+    env._task.spawn_scene(env)
     obs, info = env.reset(seed=42)
 
     # 如果需要重新采样目标物体位置
@@ -800,10 +727,6 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
                 target_obj_position = np.array(obj["position"], dtype=np.float32)
                 break
 
-        # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
-        # env._task.random_objs_and_goals(env)
-        # print("env._task.object_joints:", env._task.object_joints, "env._task.goal_joints:", env._task.goal_joints)
-
         resample_success = False
         target_obj_position_delta = 0
         for _ in range(100):  # 尝试100次
@@ -821,8 +744,6 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
         env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
         print("[Info] Resampling target object", target_obj, "to delta:", target_obj_position_delta)
-        pass
-
 
 def calculate_transform_matrix(a, b, a1, b1):
     """
@@ -1058,8 +979,10 @@ def augment_episode(env : DualArmEnv,
                     realtime : bool = False,
                     action_step : int = 1,
                     sync_codec: bool = False) -> tuple:
-    obs, info = reset_playback_env(env, demo_data, sample_range)
-    obs_list    = {k: [] for k in obs}
+    env._task.data = demo_data
+    env._task.spawn_scene(env)
+    obs, info = env.reset(seed=42)
+    obs_list    = {obs_key: [] for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
     info_list = []    
@@ -1070,7 +993,7 @@ def augment_episode(env : DualArmEnv,
 
     target_obj, target_goal = get_target_object_and_goal(demo_data)
 
-    in_goal=False
+    is_success=False
 
     # 轨迹增广需要重新采样动作
     if sample_range > 0.0:
@@ -1114,39 +1037,10 @@ def augment_episode(env : DualArmEnv,
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
         if target_obj and target_goal:
-            raw_obj_joints  = info['object']['joint_name']
-            obj_joints = [jn.decode('utf-8') if isinstance(jn, (bytes, bytearray)) else jn
-                       for jn in raw_obj_joints]
-            raw_goal_joints = info['goal']['joint_name']
-            goal_joints = [gn.decode('utf-8') if isinstance(gn, (bytes, bytearray)) else gn
-                       for gn in raw_goal_joints]
-            obj_idx  = next((i for i, jn in enumerate(obj_joints)  if target_obj  in jn), None)
-            goal_idx = next((i for i, gn in enumerate(goal_joints) if target_goal in gn), None)
-
-            if obj_idx is not None and goal_idx is not None:
-                joint_name = obj_joints[obj_idx]
-                body_name = joint_name.replace('_joint', '')
-                pos, _, _ = env.get_body_xpos_xmat_xquat([body_name])
-                pos_vec = pos[0] if hasattr(pos, 'ndim') and pos.ndim > 1 else pos
-                xy = pos_vec[:2]
-                # 读取原始值
-                gmin_raw = info['goal']['min'][goal_idx][:2]
-                gmax_raw = info['goal']['max'][goal_idx][:2]
-                # 排序：
-                gmin = np.minimum(gmin_raw, gmax_raw)
-                gmax = np.maximum(gmin_raw, gmax_raw)
-                # 然后再判定
-                in_goal = (gmin[0] <= xy[0] <= gmax[0]) and (gmin[1] <= xy[1] <= gmax[1])
-            else:
-                print(f"[Aug Error] 目标匹配失败：{target_obj}, {target_goal}")
+            is_success = env._task.is_success(env)
                     
         env.render()
-                    
-        # if len(cameras) > 0:
-        #     # time.sleep(0.01)    # wait for camera to get new frame
-        #     for camera in cameras:
-        #         camera_frame, _ = camera.get_frame(format='rgb24', size=rgb_size)
-        #         camera_frames[camera.name].append(camera_frame)
+
         global g_skip_frame
         if sync_codec and g_skip_frame < 1:
             camera_frame_index.append(env.get_next_frame())
@@ -1164,13 +1058,10 @@ def augment_episode(env : DualArmEnv,
         done_list.append(int(original_dones[i]) if i < T else 1)
         info_list.append(info)
 
-        
-
         if terminated_times >= 5 or truncated:
-            #return obs_list, reward_list, done_list, info_list, camera_frames, timestep_list,in_goal
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success
         
-    return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,in_goal
+    return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success
  
 
 def do_augmentation(
@@ -1228,11 +1119,11 @@ def do_augmentation(
                     env.begin_save_video(mp4_save_path)             
                     print("augmentation mp4 path:",mp4_save_path)
                 obs_list, reward_list, done_list, info_list\
-                    , camera_frames, timestep_list,in_goal = augment_episode(env, cameras,rgb_size,
+                    , camera_frames, timestep_list, is_success = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step, sync_codec=sync_codec)
-                if  in_goal:
+                if  is_success:
                     if output_video == True:
                         env.stop_save_video()
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
@@ -1571,15 +1462,15 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
-    ports = [
-        # 7070, 7080, 7090,        # Agent1
-        # 8070, 8080, 8090,        # Agent2
-        7070, 7090,        # Agent1
-    ]
-    monitor_processes = []
-    for port in ports:
-        process = start_monitor(port=port, project_root=project_root)
-        monitor_processes.append(process)
+    # ports = [
+    #     # 7070, 7080, 7090,        # Agent1
+    #     # 8070, 8080, 8090,        # Agent2
+    #     7070, 7090,        # Agent1
+    # ]
+    # monitor_processes = []
+    # for port in ports:
+    #     process = start_monitor(port=port, project_root=project_root)
+    #     monitor_processes.append(process)
 
     for config in algo_config:
         run_example(orcagym_addr,
@@ -1607,6 +1498,6 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
                     sync_codec=sync_codec
                     )
 
-    # 终止 Monitor 子进程
-    for process in monitor_processes:
-        terminate_monitor(process)
+    # # 终止 Monitor 子进程
+    # for process in monitor_processes:
+    #     terminate_monitor(process)
