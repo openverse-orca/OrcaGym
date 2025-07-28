@@ -1,0 +1,18 @@
+train_ant_local:
+  orcagym_addr: "localhost:50051"
+  env_name: "Ant_OrcaGymEnv"
+  agent_name: "ant_usda"
+  max_episode_steps: 1000
+  num_env_runners: 20
+  num_envs_per_env_runner: 64
+  async_env_runner: False
+  run_mode: training
+  iter: 50
+  render_mode: human
+
+test_ant_local:
+  orcagym_addr: "localhost:50051"
+  env_name: "Ant_OrcaGymEnv"
+  agent_name: "ant_usda"
+  max_episode_steps: 1000
+  run_mode: testing

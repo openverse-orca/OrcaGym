@@ -1,35 +1,27 @@
 import ray
 from ray import tune
 from ray.tune import RunConfig, CheckpointConfig
-from ray.train import ScalingConfig
-from ray.train.torch import TorchTrainer
 from ray.rllib.algorithms.appo import APPOConfig
 from ray.tune.registry import register_env
-import argparse
 
 import torch.version
 from orca_gym.adapters.rllib.metrics_callback import OrcaMetricsCallback
-from orca_gym.adapters.rllib.appo_catalog import DictAPPOTorchRLModule, DictAPPOCatalog
-from ray.rllib.algorithms.appo.appo_learner import APPOLearner
 from ray.rllib.core.rl_module.rl_module import RLModuleSpec
-from ray.rllib.algorithms.ppo.torch.default_ppo_torch_rl_module import DefaultPPOTorchRLModule
-from ray.rllib.algorithms.ppo.ppo_catalog import PPOCatalog
 import gymnasium as gym
 import torch
 from ray.rllib.algorithms.appo.torch.default_appo_torch_rl_module import DefaultAPPOTorchRLModule
 import os
-import sys
-import subprocess
-from ray.runtime_env import RuntimeEnv
-import glob
-from ray.rllib.policy.torch_policy import TorchPolicy
 from ray.rllib.core.rl_module.rl_module import RLModule
 from ray.rllib.core import DEFAULT_MODULE_ID
 from ray.rllib.core.columns import Columns
 import numpy as np
-from ray.rllib.utils.numpy import convert_to_numpy, softmax
+from ray.rllib.utils.numpy import convert_to_numpy
 import tree
 import time
+import os
+import gymnasium as gym
+import json
+
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
@@ -52,7 +44,23 @@ def get_orca_gym_register_info(
         env_name : str, 
         agent_name : str, 
         render_mode: str,
+        worker_idx: int,
+        vector_idx: int,
+        async_env_runner: bool
     ) -> tuple[ str, dict ]:
+
+    # 只有第一个worker的第一个环境渲染
+    if render_mode == 'human':
+        call_times = read_render_env_file()
+        max_call_times = 3 if async_env_runner else 2
+        if worker_idx == 1 and call_times < max_call_times:
+            set_render_env_file(call_times + 1)
+            render_mode = 'human'
+            print(f"worker_idx: {worker_idx}, vector_idx: {vector_idx}, render_mode: {render_mode}")
+        else:
+            render_mode = 'none'
+
+
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + "-" + render_mode
     agent_names = [f"{agent_name}"]
@@ -71,6 +79,7 @@ def create_demo_env_instance(
     env_name: str = "Ant_OrcaGymEnv",
     agent_name: str = "ant",
     max_episode_steps: int = 1000,
+    async_env_runner: bool = False
 ):
     """
     创建一个演示环境实例，主要用于测试和验证。
@@ -81,7 +90,10 @@ def create_demo_env_instance(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        render_mode=render_mode
+        render_mode=render_mode,
+        worker_idx=1,
+        vector_idx=1,
+        async_env_runner=async_env_runner
     )
 
     if env_id not in gym.envs.registry:
@@ -104,7 +116,8 @@ def get_config(
     num_env_runners: int, 
     num_envs_per_env_runner: int,
     env: gym.Env,
-    num_gpus_available: int
+    num_gpus_available: int,
+    async_env_runner: bool
 ):
     config = (
         APPOConfig()
@@ -119,6 +132,7 @@ def get_config(
             num_cpus_per_env_runner=1,
             num_gpus_per_env_runner=(num_gpus_available - 0.1) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
             rollout_fragment_length=64,
+            gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
         )
         .rl_module(
             rl_module_spec=RLModuleSpec(
@@ -159,7 +173,8 @@ def config_appo_tuner(
         num_env_runners: int, 
         num_envs_per_env_runner: int,
         iter: int,
-        env: gym.Env
+        env: gym.Env,
+        async_env_runner: bool
     ) -> tune.Tuner:
     # 重要：获取系统的实际GPU数量
     num_gpus_available = torch.cuda.device_count()
@@ -171,7 +186,8 @@ def config_appo_tuner(
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         env=env,
-        num_gpus_available=num_gpus_available
+        num_gpus_available=num_gpus_available,
+        async_env_runner=async_env_runner
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -216,7 +232,8 @@ def env_creator(
         env_name: str,
         agent_name: str,
         max_episode_steps: int,
-        render_mode: str
+        render_mode: str,
+        async_env_runner: bool
     ):
 
     if env_context is None:
@@ -232,36 +249,25 @@ def env_creator(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        render_mode=render_mode
+        render_mode=render_mode,
+        worker_idx=worker_idx,
+        vector_idx=vector_idx,
+        async_env_runner=async_env_runner
     )
 
-    # 只有第一个worker的第一个环境渲染
-    if render_mode == 'human':
-        # render_mode = 'human' if worker_idx == 1 and vector_idx == 0 else 'none'
-        if worker_idx == 1 and env_id not in gym.envs.registry:
-            # 如果是第一个worker的第一个环境，使用人类渲染模式
-            render_mode = 'human'
-        else:
-            render_mode = 'none'
-            kwargs['render_mode'] = 'none'  # 确保其他worker不渲染
+    # if vector_idx == 0:
+    # 避免重复注册冲突
+    if env_id not in gym.envs.registry:
+        print(f"Registering environment: {env_id}")
+        gym.register(
+            id=env_id,
+            entry_point=ENV_ENTRY_POINT[env_name],
+            kwargs=kwargs,
+            max_episode_steps=max_episode_steps,
+            reward_threshold=0.0,
+        )
     else:
-        render_mode = 'none'
-    
-
-
-    if vector_idx == 0:
-        # 避免重复注册冲突
-        if env_id not in gym.envs.registry:
-            print(f"Registering environment: {env_id}")
-            gym.register(
-                id=env_id,
-                entry_point=ENV_ENTRY_POINT[env_name],
-                kwargs=kwargs,
-                max_episode_steps=max_episode_steps,
-                reward_threshold=0.0,
-            )
-        else:
-            print(f"Environment {env_id} already registered, skipping registration.")
+        print(f"Environment {env_id} already registered, skipping registration.")
 
     # 创建环境并验证
     try:
@@ -278,7 +284,8 @@ def env_creator(
             print(f"WARNING: Sampled observation is not within observation space!")
         
         print(f"Environment {env_id} created successfully in worker {worker_idx}, vector {vector_idx}."
-              f" Render mode: {render_mode}")
+              f" Render mode: {render_mode}"
+              f" ProcessID: {os.getpid()}")
         return env
         
     except Exception as e:
@@ -387,7 +394,35 @@ def worker_env_check():
         "cuda_home": os.environ.get("CUDA_HOME", ""),
     }
 
+def set_render_env_file(call_times: int):
+    home_dir = os.path.expanduser("~")
+    render_env_json_path = os.path.join(home_dir, "orcagym_render_env.json")
+    if not os.path.exists(render_env_json_path):
+        try:
+            with open(render_env_json_path, "w") as f:
+                json.dump({"call_times": call_times}, f)
+            print(f"Created {render_env_json_path}")
+        except Exception as e:
+            print(f"Failed to create {render_env_json_path}: {e}")
+    else:
+        try:
+            with open(render_env_json_path, "r") as f:
+                data = json.load(f)
+                data["call_times"] = call_times
+            with open(render_env_json_path, "w") as f:
+                json.dump(data, f)
+        except Exception as e:
+            print(f"Failed to update {render_env_json_path}: {e}")
 
+def read_render_env_file():
+    home_dir = os.path.expanduser("~")
+    render_env_json_path = os.path.join(home_dir, "orcagym_render_env.json")
+    if os.path.exists(render_env_json_path):
+        with open(render_env_json_path, "r") as f:
+            data = json.load(f)
+            return data["call_times"]
+
+    return 0
 
 def run_training(
         orcagym_addr: str,
@@ -396,6 +431,7 @@ def run_training(
         max_episode_steps: int,
         num_env_runners: int,
         num_envs_per_env_runner: int,
+        async_env_runner: bool,
         iter: int,
         render_mode: str
     ):
@@ -404,6 +440,8 @@ def run_training(
     # 在环境设置后调用
     verify_pytorch_cuda()
 
+    set_render_env_file(0)
+    
     register_env(
         "OrcaGymEnv", 
         lambda env_context: env_creator(
@@ -413,24 +451,9 @@ def run_training(
             agent_name=agent_name,
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
+            async_env_runner=async_env_runner
         )
     )
-
-    # 优化Ray初始化参数
-    ray.init(
-        num_cpus=num_env_runners + 1, 
-        num_gpus=1,
-        object_store_memory=num_env_runners * 1024**3, 
-        include_dashboard=False, 
-        ignore_reinit_error=True,
-        runtime_env={
-            "env_vars": {
-                "CUDA_VISIBLE_DEVICES": "0,1",
-                "NVIDIA_VISIBLE_DEVICES": "all"
-            }
-        }
-    )
-
     @ray.remote(num_gpus=0.1)
     def worker_env_check_remote():
         return worker_env_check()
@@ -459,6 +482,7 @@ def run_training(
         env_name="Ant_OrcaGymEnv",
         agent_name="ant_usda",
         max_episode_steps=max_episode_steps,
+        async_env_runner=async_env_runner
     )
 
     print("\nStarting training...")
@@ -471,7 +495,8 @@ def run_training(
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         iter=iter,
-        env=demo_env
+        env=demo_env,
+        async_env_runner=async_env_runner
     )
     results = tuner.fit()
 
@@ -509,6 +534,8 @@ def test_model(
         explore_during_inference: bool = False
     ):
 
+    set_render_env_file(0)
+
     env = env_creator(
         env_context=None,  # 空上下文
         orcagym_addr=orcagym_addr,
@@ -516,6 +543,7 @@ def test_model(
         agent_name=agent_name,
         max_episode_steps=max_episode_steps,
         render_mode='human',
+        async_env_runner=False
     )
     
     # Create new RLModule and restore its state from the last algo checkpoint.

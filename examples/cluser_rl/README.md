@@ -25,7 +25,7 @@ conda install -c conda-forge -c nvidia cuda-toolkit=12.8
 2. 运行关卡
 3. 在OrcaGym/examples/cluser_rl目录下，运行以下命令：
 ```bash
-python run_ant_local.py --run_mode training --iter 50
+python run_ant_local.py --run_mode training
 ```
 默认情况下，会启动16个环境运行器，每个运行器启动64个环境。
 在配备RTX3070 显卡以及 i7-14700H CPU的电脑上，训练50个迭代大约需要10分钟。
@@ -34,7 +34,7 @@ python run_ant_local.py --run_mode training --iter 50
 ### 测试
 运行以下命令：
 ```bash
-python run_ant_local.py --run_mode testing --checkpoint_path xxxx
+python run_ant_local.py --run_mode testing --checkpoint xxxx
 ```
 可以看到Ant机器人向远方(x轴正方向)移动。
 
