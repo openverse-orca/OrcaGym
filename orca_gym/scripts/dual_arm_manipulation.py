@@ -57,6 +57,7 @@ INIT_SCENE_TEXT = {
     "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
+    "guizi":   ("一个机器人站在货架前",  "A robot stands in front of a shady cabinet​​.")
 }
 _light_counter = 0
 
@@ -79,15 +80,21 @@ OBJ_CN = {
     "pipalu": "枇杷露",
     "xiaokepian": "消咳片",
     "bow_yellow_kps": "黄色碗",
+    "changyanning": "肠炎宁",
+    "fenghanganmao": "风寒感冒颗粒",
+    "yiyakangpian": "益压康片",
+    "xiaozhongzhitong": "消肿止痛酊",
     "coffeecup_white_kps": "白色咖啡杯",
     "basket_kitchen_01" : "篮子",
-    "shoppingtrolley_01" : "购物手推车"
+    "shoppingtrolley_01" : "购物手推车",
+    "box_blue" : "蓝色筐子"
 }
 SCENE_SUBSCENE_MAPPING = {
     "shop":    ("Shop",    "Cashier_Operation"),
     "jiazi":   ("Shop",    "Shelf_Operation"),
     "kitchen": ("Kitchen", "Countertop_Operation"),
     "yaodian": ("Pharmacy","Shelf_Operation"),
+    "guizi": ("Cooler​​","Shelf_Operation")
 }
 
 with open("camera_config.yaml", "r") as f:

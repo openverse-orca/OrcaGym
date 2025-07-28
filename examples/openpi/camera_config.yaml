@@ -83,3 +83,14 @@ scenes:
     camera_wrist_r:
       translation: [-5.405, 2.31, 1.59]
       rotation:    [48.1, 0.0, 0.0]
+
+  guizi:
+    camera_head:
+      translation: [2.77, 7.06, 1.36]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [2.25, 7.04, 0.91]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [3.28, 7.04, 0.91]
+      rotation:    [48.1, 0.0, 0.0]

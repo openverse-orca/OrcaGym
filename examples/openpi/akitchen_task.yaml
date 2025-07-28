@@ -6,8 +6,9 @@ random_light_position: true
 random_light_rotation: true
 lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
 lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
-light_center: [-4.43, -4.15, 1.72]
-light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+# light_center: [-4.43, -4.15, 1.72]
+light_center: [-4.224, -1.171, 1.744]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0.19, 0.2]]
 
 object_bodys: [ "bottle_red", "bow_yellow_kps", "coffeecup_white_kps", "jar_01", "salt"]
 object_sites: ["bottle_redsite", "bow_yellow_kpssite", "coffeecup_white_kpssite", "jar_01site", "salt"]
