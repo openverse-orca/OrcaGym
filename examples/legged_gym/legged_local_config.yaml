@@ -3,9 +3,9 @@ train_legged_local:
   env_name: "LeggedGym_OrcaGymEnv"
   agent_name: "go2_usda"
   max_episode_steps: 1000
-  num_env_runners: 1
-  num_envs_per_env_runner: 1
-  async_env_runner: False
+  num_env_runners: 2
+  num_envs_per_env_runner: 2
+  async_env_runner: True
   run_mode: training
   iter: 100
   render_mode: human

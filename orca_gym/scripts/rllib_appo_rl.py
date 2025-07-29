@@ -21,15 +21,17 @@ import time
 import os
 import gymnasium as gym
 import json
-
+from ray.rllib.env.single_agent_env_runner import (
+    SingleAgentEnvRunner,
+)
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
     "LeggedGym_OrcaGymEnv": "envs.legged_gym.legged_gym_rllib_env:LeggedGymRLLibEnv",
 }
 
-TIME_STEP = 0.001
-FRAME_SKIP = 20
+TIME_STEP = 0.005
+FRAME_SKIP = 4
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
@@ -127,14 +129,21 @@ def get_config(
     num_gpus_available: int,
     async_env_runner: bool
 ):
+    print("action_space: ", env.action_space, "observation_space: ", env.observation_space)
     config = (
         APPOConfig()
         .environment(
             env="OrcaGymEnv",
-            env_config={"worker_index": 1},
+            env_config={"worker_index": 1, "vector_index": 1, "num_env_runners": num_env_runners, "num_envs_per_env_runner": num_envs_per_env_runner},
             disable_env_checking=False,
+            # render_env=True,
+            # action_space=env.action_space,
+            # observation_space=env.observation_space,
+            normalize_actions=True,
+            clip_actions=True,
         )
         .env_runners(
+            env_runner_cls=SingleAgentEnvRunner,
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1,
@@ -148,10 +157,10 @@ def get_config(
                 action_space=env.action_space,
                 module_class=DefaultAPPOTorchRLModule,
                 model_config={
-                    "fcnet_hiddens": [256, 256],
+                    "fcnet_hiddens": [512, 256, 128],
                     "fcnet_activation": "relu",
-                    "post_fcnet_activation": None,
-                    "vf_share_layers": True,
+                    "post_fcnet_activation": "tanh",
+                    "vf_share_layers": False,
                     "use_gpu": num_gpus_available > 0,
                 },
             )

@@ -150,7 +150,6 @@ class LeggedGymRLLibEnv(OrcaGymLocalEnv):
         self._desired_goal = agent_obs_dict["desired_goal"]
 
     def step(self, action) -> tuple:
-        
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         self._agent.on_step(self, action)
         
@@ -169,16 +168,16 @@ class LeggedGymRLLibEnv(OrcaGymLocalEnv):
         truncated = self._is_truncated()
         reward = self.compute_reward(self._achieved_goal, self._desired_goal)
 
-        print(
-            "action: ", action,
-            "ctrl: ", self.ctrl, 
-            # "obs: ", obs, 
-            "reward: ", reward, 
-            "terminated: ", terminated, 
-            "truncated: ", truncated,
-            "achieved_goal: ", self._achieved_goal,
-            "desired_goal: ", self._desired_goal
-        )
+        # print(
+        #     "action: ", action,
+        #     "ctrl: ", self.ctrl, 
+        #     # "obs: ", obs, 
+        #     "reward: ", reward, 
+        #     "terminated: ", terminated, 
+        #     "truncated: ", truncated,
+        #     "achieved_goal: ", self._achieved_goal,
+        #     "desired_goal: ", self._desired_goal
+        # )
 
         return obs, reward, terminated, truncated, info
 
