@@ -15,9 +15,9 @@ from gymnasium.spaces import Space
 from gymnasium.core import ObsType
 
 from orca_gym.environment import OrcaGymLocalEnv
-from .orca_gym_agent import OrcaGymAgent
+from .orca_gym_async_agent import OrcaGymAsyncAgent
 
-class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
+class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def __init__(
         self,
         frame_skip: int,
@@ -46,7 +46,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
             **kwargs
         )
 
-        self._agents : list[OrcaGymAgent] = []
+        self._agents : list[OrcaGymAsyncAgent] = []
 
         self.initialize_agents(entry=agent_engry, 
                                task=task, 
@@ -134,7 +134,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
         """
         raise NotImplementedError
     
-    def reset_agents(self, agents : list[OrcaGymAgent]):
+    def reset_agents(self, agents : list[OrcaGymAsyncAgent]):
         """
         Do specific reset operations for each agent. It is defined in the subclass.
         """
@@ -181,7 +181,7 @@ class OrcaGymMultiAgentEnv(OrcaGymLocalEnv):
                 "terminated" : [False for _ in range(len(self._agents))],
                 "truncated" : [False for _ in range(len(self._agents))]}
 
-        agents_to_reset : list[OrcaGymAgent] = []
+        agents_to_reset : list[OrcaGymAsyncAgent] = []
         for i, agent in enumerate(self._agents):
             # achieved_goal = obs["achieved_goal"][i * achieved_goal_shape : (i + 1) * achieved_goal_shape]
             # desired_goal = obs["desired_goal"][i * desired_goal_shape : (i + 1) * desired_goal_shape]

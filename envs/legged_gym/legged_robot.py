@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime
 import math
 from gymnasium.core import ObsType
-from orca_gym.environment.multi_agent import OrcaGymAgent
+from orca_gym.environment.async_env import OrcaGymAsyncAgent
 from orca_gym.utils import rotations
 from orca_gym.utils.reward_printer import RewardPrinter
 from typing import Optional, Any, SupportsFloat
@@ -92,7 +92,7 @@ def smooth_sqr_wave_np(phase, phase_freq, eps):
     denominator = 2.0 * np.sqrt(np.sin(p)**2 + eps**2)
     return numerator / denominator + 0.5
 
-class LeggedRobot(OrcaGymAgent):
+class LeggedRobot(OrcaGymAsyncAgent):
     def __init__(self, 
                  env_id: str,                 
                  agent_name: str, 

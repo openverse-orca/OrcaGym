@@ -6,7 +6,7 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 # from stable_baselines3.common.vec_env import SubprocVecEnv
-from orca_gym.environment.multi_agent import SubprocVecEnvMA
+from orca_gym.environment.async_env import OrcaGymAsyncSubprocVecEnv
 from sb3_contrib import TQC
 from stable_baselines3.her import GoalSelectionStrategy, HerReplayBuffer
 from stable_baselines3.common.noise import NormalActionNoise
@@ -146,7 +146,7 @@ def training_model(
         model.save(model_file)
 
 def setup_model_ppo(
-    env: SubprocVecEnvMA, 
+    env: OrcaGymAsyncSubprocVecEnv, 
     env_num: int, 
     agent_num: int, 
     agent_config : dict,
@@ -272,7 +272,7 @@ def train_model(
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
-        env = SubprocVecEnvMA(env_fns, agent_num)
+        env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
 
         print("Start Simulation!")
         model = setup_model_ppo(
@@ -333,7 +333,7 @@ def test_model(
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
-        env = SubprocVecEnvMA(env_fns, agent_num)
+        env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         model: PPO = PPO.load(model_file, env=env, device=device)
@@ -377,7 +377,7 @@ def _output_test_info(
     print("---------------------------------------")
 
 def testing_model(
-    env: SubprocVecEnvMA, 
+    env: OrcaGymAsyncSubprocVecEnv, 
     agent_num: int, 
     model, 
     time_step: float, 
@@ -388,7 +388,7 @@ def testing_model(
     测试模型。
 
     参数:
-    - env: SubprocVecEnvMA
+    - env: OrcaGymAsyncSubprocVecEnv
         测试环境
     - agent_num: int
         智能体数量

@@ -75,7 +75,7 @@ def _worker(
             break
 
 
-class SubprocVecEnvMA(VecEnv):
+class OrcaGymAsyncSubprocVecEnv(VecEnv):
     """
     Creates a multiprocess vectorized wrapper for multiple environments, distributing each environment to its own
     process, allowing significant speed up when the environment is computationally complex.

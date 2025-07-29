@@ -5,7 +5,7 @@ from gymnasium import spaces
 import datetime
 
 
-class OrcaGymAgent:
+class OrcaGymAsyncAgent:
     def __init__(self, 
                  env_id: str,
                  agent_name: str, 

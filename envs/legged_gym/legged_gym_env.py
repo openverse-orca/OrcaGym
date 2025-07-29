@@ -1,6 +1,6 @@
 import numpy as np
 from gymnasium.core import ObsType
-from orca_gym.environment.multi_agent import OrcaGymMultiAgentEnv
+from orca_gym.environment.async_env import OrcaGymAsyncEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
@@ -15,7 +15,7 @@ from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
 
-class LeggedGymEnv(OrcaGymMultiAgentEnv):
+class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
 
     def __init__(
