@@ -177,8 +177,8 @@ class DatasetWriter:
             {
                 'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
                 'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
-                'objects': np.ndarray (N, O),   # 物体的位姿
-                'goals': np.ndarray (N, G)      # 目标位姿（可选）
+                'objects': str,   # 物体的相关信息 json格式
+                'goals': str     # 目标的相关信息 json格式
                 'rewards': np.ndarray (N,),     # 奖励
                 'dones': np.ndarray (N,),       # 完成标志
                 'obs': dict of np.ndarrays      # 观测数据字典

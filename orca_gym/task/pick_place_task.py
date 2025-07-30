@@ -59,66 +59,10 @@ class PickPlaceTask(AbstractTask):
         获取一个增广任务
         '''
         self._restore_objects_(env, data['objects'])
-        self._restore_goals_(env, data['goals'])
         self._set_target_object_(env, data)
         if sample_range > 0.0:
             self._resample_objects_(env, data, sample_range)
         self.__random_count__ += 1
-
-    def _restore_objects_(self, env: OrcaGymLocalEnv, objects_data):
-        """
-        恢复物体到指定位置
-        :param positions: 物体位置字典
-        """
-        qpos_dict = {}
-        arr = objects_data
-        for entry in arr:
-            name = entry['joint_name']
-            pos  = entry['position']
-            quat = entry['orientation']
-            qpos_dict[name] = np.concatenate([pos, quat], axis=0)
-
-        env.set_joint_qpos(qpos_dict)
-
-        env.mj_forward()
-
-    def _restore_goals_(self, env: OrcaGymLocalEnv, goals_data):
-        arr = goals_data
-        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
-            self.goals = arr.copy()
-            return
-
-        # 2) 否则把它变为 (num_goals, 16) 的纯数值数组
-        flat = np.asarray(arr, dtype=np.float32)
-        if flat.ndim == 1:
-            flat = flat.reshape(-1, 16)
-        elif flat.ndim == 2 and flat.shape[0] > 1:
-            # 如果是时序数据，取第一帧
-            flat = flat[0].reshape(-1, 16)
-
-        # joint_name 列表从旧的 self.goals 拿，如果第一次用请先跑一次 reset_model() 初始化它
-        names = [entry['joint_name'] for entry in self.goals]
-
-        # 3) 重建结构化数组
-        goal_dtype = np.dtype([
-            ('joint_name',  'U100'),
-            ('position',    'f4', (3,)),
-            ('orientation', 'f4', (4,)),
-            ('min',         'f4', (3,)),
-            ('max',         'f4', (3,)),
-            ('size',        'f4', (3,))
-        ])
-        entries = []
-        for idx, row in enumerate(flat):
-            name = names[idx]
-            pos  = row[ 0:3].tolist()
-            quat = row[ 3:7].tolist()
-            mn   = row[ 7:10].tolist()
-            mx   = row[10:13].tolist()
-            sz   = row[13:16].tolist()
-            entries.append((name, pos, quat, mn, mx, sz))
-
-        self.goals = np.array(entries, dtype=goal_dtype)
 
     def _set_target_object_(self, env: OrcaGymLocalEnv, data: dict):
         lang_instr = data.get("language_instruction", b"")

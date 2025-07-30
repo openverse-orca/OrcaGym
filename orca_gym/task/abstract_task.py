@@ -1,3 +1,5 @@
+import json
+
 from mujoco.usd import lights
 
 from orca_gym.environment import OrcaGymLocalEnv
@@ -76,7 +78,7 @@ class AbstractTask:
         self.type = "pick_and_place"  # 任务类型，默认是pick_and_place
         self.range = {}
         self.random_actor = False
-        self.__random_count__ = 0
+        self.__random_count__ = 0 # 用于随机Actor的计数， 每次随机摆放Actor和灯光都要+1
         self.random_cycle = 20
         self.random_actor_position = False
         self.random_actor_rotation = False
@@ -135,6 +137,14 @@ class AbstractTask:
     def get_goal_joints_xpos(self, env: OrcaGymLocalEnv):
         env_goal_joints = [env.joint(joint_name) for joint_name in self.goal_joints]
         return env.query_joint_qpos(env_goal_joints)
+
+    def get_object_xpos_xmat_xquat(self, env: OrcaGymLocalEnv):
+        env_objects_body = [env.body(body_name) for body_name in self.object_bodys]
+        return env.get_body_xpos_xmat_xquat(env_objects_body)
+
+    def get_goal_xpos_xmat_xquat(self, env: OrcaGymLocalEnv):
+        env_goals_body = [env.body(body_name) for body_name in self.goal_bodys]
+        return env.get_body_xpos_xmat_xquat(env_goals_body)
 
     def generate_object(self, env:OrcaGymLocalEnv, pick_min, pick_max):
         '''
@@ -238,7 +248,7 @@ class AbstractTask:
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
-                yaw = np.random.uniform(-np.pi, np.pi)
+                yaw = np.random.uniform(np.pi * 0.25, np.pi * 0.75)
                 world_quat = rotations.euler2quat([0.0, 0.0, yaw])
                 obj_qpos = np.concatenate([world_pos, world_quat])
 
@@ -423,7 +433,7 @@ class AbstractTask:
         raise NotImplementedError("This method should be overridden by subclasses")
 
     def get_language_instruction(self) -> str:
-        pass
+        raise NotImplementedError("This method should be overridden by subclasses")
 
     def __get_config_setting__(self, attr, config: dict):
         if attr in config:
@@ -447,7 +457,84 @@ class AbstractTask:
         position = np.array([np.random.uniform(center[0] + bound[0][0], center[0] + bound[0][1]),
                              np.random.uniform(center[1] + bound[1][0], center[1] + bound[1][1]),
                              np.random.uniform(center[2] + bound[2][0], center[2] + bound[2][1])])
-        rotation = rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi), 
-                                                  np.random.uniform(-np.pi, np.pi), 
+        rotation = rotations.euler2quat(np.array([np.random.uniform(-np.pi, np.pi),
+                                                  np.random.uniform(-np.pi, np.pi),
                                                   np.random.uniform(-np.pi, np.pi)]))
         return position, rotation
+
+    def _restore_objects_(self, env: OrcaGymLocalEnv, objects_data):
+        """
+        恢复物体到指定位置
+        :param positions: 物体位置字典
+        """
+        qpos_dict = {}
+        if objects_data.shape == () and objects_data.dtype == "object":
+            json_str = objects_data[()]
+            json_data = json.loads(json_str)
+            for object, object_info in json_data.items():
+                joint_name = object_info['joint_name']
+                qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
+        else:
+            arr = objects_data
+            for entry in arr:
+                name = entry['joint_name']
+                pos = entry['position']
+                quat = entry['orientation']
+                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+
+        env.set_joint_qpos(qpos_dict)
+
+        env.mj_forward()
+
+    def _restore_goals_(self, env: OrcaGymLocalEnv, goals_data):
+        """
+        恢复目标到指定位置
+        :param positions: 目标位置字典
+        """
+        qpos_dict = {}
+        if goals_data.shape == () and goals_data.dtype == "object":
+            json_str = goals_data[()]
+            json_data = json.loads(json_str)
+            for object, object_info in json_data.items():
+                joint_name = object_info['joint_name']
+                qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
+
+        env.set_joint_qpos(qpos_dict)
+        env.mj_forward()
+
+    def get_objects_info(self, env: OrcaGymLocalEnv) -> str:
+        info = {}
+        jpos_dict = self.get_object_joints_xpos(env)
+        xpos, xmat, xquat = self.get_object_xpos_xmat_xquat(env)
+        for i in range(len(self.object_bodys)):
+            info[self.object_bodys[i]] = {
+                "joint_name": self.object_joints[i],
+                "position": jpos_dict[env.joint(self.object_joints[i])].tolist(),
+                "orientation": xquat[i * 4:(i + 1)*4].tolist()
+            }
+
+        json_str = json.dumps(info)
+        return json_str
+
+    def get_goals_info(self, env: OrcaGymLocalEnv) -> str:
+        info = {}
+        jpos_dict = self.get_goal_joints_xpos(env)
+        xpos, xmat, xquat = self.get_goal_xpos_xmat_xquat(env)
+        for i in range(len(self.goal_bodys)):
+            geom_size = env.get_goal_bounding_box(env.body(self.goal_bodys[i]))
+            if not geom_size:
+                continue
+            mn = np.array(geom_size["min"]).flatten()
+            mx = np.array(geom_size["max"]).flatten()
+            sz = mx - mn
+            info[self.goal_bodys[i]] = {
+                "joint_name": self.goal_joints[i],
+                "position": jpos_dict[env.joint(self.goal_joints[i])].tolist(),
+                "orientation": xquat[i * 4:(i + 1)*4].tolist(),
+                "min": mn.tolist(),
+                "max": mx.tolist(),
+                "size": sz.tolist()
+            }
+
+        json_str = json.dumps(info)
+        return json_str

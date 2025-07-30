@@ -291,8 +291,6 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
 
-        target_obj, target_goal = get_target_object_and_goal(info)
-    
         env.render()
         task_status = info['task_status']
         
@@ -432,58 +430,12 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         
     # 只处理第一个info对象（初始状态）
     first_info = info_list[0]
-    
-    dtype = np.dtype([
-        ('joint_name', h5py.special_dtype(vlen=str)),
-        ('position', 'f4', (3,)),
-        ('orientation', 'f4', (4,))
-    ])
-    gdtype = np.dtype([
-        ('joint_name', h5py.special_dtype(vlen=str)),
-        ('position', 'f4', (3,)),
-        ('orientation', 'f4', (4,)),
-        ('min', 'f4', (3,)),
-        ('max', 'f4', (3,)),
-        ('size', 'f4', (3,))
-    ])
-    
-    # 只提取第一个对象的关节信息
-    objects_array = np.array([
-        (
-            joint_name,
-            position,
-            orientation
-        )
-        for joint_name, position, orientation in zip(
-            first_info['object']['joint_name'],
-            first_info['object']['position'],
-            first_info['object']['orientation']
-        )
-    ], dtype=dtype)
-    goals_array = np.array([
-        (
-            joint_name,
-            position,
-            orientation,
-            min,
-            max,
-            size
-        )
-        for joint_name, position, orientation,max,min,size in zip(
-            first_info['goal']['joint_name'],
-            first_info['goal']['position'],
-            first_info['goal']['orientation'],
-            first_info['goal']['min'],
-            first_info['goal']['max'],
-            first_info['goal']['size']
-        )
-    ], dtype=gdtype)
 
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-        'objects': objects_array,
-        'goals': goals_array,
+        'objects': first_info['object'],
+        'goals': first_info['goal'],
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
@@ -673,6 +625,7 @@ def spawn_scene(env: DualArmEnv, task_config: Dict[str, Any]) -> None:
 
     _light_counter += 1
 
+# todo： objects 和 goal的数据结构有改变，需要重新处理
 def reset_playback_env(env: DualArmEnv, demo_data, sample_range=0.0):
     if "objects" in demo_data:
         env.objects = demo_data["objects"]        # 结构化物体信息，reset_model会用
@@ -740,8 +693,6 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
 
         if not resample_success:
             print(f"Warning: Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
-        
-        env.update_objects_goals(env._task.randomized_object_positions, env._task.randomized_goal_positions)
 
         print("[Info] Resampling target object", target_obj, "to delta:", target_obj_position_delta)
 
@@ -981,7 +932,7 @@ def augment_episode(env : DualArmEnv,
                     sync_codec: bool = False) -> tuple:
     env._task.data = demo_data
     env._task.spawn_scene(env)
-    obs, info = env.reset(seed=42)
+    obs, _ = env.reset(seed=42)
     obs_list    = {obs_key: [] for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
@@ -1036,7 +987,8 @@ def augment_episode(env : DualArmEnv,
                 if elapsed_time.total_seconds() < REALTIME_STEP:
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
-        if target_obj and target_goal:
+        is_success = False
+        if original_dones[i] and target_obj and target_goal:
             is_success = env._task.is_success(env)
                     
         env.render()
@@ -1109,7 +1061,6 @@ def do_augmentation(
             max_trials = 2
             while not done and trial_count < max_trials:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
-                env.objects = demo_data['objects']
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
                 level_name = demo_data["language_instruction"].split()[1]

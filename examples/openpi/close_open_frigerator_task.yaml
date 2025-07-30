@@ -1,0 +1,8 @@
+level_name: "Pharmacy_Fridge_02"
+type: "close_open"
+
+object_bodys: ["frigerator"]
+object_joints: ["frigerator_joint"]
+
+goal_bodys: ["frigerator"]
+goal_joints: ["frigerator_joint"]

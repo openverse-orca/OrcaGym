@@ -8,6 +8,7 @@ from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.task.scan_QR_task import ScanQRTask
+from orca_gym.task.close_open_task import CloseOpenTask
 from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.task.abstract_task import TaskStatus
 from orca_gym.task.pick_place_task import PickPlaceTask
@@ -106,12 +107,16 @@ class DualArmEnv(RobomimicEnv):
         self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
+
+        # todo: 这里应该改为工厂函数，
         self._config = task_config_dict
         self._config['grpc_addr'] = orcagym_addr
         if self._config["type"] == "pick_and_place":
             self._task = PickPlaceTask(self._config)
         elif self._config["type"] == "scan":
             self._task = ScanQRTask(self._config)
+        elif self._config["type"] == "close_open":
+            self._task = CloseOpenTask(self._config)
 
         self._task.register_init_env_callback(self.init_env)
         kwargs["task"] = self._task
@@ -288,8 +293,8 @@ class DualArmEnv(RobomimicEnv):
 
         info = {"state": self.get_state(),
                 "action": scaled_action,
-                "object": self.objects,  # 提取第一个对象的位置
-                "goal": self.goals,
+                "object": self._task.get_objects_info(self),  # 提取第一个对象的位置
+                "goal": self._task.get_goals_info(self),
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
                 "time_step": self.data.time}
@@ -433,89 +438,9 @@ class DualArmEnv(RobomimicEnv):
 
         self._task.get_task(self)
 
-        self.update_objects_goals(self._task.get_object_joints_xpos(self), self._task.get_goal_joints_xpos(self))
-
         self.mj_forward()
         obs = self._get_obs().copy()
-        return obs, {"objects": self.objects, "goals": self.goals}
-
-
-    #object  goals 应该从task获取，不应该在env下处理
-    def update_objects_goals(self, object_positions, goal_positions):
-        # objects structured array
-        obj_dtype = np.dtype([
-            ("joint_name",  "U100"),
-            ("position",    "f4", 3),
-            ("orientation", "f4", 4),
-        ])
-        self.objects = np.array(
-            [(jn, pos[:3].tolist(), pos[3:].tolist())
-             for jn, pos in object_positions.items()],
-            dtype=obj_dtype,
-        )
-
-        # goals structured array
-        goal_dtype = np.dtype([
-            ("joint_name",  "U100"),
-            ("position",    "f4", 3),
-            ("orientation", "f4", 4),
-            ("min",         "f4", 3),
-            ("max",         "f4", 3),
-            ("size",        "f4", 3),
-        ])
-        entries, _ = self.process_goals(goal_positions)
-        self.goals = np.array(
-            [
-                (e["joint_name"], e["position"], e["orientation"],
-                 e["min"], e["max"], e["size"])
-                for e in entries
-            ],
-            dtype=goal_dtype,
-        )
-
-
-    def process_goals(self, goal_positions):
-        """
-        处理目标（goals）的信息，返回目标的bounding box（最大最小坐标）。
-        :param goal_positions: 目标位置字典
-        :return: 目标信息的条目，目标位置数组，和bounding box数据
-        """
-        goal_entries = []
-        goal_positions_list = []
-        goal_bounding_boxes = {}  # 用于存储目标的bounding box信息
-
-        for goal_joint_name, qpos in goal_positions.items():
-            # 获取目标的尺寸
-            goal_name = goal_joint_name.replace("_joint", "")
-            info = self.get_goal_bounding_box(goal_name)
-
-            # 如果没有尺寸信息，跳过目标
-            if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
-                continue
-
-            mn = np.array(info["min"]).flatten()
-            mx = np.array(info["max"]).flatten()
-            sz = mx - mn
-
-
-            # 添加目标位置信息
-            goal_entries.append({
-                "joint_name":  goal_name,
-                "position":    qpos[:3].tolist(),
-                "orientation": qpos[3:].tolist(),
-                "min":         mn.tolist(),
-                "max":         mx.tolist(),
-                "size":        sz.tolist()
-            })
-
-            goal_positions_list.append(qpos[:3])  # 仅记录目标位置
-
-        goal_positions_array = np.array(goal_positions_list)
-
-        # 返回目标数据及bounding box信息
-        return goal_entries, goal_positions_array
-
+        return obs, {"objects": self._task.get_objects_info(self), "goals": self._task.get_goals_info(self)}
 
     def replace_objects(self, objects_data):
         """

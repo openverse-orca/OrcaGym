@@ -51,66 +51,11 @@ class ScanQRTask(AbstractTask):
         获取一个增广任务
         '''
         self._restore_objects_(env, data['objects'])
-        self._restore_goals_(env, data['goals'])
         self._set_target_object_(env, data)
         if sample_range > 0.0:
             self._resample_objects_(env, data, sample_range)
         self.__random_count__ += 1
 
-    def _restore_objects_(self, env: OrcaGymLocalEnv, objects_data):
-        """
-        恢复物体到指定位置
-        :param positions: 物体位置字典
-        """
-        qpos_dict = {}
-        arr = objects_data
-        for entry in arr:
-            name = entry['joint_name']
-            pos = entry['position']
-            quat = entry['orientation']
-            qpos_dict[name] = np.concatenate([pos, quat], axis=0)
-
-        env.set_joint_qpos(qpos_dict)
-
-        env.mj_forward()
-
-    def _restore_goals_(self, env: OrcaGymLocalEnv, goals_data):
-        arr = goals_data
-        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
-            self.goals = arr.copy()
-            return
-
-        # 2) 否则把它变为 (num_goals, 16) 的纯数值数组
-        flat = np.asarray(arr, dtype=np.float32)
-        if flat.ndim == 1:
-            flat = flat.reshape(-1, 16)
-        elif flat.ndim == 2 and flat.shape[0] > 1:
-            # 如果是时序数据，取第一帧
-            flat = flat[0].reshape(-1, 16)
-
-        # joint_name 列表从旧的 self.goals 拿，如果第一次用请先跑一次 reset_model() 初始化它
-        names = [entry['joint_name'] for entry in self.goals]
-
-        # 3) 重建结构化数组
-        goal_dtype = np.dtype([
-            ('joint_name', 'U100'),
-            ('position', 'f4', (3,)),
-            ('orientation', 'f4', (4,)),
-            ('min', 'f4', (3,)),
-            ('max', 'f4', (3,)),
-            ('size', 'f4', (3,))
-        ])
-        entries = []
-        for idx, row in enumerate(flat):
-            name = names[idx]
-            pos = row[0:3].tolist()
-            quat = row[3:7].tolist()
-            mn = row[7:10].tolist()
-            mx = row[10:13].tolist()
-            sz = row[13:16].tolist()
-            entries.append((name, pos, quat, mn, mx, sz))
-
-        self.goals = np.array(entries, dtype=goal_dtype)
 
     def _set_target_object_(self, env: OrcaGymLocalEnv, data: dict):
         lang_instr = data.get("language_instruction", b"")
@@ -144,7 +89,7 @@ class ScanQRTask(AbstractTask):
         pos, _, quat = env.get_body_xpos_xmat_xquat([env.body(self.target_object), env.body(self.goal_bodys[0])])
         target_pos, goal_pos = pos[:3], pos[3:6]
         target_quat, goal_quat = quat[:4], quat[4:8]
-        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 120.0)
+        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 90.0)
         print(f"task is success: {is_success}")
         return is_success
 
@@ -168,7 +113,7 @@ class ScanQRTask(AbstractTask):
             return forward
         return forward / norm
 
-    def _is_facing_(self, posA, quatA, posB, quatB, tolerance_deg=60.0) -> bool:
+    def _is_facing_(self, posA, quatA, posB, quatB, tolerance_deg=60.0, tolerance_distance=0.2) -> bool:
         """
         检查物体A是否面向物体B
         :param posA: 物体A的位置
@@ -176,6 +121,7 @@ class ScanQRTask(AbstractTask):
         :param posB: 物体B的位置
         :param quatB: 物体B的四元数
         :param tolerance_deg: 面向的角度偏差
+        :param tolerance_distance: 面向的距离偏差
         :return: 是否面向
         """
         cos_tolerance = np.cos(np.radians(tolerance_deg))
@@ -194,7 +140,8 @@ class ScanQRTask(AbstractTask):
 
         # 计算方向向量
         dir_A_to_B = posB - posA
-        if np.linalg.norm(dir_A_to_B) < 1e-10:
+
+        if np.linalg.norm(dir_A_to_B) < 1e-10 or np.linalg.norm(dir_A_to_B) > tolerance_distance:
             return False  # 避免除以零
         dir_A_to_B_normalized = dir_A_to_B / np.linalg.norm(dir_A_to_B)
 
