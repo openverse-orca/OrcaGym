@@ -36,8 +36,10 @@ Go2Config = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "action_scale" :         0.5,
-        "action_space_range" : [-1.0, 1.0],
+        "kp" :                   20,
+        "kd" :                   0.5,
+        "action_scale" :         0.25,
+        "action_space_range" :   [-1.0, 1.0],
 
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],

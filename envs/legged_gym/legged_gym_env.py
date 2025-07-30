@@ -9,7 +9,7 @@ from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
-
+from .legged_utils import pd_control
 import requests
 from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
@@ -445,3 +445,42 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                 self._agent_contact_site_names = [site_name for agent in self.agents for site_name in agent._contact_site_names]
             
             return self.query_site_pos_and_quat(self._agent_contact_site_names)
+
+    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
+        # 缩放后的 action
+        if self._action_scale_mask is None:
+            scaled_action = action * self._action_scale
+        else:
+            scaled_action = action * self._action_scale * self._action_scale_mask
+
+        # 限制 scaled_action 在有效范围内
+        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+
+        # 批量计算插值
+        if (self._actuator_type == "position"):
+            ctrl_delta = (
+                self._ctrl_delta_range[:, 0] +  # fp1
+                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
+                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            )
+
+            position_ctrl = self._neutral_joint_values + ctrl_delta
+        # elif (self._actuator_type == "torque"):
+        #     actuator_ctrl = (
+        #         self._ctrl_range[:, 0] +  # fp1
+        #         (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
+        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
+        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+        #     )
+        else:
+            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
+
+        torque_ctrl = pd_control(position_ctrl, self.leg_qpos, self._kp, self.leg_qvel, self.leg_qvel, self._kd)
+
+        return torque_ctrl
+
+    def update_joint_qpos_qvel(self) -> None:
+        self.leg_qpos = [agent.leg_joint_qpos for agent in self.agents]
+        self.leg_qvel = [agent.leg_joint_qvel for agent in self.agents]
+        # self.leg_qacc = [agent.leg_joint_qacc for agent in self.agents]

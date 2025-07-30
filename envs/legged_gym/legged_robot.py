@@ -9,6 +9,9 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import copy
 import sys
+import numpy as np
+
+from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np
 
 from .legged_config import LeggedRobotConfig, LeggedObsConfig
 
@@ -26,71 +29,6 @@ def get_legged_robot_name(agent_name: str) -> str:
         return "g1"
     else:
         raise ValueError(f"Unsupported agent name: {agent_name}")
-
-def local2global(q_global_to_local, v_local, v_omega_local) -> tuple[np.ndarray, np.ndarray]:
-    # Vg = QVlQ*
-
-    # 将速度向量从局部坐标系转换到全局坐标系
-    q_v_local = np.array([0, v_local[0], v_local[1], v_local[2]])  # 局部坐标系下的速度向量表示为四元数
-    q_v_global = rotations.quat_mul(q_global_to_local, rotations.quat_mul(q_v_local, rotations.quat_conjugate(q_global_to_local)))
-    v_global = np.array(q_v_global[1:])  # 提取虚部作为全局坐标系下的线速度
-
-    # 将角速度从局部坐标系转换到全局坐标系
-    q_omega_local = np.array([0, v_omega_local[0], v_omega_local[1], v_omega_local[2]])  # 局部坐标系下的角速度向量表示为四元数
-    q_omega_global = rotations.quat_mul(q_global_to_local, rotations.quat_mul(q_omega_local, rotations.quat_conjugate(q_global_to_local)))
-    v_omega_local = np.array(q_omega_global[1:])  # 提取虚部作为全局坐标系下的角速度
-
-    return v_global, q_omega_global
-
-def global2local(q_global_to_local, v_global, v_omega_global) -> tuple[np.ndarray, np.ndarray]:
-    # Vl = Q*VgQ
-
-    # 将速度向量从全局坐标系转换到局部坐标系
-    q_v_global = np.array([0, v_global[0], v_global[1], v_global[2]])  # 速度向量表示为四元数
-    q_v_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_v_global, q_global_to_local))
-    v_local = np.array(q_v_local[1:])  # 提取虚部作为局部坐标系下的线速度
-
-    # 将角速度从全局坐标系转换到局部坐标系
-    # print("q_omega_global: ", v_omega_global, "q_global_to_local: ", q_global_to_local)
-    q_omega_global = np.array([0, v_omega_global[0], v_omega_global[1], v_omega_global[2]])  # 角速度向量表示为四元数
-    q_omega_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_omega_global, q_global_to_local))
-    v_omega_local = np.array(q_omega_local[1:])  # 提取虚部作为局部坐标系下的角速度
-
-    return v_local, v_omega_local
-
-def quat_angular_velocity(q1, q2, dt):
-    # q1 = q1 / np.linalg.norm(q1)
-    # q2 = q2 / np.linalg.norm(q2)
-    # 计算四元数的角速度
-    q_diff = rotations.quat_mul(q2, rotations.quat_conjugate(q1))
-    # print("q_diff: ", q_diff)
-    
-    if q_diff[0] > 1.0:
-        return 0.0
-    
-    angle = 2 * math.acos(q_diff[0])
-    if angle > math.pi:
-        angle = 2 * math.pi - angle
-    return angle / dt
-
-import math
-
-def smooth_sqr_wave_np(phase, phase_freq, eps):
-    """
-    生成一个平滑的方波信号。
-
-    参数:
-    - phase: 当前相位（0到1之间的值，标量）。
-    - phase_freq: 相位频率，用于调整信号的周期（标量）。
-    - eps: 一个小值，用于防止分母为零（标量）。
-
-    返回:
-    - 平滑的方波信号，值介于0和1之间（标量）。
-    """
-    p = 2.0 * np.pi * phase * phase_freq
-    numerator = np.sin(p)
-    denominator = 2.0 * np.sqrt(np.sin(p)**2 + eps**2)
-    return numerator / denominator + 0.5
 
 class LeggedRobot(OrcaGymAsyncAgent):
     def __init__(self, 
@@ -130,6 +68,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._action_scale_mask = np.array([mask[key] for key in mask]).flatten()
 
         self._action_space_range_config = robot_config["action_space_range"]
+        self._kp = robot_config["kp"]
+        self._kd = robot_config["kd"]
         
         self._imu_site_name = self.name_space(robot_config["imu_site_name"])
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
@@ -258,6 +198,20 @@ class LeggedRobot(OrcaGymAsyncAgent):
     @property
     def base_joint_name(self) -> str:
         return self._base_joint_name
+
+    @property
+    def leg_joint_qpos(self) -> np.ndarray:
+        return self._leg_joint_qpos
+
+    @property
+    def leg_joint_qvel(self) -> np.ndarray:
+        return self._leg_joint_qvel
+
+    @property
+    def leg_joint_qacc(self) -> np.ndarray:
+        return self._leg_joint_qacc
+
+    
 
     # @property
     # def body_contact_force_threshold(self) -> float:
