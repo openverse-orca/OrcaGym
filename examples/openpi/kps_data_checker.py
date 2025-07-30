@@ -36,6 +36,7 @@ class BasicUnitChecker:
             ret, frame_counts = self.mp4_metadata_checker(mp4_video_filepath)
             if ret is not ErrorType.Qualified:
                 return ret
+            frame_counts_list.append(frame_counts)
 
             ret, frame_counts = self.mp4_metadata_checker(mp4_depth_filepath)
             if ret is not ErrorType.Qualified:
@@ -45,7 +46,7 @@ class BasicUnitChecker:
 
         min_frame_count, max_frame_count = min(frame_counts_list), max(frame_counts_list)
         if (max_frame_count - min_frame_count) > 5:
-            return ErrorType.MP4FPSError
+            return ErrorType.MP4FrameCountError
         return ErrorType.Qualified
 
     def mp4_metadata_checker(self, media_path) :
