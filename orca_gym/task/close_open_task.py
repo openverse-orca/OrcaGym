@@ -1,6 +1,6 @@
-import re
-
+import json
 import numpy as np
+
 from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.task.abstract_task import AbstractTask
@@ -59,12 +59,17 @@ class CloseOpenTask(AbstractTask):
         :param positions: 物体位置字典
         """
         qpos_dict = {}
-        arr = objects_data
-        for entry in arr:
-            name = entry['joint_name']
-            pos = entry['position']
-            quat = entry['orientation']
-            qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+        if objects_data.shape == () and objects_data.dtype == "object":
+            json_str = objects_data[()]
+            json_data = json.loads(json_str)
+            for object, object_info in json_data.items():
+                joint_name = object_info['joint_name']
+                position = object_info['position']
+                if position[0] < 0.01:
+                    self.mode = 1
+                else:
+                    self.mode = 0
+                qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
 
         env.set_joint_qpos(qpos_dict)
 

@@ -1,0 +1,17 @@
+level_name: "guizi"
+type: "close_open"
+
+object_bodys: ["frigerator"]
+object_joints: ["frigerator_joint"]
+
+goal_bodys: ["frigerator"]
+goal_joints: ["frigerator_joint"]
+
+random_light : true
+num_lights: 3
+random_light_position: true
+random_light_rotation: true
+lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
+lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
+light_center: [4.4287839, 6.8569307, 2.7713115]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0.19, 0.2]]

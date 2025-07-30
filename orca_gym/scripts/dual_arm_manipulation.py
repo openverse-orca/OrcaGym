@@ -942,8 +942,6 @@ def augment_episode(env : DualArmEnv,
     camera_frame_index = []
     timestep_list = []
 
-    target_obj, target_goal = get_target_object_and_goal(demo_data)
-
     is_success=False
 
     # 轨迹增广需要重新采样动作
@@ -988,7 +986,7 @@ def augment_episode(env : DualArmEnv,
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
         is_success = False
-        if original_dones[i] and target_obj and target_goal:
+        if original_dones[i] :
             is_success = env._task.is_success(env)
                     
         env.render()
