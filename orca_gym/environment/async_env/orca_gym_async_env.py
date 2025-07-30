@@ -110,14 +110,16 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self.observation_space = self.generate_observation_space(agent_0_obs)
 
     def set_action_space(self) -> None:
+        [agent.set_action_space() for agent in self._agents]        
         action_size = self._agents[0].get_action_size()
+        action_range = self._agents[0].action_range
         self.action_space = spaces.Box(
-            low=np.array([-2.0] * action_size, dtype=np.float32),
-            high=np.array([2.0] * action_size, dtype=np.float32),
+            low=action_range[:, 0],
+            high=action_range[:, 1],
             dtype=np.float32,
+            shape=(action_size, ),
         )
-        [agent.set_action_space(self.action_space) for agent in self._agents]        
-
+        
     def initialize_agents(self, entry, *args, **kwargs):
         module_name, class_name = entry.rsplit(":", 1)
         module = importlib.import_module(module_name)

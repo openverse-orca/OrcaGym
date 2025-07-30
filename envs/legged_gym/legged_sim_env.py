@@ -288,7 +288,7 @@ class AgentBase:
 
     @property
     def action_range(self) -> np.ndarray:
-        return self._action_range
+        return self.agent._action_range
 
     def init_agent(self, env: LeggedSimEnv, id: int):
         self._legged_agent = LeggedRobot(
@@ -310,16 +310,7 @@ class AgentBase:
             init_site_pos_quat=init_site_pos_quat,
         )
         
-        action_size = self.agent.get_action_size()
-        self._action_range = np.array([[-3.0, 3.0]] * action_size, dtype=np.float32)
-        action_space = spaces.Box(
-            low=self._action_range[:, 0],
-            high=self._action_range[:, 1],
-            dtype=np.float32,
-            shape=(action_size, ),
-        )
-        print("Action space: ", action_space)
-        self.agent.set_action_space(action_space) 
+        self.agent.set_action_space() 
         self.generate_action_scale_array(self._query_ctrl_info())
         self._init_playable(env)
 

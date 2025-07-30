@@ -37,7 +37,8 @@ Go2Config = {
 
         "actuator_type" :        "position",  # "torque" or "position"
         "action_scale" :         0.5,
-        
+        "action_space_range" : [-1.0, 1.0],
+
         "imu_site_name" :       "imu",
         "contact_site_names" :  ["FL_site", "FR_site", "RL_site", "RR_site"],
         

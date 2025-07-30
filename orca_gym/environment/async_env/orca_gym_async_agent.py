@@ -92,6 +92,10 @@ class OrcaGymAsyncAgent:
     def ctrl_start(self) -> int:
         return self._ctrl_start
 
+    @property
+    def action_range(self) -> np.ndarray:
+        return self._action_range
+
     def get_obs(self, **kwargs):
         raise NotImplementedError
 
@@ -133,7 +137,7 @@ class OrcaGymAsyncAgent:
         """
         raise NotImplementedError
     
-    def set_action_space(self, action_space : spaces) -> None:
+    def set_action_space(self) -> None:
         """
         Action space is specific to the agent and is defined in the subclass.
         """

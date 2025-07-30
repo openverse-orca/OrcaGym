@@ -24,10 +24,18 @@ import json
 from ray.rllib.env.single_agent_env_runner import (
     SingleAgentEnvRunner,
 )
+from orca_gym.environment.async_env.single_agent_env_runner import (
+    OrcaGymAsyncSingleAgentEnvRunner
+)
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
     "LeggedGym_OrcaGymEnv": "envs.legged_gym.legged_gym_rllib_env:LeggedGymRLLibEnv",
+}
+
+ENV_RUNNER_CLS = {
+    "Ant_OrcaGymEnv": SingleAgentEnvRunner,
+    "LeggedGym_OrcaGymEnv": OrcaGymAsyncSingleAgentEnvRunner,
 }
 
 TIME_STEP = 0.005
@@ -70,14 +78,24 @@ def get_orca_gym_register_info(
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{worker_idx:03d}"
     agent_names = [f"{agent_name}"]
     kwargs = {
-        'frame_skip': FRAME_SKIP,
-        'orcagym_addr': orcagym_addr,
-        'agent_names': agent_names,
-        'time_step': TIME_STEP,
-        'render_mode': render_mode,
-        'height_map_file': height_map_file,
-        'env_id': env_id,
-        'max_episode_steps': max_episode_steps,
+        'Ant_OrcaGymEnv': {
+            'frame_skip': FRAME_SKIP,
+            'orcagym_addr': orcagym_addr,
+            'agent_names': agent_names,
+            'time_step': TIME_STEP,
+            'render_mode': render_mode,
+            'max_episode_steps': max_episode_steps,
+        },
+        'LeggedGym_OrcaGymEnv': {
+            'frame_skip': FRAME_SKIP,
+            'orcagym_addr': orcagym_addr,
+            'agent_names': agent_names,
+            'time_step': TIME_STEP,
+            'render_mode': render_mode,
+            'height_map_file': height_map_file,
+            'env_id': env_id,
+            'max_episode_steps': max_episode_steps,
+        },
     }
 
     return env_id, kwargs
@@ -111,13 +129,13 @@ def create_demo_env_instance(
         gym.register(
             id=env_id,
             entry_point=ENV_ENTRY_POINT[env_name],
-            kwargs=kwargs,
+            kwargs=kwargs[env_name],
             max_episode_steps=max_episode_steps,
             reward_threshold=0.0,
         )
     
     print(f"Creating environment {env_id} with kwargs={kwargs}")
-    env = gym.make(env_id, **kwargs)
+    env = gym.make(env_id, **kwargs[env_name])
     
     return env
 
@@ -127,7 +145,8 @@ def get_config(
     num_envs_per_env_runner: int,
     env: gym.Env,
     num_gpus_available: int,
-    async_env_runner: bool
+    async_env_runner: bool,
+    env_name: str
 ):
     print("action_space: ", env.action_space, "observation_space: ", env.observation_space)
     config = (
@@ -143,7 +162,7 @@ def get_config(
             clip_actions=True,
         )
         .env_runners(
-            env_runner_cls=SingleAgentEnvRunner,
+            env_runner_cls=ENV_RUNNER_CLS[env_name],
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1,
@@ -191,7 +210,8 @@ def config_appo_tuner(
         num_envs_per_env_runner: int,
         iter: int,
         env: gym.Env,
-        async_env_runner: bool
+        async_env_runner: bool,
+        env_name: str
     ) -> tune.Tuner:
     # 重要：获取系统的实际GPU数量
     num_gpus_available = torch.cuda.device_count()
@@ -204,7 +224,8 @@ def config_appo_tuner(
         num_envs_per_env_runner=num_envs_per_env_runner,
         env=env,
         num_gpus_available=num_gpus_available,
-        async_env_runner=async_env_runner
+        async_env_runner=async_env_runner,
+        env_name=env_name
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -282,7 +303,7 @@ def env_creator(
         gym.register(
             id=env_id,
             entry_point=ENV_ENTRY_POINT[env_name],
-            kwargs=kwargs,
+            kwargs=kwargs[env_name],
             max_episode_steps=max_episode_steps,
             reward_threshold=0.0,
         )
@@ -292,7 +313,7 @@ def env_creator(
     # 创建环境并验证
     try:
         print(f"Worker {worker_idx}, vector {vector_idx}: Creating environment {env_id}, kwargs={kwargs}")
-        env = gym.make(env_id, **kwargs)
+        env = gym.make(env_id, **kwargs[env_name])
         
         # 验证观测空间
         print(f"Observation space for {env_id}: {env.observation_space}")
@@ -518,7 +539,8 @@ def run_training(
         num_envs_per_env_runner=num_envs_per_env_runner,
         iter=iter,
         env=demo_env,
-        async_env_runner=async_env_runner
+        async_env_runner=async_env_runner,
+        env_name=env_name
     )
     results = tuner.fit()
 

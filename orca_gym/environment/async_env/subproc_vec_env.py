@@ -99,7 +99,8 @@ class OrcaGymAsyncSubprocVecEnv(VecEnv):
            Defaults to 'forkserver' on available platforms, and 'spawn' otherwise.
 
 
-    修改baseline3中的SubprocVecEnv，使其支持多智能体环境
+    修改baseline3中的SubprocVecEnv，对于每个环境，创建 agent_num 个智能体，每个智能体共享一个环境
+    通过拼接每个agent的action和obs，来实现异步多环境的功能
     agent_num: 每个环境中智能体的数量
     """
 

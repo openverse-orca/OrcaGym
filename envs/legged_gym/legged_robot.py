@@ -128,6 +128,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         if "action_scale_mask" in robot_config:
             mask = robot_config["action_scale_mask"]
             self._action_scale_mask = np.array([mask[key] for key in mask]).flatten()
+
+        self._action_space_range_config = robot_config["action_space_range"]
         
         self._imu_site_name = self.name_space(robot_config["imu_site_name"])
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
@@ -329,7 +331,16 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._last_action[:] = self._action
         self._action[:] = action
     
-    def set_action_space(self, action_space : spaces) -> None:
+    def set_action_space(self) -> None:
+        action_size = self.get_action_size()
+        self._action_range = np.array([self._action_space_range_config] * action_size, dtype=np.float32)
+        action_space = spaces.Box(
+            low=self._action_range[:, 0],
+            high=self._action_range[:, 1],
+            dtype=np.float32,
+            shape=(action_size, ),
+        )
+        print("Action space: ", action_space)
         self._action_space_range = np.array([action_space.low[0], action_space.high[0]]) 
         
     def init_joint_index(self, qpos_offset, qvel_offset, qacc_offset, qpos_length, qvel_length, qacc_length) -> None:
