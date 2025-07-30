@@ -15,6 +15,7 @@ class ErrorType(Enum):
     MP4NotExistError = 4
     ParametersError = 5
     ProprioStatsError = 6
+    MP4FrameCountError = 7
 
 class BasicUnitChecker:
 
@@ -25,42 +26,49 @@ class BasicUnitChecker:
         self.duration = 0.0
 
     def camera_checker(self):
+        frame_counts_list = []
         for camera_name in self.camera_name_list:
             mp4_video_filepath = os.path.join(self.basic_unit_path, "camera", "video", f"{camera_name}_color.mp4")
             mp4_depth_filepath = os.path.join(self.basic_unit_path, "camera", "depth", f"{camera_name}_depth.mp4")
             if not os.path.exists(mp4_video_filepath) or not os.path.exists(mp4_depth_filepath):
                 return ErrorType.MP4NotExistError
 
-            ret = self.mp4_metadata_checker(mp4_video_filepath)
+            ret, frame_counts = self.mp4_metadata_checker(mp4_video_filepath)
             if ret is not ErrorType.Qualified:
                 return ret
 
-            ret = self.mp4_metadata_checker(mp4_depth_filepath)
+            ret, frame_counts = self.mp4_metadata_checker(mp4_depth_filepath)
             if ret is not ErrorType.Qualified:
                 return ret
 
+            frame_counts_list.append(frame_counts)
+
+        min_frame_count, max_frame_count = min(frame_counts_list), max(frame_counts_list)
+        if (max_frame_count - min_frame_count) > 5:
+            return ErrorType.MP4FPSError
         return ErrorType.Qualified
 
     def mp4_metadata_checker(self, media_path) :
         media = MediaInfo.parse(media_path)
         if not media.tracks:
-            return ErrorType.MP4TrackError
+            return ErrorType.MP4TrackError, -1
         try:
             video_track = media.tracks[1]
         except IndexError:
             print("media file does not have a video track: ", media_path)
-            return ErrorType.MP4TrackError
+            return ErrorType.MP4TrackError, -1
 
         duration = video_track.duration / 1000.0
-        fps = float(video_track.frame_count) / duration
+        frame_count = int(video_track.frame_count)
+        fps = frame_count / duration
         if float(fps) < 30:
-            return ErrorType.MP4FPSError
+            return ErrorType.MP4FPSError, frame_count
         if duration < 8 or duration > 30:
-           return ErrorType.MP4DurationError
+           return ErrorType.MP4DurationError, frame_count
 
 
         self.duration = duration
-        return ErrorType.Qualified
+        return ErrorType.Qualified, frame_count
 
     def parameters_checker(self) -> bool:
         for camera_name in self.camera_name_list:
@@ -105,6 +113,7 @@ class KPSDataChecker:
         self.mp4_not_exist_error_path = []
         self.proprio_stats_error_path = []
         self.parameters_error_path = []
+        self.mp4_frame_count_error_path = []
         self.qualified_path = []
 
     def get_subdirectories(self):
@@ -142,7 +151,8 @@ class KPSDataChecker:
                 self.parameters_error_path.append(subdir)
             elif error_type == ErrorType.ProprioStatsError:
                 self.proprio_stats_error_path.append(subdir)
-
+            elif error_type == ErrorType.MP4FrameCountError:
+                self.mp4_frame_count_error_path.append(subdir)
 
 class KPSDataExport:
     def __init__(self, dataset_path: str, json_file: str):
@@ -171,7 +181,8 @@ class KPSDataExport:
                         mp4_not_exist_error_path: list,
                         parameters_error_path: list,
                         proprio_stats_error_path: list,
-                        output_file: str = "reporter.md",):
+                        mp4_frame_count_error_path: list,
+                        output_file: str = "reporter.md"):
 
         subdirectories_len = len(subdirectories)
         qualified_path_len = len(qualified_path)
@@ -181,22 +192,26 @@ class KPSDataExport:
         not_exist_error_len = len(mp4_not_exist_error_path)
         parameters_error_len = len(parameters_error_path)
         proprio_stats_error_len = len(proprio_stats_error_path)
+        mp4_frame_count_error_len = len(mp4_frame_count_error_path)
         total_error_count = (fps_error_len + duration_error_len + tracks_error_len +
-                             not_exist_error_len + parameters_error_len + proprio_stats_error_len)
+                             not_exist_error_len + parameters_error_len + proprio_stats_error_len +
+                             mp4_frame_count_error_len)
+        total_count = qualified_path_len + total_error_count
         reporter_str = (
             "## 数据采集质检报告\n"
             f"**检测项目:{self.json_file}**\n"
             f"**检测员: 系统脚本检测**\n"
             f"**检测方式：全检测**\n"
             f"**采集数据数量: {subdirectories_len}**\n"
-            f"合格数据采集数量: {qualified_path_len}\n"
-            f"MP4帧率不合格数量: {fps_error_len}\n"
-            f"MP4时长不合格数量: {duration_error_len}\n"
-            f"MP4轨道不合格数量: {tracks_error_len}\n"
-            f"MP4文件不存在数量: {not_exist_error_len}\n"
-            f"相机参数文件缺失错误数量: {parameters_error_len}\n"
-            f"ProprioStats文件缺失错误数量: {proprio_stats_error_len}\n"
-            f"总计不合格数量： {total_error_count}"
+            f"合格数据采集数量: {qualified_path_len} 占比: {qualified_path_len / total_count * 100}%\n"
+            f"MP4帧率不合格数量: {fps_error_len} 占比:{fps_error_len / total_count * 100}%\n"
+            f"MP4时长不合格数量: {duration_error_len} 占比: {duration_error_len / total_count * 100}%\n"
+            f"MP4轨道不合格数量: {tracks_error_len} 占比: {tracks_error_len / total_count * 100}%\n"
+            f"MP4文件不存在数量: {not_exist_error_len} 占比: {not_exist_error_len / total_count * 100}%\n"
+            f"相机参数文件缺失错误数量: {parameters_error_len} 占比: {parameters_error_len / total_count * 100}%\n"
+            f"ProprioStats文件缺失错误数量: {proprio_stats_error_len} 占比: {proprio_stats_error_len / total_count * 100}%\n"
+            f"MP4帧数差异不合格数量: {mp4_frame_count_error_len} 占比: {mp4_frame_count_error_len / total_count * 100}%\n"
+            f"总计不合格数量： {total_error_count} 占比: {total_error_count / total_count * 100}%"
         )
         with open(os.path.join(self.dataset_path, output_file), 'w') as f:
             f.write(reporter_str)
@@ -294,10 +309,11 @@ def export_data(dataset_path_list: list, json_file: str, output_filepath: str):
                                       kpsDataChecker.mp4_not_exist_error_path,
                                       kpsDataChecker.parameters_error_path,
                                       kpsDataChecker.proprio_stats_error_path,
+                                      kpsDataChecker.mp4_frame_count_error_path,
                                       output_file="reporter.md")
         unqualified_path = kpsDataChecker.mp4_fps_error_path + kpsDataChecker.mp4_duration_error_path + \
                            kpsDataChecker.mp4_tracks_error_path + kpsDataChecker.mp4_not_exist_error_path + \
-                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path
+                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path + kpsDataChecker.mp4_frame_count_error_path
         kpsDataExport.export_data(output_filepath, kpsDataChecker.qualified_path, unqualified_path,
                                   kpsDataChecker.duration_total)
 
@@ -316,10 +332,11 @@ def filter_data(dataset_path_list: list, json_file: str):
                                       kpsDataChecker.mp4_not_exist_error_path,
                                       kpsDataChecker.parameters_error_path,
                                       kpsDataChecker.proprio_stats_error_path,
+                                      kpsDataChecker.mp4_frame_count_error_path,
                                       output_file="reporter.md")
         unqualified_path = kpsDataChecker.mp4_fps_error_path + kpsDataChecker.mp4_duration_error_path + \
                            kpsDataChecker.mp4_tracks_error_path + kpsDataChecker.mp4_not_exist_error_path + \
-                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path
+                           kpsDataChecker.parameters_error_path + kpsDataChecker.proprio_stats_error_path + kpsDataChecker.mp4_frame_count_error_path
         kpsDataExport.filter_data(kpsDataChecker.qualified_path, unqualified_path, kpsDataChecker.duration_total)
 
 
