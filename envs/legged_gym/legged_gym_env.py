@@ -9,7 +9,6 @@ from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
-from .legged_utils import pd_control
 import requests
 from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
@@ -68,22 +67,13 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
     def agents(self) -> list[LeggedRobot]:
         return self._agents
 
-    def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray) -> None:
         if self._task == "no_action":
             self._update_no_action_ctrl()
             return
                     
         # print("Step agents: ", action)
         self._update_playable()
-
-        # 性能优化：在Env中批量更新所有agent的控制量
-        if len(self.ctrl) == len(actuator_ctrl):
-            self.ctrl = actuator_ctrl
-        else:
-            assert len(self.ctrl) > len(actuator_ctrl)
-            actuator_ctrl = np.array(actuator_ctrl).reshape(len(self.agents), -1)
-            for i in range(len(actuator_ctrl)):
-                self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
 
         # 切分action 给每个 agent
         action = action.reshape(len(self.agents), -1)
@@ -454,33 +444,25 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             scaled_action = action * self._action_scale * self._action_scale_mask
 
         # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+        clipped_action = np.clip(scaled_action, -1, 1)
 
         # 批量计算插值
         if (self._actuator_type == "position"):
+            # ctrl_delta is the result of mapping clipped_action from [-1, 1] to ctrl_delta_range
             ctrl_delta = (
-                self._ctrl_delta_range[:, 0] +  # fp1
-                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
-                (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-                (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+                self._ctrl_delta_range[:, 0] +
+                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
+                (clipped_action + 1) / 2
             )
 
             position_ctrl = self._neutral_joint_values + ctrl_delta
-        # elif (self._actuator_type == "torque"):
-        #     actuator_ctrl = (
-        #         self._ctrl_range[:, 0] +  # fp1
-        #         (self._ctrl_range[:, 1] - self._ctrl_range[:, 0]) *  # (fp2 - fp1)
-        #         (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-        #         (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-        #     )
         else:
             raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
 
-        torque_ctrl = pd_control(position_ctrl, self.leg_qpos, self._kp, self.leg_qvel, self.leg_qvel, self._kd)
-
-        return torque_ctrl
+        return position_ctrl
 
     def update_joint_qpos_qvel(self) -> None:
-        self.leg_qpos = [agent.leg_joint_qpos for agent in self.agents]
-        self.leg_qvel = [agent.leg_joint_qvel for agent in self.agents]
+        [agent.update_qpos_qvel(self.data.qpos, self.data.qvel) for agent in self.agents]
+        self.joint_qpos = np.array([agent.leg_joint_qpos for agent in self.agents]).flatten()
+        self.joint_qvel = np.array([agent.leg_joint_qvel for agent in self.agents]).flatten()
         # self.leg_qacc = [agent.leg_joint_qacc for agent in self.agents]

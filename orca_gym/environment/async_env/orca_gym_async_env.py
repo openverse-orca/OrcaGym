@@ -4,6 +4,7 @@ from os import path
 import time
 from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 import datetime
+from sympy.parsing.sympy_parser import null
 import torch
 
 import numpy as np
@@ -16,6 +17,7 @@ from gymnasium.core import ObsType
 
 from orca_gym.environment import OrcaGymLocalEnv
 from .orca_gym_async_agent import OrcaGymAsyncAgent
+from orca_gym.utils.joint_controller import pd_control
 
 class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def __init__(
@@ -61,11 +63,17 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self.nu = self.model.nu
         self.nq = self.model.nq
         self.nv = self.model.nv
+        self.kps = np.array([agent.kps for agent in self._agents]).flatten()
+        self.kds = np.array([agent.kds for agent in self._agents]).flatten()
+        self.target_dq = np.zeros_like(self.kds)
+        self.joint_qpos = None
+        self.joint_qvel = None
 
         # control info, this is about the actuators, not about the actoins. 
         # in some cases, agent may not use all actuators for actions.
         all_actuator = self.model.get_actuator_dict()
-        [agent.init_ctrl_info(all_actuator) for agent in self._agents]
+        all_joint = self.model.get_joint_dict()
+        [agent.init_ctrl_info(all_actuator, all_joint) for agent in self._agents]
         self.ctrl = np.zeros(self.nu)
 
         # TODO: mujoco bugs? 
@@ -143,7 +151,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         raise NotImplementedError
     
 
-    def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray) -> None:
         """
         Do specific operations each step in the environment. It is defined in the subclass.
         """
@@ -156,13 +164,14 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
         
-        actuator_ctrl = self._action2ctrl(action)
-        self.step_agents(action, actuator_ctrl)
-        # step_action = (datetime.datetime.now() - step_start).total_seconds() * 1000
+        self.step_agents(action)
+        position_ctrl = self._action2ctrl(action)
 
-        self.do_simulation(self.ctrl, self.frame_skip)
-        # step_sim = (datetime.datetime.now() - step_start).total_seconds() * 1000
-
+        for _ in range(self.frame_skip):
+            self.update_joint_qpos_qvel()
+            self.ctrl = pd_control(position_ctrl, self.joint_qpos, self.kps, self.target_dq, self.joint_qvel, self.kds)
+            self.do_simulation(self.ctrl, 1)
+        
         if self.render_mode == "human" and not self.is_subenv:
             self.render()
         # step_render = (datetime.datetime.now() - step_start).total_seconds() * 1000
@@ -176,8 +185,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         # achieved_goal_shape = len(obs["achieved_goal"]) // len(self._agents)
         # desired_goal_shape = len(obs["desired_goal"]) // len(self._agents)
 
-        # update the joint qpos, qvel
-        self.update_joint_qpos_qvel()
+
 
         info = {"env_obs": env_obs,
                 "agent_obs": agent_obs,
@@ -239,6 +247,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         # 依次 reset 每个agent
         self.reset_agents(self._agents)
         env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
+        self.update_joint_qpos_qvel()
         reset_info = {
             "env_obs": env_obs
         }
@@ -305,7 +314,6 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
         self._actuator_type = next(iter(ctrl_info.values()))["actuator_type"]           # shape = (1)
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
-        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
 
         if next(iter(ctrl_info.values()))["action_scale_mask"] is None:
             self._action_scale_mask = None

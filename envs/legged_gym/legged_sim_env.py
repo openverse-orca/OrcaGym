@@ -301,7 +301,8 @@ class AgentBase:
         
         self.dt = env.dt
         all_actuator = env.model.get_actuator_dict()
-        self.agent.init_ctrl_info(all_actuator)
+        all_joint = env.model.get_joint_dict()
+        self.agent.init_ctrl_info(all_actuator, all_joint)
         
         init_joint_qpos = env.query_joint_qpos(self.agent.joint_names)
         init_site_pos_quat = env.query_site_pos_and_quat(self.agent.site_names)
@@ -384,14 +385,14 @@ class AgentBase:
             scaled_action = action * self._action_scale * self._action_scale_mask
 
         # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
+        clipped_action = np.clip(scaled_action, -1, 1)
 
         # 批量计算插值
+        # ctrl_delta is the result of mapping clipped_action from [-1, 1] to ctrl_delta_range
         ctrl_delta = (
-            self._ctrl_delta_range[:, 0] +  # fp1
-            (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
-            (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-            (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
+            self._ctrl_delta_range[:, 0] +
+            (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
+            (clipped_action + 1) / 2
         )
 
         actuator_ctrl = self._neutral_joint_values + ctrl_delta
@@ -407,7 +408,6 @@ class AgentBase:
     
     def generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
-        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
 
         if next(iter(ctrl_info.values()))["action_scale_mask"] is None:
             self._action_scale_mask = None

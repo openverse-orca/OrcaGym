@@ -67,9 +67,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
             mask = robot_config["action_scale_mask"]
             self._action_scale_mask = np.array([mask[key] for key in mask]).flatten()
 
-        self._action_space_range_config = robot_config["action_space_range"]
-        self._kp = robot_config["kp"]
-        self._kd = robot_config["kd"]
+        self._kps = np.array(robot_config["kps"]).flatten()
+        self._kds = np.array(robot_config["kds"]).flatten()
         
         self._imu_site_name = self.name_space(robot_config["imu_site_name"])
         self._contact_site_names = self.name_space_list(robot_config["contact_site_names"])
@@ -200,6 +199,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return self._base_joint_name
 
     @property
+    def action_range(self) -> np.ndarray:
+        return self._action_range
+
+    @property
     def leg_joint_qpos(self) -> np.ndarray:
         return self._leg_joint_qpos
 
@@ -211,6 +214,13 @@ class LeggedRobot(OrcaGymAsyncAgent):
     def leg_joint_qacc(self) -> np.ndarray:
         return self._leg_joint_qacc
 
+    @property
+    def kps(self) -> float:
+        return self._kps
+
+    @property
+    def kds(self) -> float:
+        return self._kds
     
 
     # @property
@@ -223,9 +233,12 @@ class LeggedRobot(OrcaGymAsyncAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict, site_pos_quat : dict, height_map : np.ndarray) -> dict:
+    def update_qpos_qvel(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> None:
         self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
         self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
+
+    def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict, site_pos_quat : dict, height_map : np.ndarray) -> dict:
+        self.update_qpos_qvel(qpos_buffer, qvel_buffer)
         self._leg_joint_qacc[:] = qacc_buffer[self._qacc_index["leg_start"] : self._qacc_index["leg_start"] + self._qacc_index["leg_length"]]
 
         self._last_leg_joint_qpos[:] = self._leg_joint_qpos
@@ -287,15 +300,13 @@ class LeggedRobot(OrcaGymAsyncAgent):
     
     def set_action_space(self) -> None:
         action_size = self.get_action_size()
-        self._action_range = np.array([self._action_space_range_config] * action_size, dtype=np.float32)
+        self._action_range = np.array([[-1, 1]] * action_size, dtype=np.float32)
         action_space = spaces.Box(
             low=self._action_range[:, 0],
             high=self._action_range[:, 1],
             dtype=np.float32,
             shape=(action_size, ),
         )
-        print("Action space: ", action_space)
-        self._action_space_range = np.array([action_space.low[0], action_space.high[0]]) 
         
     def init_joint_index(self, qpos_offset, qvel_offset, qacc_offset, qpos_length, qvel_length, qacc_length) -> None:
         self._qpos_index = {joint_name: {"offset": qpos_offset[i], "len": qpos_length[i]} for i, joint_name in enumerate(self.joint_names)}
@@ -536,7 +547,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return reward
     
     def _compute_reward_limit(self, coeff) -> SupportsFloat:     
-        reward = -(np.sum(self._action == self._action_space_range[0]) + np.sum(self._action == self._action_space_range[1])) * coeff * self.dt
+        reward = -(np.sum(self._action == -1.0) + np.sum(self._action == 1.0)) * coeff * self.dt
         self._print_reward("Limit over threshold reward: ", reward, coeff * self.dt)
         return reward
     

@@ -1,5 +1,10 @@
 import numpy as np
 
+
+def pd_control(target_q, q, kp, target_dq, dq, kd):
+    """Calculates torques from position commands"""
+    return (target_q - q) * kp + (target_dq - dq) * kd
+
 class JointController:
     def __init__(self, Kp=10.0, Ki=0.1, Kd=2.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)):
         """

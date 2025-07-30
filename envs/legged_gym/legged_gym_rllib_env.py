@@ -278,7 +278,8 @@ class AgentBase:
         
         self.dt = env.dt
         all_actuator = env.model.get_actuator_dict()
-        self.agent.init_ctrl_info(all_actuator)
+        all_joint = env.model.get_joint_dict()
+        self.agent.init_ctrl_info(all_actuator, all_joint)
         
         init_joint_qpos = env.query_joint_qpos(self.agent.joint_names)
         init_site_pos_quat = env.query_site_pos_and_quat(self.agent.site_names)
@@ -396,7 +397,6 @@ class AgentBase:
     
     def generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
-        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
 
         if next(iter(ctrl_info.values()))["action_scale_mask"] is None:
             self._action_scale_mask = None

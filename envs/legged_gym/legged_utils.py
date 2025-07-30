@@ -66,7 +66,3 @@ def smooth_sqr_wave_np(phase, phase_freq, eps):
     numerator = np.sin(p)
     denominator = 2.0 * np.sqrt(np.sin(p)**2 + eps**2)
     return numerator / denominator + 0.5
-
-def pd_control(target_q, q, kp, target_dq, dq, kd):
-    """Calculates torques from position commands"""
-    return (target_q - q) * kp + (target_dq - dq) * kd

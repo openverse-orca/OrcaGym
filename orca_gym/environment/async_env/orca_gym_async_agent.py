@@ -29,7 +29,6 @@ class OrcaGymAsyncAgent:
         self._actuator_type = None
         self._action_scale = None
         self._action_scale_mask = None
-        self._action_space_range = None
         self._ctrl_range = None
         self._ctrl_delta_range = None
         self._ctrl_range_low = None
@@ -94,21 +93,32 @@ class OrcaGymAsyncAgent:
 
     @property
     def action_range(self) -> np.ndarray:
-        return self._action_range
+        raise NotImplementedError
+
+    @property
+    def kps(self) -> float:
+        raise NotImplementedError
+    
+    @property
+    def kds(self) -> float:
+        raise NotImplementedError
 
     def get_obs(self, **kwargs):
         raise NotImplementedError
 
-    def init_ctrl_info(self, actuator_dict) -> None:
+    def init_ctrl_info(self, actuator_dict, joint_dict) -> None:
         ctrl_range_list = []
         ctrl_delta_range_list = []
-        for i, actuator_name in enumerate(self._actuator_names):
+        for i, joint_name in enumerate(self._joint_names):
+            if i == 0:
+                continue    # pass the first joint, which is the free joint
             # matain the order of actuators
-            ctrl_range_list.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
+            ctrl_range_list.append(np.array(joint_dict[joint_name]['Range']).flatten())
             ctrl_range_width = ctrl_range_list[-1][1] - ctrl_range_list[-1][0]
             ctrl_delta_range_list.append([-ctrl_range_width/2, ctrl_range_width/2])
-            if i == 0:
-                self._ctrl_start = actuator_dict[actuator_name]['ActuatorId']
+
+
+        self._ctrl_start = actuator_dict[self._actuator_names[0]]['ActuatorId']
 
         self._ctrl_range = np.array(ctrl_range_list)
         self._ctrl_delta_range = np.array(ctrl_delta_range_list)
@@ -121,7 +131,6 @@ class OrcaGymAsyncAgent:
             "actuator_type": self._actuator_type,
             "action_scale": self._action_scale,
             "action_scale_mask": self._action_scale_mask,
-            "action_space_range": self._action_space_range,
             "ctrl_range": self._ctrl_range,
             "ctrl_delta_range": self._ctrl_delta_range,
             "ctrl_range_low": self._ctrl_range_low,
@@ -188,3 +197,6 @@ class OrcaGymAsyncAgent:
         But in some cases, the action size may be different.
         """        
         return self._nu
+
+    def update_qpos_qvel(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> None:
+        raise NotImplementedError
