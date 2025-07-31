@@ -13,7 +13,6 @@ class ScanQRTask(AbstractTask):
             super().__init__(config)
         else:
             super().__init__()
-        self.target_object = None
 
     def get_task(self, env: OrcaGymLocalEnv):
         # 随机灯光说明是增广任务
@@ -53,7 +52,7 @@ class ScanQRTask(AbstractTask):
         self._restore_objects_(env, data['objects'])
         self._set_target_object_(env, data)
         if sample_range > 0.0:
-            self._resample_objects_(env, data, sample_range)
+            self.resample_objects(env, sample_range)
         self.__random_count__ += 1
 
 
@@ -64,32 +63,11 @@ class ScanQRTask(AbstractTask):
         obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
         self.target_object = obj_match.group(1) if obj_match else None
 
-    def _resample_objects_(self, env: OrcaGymLocalEnv, data: dict, sample_range: float = 0.0):
-        target_obj_joint_name = env.joint(self.target_object + "_joint")
-        target_obj_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        objects = data.get("objects", [])
-        for obj in objects:
-            joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else \
-            obj["joint_name"]
-            if target_obj_joint_name == joint_name:
-                target_obj_position = np.array(obj["position"], dtype=np.float32)
-                break
-
-        resample_success = False
-        for i in range(100):
-            self.random_objs_and_goals(env, False, target_obj_joint_name)
-            target_obj_joint_qpos = env.query_joint_qpos([target_obj_joint_name])[target_obj_joint_name]
-            target_obj_position_delta = np.linalg.norm(target_obj_joint_qpos[:2] - target_obj_position[:2])
-            if target_obj_position_delta < sample_range:
-                resample_success = True
-                break
-
-
     def is_success(self, env: OrcaGymLocalEnv):
         pos, _, quat = env.get_body_xpos_xmat_xquat([env.body(self.target_object), env.body(self.goal_bodys[0])])
         target_pos, goal_pos = pos[:3], pos[3:6]
         target_quat, goal_quat = quat[:4], quat[4:8]
-        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 90.0)
+        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 100, 0.3)
         print(f"task is success: {is_success}")
         return is_success
 

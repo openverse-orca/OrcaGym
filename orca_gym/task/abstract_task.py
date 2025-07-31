@@ -102,6 +102,7 @@ class AbstractTask:
         self.first_spawn = True
         self.data = {} #来着增广的数据
         self.sample_range = 0.0 #增广采样范围
+        self.target_object = None
 
 
     def get_object_sites(self):
@@ -466,20 +467,27 @@ class AbstractTask:
         :param positions: 物体位置字典
         """
         qpos_dict = {}
+        self.object_bodys, self.object_joints = [], []
         if objects_data.shape == () and objects_data.dtype == "object":
             json_str = objects_data[()]
             json_data = json.loads(json_str)
             for object, object_info in json_data.items():
                 joint_name = object_info['joint_name']
                 qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
+                self.object_bodys.append(object)
+                self.object_joints.append(joint_name)
         else:
             arr = objects_data
+            empty_name = env.joint("")
             for entry in arr:
                 name = entry['joint_name']
                 pos = entry['position']
                 quat = entry['orientation']
                 qpos_dict[name] = np.concatenate([pos, quat], axis=0)
-
+                origin_joint = str(name, encoding='utf-8').removeprefix(empty_name)
+                origin_body = origin_joint.removesuffix("_joint")
+                self.object_bodys.append(origin_body)
+                self.object_joints.append(origin_joint)
         env.set_joint_qpos(qpos_dict)
 
         env.mj_forward()
@@ -490,13 +498,15 @@ class AbstractTask:
         :param positions: 目标位置字典
         """
         qpos_dict = {}
+        self.goal_bodys, self.goal_joints = [], []
         if goals_data.shape == () and goals_data.dtype == "object":
             json_str = goals_data[()]
             json_data = json.loads(json_str)
             for object, object_info in json_data.items():
                 joint_name = object_info['joint_name']
                 qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
-
+                self.goal_bodys.append(object)
+                self.goal_joints.append(joint_name)
         env.set_joint_qpos(qpos_dict)
         env.mj_forward()
 
@@ -536,3 +546,21 @@ class AbstractTask:
 
         json_str = json.dumps(info)
         return json_str
+
+    def resample_objects(self, env: OrcaGymLocalEnv, sample_range: float = 0.0):
+        """
+        Resample objects within a specified range.
+        :param sample_range: The range within which to resample objects.
+        """
+        if sample_range <= 0.0:
+            return
+
+        env_joints = [env.joint(joint_name) for joint_name in self.object_joints]
+        joints_pos = env.query_joint_qpos(env_joints)
+        for joint, qpos in joints_pos.items():
+            new_pos = qpos[:2] + np.random.uniform(-sample_range, sample_range, size=2)
+            new_qpos = np.concatenate([new_pos, qpos[2:]])
+            joints_pos[joint] = new_qpos
+
+        env.set_joint_qpos(joints_pos)
+        env.mj_forward()

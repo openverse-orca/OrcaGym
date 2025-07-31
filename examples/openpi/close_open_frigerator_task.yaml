@@ -1,8 +1,6 @@
 level_name: "guizi"
 type: "close_open"
 
-object_bodys: ["frigerator"]
-object_joints: ["frigerator_joint"]
+object_bodys: ["fridge_right_up", "fridge_left_up"]
+object_joints: ["fridge_right_up_joint", "fridge_left_up_joint"]
 
-goal_bodys: ["frigerator"]
-goal_joints: ["frigerator_joint"]

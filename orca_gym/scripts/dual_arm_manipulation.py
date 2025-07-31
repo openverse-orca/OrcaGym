@@ -776,37 +776,39 @@ def _set_eef_xy_to_action(env: DualArmEnv, noscale_action_list: np.ndarray, xy_l
 
 def _get_target_xy(env: DualArmEnv, demo_data: dict, target_obj: str) -> tuple[np.ndarray, np.ndarray]:
     target_obj_full_name = env.body(target_obj) + "_joint"
-    env_objects = env.objects
-    demo_objects = demo_data.get("objects", [])
-    
-    # print("Demo Objects: ", demo_objects)
-    # print("Target Object: ", target_obj_full_name)
-    # print("env_objects: ", env_objects)
+    env_objects = json.loads(env._task.get_objects_info(env))
+    demo_objects = demo_data["objects"]
 
-    def _get_object_info(obj_name: str, objects: list[tuple]) -> dict:
-        for obj in objects:
-            name = obj[0]
-            # print("Checking object name: ", name)
-            if isinstance(name, (bytes, bytearray)):
-                name = name.decode('utf-8')
-            if name == obj_name:
-                return {
-                    "joint_name": name,
-                    "position": np.array(obj[1], dtype=np.float32),
-                    "orientation": np.array(obj[2], dtype=np.float32)
-                }
-            
-        print(f"Warning: Object '{obj_name}' not found in the provided objects list.")
+    # 版本兼容：新版本的 objects 是一个 JSON 字符串或者从hdf5文件中读取的json， 老版本是ndarray
+    def _get_object_info(obj_joint_name: str, objects) -> dict:
+        if (demo_objects.shape == () and demo_objects.dtype == "object"):
+            json_str = demo_objects[()]
+            json_data = json.loads(json_str)
+            for object, object_info in json_data.items():
+                if env.joint(object_info['joint_name']) == obj_joint_name:
+                    return {
+                        "joint_name": env.joint(object_info['joint_name']),
+                        "position": np.array(object_info['position'], dtype=np.float32),
+                        "orientation": np.array(object_info['orientation'], dtype=np.float32)
+                    }
+
+        else:
+            arr = demo_objects
+            for entry in arr:
+                name = str(entry['joint_name'], encoding="utf-8")
+                if name == obj_joint_name:
+                    return {
+                        "joint_name": name,
+                        "position": np.array(entry['position'], dtype=np.float32),
+                        "orientation": np.array(entry['orientation'], dtype=np.float32)
+                    }
+
         return {}
     
     target_obj_demo_info = _get_object_info(target_obj_full_name, demo_objects)
-    target_obj_env_info = _get_object_info(target_obj_full_name, env_objects)
-
-    # print("Target Object Demo Info: ", target_obj_demo_info)
-    # print("Target Object Env Info: ", target_obj_env_info)
 
     demo_xy = target_obj_demo_info.get("position", np.zeros(3, dtype=np.float32))[:2]
-    env_xy = target_obj_env_info.get("position", np.zeros(3, dtype=np.float32))[:2]
+    env_xy = env_objects[target_obj]["position"][:2]
     return demo_xy, env_xy
 
 def _find_closest_step(xy_list: np.ndarray, target_xy: np.ndarray) -> int:
@@ -859,7 +861,7 @@ def resample_actions(
     最终效果：夹爪到达新物体位置，然后再到达原轨迹中的最终位置
     """
     demo_action_list = demo_data['actions']
-    target_obj, _ = get_target_object_and_goal(demo_data)
+    target_obj = env._task.target_object
 
     if target_obj is None:
         print("Warning: No target object found in the demo data.")
@@ -932,6 +934,7 @@ def augment_episode(env : DualArmEnv,
                     sync_codec: bool = False) -> tuple:
     env._task.data = demo_data
     env._task.spawn_scene(env)
+    env._task.sample_range = sample_range
     obs, _ = env.reset(seed=42)
     obs_list    = {obs_key: [] for obs_key, obs_data in obs.items()}
     reward_list = []

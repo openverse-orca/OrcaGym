@@ -13,8 +13,6 @@ class PickPlaceTask(AbstractTask):
             super().__init__(config)
         else:
             super().__init__()
-        self.target_object = None
-
 
     def get_task(self, env: OrcaGymLocalEnv):
         # 随机灯光说明是增广任务
@@ -61,7 +59,7 @@ class PickPlaceTask(AbstractTask):
         self._restore_objects_(env, data['objects'])
         self._set_target_object_(env, data)
         if sample_range > 0.0:
-            self._resample_objects_(env, data, sample_range)
+            self.resample_objects(env, sample_range)
         self.__random_count__ += 1
 
     def _set_target_object_(self, env: OrcaGymLocalEnv, data: dict):
