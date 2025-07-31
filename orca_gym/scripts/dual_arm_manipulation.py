@@ -94,7 +94,7 @@ SCENE_SUBSCENE_MAPPING = {
     "jiazi":   ("Shop",    "Shelf_Operation"),
     "kitchen": ("Kitchen", "Countertop_Operation"),
     "yaodian": ("Pharmacy","Shelf_Operation"),
-    "guizi": ("Cooler​​","Shelf_Operation")
+    "guizi": ("Cooler","Shelf_Operation")
 }
 
 with open("camera_config.yaml", "r") as f:

@@ -348,6 +348,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_path', type=str, required=True, help='The dataset path to check')
     parser.add_argument('--output_filepath', type=str, help='The output filepath')
     parser.add_argument('--mode', type=str, required=True, choices=['export', 'filter'], help='The mode to run' )
+    parser.add_argument("--json_files", type=str, nargs='+', default=["Shop-Cashier_Operation.json", "Shop-Shelf_Operation.json", "Kitchen-Countertop_Operation.json", "Pharmacy-Shelf_Operation.json"], help='The json files to check')
 
     args = parser.parse_args()
     output_filepath = args.output_filepath
@@ -360,8 +361,8 @@ if __name__ == "__main__":
 
     dataset_path = Path(args.dataset_path).resolve()
 
-    json_file_list = ["Shop-Cashier_Operation.json", "Shop-Shelf_Operation.json", "Kitchen-Countertop_Operation.json", "Pharmacy-Shelf_Operation.json"]
-
+    json_file_list = args.json_files
+    operation_dict = {json_file: [] for json_file in json_file_list}
     sub_dataset_directory = []
     with os.scandir(dataset_path) as entries:
         for entry in entries:
@@ -381,22 +382,11 @@ if __name__ == "__main__":
                 if entry.is_file() and entry.name.endswith('.json'):
                     print("Found JSON file:", entry.name, "in directory:", subdir)
                 if entry.name in json_file_list:
-                    if entry.name == "Shop-Cashier_Operation.json":
-                        shop_cashier_operation_directory.append(subdir)
-                    elif entry.name == "Shop-Shelf_Operation.json":
-                        shop_shelf_operation_directory.append(subdir)
-                    elif entry.name == "Kitchen-Countertop_Operation.json":
-                        kitchen_countertop_operation_directory.append(subdir)
-                    elif entry.name == "Pharmacy-Shelf_Operation.json":
-                        pharmacy_shelf_operation_directory.append(subdir)
+                    operation_dict[entry.name].append(subdir)
 
     if mode == "export":
-        export_data(shop_cashier_operation_directory, "Shop-Cashier_Operation.json", os.path.join(output_filepath, "shop-cashier_operation"))
-        export_data(shop_shelf_operation_directory, "Shop-Shelf_Operation.json", os.path.join(output_filepath, "shop-shelf_operation"))
-        export_data(kitchen_countertop_operation_directory, "Kitchen-Countertop_Operation.json", os.path.join(output_filepath, "kitchen-countertop_operation"))
-        export_data(pharmacy_shelf_operation_directory, "Pharmacy-Shelf_Operation.json", os.path.join(output_filepath, "pharmacy-shelf_operation"))
+        for json_file, directories in operation_dict.items():
+            export_data(directories, json_file, os.path.join(output_filepath, json_file.replace('.json', '')))
     elif mode == "filter":
-        filter_data(shop_cashier_operation_directory, "Shop-Cashier_Operation.json")
-        filter_data(shop_shelf_operation_directory, "Shop-Shelf_Operation.json")
-        filter_data(kitchen_countertop_operation_directory, "Kitchen-Countertop_Operation.json")
-        filter_data(pharmacy_shelf_operation_directory, "Pharmacy-Shelf_Operation.json")
+        for json_file, directories in operation_dict.items():
+            filter_data(directories, json_file)
