@@ -1,4 +1,5 @@
 import json
+import re
 
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
@@ -419,8 +420,7 @@ class AbstractTask:
         self.scene.publish_scene()
 
     def destory_scene(self):
-        self.scene.publish_scene()
-        self.scene.close()
+        self.scene.destory_scene()
 
     def register_init_env_callback(self, init_env_call):
         self.scene.register_init_env_callback(init_env_call)
@@ -518,7 +518,8 @@ class AbstractTask:
             info[self.object_bodys[i]] = {
                 "joint_name": self.object_joints[i],
                 "position": jpos_dict[env.joint(self.object_joints[i])].tolist(),
-                "orientation": xquat[i * 4:(i + 1)*4].tolist()
+                "orientation": xquat[i * 4:(i + 1)*4].tolist(),
+                "target_body": self.target_object == self.object_bodys[i]
             }
 
         json_str = json.dumps(info)
@@ -564,3 +565,20 @@ class AbstractTask:
 
         env.set_joint_qpos(joints_pos)
         env.mj_forward()
+
+    def _set_target_object_(self, env: OrcaGymLocalEnv, data: dict):
+        qpos_dict = {}
+        objects_data = data['objects']
+        if objects_data.shape == () and objects_data.dtype == "object":
+            json_str = objects_data[()]
+            json_data = json.loads(json_str)
+            for object, object_info in json_data.items():
+                if object_info["target_body"]:
+                    self.target_object = object
+        #老数据兼容
+        else:
+            lang_instr = data.get("language_instruction", b"")
+            if isinstance(lang_instr, (bytes, bytearray)):
+                lang_instr = lang_instr.decode("utf-8")
+            obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
+            self.target_object = obj_match.group(1) if obj_match else None

@@ -55,14 +55,6 @@ class ScanQRTask(AbstractTask):
             self.resample_objects(env, sample_range)
         self.__random_count__ += 1
 
-
-    def _set_target_object_(self, env: OrcaGymLocalEnv, data: dict):
-        lang_instr = data.get("language_instruction", b"")
-        if isinstance(lang_instr, (bytes, bytearray)):
-            lang_instr = lang_instr.decode("utf-8")
-        obj_match = re.search(r'object:\s*([^\s]+)', lang_instr)
-        self.target_object = obj_match.group(1) if obj_match else None
-
     def is_success(self, env: OrcaGymLocalEnv):
         pos, _, quat = env.get_body_xpos_xmat_xquat([env.body(self.target_object), env.body(self.goal_bodys[0])])
         target_pos, goal_pos = pos[:3], pos[3:6]

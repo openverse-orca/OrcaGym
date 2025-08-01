@@ -45,7 +45,7 @@ class CloseOpenTask(AbstractTask):
         goal_idx = random.choice(range(len(self.object_bodys)))
         self.goal_bodys = [self.object_bodys[goal_idx]]
         self.goal_joints = [self.object_joints[goal_idx]]
-
+        self.target_body = self.object_bodys[goal_idx]
         env.set_joint_qpos({env.joint(self.goal_joints[0]): [joint_pos]})
 
 
@@ -54,6 +54,7 @@ class CloseOpenTask(AbstractTask):
         获取一个增广任务
         '''
         self._restore_goals_(env, data['goals'])
+        self._set_target_object_(env, data)
         qpos = env.query_joint_qpos([env.joint(joint_name) for joint_name in self.goal_joints])
         for joint_name in self.goal_joints:
             joint_pos = qpos[env.joint(joint_name)]
