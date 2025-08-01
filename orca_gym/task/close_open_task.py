@@ -38,7 +38,7 @@ class CloseOpenTask(AbstractTask):
         print(f"self.mode: {self.mode}")
         if self.mode  == 0:
             # 关门
-            joint_pos = np.random.uniform(0, 2.09)
+            joint_pos = np.random.uniform(0.785, 2.09)
         else:
             joint_pos = 0.0
 
@@ -57,7 +57,7 @@ class CloseOpenTask(AbstractTask):
         qpos = env.query_joint_qpos([env.joint(joint_name) for joint_name in self.goal_joints])
         for joint_name in self.goal_joints:
             joint_pos = qpos[env.joint(joint_name)]
-            if qpos < 0.01:
+            if joint_pos < 0.01:
                 self.mode = 1
             else:
                 self.mode = 0
@@ -71,9 +71,9 @@ class CloseOpenTask(AbstractTask):
         is_success = False
         if self.mode == 0:
             # 关门
-            is_success = joints_pos[env.joint(self.goal_joints)] < 0.01
+            is_success = joints_pos[env.joint(self.goal_joints[0])] < 0.01
         else:
-            is_success = joints_pos[env.joint(self.goal_joints)] > 1.05
+            is_success = joints_pos[env.joint(self.goal_joints[0])] > 1.05
         print(f"task is_success: {is_success}")
         return is_success
 
