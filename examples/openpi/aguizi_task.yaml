@@ -1,6 +1,7 @@
 # guizi任务配置文件
 
-level_name: "guizi"
+# level_name: "guizi"
+level_name: "pharmacy"
 type: "pick_and_place"
 range: { x: [0.55, 0.65], y: [-0.35, 0.35], z: -0.15 , r: 0.3 }
 

@@ -136,5 +136,6 @@ class ScanQRTask(AbstractTask):
         obj_str = "object: " + self.target_object
         goal_str = "goal: " + self.goal_bodys[0]
 
-        return f"level: {self.level_name}  use {goal_str} scan {obj_str} QR code"
+        # return f"level: {self.level_name}  use {goal_str} scan {obj_str} QR code"
+        return f"In the {self.level_name} scene, pick up the {self.target_object} and scan it with the {self.goal_bodys[0]}."
 
