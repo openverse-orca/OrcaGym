@@ -17,7 +17,6 @@ from gymnasium.core import ObsType
 
 from orca_gym.environment import OrcaGymLocalEnv
 from .orca_gym_async_agent import OrcaGymAsyncAgent
-from orca_gym.utils.joint_controller import pd_control
 
 class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def __init__(
@@ -165,15 +164,15 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
             raise ValueError("Action dimension mismatch")
         
         self.step_agents(action)
-        position_ctrl = self._action2ctrl(action)
 
         for _ in range(self.frame_skip):
-            self.update_joint_qpos_qvel()
-            self.ctrl = pd_control(position_ctrl, self.joint_qpos, self.kps, self.target_dq, self.joint_qvel, self.kds)
+            for agent in self._agents:
+                torque_ctrl = agent.compute_torques(self.data.qpos, self.data.qvel)
+                self.ctrl[agent.ctrl_start : agent.ctrl_start + len(torque_ctrl)] = torque_ctrl
+
 
             # print("--------------------------------")
             # print("action: ", action)
-            # print("position_ctrl: ", position_ctrl)
             # print("ctrl: ", self.ctrl)
 
             self.do_simulation(self.ctrl, 1)
@@ -253,7 +252,6 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         # 依次 reset 每个agent
         self.reset_agents(self._agents)
         env_obs, agent_obs, achieved_goals, desired_goals = self.get_obs()
-        self.update_joint_qpos_qvel()
         reset_info = {
             "env_obs": env_obs
         }
@@ -332,9 +330,3 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self._ctrl_delta_range = np.array([ctrl["ctrl_delta_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)  # shape = (agent_num x actor_num, 2)
         self._neutral_joint_values = np.array([ctrl["neutral_joint_values"] for key, ctrl in ctrl_info.items()]).reshape(-1) # shape = (agent_num x actor_num)
 
-
-    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
-
-    def update_joint_qpos_qvel(self) -> None:
-        raise NotImplementedError

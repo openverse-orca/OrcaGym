@@ -109,6 +109,7 @@ class OrcaGymAsyncAgent:
     def init_ctrl_info(self, actuator_dict, joint_dict) -> None:
         ctrl_range_list = []
         ctrl_delta_range_list = []
+        torques_range_list = []
         for i, joint_name in enumerate(self._joint_names):
             if i == 0:
                 continue    # pass the first joint, which is the free joint
@@ -117,10 +118,14 @@ class OrcaGymAsyncAgent:
             ctrl_range_width = ctrl_range_list[-1][1] - ctrl_range_list[-1][0]
             ctrl_delta_range_list.append([-ctrl_range_width/2, ctrl_range_width/2])
 
+        for actuator_name in self._actuator_names:
+            torques_range_list.append(np.array(actuator_dict[actuator_name]['CtrlRange']).flatten())
+
 
         self._ctrl_start = actuator_dict[self._actuator_names[0]]['ActuatorId']
 
         self._ctrl_range = np.array(ctrl_range_list)
+        self._torques_range = np.array(torques_range_list)
         self._joint_qpos_limit = np.array([[self._ctrl_range[i][0] * self._soft_joint_qpos_limit, 
                                            self._ctrl_range[i][1] * self._soft_joint_qpos_limit] 
                                            for i in range(len(self._ctrl_range))])
@@ -206,5 +211,5 @@ class OrcaGymAsyncAgent:
         """        
         return self._nu
 
-    def update_qpos_qvel(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> None:
+    def compute_torques(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> np.ndarray:
         raise NotImplementedError

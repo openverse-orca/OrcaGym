@@ -36,8 +36,8 @@ Go2Config = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "kps" :                  [20, 20, 30, 20, 20, 30, 20, 20, 30, 20, 20, 30],
-        "kds" :                  [0.5, 0.5, 0.75, 0.5, 0.5, 0.75, 0.5, 0.5, 0.75, 0.5, 0.5, 0.75],
+        "kps" :                  [30, 30, 40, 30, 30, 40, 30, 30, 40, 30, 30, 40],
+        "kds" :                  [0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1],
         "action_scale" :         0.5,
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
 
@@ -77,16 +77,16 @@ Go2Config = {
             "foot_touch" : 0,
             "joint_angles" : 0.1,
             "joint_accelerations" : 2.5e-7,
-            "limit" : 0.1,
+            "limit" : 0.01,
             "action_rate" : 0.01,
             "base_gyro" : 0,
             "base_accelerometer" : 0,
             "follow_command_linvel" : 1,
             "follow_command_angvel" : 0.5,
-            "height" : 10,
+            "height" : 1,
             "body_lin_vel" : 2,
             "body_ang_vel" : 0.05,
-            "body_orientation" : 0,
+            "body_orientation" : 1,
             "feet_air_time" : 1,
             "feet_self_contact" : 0,
             "feet_slip" : 0.1,
@@ -94,11 +94,11 @@ Go2Config = {
             "feet_fitted_ground" : 0.1,
             "fly" : 0.1,
             "stepping" : 0.1,     
-            # "torques" : 0.0002,       
+            "torques" : 1e-5,       
             "joint_qpos_limits" : 10.0,
             # "joint_qvel_limits" : 1.0,
             # "soft_torque_limit" : 1.0,
-            "contact_no_vel" : 0.2
+            "contact_no_vel" : 0,
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -121,7 +121,7 @@ Go2Config = {
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
-        "push_interval_s" :         15,
+        "push_interval_s" :         5,
         "max_push_vel_xy" :         1.0,
         "pos_random_range" :        2.0,    # randomize the x,y position of the robot in each episode
         
@@ -129,7 +129,7 @@ Go2Config = {
         "curriculum_learning" :     True,
         "curriculum_levels" : [
             # basic moving skills
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.7, "command_type": "stand_still", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", },
             {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
@@ -157,34 +157,34 @@ Go2Config = {
             },
 
             "move_slowly" : {
-                "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.3,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.5, 1.5], # x direction for forward max speed
-                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward
-                "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right
-                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 1.0,  # max turning rate
+                "command_lin_vel_range_x" : [-0.15, 0.5], # x direction for forward
+                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+                "command_lin_vel_threshold" : [-0.05, 0.1], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.5,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : [0, 0.5], # x direction for forward
-                "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
-                "command_lin_vel_threshold" : [0.0, 0.1], # min linear velocity to trigger moving
-                "command_ang_vel_range" : 0.5,  # max turning rate
+                "command_lin_vel_range_x" : [0, 0.3], # x direction for forward
+                "command_lin_vel_range_y" : [-0.05, 0.05], # y direction for left/right
+                "command_lin_vel_threshold" : [0.0, 0.05], # min linear velocity to trigger moving
+                "command_ang_vel_range" : 0.3,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
         },

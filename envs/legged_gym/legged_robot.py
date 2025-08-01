@@ -14,7 +14,8 @@ import numpy as np
 from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np
 
 from .legged_config import LeggedRobotConfig, LeggedObsConfig
-
+from orca_gym.utils.joint_controller import pd_control
+from numpy.linalg import norm, lstsq
 
 def get_legged_robot_name(agent_name: str) -> str:
     if agent_name.startswith("go2"):
@@ -172,6 +173,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._is_playable = False
         self._player_control = False
 
+        self._compute_body_height = True if robot_config["reward_coeff"]["height"] > 0 else False
+
         self._is_obs_updated = False
         self._setup_reward_functions(robot_config)
         self._setup_curriculum_functions()
@@ -239,19 +242,31 @@ class LeggedRobot(OrcaGymAsyncAgent):
             joint_qpos[name] = np.array([value])
         return joint_qpos
 
-    def update_qpos_qvel(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> None:
+    def compute_torques(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> np.ndarray:
         self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
         self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
+        
+        torques = pd_control(self._position_ctrl, self._leg_joint_qpos, self.kps, self.target_dq, self._leg_joint_qvel, self.kds)
+        # print("pd control torques: ", torques)
+        self._torques = np.clip(torques, self._torques_range[:, 0], self._torques_range[:, 1])
+        # print("clip torques: ", self._torques)
+        return self._torques
 
     def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict, site_pos_quat : dict, height_map : np.ndarray) -> dict:
-        self.update_qpos_qvel(qpos_buffer, qvel_buffer)
+        # self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
+        # self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
+        # NOTE qpos, qvel 在 compute_torques 中已经更新，且在 get_obs 前已经被调用过
         self._leg_joint_qacc[:] = qacc_buffer[self._qacc_index["leg_start"] : self._qacc_index["leg_start"] + self._qacc_index["leg_length"]]
 
         self._last_leg_joint_qpos[:] = self._leg_joint_qpos
 
+
         self._body_lin_vel, self._body_ang_vel, self._body_orientation, self._body_pos = self._get_body_local(qpos_buffer, qvel_buffer)
 
-        self._body_height = self._get_body_height(qpos_buffer, height_map)
+        self._body_height, quaternion = self._get_body_height(qpos_buffer, height_map)
+        self._target_orientation = rotations.quat2euler(quaternion)
+        # print("body_height: ", self._body_height)
+        # print("target_orientation: ", self._target_orientation)
         self._foot_height = self._get_foot_height(site_pos_quat, height_map)  # Foot position in the local frame
         self._foot_touch_force = self._get_foot_touch_force(sensor_data)  # Penalty if the foot touch force is too strong
         self._update_foot_touch_air_time(self._foot_touch_force)  # Reward for air time of the feet
@@ -276,9 +291,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
-                    # np.array([self._body_height]),
+                    self._body_height,
                 ]).reshape(-1).astype(np.float32)
-        
+
         obs *= self._obs_scale_vec
 
         noise_vec = ((self._np_random.random(len(self._noise_scale_vec)) * 2) - 1) * self._noise_scale_vec
@@ -337,6 +352,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         """
         self._set_action(action)
         # self._set_action_ctrl(action_ctrl)
+        self._position_ctrl = self._action2ctrl(action)
 
         visualized_command = {}
         if update_mocap and self._visualize_command:        
@@ -412,6 +428,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
         self._command_resample_duration = 0
         # print("Command: ", self._command)
+
+        self._terminated_times = 0
+        self._terminated_times_threshold = 3
         
         self._last_push_duration = 0.0
         self._last_contact_site_xpos = None
@@ -455,7 +474,16 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
     def is_terminated(self, achieved_goal, desired_goal) -> bool:
         assert achieved_goal.shape == desired_goal.shape
-        return any(achieved_goal != desired_goal)
+        if any(achieved_goal != desired_goal):
+            self._terminated_times += 1
+            # print("Terminated times: ", self._terminated_times)
+            if self._terminated_times > self._terminated_times_threshold:
+                return True
+            else:
+                return False
+        else:
+            self._terminated_times = 0
+            return False
 
     def is_success(self, achieved_goal, desired_goal) -> np.float32:
         if self.truncated and not self.is_terminated(achieved_goal, desired_goal):
@@ -606,7 +634,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return reward
     
     def _compute_reward_height(self, coeff) -> SupportsFloat:
-        reward = -abs(self._body_height - self._base_height_target) * coeff * self.dt
+        # body height 为一个 3x3 数组，这里取中心点的高度
+        reward = -abs(self._body_height[4] - self._base_height_target) * coeff * self.dt
         self._print_reward("Height reward: ", reward, coeff * self.dt)
         return reward
     
@@ -624,7 +653,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
     
     def _compute_reward_body_orientation(self, coeff) -> SupportsFloat:
         # Penalty if the body orientation in XY axis (Yaw) is too high
-        reward = -np.sum(np.square(self._body_orientation[:2])) * coeff * self.dt
+
+        reward = -np.sum(np.square(self._body_orientation[:2] - self._target_orientation[:2])) * coeff * self.dt
         self._print_reward("Body orientation reward: ", reward, coeff * self.dt)
         return reward
     
@@ -778,11 +808,11 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._print_reward("Contact no velocity reward: ", reward, coeff * self.dt)
         return reward
 
-    # def _compute_reward_torques(self, coeff) -> SupportsFloat:
-    #     # Penalize torques
-    #     reward = -np.sum(np.square(self._torques)) * coeff * self.dt
-    #     self._print_reward("Torques reward: ", reward, coeff * self.dt)
-    #     return reward
+    def _compute_reward_torques(self, coeff) -> SupportsFloat:
+        # Penalize torques
+        reward = -np.sum(np.square(self._torques)) * coeff * self.dt
+        self._print_reward("Torques reward: ", reward, coeff * self.dt)
+        return reward
 
     def _compute_reward_joint_qpos_limits(self, coeff) -> SupportsFloat:
         # Penalize dof positions too close to the limit
@@ -929,12 +959,127 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # print("Foot site pos: ", foot_site_pos, "Foot height: ", foot_height)
         return foot_height
 
-    def _get_body_height(self, qpos_buffer : np.ndarray, height_map : np.ndarray) -> float:
-        body_joint_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
-        body_height = body_joint_qpos[2] - height_map[int(body_joint_qpos[0] * 10 + height_map.shape[0] / 2), 
-                                                      int(body_joint_qpos[1] * 10 + height_map.shape[1] / 2)]
-        return body_height
-    
+    # def _get_body_height(self, qpos_buffer : np.ndarray, height_map : np.ndarray) -> np.ndarray:
+    #     if not self._compute_body_height:
+    #         return np.zeros(9)
+
+    #     body_joint_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]]
+    #     # body height 为一个数组，分别为以机器人中心为原点
+    #     # [-1, -1], [0, -1], [1, -1], 
+    #     # [-1, 0], [0, 0], [1, 0], 
+    #     # [-1, 1], [0, 1], [1, 1] 
+    #     # 的 9 个点的高度
+    #     body_height = np.zeros(9)
+    #     # 定义9个点的相对偏移（以机器人中心为原点，单位为米）
+    #     offsets = [(-1, -1), (0, -1), (1, -1),
+    #                (-1,  0), (0,  0), (1,  0),
+    #                (-1,  1), (0,  1), (1,  1)]
+    #     for i, (dx, dy) in enumerate(offsets):
+    #         # 计算每个点在 height_map 上的索引
+    #         x_idx = int((body_joint_qpos[0] + dx * 0.1) * 10 + height_map.shape[0] / 2)
+    #         y_idx = int((body_joint_qpos[1] + dy * 0.1) * 10 + height_map.shape[1] / 2)
+    #         # 边界检查，防止越界
+    #         x_idx = np.clip(x_idx, 0, height_map.shape[0] - 1)
+    #         y_idx = np.clip(y_idx, 0, height_map.shape[1] - 1)
+    #         body_height[i] = body_joint_qpos[2] - height_map[x_idx, y_idx]
+
+    #     # 同时，以这9个点为顶点，插值出一个平面，计算平面与 z 轴的夹角
+    #     # 计算平面的旋转四元数
+    #     plane_points = np.array([[offsets[i][0], offsets[i][1], body_height[i]] for i in range(9)])
+    #     plane_normal = np.cross(plane_points[1] - plane_points[0], plane_points[2] - plane_points[0])
+    #     np_linalg_norm = np.linalg.norm(plane_normal)
+    #     if np_linalg_norm > 0:
+    #         plane_normal = plane_normal / np_linalg_norm
+    #         angle_x = np.arccos(np.dot(plane_normal, np.array([1, 0, 0])))
+    #         angle_y = np.arccos(np.dot(plane_normal, np.array([0, 1, 0])))
+    #         target_orientation = np.array([angle_x, angle_y])
+    #     else:
+    #         target_orientation = np.array([0, 0])
+    #     print("target_orientation: ", target_orientation)
+    #     print("body_height: ", body_height)
+
+    #     return body_height, target_orientation
+
+    def _get_body_height(self, qpos_buffer: np.ndarray, height_map: np.ndarray) -> tuple:
+        if not self._compute_body_height:
+            return np.zeros(9), np.array([1.0, 0.0, 0.0, 0.0])  # 返回单位四元数
+
+        # 获取机器人本体位置（x, y, z）
+        body_joint_qpos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"]: 
+                                    self._qpos_index[self._base_joint_name]["offset"] + 
+                                    self._qpos_index[self._base_joint_name]["len"]]
+        
+        # 定义9个点的相对偏移（以机器人中心为原点）
+        offsets = [(-1, -1), (0, -1), (1, -1),
+                (-1,  0), (0,  0), (1,  0),
+                (-1,  1), (0,  1), (1,  1)]
+        
+        body_height = np.zeros(9)
+        
+        # 计算各点高度（机器人高度减去地面高度）
+        for i, (dx, dy) in enumerate(offsets):
+            # 计算高度图索引
+            x_idx = int((body_joint_qpos[0] + dx * 0.1) * 10 + height_map.shape[0] / 2)
+            y_idx = int((body_joint_qpos[1] + dy * 0.1) * 10 + height_map.shape[1] / 2)
+            # 边界检查
+            x_idx = np.clip(x_idx, 0, height_map.shape[0] - 1)
+            y_idx = np.clip(y_idx, 0, height_map.shape[1] - 1)
+            # 高度差：机器人高度 - 地面高度
+            body_height[i] = body_joint_qpos[2] - height_map[x_idx, y_idx]
+        
+        # ====================== 修正平面法向量计算 ====================== 
+        # 使用最小二乘法拟合平面 z = ax + by + c
+        X = np.column_stack([np.ones(9), 
+                            [dx * 0.1 for dx, _ in offsets],
+                            [dy * 0.1 for dy, _ in offsets]])
+        A = X[:, 1:]  # 仅取[x, y]部分
+        b = body_height
+        
+        # 解平面方程系数: [a, b, c] 满足 z ≈ ax + by + c
+        coeffs, _, _, _ = lstsq(X, b, rcond=None)
+        c, a, b = coeffs  # [常数项, x系数, y系数]
+        
+        # 平面法向量 (归一化的法向量指向上方)
+        normal = np.array([-a, -b, 1])  # 取负确保方向正确
+        normal_norm = norm(normal)
+        if normal_norm < 1e-6:
+            normal_unit = np.array([0, 0, 1])
+        else:
+            normal_unit = normal / normal_norm
+
+        # ====================== 计算四元数 ====================== 
+        # 参考法向量（理想Z轴向上）
+        ref_normal = np.array([0, 0, 1])
+        cos_theta = np.dot(normal_unit, ref_normal)
+        
+        # 避免数值不稳定性
+        cos_theta = np.clip(cos_theta, -1, 1)
+        
+        # 当法向量与Z轴几乎平行时
+        if abs(cos_theta - 1) < 1e-6:
+            return body_height, np.array([1.0, 0.0, 0.0, 0.0])  # 无旋转
+        elif abs(cos_theta + 1) < 1e-6:
+            return body_height, np.array([0.0, 0.0, 1.0, 0.0])  # 180°绕Z轴旋转
+            
+        # 计算旋转轴和角度
+        axis = np.cross(ref_normal, normal_unit)
+        axis_norm = norm(axis)
+        if axis_norm < 1e-6:
+            quaternion = np.array([1.0, 0.0, 0.0, 0.0])
+        else:
+            axis = axis / axis_norm
+            angle = np.arccos(cos_theta)
+            sin_half = np.sin(angle / 2)
+            quaternion = np.array([
+                np.cos(angle / 2),          # w
+                axis[0] * sin_half,         # x
+                axis[1] * sin_half,         # y
+                axis[2] * sin_half           # z
+            ])
+
+        
+        return body_height, quaternion
+
     def _get_foot_touch_force(self, sensor_data: dict) -> np.ndarray:
         contact_force = np.zeros(len(self._foot_touch_sensor_names))
         for i, touch_sensor_name in enumerate(self._foot_touch_sensor_names):
@@ -968,7 +1113,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         """
         Command is a combination of linear and angular velocity, It's base on the local coordinate system of the robot.
         """
-        if self._np_random.random() < 1.0:            
+        if self._np_random.random() < 0.75:            
             # Forward
             lin_vel = np.array([self._np_random.uniform(0, self._command_lin_vel_range_x[1]), 
                                 self._np_random.uniform(self._command_lin_vel_range_y[0], self._command_lin_vel_range_y[1]),
@@ -1064,7 +1209,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
         scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
-        # scale_height = np.array([1]) * LeggedObsConfig["scale"]["height"]
+        scale_height = np.ones(9) * LeggedObsConfig["scale"]["height"]
 
         scale_vec = np.concatenate([
             scale_lin_vel, 
@@ -1076,7 +1221,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             scale_leg_joint_qpos, 
             scale_leg_joint_qvel, 
             scale_action, 
-            # scale_height
+            scale_height
             ]).flatten()
         
         return scale_vec.astype(np.float32)
@@ -1101,7 +1246,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * LeggedObsConfig["scale"]["qpos"]
         noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * LeggedObsConfig["scale"]["qvel"]
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
-        noise_height = np.array([1]) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
+        noise_height = np.ones(9) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
 
         noise_vec = np.concatenate([
             noise_lin_vel, 
@@ -1113,7 +1258,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             noise_leg_joint_qpos, 
             noise_leg_joint_qvel, 
             noise_action, 
-            # noise_height
+            noise_height
             ]).flatten()
         
         # print("noise vec: ", noise_vec)
@@ -1177,6 +1322,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             {"function": self._compute_reward_contact_no_vel, "coeff": reward_coeff["contact_no_vel"] if "contact_no_vel" in reward_coeff else 0},
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["phase_contact"] if "phase_contact" in reward_coeff else 0},  
             {"function": self._compute_reward_joint_qpos_limits, "coeff": reward_coeff["joint_qpos_limits"] if "joint_qpos_limits" in reward_coeff else 0},
+            {"function": self._compute_reward_torques, "coeff": reward_coeff["torques"] if "torques" in reward_coeff else 0},
         ]
         
     def _setup_curriculum_functions(self):
@@ -1249,17 +1395,17 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._max_episode_steps = sys.maxsize
             
     def _reset_commands_config(self, current_level : int) -> None:
-        command_type = self._curriculum_levels[current_level]["command_type"]
-        self._command_lin_vel_range_x = self._curriculum_commands[command_type]["command_lin_vel_range_x"]
-        self._command_lin_vel_range_y = self._curriculum_commands[command_type]["command_lin_vel_range_y"]
-        self._command_lin_vel_threshold = self._curriculum_commands[command_type]["command_lin_vel_threshold"]
-        self._command_ang_vel_range = self._curriculum_commands[command_type]["command_ang_vel_range"]
+        self._command_type = self._curriculum_levels[current_level]["command_type"]
+        self._command_lin_vel_range_x = self._curriculum_commands[self._command_type]["command_lin_vel_range_x"]
+        self._command_lin_vel_range_y = self._curriculum_commands[self._command_type]["command_lin_vel_range_y"]
+        self._command_lin_vel_threshold = self._curriculum_commands[self._command_type]["command_lin_vel_threshold"]
+        self._command_ang_vel_range = self._curriculum_commands[self._command_type]["command_ang_vel_range"]
    
         
     def _init_commands_config(self) -> None:
         self._reset_commands_config(0)
-        command_type = self._curriculum_levels[0]["command_type"]
-        self._command_resample_interval = self._curriculum_commands[command_type]["command_resample_interval"]              
+        self._command_type = self._curriculum_levels[0]["command_type"]
+        self._command_resample_interval = self._curriculum_commands[self._command_type]["command_resample_interval"]              
 
     def _compute_square_wave(self):
         """
@@ -1316,3 +1462,25 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # print("Robot: ", self.name, " Sin phase: ", sin_phase, "Cos phase: ", cos_phase)
         
         return sin_phase, cos_phase
+
+    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
+        # 缩放后的 action
+        if self._action_scale_mask is None:
+            scaled_action = action * self._action_scale
+        else:
+            scaled_action = action * self._action_scale * self._action_scale_mask
+
+        # 限制 scaled_action 在有效范围内
+        clipped_action = np.clip(scaled_action, -1, 1)
+
+        # 批量计算插值
+        # ctrl_delta is the result of mapping clipped_action from [-1, 1] to ctrl_delta_range
+        ctrl_delta = (
+            self._ctrl_delta_range[:, 0] +
+            (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
+            (clipped_action + 1) / 2
+        )
+
+        position_ctrl = self._neutral_joint_values + ctrl_delta
+        
+        return position_ctrl    

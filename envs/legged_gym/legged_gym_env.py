@@ -436,33 +436,3 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             
             return self.query_site_pos_and_quat(self._agent_contact_site_names)
 
-    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
-        # 缩放后的 action
-        if self._action_scale_mask is None:
-            scaled_action = action * self._action_scale
-        else:
-            scaled_action = action * self._action_scale * self._action_scale_mask
-
-        # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, -1, 1)
-
-        # 批量计算插值
-        if (self._actuator_type == "position"):
-            # ctrl_delta is the result of mapping clipped_action from [-1, 1] to ctrl_delta_range
-            ctrl_delta = (
-                self._ctrl_delta_range[:, 0] +
-                (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
-                (clipped_action + 1) / 2
-            )
-
-            position_ctrl = self._neutral_joint_values + ctrl_delta
-        else:
-            raise ValueError(f"Unsupported actuator type: {self._actuator_type}")
-
-        return position_ctrl
-
-    def update_joint_qpos_qvel(self) -> None:
-        [agent.update_qpos_qvel(self.data.qpos, self.data.qvel) for agent in self.agents]
-        self.joint_qpos = np.array([agent.leg_joint_qpos for agent in self.agents]).flatten()
-        self.joint_qvel = np.array([agent.leg_joint_qvel for agent in self.agents]).flatten()
-        # self.leg_qacc = [agent.leg_joint_qacc for agent in self.agents]
