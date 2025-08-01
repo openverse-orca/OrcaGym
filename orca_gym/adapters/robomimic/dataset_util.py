@@ -64,14 +64,18 @@ class DatasetWriter:
             self.create_hdf5_file()  # 新增: 创建HDF5文件
         else:
             self.basedir = base_dir
-            self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-            self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+            # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
+            # self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+            uuid1 = str(uuid.uuid4())[:8]
+            uuid2 = str(uuid.uuid4())[:8]
+            self.experiment_id = f"{uuid1}_{uuid2}"
+            self.uuid_dir = os.path.join(base_dir, self.experiment_id)
             self.camera_dir = os.path.join(self.uuid_dir, "camera")
             self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
             self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
             self.depth_dir = os.path.join(self.camera_dir, "depth")
             self.video_dir = os.path.join(self.camera_dir, "video")
-        # print("self.uuid_dir..............:",self.uuid_dir)
+            print("self.uuid_dir..............:",self.uuid_dir)
             self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
             self.mp4_save_path : str = None
             
@@ -88,8 +92,12 @@ class DatasetWriter:
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
 
     def set_UUIDPATH(self):
-        self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-        self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+        # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
+        # self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+        uuid1 = str(uuid.uuid4())[:8]
+        uuid2 = str(uuid.uuid4())[:8]
+        self.experiment_id = f"{uuid1}_{uuid2}"
+        self.uuid_dir = os.path.join(self.basedir, self.experiment_id)
         self.camera_dir = os.path.join(self.uuid_dir, "camera")
         self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
         self.depth_dir = os.path.join(self.camera_dir, "depth")

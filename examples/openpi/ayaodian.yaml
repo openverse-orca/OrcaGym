@@ -1,11 +1,7 @@
 # shop1灯光配置文件
 level_name: "yaodian"
 type: "pick_and_place"
-range:
-  - x: [0.44, 0.54]
-  - y: [-0.4, 0.4]
-  - z: 0.15
-  - r: 0.1
+range: {x: [0.44, 0.54] ,y: [-0.4, 0.4],z: 0.15 ,r: 0.1}
 
 random_light : true
 num_lights: 3

@@ -153,5 +153,7 @@ class PickPlaceTask(AbstractTask):
         obj_str = "object: " + self.target_object
         goal_str = "goal: " + self.goal_bodys[0]
 
-        return f"level: {self.level_name}  {obj_str} to {goal_str}"
+        # return f"level: {self.level_name}  {obj_str} to {goal_str}"
+        # return f"In the level {self.level_name} put the {self.target_object} into the {self.goal_bodys[0]}."
+        return f"In the {self.level_name} scene, put the {self.target_object} into the {self.goal_bodys[0]}."
 

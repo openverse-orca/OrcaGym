@@ -1,0 +1,22 @@
+# guizi任务配置文件
+
+level_name: "guizi"
+type: "pick_and_place"
+range: { x: [0.55, 0.65], y: [-0.35, 0.35], z: -0.15 , r: 0.3 }
+# body, site, joint 的顺序需要保持一致
+object_bodys: [ "changyanning", "fenghanganmao", "yiyakangpian", "qianglipipalu", "xiaozhongzhitong"]
+object_sites: ["changyanningsite", "fenghanganmaosite", "yiyakangpiansite", "qianglipipalu_site", "xiaozhongzhitong_site"]
+object_joints: ["changyanning_joint", "fenghanganmao_joint", "yiyakangpian_joint", "qianglipipalu_joint", "xiaozhongzhitong_joint"]
+
+goal_bodys: ["Box_Blue"]
+goal_sites: ["Box_Bluesite"]
+goal_joints: ["Box_Blue_joint"]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["changyanning", "fenghanganmao", "yiyakangpian", "qianglipipalu", "xiaozhongzhitong"]
+actors_spawnable: ["changyanning", "fenghanganmao", "yiyakangpian", "qianglipipalu", "xiaozhongzhitong"]
+center: [-6.35, 2.56, 2.32]
+infinity: [1000, 1000, 1]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

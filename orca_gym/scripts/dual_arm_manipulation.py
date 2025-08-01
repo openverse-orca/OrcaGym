@@ -57,7 +57,7 @@ INIT_SCENE_TEXT = {
     "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
-    "guizi":   ("一个机器人站在货架前",  "A robot stands in front of a shady cabinet​​.")
+    "guizi":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet​​.")
 }
 _light_counter = 0
 
@@ -87,7 +87,14 @@ OBJ_CN = {
     "coffeecup_white_kps": "白色咖啡杯",
     "basket_kitchen_01" : "篮子",
     "shoppingtrolley_01" : "购物手推车",
-    "box_blue" : "蓝色筐子"
+    "qianglipipalu": "强力枇杷露",
+    "box_blue" : "蓝色筐子",
+    "shop": "超市",
+    "kitchen": "厨房",
+    "yaodian": "药店",
+    "Guizi": "柜子",
+    "guizi": "柜子",
+    "clinic": "诊所",
 }
 SCENE_SUBSCENE_MAPPING = {
     "shop":    ("Shop",    "Cashier_Operation"),
@@ -172,12 +179,17 @@ def normalize_key(key: str) -> str:
     """去掉多余标点，统一小写"""
     return re.sub(r'[^\w]', '', key).lower()
 
-def eng2cn(instruction_en: str) -> str:
+def eng2cn(instruction_en: str,level_name: str = "") -> str:
     """
     把类似 "level: shop object: bottle_blue to goal: basket" 或
     "put bottle_blue into basket" 之类的英文指令，翻成中文。
     """
     text = instruction_en.strip().lower()
+    # 如果没传 level_name，就从 instruction_en 里提取
+    if not level_name:
+        m_lvl = re.search(r'in level\s+([\w_]+)', text)
+        if m_lvl:
+            level_name = m_lvl.group(1)
     
     # 1) 先试“object … to goal …” 的结构
     m = re.search(r'object[:\s]+([\w_]+)\s+to\s+goal[:\s]+([\w_]+)', text)
@@ -187,6 +199,17 @@ def eng2cn(instruction_en: str) -> str:
         obj_cn   = OBJ_CN.get(obj_key, obj_key)
         goal_cn  = OBJ_CN.get(goal_key, goal_key)
         return f"将{obj_cn}放入{goal_cn}中"
+    
+    # 2) 新格式: "in level shop put the bottle_blue into the basket"
+    m = re.search(r'put the ([\w_]+) into the ([\w_]+)', text)
+    if m:
+        obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(2))
+        obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        level_cn = OBJ_CN.get(level_name.lower(), level_name)
+        return f"在场景{level_cn}中将{obj_cn}放入{goal_cn}中"
+
     
     # 2) 再试 put … into … 结构
     m = re.search(r'put\s+([\w_]+)\s+into\s+([\w_]+)', text)
@@ -532,7 +555,7 @@ def do_teleoperation(env,
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
 
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = info_list[0]["language_instruction"].split()[1])
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = info_list[0]["language_instruction"].split()[2])
         if exit_program or current_round > teleoperation_rounds:
             break
         
