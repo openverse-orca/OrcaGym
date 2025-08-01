@@ -22,22 +22,13 @@ if project_root not in sys.path:
 
 from envs.legged_gym.legged_config import LeggedEnvConfig
 
-TIME_STEP = LeggedEnvConfig["TIME_STEP"]
-
-FRAME_SKIP_REALTIME = LeggedEnvConfig["FRAME_SKIP_REALTIME"]
-FRAME_SKIP_SHORT = LeggedEnvConfig["FRAME_SKIP_SHORT"]
-FRAME_SKIP_LONG = LeggedEnvConfig["FRAME_SKIP_LONG"]
-
 EPISODE_TIME_VERY_SHORT = LeggedEnvConfig["EPISODE_TIME_VERY_SHORT"]
 EPISODE_TIME_SHORT = LeggedEnvConfig["EPISODE_TIME_SHORT"]
 EPISODE_TIME_LONG = LeggedEnvConfig["EPISODE_TIME_LONG"]
 
+TIME_STEP = 0.005                       # 1000 Hz for physics simulation
+FRAME_SKIP = 4
 
-
-FRAME_SKIP = FRAME_SKIP_SHORT # FRAME_SKIP_REALTIME
-
-TIME_STEP = 0.001                       # 1000 Hz for physics simulation
-FRAME_SKIP = 20
 REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for rendering
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for ppo policy
 
@@ -206,6 +197,8 @@ def run_simulation(env: gym.Env,
         while True:
             start_time = datetime.now()
 
+
+
             segmented_obs = segment_obs(obs, agent_name_list)
             action_list = []
             for agent_obs in segmented_obs.values():
@@ -224,6 +217,10 @@ def run_simulation(env: gym.Env,
             
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()
+
+            print("--------------------------------")
+            print("action: ", action)
+            print("obs: ", obs)
 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:

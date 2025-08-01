@@ -170,6 +170,12 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         for _ in range(self.frame_skip):
             self.update_joint_qpos_qvel()
             self.ctrl = pd_control(position_ctrl, self.joint_qpos, self.kps, self.target_dq, self.joint_qvel, self.kds)
+
+            # print("--------------------------------")
+            # print("action: ", action)
+            # print("position_ctrl: ", position_ctrl)
+            # print("ctrl: ", self.ctrl)
+
             self.do_simulation(self.ctrl, 1)
         
         if self.render_mode == "human" and not self.is_subenv:

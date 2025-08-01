@@ -121,7 +121,15 @@ class OrcaGymAsyncAgent:
         self._ctrl_start = actuator_dict[self._actuator_names[0]]['ActuatorId']
 
         self._ctrl_range = np.array(ctrl_range_list)
+        self._joint_qpos_limit = np.array([[self._ctrl_range[i][0] * self._soft_joint_qpos_limit, 
+                                           self._ctrl_range[i][1] * self._soft_joint_qpos_limit] 
+                                           for i in range(len(self._ctrl_range))])
+        # print("ctrl_range: ", self._ctrl_range)
+        # print("soft_joint_qpos_limit: ", self._soft_joint_qpos_limit)
+        # print("joint_qpos_limit: ", self._joint_qpos_limit)
+
         self._ctrl_delta_range = np.array(ctrl_delta_range_list)
+
 
         self._ctrl_range_low = np.array([range[0] for range in self._ctrl_range])
         self._ctrl_range_high = np.array([range[1] for range in self._ctrl_range])

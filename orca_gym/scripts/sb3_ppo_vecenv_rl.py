@@ -413,6 +413,8 @@ def testing_model(
             step += 1
             start_time = datetime.now()
 
+
+
             obs_list = _segment_observation(observations, agent_num)
             action_list = []
             for agent_obs in obs_list:
@@ -423,6 +425,15 @@ def testing_model(
             observations, rewards, dones, infos = env.step(action)
 
             env.render()
+
+            print("--------------------------------")
+            result = [True if a < 1 and a > -1 else False for a in action]
+            if any(result):
+                print("action: ", action)
+                print("observations: ", observations)
+                print("rewards: ", rewards)
+                print("dones: ", dones)
+                print("infos: ", infos)
 
             total_rewards += rewards
 

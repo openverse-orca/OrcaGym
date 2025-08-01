@@ -13,6 +13,7 @@ from collections import defaultdict
 from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
+from orca_gym.utils.joint_controller import pd_control
 
 class ControlDevice:
     """
@@ -158,8 +159,28 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         agent_action = self._split_agent_action(action)
         [agent.on_step(self, agent_action[agent.name]) for agent in self._agents.values()]
         
-        # step the simulation with original action space
-        self.do_simulation(self.ctrl, self.frame_skip)
+        position_ctrl_list = [agent._action2ctrl(agent_action[agent.name]) for agent in self._agents.values()]
+        
+        for _ in range(self.frame_skip):
+            torque_ctrl_list = [
+                pd_control(
+                    position_ctrl_list[i], 
+                    agent.agent.leg_joint_qpos, 
+                    agent.agent.kps, 
+                    agent.agent.target_dq, 
+                    agent.agent.leg_joint_qvel, 
+                    agent.agent.kds
+                ) for i, agent in enumerate(self._agents.values())
+            ]
+            print("--------------------------------")
+            print("action: ", action)
+            print("agent_action: ", agent_action)
+            print("position_ctrl_list: ", position_ctrl_list)
+            print("torque_ctrl_list: ", torque_ctrl_list)
+            [agent.set_acatuator_ctrl(self, torque_ctrl_list[i]) for i, agent in enumerate(self._agents.values())]
+
+            # step the simulation with original action space
+            self.do_simulation(self.ctrl, 1)
 
         obs = self._get_obs().copy()
 
@@ -343,10 +364,6 @@ class AgentBase:
         # print("Step agents: ", action)
         self._update_playable(env)
 
-        actuator_ctrl = self._action2ctrl(action)
-        self.set_acatuator_ctrl(env, actuator_ctrl)
-        
-
         self.agent.update_command(env.data.qpos)
         agent_ctrl, agent_mocap = self.agent.step(action, update_mocap=True)
         # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
@@ -395,9 +412,9 @@ class AgentBase:
             (clipped_action + 1) / 2
         )
 
-        actuator_ctrl = self._neutral_joint_values + ctrl_delta
+        position_ctrl = self._neutral_joint_values + ctrl_delta
         
-        return actuator_ctrl    
+        return position_ctrl    
 
     def on_reset_model(self, env: LeggedSimEnv) -> None:
         pass
