@@ -310,7 +310,6 @@ class AbstractTask:
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回
-        print(f"[Debug] Placed objects: {placed}")
         qpos_dict = {jn: q for jn, q in placed}
         env.set_joint_qpos(qpos_dict)
         env.mj_forward()

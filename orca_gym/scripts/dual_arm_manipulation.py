@@ -339,6 +339,8 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     is_success_list.append(is_success)
                     env.stop_save_video()
                     saving_mp4 = False
+                    if not is_success:
+                        dataset_writer.remove_path()
                 elif task_status == TaskStatus.FAILURE:
 
 #                     env.stop_save_video()
