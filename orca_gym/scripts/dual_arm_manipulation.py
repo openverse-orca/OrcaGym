@@ -555,7 +555,7 @@ def do_teleoperation(env,
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
 
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = info_list[0]["language_instruction"].split()[2])
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = env._task.level_name)
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -1087,7 +1087,7 @@ def do_augmentation(
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
                 print("Augmenting original demo: ", original_demo_name)
                 language_instruction = demo_data['language_instruction']
-                level_name = demo_data["language_instruction"].split()[1]
+                level_name = env._task.level_name
                 dataset_writer.set_UUIDPATH()
                 if output_video == True:
                     mp4_save_path = dataset_writer.get_mp4_save_path()
