@@ -62,12 +62,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         
         self._actuator_names = self.name_space_list(robot_config["actuator_names"])
         self._actuator_type = robot_config["actuator_type"]
-        self._action_scale = robot_config["action_scale"]
+        self._action_scale = np.array(robot_config["action_scale"]).flatten()
         self._soft_joint_qpos_limit = robot_config["soft_joint_qpos_limit"]
-        
-        if "action_scale_mask" in robot_config:
-            mask = robot_config["action_scale_mask"]
-            self._action_scale_mask = np.array([mask[key] for key in mask]).flatten()
 
         self._kps = np.array(robot_config["kps"]).flatten()
         self._kds = np.array(robot_config["kds"]).flatten()
@@ -1465,22 +1461,16 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
     def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
         # 缩放后的 action
-        if self._action_scale_mask is None:
-            scaled_action = action * self._action_scale
-        else:
-            scaled_action = action * self._action_scale * self._action_scale_mask
-
-        # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, -1, 1)
+        scaled_action = action * self._action_scale
 
         # 批量计算插值
         # ctrl_delta is the result of mapping clipped_action from [-1, 1] to ctrl_delta_range
-        ctrl_delta = (
-            self._ctrl_delta_range[:, 0] +
-            (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
-            (clipped_action + 1) / 2
-        )
-
-        position_ctrl = self._neutral_joint_values + ctrl_delta
+        # ctrl_delta = (
+        #     self._ctrl_delta_range[:, 0] +
+        #     (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *
+        #     (scaled_action + 1) / 2
+        # )
         
+        position_ctrl = np.clip(self._neutral_joint_values + scaled_action, self._ctrl_range[:, 0], self._ctrl_range[:, 1])
+
         return position_ctrl    

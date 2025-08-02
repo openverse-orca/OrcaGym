@@ -38,7 +38,20 @@ Go2Config = {
         "actuator_type" :        "position",  # "torque" or "position"
         "kps" :                  [30, 30, 40, 30, 30, 40, 30, 30, 40, 30, 30, 40],
         "kds" :                  [0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1],
-        "action_scale" :         0.5,
+        "action_scale" :         [
+            0.3,    # joint name="FL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
+            1.0,    # joint name="FL_thigh_joint" class="front_hip", joint range="-1.5708 3.4907", neutral=0.8
+            0.5,    # joint name="FL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+            0.3,    # joint name="FR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
+            1.0,    # joint name="FR_thigh_joint" class="front_hip", joint range="-1.5708 3.4907", neutral=0.8
+            0.5,    # joint name="FR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+            0.3,    # joint name="RL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
+            1.0,    # joint name="RL_thigh_joint" class="back_hip", joint range="-0.5236 4.5379", neutral=1.0
+            0.5,    # joint name="RL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+            0.3,    # joint name="RR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
+            1.0,    # joint name="RR_thigh_joint" class="back_hip", joint range="-0.5236 4.5379", neutral=1.0
+            0.5,    # joint name="RR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+        ],
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
 
         "imu_site_name" :       "imu",
@@ -84,16 +97,16 @@ Go2Config = {
             "follow_command_linvel" : 1,
             "follow_command_angvel" : 0.5,
             "height" : 1,
-            "body_lin_vel" : 2,
-            "body_ang_vel" : 0.05,
+            "body_lin_vel" : 1,
+            "body_ang_vel" : 0.025,
             "body_orientation" : 1,
-            "feet_air_time" : 1,
+            "feet_air_time" : 0.5,
             "feet_self_contact" : 0,
-            "feet_slip" : 0.1,
-            "feet_wringing" : 0.1,
-            "feet_fitted_ground" : 0.1,
+            "feet_slip" : 0.05,
+            "feet_wringing" : 0.05,
+            "feet_fitted_ground" : 0.05,
             "fly" : 0.1,
-            "stepping" : 0.1,     
+            "stepping" : 0.05,     
             "torques" : 1e-5,       
             "joint_qpos_limits" : 10.0,
             # "joint_qvel_limits" : 1.0,
@@ -129,8 +142,8 @@ Go2Config = {
         "curriculum_learning" :     True,
         "curriculum_levels" : [
             # basic moving skills
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", },
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", },
+            # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
