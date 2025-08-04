@@ -36,21 +36,25 @@ Go2Config = {
                                 "RR_hip_actuator", "RR_thigh_actuator", "RR_calf_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "kps" :                  [30, 30, 40, 30, 30, 40, 30, 30, 40, 30, 30, 40],
-        "kds" :                  [0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1, 0.75, 0.75, 1],
+        "kps" :                  [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15],
+        "kds" :                  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+
         "action_scale" :         [
-            0.3,    # joint name="FL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
+            0.2,    # joint name="FL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
             1.0,    # joint name="FL_thigh_joint" class="front_hip", joint range="-1.5708 3.4907", neutral=0.8
-            0.5,    # joint name="FL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
-            0.3,    # joint name="FR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
+            0.8,    # joint name="FL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+
+            0.2,    # joint name="FR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
             1.0,    # joint name="FR_thigh_joint" class="front_hip", joint range="-1.5708 3.4907", neutral=0.8
-            0.5,    # joint name="FR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
-            0.3,    # joint name="RL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
+            0.8,    # joint name="FR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+
+            0.2,    # joint name="RL_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=0.1
             1.0,    # joint name="RL_thigh_joint" class="back_hip", joint range="-0.5236 4.5379", neutral=1.0
-            0.5,    # joint name="RL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
-            0.3,    # joint name="RR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
+            0.8,    # joint name="RL_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+
+            0.2,    # joint name="RR_hip_joint" class="abduction", joint axis="1 0 0" range="-1.0472 1.0472", neutral=-0.1
             1.0,    # joint name="RR_thigh_joint" class="back_hip", joint range="-0.5236 4.5379", neutral=1.0
-            0.5,    # joint name="RR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
+            0.8,    # joint name="RR_calf_joint" class="knee", joint range="-2.7227 -0.83776", neutral=-1.5
         ],
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
 
@@ -83,35 +87,36 @@ Go2Config = {
 
         # Config for reward
         "reward_coeff" : {
-            "alive" : 0,
-            "success" : 0,
-            "failure" : 0,
-            "contact" : 1,
-            "foot_touch" : 0,
-            "joint_angles" : 0.1,
-            "joint_accelerations" : 2.5e-7,
-            "limit" : 0.01,
-            "action_rate" : 0.01,
-            "base_gyro" : 0,
+            "alive" : 0,                     # 存活奖励
+            "success" : 0,                   # 成功奖励
+            "failure" : 0,                   # 失败惩罚
+            "leg_contact" : 1,               # 腿部身体接触惩罚
+            "body_contact" : 10,              # 身体接触惩罚
+            "foot_touch" : 0,                # 重踏惩罚
+            "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
+            "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
+            "limit" : 0.01,                 # Action极限值惩罚
+            "action_rate" : 0.01,           # Action平滑
+            "base_gyro" : 0,                
             "base_accelerometer" : 0,
-            "follow_command_linvel" : 1,
-            "follow_command_angvel" : 0.5,
-            "height" : 1,
-            "body_lin_vel" : 1,
-            "body_ang_vel" : 0.025,
-            "body_orientation" : 1,
-            "feet_air_time" : 0.5,
-            "feet_self_contact" : 0,
-            "feet_slip" : 0.05,
-            "feet_wringing" : 0.05,
-            "feet_fitted_ground" : 0.05,
-            "fly" : 0.1,
-            "stepping" : 0.05,     
-            "torques" : 1e-5,       
-            "joint_qpos_limits" : 10.0,
-            # "joint_qvel_limits" : 1.0,
-            # "soft_torque_limit" : 1.0,
-            "contact_no_vel" : 0,
+            "follow_command_linvel" : 1,    # 跟随指令速度奖励
+            "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
+            "height" : 1,                   # 身体高度惩罚
+            "body_lin_vel" : 1,             # 身体上下线速度惩罚
+            "body_ang_vel" : 0.025,         # 身体倾斜角速度惩罚
+            "body_orientation" : 0,         # 身体姿态惩罚
+            "feet_air_time" : 0.5,          # 足底离地时间，小于给定的世间惩罚
+            "feet_self_contact" : 0,        # 足底自接触惩罚
+            "feet_slip" : 0.05,             # 接触时，足底线速度
+            "feet_wringing" : 0.05,         # 解除时，足底角速度
+            "feet_fitted_ground" : 0.05,    # 鼓励对角步态，避免单侧滑步
+            "fly" : 0.1,                    # 四足离地惩罚
+            "stepping" : 0,                 # 无指令时，踏步惩罚
+            "torques" : 1e-5,                # 关节力矩惩罚
+            "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
+            # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
+            # "soft_torque_limit" : 1.0,       # 避免关节力矩过大
+            "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
         },
 
         # Robot's Self-Weight: Approximately 149.2 Newtons.
@@ -143,21 +148,30 @@ Go2Config = {
         "curriculum_levels" : [
             # basic moving skills
             # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", },
-            # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
             # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
             # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 2.0, "rating": 0.5, "command_type": "move_slowly", },
 
             # advanced moving skills
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
-            {"name" : "rough" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
-            {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
-            {"name" : "rough" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", "terminate_threshold": 3},
+
+            # {"name" : "smooth" ,                "offset" : [-55, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough" ,                 "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "smooth_slope" ,          "offset" : [0, -55, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "rough_slope" ,           "offset" : [55, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "slope", },
+            # {"name" : "rough" ,                "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
+            # {"name" : "terrain_stairs_low" ,    "offset" : [-55, -55, 0],   "distance": 3.0, "rating": 0.5, "command_type": "stairs", },
+            # {"name" : "rough" ,                "offset" : [-0, 55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "flat_plane", },
             # {"name" : "terrain_brics" ,         "offset" : [55, -55, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope", },
         ],
         "curriculum_commands" : {
@@ -166,27 +180,27 @@ Go2Config = {
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.0,  # max turning rate
-                "command_resample_interval" : 100, # second to resample the command
+                "command_resample_interval" : 20, # second to resample the command
             },
 
             "move_slowly" : {
-                "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.0, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.3,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
             "flat_plane" : {
-                "command_lin_vel_range_x" : [-0.3, 1.0], # x direction for forward max speed
-                "command_lin_vel_range_y" : [-0.2, 0.2], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
+                "command_lin_vel_range_x" : [-0.3, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [-0.1, 0.3], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 1.0,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
             
             "slope" : {
-                "command_lin_vel_range_x" : [-0.15, 0.5], # x direction for forward
+                "command_lin_vel_range_x" : [-0.15, 1.0], # x direction for forward
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
                 "command_lin_vel_threshold" : [-0.05, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.5,  # max turning rate
@@ -194,7 +208,7 @@ Go2Config = {
             },
             
             "stairs" : {
-                "command_lin_vel_range_x" : [0, 0.3], # x direction for forward
+                "command_lin_vel_range_x" : [0, 0.5], # x direction for forward
                 "command_lin_vel_range_y" : [-0.05, 0.05], # y direction for left/right
                 "command_lin_vel_threshold" : [0.0, 0.05], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.3,  # max turning rate

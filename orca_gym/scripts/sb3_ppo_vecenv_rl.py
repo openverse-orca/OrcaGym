@@ -426,14 +426,14 @@ def testing_model(
 
             env.render()
 
-            print("--------------------------------")
-            result = [True if a < 1 and a > -1 else False for a in action]
-            if any(result):
-                print("action: ", action)
-                print("observations: ", observations)
-                print("rewards: ", rewards)
-                print("dones: ", dones)
-                print("infos: ", infos)
+            # print("--------------------------------")
+            # result = [True if a < 1 and a > -1 else False for a in action]
+            # if any(result):
+            #     print("action: ", action)
+            #     print("observations: ", observations)
+            #     print("rewards: ", rewards)
+            #     print("dones: ", dones)
+            #     print("infos: ", infos)
 
             total_rewards += rewards
 
