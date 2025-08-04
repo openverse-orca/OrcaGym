@@ -1,11 +1,7 @@
 # shop2增广灯光配置文件
 level_name: "jiazi"
 type: "pick_and_place"
-range:
-  - x: [0.55, 0.65]
-  - y: [-0.4, 0.4]
-  - z: -0.15
-  - r: 0.3
+range: {x: [0.55, 0.65],y: [-0.4, 0.4],z: -0.15,r: 0.3}
 
 random_light : true
 num_lights: 3

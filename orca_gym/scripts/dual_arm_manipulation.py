@@ -68,7 +68,7 @@ g_skip_frame = 0
 
 
 OBJ_CN = {
-    "can": "罐子",
+    "can": "易拉罐",
     "bottle_red":"红色瓶子",
     "bottle_blue":"蓝色瓶子",
     "jar_01": "罐子",
