@@ -332,6 +332,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
         task_status = info['task_status']
         
         action_step_taken += 1
+        is_success = False
         if action_step_taken >= action_step:        
             action_step_taken = 0
             if task_status in [TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.BEGIN]:
@@ -349,6 +350,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         camera_frame_index.append(env.get_current_frame())
 
                 if task_status == TaskStatus.SUCCESS:
+                    camera_frame_index.append(env.get_current_frame())
                     is_success = env._task.is_success(env)
                     is_success_list.append(is_success)
                     env.stop_save_video()
@@ -379,7 +381,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                 timestep_list.append(info['time_step'])
                 
 
-        if terminated_times >= 5 or truncated:
+        if terminated_times >= 5 or truncated or is_success:
             return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success_list
 
         elapsed_time = datetime.now() - start_time
@@ -1051,7 +1053,7 @@ def augment_episode(env : DualArmEnv,
         info_list.append(info)
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success
         
     return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success
  

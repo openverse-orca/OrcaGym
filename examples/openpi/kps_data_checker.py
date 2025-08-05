@@ -2,6 +2,7 @@ import argparse
 import json
 import os, sys, shutil
 import time
+import h5py
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pymediainfo import MediaInfo
 from enum import Enum
@@ -44,8 +45,14 @@ class BasicUnitChecker:
 
             frame_counts_list.append(frame_counts)
 
+        with h5py.File(os.path.join(self.basic_unit_path, "proprio_stats", self.proprio_stats), 'r' ) as f:
+            demo_group = f['data']['demo_00000']
+            camera_frames = demo_group['camera_frames']
+            last_frames = camera_frames[-1]
+            frame_counts_list.append(last_frames)
+
         min_frame_count, max_frame_count = min(frame_counts_list), max(frame_counts_list)
-        if (max_frame_count - min_frame_count) > 5:
+        if (max_frame_count - min_frame_count) > 3:
             return ErrorType.MP4FrameCountError
         return ErrorType.Qualified
 
@@ -88,13 +95,15 @@ class BasicUnitChecker:
         return True
 
     def check(self):
-        ret = self.camera_checker()
-        if ret is not ErrorType.Qualified:
-            return ret, 0.0
         if not self.parameters_checker():
             return ErrorType.ParametersError, 0.0
         if not self.proprio_stats_checker():
             return ErrorType.ProprioStatsError, 0.0
+
+        ret = self.camera_checker()
+        if ret is not ErrorType.Qualified:
+            return ret, 0.0
+
         return ErrorType.Qualified, self.duration
 
 class KPSDataChecker:
