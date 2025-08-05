@@ -295,7 +295,7 @@ class KPSDataExport:
     def _generate_output_json_list_(self, paths: list) -> list:
         output_json_list = []
         for subdir in paths:
-            episode_id = subdir.split("_")[0]
+            episode_id = subdir
             if episode_id in self.id_to_index:
                 index = self.id_to_index[episode_id]
                 data = self.json_data[index]
