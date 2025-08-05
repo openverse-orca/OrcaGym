@@ -306,6 +306,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.disableactuator = self.opt.disableactuator
         self._mjModel.opt.sdf_initpoints = self.opt.sdf_initpoints
         self._mjModel.opt.sdf_iterations = self.opt.sdf_iterations
+        self._mjModel.opt.disableflags = self._mjModel.opt.disableflags | mujoco.mjtDisableBit.mjDSBL_FILTERPARENT if not self.opt.filterparent else self._mjModel.opt.disableflags & ~mujoco.mjtDisableBit.mjDSBL_FILTERPARENT.value
         
 
     def query_opt_config(self):
@@ -338,7 +339,8 @@ class OrcaGymLocal(OrcaGymBase):
             "enableflags": self._mjModel.opt.enableflags,
             "disableactuator": self._mjModel.opt.disableactuator,
             "sdf_initpoints": self._mjModel.opt.sdf_initpoints,
-            "sdf_iterations": self._mjModel.opt.sdf_iterations
+            "sdf_iterations": self._mjModel.opt.sdf_iterations,
+            "filterparent": False if self._mjModel.opt.disableflags & mujoco.mjtDisableBit.mjDSBL_FILTERPARENT else True
         }
         return opt_config
 

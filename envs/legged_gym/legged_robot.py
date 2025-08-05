@@ -163,7 +163,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         else:
             self._visualize_command = False
             
-        if self.name == robot_config["playable_agent_name"]:
+        if self.name == robot_config["playable_agent_name"] and env_idx in robot_config["log_env_ids"]:
             self._is_playable = True
         else:
             self._is_playable = False
@@ -1323,14 +1323,17 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # 高于奖励阈值，并达到行走距离，升级
         if mean_rating < self._curriculum_levels[self._current_level]["rating"] + self._curriculum_clear_times * 0.01:
             self._current_level = max(self._current_level - 1, 0)
-            # print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating)
+            if self.playable:
+                print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating)
         elif hasattr(self, "_base_neutral_qpos") and not self.is_terminated(self._achieved_goal, self._desired_goal):
             start_pos = self._base_neutral_qpos[self._base_joint_name][:3]
             current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
             move_distance = np.linalg.norm(start_pos - current_pos)
-            # print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
+            if self.playable:
+                print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
             if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
-                # print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._curriculum_current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
+                if self.playable:
+                    print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
                 if self._current_level == len(self._curriculum_levels) - 1:
                     self._curriculum_clear_times += 1
                     self._current_level = 0

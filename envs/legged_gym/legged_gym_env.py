@@ -322,8 +322,8 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         elif "g1" in self._player_agent.name:
             robot_config = LeggedRobotConfig["g1"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
@@ -404,6 +404,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
         self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
         self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
+        self.gym.opt.filterparent = LeggedEnvConfig[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)

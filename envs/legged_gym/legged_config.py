@@ -22,12 +22,14 @@ LeggedEnvConfig = {
         "noslip_iterations" : 0,
         "ccd_iterations" : 0,
         "sdf_iterations" : 0,
+        "filterparent" : "disable"
     },
     "phy_high" : {
         "iterations" : 100,
         "noslip_iterations" : 10,
         "ccd_iterations" : 50,
         "sdf_iterations" : 10,  
+        "filterparent" : "disable"
     },
     "phy_config" : "phy_high",
 }

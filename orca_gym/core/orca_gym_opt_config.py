@@ -38,4 +38,5 @@ class OrcaGymOptConfig:
         self.disableactuator = opt_config['disableactuator']
         self.sdf_initpoints = opt_config['sdf_initpoints']
         self.sdf_iterations = opt_config['sdf_iterations']
+        self.filterparent = opt_config['filterparent']
 
