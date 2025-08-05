@@ -35,9 +35,8 @@ if __name__ == "__main__":
 
     TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 
-    FRAME_SKIP_REALTIME = LeggedEnvConfig["FRAME_SKIP_REALTIME"]
-    FRAME_SKIP_SHORT = LeggedEnvConfig["FRAME_SKIP_SHORT"]
-    FRAME_SKIP_LONG = LeggedEnvConfig["FRAME_SKIP_LONG"]
+    FRAME_SKIP = LeggedEnvConfig["FRAME_SKIP"]
+    ACTION_SKIP = LeggedEnvConfig["ACTION_SKIP"]
 
     EPISODE_TIME_VERY_SHORT = LeggedEnvConfig["EPISODE_TIME_VERY_SHORT"]
     EPISODE_TIME_SHORT = LeggedEnvConfig["EPISODE_TIME_SHORT"]
@@ -58,7 +57,8 @@ if __name__ == "__main__":
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
     if task == 'stand' or task == 'move_forward' or task == 'no_action' or task == 'follow_command':
-        frame_skip = FRAME_SKIP_SHORT # FRAME_SKIP_REALTIME
+        frame_skip = FRAME_SKIP
+        action_skip = ACTION_SKIP
         max_episode_steps = int(1 / (TIME_STEP * frame_skip) * EPISODE_TIME_LONG)
     else:
         raise ValueError("Invalid task")
@@ -93,6 +93,7 @@ if __name__ == "__main__":
                 max_episode_steps=max_episode_steps, 
                 render_mode=render_mode,
                 frame_skip=frame_skip, 
+                action_skip=action_skip,
                 total_timesteps=total_steps, 
                 model_file=model_file, 
                 height_map_file=height_map_file, 
@@ -113,6 +114,7 @@ if __name__ == "__main__":
                 max_episode_steps=max_episode_steps, 
                 render_mode="human",
                 frame_skip=frame_skip, 
+                action_skip=action_skip,
                 model_file=model_file, 
                 height_map_file=height_map_file
             )  

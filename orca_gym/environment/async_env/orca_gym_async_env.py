@@ -22,6 +22,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def __init__(
         self,
         frame_skip: int,
+        action_skip: int,
         orcagym_addr: str,
         agent_names: list[str],
         time_step: float,    
@@ -38,6 +39,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self._is_subenv = is_subenv
         self._env_id = env_id
         self._task = task
+        self._action_skip = action_skip
         
         super().__init__(
             frame_skip = frame_skip,
@@ -52,7 +54,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self.initialize_agents(entry=agent_engry, 
                                task=task, 
                                max_episode_steps=max_episode_steps,
-                               dt=self.dt)
+                               dt=self.dt * self._action_skip)
 
         self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]
         self._agent_actuator_names = [actuator_name for agent in self._agents for actuator_name in agent.actuator_names]
@@ -165,7 +167,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         
         self.step_agents(action)
 
-        for _ in range(self.frame_skip):
+        for _ in range(self._action_skip):
             for agent in self._agents:
                 torque_ctrl = agent.compute_torques(self.data.qpos, self.data.qvel)
                 self.ctrl[agent.ctrl_start : agent.ctrl_start + len(torque_ctrl)] = torque_ctrl
@@ -175,7 +177,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
             # print("action: ", action)
             # print("ctrl: ", self.ctrl)
 
-            self.do_simulation(self.ctrl, 1)
+            self.do_simulation(self.ctrl, self.frame_skip)
         
         if self.render_mode == "human" and not self.is_subenv:
             self.render()

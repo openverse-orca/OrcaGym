@@ -56,6 +56,7 @@ def register_env(
     max_episode_steps: int,
     render_mode: str,
     frame_skip: int,
+    action_skip: int,
     is_subenv: bool,
     height_map_file: str
 ) -> str:
@@ -66,6 +67,7 @@ def register_env(
         entry_point=entry_point,
         kwargs={
             'frame_skip': frame_skip,
+            'action_skip': action_skip,
             'task': task,
             'orcagym_addr': orcagym_addr,
             'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)],
@@ -98,6 +100,7 @@ def make_env(
     max_episode_steps: int, 
     render_mode: str,
     frame_skip: int, 
+    action_skip: int,
     is_subenv: bool, 
     height_map_file: str
 ) -> callable:
@@ -117,6 +120,7 @@ def make_env(
             max_episode_steps=max_episode_steps, 
             render_mode=render_mode,
             frame_skip=frame_skip, 
+            action_skip=action_skip,
             is_subenv=is_subenv, 
             height_map_file=height_map_file
         )
@@ -241,6 +245,7 @@ def train_model(
     max_episode_steps: int,
     render_mode: str,
     frame_skip: int,
+    action_skip: int,
     total_timesteps: int,
     model_file: str,
     height_map_file: str,
@@ -267,6 +272,7 @@ def train_model(
                 max_episode_steps=max_episode_steps,
                 render_mode=render_mode,
                 frame_skip=frame_skip,
+                action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
             )
@@ -303,6 +309,7 @@ def test_model(
     max_episode_steps: int,
     render_mode: str,
     frame_skip: int,
+    action_skip: int,
     model_file: str,
     height_map_file: str
 ):
@@ -328,6 +335,7 @@ def test_model(
                 max_episode_steps=max_episode_steps,
                 render_mode=render_mode,
                 frame_skip=frame_skip,
+                action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
             )

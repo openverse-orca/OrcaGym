@@ -88,7 +88,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._foot_touch_force_air_threshold = robot_config["foot_touch_force_air_threshold"]
         self._foot_touch_force_step_threshold = robot_config["foot_touch_force_step_threshold"]
         self._foot_touch_air_time_ideal = robot_config["foot_touch_air_time_ideal"]
-        
+
+        self._foot_touch_air_time = np.zeros(len(self._foot_touch_sensor_names))
+        self._foot_in_air_time = np.zeros(len(self._foot_touch_sensor_names))
+
         self._foot_square_wave = robot_config["foot_square_wave"] if "foot_square_wave" in robot_config else None
         self._square_wave_phase = 0.0
         self._foot_leg_period = robot_config["foot_leg_period"] if "foot_leg_period" in robot_config else None
@@ -680,14 +683,19 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # The agent need to put it's feet on the ground to get the reward. 
         # So the agent will learn to keep the feet in the air for the ideal air time, go get the maximum reward in one episode.
         
-        # print("feet air time: ", self._foot_touch_air_time)
         for i in range(len(self._foot_touch_air_time)):
-            if self._foot_in_air_time[i] > self._foot_touch_air_time_ideal:
-                reward -= (self._foot_in_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
             if self._foot_touch_air_time[i] > 0:
-                # reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
-                reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
-                # reward += -(self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal)**2  * coeff * self.dt
+                reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0) * coeff * self.dt
+
+
+        # print("feet air time: ", self._foot_touch_air_time)
+        # for i in range(len(self._foot_touch_air_time)):
+        #     if self._foot_in_air_time[i] > self._foot_touch_air_time_ideal:
+        #         reward -= (self._foot_in_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
+        #     if self._foot_touch_air_time[i] > 0:
+        #         # reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
+        #         reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
+        #         # reward += -(self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal)**2  * coeff * self.dt
 
         self._print_reward("Feet air time reward: ", reward, coeff * self.dt)
         return reward
@@ -1061,9 +1069,6 @@ class LeggedRobot(OrcaGymAsyncAgent):
         """
         Compute the air time for each foot
         """
-        if not hasattr(self, "_foot_touch_air_time"):
-            self._foot_touch_air_time = np.zeros(len(foot_touch_force))
-            self._foot_in_air_time = np.zeros(len(foot_touch_force))
 
         # If the robot is in the air, reset the air time   
         # if all(foot_touch_force < self._foot_touch_force_air_threshold):
