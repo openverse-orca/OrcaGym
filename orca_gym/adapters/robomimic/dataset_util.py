@@ -7,7 +7,7 @@ import os
 import uuid  # 新增导入uuid模块
 import time  # 新增导入time模块
 import shutil
-
+import hashlib
 class DatasetWriter:
     # def __init__(self, base_dir, env_name, env_version, env_kwargs=None):  # 修改1: 参数名改为base_dir
     #     """
@@ -66,9 +66,14 @@ class DatasetWriter:
             self.basedir = base_dir
             # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
             # self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-            uuid1 = str(uuid.uuid4())[:8]
-            uuid2 = str(uuid.uuid4())[:8]
-            self.experiment_id = f"{uuid1}_{uuid2}"
+
+            # uuid1 = str(uuid.uuid4())[:8]
+            # uuid2 = str(uuid.uuid4())[:8]
+            raw_uuid = str(uuid.uuid4())
+            hash_digest = hashlib.sha256(raw_uuid.encode('utf-8')).hexdigest()
+            short_id = hash_digest[:16]
+            self.experiment_id = short_id
+            # self.experiment_id = f"{uuid1}_{uuid2}"
             self.uuid_dir = os.path.join(base_dir, self.experiment_id)
             self.camera_dir = os.path.join(self.uuid_dir, "camera")
             self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
@@ -94,9 +99,13 @@ class DatasetWriter:
     def set_UUIDPATH(self):
         # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
         # self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
-        uuid1 = str(uuid.uuid4())[:8]
-        uuid2 = str(uuid.uuid4())[:8]
-        self.experiment_id = f"{uuid1}_{uuid2}"
+        # uuid1 = str(uuid.uuid4())[:8]
+        # uuid2 = str(uuid.uuid4())[:8]
+        # self.experiment_id = f"{uuid1}_{uuid2}"
+        raw_uuid = str(uuid.uuid4())
+        hash_digest = hashlib.sha256(raw_uuid.encode('utf-8')).hexdigest()
+        short_id = hash_digest[:16]
+        self.experiment_id = short_id
         self.uuid_dir = os.path.join(self.basedir, self.experiment_id)
         self.camera_dir = os.path.join(self.uuid_dir, "camera")
         self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
