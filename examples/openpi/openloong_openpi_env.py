@@ -5,7 +5,7 @@ from openpi_client.runtime import environment as _environment
 from typing_extensions import override
 import cv2
 from orca_gym.sensor.rgbd_camera import CameraWrapper
-from orca_gym.scripts.openloong_manipulation import RGB_SIZE, CAMERA_CONFIG
+from orca_gym.scripts.dual_arm_manipulation import RGB_SIZE, CAMERA_CONFIG
 import time
 
 class OpenLoongOpenpiEnv(_environment.Environment):
@@ -77,13 +77,22 @@ class OpenLoongOpenpiEnv(_environment.Environment):
         # Convert axis order from [H, W, C] --> [C, H, W]
         img = np.transpose(img, (2, 0, 1))
         
-        
+        # YAO: TODO
+        # joint_qpos = np.concatenate([
+        #     gym_obs["arm_joint_qpos_l"], 
+        #     gym_obs["grasp_value_l"],
+        #     gym_obs["arm_joint_qpos_r"],
+        #     gym_obs["grasp_value_r"],
+        # ]).flatten()   
         joint_qpos = np.concatenate([
+            gym_obs["ee_pos_l"],
+            gym_obs["ee_pos_r"],
             gym_obs["arm_joint_qpos_l"], 
-            gym_obs["grasp_value_l"],
             gym_obs["arm_joint_qpos_r"],
+            gym_obs["grasp_value_l"],
             gym_obs["grasp_value_r"],
-        ]).flatten()        
+            np.zeros(10),
+        ]).flatten()         
         
         
         return {

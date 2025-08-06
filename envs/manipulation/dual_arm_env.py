@@ -282,8 +282,8 @@ class DualArmEnv(RobomimicEnv):
 
         info = {"state": self.get_state(),
                 "action": scaled_action,
-                "object": self.objects,  # 提取第一个对象的位置
-                "goal": self.goals,
+                # "object": self.objects,  # 提取第一个对象的位置
+                # "goal": self.goals,
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
                 "time_step": self.data.time}

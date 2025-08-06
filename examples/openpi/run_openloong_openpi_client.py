@@ -10,28 +10,28 @@ import tyro
 import dataclasses
 import gymnasium as gym
 import orca_gym.scripts.camera_monitor as camera_monitor
-from envs.manipulation.openloong_env import ControlDevice, RunMode, OpenLoongEnv
-import orca_gym.scripts.openloong_manipulation as openloong_manipulation
-from orca_gym.scripts.openloong_manipulation import ActionType
+from envs.manipulation.dual_arm_env import ControlDevice, RunMode
+import orca_gym.scripts.dual_arm_manipulation as dual_arm_manipulation
+from orca_gym.scripts.dual_arm_manipulation import ActionType
 import logging
 
 
-TIME_STEP = openloong_manipulation.TIME_STEP
-FRAME_SKIP = openloong_manipulation.FRAME_SKIP
+TIME_STEP = dual_arm_manipulation.TIME_STEP
+FRAME_SKIP = dual_arm_manipulation.FRAME_SKIP
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
-CAMERA_CONFIG = openloong_manipulation.CAMERA_CONFIG
-RGB_SIZE = openloong_manipulation.RGB_SIZE
+CAMERA_CONFIG = dual_arm_manipulation.CAMERA_CONFIG
+RGB_SIZE = dual_arm_manipulation.RGB_SIZE
 
 
 
 @dataclasses.dataclass
 class Args:
-    orca_gym_address: str = 'localhost:50051'
-    env_name: str = "OpenLoong"
+    orca_gym_address: str = '192.168.1.164:50051'
+    env_name: str = "DualArmEnv"
     seed: int = 0
-    agent_names: str = "OpenLoongGripper"
+    agent_names: str = "openloong_gripper_2f85_fix_base"
     record_time: int = 20
     task: str = "Manipulation"
     obs_type: str = "pixels_agent_pos"
@@ -56,7 +56,7 @@ def main(args: Args) -> None:
     camera_config = CAMERA_CONFIG
     task_config_dict = {}
 
-    env_id, kwargs = openloong_manipulation.register_env(
+    env_id, kwargs = dual_arm_manipulation.register_env(
         orcagym_addr=args.orca_gym_address,
         env_name=args.env_name, 
         env_index=env_index, 
