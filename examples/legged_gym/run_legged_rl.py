@@ -27,8 +27,8 @@ if __name__ == "__main__":
     parser.add_argument('--algorithm', type=str, default='ppo', help='The algorithm to use (ppo / appo)')
     parser.add_argument('--run_mode', type=str, default='training', help='The mode to run (training / testing / play / nav)')
     parser.add_argument('--render_mode', type=str, default='human', help='The render mode (human / none)')
-    parser.add_argument('--model_file', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
-    parser.add_argument('--height_map_file', type=str, default='../../orca_gym/tools/height_map.npy', help='The height field map file')
+    parser.add_argument('--ckpt', type=str, help='The model file to save/load. If not provided, a new model file will be created while training')
+    parser.add_argument('--height_map', type=str, default='height_map_train.npy', help='The height field map file')
     parser.add_argument('--training_episode', type=int, default=200, help='The number of training episodes for each agent')
     parser.add_argument('--nav_ip', type=str, default="localhost", help='The IP address of the navigation server, default is localhost, should be local pc ip address')
     args = parser.parse_args()
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     agent_name = args.agent_name
     task = args.task
     algorithm = args.algorithm
-    height_map_file = args.height_map_file
+    height_map_file = args.height_map
     run_mode = args.run_mode
     render_mode = args.render_mode
     training_episode = args.training_episode
@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     create_tmp_dir("trained_models_tmp")
 
-    if args.model_file is not None:
-        model_file = args.model_file
+    if args.ckpt is not None:
+        model_file = args.ckpt
     elif run_mode == "training":
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         model_dir = f"./trained_models_tmp/{agent_name}_{algorithm}_{subenv_num * agent_num}-agents_{training_episode}-episodes_{formatted_now}"

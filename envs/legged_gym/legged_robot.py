@@ -966,8 +966,11 @@ class LeggedRobot(OrcaGymAsyncAgent):
         foot_site_pos = [site_pos_quat[foot_site_name]["xpos"] for foot_site_name in self._contact_site_names]
         foot_height = np.zeros(len(foot_site_pos))
         for i in range(len(foot_site_pos)):
-            foot_height[i] = foot_site_pos[i][2] - height_map[int(foot_site_pos[i][0] * 10 + height_map.shape[0] / 2), 
-                                                              int(foot_site_pos[i][1] * 10 + height_map.shape[1] / 2)]
+            x_idx = int(foot_site_pos[i][0] * 10 + height_map.shape[0] / 2)
+            y_idx = int(foot_site_pos[i][1] * 10 + height_map.shape[1] / 2)
+            x_idx = np.clip(x_idx, 0, height_map.shape[0] - 1)
+            y_idx = np.clip(y_idx, 0, height_map.shape[1] - 1)
+            foot_height[i] = foot_site_pos[i][2] - height_map[x_idx, y_idx]
 
         # print("Foot site pos: ", foot_site_pos, "Foot height: ", foot_height)
         return foot_height

@@ -352,7 +352,8 @@ def test_model(
             model=model,
             time_step=time_step,
             max_episode_steps=max_episode_steps,
-            frame_skip=frame_skip
+            frame_skip=frame_skip,
+            action_skip=action_skip
         )
 
     except KeyboardInterrupt:
@@ -390,7 +391,8 @@ def testing_model(
     model, 
     time_step: float, 
     max_episode_steps: int, 
-    frame_skip: int
+    frame_skip: int,
+    action_skip: int
 ):
     """
     测试模型。
@@ -414,14 +416,12 @@ def testing_model(
     test = 0
     total_rewards = np.zeros(agent_num)
     step = 0
-    dt = time_step * frame_skip
+    dt = time_step * frame_skip * action_skip
     print("Start Testing!")
     try:
         while True:
             step += 1
             start_time = datetime.now()
-
-
 
             obs_list = _segment_observation(observations, agent_num)
             action_list = []

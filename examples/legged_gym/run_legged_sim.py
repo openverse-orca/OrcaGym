@@ -26,10 +26,11 @@ EPISODE_TIME_VERY_SHORT = LeggedEnvConfig["EPISODE_TIME_VERY_SHORT"]
 EPISODE_TIME_SHORT = LeggedEnvConfig["EPISODE_TIME_SHORT"]
 EPISODE_TIME_LONG = LeggedEnvConfig["EPISODE_TIME_LONG"]
 
-TIME_STEP = 0.005                       # 1000 Hz for physics simulation
-FRAME_SKIP = 4
+TIME_STEP = 0.001                       # 1000 Hz for physics simulation
+FRAME_SKIP = 5
+ACTION_SKIP = 4
 
-REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for rendering
+REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP  # 50 Hz for policy
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for ppo policy
 
 MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
@@ -39,7 +40,9 @@ def register_env(orcagym_addr : str,
                  env_index : int, 
                  agent_names : str,
                  ctrl_device : str,
-                 max_episode_steps : int,) -> str:
+                 max_episode_steps : int,
+                 height_map : str,
+                 ) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names_list = agent_names.split(" ")
@@ -49,9 +52,12 @@ def register_env(orcagym_addr : str,
                 'env_id': env_id,
                 'agent_names': agent_names_list,
                 'time_step': TIME_STEP,
+                'action_skip': ACTION_SKIP,
                 'max_episode_steps': max_episode_steps,
                 'ctrl_device': ctrl_device,
-                'control_freq': CONTROL_FREQ,}
+                'control_freq': CONTROL_FREQ,
+                'height_map': height_map,
+                }
     gym.register(
         id=env_id,
         entry_point='envs.legged_gym.legged_sim_env:LeggedSimEnv',
@@ -62,10 +68,13 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 
-def main(orcagym_addr: str,
-                   agent_names: str,
-                   model_file: str,
-                   ctrl_device: str = "keyboard",):
+def main(
+    orcagym_addr: str,
+    agent_names: str,
+    model_file: str,
+    height_map: str,
+    ctrl_device: str = "keyboard",
+    ):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
         env_name = "LeggedSim-v0"
@@ -76,6 +85,7 @@ def main(orcagym_addr: str,
             agent_names=agent_names, 
             ctrl_device=ctrl_device, 
             max_episode_steps=MAX_EPISODE_STEPS,
+            height_map=height_map,
         )
         print("Registered environment: ", env_id)
 
@@ -91,7 +101,8 @@ def main(orcagym_addr: str,
             agent_name_list=agent_name_list,
             model=model,
             time_step=TIME_STEP,
-            frame_skip=FRAME_SKIP
+            frame_skip=FRAME_SKIP,
+            action_skip=ACTION_SKIP
         )
     finally:
         print("退出仿真环境")
@@ -181,9 +192,10 @@ def run_simulation(env: gym.Env,
                  agent_name_list: list[str],
                  model: nn.Module, 
                  time_step: float, 
-                 frame_skip: int):
+                 frame_skip: int,
+                 action_skip: int):
     obs, info = env.reset()
-    dt = time_step * frame_skip
+    dt = time_step * frame_skip * action_skip
     if not os.path.exists("./log"):
         os.makedirs("./log")
     log_file = f"./log/simulation_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -218,9 +230,9 @@ def run_simulation(env: gym.Env,
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()
 
-            print("--------------------------------")
-            print("action: ", action)
-            print("obs: ", obs)
+            # print("--------------------------------")
+            # print("action: ", action)
+            # print("obs: ", obs)
 
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < dt:
@@ -234,14 +246,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addr', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
     parser.add_argument('--agent_name', type=str, default='go2', help='The name list of the agent to control, separated by space')
-    parser.add_argument('--model_file', type=str, help='The model file to load')
+    parser.add_argument('--ckpt', type=str, help='The model file to load')
+    parser.add_argument('--height_map', type=str, default='height_map_test.npy', help='The height field map file')
     parser.add_argument('--ctrl_device', type=str, default='keyboard', help='The control device to use ')
     args = parser.parse_args()
 
     main(
         orcagym_addr=args.orcagym_addr, 
         agent_names=args.agent_name, 
-        model_file=args.model_file,
+        model_file=args.ckpt,
+        height_map=args.height_map,
         ctrl_device=args.ctrl_device
     )    
 
