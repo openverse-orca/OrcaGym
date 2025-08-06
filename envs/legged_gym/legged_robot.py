@@ -174,6 +174,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
         self._compute_body_height = True if robot_config["reward_coeff"]["height"] > 0 else False
         self._compute_body_orientation = True if robot_config["reward_coeff"]["body_orientation"] > 0 else False
+        self._compute_foot_height = True if "feet_swing_height" in robot_config["reward_coeff"] and robot_config["reward_coeff"]["feet_swing_height"] > 0 else False
 
         self._is_obs_updated = False
         self._setup_reward_functions(robot_config)
@@ -963,6 +964,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return imu_data.flatten()
     
     def _get_foot_height(self, site_pos_quat: dict, height_map : np.ndarray) -> np.ndarray:
+        if not self._compute_foot_height:
+            return np.zeros(len(self._contact_site_names))
+        
         foot_site_pos = [site_pos_quat[foot_site_name]["xpos"] for foot_site_name in self._contact_site_names]
         foot_height = np.zeros(len(foot_site_pos))
         for i in range(len(foot_site_pos)):
