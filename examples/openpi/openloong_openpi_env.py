@@ -46,6 +46,19 @@ class OpenLoongOpenpiEnv(_environment.Environment):
 
         return self._last_obs  # type: ignore
 
+    # # 数据采集保存局部坐标系
+    # action_l_B = np.concatenate([grasp_l_xpos, grasp_l_axisangle])
+    # action_r_B = np.concatenate([grasp_r_xpos, grasp_r_axisangle])
+    # ctrl_l = np.asarray(ctrl_l, dtype=np.float32)
+    # ctrl_r = np.asarray(ctrl_r, dtype=np.float32)
+    # action = np.concatenate([
+    #     np.asarray(action_l_B, dtype=np.float32),                # 0-5  : left eef pos and axisangle, normalized to [-1, 1] based on the coordinate action space [-2m, 2m] and rotation action space [-pi, pi]
+    #     ctrl_l,                                                  # 6-12 : left arm joint pos (ik control mode) or torque (osc control mode) ,  normalized to [-1, 1] based on the pos or torque range
+    #     np.array([self._grasp_value_l], dtype=np.float32),       # 13   : left hand grasp value, normalized to [-1, 1] based on the pos or torque range
+    #     np.asarray(action_r_B, dtype=np.float32),                # 14-19: right eef pos and axisangle, normalized to [-1, 1] based on the coordinate action space [-2m, 2m] and rotation action space [-pi, pi]
+    #     ctrl_r,                                                  # 20-26: right arm joint pos (ik control mode) or torque (osc control mode) ,  normalized to [-1, 1] based on the pos or torque range
+    #     np.array([self._grasp_value_r], dtype=np.float32)        # 27   : right hand grasp value, normalized to [-1, 1] based on the pos or torque range
+    # ]).flatten()
     @override
     def apply_action(self, action: dict) -> None:
         joint_pos = action["actions"]
