@@ -148,6 +148,18 @@ class DualArmEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
+        from orca_gym.task.abstract_task import AbstractTask
+        from orca_gym.scene.orca_gym_scene import OrcaGymScene
+        # self._task = AbstractTask()
+        # self._task.grpc_addr = "192.168.1.164:50051"
+        # self._task.scene = OrcaGymScene(self._task.grpc_addr)
+        # self._task.actors = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
+        # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
+        # self._task.register_init_env_callback(self.init_env)
+        self._config = task_config_dict
+        self._config["grpc_addr"] = "192.168.1.164:50051"
+        self._task = PickPlaceTask(self._config)
+
 
     def init_env(self):
         self.model, self.data = self.initialize_simulation()
@@ -477,6 +489,7 @@ class DualArmEnv(RobomimicEnv):
         }
     
     def reset_model(self) -> tuple[dict, dict]:
+        self._task.spawn_scene(self)
         if self._run_mode == RunMode.TELEOPERATION:
             return self.reset_teleoperation()
         elif self._run_mode == RunMode.POLICY_NORMALIZED:

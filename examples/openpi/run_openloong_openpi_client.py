@@ -14,7 +14,7 @@ from envs.manipulation.dual_arm_env import ControlDevice, RunMode
 import orca_gym.scripts.dual_arm_manipulation as dual_arm_manipulation
 from orca_gym.scripts.dual_arm_manipulation import ActionType
 import logging
-
+import yaml
 
 TIME_STEP = dual_arm_manipulation.TIME_STEP
 FRAME_SKIP = dual_arm_manipulation.FRAME_SKIP
@@ -49,12 +49,17 @@ class Args:
     action_type: ActionType = ActionType.JOINT_POS
 
     display: bool = False
+    
+    task_config: str = "shop_task.yaml"
 
 def main(args: Args) -> None:
     max_episode_steps = int(args.record_time * CONTROL_FREQ)    
     env_index = 0
     camera_config = CAMERA_CONFIG
     task_config_dict = {}
+    if args.task_config is not None:
+        with open(args.task_config, "r") as f:
+            task_config_dict = yaml.safe_load(f)
 
     env_id, kwargs = dual_arm_manipulation.register_env(
         orcagym_addr=args.orca_gym_address,
