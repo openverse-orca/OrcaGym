@@ -108,8 +108,14 @@ def run_sb3_ppo_rl(
     config: dict,
     run_mode: str,
     ckpt: str,
+    remote: str,
+    visualize: bool,
 ):
-    orcagym_addresses = config['orcagym_addresses']
+    if remote is not None:
+        orcagym_addresses = [remote]
+    else:
+        orcagym_addresses = config['orcagym_addresses']
+
     agent_name = config['agent_name']
     agent_spawnable_name = config['agent_spawnable_name']
     training_episode = config['training_episode']
@@ -118,7 +124,12 @@ def run_sb3_ppo_rl(
     subenv_num = run_mode_config['subenv_num']
     agent_num = run_mode_config['agent_num']
     task = run_mode_config['task']
-    render_mode = run_mode_config['render_mode']
+
+    if visualize:
+        render_mode = "human"
+    else:
+        render_mode = run_mode_config['render_mode']
+
     terrain_spawnable_names = run_mode_config['terrain_spawnable_names']
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
@@ -182,6 +193,7 @@ def run_sb3_ppo_rl(
             total_timesteps=total_steps, 
             model_file=model_file, 
             height_map_file=height_map_file, 
+            curriculum_list=run_mode_config['curriculum_list'],
         )
     elif run_mode in ["testing", "play"]:
         print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
@@ -199,7 +211,8 @@ def run_sb3_ppo_rl(
             frame_skip=FRAME_SKIP, 
             action_skip=ACTION_SKIP,
             model_file=model_file, 
-            height_map_file=height_map_file
+            height_map_file=height_map_file,
+            curriculum_list=run_mode_config['curriculum_list'],
         )  
   
     else:
@@ -247,12 +260,14 @@ def run_rllib_appo_rl(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
+    parser = argparse.ArgumentParser(description='Run legged RL.')
     parser.add_argument('--config', type=str, help='The path of the config file')
     parser.add_argument('--train', action='store_true', help='Train the model')
     parser.add_argument('--test', action='store_true', help='Test the model')
     parser.add_argument('--play', action='store_true', help='Play the model')
     parser.add_argument('--ckpt', type=str, help='The path to the checkpoint file for testing / play')
+    parser.add_argument('--remote', type=str, help='[Optional] The remote address of the ORCA Lab Simulator. Example: 192.198.1.123:50051')
+    parser.add_argument('--visualize', action='store_true', help='Visualize the training process')
     args = parser.parse_args()
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -263,11 +278,11 @@ if __name__ == "__main__":
     assert not (args.test and args.play), "Please specify only one of --train, --test, or --play"
 
     if args.train:
-        run_sb3_ppo_rl(config, 'training', None)
+        run_sb3_ppo_rl(config, 'training', args.ckpt, args.remote, args.visualize)
     elif args.test:
-        run_sb3_ppo_rl(config, 'testing', args.ckpt)
+        run_sb3_ppo_rl(config, 'testing', args.ckpt, args.remote, args.visualize)
     elif args.play:
-        run_sb3_ppo_rl(config, 'play', args.ckpt)
+        run_sb3_ppo_rl(config, 'play', args.ckpt, args.remote, args.visualize)
     else:
         raise ValueError("Invalid config file")
 

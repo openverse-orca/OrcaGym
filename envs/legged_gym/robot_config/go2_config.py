@@ -147,28 +147,31 @@ Go2Config = {
         
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
-        "curriculum_levels" : [
-            # basic moving skills
-            # {"name" : "test" ,                  "offset" : [-30, 30, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
-            # {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "move_medium", "terminate_threshold": 10},
-
-            # normal moving skills
-            {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-            {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
-            {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-
-            # advanced moving skills
-            {"name" : "smooth_slope" ,          "offset" : [0, -30, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "rough" ,                "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "rough_slope" ,           "offset" : [30, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "rough" ,                "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "terrain_stairs_low" ,    "offset" : [-30, -30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            {"name" : "rough" ,                "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            # {"name" : "terrain_brics" ,         "offset" : [30, -30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "slope",  "terminate_threshold": 10},
-        ],
+        "curriculum_levels" : {
+            "stand_still" : [
+                {"name" : "stand_still" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
+            ],
+            "basic_moving" : [
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "move_medium", "terminate_threshold": 10},
+            ],
+            "flat_terrain" : [
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
+            ],
+            "rough_terrain" : [
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+            ],
+            "advanced_moving" : [
+                {"name" : "smooth_slope" ,          "offset" : [0, -30, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "rough_slope" ,           "offset" : [30, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "terrain_stairs_low" ,    "offset" : [-30, -30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+           ],
+        },
         "curriculum_commands" : {
             "stand_still" : {
                 "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
@@ -179,25 +182,25 @@ Go2Config = {
             },
 
             "move_slowly" : {
-                "command_lin_vel_range_x" : [-0.0, 0.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [-0.0, 0.1], # min linear velocity to trigger moving
-                "command_ang_vel_range" : np.pi / 4,  # max turning rate
+                "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
+                "command_ang_vel_range" : np.pi / 2,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
             "move_medium" : {
-                "command_lin_vel_range_x" : [-0.5, 1.0], # x direction for forward
+                "command_lin_vel_range_x" : [-1.0, 1.0], # x direction for forward
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
-                "command_lin_vel_threshold" : [-0.1, 0.2], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 2,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },
 
             "move_fast" : {
-                "command_lin_vel_range_x" : [-0.75, 1.5], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-1.0, 2.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [-0.15, 0.3], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.2, 0.4], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 2,  # max turning rate
                 "command_resample_interval" : 7, # second to resample the command
             },

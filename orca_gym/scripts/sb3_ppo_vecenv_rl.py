@@ -42,6 +42,45 @@ class SnapshotCallback(BaseCallback):
             self.model.save(model_path)
         return True  # 确保训练继续
 
+class CurriculumCallback(BaseCallback):
+    def __init__(self, 
+                 save_path : str,
+                 model_nstep : int,
+                 curriculum_list : list[dict[str, int]],
+                 verbose=0):
+        super().__init__(verbose)
+        self.steps_count = 0                # 步数计数器
+        self.iteration_count = 0            # 迭代计数器
+        self.save_path = save_path          # 保存路径前缀
+        self.model_nstep = model_nstep      # 模型每迭代执行步数
+        self.curriculum_list = curriculum_list        # 课程名称和持续迭代数
+        self.curriculum_index = 0
+        
+    def _on_step(self) -> bool:
+        # 每步递增计数器
+        self.steps_count += 1
+        if self.steps_count % self.model_nstep == 0:
+            self.iteration_count += 1
+        # print("callback step: ", self.steps_count, " iteration: ", self.iteration_count)
+        # 满足间隔条件时保存
+        if self.iteration_count > 0 and self.iteration_count % self.curriculum_list[self.curriculum_index]["milestone"] == 0 and self.steps_count % self.model_nstep == 0:
+            # 保存模型
+            model_path = f"{self.save_path}_{self.curriculum_list[self.curriculum_index]['name']}_iteration_{self.iteration_count}.zip"
+            self.logger.info(f"保存模型到 {model_path}")
+            self.model.save(model_path)
+
+            # 更新课程
+            self.curriculum_index += 1
+            if self.curriculum_index >= len(self.curriculum_list):
+                self.curriculum_index = 0
+            self.logger.info(f"更新课程: {self.curriculum_list[self.curriculum_index]['name']}")
+            self.model.env.setup_curriculum(self.curriculum_list[self.curriculum_index]["name"])
+            self.model.env.reset()
+
+            
+        return True  # 确保训练继续
+
+
 def register_env(
     orcagym_addr: str,
     env_name: str,
@@ -132,15 +171,20 @@ def training_model(
     model : PPO, 
     total_timesteps: int, 
     model_file: str,
+    curriculum_list: list[dict[str, int]],
 ):
     try:
         snapshot_callback = SnapshotCallback(save_interval=100, 
                                              save_path=model_file,
                                              model_nstep=model.n_steps)
+
+        curriculum_callback = CurriculumCallback(save_path=model_file, 
+                                                 model_nstep=model.n_steps, 
+                                                 curriculum_list=curriculum_list)
         
         
         model.learn(total_timesteps=total_timesteps, 
-                    callback=snapshot_callback)
+                    callback=[snapshot_callback, curriculum_callback])
     finally:
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
@@ -245,6 +289,7 @@ def train_model(
     total_timesteps: int,
     model_file: str,
     height_map_file: str,
+    curriculum_list: list[dict[str, int]],
 ):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
@@ -274,6 +319,7 @@ def train_model(
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
         env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
+        env.setup_curriculum(curriculum_list[0]["name"])
 
         print("Start Simulation!")
         model = setup_model_ppo(
@@ -284,7 +330,7 @@ def train_model(
             model_file=model_file,
         )
 
-        training_model(model, total_timesteps, model_file)
+        training_model(model, total_timesteps, model_file, curriculum_list)
 
     finally:
         print("退出仿真环境")
@@ -305,7 +351,8 @@ def test_model(
     frame_skip: int,
     action_skip: int,
     model_file: str,
-    height_map_file: str
+    height_map_file: str,
+    curriculum_list: list[dict[str, int]],
 ):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
@@ -335,6 +382,7 @@ def test_model(
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
         env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
+        env.setup_curriculum(curriculum_list[0]["name"])
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         model: PPO = PPO.load(model_file, env=env, device=device)

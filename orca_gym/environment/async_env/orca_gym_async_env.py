@@ -332,3 +332,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self._ctrl_delta_range = np.array([ctrl["ctrl_delta_range"] for key, ctrl in ctrl_info.items()]).reshape(-1, 2)  # shape = (agent_num x actor_num, 2)
         self._neutral_joint_values = np.array([ctrl["neutral_joint_values"] for key, ctrl in ctrl_info.items()]).reshape(-1) # shape = (agent_num x actor_num)
 
+
+    def setup_curriculum(self, curriculum : str) -> None:
+        for agent in self._agents:
+            agent.setup_curriculum(curriculum)

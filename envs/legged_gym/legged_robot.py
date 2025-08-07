@@ -132,26 +132,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._pos_random_range = robot_config["pos_random_range"]
         
         # Curriculum learning
-        self._curriculum_learning = robot_config["curriculum_learning"]
-        self._curriculum_levels = robot_config["curriculum_levels"]
-        self._curriculum_commands = robot_config["curriculum_commands"]
-        if self._curriculum_learning:
-            buffer_size = self._max_episode_steps
-            self._curriculum_reward_buffer = {
-                "lin_vel" : {
-                    "buffer_size": buffer_size,
-                    "buffer": np.zeros(buffer_size),
-                    "index": 0,
-                },
-                "ang_vel" : {
-                    "buffer_size": buffer_size,
-                    "buffer": np.zeros(buffer_size),
-                    "index": 0,
-                },
-            } 
-            self._current_level = 0
-            self._curriculum_clear_times = 0
-            self._max_level_times = 0
+        self.setup_curriculum(list(robot_config["curriculum_levels"].keys())[0])
         
         self._init_commands_config()
    
@@ -423,10 +404,6 @@ class LeggedRobot(OrcaGymAsyncAgent):
         
         # Update the height of the base body
         self._base_neutral_qpos[self._base_joint_name][2] += self._compute_base_height(height_map)
-        
-        # 避免脚陷入障碍物，出生的时候拉高20cm
-        if self._curriculum_levels[self._current_level]["name"] != "default":
-            self._base_neutral_qpos[self._base_joint_name][2] += 0.2
 
         # print("Base neutral qpos: ", self._base_neutral_qpos)
         joint_neutral_qpos.update(self._base_neutral_qpos)
@@ -1352,7 +1329,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
                     if self._curriculum_clear_times > 10:
                         self._curriculum_clear_times = 0
                         self._max_level_times += 1
-                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times, "Max level times: ", self._max_level_times)
+                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times, "Max level times: ", self._max_level_times)
                 else:
                     self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
 
@@ -1465,3 +1442,28 @@ class LeggedRobot(OrcaGymAsyncAgent):
         position_ctrl = np.clip(self._neutral_joint_values + scaled_action, self._ctrl_range[:, 0], self._ctrl_range[:, 1])
 
         return position_ctrl    
+
+    def setup_curriculum(self, curriculum : str) -> None:
+        print("Agent: ", self._env_id + self.name, "Setup curriculum: ", curriculum)
+
+        robot_config = LeggedRobotConfig[get_legged_robot_name(self.name)]
+        self._curriculum_levels =  robot_config["curriculum_levels"][curriculum]
+        self._curriculum_learning = robot_config["curriculum_learning"]
+        self._curriculum_commands = robot_config["curriculum_commands"]
+        if self._curriculum_learning:
+            buffer_size = self._max_episode_steps
+            self._curriculum_reward_buffer = {
+                "lin_vel" : {
+                    "buffer_size": buffer_size,
+                    "buffer": np.zeros(buffer_size),
+                    "index": 0,
+                },
+                "ang_vel" : {
+                    "buffer_size": buffer_size,
+                    "buffer": np.zeros(buffer_size),
+                    "index": 0,
+                },
+            } 
+            self._current_level = 0
+            self._curriculum_clear_times = 0
+            self._max_level_times = 0

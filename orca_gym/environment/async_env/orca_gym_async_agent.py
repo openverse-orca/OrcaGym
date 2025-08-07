@@ -213,3 +213,6 @@ class OrcaGymAsyncAgent:
 
     def compute_torques(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> np.ndarray:
         raise NotImplementedError
+
+    def setup_curriculum(self, curriculum : str) -> None:
+        raise NotImplementedError

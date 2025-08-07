@@ -9,12 +9,27 @@ training:
   task: "follow_command"
   render_mode: "none"
   terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+  curriculum_list:
+    - name: "stand_still"
+      milestone: 50
+    - name: "basic_moving"
+      milestone: 200
+    - name: "flat_terrain"
+      milestone: 400
+    - name: "rough_terrain"
+      milestone: 600
+    - name: "advanced_moving"
+      milestone: 1000
+
 testing:
   subenv_num: 1
   agent_num: 8
   task: "follow_command"
   render_mode: "human"
   terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+  curriculum_list:
+    - name: "flat_terrain"
+      milestone: 1000
 
 play:
   subenv_num: 1
@@ -22,3 +37,6 @@ play:
   task: "follow_command"
   render_mode: "human"
   terrain_spawnable_names: ["terrain_test_usda"]
+  curriculum_list:
+    - name: "flat_terrain"
+      milestone: 1000
