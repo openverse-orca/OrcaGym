@@ -17,7 +17,8 @@ class OpenLoongGripperFixBase(DualArmRobot):
         super().init_agent(id)
 
         self._l_hand_actuator_names = [self._env.actuator(config["left_hand"]["actuator_names"][0], id)]
-        
+        self._l_hand_joint_names = [self._env.actuator(joint_name, id) for joint_name in config["left_hand"]["joint_names"]]
+
         self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
         self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][0], id), self._env.body(config["left_hand"]["body_names"][1], id)]
         self._l_hand_gemo_ids = []
@@ -26,6 +27,7 @@ class OpenLoongGripperFixBase(DualArmRobot):
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
         self._r_hand_actuator_names = [self._env.actuator(config["right_hand"]["actuator_names"][0], id)]
+        self._r_hand_joint_names = [self._env.actuator(joint_name, id) for joint_name in config["right_hand"]["joint_names"]]
 
         self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
         self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][0], id), self._env.body(config["right_hand"]["body_names"][1], id)]
@@ -114,7 +116,11 @@ class OpenLoongGripperFixBase(DualArmRobot):
         compose_force = 0
         for force in contact_force_dict.values():
             compose_force += np.linalg.norm(force[:3])
-        return compose_force                
-    
+        return compose_force
+
+    def _get_hand_joint_values(self, joint_names) -> np.ndarray:
+        qpos_dict = self._env.query_joint_qpos(joint_names)
+        return np.array([qpos_dict[joint_name] for joint_name in joint_names]).flatten()
+
     def set_wheel_ctrl(self, joystick_state) -> None:
         return

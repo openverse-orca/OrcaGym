@@ -77,6 +77,8 @@ class DualArmRobot(AgentBase):
         self._l_neutral_joint_values = np.array(config["left_arm"]["neutral_joint_values"])
         self._ee_site_l  = self._env.site(config["left_arm"]["ee_center_site_name"], id)
 
+        self._l_hand_joint_names, self._r_hand_joint_names = [], []
+
     def _setup_initial_info(self):
         """
         读取系统初始化状态
@@ -241,6 +243,9 @@ class DualArmRobot(AgentBase):
         arm_joint_velocities_l = self._get_arm_joint_velocities(self._l_arm_joint_names)
         arm_joint_velocities_r = self._get_arm_joint_velocities(self._r_arm_joint_names)
 
+        hand_joint_values_l = self._get_hand_joint_values(self._l_hand_joint_names)[0]
+        hand_joint_values_r = self._get_hand_joint_values(self._r_hand_joint_names)[0]
+
         self._obs = {
             "ee_pos_l": ee_sites[self._ee_site_l]["xpos"].flatten().astype(np.float32),
             "ee_quat_l": ee_sites[self._ee_site_l]["xquat"].flatten().astype(np.float32),
@@ -264,6 +269,9 @@ class DualArmRobot(AgentBase):
 
             "grasp_value_l": np.array([self._grasp_value_l], dtype=np.float32),
             "grasp_value_r": np.array([self._grasp_value_r], dtype=np.float32),
+
+            "grasp_joint_pos_l": np.array(np.clip(hand_joint_values_l[0], 0, 1)),
+            "grasp_joint_pos_r": np.array(np.clip(hand_joint_values_r[0], 0, 1)), #抓夹驱动关节的值
         }
         scaled_obs = {key : self._obs[key] * self._obs_scale[key] for key in self._obs.keys()}
         return scaled_obs
@@ -310,7 +318,10 @@ class DualArmRobot(AgentBase):
             "arm_joint_vel_r": np.ones(len(arm_qpos_scale_r), dtype=np.float32) / max_arm_joint_vel,
 
             "grasp_value_l": np.ones(1, dtype=np.float32),
-            "grasp_value_r": np.ones(1, dtype=np.float32),       
+            "grasp_value_r": np.ones(1, dtype=np.float32),
+
+            "grasp_joint_pos_l": np.ones(1, dtype=np.float32),
+            "grasp_joint_pos_r": np.ones(1, dtype=np.float32), #抓夹驱动关节的值
         }
 
     def _setup_action_range(self, arm_ctrl_range_l, arm_ctrl_range_r) -> None:
@@ -619,7 +630,9 @@ class DualArmRobot(AgentBase):
         raise NotImplementedError("This method should be implemented in the derived class.")
 
     def set_wheel_actuator_ctrl(self, offset_rate) -> None:
-        raise NotImplementedError("This method should be implemented in the derived class.")    
+        raise NotImplementedError("This method should be implemented in the derived class.")
 
+    def _get_hand_joint_values(self, joint_names) -> np.ndarray:
+        raise NotImplementedError("This method should be implemented in the derived class.")
 
     
