@@ -1,0 +1,24 @@
+orcagym_addresses: ["localhost:50051"]
+agent_name: "go2"
+agent_spawnable_name: "go2_usda"
+training_episode: 200
+
+training:
+  subenv_num: 32
+  agent_num: 32
+  task: "follow_command"
+  render_mode: "none"
+  terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+testing:
+  subenv_num: 1
+  agent_num: 8
+  task: "follow_command"
+  render_mode: "human"
+  terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+
+play:
+  subenv_num: 1
+  agent_num: 1
+  task: "follow_command"
+  render_mode: "human"
+  terrain_spawnable_names: ["terrain_test_usda"]

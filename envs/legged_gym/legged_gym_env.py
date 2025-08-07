@@ -30,18 +30,10 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         run_mode: str,
         env_id: str,
         task: str,
-        port:int = 15632, 
-        ip:str="localhost",
         **kwargs,
     ):
         self._init_height_map(height_map_file)
         self._run_mode = run_mode       
-        
-        if self._run_mode == "nav":
-            self.url = "http://"+ip+f":{port}/posyaw"  
-            self.rec_action = RecAction(ip=ip)
-        print("------------------------------")
-        print("ip:", ip, "port:", port)
         
         super().__init__(
             frame_skip = frame_skip,
