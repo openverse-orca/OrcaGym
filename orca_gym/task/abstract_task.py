@@ -248,7 +248,7 @@ class AbstractTask:
                 local_pos = np.array([lx, ly, lz], dtype=np.float32)
 
                 world_pos = rotations.quat_rot_vec(base_quat, local_pos) + base_pos
-                yaw = np.random.uniform(np.pi * 0.25, np.pi * 0.75)
+                yaw = np.random.uniform(-np.pi * 0.75, -np.pi * 0.25)
                 world_quat = rotations.euler2quat([0.0, 0.0, yaw])
                 obj_qpos = np.concatenate([world_pos, world_quat])
 

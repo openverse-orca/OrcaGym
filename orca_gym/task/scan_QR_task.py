@@ -59,7 +59,7 @@ class ScanQRTask(AbstractTask):
         pos, _, quat = env.get_body_xpos_xmat_xquat([env.body(self.target_object), env.body(self.goal_bodys[0])])
         target_pos, goal_pos = pos[:3], pos[3:6]
         target_quat, goal_quat = quat[:4], quat[4:8]
-        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 100, 0.3)
+        is_success = self._is_facing_(target_pos, target_quat, goal_pos, goal_quat, 75, 0.3)
         print(f"task is success: {is_success}")
         return is_success
 
@@ -73,17 +73,16 @@ class ScanQRTask(AbstractTask):
         """计算当前前向向量，基于初始前向 (0, 1, 0)"""
         w, x, y, z = quat
         # 直接公式计算
-        forward_x = 2 * (x * y + w * z)
+        forward_x = 2 * (x * y - w * z)
         forward_y = w * w - x * x + y * y - z * z
-        forward_z = 2 * (y * z - w * x)
+        forward_z = 2 * (y * z + w * x)
         forward = np.array([forward_x, forward_y, forward_z])
-        # 归一化防止浮点误差
         norm = np.linalg.norm(forward)
         if norm < 1e-10:
             return forward
         return forward / norm
 
-    def _is_facing_(self, posA, quatA, posB, quatB, tolerance_deg=60.0, tolerance_distance=0.2) -> bool:
+    def _is_facing_(self, posA, quatA, posB, quatB, tolerance_deg=60, tolerance_distance=0.2) -> bool:
         """
         检查物体A是否面向物体B
         :param posA: 物体A的位置
@@ -94,7 +93,7 @@ class ScanQRTask(AbstractTask):
         :param tolerance_distance: 面向的距离偏差
         :return: 是否面向
         """
-        cos_tolerance = np.cos(np.radians(tolerance_deg))
+        cos_tolerance = np.cos(np.radians(tolerance_deg ))
         cos_opposite = np.cos(np.radians(180 - tolerance_deg))
 
         posA = np.array(posA)
@@ -111,23 +110,24 @@ class ScanQRTask(AbstractTask):
         # 计算方向向量
         dir_A_to_B = posB - posA
 
-        if np.linalg.norm(dir_A_to_B) < 1e-10 or np.linalg.norm(dir_A_to_B) > tolerance_distance:
+        distance = np.linalg.norm(dir_A_to_B)
+        if distance < 1e-10 or distance > tolerance_distance:
+            print(f"Distance too small or too large: {distance}")
             return False  # 避免除以零
-        dir_A_to_B_normalized = dir_A_to_B / np.linalg.norm(dir_A_to_B)
 
-        dir_B_to_A = posA - posB
-        dir_B_to_A_normalized = dir_B_to_A / np.linalg.norm(dir_B_to_A)
+        dir_A_to_B_normalized = dir_A_to_B / distance
+
+        dir_B_to_A_normalized = -dir_A_to_B_normalized
 
         # 计算关键点积
         dot_forward = np.dot(forwardA, forwardB)
         dot_A_to_B = np.dot(forwardA, dir_A_to_B_normalized)
         dot_B_to_A = np.dot(forwardB, dir_B_to_A_normalized)
 
-        # 判断对视条件（允许60度偏差）
         return (
-                dot_forward <= cos_opposite and  # 两个前向向量夹角在120°~180°之间
-                dot_A_to_B >= cos_tolerance and  # A的前向与A到B方向夹角≤60°
-                dot_B_to_A >= cos_tolerance  # B的前向与B到A方向夹角≤60°
+                dot_forward <= cos_opposite and
+                dot_A_to_B >= cos_tolerance and
+                dot_B_to_A >= cos_tolerance
         )
 
     def get_language_instruction(self) -> str:
