@@ -1,4 +1,4 @@
-level_name: "guizi"
+level_name: "housekeeping"
 type: "close_open"
 
 object_bodys: ["fridge_right_up", "fridge_left_up"]

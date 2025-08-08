@@ -58,7 +58,8 @@ INIT_SCENE_TEXT = {
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
     # "guizi":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet​​.")
-    "pharmacy":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet​​.")
+    "pharmacy":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet."),
+    "housekeeping":   ("一个机器人站在冰箱前",  "A robot stands in front of a fridge."),
 }
 _light_counter = 0
 
@@ -90,9 +91,13 @@ OBJ_CN = {
     "shoppingtrolley_01" : "购物手推车",
     "qianglipipalu": "强力枇杷露",
     "box_blue" : "蓝色筐子",
+    "fridge_right_up":"冰箱右边",
+    "fridge_left_up":"冰箱左边",
     "shop": "超市",
     "kitchen": "厨房",
     "yaodian": "药店",
+    "fridge":"冰箱",
+    "housekeeping":"家政",
     "Guizi": "柜子",
     "guizi": "柜子",
     "clinic": "诊所",
@@ -105,7 +110,8 @@ SCENE_SUBSCENE_MAPPING = {
     "kitchen": ("Kitchen", "Countertop_Operation"),
     "yaodian": ("Pharmacy","Shelf_Operation"),
     # "guizi": ("Cooler","Shelf_Operation")
-    "pharmacy": ("pharmacy","Cooler_Operation")
+    "pharmacy": ("pharmacy","Cooler_Operation"),
+    "housekeeping": ("fridge","Fridge_Operation")
 }
 
 with open("camera_config.yaml", "r") as f:
@@ -214,7 +220,27 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         level_cn = OBJ_CN.get(level_name.lower(), level_name)
         return f"在场景{level_cn}中将{obj_cn}放入{goal_cn}中"
     
-    # 新格式: "in the shop scene, pick up the niuhuangwan and scan it with the pipalu"
+     # 3) 打开门场景: "in level hosekeeping sence, open the fridge_left_up door."
+    m = re.search(r'open the ([\w_]+) door', text)
+    if m:
+        # obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(1))
+        # obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        level_cn = OBJ_CN.get(level_name.lower(), level_name)
+        return f"在{level_cn}场景中打开{goal_cn}门"
+    
+    # 4) 关闭门场景: "in level hosekeeping sence, close the  fridge_left_up door."
+    m = re.search(r'close the ([\w_]+) door', text)
+    if m:
+        # obj_key  = normalize_key(m.group(1))
+        goal_key = normalize_key(m.group(1))
+        # obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        level_cn = OBJ_CN.get(level_name.lower(), level_name)
+        return f"在{level_cn}场景中关闭{goal_cn}门"
+    
+    # 5): "in the shop scene, pick up the niuhuangwan and scan it with the pipalu"
     m = re.search(r'pick up the ([\w_]+) and scan it with the ([\w_]+)', text)
     if m:
         obj_key  = normalize_key(m.group(1))
@@ -225,7 +251,7 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         return f"在场景{level_cn}中，拿起{obj_cn}用{goal_cn}扫描"
 
     
-    # 3) 再试 put … into … 结构
+    # 6) 再试 put … into … 结构
     m = re.search(r'put\s+([\w_]+)\s+into\s+([\w_]+)', text)
     if m:
         obj_key  = normalize_key(m.group(1))
@@ -234,7 +260,7 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         goal_cn  = OBJ_CN.get(goal_key, goal_key)
         return f"将{obj_cn}放入{goal_cn}中"
     
-    # 4) 再试 move … to … 结构
+    # 7) 再试 move … to … 结构
     m = re.search(r'move\s+([\w_]+)\s+to\s+([\w_]+)', text)
     if m:
         obj_key  = normalize_key(m.group(1))
@@ -243,7 +269,7 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         goal_cn  = OBJ_CN.get(goal_key, goal_key)
         return f"将{obj_cn}移动到{goal_cn}前"
     
-    # 5) 回退：保留原文
+    # 8) 回退：保留原文
     return instruction_en
 
 def register_env(orcagym_addr : str, 

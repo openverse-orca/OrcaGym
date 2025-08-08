@@ -80,6 +80,8 @@ class CloseOpenTask(AbstractTask):
 
     def get_language_instruction(self) -> str:
         if self.mode == 0:
-            return f"level: {self.level_name} Close the frigerator {self.goal_bodys} door."
+            # return f"level: {self.level_name} Close the frigerator {self.goal_bodys} door."
+            return f"In the {self.level_name} scene,close the {self.goal_bodys[0]} door."
         else:
-            return f"level: {self.level_name} Open the frigerator {self.goal_bodys} door."
+            # return f"level: {self.level_name} Open the frigerator {self.goal_bodys} door."
+            return f"In the {self.level_name} scene,open the {self.goal_bodys[0]} door."
