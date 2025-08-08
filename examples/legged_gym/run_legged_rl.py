@@ -55,7 +55,7 @@ def run_sb3_ppo_rl(
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
 
-    if task == 'stand' or task == 'move_forward' or task == 'no_action' or task == 'follow_command':
+    if task == 'stand_still' or task == 'no_action' or task == 'follow_command':
         max_episode_steps = int(1 / (TIME_STEP * FRAME_SKIP * ACTION_SKIP) * EPISODE_TIME)
     else:
         raise ValueError("Invalid task")

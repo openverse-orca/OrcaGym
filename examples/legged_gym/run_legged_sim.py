@@ -44,11 +44,12 @@ MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
 class KeyboardControl:
     def __init__(self, orcagym_addr: str, env: LeggedSimEnv, robot_config: dict):
         self.keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
-        self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
+        self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0, "R": 0, "F": 0}   
         self.env = env
-        self.player_agent_lin_vel_x = robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]
-        self.player_agent_lin_vel_y = robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]
-        self.player_agent_turn_angel = robot_config["curriculum_commands"]["move_medium"]["command_ang_vel_range"]
+        self.player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_x"]) / 2
+        self.player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_y"]) / 2
+        self.player_agent_turn_angel = np.array(robot_config["curriculum_commands"]["move_fast"]["command_ang_vel_range"])
+        self.terrain_type = "flat_terrain"
 
     def update(self):
         self.keyboard_controller.update()
@@ -69,17 +70,27 @@ class KeyboardControl:
             ang_vel = self.player_agent_turn_angel
         if key_status["D"] == 1:
             ang_vel = -self.player_agent_turn_angel
-        if self._last_key_status["Space"] == 0 and key_status["Space"] == 1:
+        if self._last_key_status["R"] == 0 and key_status["R"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
             lin_vel[:2] *= 2
+        if key_status["Space"] == 0 and self._last_key_status["Space"] == 1:
+            if self.terrain_type == "flat_terrain":
+                self.terrain_type = "rough_terrain"
+                print("Switch to rough terrain")
+            else:
+                self.terrain_type = "flat_terrain"
+                print("Switch to flat terrain")
 
         self._last_key_status = key_status.copy()
-        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
-        return lin_vel, ang_vel, reborn    
+        # print("Lin vel: ", lin_vel, "Turn angel: ", ang_vel, "Reborn: ", reborn, "Terrain type: ", self.terrain_type)
+        return lin_vel, ang_vel, reborn, self.terrain_type
 
     def get_state(self):
         return self.key_status
+
+    def get_terrain_type(self):
+        return self.terrain_type
 
 
 def register_env(orcagym_addr : str, 
@@ -121,13 +132,13 @@ def main(
     try:
         orcagym_addresses = config['orcagym_addresses']
         agent_name = config['agent_name']
-        follow_command_model_file = config['model_file']["follow_command"]
-        stand_still_model_file = config['model_file']["stand_still"]
+        model_file = config['model_file']
         ctrl_device = config['ctrl_device']
         terrain_spawnable_names = config['terrain_spawnable_names']
         agent_spawnable_name = config['agent_spawnable_name']
 
-        model_dir = os.path.dirname(follow_command_model_file)
+        model_dir = os.path.dirname(list(model_file.values())[0])
+        command_model = config['command_model']
 
         # 清空场景
         clear_scene(
@@ -174,8 +185,9 @@ def main(
         print("Starting simulation...")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        follow_command_model = PPO.load(follow_command_model_file, device=device)
-        stand_still_model = PPO.load(stand_still_model_file, device=device)
+        models = {}
+        for key, value in model_file.items():
+            models[key] = PPO.load(value, device=device)
 
         keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name])
 
@@ -183,12 +195,12 @@ def main(
         run_simulation(
             env=env,
             agent_name_list=agent_name_list,
-            follow_command_model=follow_command_model,
-            stand_still_model=stand_still_model,
+            models=models,
             time_step=TIME_STEP,
             frame_skip=FRAME_SKIP,
             action_skip=ACTION_SKIP,
-            keyboard_control=keyboard_control
+            keyboard_control=keyboard_control,
+            command_model=command_model,
         )
     finally:
         print("退出仿真环境")
@@ -276,12 +288,12 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
 
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
-                 follow_command_model: nn.Module, 
-                 stand_still_model: nn.Module, 
+                 models: dict[str, nn.Module], 
                  time_step: float, 
                  frame_skip: int,
                  action_skip: int,
-                 keyboard_control: KeyboardControl):
+                 keyboard_control: KeyboardControl,
+                 command_model: dict[str, str]):
     obs, info = env.reset()
     dt = time_step * frame_skip * action_skip
     if not os.path.exists("./log"):
@@ -297,7 +309,7 @@ def run_simulation(env: gym.Env,
         while True:
             start_time = datetime.now()
 
-            lin_vel, ang_vel, reborn = keyboard_control.update()
+            lin_vel, ang_vel, reborn, terrain_type = keyboard_control.update()
             if reborn:
                 obs, info = env.reset()
                 continue
@@ -307,10 +319,17 @@ def run_simulation(env: gym.Env,
                 env.setup_command(command_dict)
             else:
                 env.unwrapped.setup_command(command_dict)
+
             if ang_vel == 0.0 and np.linalg.norm(lin_vel) == 0.0:
-                model = stand_still_model
+                model = models[command_model["stand_still"]]
+            elif ang_vel != 0.0 and np.linalg.norm(lin_vel) == 0.0:
+                model = models[command_model[terrain_type]["turn"]]
+            elif lin_vel[0] > 0:
+                model = models[command_model[terrain_type]["forward"] ]
+            elif lin_vel[0] < 0:
+                model = models[command_model[terrain_type]["backward"]]
             else:
-                model = follow_command_model
+                model = models[command_model["stand_still"]]   # no action
 
             segmented_obs = segment_obs(obs, agent_name_list)
             action_list = []
