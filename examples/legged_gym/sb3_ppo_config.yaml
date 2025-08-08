@@ -5,7 +5,7 @@ training_episode: 200
 task: "follow_command"
 
 training:
-  subenv_num: 32
+  subenv_num: 64
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
@@ -14,11 +14,11 @@ training:
       - name: "basic_moving"
         milestone: 50
       - name: "flat_terrain"
-        milestone: 200
+        milestone: 300
       - name: "rough_terrain"
-        milestone: 1000
+        milestone: 600
       - name: "advanced_moving"
-        milestone: 1500
+        milestone: 1200
     stand_still:
       - name: "basic_moving"
         milestone: 500
