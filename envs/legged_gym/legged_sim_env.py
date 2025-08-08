@@ -275,6 +275,9 @@ class LeggedSimEnv(OrcaGymLocalEnv):
 
         return contact_dict
 
+    def setup_command(self, command_dict : dict) -> None:
+        [agent.agent.setup_command(command_dict) for agent in self._agents.values()]
+
 
 
 ## --------------------------------            
@@ -349,10 +352,6 @@ class AgentBase:
         env.update_data()      
     
     def on_step(self, env: LeggedSimEnv, action: np.ndarray) -> None:
-        # print("Step agents: ", action)
-        self._update_playable(env)
-
-        self.agent.update_command(env.data.qpos)
         self.agent.step(action, update_mocap=False)
 
     def set_acatuator_ctrl(self, env : LeggedSimEnv, actuator_ctrl: np.ndarray) -> None:
@@ -410,52 +409,8 @@ class AgentBase:
         return ctrl_info    
     
     def _init_playable(self, env: LeggedSimEnv) -> None:
-        self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, env._keyboard_addr)
-        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
-        
-        self._player_agent = self.agent
         self.agent.init_playable()
         self.agent.player_control = True
-            
-        robot_config = LeggedRobotConfig[self.config_name]
-
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_y"]) / 2
-        self._player_agent_turn_angel = np.array(robot_config["curriculum_commands"]["move_fast"]["command_ang_vel_range"])
-    
-    def _update_playable(self, env : LeggedSimEnv) -> None:
-        lin_vel, turn_angel, reborn = self._update_keyboard_control()
-        self._player_agent.update_playable(lin_vel, turn_angel, reborn)
- 
-    
-    def _update_keyboard_control(self) -> tuple[np.ndarray, float, bool]:
-        self._keyboard_controller.update()
-        key_status = self._keyboard_controller.get_state()
-        lin_vel = np.zeros(3)
-        turn_angel = 0.0
-        reborn = False
-        
-        if key_status["W"] == 1:
-            lin_vel[0] = self._player_agent_lin_vel_x[1]
-        if key_status["S"] == 1:
-            lin_vel[0] = self._player_agent_lin_vel_x[0]
-        if key_status["Q"] == 1:
-            lin_vel[1] = self._player_agent_lin_vel_y[1]
-        if key_status["E"] == 1:
-            lin_vel[1] = self._player_agent_lin_vel_y[0]
-        if key_status["A"] == 1:
-            turn_angel += self._player_agent_turn_angel * self.dt
-        if key_status["D"] == 1:
-            turn_angel += -self._player_agent_turn_angel * self.dt
-        if self._key_status["Space"] == 0 and key_status["Space"] == 1:
-            reborn = True
-        if key_status["LShift"] == 1:
-            lin_vel[:2] *= 2
-
-        self._key_status = key_status.copy()
-        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
-        return lin_vel, turn_angel, reborn    
-    
 class Lite3Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)

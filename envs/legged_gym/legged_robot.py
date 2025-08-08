@@ -153,9 +153,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._is_playable = False
         self._player_control = False
 
-        self._compute_body_height = True if robot_config["reward_coeff"]["height"] > 0 else False
-        self._compute_body_orientation = True if robot_config["reward_coeff"]["body_orientation"] > 0 else False
-        self._compute_foot_height = True if "feet_swing_height" in robot_config["reward_coeff"] and robot_config["reward_coeff"]["feet_swing_height"] > 0 else False
+        self._compute_body_height = True if robot_config["reward_coeff"][self._task]["height"] > 0 else False
+        self._compute_body_orientation = True if robot_config["reward_coeff"][self._task]["body_orientation"] > 0 else False
+        self._compute_foot_height = True if "feet_swing_height" in robot_config["reward_coeff"][self._task] and robot_config["reward_coeff"][self._task]["feet_swing_height"] > 0 else False
 
         self._is_obs_updated = False
         self._setup_reward_functions(robot_config)
@@ -1111,6 +1111,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
         # print("Command: ", self._command, "Body heading angle: ", body_heading_angle, "Angle error: ", angle_error)
 
+    def setup_command(self, command_dict : dict) -> None:
+        self._command = command_dict
+        self._command_values[:3] = self._command["lin_vel"]
+        self._command_values[3] = self._command["ang_vel"]
 
     def _resample_command(self) -> None:
         self._command_resample_duration += self.dt
@@ -1249,7 +1253,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return index_start, index_len    
     
     def _setup_reward_functions(self, robot_config : dict) -> None:
-        reward_coeff = robot_config["reward_coeff"]
+        reward_coeff = robot_config["reward_coeff"][self._task]
         self._reward_functions = [
             {"function": self._compute_reward_alive, "coeff": reward_coeff["alive"] if "alive" in reward_coeff else 0},
             {"function": self._compute_reward_success, "coeff": reward_coeff["success"] if "success" in reward_coeff else 0},
@@ -1321,18 +1325,18 @@ class LeggedRobot(OrcaGymAsyncAgent):
             if self.playable:
                 print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
             if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
-                if self.playable:
-                    print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
-                if self._current_level == len(self._curriculum_levels) - 1:
+                self._current_level += 1
+                if self._current_level >= len(self._curriculum_levels):
                     self._curriculum_clear_times += 1
                     self._current_level = 0
                     if self._curriculum_clear_times > 10:
                         self._curriculum_clear_times = 0
                         self._max_level_times += 1
-                        print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times, "Max level times: ", self._max_level_times)
-                else:
-                    self._current_level = min(self._current_level + 1, len(self._curriculum_levels) - 1)
 
+                    print("Agent: ", self._env_id + self.name, "Curriculum cleared! mean rating: ", mean_rating, "Move distance: ", move_distance, "Clear times: ", self._curriculum_clear_times, "Max level times: ", self._max_level_times)
+                else:
+                    if self.playable:
+                        print("Agent: ", self._env_id + self.name, "Level Upgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating, "Move distance: ", move_distance)
         
         for buffer in self._curriculum_reward_buffer.values():
             buffer["index"] = 0
@@ -1451,7 +1455,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_commands = robot_config["curriculum_commands"]
         if self._curriculum_learning:
-            buffer_size = self._max_episode_steps
+            buffer_size = min(self._max_episode_steps, 1000)
             self._curriculum_reward_buffer = {
                 "lin_vel" : {
                     "buffer_size": buffer_size,

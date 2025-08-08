@@ -11,6 +11,11 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import csv
+import yaml
+from scene_util import clear_scene, publish_terrain, generate_height_map_file, publish_scene
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
+from envs.legged_gym.legged_sim_env import LeggedSimEnv
+from envs.legged_gym.legged_config import LeggedRobotConfig
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -34,6 +39,48 @@ REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP  # 50 Hz for policy
 CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for ppo policy
 
 MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
+
+
+class KeyboardControl:
+    def __init__(self, orcagym_addr: str, env: LeggedSimEnv, robot_config: dict):
+        self.keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
+        self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
+        self.env = env
+        self.player_agent_lin_vel_x = robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]
+        self.player_agent_lin_vel_y = robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]
+        self.player_agent_turn_angel = robot_config["curriculum_commands"]["move_medium"]["command_ang_vel_range"]
+
+    def update(self):
+        self.keyboard_controller.update()
+        key_status = self.keyboard_controller.get_state()
+        lin_vel = np.zeros(3)
+        ang_vel = 0.0
+        reborn = False
+        
+        if key_status["W"] == 1:
+            lin_vel[0] = self.player_agent_lin_vel_x[1]
+        if key_status["S"] == 1:
+            lin_vel[0] = self.player_agent_lin_vel_x[0]
+        if key_status["Q"] == 1:
+            lin_vel[1] = self.player_agent_lin_vel_y[1]
+        if key_status["E"] == 1:
+            lin_vel[1] = self.player_agent_lin_vel_y[0]
+        if key_status["A"] == 1:
+            ang_vel = self.player_agent_turn_angel
+        if key_status["D"] == 1:
+            ang_vel = -self.player_agent_turn_angel
+        if self._last_key_status["Space"] == 0 and key_status["Space"] == 1:
+            reborn = True
+        if key_status["LShift"] == 1:
+            lin_vel[:2] *= 2
+
+        self._last_key_status = key_status.copy()
+        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
+        return lin_vel, ang_vel, reborn    
+
+    def get_state(self):
+        return self.key_status
+
 
 def register_env(orcagym_addr : str, 
                  env_name : str, 
@@ -69,23 +116,57 @@ def register_env(orcagym_addr : str,
 
 
 def main(
-    orcagym_addr: str,
-    agent_names: str,
-    model_file: str,
-    height_map: str,
-    ctrl_device: str = "keyboard",
+    config: dict,
     ):
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        orcagym_addresses = config['orcagym_addresses']
+        agent_name = config['agent_name']
+        follow_command_model_file = config['model_file']["follow_command"]
+        stand_still_model_file = config['model_file']["stand_still"]
+        ctrl_device = config['ctrl_device']
+        terrain_spawnable_names = config['terrain_spawnable_names']
+        agent_spawnable_name = config['agent_spawnable_name']
+
+        model_dir = os.path.dirname(follow_command_model_file)
+
+        # 清空场景
+        clear_scene(
+            orcagym_addresses=orcagym_addresses,
+        )
+
+        # 发布地形
+        publish_terrain(
+            orcagym_addresses=orcagym_addresses,
+            terrain_spawnable_names=terrain_spawnable_names,
+        )
+
+        # 空场景生成高度图
+        height_map_file = generate_height_map_file(
+            orcagym_addresses=orcagym_addresses,
+            model_dir=model_dir,
+        )
+
+        # 放置机器人
+        publish_scene(
+            orcagym_addresses=orcagym_addresses,
+            agent_name=agent_name,
+            agent_spawnable_name=agent_spawnable_name,
+            agent_num=1,
+            terrain_spawnable_names=terrain_spawnable_names,
+        )
+
+        agent_names = f"{agent_name}_000"
+
+        print("simulation running... , orcagym_addr: ", orcagym_addresses)
         env_name = "LeggedSim-v0"
         env_id, kwargs = register_env(
-            orcagym_addr=orcagym_addr, 
+            orcagym_addr=orcagym_addresses[0], 
             env_name=env_name, 
             env_index=0, 
             agent_names=agent_names, 
             ctrl_device=ctrl_device, 
             max_episode_steps=MAX_EPISODE_STEPS,
-            height_map=height_map,
+            height_map=height_map_file,
         )
         print("Registered environment: ", env_id)
 
@@ -93,16 +174,21 @@ def main(
         print("Starting simulation...")
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = PPO.load(model_file, device=device)
+        follow_command_model = PPO.load(follow_command_model_file, device=device)
+        stand_still_model = PPO.load(stand_still_model_file, device=device)
 
-        agent_name_list = agent_names.split(" ")
+        keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name])
+
+        agent_name_list = [agent_name]
         run_simulation(
             env=env,
             agent_name_list=agent_name_list,
-            model=model,
+            follow_command_model=follow_command_model,
+            stand_still_model=stand_still_model,
             time_step=TIME_STEP,
             frame_skip=FRAME_SKIP,
-            action_skip=ACTION_SKIP
+            action_skip=ACTION_SKIP,
+            keyboard_control=keyboard_control
         )
     finally:
         print("退出仿真环境")
@@ -190,10 +276,12 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
 
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
-                 model: nn.Module, 
+                 follow_command_model: nn.Module, 
+                 stand_still_model: nn.Module, 
                  time_step: float, 
                  frame_skip: int,
-                 action_skip: int):
+                 action_skip: int,
+                 keyboard_control: KeyboardControl):
     obs, info = env.reset()
     dt = time_step * frame_skip * action_skip
     if not os.path.exists("./log"):
@@ -204,12 +292,25 @@ def run_simulation(env: gym.Env,
     physics_step = 0
     control_step = 0
     sim_time = 0.0
-    
+        
     try:
         while True:
             start_time = datetime.now()
 
-
+            lin_vel, ang_vel, reborn = keyboard_control.update()
+            if reborn:
+                obs, info = env.reset()
+                continue
+            
+            command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
+            if hasattr(env, "setup_command"):
+                env.setup_command(command_dict)
+            else:
+                env.unwrapped.setup_command(command_dict)
+            if ang_vel == 0.0 and np.linalg.norm(lin_vel) == 0.0:
+                model = stand_still_model
+            else:
+                model = follow_command_model
 
             segmented_obs = segment_obs(obs, agent_name_list)
             action_list = []
@@ -244,19 +345,14 @@ def run_simulation(env: gym.Env,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
-    parser.add_argument('--orcagym_addr', type=str, default='localhost:50051', help='The gRPC addresses to connect to')
-    parser.add_argument('--agent_name', type=str, default='go2', help='The name list of the agent to control, separated by space')
-    parser.add_argument('--ckpt', type=str, help='The model file to load')
-    parser.add_argument('--height_map', type=str, default='height_map_test.npy', help='The height field map file')
-    parser.add_argument('--ctrl_device', type=str, default='keyboard', help='The control device to use ')
+    parser.add_argument('--config', type=str, default='go2_sim_config.yaml', help='The path of the config file')
     args = parser.parse_args()
 
+    with open(args.config, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
     main(
-        orcagym_addr=args.orcagym_addr, 
-        agent_names=args.agent_name, 
-        model_file=args.ckpt,
-        height_map=args.height_map,
-        ctrl_device=args.ctrl_device
-    )    
+        config=config,
+    )
 
 

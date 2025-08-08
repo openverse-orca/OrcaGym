@@ -1,0 +1,8 @@
+orcagym_addresses: ["192.168.1.112:50051"]
+agent_name: "go2"
+agent_spawnable_name: "go2_usda"
+model_file: 
+  "follow_command": "/home/superfhwl/repo/OrcaGym/examples/legged_gym/trained_models_tmp/go2_1024_2025-08-08_11-43-18/go2_follow_command.zip_iteration_300.zip"
+  "stand_still": "/home/superfhwl/repo/OrcaGym/examples/legged_gym/trained_models_tmp/go2_1024_2025-08-08_09-32-57/go2_follow_command.zip_iteration_100.zip"
+ctrl_device: "keyboard"
+terrain_spawnable_names: ["terrain_test_usda"]
