@@ -270,8 +270,8 @@ class DualArmRobot(AgentBase):
             "grasp_value_l": np.array([self._grasp_value_l], dtype=np.float32),
             "grasp_value_r": np.array([self._grasp_value_r], dtype=np.float32),
 
-            "grasp_joint_pos_l": np.array(np.clip(hand_joint_values_l[0], 0, 1)),
-            "grasp_joint_pos_r": np.array(np.clip(hand_joint_values_r[0], 0, 1)), #抓夹驱动关节的值
+            "grasp_joint_pos_l": np.array(np.clip(hand_joint_values_l, 0, 1)),
+            "grasp_joint_pos_r": np.array(np.clip(hand_joint_values_r, 0, 1)), #抓夹驱动关节的值
         }
         scaled_obs = {key : self._obs[key] * self._obs_scale[key] for key in self._obs.keys()}
         return scaled_obs
