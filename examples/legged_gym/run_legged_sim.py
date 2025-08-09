@@ -67,9 +67,15 @@ class KeyboardControl:
         if key_status["E"] == 1:
             lin_vel[1] = self.player_agent_lin_vel_y[0]
         if key_status["A"] == 1:
-            ang_vel = self.player_agent_turn_angel
+            if lin_vel[0] > 0:
+                ang_vel = self.player_agent_turn_angel
+            elif lin_vel[0] < 0:
+                ang_vel = -self.player_agent_turn_angel
         if key_status["D"] == 1:
-            ang_vel = -self.player_agent_turn_angel
+            if lin_vel[0] > 0:
+                ang_vel = -self.player_agent_turn_angel
+            elif lin_vel[0] < 0:
+                ang_vel = self.player_agent_turn_angel
         if self._last_key_status["R"] == 0 and key_status["R"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
@@ -313,23 +319,21 @@ def run_simulation(env: gym.Env,
             if reborn:
                 obs, info = env.reset()
                 continue
-            
-            command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
-            if hasattr(env, "setup_command"):
-                env.setup_command(command_dict)
-            else:
-                env.unwrapped.setup_command(command_dict)
 
             if ang_vel == 0.0 and np.linalg.norm(lin_vel) == 0.0:
                 model = models[command_model["stand_still"]]
-            elif ang_vel != 0.0 and np.linalg.norm(lin_vel) == 0.0:
-                model = models[command_model[terrain_type]["turn"]]
-            elif lin_vel[0] > 0:
+            elif lin_vel[0] >= 0:
                 model = models[command_model[terrain_type]["forward"] ]
             elif lin_vel[0] < 0:
                 model = models[command_model[terrain_type]["backward"]]
             else:
                 model = models[command_model["stand_still"]]   # no action
+
+            command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
+            if hasattr(env, "setup_command"):
+                env.setup_command(command_dict)
+            else:
+                env.unwrapped.setup_command(command_dict)
 
             segmented_obs = segment_obs(obs, agent_name_list)
             action_list = []
@@ -346,6 +350,9 @@ def run_simulation(env: gym.Env,
             physics_step += frame_skip  # Each control step includes frame_skip physics steps
             control_step += 1
             sim_time += dt
+
+            # no action testing
+            # action = np.zeros(env.action_space.shape[0])
             
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()

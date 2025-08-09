@@ -1,11 +1,11 @@
 orcagym_addresses: ["localhost:50051"]
-agent_name: "go2"
-agent_spawnable_name: "go2_usda"
+agent_name: "Lite3"
+agent_spawnable_name: "lite3_usda"
 
 model_file: 
-  "flat_terrain": "./test/go2_rough_terrain_good.zip"
-  "rough_terrain": "./test/go2_rough_terrain_good.zip"
-  "stand_still": "./test/go2_stand_still_good.zip"
+  "flat_terrain": "./test/Lite3_follow_command.zip_flat_terrain_iteration_300.zip"
+  "rough_terrain": "./test/Lite3_follow_command.zip_rough_terrain_iteration_600.zip"
+  "stand_still": "./test/Lite3_follow_command.zip_rough_terrain_iteration_600.zip"
 
 ctrl_device: "keyboard"
 

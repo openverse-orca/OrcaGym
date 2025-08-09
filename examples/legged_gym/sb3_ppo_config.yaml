@@ -5,20 +5,22 @@ training_episode: 200
 task: "follow_command"
 
 training:
-  subenv_num: 64
+  subenv_num: 32
   agent_num: 32
   render_mode: "none"
-  terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+  terrain_spawnable_names: 
+    follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+    stand_still: []
   curriculum_list:
     follow_command:
       - name: "basic_moving"
-        milestone: 50
+        milestone: 200
       - name: "flat_terrain"
-        milestone: 300
+        milestone: 500
       - name: "rough_terrain"
-        milestone: 600
+        milestone: 1000
       - name: "advanced_moving"
-        milestone: 1200
+        milestone: 1500
     stand_still:
       - name: "basic_moving"
         milestone: 500
@@ -27,24 +29,20 @@ testing:
   subenv_num: 1
   agent_num: 8
   render_mode: "human"
-  terrain_spawnable_names: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+  terrain_spawnable_names: 
+    follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
   curriculum_list:
     follow_command:
       - name: "flat_terrain"
-        milestone: 2000
-    stand_still:
-      - name: "basic_moving"
         milestone: 2000
 
 play:
   subenv_num: 1
   agent_num: 1
   render_mode: "human"
-  terrain_spawnable_names: ["terrain_test_usda"]
+  terrain_spawnable_names: 
+    follow_command: ["terrain_test_usda"]
   curriculum_list:
     follow_command:
       - name: "flat_terrain"
-        milestone: 2000
-    stand_still:
-      - name: "basic_moving"
         milestone: 2000

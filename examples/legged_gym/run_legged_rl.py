@@ -51,7 +51,7 @@ def run_sb3_ppo_rl(
     else:
         render_mode = run_mode_config['render_mode']
 
-    terrain_spawnable_names = run_mode_config['terrain_spawnable_names']
+    terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
 

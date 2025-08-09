@@ -195,7 +195,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self.mj_forward()
         # 通过射线投射的方式生成高程图
         for x in range(self._height_map["map"]["width"]):
-            print("Generate Height map: ", x, "/", self._height_map["map"]["width"])
+            print("\rGenerate Height map: {}/{}".format(x, self._height_map["map"]["width"]), end='', flush=True)
             for y in range(self._height_map["map"]["height"]):
                 if self._height_map["map"]["data"][x, y] < self._height_map["height_range"][0]:
                     # print("Height map ", x, y, " is already the lowest height")
@@ -213,6 +213,8 @@ class HeightMapGenerater(OrcaGymLocalEnv):
                 if distance > 0.0 and height > 0.001:
                     # print("Height map: ", x, y, height, "Geom ID: ", geomid[0])
                     self._height_map["map"]["data"][x, y] = height
+        
+        print("\nDone!")
         
     def _generate_height_map(self, action):
         for x in range(self._height_map["mini_map"]["width"]):
