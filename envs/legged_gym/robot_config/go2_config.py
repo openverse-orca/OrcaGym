@@ -8,7 +8,7 @@ RewardConfig = {
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
         "leg_contact" : 1,               # 腿部身体接触惩罚
-        "body_contact" : 10,              # 身体接触惩罚
+        "body_contact" : 1,              # 身体接触惩罚
         "foot_touch" : 0,                # 重踏惩罚
         "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
@@ -24,8 +24,8 @@ RewardConfig = {
         "body_orientation" : 0,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0.1,             # 接触时，足底线速度
-        "feet_wringing" : 0.1,         # 接触时，足底角速度
+        "feet_slip" : 0,             # 接触时，足底线速度
+        "feet_wringing" : 0,         # 接触时，足底角速度
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
         "fly" : 0.1,                    # 四足离地惩罚
         "stepping" : 0.1,                 # 无指令时，踏步惩罚

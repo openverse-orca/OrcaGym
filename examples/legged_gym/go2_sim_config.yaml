@@ -3,9 +3,9 @@ agent_name: "go2"
 agent_spawnable_name: "go2_usda"
 
 model_file: 
-  "flat_terrain": "./test/go2_rough_terrain_good.zip"
-  "rough_terrain": "./test/go2_rough_terrain_good.zip"
-  "stand_still": "./test/go2_stand_still_good.zip"
+  "flat_terrain": "/home/superfhwl/repo/OrcaGym/examples/legged_gym/trained_models_tmp/go2_1024_2025-08-10_21-32-59/go2_follow_command.zip_iteration_600.zip"
+  "rough_terrain": "/home/superfhwl/repo/OrcaGym/examples/legged_gym/trained_models_tmp/go2_1024_2025-08-10_21-32-59/go2_follow_command.zip_basic_moving_iteration_100.zip"
+  "stand_still": "/home/superfhwl/repo/OrcaGym/examples/legged_gym/trained_models_tmp/go2_1024_2025-08-10_21-32-59/go2_follow_command.zip_iteration_600.zip"
 
 ctrl_device: "keyboard"
 
