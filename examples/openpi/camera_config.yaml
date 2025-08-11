@@ -106,3 +106,14 @@ scenes:
     camera_wrist_r:
       translation: [-3.67, 1.35, 1.38]
       rotation:    [48.1, 0.0, 0.0]
+
+  3c_fabrication:
+    camera_head:
+      translation: [-3.69, 0.84, 1.83]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [-3.67, 0.32, 1.38]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [-3.67, 1.35, 1.38]
+      rotation:    [48.1, 0.0, 0.0]
