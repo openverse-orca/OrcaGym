@@ -5,7 +5,7 @@ import time
 import numpy as np
 from datetime import datetime
 import yaml
-
+import json
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -24,6 +24,16 @@ TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 FRAME_SKIP = LeggedEnvConfig["FRAME_SKIP"]
 ACTION_SKIP = LeggedEnvConfig["ACTION_SKIP"]
 EPISODE_TIME = LeggedEnvConfig["EPISODE_TIME_LONG"]
+
+def export_config(config: dict, model_dir: str):
+    agent_name = config['agent_name']
+    agent_config = LeggedRobotConfig[agent_name]
+
+    config['agent_config'] = agent_config
+
+    # 输出到 json 文件
+    with open(os.path.join(model_dir, 'config.json'), 'w') as f:
+        json.dump(config, f, indent=4)
 
 def run_sb3_ppo_rl(
     config: dict,
@@ -72,6 +82,7 @@ def run_sb3_ppo_rl(
         model_dir = f"./trained_models_tmp/{agent_name}_{subenv_num * agent_num}_{formatted_now}"
         os.makedirs(model_dir, exist_ok=True)
         model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
+        export_config(config, model_dir)
     else:
         raise ValueError("Invalid model file! Please provide a model file for testing / play.")
 

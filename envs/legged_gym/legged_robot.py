@@ -408,6 +408,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # print("Base neutral qpos: ", self._base_neutral_qpos)
         joint_neutral_qpos.update(self._base_neutral_qpos)
 
+        if self._curriculum_learning:
+            self._move_way_points.clear()
+            self._move_way_points.append(self._base_neutral_qpos[self._base_joint_name][:3])
+
         self._command = self._genarate_command(z_rotation_angle)
         self._command_values = np.concatenate([self._command["lin_vel"], [self._command["ang_vel"]]]).flatten()
         self._command_resample_duration = 0
@@ -1097,7 +1101,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         """
         Update the z ang_vel by heading 
         """
-        self._resample_command()
+        self._resample_command(qpos_buffer)
 
         # Get the body heading quaternion in global coordinate system
         body_qpos_index = self._qpos_index[self._base_joint_name]
@@ -1116,16 +1120,20 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._command_values[:3] = self._command["lin_vel"]
         self._command_values[3] = self._command["ang_vel"]
 
-    def _resample_command(self) -> None:
+    def _resample_command(self, qpos_buffer : np.ndarray) -> None:
         self._command_resample_duration += self.dt
         if self._command_resample_duration > self._command_resample_interval:
             self._command_resample_duration = 0
-            turn_angle = self._np_random.uniform(-self._command_ang_vel_range, self._command_ang_vel_range)
+            turn_angle = self._np_random.uniform(-np.pi, np.pi)
             self._command = self._genarate_command(self._command["heading_angle"] + turn_angle)
             self._command_values[:3] = self._command["lin_vel"]
             
             turn_quat = rotations.euler2quat([0, 0, turn_angle])
             self._cmd_mocap_pos_quat["quat"] = rotations.quat_mul(self._cmd_mocap_pos_quat["quat"], turn_quat)
+
+            current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
+            self._move_way_points.append(current_pos)
+
     
     def _print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1) -> None:
         if self._reward_printer is not None:
@@ -1319,11 +1327,15 @@ class LeggedRobot(OrcaGymAsyncAgent):
             if self.playable:
                 print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating)
         elif hasattr(self, "_base_neutral_qpos") and not self.is_terminated(self._achieved_goal, self._desired_goal):
-            start_pos = self._base_neutral_qpos[self._base_joint_name][:3]
             current_pos = qpos_buffer[self._qpos_index[self._base_joint_name]["offset"] : self._qpos_index[self._base_joint_name]["offset"] + self._qpos_index[self._base_joint_name]["len"]][:3]
-            move_distance = np.linalg.norm(start_pos - current_pos)
+            self._move_way_points.append(current_pos)
+            move_distance = 0
+            for i in range(len(self._move_way_points) - 1):
+                move_distance += np.linalg.norm(self._move_way_points[i] - self._move_way_points[i + 1])
+
             if self.playable:
                 print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
+
             if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
                 self._current_level += 1
                 if self._current_level >= len(self._curriculum_levels):
@@ -1471,3 +1483,4 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._current_level = 0
             self._curriculum_clear_times = 0
             self._max_level_times = 0
+            self._move_way_points = []

@@ -192,6 +192,7 @@ Go2Config = {
             "basic_moving" : [
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "move_medium", "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
             ],
             "flat_terrain" : [
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
@@ -219,12 +220,20 @@ Go2Config = {
                 "command_resample_interval" : 20, # second to resample the command
             },
 
+            "spot_turn" : {
+                "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
+                "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+                "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
+                "command_ang_vel_range" : np.pi / 2,  # max turning rate
+                "command_resample_interval" : 2, # second to resample the command
+            },
+
             "move_slowly" : {
                 "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 2,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_resample_interval" : 4, # second to resample the command
             },
 
             "move_medium" : {
@@ -232,7 +241,7 @@ Go2Config = {
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
                 "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 2,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_resample_interval" : 4, # second to resample the command
             },
 
             "move_fast" : {
