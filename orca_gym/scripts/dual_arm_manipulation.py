@@ -53,13 +53,13 @@ CAMERA_CONFIG = {
 _light_counter = 0
 _LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
 INIT_SCENE_TEXT = {
-    "shop":    ("一个机器人站在柜台前",  "A robot stands in front of a counter."),
+    "shop":    ("机器人站在收银台前，1-5个可抓取物体随机分布在收银台上，扫码枪位于机器人右手边。",  "The robot stands in front of the cash register, 1-5 grabbable objects are randomly distributed on the cash register, and the code scanner is located on the right hand side of the robot."),
     "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
     # "guizi":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet​​.")
-    "pharmacy":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet."),
-    "housekeeping":   ("一个机器人站在冰箱前",  "A robot stands in front of a fridge."),
+    "pharmacy":   ("机器人站在阴凉柜前，蓝色的框子位于机器人前，1-5个可抓取药盒随机分布在阴凉柜架子上。",  "The robot stands in front of the cooler, and the blue box is located in front of the robot，and 1-5 grabbable pill boxes are randomly distributed on the cooler shelves."),
+    "housekeeping":   ("机器人站在双开门冰箱前，冰箱门状态为以下四种状态（左开、左闭、右开、右闭）之一。",  "The robot stands in front of the double-door refrigerator, and the refrigerator door state is one of the following four states (left open, left closed, right open, right closed)."),
 }
 _light_counter = 0
 
