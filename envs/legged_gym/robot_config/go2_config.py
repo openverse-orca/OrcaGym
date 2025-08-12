@@ -1,7 +1,5 @@
 import numpy as np
 
-
-
 RewardConfig = {
     "follow_command": {
         "alive" : 0,                     # 存活奖励
@@ -26,7 +24,7 @@ RewardConfig = {
         "feet_self_contact" : 0,        # 足底自接触惩罚
         "feet_slip" : 0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
+        "feet_fitted_ground" : 0.01,    # 鼓励对角步态，避免单侧滑步
         "fly" : 0.1,                    # 四足离地惩罚
         "stepping" : 0.1,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
@@ -202,12 +200,10 @@ Go2Config = {
             ],
             "rough_terrain" : [
                 {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-            ],
-            "advanced_moving" : [
                 {"name" : "smooth_slope" ,          "offset" : [0, -30, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
                 {"name" : "rough_slope" ,           "offset" : [30, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
                 {"name" : "terrain_stairs_low" ,    "offset" : [-30, -30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
            ],
         },
@@ -224,7 +220,7 @@ Go2Config = {
                 "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
-                "command_ang_vel_range" : np.pi / 2,  # max turning rate
+                "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 2, # second to resample the command
             },
 
@@ -232,7 +228,7 @@ Go2Config = {
                 "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
-                "command_ang_vel_range" : np.pi / 2,  # max turning rate
+                "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 4, # second to resample the command
             },
 
@@ -240,7 +236,7 @@ Go2Config = {
                 "command_lin_vel_range_x" : [-1.0, 1.0], # x direction for forward
                 "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
                 "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
-                "command_ang_vel_range" : np.pi / 2,  # max turning rate
+                "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 4, # second to resample the command
             },
 
@@ -248,8 +244,8 @@ Go2Config = {
                 "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
                 "command_lin_vel_threshold" : [-0.2, 0.3], # min linear velocity to trigger moving
-                "command_ang_vel_range" : np.pi / 2,  # max turning rate
-                "command_resample_interval" : 7, # second to resample the command
+                "command_ang_vel_range" : np.pi / 4,  # max turning rate
+                "command_resample_interval" : 4, # second to resample the command
             },
         },
 

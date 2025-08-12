@@ -134,9 +134,14 @@ def register_env(orcagym_addr : str,
 
 def main(
     config: dict,
+    remote: str,
     ):
     try:
-        orcagym_addresses = config['orcagym_addresses']
+        if remote is not None:
+            orcagym_addresses = [remote]
+        else:
+            orcagym_addresses = config['orcagym_addresses']
+
         agent_name = config['agent_name']
         model_file = config['model_file']
         ctrl_device = config['ctrl_device']
@@ -321,13 +326,13 @@ def run_simulation(env: gym.Env,
                 continue
 
             if ang_vel == 0.0 and np.linalg.norm(lin_vel) == 0.0:
-                model = models[command_model["stand_still"]]
+                model = models[command_model[terrain_type]["stand_still"]]
             elif lin_vel[0] >= 0:
-                model = models[command_model[terrain_type]["forward"] ]
+                model = models[command_model[terrain_type]["forward"]]
             elif lin_vel[0] < 0:
                 model = models[command_model[terrain_type]["backward"]]
             else:
-                model = models[command_model["stand_still"]]   # no action
+                model = models[command_model[terrain_type]["stand_still"]]   # no action
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
             if hasattr(env, "setup_command"):
@@ -372,6 +377,7 @@ def run_simulation(env: gym.Env,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--config', type=str, default='go2_sim_config.yaml', help='The path of the config file')
+    parser.add_argument('--remote', type=str, help='The remote address of the orca studio')
     args = parser.parse_args()
 
     with open(args.config, 'r') as f:
@@ -379,6 +385,7 @@ if __name__ == "__main__":
 
     main(
         config=config,
+        remote=args.remote,
     )
 
 
