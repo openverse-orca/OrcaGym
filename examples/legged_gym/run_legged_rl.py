@@ -257,6 +257,8 @@ def run_rllib_appo_rl(
             orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
             agent_name=agent_name,
+            agent_config=LeggedRobotConfig[agent_name],
+            task=task,
             max_episode_steps=run_mode_config['max_episode_steps'],
             num_env_runners=num_env_runners,
             num_envs_per_env_runner=num_envs_per_env_runner,

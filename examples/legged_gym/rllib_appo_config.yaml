@@ -8,7 +8,7 @@ env_name: "LeggedGym"
 training:
   max_episode_steps: 1000
   num_env_runners: 16
-  num_envs_per_env_runner: 64
+  num_envs_per_env_runner: 32
   async_env_runner: True
   iter: 1000
   render_mode: none

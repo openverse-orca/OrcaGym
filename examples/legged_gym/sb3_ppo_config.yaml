@@ -6,7 +6,7 @@ training_episode: 200
 task: "follow_command"
 
 training:
-  subenv_num: 64
+  subenv_num: 16
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 

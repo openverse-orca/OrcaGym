@@ -61,7 +61,8 @@ def get_orca_gym_register_info(
         vector_idx: int,
         async_env_runner: bool,
         height_map_file: str,
-        max_episode_steps: int
+        max_episode_steps: int,
+        task: str
     ) -> tuple[ str, dict ]:
 
     orcagym_addr_str = orcagym_addr.replace(":", "-")
@@ -88,7 +89,7 @@ def get_orca_gym_register_info(
             'max_episode_steps': max_episode_steps,
             'is_subenv': True,
             'run_mode': 'training',
-            'task': 'follow_command',
+            'task': task,
         },
     }
 
@@ -102,7 +103,8 @@ def create_demo_env_instance(
     max_episode_steps: int,
     async_env_runner: bool,
     height_map_file: str,
-    render_mode: str
+    render_mode: str,
+    task: str
 ):
     """
     创建一个演示环境实例，主要用于测试和验证。
@@ -117,7 +119,8 @@ def create_demo_env_instance(
         vector_idx=1,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
-        max_episode_steps=max_episode_steps
+        max_episode_steps=max_episode_steps,
+        task=task
     )
 
     if env_id not in gym.envs.registry:
@@ -138,6 +141,8 @@ def create_demo_env_instance(
 
 
 def get_config(
+    agent_config: dict,
+    task: str,
     num_env_runners: int, 
     num_envs_per_env_runner: int,
     env: gym.Env,
@@ -184,10 +189,10 @@ def get_config(
                 action_space=env.action_space,
                 module_class=DefaultAPPOTorchRLModule,
                 model_config={
-                    "fcnet_hiddens": [512, 256, 128],
+                    "fcnet_hiddens": agent_config["pi"],
                     "fcnet_activation": "relu",
                     "post_fcnet_activation": "tanh",
-                    "vf_share_layers": False,
+                    # "vf_share_layers": False,
                     "use_gpu": num_gpus_available > 0,
                 },
             )
@@ -197,7 +202,11 @@ def get_config(
             num_gpus_per_learner=num_gpus_available * 0.1,
         )
         .training(
-            train_batch_size_per_learner=4096,
+            train_batch_size_per_learner=agent_config["batch_size"],
+            lr=agent_config["learning_rate"],
+            grad_clip=agent_config["max_grad_norm"],
+            grad_clip_by="norm",
+            gamma=agent_config["gamma"],
         )
         .resources(
             num_cpus_for_main_process=1,
@@ -214,6 +223,8 @@ def get_config(
     return config
 
 def config_appo_tuner(
+        agent_config: dict,
+        task: str,
         num_env_runners: int, 
         num_envs_per_env_runner: int,
         iter: int,
@@ -229,6 +240,8 @@ def config_appo_tuner(
     print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
     
     config = get_config(
+        agent_config=agent_config,
+        task=task,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         env=env,
@@ -284,6 +297,7 @@ def env_creator(
         render_mode: str,
         async_env_runner: bool,
         height_map_file: str,
+        task: str
     ):
 
     if env_context is None:
@@ -305,7 +319,8 @@ def env_creator(
         vector_idx=vector_idx,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
-        max_episode_steps=max_episode_steps
+        max_episode_steps=max_episode_steps,
+        task=task
     )
 
     # if vector_idx == 0:
@@ -452,6 +467,8 @@ def run_training(
         orcagym_addr: str,
         env_name: str,
         agent_name: str,
+        agent_config: dict,
+        task: str,
         max_episode_steps: int,
         num_env_runners: int,
         num_envs_per_env_runner: int,
@@ -476,7 +493,8 @@ def run_training(
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
             async_env_runner=async_env_runner,
-            height_map_file=height_map_file
+            height_map_file=height_map_file,
+            task=task
         )
     )
     @ray.remote(num_gpus=0.1)
@@ -511,6 +529,7 @@ def run_training(
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
         render_mode=render_mode,
+        task=task
     )
 
     print("\nStarting training...")
@@ -520,6 +539,8 @@ def run_training(
     # result = trainer.fit()
 
     tuner = config_appo_tuner(
+        agent_config=agent_config,
+        task=task,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         iter=iter,
