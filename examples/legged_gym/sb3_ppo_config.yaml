@@ -1,12 +1,12 @@
 framework: "sb3"
 orcagym_addresses: ["localhost:50051"]
-agent_name: "go2"
-agent_spawnable_name: "go2_usda"
+agent_name: "Lite3"
+agent_spawnable_name: "lite3_usda"
 training_episode: 200
 task: "follow_command"
 
 training:
-  subenv_num: 16
+  subenv_num: 64
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 
