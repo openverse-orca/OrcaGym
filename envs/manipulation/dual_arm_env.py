@@ -288,6 +288,7 @@ class DualArmEnv(RobomimicEnv):
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
+        time_stamp = time.time_ns()
 
         obs = self._get_obs().copy()
 
@@ -297,7 +298,8 @@ class DualArmEnv(RobomimicEnv):
                 "goal": self._task.get_goals_info(self),
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
-                "time_step": self.data.time}
+                "time_step": self.data.time,
+                "time_stamp": time_stamp,}
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)

@@ -203,6 +203,7 @@ class DatasetWriter:
                 'language_instruction': str     # 语言指令（可选）
                 'next_obs'                      # 如果未提供，将自动生成
                 'camera_frames'                 # 可选，用于存储相机帧，格式为字典，键为相机名称，值为帧列表
+                'camera_time_stamp': dict       # 相机时间戳，键为相机名称，值为时间戳列表
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
         """
@@ -224,7 +225,7 @@ class DatasetWriter:
             if model_file:
                 demo_group.attrs['model_file'] = model_file
 
-            for key in ['states', 'actions', 'camera_frames', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps']:
+            for key in ['states', 'actions', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps', 'timestamps']:
                 if key in demo_data:
                     demo_group.create_dataset(key, data=demo_data[key])
 
@@ -233,13 +234,14 @@ class DatasetWriter:
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data, compression="gzip", compression_opts=4)
  
-            # # 处理 camera_frames
-            # if 'camera_frames' in demo_data:  # 修改10: 添加条件判断
-            #     fps = demo_data['timesteps'].shape[0] // (demo_data['timesteps'][-1] - demo_data['timesteps'][0])
-            #     for camera_name, frames in demo_data['camera_frames'].items():  # 修改11: 遍历所有相机
-            #         # video_path = self.get_mp4_save_path(demo_name_h5, camera_name)  # 使用新方法获取路径
-            #         video_path = self.get_mp4_save_path(demo_name, camera_name)
-            #         self.save_single_camera_video(frames, video_path, fps)  # 修改12: 使用新的保存方法
+            camera_group = demo_group.create_group('camera')
+            for key in ['camera_frames', 'camera_time_stamp']:
+                if key == 'camera_frames' and 'camera_frames' in demo_data:
+                    # 如果存在 camera_frames，则创建相机帧数据集
+                    demo_group.create_dataset('camera_frames', data=demo_data['camera_frames'], compression="gzip", compression_opts=4)
+                if key == 'camera_time_stamp' and 'camera_frames' in demo_data:
+                    for camera_name, time_stamps in demo_data['camera_time_stamp'].items():
+                        camera_group.create_dataset(camera_name, data=time_stamps, compression="gzip", compression_opts=4)
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
@@ -487,4 +489,9 @@ class DatasetReader:
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
                 'camera_frames': np.array(demo_group['camera_frames'])
             }
+
+            if 'timestamps' in demo_group:
+                demo_data['timestamps'] = np.array(demo_group['timestamps'])
+            if 'camera' in demo_group:
+                demo_data['camera'] = {key: np.array(demo_group['camera'][key]) for key in demo_group['camera'].keys()}
         return demo_data

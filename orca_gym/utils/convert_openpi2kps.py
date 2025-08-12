@@ -4,7 +4,7 @@ import h5py
 import numpy as np
 import os
 from pathlib import Path
-from orca_gym.dataset_util import DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetReader
 
 class KPSDataSet:
     def __init__(self, file_path):
@@ -14,8 +14,11 @@ class KPSDataSet:
     def create(self, data: dict):
         openpi_action = data['actions']
         openpi_obs = data['obs']
-        openpi_timesteps = data['timesteps']
-        len = openpi_timesteps.shape[0]
+        if data.get('timestamps') is None:
+            openpi_timestamps = data['timesteps']
+        else:
+            openpi_timestamps = data['timestamps']
+        len = openpi_timestamps.shape[0]
         index = range(len)
 
         kps_action_effector_position_l, kps_action_effector_position_r = openpi_obs['grasp_joint_pos_l'], openpi_obs['grasp_joint_pos_r']
@@ -40,7 +43,7 @@ class KPSDataSet:
         with h5py.File(self.file_path, 'w') as f:
             action_group = f.create_group('action')
             state_group = f.create_group('state')
-            timestamps = f.create_dataset('timestamps', data=openpi_timesteps, compression="gzip", compression_opts=4)
+            timestamps = f.create_dataset('timestamps', data=openpi_timestamps, compression="gzip", compression_opts=4)
 
             action_effector = action_group.create_group('effector')
             action_effector_index = action_effector.create_dataset('index', data=index)
@@ -100,6 +103,10 @@ class KPSDataSet:
             state_waist_position = state_waist.create_dataset('position', data=np.zeros((len, 2)), compression="gzip", compression_opts=4)
             state_waist_velocity = state_waist.create_dataset('velocity', data=np.zeros((len, 2)), compression="gzip", compression_opts=4)
 
+            if data.get('camera') is not None:
+                camera_data = data['camera']
+                for camera_name, camera_timestamps in camera_data.items():
+                    f.create_dataset(f"{camera_name}_mp4_timestamps", data=camera_timestamps, compression="gzip", compression_opts=4)
 
     def create_dataset(self, group, data):
         pass

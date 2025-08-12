@@ -192,6 +192,14 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.GetCurrentFrameIndex(request)
         return response.current_frame
 
+    async def get_camera_time_stamp(self, last_frame) -> dict:
+        request = mjc_message_pb2.GetTimeStampRequest()
+        request.last_frame_index = last_frame
+        response = await self.stub.GetTimeStamp(request)
+        if response.error_message != "":
+            print(f"Get time stamp failed. error message: {response.error_message}")
+        return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
+
     @property
     def xml_file_dir(self):
         user_home = os.path.expanduser('~')  # 自动适配Windows/Linux/Mac

@@ -348,6 +348,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
     is_success_list = []
     # camera_frames = {camera.name: [] for camera in cameras}
     camera_frame_index = []
+    camera_time_stamp = {}
     timestep_list = []
     action_step_taken = 0
     saving_mp4 = False
@@ -382,6 +383,9 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     camera_frame_index.append(env.get_current_frame())
                     is_success = env._task.is_success(env)
                     is_success_list.append(is_success)
+                    time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
+                    for camera_name, time_list in time_stamp_dict.items():
+                        camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
                     env.stop_save_video()
                     saving_mp4 = False
                     if not is_success:
@@ -411,7 +415,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                 
 
         if terminated_times >= 5 or truncated or is_success:
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success_list
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success_list, camera_time_stamp
 
         elapsed_time = datetime.now() - start_time
         if elapsed_time.total_seconds() < REALTIME_STEP:
@@ -493,7 +497,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         reward_list, 
                         done_list, 
                         info_list, 
-                        camera_frames, 
+                        camera_frames,
+                        camera_time_stamp,
                         timestep_list, 
                         language_instruction,
                         level_name):
@@ -510,7 +515,9 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
         'camera_frames': camera_frames,
+        'camera_time_stamp': camera_time_stamp,
         'timesteps': np.array(timestep_list, dtype=np.float32),
+        'timestamps': np.array([info["time_stamp"] for info in info_list], dtype=np.uint64),
         'language_instruction': language_instruction
     })
     # 1) 拿到 level_name
@@ -587,7 +594,7 @@ def do_teleoperation(env,
         camera.start()
 
     while True:
-        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list = teleoperation_episode(
+        obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, camera_time_stamp = teleoperation_episode(
         env, cameras, dataset_writer, rgb_size, action_step
     )
     
@@ -602,7 +609,7 @@ def do_teleoperation(env,
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
 
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, info_list[0]["language_instruction"],level_name = env._task.level_name)
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"],level_name = env._task.level_name)
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -1146,10 +1153,14 @@ def do_augmentation(
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step, sync_codec=sync_codec)
                 if  is_success:
+                    camera_time_stamp = {}
                     if output_video == True:
+                        time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1])
+                        for camera_name, time_list in time_stamp_dict.items():
+                            camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
                         env.stop_save_video()
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
-                                        camera_frames, timestep_list, language_instruction,level_name)
+                                        camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
                     done_demo_count += 1
                     print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True

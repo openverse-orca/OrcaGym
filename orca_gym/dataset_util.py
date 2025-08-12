@@ -338,4 +338,8 @@ class DatasetReader:
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
                 'camera_frames': np.array(demo_group['camera_frames']),
             }
+            if 'timestamps' in demo_group:
+                demo_data['timestamps'] = np.array(demo_group['timestamps'])
+            if 'camera' in demo_group:
+                demo_data['camera'] = {key: np.array(demo_group['camera'][key]) for key in demo_group['camera'].keys()}
         return demo_data

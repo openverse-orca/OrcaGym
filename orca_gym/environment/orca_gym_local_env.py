@@ -148,6 +148,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     async def _get_current_frame(self):
         return await self.gym.get_current_frame()
 
+    def get_camera_time_stamp(self, last_frame_index) -> dict:
+        return self.loop.run_until_complete(self._get_camera_time_stamp(last_frame_index))
+
+    async def _get_camera_time_stamp(self, last_frame_index):
+        return await self.gym.get_camera_time_stamp(last_frame_index)
+
     def get_body_manipulation_movement(self):
         actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
         delta_pos = actor_movement["delta_pos"]
