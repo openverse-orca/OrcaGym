@@ -1,3 +1,4 @@
+framework: "sb3"
 orcagym_addresses: ["localhost:50051"]
 agent_name: "go2"
 agent_spawnable_name: "go2_usda"

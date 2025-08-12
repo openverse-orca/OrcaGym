@@ -1,19 +1,27 @@
-train_legged_local:
-  orcagym_addr: "localhost:50051"
-  env_name: "LeggedGym_OrcaGymEnv"
-  agent_name: "go2_usda"
-  max_episode_steps: 1000
-  num_env_runners: 2
-  num_envs_per_env_runner: 2
-  async_env_runner: True
-  run_mode: training
-  iter: 100
-  render_mode: human
-  height_map_file: "../../orca_gym/tools/height_map.npy"
+framework: "rllib"
+orcagym_addresses: ["localhost:50051"]
+agent_name: "go2"
+agent_spawnable_name: "go2_usda"
+task: "follow_command"
+env_name: "LeggedGym"
 
-test_legged_local:
-  orcagym_addr: "localhost:50051"
-  env_name: "LeggedGym_OrcaGymEnv"
-  agent_name: "go2_usda"
+training:
   max_episode_steps: 1000
-  run_mode: testing
+  num_env_runners: 4
+  num_envs_per_env_runner: 4
+  async_env_runner: True
+  iter: 100
+  render_mode: none
+  terrain_spawnable_names: 
+    follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+    stand_still: []
+
+testing:
+  agent_name: "go2_000"
+  max_episode_steps: 1000
+  render_mode: human
+
+playing:
+  agent_name: "go2_000"
+  max_episode_steps: 1000
+  render_mode: human

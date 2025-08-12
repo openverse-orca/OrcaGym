@@ -1,7 +1,5 @@
 from gymnasium.vector.vector_env import ArrayType, VectorEnv
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import numpy as np
@@ -11,8 +9,8 @@ from gymnasium.core import ActType, ObsType, RenderFrame
 from gymnasium.utils import seeding
 
 
-if TYPE_CHECKING:
-    from gymnasium.envs.registration import EnvSpec
+
+from gymnasium.envs.registration import EnvSpec
 
 ArrayType = TypeVar("ArrayType")
 
@@ -83,21 +81,48 @@ class OrcaGymVectorEnv(VectorEnv):
     _np_random: np.random.Generator | None = None
     _np_random_seed: int | None = None
 
-    def __init__(self, env_id: str, num_envs: int, **kwargs):
+    def __init__(self, 
+        num_envs: int, 
+        worker_index: int,
+        entry_point: str,
+        **kwargs
+    ):
         self.agent_num = num_envs
-        self.env : OrcaGymAsyncEnv = gym.make(env_id, **kwargs)
+        self.worker_index = worker_index
+        env_id = kwargs.get("env_id", "")
+        env_id_prefix = "-".join(env_id.split("-")[:-1])
+        worker_env_id = f"{env_id_prefix}-{worker_index:03d}"
+        kwargs["env_id"] = worker_env_id
+
+        print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
+
+        gym.register(
+            id=worker_env_id,
+            entry_point=entry_point,
+            kwargs=kwargs
+        )
+
+        self.env : OrcaGymAsyncEnv = gym.make(worker_env_id, **kwargs)
 
         # OrcaGymAsyncEnv 的 obs 是 字典形式，不符合rllib的格式，需要转换为np形式
-        _, agent_obs, _, _ = self.env.get_obs()
-        agent_obs_np = np.concatenate([obs for obs in agent_obs.values()], axis=0)
-        self.observation_space = self.env.generate_observation_space(agent_obs_np)
-        self.single_observation_space = self.env.generate_observation_space(agent_obs[0])
+        unwrapped_env : OrcaGymAsyncEnv = self.env.unwrapped
+        env_obs, _, _, _ = unwrapped_env.get_obs()
+        obs = env_obs["observation"]
+        self.observation_space = unwrapped_env.generate_observation_space(obs)
+        self.single_observation_space = unwrapped_env.generate_observation_space(obs[0])
 
-        
-
-        self.action_space = self.env.action_space
-        
         self.single_action_space = self.env.action_space
+        # 将 single_action_space 扩展到 env_num 维度
+        self.action_space = gym.spaces.Box(
+            low=np.tile(self.single_action_space.low, (self.agent_num, 1)),
+            high=np.tile(self.single_action_space.high, (self.agent_num, 1)),
+            dtype=self.single_action_space.dtype,
+        )
+
+        print("OrcaGymVectorEnv observation_space: ", self.observation_space)
+        print("OrcaGymVectorEnv single_observation_space: ", self.single_observation_space)
+        print("OrcaGymVectorEnv action_space: ", self.action_space)
+        print("OrcaGymVectorEnv single_action_space: ", self.single_action_space)
    
         self.num_envs = num_envs
         self.closed = False
@@ -132,6 +157,13 @@ class OrcaGymVectorEnv(VectorEnv):
         """
         if seed is not None:
             self._np_random, self._np_random_seed = seeding.np_random(seed)
+
+        obs, _ = self.env.reset()
+        # print("OrcaGymVectorEnv reset obs: ", obs)
+        # print("OrcaGymVectorEnv reset info: ", info)
+        infos = [{"info": "None"} for _ in range(self.agent_num)]
+
+        return obs["observation"], infos
 
     def step(
         self, actions: ActType
@@ -169,7 +201,16 @@ class OrcaGymVectorEnv(VectorEnv):
             >>> infos
             {}
         """
-        raise NotImplementedError(f"{self.__str__()} step function is not implemented.")
+        # raise NotImplementedError(f"{self.__str__()} step function is not implemented.")
+        print("OrcaGymVectorEnv step actions: ", actions)
+        actions = actions.flatten()
+        obs, reward, terminated, truncated, info = self.env.step(actions)
+        print("OrcaGymVectorEnv step obs: ", obs)
+        print("OrcaGymVectorEnv step reward: ", reward)
+        print("OrcaGymVectorEnv step terminated: ", terminated)
+        print("OrcaGymVectorEnv step truncated: ", truncated)
+        print("OrcaGymVectorEnv step info: ", info)
+        return obs["observation"], reward, terminated, truncated, info
 
     def render(self) -> tuple[RenderFrame, ...] | None:
         """Returns the rendered frames from the parallel environments.
@@ -177,9 +218,10 @@ class OrcaGymVectorEnv(VectorEnv):
         Returns:
             A tuple of rendered frames from the parallel environments
         """
-        raise NotImplementedError(
-            f"{self.__str__()} render function is not implemented."
-        )
+        # raise NotImplementedError(
+        #     f"{self.__str__()} render function is not implemented."
+        # )
+        self.env.render()
 
     def close(self, **kwargs: Any):
         """Close all parallel environments and release resources.
@@ -201,119 +243,121 @@ class OrcaGymVectorEnv(VectorEnv):
         if self.closed:
             return
 
+        self.env.close()
+
         self.close_extras(**kwargs)
         self.closed = True
 
-    def close_extras(self, **kwargs: Any):
-        """Clean up the extra resources e.g. beyond what's in this base class."""
-        pass
+    # def close_extras(self, **kwargs: Any):
+    #     """Clean up the extra resources e.g. beyond what's in this base class."""
+    #     pass
 
-    @property
-    def np_random(self) -> np.random.Generator:
-        """Returns the environment's internal :attr:`_np_random` that if not set will initialise with a random seed.
+    # @property
+    # def np_random(self) -> np.random.Generator:
+    #     """Returns the environment's internal :attr:`_np_random` that if not set will initialise with a random seed.
 
-        Returns:
-            Instances of `np.random.Generator`
-        """
-        if self._np_random is None:
-            self._np_random, self._np_random_seed = seeding.np_random()
-        return self._np_random
+    #     Returns:
+    #         Instances of `np.random.Generator`
+    #     """
+    #     if self._np_random is None:
+    #         self._np_random, self._np_random_seed = seeding.np_random()
+    #     return self._np_random
 
-    @np_random.setter
-    def np_random(self, value: np.random.Generator):
-        self._np_random = value
-        self._np_random_seed = -1
+    # @np_random.setter
+    # def np_random(self, value: np.random.Generator):
+    #     self._np_random = value
+    #     self._np_random_seed = -1
 
-    @property
-    def np_random_seed(self) -> int | None:
-        """Returns the environment's internal :attr:`_np_random_seed` that if not set will first initialise with a random int as seed.
+    # @property
+    # def np_random_seed(self) -> int | None:
+    #     """Returns the environment's internal :attr:`_np_random_seed` that if not set will first initialise with a random int as seed.
 
-        If :attr:`np_random_seed` was set directly instead of through :meth:`reset` or :meth:`set_np_random_through_seed`,
-        the seed will take the value -1.
+    #     If :attr:`np_random_seed` was set directly instead of through :meth:`reset` or :meth:`set_np_random_through_seed`,
+    #     the seed will take the value -1.
 
-        Returns:
-            int: the seed of the current `np_random` or -1, if the seed of the rng is unknown
-        """
-        if self._np_random_seed is None:
-            self._np_random, self._np_random_seed = seeding.np_random()
-        return self._np_random_seed
+    #     Returns:
+    #         int: the seed of the current `np_random` or -1, if the seed of the rng is unknown
+    #     """
+    #     if self._np_random_seed is None:
+    #         self._np_random, self._np_random_seed = seeding.np_random()
+    #     return self._np_random_seed
 
-    @property
-    def unwrapped(self):
-        """Return the base environment."""
-        return self
+    # @property
+    # def unwrapped(self):
+    #     """Return the base environment."""
+    #     return self
 
-    def _add_info(
-        self, vector_infos: dict[str, Any], env_info: dict[str, Any], env_num: int
-    ) -> dict[str, Any]:
-        """Add env info to the info dictionary of the vectorized environment.
+    # def _add_info(
+    #     self, vector_infos: dict[str, Any], env_info: dict[str, Any], env_num: int
+    # ) -> dict[str, Any]:
+    #     """Add env info to the info dictionary of the vectorized environment.
 
-        Given the `info` of a single environment add it to the `infos` dictionary
-        which represents all the infos of the vectorized environment.
-        Every `key` of `info` is paired with a boolean mask `_key` representing
-        whether or not the i-indexed environment has this `info`.
+    #     Given the `info` of a single environment add it to the `infos` dictionary
+    #     which represents all the infos of the vectorized environment.
+    #     Every `key` of `info` is paired with a boolean mask `_key` representing
+    #     whether or not the i-indexed environment has this `info`.
 
-        Args:
-            vector_infos (dict): the infos of the vectorized environment
-            env_info (dict): the info coming from the single environment
-            env_num (int): the index of the single environment
+    #     Args:
+    #         vector_infos (dict): the infos of the vectorized environment
+    #         env_info (dict): the info coming from the single environment
+    #         env_num (int): the index of the single environment
 
-        Returns:
-            infos (dict): the (updated) infos of the vectorized environment
-        """
-        for key, value in env_info.items():
-            # If value is a dictionary, then we apply the `_add_info` recursively.
-            if isinstance(value, dict):
-                array = self._add_info(vector_infos.get(key, {}), value, env_num)
-            # Otherwise, we are a base case to group the data
-            else:
-                # If the key doesn't exist in the vector infos, then we can create an array of that batch type
-                if key not in vector_infos:
-                    if type(value) in [int, float, bool] or issubclass(
-                        type(value), np.number
-                    ):
-                        array = np.zeros(self.num_envs, dtype=type(value))
-                    elif isinstance(value, np.ndarray):
-                        # We assume that all instances of the np.array info are of the same shape
-                        array = np.zeros(
-                            (self.num_envs, *value.shape), dtype=value.dtype
-                        )
-                    else:
-                        # For unknown objects, we use a Numpy object array
-                        array = np.full(self.num_envs, fill_value=None, dtype=object)
-                # Otherwise, just use the array that already exists
-                else:
-                    array = vector_infos[key]
+    #     Returns:
+    #         infos (dict): the (updated) infos of the vectorized environment
+    #     """
+    #     for key, value in env_info.items():
+    #         # If value is a dictionary, then we apply the `_add_info` recursively.
+    #         if isinstance(value, dict):
+    #             array = self._add_info(vector_infos.get(key, {}), value, env_num)
+    #         # Otherwise, we are a base case to group the data
+    #         else:
+    #             # If the key doesn't exist in the vector infos, then we can create an array of that batch type
+    #             if key not in vector_infos:
+    #                 if type(value) in [int, float, bool] or issubclass(
+    #                     type(value), np.number
+    #                 ):
+    #                     array = np.zeros(self.num_envs, dtype=type(value))
+    #                 elif isinstance(value, np.ndarray):
+    #                     # We assume that all instances of the np.array info are of the same shape
+    #                     array = np.zeros(
+    #                         (self.num_envs, *value.shape), dtype=value.dtype
+    #                     )
+    #                 else:
+    #                     # For unknown objects, we use a Numpy object array
+    #                     array = np.full(self.num_envs, fill_value=None, dtype=object)
+    #             # Otherwise, just use the array that already exists
+    #             else:
+    #                 array = vector_infos[key]
 
-                # Assign the data in the `env_num` position
-                #   We only want to run this for the base-case data (not recursive data forcing the ugly function structure)
-                array[env_num] = value
+    #             # Assign the data in the `env_num` position
+    #             #   We only want to run this for the base-case data (not recursive data forcing the ugly function structure)
+    #             array[env_num] = value
 
-            # Get the array mask and if it doesn't already exist then create a zero bool array
-            array_mask = vector_infos.get(
-                f"_{key}", np.zeros(self.num_envs, dtype=np.bool_)
-            )
-            array_mask[env_num] = True
+    #         # Get the array mask and if it doesn't already exist then create a zero bool array
+    #         array_mask = vector_infos.get(
+    #             f"_{key}", np.zeros(self.num_envs, dtype=np.bool_)
+    #         )
+    #         array_mask[env_num] = True
 
-            # Update the vector info with the updated data and mask information
-            vector_infos[key], vector_infos[f"_{key}"] = array, array_mask
+    #         # Update the vector info with the updated data and mask information
+    #         vector_infos[key], vector_infos[f"_{key}"] = array, array_mask
 
-        return vector_infos
+    #     return vector_infos
 
-    def __del__(self):
-        """Closes the vector environment."""
-        if not getattr(self, "closed", True):
-            self.close()
+    # def __del__(self):
+    #     """Closes the vector environment."""
+    #     if not getattr(self, "closed", True):
+    #         self.close()
 
-    def __repr__(self) -> str:
-        """Returns a string representation of the vector environment.
+    # def __repr__(self) -> str:
+    #     """Returns a string representation of the vector environment.
 
-        Returns:
-            A string containing the class name, number of environments and environment spec id
-        """
-        if self.spec is None:
-            return f"{self.__class__.__name__}(num_envs={self.num_envs})"
-        else:
-            return (
-                f"{self.__class__.__name__}({self.spec.id}, num_envs={self.num_envs})"
-            )
+    #     Returns:
+    #         A string containing the class name, number of environments and environment spec id
+    #     """
+    #     if self.spec is None:
+    #         return f"{self.__class__.__name__}(num_envs={self.num_envs})"
+    #     else:
+    #         return (
+    #             f"{self.__class__.__name__}({self.spec.id}, num_envs={self.num_envs})"
+    #         )

@@ -17,6 +17,7 @@ if project_root not in sys.path:
 
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 import orca_gym.scripts.sb3_ppo_vecenv_rl as sb3_ppo_vecenv_rl
+import orca_gym.scripts.rllib_appo_rl as rllib_appo_rl
 from orca_gym.utils.dir_utils import create_tmp_dir
 from scene_util import generate_height_map_file, clear_scene, publish_terrain, publish_scene
 
@@ -34,6 +35,67 @@ def export_config(config: dict, model_dir: str):
     # 输出到 json 文件
     with open(os.path.join(model_dir, 'config.json'), 'w') as f:
         json.dump(config, f, indent=4)
+
+def process_scene(
+    orcagym_addresses: list[str],
+    agent_name: str,
+    agent_spawnable_name: str,
+    agent_num: int,
+    terrain_spawnable_names: list[str],
+    model_dir: str,
+):
+    # 清空场景
+    clear_scene(
+        orcagym_addresses=orcagym_addresses,
+    )
+
+    # 发布地形
+    publish_terrain(
+        orcagym_addresses=orcagym_addresses,
+        terrain_spawnable_names=terrain_spawnable_names,
+    )
+
+    # 空场景生成高度图
+    height_map_file = generate_height_map_file(
+        orcagym_addresses=orcagym_addresses,
+        model_dir=model_dir,
+    )
+
+    # 放置机器人
+    publish_scene(
+        orcagym_addresses=orcagym_addresses,
+        agent_name=agent_name,
+        agent_spawnable_name=agent_spawnable_name,
+        agent_num=agent_num,
+        terrain_spawnable_names=terrain_spawnable_names,
+    )
+
+    return height_map_file
+
+def process_model_dir(
+    config: dict, 
+    run_mode: str, 
+    ckpt: str, 
+    subenv_num: int, 
+    agent_num: int, 
+    agent_name: str, 
+    task: str
+):
+    create_tmp_dir("trained_models_tmp")
+
+    if ckpt is not None:
+        model_file = ckpt
+        model_dir = os.path.dirname(model_file)
+    elif run_mode == "training":
+        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        model_dir = f"./trained_models_tmp/{agent_name}_{subenv_num * agent_num}_{formatted_now}"
+        os.makedirs(model_dir, exist_ok=True)
+        model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
+        export_config(config, model_dir)
+    else:
+        raise ValueError("Invalid model file! Please provide a model file for testing / play.")
+
+    return model_dir, model_file
 
 def run_sb3_ppo_rl(
     config: dict,
@@ -64,7 +126,6 @@ def run_sb3_ppo_rl(
     terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
-
     if task == 'stand_still' or task == 'no_action' or task == 'follow_command':
         max_episode_steps = int(1 / (TIME_STEP * FRAME_SKIP * ACTION_SKIP) * EPISODE_TIME)
     else:
@@ -72,45 +133,25 @@ def run_sb3_ppo_rl(
 
     total_steps = training_episode * subenv_num * agent_num * max_episode_steps
 
-    create_tmp_dir("trained_models_tmp")
-
-    if ckpt is not None:
-        model_file = ckpt
-        model_dir = os.path.dirname(model_file)
-    elif run_mode == "training":
-        formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_dir = f"./trained_models_tmp/{agent_name}_{subenv_num * agent_num}_{formatted_now}"
-        os.makedirs(model_dir, exist_ok=True)
-        model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
-        export_config(config, model_dir)
-    else:
-        raise ValueError("Invalid model file! Please provide a model file for testing / play.")
-
-    # 清空场景
-    clear_scene(
-        orcagym_addresses=orcagym_addresses,
+    model_dir, model_file = process_model_dir(
+        config=config, 
+        run_mode=run_mode, 
+        ckpt=ckpt, 
+        subenv_num=subenv_num, 
+        agent_num=agent_num, 
+        agent_name=agent_name, 
+        task=task
     )
 
-    # 发布地形
-    publish_terrain(
-        orcagym_addresses=orcagym_addresses,
-        terrain_spawnable_names=terrain_spawnable_names,
-    )
-
-    # 空场景生成高度图
-    height_map_file = generate_height_map_file(
-        orcagym_addresses=orcagym_addresses,
-        model_dir=model_dir,
-    )
-
-    # 放置机器人
-    publish_scene(
+    height_map_file = process_scene(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
         agent_spawnable_name=agent_spawnable_name,
         agent_num=agent_num,
         terrain_spawnable_names=terrain_spawnable_names,
+        model_dir=model_dir,
     )
+
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
@@ -159,33 +200,76 @@ def run_sb3_ppo_rl(
 
 def run_rllib_appo_rl(
     config: dict,
+    run_mode: str,
+    ckpt: str,
+    remote: str,
+    visualize: bool,
 ):
-    from orca_gym.scripts.rllib_appo_rl import env_creator, test_model, run_training, setup_cuda_environment
 
     # 在脚本开头调用
-    if setup_cuda_environment():
+    if rllib_appo_rl.setup_cuda_environment():
         print("CUDA 环境验证通过")
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
 
+    if remote is not None:
+        orcagym_addresses = [remote]
+    else:
+        orcagym_addresses = config['orcagym_addresses']
+
+    agent_name = config['agent_name']
+    agent_spawnable_name = config['agent_spawnable_name']
+    task = config['task']
+
+    run_mode_config = config[run_mode]
+    num_env_runners = run_mode_config['num_env_runners']
+    num_envs_per_env_runner = run_mode_config['num_envs_per_env_runner']
+
+    if visualize:
+        render_mode = "human"
+    else:
+        render_mode = run_mode_config['render_mode']
+
+    terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
+
+    model_dir, model_file = process_model_dir(
+        config=config, 
+        run_mode=run_mode, 
+        ckpt=ckpt, 
+        subenv_num=num_env_runners, 
+        agent_num=num_envs_per_env_runner, 
+        agent_name=agent_name, 
+        task=task
+    )
+
+    height_map_file = process_scene(
+        orcagym_addresses=orcagym_addresses,
+        agent_name=agent_name,
+        agent_spawnable_name=agent_spawnable_name,
+        agent_num=num_envs_per_env_runner,
+        terrain_spawnable_names=terrain_spawnable_names,
+        model_dir=model_dir,
+    )
+
+
     if run_mode == 'training':
-        run_training(
-            orcagym_addr=config['orcagym_addr'],
+        rllib_appo_rl.run_training(
+            orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
-            agent_name=config['agent_name'],
-            max_episode_steps=config['max_episode_steps'],
-            num_env_runners=config['num_env_runners'],
-            num_envs_per_env_runner=config['num_envs_per_env_runner'],
-            async_env_runner=config['async_env_runner'],
-            iter=config['iter'],
-            render_mode=config['render_mode'],
-            height_map_file=config['height_map_file']
+            agent_name=agent_name,
+            max_episode_steps=run_mode_config['max_episode_steps'],
+            num_env_runners=num_env_runners,
+            num_envs_per_env_runner=num_envs_per_env_runner,
+            async_env_runner=run_mode_config['async_env_runner'],
+            iter=run_mode_config['iter'],
+            render_mode=render_mode,
+            height_map_file=height_map_file
         )
     elif run_mode == 'testing':
-        if not checkpoint_path:
+        if not ckpt:
             raise ValueError("Checkpoint path must be provided for testing.")
-        test_model(
-            checkpoint_path=checkpoint_path,
+        rllib_appo_rl.test_model(
+            checkpoint_path=ckpt,
             orcagym_addr=config['orcagym_addr'],
             env_name=config['env_name'],
             agent_name=config['agent_name'],
@@ -195,6 +279,14 @@ def run_rllib_appo_rl(
         )
     else:
         raise ValueError("Invalid run mode. Use 'training' or 'testing'.")
+
+def run_rl(config: dict, run_mode: str, ckpt: str, remote: str, visualize: bool):
+    if config['framework'] == 'sb3':
+        run_sb3_ppo_rl(config, run_mode, ckpt, remote, visualize)
+    elif config['framework'] == 'rllib':
+        run_rllib_appo_rl(config, run_mode, ckpt, remote, visualize)
+    else:
+        raise ValueError("Invalid framework")
 
 
 if __name__ == "__main__":
@@ -216,11 +308,11 @@ if __name__ == "__main__":
     assert not (args.test and args.play), "Please specify only one of --train, --test, or --play"
 
     if args.train:
-        run_sb3_ppo_rl(config, 'training', args.ckpt, args.remote, args.visualize)
+        run_rl(config, 'training', args.ckpt, args.remote, args.visualize)
     elif args.test:
-        run_sb3_ppo_rl(config, 'testing', args.ckpt, args.remote, args.visualize)
+        run_rl(config, 'testing', args.ckpt, args.remote, args.visualize)
     elif args.play:
-        run_sb3_ppo_rl(config, 'play', args.ckpt, args.remote, args.visualize)
+        run_rl(config, 'play', args.ckpt, args.remote, args.visualize)
     else:
-        raise ValueError("Invalid config file")
+        raise ValueError("Invalid run mode")
 

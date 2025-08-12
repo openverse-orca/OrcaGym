@@ -30,17 +30,18 @@ from orca_gym.environment.async_env.single_agent_env_runner import (
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
-    "LeggedGym_OrcaGymEnv": "envs.legged_gym.legged_gym_rllib_env:LeggedGymRLLibEnv",
+    "LeggedGym": "envs.legged_gym.legged_gym_env:LeggedGymEnv",
 }
 
 ENV_RUNNER_CLS = {
     "Ant_OrcaGymEnv": SingleAgentEnvRunner,
-    "LeggedGym_OrcaGymEnv": OrcaGymAsyncSingleAgentEnvRunner,
+    "LeggedGym": OrcaGymAsyncSingleAgentEnvRunner,
 }
 
-TIME_STEP = 0.005
-FRAME_SKIP = 4
-REALTIME_STEP = TIME_STEP * FRAME_SKIP
+TIME_STEP = 0.001
+FRAME_SKIP = 5
+ACTION_SKIP = 4
+REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
 from ray.rllib.utils.metrics import (
@@ -54,6 +55,7 @@ def get_orca_gym_register_info(
         orcagym_addr : str,
         env_name : str, 
         agent_name : str, 
+        agent_num: int,
         render_mode: str,
         worker_idx: int,
         vector_idx: int,
@@ -76,7 +78,7 @@ def get_orca_gym_register_info(
 
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{worker_idx:03d}"
-    agent_names = [f"{agent_name}"]
+    agent_names = [f"{agent_name}_{i:03d}" for i in range(agent_num)]
     kwargs = {
         'Ant_OrcaGymEnv': {
             'frame_skip': FRAME_SKIP,
@@ -86,8 +88,9 @@ def get_orca_gym_register_info(
             'render_mode': render_mode,
             'max_episode_steps': max_episode_steps,
         },
-        'LeggedGym_OrcaGymEnv': {
+        'LeggedGym': {
             'frame_skip': FRAME_SKIP,
+            'action_skip': ACTION_SKIP,
             'orcagym_addr': orcagym_addr,
             'agent_names': agent_names,
             'time_step': TIME_STEP,
@@ -95,17 +98,22 @@ def get_orca_gym_register_info(
             'height_map_file': height_map_file,
             'env_id': env_id,
             'max_episode_steps': max_episode_steps,
+            'is_subenv': False,
+            'run_mode': 'training',
+            'task': 'follow_command',
         },
     }
 
     return env_id, kwargs
 
 def create_demo_env_instance(
-    orcagym_addr: str = "localhost:50051",
-    env_name: str = "Ant_OrcaGymEnv",
-    agent_name: str = "ant",
-    max_episode_steps: int = 1000,
-    async_env_runner: bool = False
+    orcagym_addr: str,
+    env_name: str,
+    agent_name: str,
+    agent_num: int,
+    max_episode_steps: int,
+    async_env_runner: bool,
+    height_map_file: str
 ):
     """
     创建一个演示环境实例，主要用于测试和验证。
@@ -116,11 +124,12 @@ def create_demo_env_instance(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
+        agent_num=agent_num,
         render_mode=render_mode,
-        worker_idx=1,
+        worker_idx=999,
         vector_idx=1,
         async_env_runner=async_env_runner,
-        height_map_file=None,
+        height_map_file=height_map_file,
         max_episode_steps=max_episode_steps
     )
 
@@ -132,12 +141,13 @@ def create_demo_env_instance(
             kwargs=kwargs[env_name],
             max_episode_steps=max_episode_steps,
             reward_threshold=0.0,
+            vector_entry_point=ENV_ENTRY_POINT[env_name],
         )
     
     print(f"Creating environment {env_id} with kwargs={kwargs}")
     env = gym.make(env_id, **kwargs[env_name])
     
-    return env
+    return env, kwargs[env_name]
 
 
 def get_config(
@@ -146,14 +156,25 @@ def get_config(
     env: gym.Env,
     num_gpus_available: int,
     async_env_runner: bool,
-    env_name: str
+    env_name: str,
+    env_kwargs: dict
 ):
+    # env_name 是用 - 分隔的字符串，去掉最后一段，保留前面的
+    env_name_prefix = "-".join(env.spec.id.split("-")[:-1])
+    print("env_name_prefix: ", env_name_prefix)
     print("action_space: ", env.action_space, "observation_space: ", env.observation_space)
     config = (
         APPOConfig()
         .environment(
-            env="OrcaGymEnv",
-            env_config={"worker_index": 1, "vector_index": 1, "num_env_runners": num_env_runners, "num_envs_per_env_runner": num_envs_per_env_runner},
+            env=env_name,
+            env_config={
+                "worker_index": 1, 
+                "vector_index": 1, 
+                "num_env_runners": num_env_runners, 
+                "num_envs_per_env_runner": num_envs_per_env_runner, 
+                "env_kwargs": env_kwargs, 
+                "entry_point": ENV_ENTRY_POINT[env_name]
+            },
             disable_env_checking=False,
             # render_env=True,
             # action_space=env.action_space,
@@ -172,7 +193,7 @@ def get_config(
         )
         .rl_module(
             rl_module_spec=RLModuleSpec(
-                observation_space=env.observation_space,
+                observation_space=env.observation_space["observation"],
                 action_space=env.action_space,
                 module_class=DefaultAPPOTorchRLModule,
                 model_config={
@@ -211,7 +232,8 @@ def config_appo_tuner(
         iter: int,
         env: gym.Env,
         async_env_runner: bool,
-        env_name: str
+        env_name: str,
+        env_kwargs: dict
     ) -> tune.Tuner:
     # 重要：获取系统的实际GPU数量
     num_gpus_available = torch.cuda.device_count()
@@ -225,7 +247,8 @@ def config_appo_tuner(
         env=env,
         num_gpus_available=num_gpus_available,
         async_env_runner=async_env_runner,
-        env_name=env_name
+        env_name=env_name,
+        env_kwargs=env_kwargs
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -269,6 +292,7 @@ def env_creator(
         orcagym_addr: str,
         env_name: str,
         agent_name: str,
+        agent_num: int,
         max_episode_steps: int,
         render_mode: str,
         async_env_runner: bool,
@@ -288,6 +312,7 @@ def env_creator(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
+        agent_num=agent_num,
         render_mode=render_mode,
         worker_idx=worker_idx,
         vector_idx=vector_idx,
@@ -491,6 +516,7 @@ def run_training(
             orcagym_addr=orcagym_addr,
             env_name=env_name,
             agent_name=agent_name,
+            agent_num=num_envs_per_env_runner,
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
             async_env_runner=async_env_runner,
@@ -520,12 +546,14 @@ def run_training(
         print(f"  CUDA 版本: {res['cuda_version']}")
 
     # 创建一个样本环境实例
-    demo_env = create_demo_env_instance(
+    demo_env, demo_env_kwargs = create_demo_env_instance(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
+        agent_num=num_envs_per_env_runner,
         max_episode_steps=max_episode_steps,
         async_env_runner=async_env_runner,
+        height_map_file=height_map_file,
     )
 
     print("\nStarting training...")
@@ -540,7 +568,8 @@ def run_training(
         iter=iter,
         env=demo_env,
         async_env_runner=async_env_runner,
-        env_name=env_name
+        env_name=env_name,
+        env_kwargs=demo_env_kwargs
     )
     results = tuner.fit()
 
