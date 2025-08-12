@@ -1,9 +1,9 @@
 from gymnasium.vector.vector_env import ArrayType, VectorEnv
-
+import uuid
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import numpy as np
-
+import json
 import gymnasium as gym
 from gymnasium.core import ActType, ObsType, RenderFrame
 from gymnasium.utils import seeding
@@ -93,6 +93,8 @@ class OrcaGymVectorEnv(VectorEnv):
         env_id_prefix = "-".join(env_id.split("-")[:-1])
         worker_env_id = f"{env_id_prefix}-{worker_index:03d}"
         kwargs["env_id"] = worker_env_id
+        if worker_index == 1:
+            kwargs["is_subenv"] = False
 
         print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
 
@@ -158,12 +160,15 @@ class OrcaGymVectorEnv(VectorEnv):
         if seed is not None:
             self._np_random, self._np_random_seed = seeding.np_random(seed)
 
-        obs, _ = self.env.reset()
-        # print("OrcaGymVectorEnv reset obs: ", obs)
-        # print("OrcaGymVectorEnv reset info: ", info)
-        infos = [{"info": "None"} for _ in range(self.agent_num)]
+        # obs 只取第一个 agent 的观测数据，实际所有 agent 的观测数据在 info 中
+        _, async_env_info = self.env.reset()
 
-        return obs["observation"], infos
+        obs = async_env_info["env_obs"]["observation"]
+        infos = [{} for _ in range(self.agent_num)]
+
+        # print("OrcaGymVectorEnv reset obs shape: ", obs.shape)
+
+        return obs, infos
 
     def step(
         self, actions: ActType
@@ -202,15 +207,22 @@ class OrcaGymVectorEnv(VectorEnv):
             {}
         """
         # raise NotImplementedError(f"{self.__str__()} step function is not implemented.")
-        print("OrcaGymVectorEnv step actions: ", actions)
+        # print("OrcaGymVectorEnv step actions shape: ", actions.shape)
         actions = actions.flatten()
-        obs, reward, terminated, truncated, info = self.env.step(actions)
-        print("OrcaGymVectorEnv step obs: ", obs)
-        print("OrcaGymVectorEnv step reward: ", reward)
-        print("OrcaGymVectorEnv step terminated: ", terminated)
-        print("OrcaGymVectorEnv step truncated: ", truncated)
-        print("OrcaGymVectorEnv step info: ", info)
-        return obs["observation"], reward, terminated, truncated, info
+        _, _, _, _, info = self.env.step(actions)
+
+        obs = info["env_obs"]["observation"]
+        reward = info["reward"]
+        terminated = info["terminated"]
+        truncated = info["truncated"]
+        infos = [{} for _ in range(self.agent_num)]
+
+        # print("OrcaGymVectorEnv step obs shape: ", obs.shape)
+        # print("OrcaGymVectorEnv step reward shape: ", reward.shape)
+        # print("OrcaGymVectorEnv step terminated: ", terminated)
+        # print("OrcaGymVectorEnv step truncated: ", truncated)
+
+        return obs, reward, terminated, truncated, infos
 
     def render(self) -> tuple[RenderFrame, ...] | None:
         """Returns the rendered frames from the parallel environments.
@@ -247,6 +259,13 @@ class OrcaGymVectorEnv(VectorEnv):
 
         self.close_extras(**kwargs)
         self.closed = True
+
+    def _unpack_reset_info(self, info: dict[str, Any]) -> dict[str, Any]:
+        return info["env_obs"]
+
+    def _unpack_step_info(self, info: dict[str, Any]) -> dict[str, Any]:
+        return info["env_obs"]
+
 
     # def close_extras(self, **kwargs: Any):
     #     """Clean up the extra resources e.g. beyond what's in this base class."""

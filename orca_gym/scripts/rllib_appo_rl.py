@@ -64,18 +64,6 @@ def get_orca_gym_register_info(
         max_episode_steps: int
     ) -> tuple[ str, dict ]:
 
-    # 只有第一个worker的第一个环境渲染
-    if render_mode == 'human':
-        call_times = read_render_env_file()
-        max_call_times = 3 if async_env_runner else 2
-        if worker_idx == 1 and call_times < max_call_times:
-            set_render_env_file(call_times + 1)
-            render_mode = 'human'
-            print(f"worker_idx: {worker_idx}, vector_idx: {vector_idx}, render_mode: {render_mode}")
-        else:
-            render_mode = 'none'
-
-
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{worker_idx:03d}"
     agent_names = [f"{agent_name}_{i:03d}" for i in range(agent_num)]
@@ -98,7 +86,7 @@ def get_orca_gym_register_info(
             'height_map_file': height_map_file,
             'env_id': env_id,
             'max_episode_steps': max_episode_steps,
-            'is_subenv': False,
+            'is_subenv': True,
             'run_mode': 'training',
             'task': 'follow_command',
         },
@@ -113,13 +101,12 @@ def create_demo_env_instance(
     agent_num: int,
     max_episode_steps: int,
     async_env_runner: bool,
-    height_map_file: str
+    height_map_file: str,
+    render_mode: str
 ):
     """
     创建一个演示环境实例，主要用于测试和验证。
     """
-    render_mode = 'human'
-
     env_id, kwargs = get_orca_gym_register_info(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
@@ -271,7 +258,7 @@ def config_appo_tuner(
             stop={"training_iteration": iter},
             checkpoint_config=CheckpointConfig(
                 num_to_keep=3,
-                checkpoint_frequency=1,
+                checkpoint_frequency=100,
                 checkpoint_score_attribute="env_runners/episode_return_mean",
                 checkpoint_score_order="max",
                 checkpoint_at_end=True
@@ -460,35 +447,6 @@ def worker_env_check():
         "cuda_home": os.environ.get("CUDA_HOME", ""),
     }
 
-def set_render_env_file(call_times: int):
-    home_dir = os.path.expanduser("~")
-    render_env_json_path = os.path.join(home_dir, "orcagym_render_env.json")
-    if not os.path.exists(render_env_json_path):
-        try:
-            with open(render_env_json_path, "w") as f:
-                json.dump({"call_times": call_times}, f)
-            print(f"Created {render_env_json_path}")
-        except Exception as e:
-            print(f"Failed to create {render_env_json_path}: {e}")
-    else:
-        try:
-            with open(render_env_json_path, "r") as f:
-                data = json.load(f)
-                data["call_times"] = call_times
-            with open(render_env_json_path, "w") as f:
-                json.dump(data, f)
-        except Exception as e:
-            print(f"Failed to update {render_env_json_path}: {e}")
-
-def read_render_env_file():
-    home_dir = os.path.expanduser("~")
-    render_env_json_path = os.path.join(home_dir, "orcagym_render_env.json")
-    if os.path.exists(render_env_json_path):
-        with open(render_env_json_path, "r") as f:
-            data = json.load(f)
-            return data["call_times"]
-
-    return 0
 
 def run_training(
         orcagym_addr: str,
@@ -506,8 +464,6 @@ def run_training(
 
     # 在环境设置后调用
     verify_pytorch_cuda()
-
-    set_render_env_file(0)
     
     register_env(
         "OrcaGymEnv", 
@@ -554,6 +510,7 @@ def run_training(
         max_episode_steps=max_episode_steps,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
+        render_mode=render_mode,
     )
 
     print("\nStarting training...")
@@ -604,10 +561,10 @@ def test_model(
         agent_name: str,
         max_episode_steps: int,
         use_onnx_for_inference: bool = False,
-        explore_during_inference: bool = False
+        explore_during_inference: bool = False,
+        render_mode: str = 'human',
     ):
 
-    set_render_env_file(0)
 
     env = env_creator(
         env_context=None,  # 空上下文
@@ -615,7 +572,7 @@ def test_model(
         env_name=env_name,
         agent_name=agent_name,
         max_episode_steps=max_episode_steps,
-        render_mode='human',
+        render_mode=render_mode,
         async_env_runner=False,
         height_map_file=None
     )

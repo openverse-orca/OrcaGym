@@ -7,10 +7,10 @@ env_name: "LeggedGym"
 
 training:
   max_episode_steps: 1000
-  num_env_runners: 4
-  num_envs_per_env_runner: 4
+  num_env_runners: 16
+  num_envs_per_env_runner: 64
   async_env_runner: True
-  iter: 100
+  iter: 1000
   render_mode: none
   terrain_spawnable_names: 
     follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]

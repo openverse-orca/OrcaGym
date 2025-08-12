@@ -36,7 +36,8 @@ def main(config: dict,
             agent_name=config['agent_name'],
             max_episode_steps=config['max_episode_steps'],
             use_onnx_for_inference=False,
-            explore_during_inference=False   
+            explore_during_inference=False,
+            render_mode=config['render_mode']
         )
     else:
         raise ValueError("Invalid run mode. Use 'training' or 'testing'.")
