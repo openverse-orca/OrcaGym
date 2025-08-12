@@ -38,7 +38,7 @@ RewardConfig = {
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
         "leg_contact" : 1,               # 腿部身体接触惩罚
-        "body_contact" : 10,              # 身体接触惩罚
+        "body_contact" : 1,              # 身体接触惩罚
         "foot_touch" : 0,                # 重踏惩罚
         "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
@@ -46,19 +46,19 @@ RewardConfig = {
         "action_rate" : 0.01,           # Action平滑
         "base_gyro" : 0,                
         "base_accelerometer" : 0,
-        "follow_command_linvel" : 1,    # 跟随指令速度奖励
-        "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
+        "follow_command_linvel" : 0.1,    # 跟随指令速度奖励
+        "follow_command_angvel" : 2.0,  # 跟随指令角速度奖励
         "height" : 0,                   # 身体高度惩罚
         "body_lin_vel" : 2,             # 身体上下线速度惩罚
         "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
         "body_orientation" : 0,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0.1,             # 接触时，足底线速度
-        "feet_wringing" : 0.1,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
-        "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 1,                 # 无指令时，踏步惩罚
+        "feet_slip" : 0,             # 接触时，足底线速度
+        "feet_wringing" : 0,         # 接触时，足底角速度
+        "feet_fitted_ground" : 0,    # 鼓励对角步态，避免单侧滑步
+        "fly" : 0.1,                    # 四足离地惩罚0, 0
+        "stepping" : 1.0,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
         # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
@@ -185,7 +185,10 @@ Go2Config = {
         "curriculum_learning" :     True,
         "curriculum_levels" : {
             "stand_still" : [
-                {"name" : "stand_still" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
+                {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
+                {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
+                {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
+                {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
             ],
             "basic_moving" : [
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
@@ -211,15 +214,15 @@ Go2Config = {
             "stand_still" : {
                 "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.0,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
             },
 
             "spot_turn" : {
-                "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
+                "command_lin_vel_range_x" : [-0.2, 0.2], # x direction for forward max speed
                 "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-                "command_lin_vel_threshold" : [0, 0.0], # min linear velocity to trigger moving
+                "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 2, # second to resample the command
             },

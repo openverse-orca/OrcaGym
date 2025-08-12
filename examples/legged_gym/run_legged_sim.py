@@ -325,14 +325,16 @@ def run_simulation(env: gym.Env,
                 obs, info = env.reset()
                 continue
 
-            if ang_vel == 0.0 and np.linalg.norm(lin_vel) == 0.0:
-                model = models[command_model[terrain_type]["stand_still"]]
-            elif lin_vel[0] >= 0:
-                model = models[command_model[terrain_type]["forward"]]
-            elif lin_vel[0] < 0:
-                model = models[command_model[terrain_type]["backward"]]
+            if np.linalg.norm(lin_vel) == 0.0:
+                if ang_vel != 0.0:
+                    model = models[command_model[terrain_type]["trun"]]
+                else:
+                    model = models[command_model[terrain_type]["stand_still"]]
             else:
-                model = models[command_model[terrain_type]["stand_still"]]   # no action
+                if lin_vel[0] >= 0:
+                    model = models[command_model[terrain_type]["forward"]]
+                elif lin_vel[0] < 0:
+                    model = models[command_model[terrain_type]["backward"]]
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
             if hasattr(env, "setup_command"):
