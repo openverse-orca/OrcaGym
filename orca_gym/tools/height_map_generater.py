@@ -11,9 +11,7 @@ if project_root not in sys.path:
 
 from orca_gym.utils import rotations
 from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.devices.keyboard import KeyboardInput
 from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
 import numpy as np
 import gymnasium as gym
 import time
@@ -197,7 +195,7 @@ class HeightMapGenerater(OrcaGymLocalEnv):
         self.mj_forward()
         # 通过射线投射的方式生成高程图
         for x in range(self._height_map["map"]["width"]):
-            print("Generate Height map: ", x, "/", self._height_map["map"]["width"])
+            print("\rGenerate Height map: {}/{}".format(x, self._height_map["map"]["width"]), end='', flush=True)
             for y in range(self._height_map["map"]["height"]):
                 if self._height_map["map"]["data"][x, y] < self._height_map["height_range"][0]:
                     # print("Height map ", x, y, " is already the lowest height")
@@ -215,6 +213,8 @@ class HeightMapGenerater(OrcaGymLocalEnv):
                 if distance > 0.0 and height > 0.001:
                     # print("Height map: ", x, y, height, "Geom ID: ", geomid[0])
                     self._height_map["map"]["data"][x, y] = height
+        
+        print("\nDone!")
         
     def _generate_height_map(self, action):
         for x in range(self._height_map["mini_map"]["width"]):
@@ -364,7 +364,7 @@ def register_env(orcagym_addr, env_name, env_index, height_map_border, height_ra
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
     parser.add_argument('--orcagym_addresses', type=str, nargs='+', default=['localhost:50051'], help='The gRPC addresses to connect to')
-    parser.add_argument('--height_map_border', type=int, nargs=4, default=[-100, -100, 100, 100], help='The left-up and right-down corner coordinates of the height map in meters')
+    parser.add_argument('--height_map_border', type=int, nargs=4, default=[-64, -64, 64, 64], help='The left-up and right-down corner coordinates of the height map in meters')
     parser.add_argument('--height_range', type=int, nargs=2, default=[0, 30], help='The height range of the height map in meters')
     parser.add_argument('--render_mode', type=str, default='none', help='The render mode (human or none). Set to none for faster processing')
     parser.add_argument('--output_file', type=str, default='height_map.npy', help='The output file to save the height map')

@@ -15,9 +15,9 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.manipulation.franka_env import FrankaEnv, RunMode, ControlDevice
+from envs.manipulation.single_arm_env import SingleArmEnv, RunMode, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir

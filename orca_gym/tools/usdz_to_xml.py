@@ -4,21 +4,31 @@ import os
 
 import numpy as np
 
-import glob
 from pathlib import Path
-from typing import Dict, List
 from pxr import Usd, UsdGeom, Gf, Sdf
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
 import trimesh
-import orca_gym.utils.rotations as rotations
+from copy import deepcopy
+import numpy as np
 
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
     with open(path, "r") as f:
         return yaml.safe_load(f)
-
+    
+def _deep_merge(source, overrides):
+    """
+    递归合并两个字典，处理嵌套的子节点。
+    """
+    merged = deepcopy(source)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
 
 def load_file_params(config_path: str):
     config = _load_yaml(config_path)
@@ -28,13 +38,14 @@ def load_file_params(config_path: str):
     for file_config in config["files"]:
         filename = file_config["filename"]
         file_path = os.path.join(Path(config_path).parent, filename)
-        # 合并默认参数和文件专属参数
-        params = {
-            **default, 
-            **file_config,
-            "filename": file_path,
-        }
-        file_params.append(params)
+        
+        # 深度合并默认配置和文件专属配置
+        merged_params = _deep_merge(default, file_config)
+        
+        # 添加/覆盖文件路径
+        merged_params["filename"] = file_path
+        
+        file_params.append(merged_params)
     
     return file_params
 
@@ -156,20 +167,43 @@ def export_mesh_to_obj(prim, output_dir):
 
     return obj_name
 
+# def split_mesh(obj_name, output_dir, max_split_mesh_number):
+#     # 调用cpp程序TestVHACD执行分割
+#     obj_path = os.path.join(output_dir, obj_name)
+#     subprocess.run(["./TestVHACD", obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj"], check=True)
+#     obj_name_list = []
+#     for i in range(max_split_mesh_number):
+#         obj_name_base = obj_name.split(".")[0]
+#         splited_obj_name = f"{obj_name_base}{i:03d}.obj"
+#         splited_obj_path = os.path.join(output_dir, splited_obj_name)
+#         if os.path.exists(splited_obj_path):
+#             obj_name_list.append(splited_obj_name)
+    
+#     return obj_name_list
+
 def split_mesh(obj_name, output_dir, max_split_mesh_number):
-    # 调用cpp程序TestVHACD执行分割
+    # 获取当前脚本的绝对路径所在的目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 构建 TestVHACD 的绝对路径
+    testvhacd_path = os.path.join(script_dir, "TestVHACD")
+    
+    # 调用 cpp 程序 TestVHACD 执行分割
     obj_path = os.path.join(output_dir, obj_name)
-    subprocess.run(["./TestVHACD", obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj"], check=True)
+    subprocess.run(
+        [testvhacd_path, obj_path, "-h", str(max_split_mesh_number), "-p", "true", "-o", "obj", "-g", "true"],
+        check=True
+    )
+    
+    # 收集生成的 obj 文件列表
     obj_name_list = []
+    obj_base = os.path.splitext(obj_name)[0]
     for i in range(max_split_mesh_number):
-        obj_name_base = obj_name.split(".")[0]
-        splited_obj_name = f"{obj_name_base}{i:03d}.obj"
+        splited_obj_name = f"{obj_base}{i:03d}.obj"
         splited_obj_path = os.path.join(output_dir, splited_obj_name)
         if os.path.exists(splited_obj_path):
             obj_name_list.append(splited_obj_name)
     
     return obj_name_list
-
 
 def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat"""
@@ -190,6 +224,160 @@ def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
 
     return pos, quat, scale
 
+
+def _add_mesh_assets(asset, mesh_file_name, scale):
+    mesh_name = mesh_file_name.split(".")[0]
+    mesh_elem = ET.SubElement(asset, "mesh")
+    mesh_elem.set("name", mesh_name)
+    mesh_elem.set("content_type", "model/obj")
+    mesh_elem.set("file", f"usd:{mesh_file_name}")
+    mesh_elem.set("scale", " ".join(map(str, scale)))
+
+def _add_box_geom(body, params, collision_pos, collision_size):
+    collision_geom = ET.SubElement(body, "geom")
+    collision_geom.set("type", "box")
+    collision_geom.set("group", "3")
+    collision_geom.set("density", str(params["physics_options"]["density"]))
+    collision_geom.set("pos", " ".join(map(str, collision_pos)))
+    collision_size = np.clip(collision_size, 0.01, None)   # 限制最小尺寸
+    collision_geom.set("size", " ".join(map(str, collision_size)))
+
+def _add_hull_geom(body, params, obj_name):
+    obj_name_base = obj_name.split(".")[0]
+    collision_geom = ET.SubElement(body, "geom")
+    collision_geom.set("type", "mesh")
+    collision_geom.set("mesh", obj_name_base)
+    collision_geom.set("group", "3")
+    collision_geom.set("density", str(params["physics_options"]["density"]))
+
+def _add_visualize_geom(body, mesh_file_name):
+    mesh_name = mesh_file_name.split(".")[0]
+    visual_geom = ET.SubElement(body, "geom")
+    visual_geom.set("type", "mesh")
+    visual_geom.set("mesh", mesh_name)
+    visual_geom.set("contype", "0")
+    visual_geom.set("conaffinity", "0")
+    
+def process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos):
+    # 如果需要用到obj文件，则添加 mesh 到 asset
+    if params["collision_options"]["collider_type"] == "convex_hull" or params["debug_options"]["visualize_obj"]:
+        _add_mesh_assets(asset, obj_name, output_dir, scale)
+
+    # 添加 collision geom
+    if params["collision_options"]["collider_type"] == "bounding_box":
+        bbox_range = bbox.GetRange()
+        collision_size = bbox_range.GetSize() * scale / 2.0
+        collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
+        collision_pos = bbox_range.GetMidpoint() * scale - pos
+        collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
+        _add_box_geom(body, params, collision_pos, collision_size)
+
+    elif params["collision_options"]["collider_type"] == "convex_hull":
+        _add_hull_geom(body, params, obj_name)
+    else:
+        raise ValueError(f"Unknown collider type: {params['collision_options']['collider_type']}")
+
+    # 添加 visual geom
+    if params["debug_options"]["visualize_obj"]:
+        _add_visualize_geom(body, obj_name)
+
+def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos):
+    aabb_list = []
+    for obj_name in obj_name_list:
+        # 如果需要用到obj文件，则添加 mesh 到 asset
+        if params["collision_options"]["collider_type"] == "convex_hull" or params["debug_options"]["visualize_obj"]:
+            _add_mesh_assets(asset, obj_name, scale)
+        
+        if params["collision_options"]["collider_type"] == "bounding_box":
+            # 这里不直接添加XML对象，只是先把包围盒搜集起来
+            obj_path = os.path.join(output_dir, obj_name)
+            mesh = trimesh.load(obj_path)
+            aabb_list.append(mesh.bounding_box)
+            # print(f"Bounding box for {obj_name}: {mesh.bounding_box.bounds}")
+        elif params["collision_options"]["collider_type"] == "convex_hull":
+            _add_hull_geom(body, params, obj_name)
+        else:
+            raise ValueError(f"Unknown collider type: {params['collision_options']['collider_type']}")
+
+        # 添加 visual geom
+        if params["debug_options"]["visualize_obj"]:
+            _add_visualize_geom(body, obj_name)
+
+    if len(aabb_list) == 0:
+        return
+
+    ###########################
+    # 处理包围盒
+    ###########################
+    # 步骤1：剔除被完全包含的包围盒
+    def _is_contained(a, b):
+        """判断a是否被b完全包含"""
+        return (a.bounds[0] >= b.bounds[0]).all() and (a.bounds[1] <= b.bounds[1]).all()
+    
+    # 过滤掉被其他AABB包含的包围盒
+    filtered_aabbs = []
+    for i, box in enumerate(aabb_list):
+        if not any(_is_contained(box, other) for j, other in enumerate(aabb_list) if i != j):
+            filtered_aabbs.append(box)
+        else:
+            print(f"Filtered out AABB {i} because it is contained by another AABB.")
+    
+    # 步骤2：合并高重合度包围盒（阈值设为90%）
+    merged_aabbs = []
+    skip_indices = set()
+    for itr in range(params["collision_options"]["merge_iterations"]):
+        for i in range(len(filtered_aabbs)):
+            if i in skip_indices:
+                continue
+            current = filtered_aabbs[i]
+            merged = False
+            
+            # 计算与其他包围盒的交集
+            for j in range(i+1, len(filtered_aabbs)):
+                if j in skip_indices:
+                    continue
+                
+                other = filtered_aabbs[j]
+                # 计算交集体积占比
+                inter_min = np.maximum(current.bounds[0], other.bounds[0])
+                inter_max = np.minimum(current.bounds[1], other.bounds[1])
+                inter_vol = np.prod(np.clip(inter_max - inter_min, 0, None))
+                
+                vol_current = current.volume
+                vol_other = other.volume
+                ratio = inter_vol / min(vol_current, vol_other) if min(vol_current, vol_other) > 0 else 0
+                
+                # 若交集体积占比超过阈值则合并
+                if ratio >= params["collision_options"]["merge_threshold"]:
+                    new_min = np.minimum(current.bounds[0], other.bounds[0])
+                    new_max = np.maximum(current.bounds[1], other.bounds[1])
+                    merged_box = trimesh.primitives.Box(bounds=[new_min, new_max])
+                    merged_aabbs.append(merged_box)
+                    skip_indices.update([i, j])
+                    merged = True
+                    print(f"Merged AABBs {i} and {j} into a new AABB.")
+                    filtered_aabbs.append(merged_box)
+                    break
+            
+            if not merged:
+                merged_aabbs.append(current)
+        
+        if not merged:
+            # 如果没有合并成功，说明没有更多的包围盒可以合并了
+            break
+
+        if itr < params["collision_options"]["merge_iterations"] - 1:
+            merged_aabbs = []
+
+    assert len(merged_aabbs) > 0, "No valid AABBs found after filtering and merging."
+    for aabb in merged_aabbs:
+        # 最终再写入到xml
+        size = aabb.extents         # 尺寸 (dx, dy, dz)
+        center = aabb.centroid        # 中心点坐标 (x_center, y_center, z_center)
+
+        collision_pos = center * scale - pos
+        collision_size = size * scale / 2.0
+        _add_box_geom(body, params, collision_pos, collision_size)
 
 
 def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
@@ -217,14 +405,17 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     print(f"metersPerUnit: {meters_per_unit}")
     config_scale = params["transform_options"]["scale"]
     print(f"config_scale: {config_scale}")
-    scale = np.array([config_scale, config_scale, config_scale], dtype=np.float64)
-    scale = scale * meters_per_unit
+    config_scale = np.array([config_scale, config_scale, config_scale], dtype=np.float64)
+    scale = config_scale * meters_per_unit
     print(f"scale: {scale}")
-    
+
+
+    # 添加usdz文件到asset
+    usd_file_name = os.path.basename(usd_file)
+    _add_mesh_assets(asset, usd_file_name, config_scale)
+    _add_visualize_geom(base_body, usd_file_name)
 
     bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), ['default', 'render'])
-    # all_prim = get_all_prim(stage)
-    # get_bounding_box(all_prim, {}, bbox_cache)
 
     # 递归遍历 USD 节点
     def _process_prim(prim, parent_elem, bbox_cache, scale):
@@ -247,91 +438,15 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         body.set("pos", " ".join(map(str, pos)))
         body.set("quat", " ".join(map(str, quat)))
         
-        # ET.SubElement(body, "pos").text = " ".join(map(str, pos))
-        # ET.SubElement(body, "quat").text = " ".join(map(str, quat))
-        
         # 处理 Mesh
         if prim.IsA(UsdGeom.Mesh):
             obj_name = export_mesh_to_obj(prim, output_dir)
             
             if params["collision_options"]["split_mesh"]:
                 obj_name_list = split_mesh(obj_name, output_dir, params["collision_options"]["max_split_mesh_number"])
+                process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos)
             else:
-                obj_name_list = [obj_name]
-
-            for obj_name in obj_name_list:
-                # 添加 mesh 到 asset
-                obj_name_base = obj_name.split(".")[0]
-                mesh_elem = ET.SubElement(asset, "mesh")
-                mesh_elem.set("name", obj_name_base)
-                mesh_elem.set("file", obj_name)
-                mesh_elem.set("scale", " ".join(map(str, scale)))
-                
-                # 添加 collision geom
-                if params["collision_options"]["collider_type"] == "bounding_box":
-                    collision_geom = ET.SubElement(body, "geom")
-                    collision_geom.set("type", "box")                    
-                    collision_geom.set("group", "3")
-                    collision_geom.set("density", str(params["physics_options"]["density"]))
-
-                    if not params["collision_options"]["split_mesh"]:
-                        # 不分割mesh，usd中保留有原始的bounding box
-                        bbox_range = bbox.GetRange()
-                        collision_size = bbox_range.GetSize() * scale / 2.0
-                        collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
-                        collision_pos = bbox_range.GetMidpoint() * scale - pos
-                        collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
-                    else:
-                        # 加载 OBJ 文件
-                        obj_path = os.path.join(output_dir, obj_name)
-                        mesh = trimesh.load(obj_path)
-
-                        # 获取 AABB 包围盒对象
-                        aabb = mesh.bounding_box
-
-                        # 提取 AABB 的最小和最大顶点
-                        min_point = aabb.bounds[0]  # 最小值坐标 (x_min, y_min, z_min)
-                        max_point = aabb.bounds[1]  # 最大值坐标 (x_max, y_max, z_max)
-
-                        # 计算包围盒尺寸和中心点
-                        size = aabb.extents         # 尺寸 (dx, dy, dz)
-                        center = aabb.centroid        # 中心点坐标 (x_center, y_center, z_center)
-                        print("AABB 最小值:", min_point)
-                        print("AABB 最大值:", max_point)
-                        print("AABB 尺寸:", size)
-                        print("中心点:", center)
-
-                        collision_pos = center * scale - pos
-                        # collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
-                        collision_size = size * scale / 2.0
-                        # collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
-
-                        # 旋转矩阵绕X轴旋转-90度
-                        # collision_matrix = obb.transform[:3, :3]
-                        # rotation_matrix = rotations.euler2mat([0, -np.pi / 2, 0])
-                        # collision_matrix = np.dot(rotation_matrix, collision_matrix)
-                        # collision_quat = rotations.mat2quat(collision_matrix)
-                        # collision_geom.set("quat", " ".join(map(str, collision_quat)))
-
-                    collision_geom.set("pos", " ".join(map(str, collision_pos)))
-                    collision_geom.set("size", " ".join(map(str, collision_size)))
-
-                elif params["collision_options"]["collider_type"] == "convex_hull":
-                    collision_geom = ET.SubElement(body, "geom")
-                    collision_geom.set("type", "mesh")
-                    collision_geom.set("mesh", obj_name_base)
-                    collision_geom.set("group", "3")
-                    collision_geom.set("density", str(params["physics_options"]["density"]))
-                else:
-                    raise ValueError(f"Unknown collider type: {params['collision_options']['collider_type']}")
-
-                # 添加 visual geom
-                if params["debug_options"]["visualize_obj"]:
-                    visual_geom = ET.SubElement(body, "geom")
-                    visual_geom.set("type", "mesh")
-                    visual_geom.set("mesh", obj_name_base)
-                    visual_geom.set("contype", "0")
-                    visual_geom.set("conaffinity", "0")
+                process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos)
         
         # 递归处理子节点
         for child in prim.GetChildren():
@@ -340,7 +455,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     # 从根节点开始处理
     for prim in stage.GetPseudoRoot().GetChildren():
         _process_prim(prim, base_body, bbox_cache, scale.copy())
-    
+
     # 美化 XML 并保存
     xml_str = minidom.parseString(ET.tostring(root)).toprettyxml()
     with open(mjcf_file, "w") as f:
@@ -372,77 +487,3 @@ if __name__ == "__main__":
 
     main(args.config)
 
-
-
-# def matrix_to_pos_quat(matrix: Gf.Matrix4d):
-#     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat（使用旋转矩阵方法）"""
-#     # Step 1: 定义 USD → MuJoCo 的坐标系旋转矩阵（绕X轴-90度）
-#     # 这是一个4x4变换矩阵，仅包含旋转，无平移
-#     R = Gf.Matrix4d()
-#     R.SetRotate(Gf.Rotation(Gf.Vec3d(1,0,0), -90))  # 绕X轴旋转-90度
-    
-#     # Step 2: 将USD的矩阵应用坐标系转换
-#     converted_matrix = matrix * R  # 矩阵乘法顺序取决于USD的矩阵定义（通常是列主序）
-    
-#     # Step 3: 提取转换后的位置和四元数
-#     translation = converted_matrix.ExtractTranslation()
-#     rotation = converted_matrix.ExtractRotation()
-    
-#     # 位置直接按新坐标系读取（Y-up → Z-up 已完成转换）
-#     pos = [translation[0], translation[1], translation[2]]
-    
-#     # 四元数需要调整虚部符号以匹配MuJoCo的wxyz格式
-#     usd_quat = rotation.GetQuat()
-#     quat = [usd_quat.real, 
-#             usd_quat.imaginary[0], 
-#             usd_quat.imaginary[1], 
-#             usd_quat.imaginary[2]]  # 直接使用转换后的四元数
-    
-#     return pos, quat
-
-# def export_mesh_to_obj(prim, output_dir):
-#     """将 USD Mesh 导出为 OBJ 文件（应用旋转矩阵转换 Y-up → Z-up）"""
-#     mesh = UsdGeom.Mesh(prim)
-    
-#     # 获取顶点和面数据
-#     points = mesh.GetPointsAttr().Get()  # Y-up 原始顶点
-#     face_vertex_indices = mesh.GetFaceVertexIndicesAttr().Get()
-#     face_vertex_counts = mesh.GetFaceVertexCountsAttr().Get()
-    
-#     # --- 定义 Y-up → Z-up 的旋转矩阵（绕X轴-90度）---
-#     # 矩阵形式：
-#     # [1  0   0 ]
-#     # [0  0   1 ]
-#     # [0 -1   0 ]
-#     # 等价于将原坐标 (x,y,z) 转换为 (x, z, -y)
-#     R = np.array([
-#         [1, 0, 0],
-#         [0, 0, 1],
-#         [0, -1, 0]
-#     ])
-    
-#     # 生成 OBJ 内容
-#     obj_content = "# OBJ File\n"
-    
-#     # 应用旋转矩阵到所有顶点
-#     for p in points:
-#         # 将顶点转换为 numpy 数组并应用矩阵变换
-#         v = np.array([p[0], p[1], p[2]])
-#         v_transformed = np.dot(R, v)
-#         # 写入转换后的顶点
-#         obj_content += f"v {v_transformed[0]:.6f} {v_transformed[1]:.6f} {v_transformed[2]:.6f}\n"
-    
-#     # 面数据保持不变（仅顶点位置变换，索引顺序不变）
-#     start_idx = 0
-#     for count in face_vertex_counts:
-#         face_indices = face_vertex_indices[start_idx:start_idx + count]
-#         obj_content += "f " + " ".join([str(i+1) for i in face_indices]) + "\n"
-#         start_idx += count
-    
-#     # 保存文件
-#     obj_name = f"{prim.GetName()}.obj"
-#     obj_path = os.path.join(output_dir, obj_name)
-#     with open(obj_path, "w") as f:
-#         f.write(obj_content)
-    
-#     return obj_name

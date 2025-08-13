@@ -64,6 +64,86 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.LoadContentFileRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.LoadContentFileResponse.FromString,
                 _registered_method=True)
+        self.AddActor = channel.unary_unary(
+                '/MujocoMessage.GrpcService/AddActor',
+                request_serializer=mjc__message__pb2.AddActorRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.AddActorResponse.FromString,
+                _registered_method=True)
+        self.PublishScene = channel.unary_unary(
+                '/MujocoMessage.GrpcService/PublishScene',
+                request_serializer=mjc__message__pb2.PublishSceneRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.PublishSceneResponse.FromString,
+                _registered_method=True)
+        self.SetLightInfo = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetLightInfo',
+                request_serializer=mjc__message__pb2.SetLightInfoRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetLightInfoResponse.FromString,
+                _registered_method=True)
+        self.SetCameraSensorInfo = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetCameraSensorInfo',
+                request_serializer=mjc__message__pb2.SetCameraSensorInfoRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetCameraSensorInfoResponse.FromString,
+                _registered_method=True)
+        self.MakeCameraViewportActive = channel.unary_unary(
+                '/MujocoMessage.GrpcService/MakeCameraViewportActive',
+                request_serializer=mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
+                _registered_method=True)
+        self.SetMaterialInfo = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetMaterialInfo',
+                request_serializer=mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetMaterialInfoResponse.FromString,
+                _registered_method=True)
+        self.BeginSaveMp4File = channel.unary_unary(
+                '/MujocoMessage.GrpcService/BeginSaveMp4File',
+                request_serializer=mjc__message__pb2.BeginSaveMp4FileRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.BeginSaveMp4FileResponse.FromString,
+                _registered_method=True)
+        self.StopSaveMp4File = channel.unary_unary(
+                '/MujocoMessage.GrpcService/StopSaveMp4File',
+                request_serializer=mjc__message__pb2.StopSaveMp4FileRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.StopSaveMp4FileResponse.FromString,
+                _registered_method=True)
+        self.GetCurrentFrameIndex = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetCurrentFrameIndex',
+                request_serializer=mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
+                _registered_method=True)
+        self.GetKeyPressedEvents = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetKeyPressedEvents',
+                request_serializer=mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetKeyPressedEventsResponse.FromString,
+                _registered_method=True)
+        self.GetMouseMovementEvents = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetMouseMovementEvents',
+                request_serializer=mjc__message__pb2.GetMouseMovementEventsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetMouseMovementEventsResponse.FromString,
+                _registered_method=True)
+        self.GetBodyManipulationAnchored = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+                request_serializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
+                _registered_method=True)
+        self.GetBodyManipulationMovement = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+                request_serializer=mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
+                _registered_method=True)
+        self.SetActorAnimParamNumber = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamNumber',
+                request_serializer=mjc__message__pb2.SetActorAnimParamNumberRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamNumberResponse.FromString,
+                _registered_method=True)
+        self.SetActorAnimParamBool = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamBool',
+                request_serializer=mjc__message__pb2.SetActorAnimParamBoolRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamBoolResponse.FromString,
+                _registered_method=True)
+        self.SetActorAnimParamString = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorAnimParamString',
+                request_serializer=mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -416,6 +496,105 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def LoadContentFile(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddActor(self, request, context):
+        """场景控制
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PublishScene(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetLightInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetCameraSensorInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def MakeCameraViewportActive(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetMaterialInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BeginSaveMp4File(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StopSaveMp4File(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCurrentFrameIndex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetKeyPressedEvents(self, request, context):
+        """键鼠操作
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMouseMovementEvents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBodyManipulationAnchored(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBodyManipulationMovement(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamNumber(self, request, context):
+        """动画控制
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamBool(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorAnimParamString(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -840,6 +1019,86 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.LoadContentFile,
                     request_deserializer=mjc__message__pb2.LoadContentFileRequest.FromString,
                     response_serializer=mjc__message__pb2.LoadContentFileResponse.SerializeToString,
+            ),
+            'AddActor': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddActor,
+                    request_deserializer=mjc__message__pb2.AddActorRequest.FromString,
+                    response_serializer=mjc__message__pb2.AddActorResponse.SerializeToString,
+            ),
+            'PublishScene': grpc.unary_unary_rpc_method_handler(
+                    servicer.PublishScene,
+                    request_deserializer=mjc__message__pb2.PublishSceneRequest.FromString,
+                    response_serializer=mjc__message__pb2.PublishSceneResponse.SerializeToString,
+            ),
+            'SetLightInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetLightInfo,
+                    request_deserializer=mjc__message__pb2.SetLightInfoRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetLightInfoResponse.SerializeToString,
+            ),
+            'SetCameraSensorInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetCameraSensorInfo,
+                    request_deserializer=mjc__message__pb2.SetCameraSensorInfoRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetCameraSensorInfoResponse.SerializeToString,
+            ),
+            'MakeCameraViewportActive': grpc.unary_unary_rpc_method_handler(
+                    servicer.MakeCameraViewportActive,
+                    request_deserializer=mjc__message__pb2.MakeCameraViewportActiveRequest.FromString,
+                    response_serializer=mjc__message__pb2.MakeCameraViewportActiveResponse.SerializeToString,
+            ),
+            'SetMaterialInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetMaterialInfo,
+                    request_deserializer=mjc__message__pb2.SetMaterialInfoRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetMaterialInfoResponse.SerializeToString,
+            ),
+            'BeginSaveMp4File': grpc.unary_unary_rpc_method_handler(
+                    servicer.BeginSaveMp4File,
+                    request_deserializer=mjc__message__pb2.BeginSaveMp4FileRequest.FromString,
+                    response_serializer=mjc__message__pb2.BeginSaveMp4FileResponse.SerializeToString,
+            ),
+            'StopSaveMp4File': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopSaveMp4File,
+                    request_deserializer=mjc__message__pb2.StopSaveMp4FileRequest.FromString,
+                    response_serializer=mjc__message__pb2.StopSaveMp4FileResponse.SerializeToString,
+            ),
+            'GetCurrentFrameIndex': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCurrentFrameIndex,
+                    request_deserializer=mjc__message__pb2.GetCurrentFrameIndexRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetCurrentFrameIndexResponse.SerializeToString,
+            ),
+            'GetKeyPressedEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetKeyPressedEvents,
+                    request_deserializer=mjc__message__pb2.GetKeyPressedEventsRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetKeyPressedEventsResponse.SerializeToString,
+            ),
+            'GetMouseMovementEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMouseMovementEvents,
+                    request_deserializer=mjc__message__pb2.GetMouseMovementEventsRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetMouseMovementEventsResponse.SerializeToString,
+            ),
+            'GetBodyManipulationAnchored': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationAnchored,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationAnchoredRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationAnchoredResponse.SerializeToString,
+            ),
+            'GetBodyManipulationMovement': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBodyManipulationMovement,
+                    request_deserializer=mjc__message__pb2.GetBodyManipulationMovementRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetBodyManipulationMovementResponse.SerializeToString,
+            ),
+            'SetActorAnimParamNumber': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamNumber,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamNumberRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamNumberResponse.SerializeToString,
+            ),
+            'SetActorAnimParamBool': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamBool,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamBoolRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamBoolResponse.SerializeToString,
+            ),
+            'SetActorAnimParamString': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorAnimParamString,
+                    request_deserializer=mjc__message__pb2.SetActorAnimParamStringRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorAnimParamStringResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -1319,6 +1578,438 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/LoadContentFile',
             mjc__message__pb2.LoadContentFileRequest.SerializeToString,
             mjc__message__pb2.LoadContentFileResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddActor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/AddActor',
+            mjc__message__pb2.AddActorRequest.SerializeToString,
+            mjc__message__pb2.AddActorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PublishScene(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/PublishScene',
+            mjc__message__pb2.PublishSceneRequest.SerializeToString,
+            mjc__message__pb2.PublishSceneResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetLightInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetLightInfo',
+            mjc__message__pb2.SetLightInfoRequest.SerializeToString,
+            mjc__message__pb2.SetLightInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetCameraSensorInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetCameraSensorInfo',
+            mjc__message__pb2.SetCameraSensorInfoRequest.SerializeToString,
+            mjc__message__pb2.SetCameraSensorInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def MakeCameraViewportActive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/MakeCameraViewportActive',
+            mjc__message__pb2.MakeCameraViewportActiveRequest.SerializeToString,
+            mjc__message__pb2.MakeCameraViewportActiveResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetMaterialInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetMaterialInfo',
+            mjc__message__pb2.SetMaterialInfoRequest.SerializeToString,
+            mjc__message__pb2.SetMaterialInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BeginSaveMp4File(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/BeginSaveMp4File',
+            mjc__message__pb2.BeginSaveMp4FileRequest.SerializeToString,
+            mjc__message__pb2.BeginSaveMp4FileResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StopSaveMp4File(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/StopSaveMp4File',
+            mjc__message__pb2.StopSaveMp4FileRequest.SerializeToString,
+            mjc__message__pb2.StopSaveMp4FileResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetCurrentFrameIndex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetCurrentFrameIndex',
+            mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
+            mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetKeyPressedEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetKeyPressedEvents',
+            mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
+            mjc__message__pb2.GetKeyPressedEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMouseMovementEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetMouseMovementEvents',
+            mjc__message__pb2.GetMouseMovementEventsRequest.SerializeToString,
+            mjc__message__pb2.GetMouseMovementEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBodyManipulationAnchored(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetBodyManipulationAnchored',
+            mjc__message__pb2.GetBodyManipulationAnchoredRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationAnchoredResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBodyManipulationMovement(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetBodyManipulationMovement',
+            mjc__message__pb2.GetBodyManipulationMovementRequest.SerializeToString,
+            mjc__message__pb2.GetBodyManipulationMovementResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamNumber(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamNumber',
+            mjc__message__pb2.SetActorAnimParamNumberRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamNumberResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamBool(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamBool',
+            mjc__message__pb2.SetActorAnimParamBoolRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamBoolResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorAnimParamString(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorAnimParamString',
+            mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
+            mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
             options,
             channel_credentials,
             insecure,

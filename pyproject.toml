@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OrcaGym"         # 修改为你的项目名称
-version = "0.1.0"                  # 修改为项目版本
+version = "25.7.2"                  # 修改为项目版本
 description = "OrcaGym"
 readme = "README.md"
 requires-python = ">=3.9"

@@ -14,14 +14,18 @@ class RewardPrinter:
         self._buffer_size = buffer_size
 
         self.reward_history = {}
-        
-        # if "reward_history.txt" in os.listdir("."):
-        #     os.remove("reward_history.txt")
+
+        file_dir_name = "reward_history"
+        if not os.path.exists(file_dir_name):
+            os.makedirs(file_dir_name)
+
+        datetime_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.file_name = os.path.join(file_dir_name, f"reward_history_{datetime_str}.txt")
 
     def print_reward(self, message : str, reward : Optional[float] = 0, coeff : Optional[float] = 1.0):
         if self._reward_data.get(message) is None:
             self._reward_data[message] = np.zeros(self._buffer_size)
-            self._reward_coeff[message] = coeff
+            self._reward_coeff[message] = coeff if coeff is not None else 0.0
             self._buffer_index[message] = 0
             self._reward_data[message][self._buffer_index[message]] = reward
             self._buffer_index[message] += 1
@@ -38,7 +42,8 @@ class RewardPrinter:
                         if key not in self.reward_history:
                             self.reward_history[key] = []
                         self.reward_history[key].append(value.mean()) 
-                        with open("reward_history.txt", "a") as f:
+
+                        with open(self.file_name, "a") as f:
                             f.write(f"{key.split(':')[0]}_{self._reward_coeff[key]:.2e}:{value.mean():.10f}\n")
                     else:
                         mean_value = value.mean()

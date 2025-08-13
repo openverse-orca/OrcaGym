@@ -10,9 +10,9 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 from orca_gym.environment.orca_gym_env import RewardType
-from orca_gym.robomimic.dataset_util import DatasetWriter, DatasetReader
+from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
-from envs.manipulation.franka_env import FrankaEnv, RunMode, ControlDevice
+from envs.manipulation.single_arm_env import SingleArmEnv, RunMode, ControlDevice
 from examples.imitation.train_policy import train_policy
 from examples.imitation.test_policy import create_env, rollout
 from orca_gym.utils.dir_utils import create_tmp_dir
@@ -67,7 +67,7 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 
-def teleoperation_episode(env : FrankaEnv, cameras : list[CameraWrapper], rgb_size : tuple = (256, 256), action_step : int = 1):
+def teleoperation_episode(env : SingleArmEnv, cameras : list[CameraWrapper], rgb_size : tuple = (256, 256), action_step : int = 1):
     """_summary_
 
     Args:
@@ -198,7 +198,7 @@ def do_teleoperation(env,
     for camera in cameras:
         camera.stop()
 
-def playback_episode(env : FrankaEnv, 
+def playback_episode(env : SingleArmEnv, 
                      action_list : list[np.ndarray], 
                      done_list : list[int],
                      action_step : int = 1,
@@ -231,7 +231,7 @@ def playback_episode(env : FrankaEnv,
     
     print("Episode tunkated!")
 
-def reset_playback_env(env : FrankaEnv, demo_data, sample_range=0.0):
+def reset_playback_env(env : SingleArmEnv, demo_data, sample_range=0.0):
     obs, info = env.reset(seed=42)
     
     object_data = demo_data['objects']
@@ -250,7 +250,7 @@ def reset_playback_env(env : FrankaEnv, demo_data, sample_range=0.0):
     
     # print("Resetting object position: ", obj_xpos, obj_xquat)
     
-def do_playback(env : FrankaEnv, 
+def do_playback(env : SingleArmEnv, 
                 dataset_reader : DatasetReader, 
                 playback_mode : str,
                 action_step : int = 1,
@@ -275,7 +275,7 @@ def do_playback(env : FrankaEnv,
         playback_episode(env, action_list, done_list, action_step, realtime)
         time.sleep(1)
 
-def augment_episode(env : FrankaEnv, 
+def augment_episode(env : SingleArmEnv, 
                     cameras : list[CameraWrapper], 
                     rgb_size : tuple,
                     demo_data : dict, 
@@ -344,13 +344,13 @@ def augment_episode(env : FrankaEnv,
  
     
 
-def do_augmentation(env : FrankaEnv, 
+def do_augmentation(env : SingleArmEnv, 
                     cameras : list[CameraWrapper], 
                     obs_camera : bool,
                     rgb_size : tuple,                    
                     original_dataset_path : str, 
                     augmented_dataset_path : str, 
-                    augmented_scale : float, 
+                    augmented_noise : float, 
                     sample_range : float,
                     augmented_rounds : int,
                     action_step : int = 1):
@@ -388,7 +388,7 @@ def do_augmentation(env : FrankaEnv,
                 
                 obs_list, reward_list, done_list, info_list\
                     , camera_frames, timestep_list = augment_episode(env, cameras,rgb_size,
-                                                                    demo_data, noise_scale=augmented_scale, 
+                                                                    demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
                                                                     action_step=action_step)
                 if done_list[-1] == 1:

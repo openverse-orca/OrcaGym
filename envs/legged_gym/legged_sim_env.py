@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 
 class ControlDevice:
     """
@@ -40,6 +40,7 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         env_id: str,
         agent_names: list,
         time_step: float,
+        action_skip: int,
         max_episode_steps: int,
         ctrl_device: ControlDevice,
         control_freq: int,
@@ -49,8 +50,10 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self._render_mode = "human"
         self.env_id = env_id
         self.max_episode_steps = max_episode_steps
+        self._action_skip = action_skip
         self._ctrl_device = ctrl_device
-        self._control_freq = control_freq        
+        self._control_freq = control_freq     
+        self._keyboard_addr = orcagym_addr
 
         super().__init__(
             frame_skip = frame_skip,
@@ -157,8 +160,18 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         agent_action = self._split_agent_action(action)
         [agent.on_step(self, agent_action[agent.name]) for agent in self._agents.values()]
         
-        # step the simulation with original action space
-        self.do_simulation(self.ctrl, self.frame_skip)
+        for _ in range(self._action_skip):
+            torque_ctrl_list = [
+                agent.agent.compute_torques(self.data.qpos, self.data.qvel) for agent in self._agents.values()
+            ]
+            # print("--------------------------------")
+            # print("action: ", action)
+            # print("agent_action: ", agent_action)
+            # print("torque_ctrl_list: ", torque_ctrl_list)
+            [agent.set_acatuator_ctrl(self, torque_ctrl_list[i]) for i, agent in enumerate(self._agents.values())]
+
+            # step the simulation with original action space
+            self.do_simulation(self.ctrl, self.frame_skip)
 
         obs = self._get_obs().copy()
 
@@ -262,6 +275,9 @@ class LeggedSimEnv(OrcaGymLocalEnv):
 
         return contact_dict
 
+    def setup_command(self, command_dict : dict) -> None:
+        [agent.agent.setup_command(command_dict) for agent in self._agents.values()]
+
 
 
 ## --------------------------------            
@@ -287,7 +303,7 @@ class AgentBase:
 
     @property
     def action_range(self) -> np.ndarray:
-        return self._action_range
+        return self.agent._action_range
 
     def init_agent(self, env: LeggedSimEnv, id: int):
         self._legged_agent = LeggedRobot(
@@ -300,7 +316,8 @@ class AgentBase:
         
         self.dt = env.dt
         all_actuator = env.model.get_actuator_dict()
-        self.agent.init_ctrl_info(all_actuator)
+        all_joint = env.model.get_joint_dict()
+        self.agent.init_ctrl_info(all_actuator, all_joint)
         
         init_joint_qpos = env.query_joint_qpos(self.agent.joint_names)
         init_site_pos_quat = env.query_site_pos_and_quat(self.agent.site_names)
@@ -309,18 +326,9 @@ class AgentBase:
             init_site_pos_quat=init_site_pos_quat,
         )
         
-        action_size = self.agent.get_action_size()
-        self._action_range = np.array([[-1.0, 1.0]] * action_size, dtype=np.float32)
-        action_space = spaces.Box(
-            low=self._action_range[:, 0],
-            high=self._action_range[:, 1],
-            dtype=np.float32,
-            shape=(action_size, ),
-        )
-        print("Action space: ", action_space)
-        self.agent.set_action_space(action_space) 
+        self.agent.set_action_space() 
         self.generate_action_scale_array(self._query_ctrl_info())
-        self._init_playable()
+        self._init_playable(env)
 
     @property
     def agent(self) -> LeggedRobot:
@@ -340,25 +348,11 @@ class AgentBase:
         env.set_joint_qpos(agent_joint_qpos)
         env.set_joint_qvel(agent_joint_qvel)
 
-        agent_cmd_mocap = self.agent.reset_command_indicator(env.data.qpos)    
-        env.set_mocap_pos_and_quat(agent_cmd_mocap)
-
         env.mj_forward()
         env.update_data()      
     
     def on_step(self, env: LeggedSimEnv, action: np.ndarray) -> None:
-        # print("Step agents: ", action)
-        self._update_playable(env)
-
-        actuator_ctrl = self._action2ctrl(action)
-        self.set_acatuator_ctrl(env, actuator_ctrl)
-        
-
-        self.agent.update_command(env.data.qpos)
-        agent_ctrl, agent_mocap = self.agent.step(action, update_mocap=True)
-        # self.ctrl[agent.ctrl_start : agent.ctrl_start + len(act)] = agent_ctrl
-
-        env.set_mocap_pos_and_quat(agent_mocap)
+        self.agent.step(action, update_mocap=False)
 
     def set_acatuator_ctrl(self, env : LeggedSimEnv, actuator_ctrl: np.ndarray) -> None:
         for i, actuator_name in enumerate(self.agent.actuator_names):
@@ -384,27 +378,7 @@ class AgentBase:
         else:
             return env.query_sensor_data(self.agent._foot_touch_sensor_names)
 
-    def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
-        # 缩放后的 action
-        if self._action_scale_mask is None:
-            scaled_action = action * self._action_scale
-        else:
-            scaled_action = action * self._action_scale * self._action_scale_mask
 
-        # 限制 scaled_action 在有效范围内
-        clipped_action = np.clip(scaled_action, self._action_space_range[0], self._action_space_range[1])
-
-        # 批量计算插值
-        ctrl_delta = (
-            self._ctrl_delta_range[:, 0] +  # fp1
-            (self._ctrl_delta_range[:, 1] - self._ctrl_delta_range[:, 0]) *  # (fp2 - fp1)
-            (clipped_action - self._action_space_range[0]) /  # (x - xp1)
-            (self._action_space_range[1] - self._action_space_range[0])  # (xp2 - xp1)
-        )
-
-        actuator_ctrl = self._neutral_joint_values + ctrl_delta
-        
-        return actuator_ctrl    
 
     def on_reset_model(self, env: LeggedSimEnv) -> None:
         pass
@@ -415,7 +389,6 @@ class AgentBase:
     
     def generate_action_scale_array(self, ctrl_info: dict) -> np.ndarray:
         self._action_scale = next(iter(ctrl_info.values()))["action_scale"]             # shape = (1)
-        self._action_space_range = next(iter(ctrl_info.values()))["action_space_range"] # shape = (2)
 
         if next(iter(ctrl_info.values()))["action_scale_mask"] is None:
             self._action_scale_mask = None
@@ -428,57 +401,16 @@ class AgentBase:
     def _query_ctrl_info(self):
         ctrl_info = {}
         ctrl_info[self.agent.name] = self.agent.get_ctrl_info()
+        # # store ctrl_info to pkl file, whichn is used for 2real; commented otherwise
+        # import pickle
+        # with open(f"ctrl_info.pkl", "wb") as f:
+        #     pickle.dump(ctrl_info, f)
+        # exit()
         return ctrl_info    
     
-    def _init_playable(self) -> None:
-        self._keyboard_controller = KeyboardInput()
-        self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
-        
-        self._player_agent = self.agent
+    def _init_playable(self, env: LeggedSimEnv) -> None:
         self.agent.init_playable()
         self.agent.player_control = True
-            
-        robot_config = LeggedRobotConfig[self.config_name]
-
-            
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
-    
-    def _update_playable(self, env : LeggedSimEnv) -> None:
-        lin_vel, turn_angel, reborn = self._update_keyboard_control()
-        self._player_agent.update_playable(lin_vel, turn_angel)
-        agent_cmd_mocap = self._player_agent.reset_command_indicator(env.data.qpos)
-        env.set_mocap_pos_and_quat(agent_cmd_mocap)      
-    
-    def _update_keyboard_control(self) -> tuple[np.ndarray, float, bool]:
-        self._keyboard_controller.update()
-        key_status = self._keyboard_controller.get_state()
-        lin_vel = np.zeros(3)
-        turn_angel = 0.0
-        reborn = False
-        
-        if key_status["W"] == 1:
-            lin_vel[0] = self._player_agent_lin_vel_x[1]
-        if key_status["S"] == 1:
-            lin_vel[0] = self._player_agent_lin_vel_x[0]
-        if key_status["Q"] == 1:
-            lin_vel[1] = self._player_agent_lin_vel_y[1]
-        if key_status["E"] == 1:
-            lin_vel[1] = self._player_agent_lin_vel_y[0]
-        if key_status["A"] == 1:
-            turn_angel += np.pi / 2 * self.dt
-        if key_status["D"] == 1:
-            turn_angel += -np.pi / 2 * self.dt
-        if self._key_status["Space"] == 0 and key_status["Space"] == 1:
-            reborn = True
-        if key_status["LShift"] == 1:
-            lin_vel[:2] *= 2
-
-        self._key_status = key_status.copy()
-        # print("Lin vel: ", lin_vel, "Turn angel: ", turn_angel, "Reborn: ", reborn)
-        
-        return lin_vel, turn_angel, reborn    
-    
 class Lite3Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)

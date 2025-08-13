@@ -1,0 +1,24 @@
+orcagym_addresses: ["localhost:50051"]
+agent_name: "Lite3"
+agent_spawnable_name: "lite3_usda"
+
+model_file: 
+  "flat_terrain": "trained_models_tmp/Lite3_2048_2025-08-12_23-26-54/Lite3_follow_command.zip_iteration_200.zip"
+  "rough_terrain": "trained_models_tmp/Lite3_2048_2025-08-12_23-26-54/Lite3_follow_command.zip_iteration_200.zip"
+  "stand_still": "trained_models_tmp/Lite3_2048_2025-08-12_23-26-54/Lite3_follow_command.zip_iteration_200.zip"
+
+ctrl_device: "keyboard"
+
+command_model:
+  "flat_terrain":
+    "forward": "flat_terrain"
+    "backward": "flat_terrain"
+    "stand_still": "stand_still"
+    "trun": "stand_still"
+  "rough_terrain":
+    "forward": "rough_terrain"
+    "backward": "rough_terrain"
+    "stand_still": "rough_terrain"
+    "trun": "rough_terrain"
+  
+terrain_spawnable_names: ["terrain_test_usda"]

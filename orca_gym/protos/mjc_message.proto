@@ -11,6 +11,28 @@ service GrpcService {
   rpc LoadLocalEnv (LoadLocalEnvRequest) returns (LoadLocalEnvResponse);
   rpc LoadContentFile (LoadContentFileRequest) returns (LoadContentFileResponse);
 
+  // 场景控制
+  rpc AddActor (AddActorRequest) returns (AddActorResponse);
+  rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
+  rpc SetLightInfo (SetLightInfoRequest) returns (SetLightInfoResponse);
+  rpc SetCameraSensorInfo (SetCameraSensorInfoRequest) returns (SetCameraSensorInfoResponse);
+  rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
+  rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
+  rpc BeginSaveMp4File(BeginSaveMp4FileRequest) returns (BeginSaveMp4FileResponse);
+  rpc StopSaveMp4File(StopSaveMp4FileRequest) returns (StopSaveMp4FileResponse);
+  rpc GetCurrentFrameIndex(GetCurrentFrameIndexRequest) returns (GetCurrentFrameIndexResponse);
+
+  // 键鼠操作
+  rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
+  rpc GetMouseMovementEvents (GetMouseMovementEventsRequest) returns (GetMouseMovementEventsResponse);
+  rpc GetBodyManipulationAnchored (GetBodyManipulationAnchoredRequest) returns (GetBodyManipulationAnchoredResponse);
+  rpc GetBodyManipulationMovement (GetBodyManipulationMovementRequest) returns (GetBodyManipulationMovementResponse);
+
+  // 动画控制
+  rpc SetActorAnimParamNumber (SetActorAnimParamNumberRequest) returns (SetActorAnimParamNumberResponse);
+  rpc SetActorAnimParamBool (SetActorAnimParamBoolRequest) returns (SetActorAnimParamBoolResponse);
+  rpc SetActorAnimParamString (SetActorAnimParamStringRequest) returns (SetActorAnimParamStringResponse);
+
 
   // 配置查询
   rpc QueryModelInfo (QueryModelInfoRequest) returns (QueryModelInfoResponse);
@@ -951,7 +973,13 @@ message UpdateLocalEnvRequest{
     double time = 2;
 }
 
-message UpdateLocalEnvResponse{}
+message UpdateLocalEnvResponse{
+    message OverrideCtrlInfo {
+        int32 index = 1; // 控制输入索引
+        double value = 2; // 控制输入值
+    }
+    repeated OverrideCtrlInfo override_ctrls = 1; // 覆盖的控制输入列表
+}
 
 message LoadLocalEnvRequest {
     enum ReqType {
@@ -984,4 +1012,204 @@ message LoadContentFileResponse {
     }
     Status status = 2; // 添加状态码字段
     string error_message = 3; // 错误详情（可选）
+}
+
+message AddActorRequest {
+    string name = 1;              // Actor Entity 的名字
+    string spawnable_name = 2;    // Actor 使用的 spawnable 名字
+    repeated double pos = 3;      // 位置 (3 elements)
+    repeated double quat = 4;     // 旋转四元数 (4 elements)
+    double scale = 5;             // 等比缩放 (1 elements)
+}
+message AddActorResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 添加状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message PublishSceneRequest {}
+message PublishSceneResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetLightInfoRequest {
+    string actor_name = 1;                  // Actor 名字
+    repeated float light_color = 2;         // 灯光颜色 (3 elements)
+    float light_intensity = 3;              // 灯光强度 (1 element)
+}
+message SetLightInfoResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetCameraSensorInfoRequest {
+    string actor_name = 1;                  // Actor 名字
+    bool capture_rgb = 2;                   // 是否捕获 RGB 图像
+    bool capture_depth = 3;                 // 是否捕获深度图像
+    bool save_mp4_file = 4;                // 是否保存为 MP4 文件
+    bool use_dds = 5;                     // 是否使用 DDS
+}
+
+message SetCameraSensorInfoResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message BeginSaveMp4FileRequest {
+  string file_path = 1; // 保存 MP4 文件的路径
+
+}
+
+message BeginSaveMp4FileResponse {
+  enum Status {
+    SUCCESS = 0;
+    ERROR = 1;
+  }
+  Status status = 1; // 状态码字段
+  string error_message = 2; // 错误详情（可选）
+}
+
+message StopSaveMp4FileRequest {
+    enum Status {
+        SUCCESS = 0;
+        FAILED = 1;
+    }
+    Status status = 1; // 状态码字段
+}
+
+message StopSaveMp4FileResponse {
+  // 该请求不需要任何参数
+}
+
+message GetCurrentFrameIndexRequest
+{
+  // 该请求不需要任何参数
+}
+
+message GetCurrentFrameIndexResponse {
+  int64 current_frame = 1;
+  string error_message = 2;
+}
+
+message MakeCameraViewportActiveRequest {
+    string actor_name = 1;                  // Actor 名字
+    string entity_name = 2;                // Entity 名字
+}
+message MakeCameraViewportActiveResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetMaterialInfoRequest {
+    string actor_name = 1;                  // Actor 名字
+    repeated float base_color = 4;          // 基础颜色 (4 elements)
+}
+message SetMaterialInfoResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message GetKeyPressedEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetKeyPressedEventsResponse {
+    repeated string events = 1;  // 按键事件列表
+}
+
+
+message GetMouseMovementEventsRequest {
+    // 该请求不需要任何参数
+}
+message GetMouseMovementEventsResponse {
+    float delta_x = 1;  // 鼠标在 x 轴上的移动距离
+    float delta_y = 2;  // 鼠标在 y 轴上的移动距离
+    float delta_z = 3;  // 鼠标在 z 轴上的移动距离（如果有）
+}
+
+message GetBodyManipulationAnchoredRequest {}
+
+message GetBodyManipulationAnchoredResponse {
+    enum AnchorType {
+        NONE = 0; // 无锚定
+        WELD = 1; // 焊接锚定
+        BALL = 2;  // 球形锚定
+    }
+    string body_name = 1;  // 被锚定的 Body 名字
+    AnchorType anchor_type = 2;  // 锚定类型
+}
+
+message GetBodyManipulationMovementRequest {}
+
+message GetBodyManipulationMovementResponse {
+    repeated double delta_pos = 1;  // Actor 在世界坐标系中的位置变化 (3 elements)
+    repeated double delta_quat = 2; // Actor 在世界坐标系中的旋转变化 (4 elements)
+}
+
+message SetActorAnimParamNumberRequest {
+    string actor_name = 1;
+    string param_name = 2;
+    double value = 3;
+}
+
+message SetActorAnimParamNumberResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetActorAnimParamBoolRequest {
+    string actor_name = 1;
+    string param_name = 2;
+    bool value = 3;
+}
+
+message SetActorAnimParamBoolResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
+}
+
+message SetActorAnimParamStringRequest {
+    string actor_name = 1;
+    string param_name = 2;
+    string value = 3;
+}
+
+message SetActorAnimParamStringResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1; // 状态码字段
+    string error_message = 2; // 错误详情（可选）
 }

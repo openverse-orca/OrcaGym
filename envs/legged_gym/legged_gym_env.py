@@ -1,21 +1,20 @@
 import numpy as np
 from gymnasium.core import ObsType
-from orca_gym.multi_agent import OrcaGymMultiAgentEnv
+from orca_gym.environment.async_env import OrcaGymAsyncEnv
 from orca_gym.utils import rotations
 from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 import datetime
-from orca_gym.devices.keyboard import KeyboardInput
+from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
-
 import requests
 from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
 
-class LeggedGymEnv(OrcaGymMultiAgentEnv):
+class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
 
     def __init__(
@@ -31,18 +30,10 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         run_mode: str,
         env_id: str,
         task: str,
-        port:int = 15632, 
-        ip:str="localhost",
         **kwargs,
     ):
         self._init_height_map(height_map_file)
         self._run_mode = run_mode       
-        
-        if self._run_mode == "nav":
-            self.url = "http://"+ip+f":{port}/posyaw"  
-            self.rec_action = RecAction(ip=ip)
-        print("------------------------------")
-        print("ip:", ip, "port:", port)
         
         super().__init__(
             frame_skip = frame_skip,
@@ -60,7 +51,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
         self._randomize_agent_foot_friction()
         self._add_randomized_weight()
-        self._init_playable()
+        self._init_playable(orcagym_addr)
         self._reset_phy_config()
 
      
@@ -68,22 +59,13 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
     def agents(self) -> list[LeggedRobot]:
         return self._agents
 
-    def step_agents(self, action: np.ndarray, actuator_ctrl: np.ndarray) -> None:
+    def step_agents(self, action: np.ndarray) -> None:
         if self._task == "no_action":
             self._update_no_action_ctrl()
             return
                     
         # print("Step agents: ", action)
         self._update_playable()
-
-        # 性能优化：在Env中批量更新所有agent的控制量
-        if len(self.ctrl) == len(actuator_ctrl):
-            self.ctrl = actuator_ctrl
-        else:
-            assert len(self.ctrl) > len(actuator_ctrl)
-            actuator_ctrl = np.array(actuator_ctrl).reshape(len(self.agents), -1)
-            for i in range(len(actuator_ctrl)):
-                self.ctrl[self._ctrl_start[i]:self._ctrl_end[i]] = actuator_ctrl[i]
 
         # 切分action 给每个 agent
         action = action.reshape(len(self.agents), -1)
@@ -251,7 +233,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
 
     def _add_randomized_weight(self) -> None:
         print("Add randomized weight")
-        if self._run_mode == "testing" or self._run_mode == "play":
+        if self._run_mode == "testing" or self._run_mode == "play" or self._run_mode == "nav":
             print("Skip randomized weight load in testing or play mode")
             return   
 
@@ -307,11 +289,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             agent.update_curriculum_level(self.data.qpos)
             
     
-    def _init_playable(self) -> None:
+    def _init_playable(self, orcagym_addr) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
             return
         
-        self._keyboard_controller = KeyboardInput()
+        self._keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         self._key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0}   
         
         for agent in self.agents:
@@ -329,9 +311,11 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
             robot_config = LeggedRobotConfig["AzureLoong"]
         elif "Lite3" in self._player_agent.name:
             robot_config = LeggedRobotConfig["Lite3"]
+        elif "g1" in self._player_agent.name:
+            robot_config = LeggedRobotConfig["g1"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
@@ -412,6 +396,7 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
         self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
         self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
         self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
+        self.gym.opt.filterparent = LeggedEnvConfig[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)
@@ -443,3 +428,4 @@ class LeggedGymEnv(OrcaGymMultiAgentEnv):
                 self._agent_contact_site_names = [site_name for agent in self.agents for site_name in agent._contact_site_names]
             
             return self.query_site_pos_and_quat(self._agent_contact_site_names)
+

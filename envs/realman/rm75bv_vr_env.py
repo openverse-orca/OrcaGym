@@ -7,9 +7,9 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.devices.xbox_joystick import XboxJoystickManager
 from scipy.spatial.transform import Rotation as R
-from orca_gym.robosuite.controllers.controller_factory import controller_factory
-import orca_gym.robosuite.controllers.controller_config as controller_config
-import orca_gym.robosuite.utils.transform_utils as transform_utils
+from orca_gym.adapters.robosuite.controllers.controller_factory import controller_factory
+import orca_gym.adapters.robosuite.controllers.controller_config as controller_config
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from envs.realman_rm65b.robot_controller import RobotController, DeviceType
 from envs.realman_rm65b.roh_registers import *

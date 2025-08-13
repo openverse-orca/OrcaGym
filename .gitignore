@@ -112,5 +112,10 @@ venv.bak/
 trained_models_tmp/
 ppo_tensorboard/
 
+decomp.mtl
+decomp.obj
+decomp.stl
 
 
+*.hdf5
+*.h5

@@ -13,7 +13,8 @@ import asyncio
 import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
-from orca_gym.utils.rotations import mat2quat, quat2mat
+from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -47,8 +48,20 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         render_fps = self.metadata.get("render_fps")
         self._render_interval = 1.0 / render_fps
         self._render_time_step = time.perf_counter()
+        self._last_frame_index = -1
         self.mj_forward()
 
+        self._body_anchored = None
+        self._anchor_body_name = "ActorManipulator_Anchor"
+        self._anchor_dummy_body_name = "ActorManipulator_dummy"
+        body_names = self.model.get_body_names()
+        if (self._anchor_body_name in body_names and self._anchor_dummy_body_name in body_names):
+            self._anchor_body_id = self.model.body_name2id(self._anchor_body_name)
+            self._anchor_dummy_body_id = self.model.body_name2id(self._anchor_dummy_body_name)
+        else:
+            self._anchor_body_id = None
+            self._anchor_dummy_body_id = None
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
@@ -92,6 +105,55 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def close(self):
         self.loop.run_until_complete(self._close_grpc())
 
+    async def _get_body_manipulation_anchored(self):
+        return await self.gym.get_body_manipulation_anchored()
+    
+    def get_body_manipulation_anchored(self):
+        return self.loop.run_until_complete(self._get_body_manipulation_anchored())
+    
+    async def _get_body_manipulation_movement(self):
+        return await self.gym.get_body_manipulation_movement()
+    
+    def begin_save_video(self, file_path: str):
+        return self.loop.run_until_complete(self._begin_save_video(file_path))
+
+    async def _begin_save_video(self, file_path):
+        return await self.gym.begin_save_video(file_path)
+
+    def stop_save_video(self):
+        return self.loop.run_until_complete(self._stop_save_video())
+
+    async def _stop_save_video(self):
+        return await self.gym.stop_save_video()
+
+    def get_next_frame(self) -> int:
+        current_frame = self.loop.run_until_complete(self._get_current_frame())
+        if current_frame == 0:
+            # 如果摄像头没有使能，会一直返回0
+            return current_frame
+        
+        for _ in range(10):
+            if current_frame == self._last_frame_index:
+                time.sleep(self.realtime_step)
+            else:
+                self._last_frame_index = current_frame
+                return current_frame
+        
+        return current_frame
+            
+
+    def get_current_frame(self) -> int:
+        return self.loop.run_until_complete(self._get_current_frame())
+
+    async def _get_current_frame(self):
+        return await self.gym.get_current_frame()
+
+    def get_body_manipulation_movement(self):
+        actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
+        delta_pos = actor_movement["delta_pos"]
+        delta_quat = actor_movement["delta_quat"]
+        return delta_pos, delta_quat
+
     def do_simulation(self, ctrl, n_frames) -> None:
         """
         Step the simulation n number of frames and applying a control action.
@@ -120,12 +182,140 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return False
 
     def render(self):
+        if self.render_mode not in ["human", "force"]:
+            return
+        
         time_diff = time.perf_counter() - self._render_time_step
         if (time_diff > self._render_interval):
             self._render_time_step = time.perf_counter()
-            if self.render_mode == "human" or self.render_mode == "force":
-                self.loop.run_until_complete(self.gym.render())
-            
+            self.loop.run_until_complete(self.gym.render())
+            self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+
+    def do_body_manipulation(self):
+        if self._anchor_body_id is None:
+            # 老版本不支持锚点操作
+            return
+
+        actor_anchored, anchor_type = self.get_body_manipulation_anchored()
+        if actor_anchored is None:
+            if self._body_anchored is not None:
+                self.release_body_anchored()
+            return
+        
+        if self._body_anchored is None:
+            self.anchor_actor(actor_anchored, anchor_type)
+        
+        
+        delta_pos, delta_quat = self.get_body_manipulation_movement()
+        # print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
+        delta_pos *= self._render_interval
+        delta_euler = quat2euler(delta_quat)
+        delta_euler *= self._render_interval
+        delta_quat = euler2quat(delta_euler)
+
+        # 移动和旋转锚点
+        anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
+        if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
+            print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            return
+
+        # 更新锚点位置
+        anchor_xpos = anchor_xpos + delta_pos
+        # 更新锚点四元数
+        anchor_xquat = quat_mul(
+            anchor_xquat,
+            delta_quat
+        )
+
+        # 更新锚点的位置和四元数
+        self.set_mocap_pos_and_quat({
+            self._anchor_body_name: {
+                "pos": anchor_xpos,
+                "quat": anchor_xquat
+            }
+        })
+        self.mj_forward()
+
+        # print(f"Updated anchor position: {anchor_xpos}, quaternion: {anchor_xquat}")
+
+
+    def release_body_anchored(self):
+        if self._body_anchored is not None:
+            self.update_anchor_equality_constraints(self._anchor_dummy_body_name, AnchorType.NONE)
+
+            self.set_mocap_pos_and_quat({
+                self._anchor_body_name: {
+                    "pos": np.array([0.0, 0.0, -1000.0], dtype=np.float64),
+                    "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)  # Reset to a far position
+                }
+            })
+            self.mj_forward()
+
+            # print(f"Released actor: {self._body_anchored}")
+            self._body_anchored = None
+        else:
+            print("No actor is currently anchored.")
+
+    def anchor_actor(self, actor_name: str, anchor_type: AnchorType):
+        assert self._body_anchored is None, "An actor is already anchored. Please release it first."
+        
+        # 获取actor的位姿和四元数
+        actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
+        if actor_xpos is None or actor_xmat is None or actor_xquat is None:
+            print(f"Warning: Actor {actor_name} not found in the simulation. Cannot anchor.")
+            return
+        
+        # 将锚点位置设置为actor的位姿
+
+        mocap_pos_and_quat_dict = {
+            self._anchor_body_name: {
+                "pos": actor_xpos,
+                "quat": actor_xquat if anchor_type == AnchorType.WELD else np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+            }
+        }
+        self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+        self.mj_forward()
+
+        self.update_anchor_equality_constraints(actor_name, anchor_type)
+
+
+        self._body_anchored = actor_name
+        # print(f"Anchored actor: {self._body_anchored} at position {actor_xpos} with quaternion {actor_xquat}")
+
+    def update_anchor_equality_constraints(self, actor_name: str, anchor_type: AnchorType):
+        # 更新锚点的平衡约束
+        eq_list = self.model.get_eq_list()
+        if eq_list is None or len(eq_list) == 0:
+            raise ValueError("No equality constraints found in the model.")
+        
+        for eq in eq_list:
+            old_obj1_id = eq["obj1_id"]
+            old_obj2_id = eq["obj2_id"]
+            if eq["obj1_id"] == self._anchor_body_id:
+                eq["obj2_id"] = self.model.body_name2id(actor_name)
+                self.gym.modify_equality_objects(
+                    old_obj1_id= old_obj1_id,
+                    old_obj2_id= old_obj2_id,
+                    new_obj1_id= eq["obj1_id"],
+                    new_obj2_id= eq["obj2_id"]
+                )
+                eq["eq_type"] = get_eq_type(anchor_type)
+                # print(f"Anchoring actor {actor_name} to anchor body {self._anchor_body_name}")
+                break
+            elif eq["obj2_id"] == self._anchor_body_id:
+                eq["obj1_id"] = self.model.body_name2id(actor_name)
+                self.gym.modify_equality_objects(
+                    old_obj1_id= old_obj1_id,
+                    old_obj2_id= old_obj2_id,
+                    new_obj1_id= eq["obj1_id"],
+                    new_obj2_id= eq["obj2_id"]
+                )
+                eq["eq_type"] = get_eq_type(anchor_type)
+                # print(f"Anchoring anchor body {self._anchor_body_name} to actor {actor_name}")
+                break
+
+        self.gym.update_equality_constraints(eq_list)
+        self.mj_forward()
 
     def set_ctrl(self, ctrl):
         self.gym.set_ctrl(ctrl)
@@ -136,6 +326,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def mj_forward(self):
         self.gym.mj_forward()
 
+    def mj_jacBody(self, jacp, jacr, body_id):
+        self.gym.mj_jacBody(jacp, jacr, body_id)
+
+    def mj_jacSite(self, jacp, jacr, site_name):
+        self.gym.mj_jacSite(jacp, jacr, site_name)
+
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
@@ -144,6 +340,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.time_step = time_step
         self.realtime_step = time_step * self.frame_skip
         self.gym.set_time_step(time_step)
+        self.loop.run_until_complete(self.gym.set_timestep_remote(time_step))
         return
 
     def update_data(self):
@@ -302,6 +499,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_contact_force(self, contact_ids):
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
+    
+    def get_cfrc_ext(self):
+        cfrc_ext = self.gym.get_cfrc_ext()
+        return cfrc_ext
 
     def query_actuator_torques(self, actuator_names):
         actuator_torques = self.gym.query_actuator_torques(actuator_names)

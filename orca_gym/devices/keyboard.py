@@ -3,9 +3,18 @@ import sys
 import os
 import socket
 import threading
+import grpc
+from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
+import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
+import asyncio
+import numpy as np
+
+class KeyboardInputSourceType:
+    PYGAME = "pygame"
+    ORCASTUDIO = "orcastudio"
 
 
-class KeyboardInput:
+class KeyboardInputSourcePygame:
     def __init__(self):
         # Initialize Pygame
         pygame.init()
@@ -13,14 +22,6 @@ class KeyboardInput:
         # Initialize the display (even if not used, it's required for capturing events)
         os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
         pygame.display.set_mode((400, 400))
-
-        # Initialize keyboard state
-        self.keyboard_state = {
-            "W": 0, "A": 0, "S": 0, "D": 0,
-            "Space": 0, "LShift": 0, "RShift": 0, "Ctrl": 0, "Alt": 0,
-            "Esc": 0, "Enter": 0, "Up": 0, "Down": 0,
-            "Left": 0, "Right": 0, "Q": 0, "E": 0, "R": 0, "F": 0, "Z": 0, "X": 0, "Y": 0
-        }
 
         # Define the key mapping
         self.key_map = {
@@ -34,40 +35,173 @@ class KeyboardInput:
             pygame.K_LALT: "Alt", pygame.K_RALT: "Alt"
         }
 
-    def update(self):
+    def update_keyboard_state(self, keyboard_state):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.close()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
                 if event.key in self.key_map:
-                    self.keyboard_state[self.key_map[event.key]] = 1
+                    keyboard_state[self.key_map[event.key]] = 1
                     # print(f"Key pressed: {self.key_map[event.key]}")
             elif event.type == pygame.KEYUP:
                 if event.key in self.key_map:
-                    self.keyboard_state[self.key_map[event.key]] = 0
+                    keyboard_state[self.key_map[event.key]] = 0
                     # print(f"Key released: {self.key_map[event.key]}")
+
+class KeyboardInputSourceOrcaStudio:
+    def __init__(self,
+                 grpc_addr: str,):
+        """
+        Initialize the OrcaStudio keyboard input source.
+        """
+        self.grpc_addr = grpc_addr
+        self.loop = asyncio.get_event_loop()
+        self.initialize_grpc()
+
+        self.keyboard_map = {
+            "keyboard_key_alphanumeric_A" : "A",
+            "keyboard_key_alphanumeric_B" : "B",
+            "keyboard_key_alphanumeric_C" : "C",
+            "keyboard_key_alphanumeric_D" : "D",
+            "keyboard_key_alphanumeric_E" : "E",
+            "keyboard_key_alphanumeric_F" : "F",
+            "keyboard_key_alphanumeric_G" : "G",
+            "keyboard_key_alphanumeric_H" : "H",
+            "keyboard_key_alphanumeric_I" : "I",
+            "keyboard_key_alphanumeric_J" : "J",
+            "keyboard_key_alphanumeric_K" : "K",
+            "keyboard_key_alphanumeric_L" : "L",
+            "keyboard_key_alphanumeric_M" : "M",
+            "keyboard_key_alphanumeric_N" : "N",
+            "keyboard_key_alphanumeric_O" : "O",
+            "keyboard_key_alphanumeric_P" : "P",
+            "keyboard_key_alphanumeric_Q" : "Q",
+            "keyboard_key_alphanumeric_R" : "R",
+            "keyboard_key_alphanumeric_S" : "S",
+            "keyboard_key_alphanumeric_T" : "T",
+            "keyboard_key_alphanumeric_U" : "U",
+            "keyboard_key_alphanumeric_V" : "V",
+            "keyboard_key_alphanumeric_W" : "W",
+            "keyboard_key_alphanumeric_X" : "X",
+            "keyboard_key_alphanumeric_Y" : "Y",
+            "keyboard_key_alphanumeric_Z" : "Z",
+            "keyboard_key_alphanumeric_0" : "0",
+            "keyboard_key_alphanumeric_1" : "1",
+            "keyboard_key_alphanumeric_2" : "2",
+            "keyboard_key_alphanumeric_3" : "3",
+            "keyboard_key_alphanumeric_4" : "4",
+            "keyboard_key_alphanumeric_5" : "5",
+            "keyboard_key_alphanumeric_6" : "6",
+            "keyboard_key_alphanumeric_7" : "7",
+            "keyboard_key_alphanumeric_8" : "8",
+            "keyboard_key_alphanumeric_9" : "9",
+            "keyboard_key_edit_backspace" : "Backspace",
+            "keyboard_key_edit_capslock" : "CapsLock",
+            "keyboard_key_edit_enter" : "Enter",
+            "keyboard_key_edit_space" : "Space",
+            "keyboard_key_edit_tab" : "Tab",
+            "keyboard_key_escape" : "Esc",
+            "keyboard_key_function_F01" : "F1",
+            "keyboard_key_function_F02" : "F2",
+            "keyboard_key_function_F03" : "F3",
+            "keyboard_key_function_F04" : "F4",
+            "keyboard_key_function_F05" : "F5",
+            "keyboard_key_function_F06" : "F6",
+            "keyboard_key_function_F07" : "F7",
+            "keyboard_key_function_F08" : "F8",
+            "keyboard_key_function_F09" : "F9",
+            "keyboard_key_function_F10" : "F10",
+            "keyboard_key_function_F11" : "F11",
+            "keyboard_key_function_F12" : "F12",
+            "keyboard_key_modifier_alt_l" : "Alt",
+            "keyboard_key_modifier_alt_r" : "Alt",
+            "keyboard_key_modifier_ctrl_l" : "Ctrl",
+            "keyboard_key_modifier_ctrl_r" : "Ctrl",
+            "keyboard_key_modifier_shift_l" : "LShift",
+            "keyboard_key_modifier_shift_r" : "RShift",
+            "keyboard_key_navigation_arrow_down" : "Down",
+            "keyboard_key_navigation_arrow_left" : "Left",
+            "keyboard_key_navigation_arrow_right" : "Right",
+            "keyboard_key_navigation_arrow_up" : "Up",
+            "mouse_button_left" : "MouseLeft",
+            "mouse_button_middle" : "MouseMiddle",
+            "mouse_button_right" : "MouseRight",
+            "mouse_button_x1" : "MouseX1",
+            "mouse_button_x2" : "MouseX2",
+        }
+
+    def initialize_grpc(self):
+        self.channel = grpc.aio.insecure_channel(
+            self.grpc_addr,
+        )
+        self.stub = GrpcServiceStub(self.channel)
+
+    async def _close_grpc(self):
+        if self.channel:
+            await self.channel.close()
+
+    async def _get_key_pressed_events(self):
+        request = mjc_message_pb2.GetKeyPressedEventsRequest()
+        response = await self.stub.GetKeyPressedEvents(request)
+        if response is None:
+            raise RuntimeError("Failed to get key pressed events from OrcaStudio.")
+        return response.events
+
+    def get_key_pressed(self) -> list[str]:
+        """
+        Get the current key pressed state from OrcaStudio.
+        """
+        return self.loop.run_until_complete(self._get_key_pressed_events())
+
+
+    def close(self):
+        self.loop.run_until_complete(self._close_grpc())
+
+    def update_keyboard_state(self, keyboard_state : dict[str, int]):
+        key_pressed_events = self.get_key_pressed()
+
+        # print(f"Key pressed events: {key_pressed_events}")
+
+        [keyboard_state.update({key: 0}) for key in self.keyboard_map.values()]
+
+        for event in key_pressed_events:
+            if event in self.keyboard_map:
+                key_name = self.keyboard_map[event]
+                if key_name in keyboard_state:
+                    keyboard_state[key_name] = 1
+
+class KeyboardInput:
+    def __init__(self,
+                 input_source: str,
+                 grpc_address: str = "localhost:50051"):
+        
+        # Initialize keyboard input source
+        if input_source == KeyboardInputSourceType.PYGAME:
+            self._source = KeyboardInputSourcePygame()
+        elif input_source == KeyboardInputSourceType.ORCASTUDIO:
+            self._source = KeyboardInputSourceOrcaStudio(grpc_address)
+        else:
+            raise ValueError(f"Unknown input source: {input_source}")
+
+        # Initialize keyboard state
+        self.keyboard_state = {
+            "W": 0, "A": 0, "S": 0, "D": 0,
+            "Space": 0, "LShift": 0, "RShift": 0, "Ctrl": 0, "Alt": 0,
+            "Esc": 0, "Enter": 0, "Up": 0, "Down": 0,
+            "Left": 0, "Right": 0, "Q": 0, "E": 0, "R": 0, "F": 0, "Z": 0, "X": 0, "Y": 0
+        }
+
+
+
+    def update(self):
+        # Update the keyboard state based on the input source
+        self._source.update_keyboard_state(self.keyboard_state)
+
+        # Print the current keyboard state for debugging
+        # print(self.keyboard_state)
 
     def get_state(self):
         return self.keyboard_state.copy()
-
-    def capture_keyboard_pos_ctrl(self) -> dict:
-        # Capture positional control based on keyboard input
-        state = self.get_state()
-        move_x = state["D"] - state["A"]
-        move_y = state["W"] - state["S"]
-        move_z = state["F"] - state["R"]
-        pos_ctrl = {'x': move_x, 'y': move_y, 'z': move_z}
-        return pos_ctrl
-
-    def capture_keyboard_rot_ctrl(self) -> dict:
-        # Capture rotational control based on keyboard input
-        state = self.get_state()
-        yaw = all([state["D"], state["LShift"]]) - all([state["A"], state["LShift"]])
-        pitch = all([state["W"], state["LShift"]]) - all([state["S"], state["LShift"]])
-        roll = state["E"] - state["Q"]
-        rot_ctrl = {'yaw': yaw, 'pitch': pitch, 'roll': roll}
-        return rot_ctrl
 
     def close(self):
         pygame.quit()
