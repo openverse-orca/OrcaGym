@@ -95,7 +95,8 @@ def register_env(
     frame_skip: int,
     action_skip: int,
     is_subenv: bool,
-    height_map_file: str
+    height_map_file: str,
+    render_mode: str
 ) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
@@ -110,7 +111,7 @@ def register_env(
             'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)],
             'time_step': time_step,
             'max_episode_steps': max_episode_steps,  # 环境永不停止，agent有最大步数
-            'render_mode': "human",
+            'render_mode': render_mode,
             'is_subenv': is_subenv,
             'height_map_file': height_map_file,
             'run_mode': run_mode,
@@ -136,7 +137,8 @@ def make_env(
     frame_skip: int, 
     action_skip: int,
     is_subenv: bool, 
-    height_map_file: str
+    height_map_file: str,
+    render_mode: str
 ) -> callable:
     def _init():
         # 注册环境，确保子进程中也能访问
@@ -154,7 +156,8 @@ def make_env(
             frame_skip=frame_skip, 
             action_skip=action_skip,
             is_subenv=is_subenv, 
-            height_map_file=height_map_file
+            height_map_file=height_map_file,
+            render_mode=render_mode
         )
         print("Registering environment with id: ", env_id)
 
@@ -286,6 +289,7 @@ def train_model(
     model_file: str,
     height_map_file: str,
     curriculum_list: list[dict[str, int]],
+    render_mode: str,
 ):
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
@@ -310,6 +314,7 @@ def train_model(
                 action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
+                render_mode=render_mode,
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
@@ -347,7 +352,8 @@ def test_model(
     model_file: str,
     height_map_file: str,
     curriculum_list: list[dict[str, int]],
-):
+    render_mode: str,
+    ):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
@@ -371,6 +377,7 @@ def test_model(
                 action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
+                render_mode=render_mode,
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
