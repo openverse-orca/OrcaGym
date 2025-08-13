@@ -16,8 +16,6 @@ if project_root not in sys.path:
 
 
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-import orca_gym.scripts.sb3_ppo_vecenv_rl as sb3_ppo_vecenv_rl
-import orca_gym.scripts.rllib_appo_rl as rllib_appo_rl
 from orca_gym.utils.dir_utils import create_tmp_dir
 from scene_util import generate_height_map_file, clear_scene, publish_terrain, publish_scene
 
@@ -152,6 +150,7 @@ def run_sb3_ppo_rl(
         model_dir=model_dir,
     )
 
+    import orca_gym.scripts.sb3_ppo_vecenv_rl as sb3_ppo_vecenv_rl
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
@@ -251,7 +250,8 @@ def run_rllib_appo_rl(
         model_dir=model_dir,
     )
 
-
+    import orca_gym.scripts.rllib_appo_rl as rllib_appo_rl
+    
     if run_mode == 'training':
         rllib_appo_rl.run_training(
             orcagym_addr=orcagym_addresses[0],
