@@ -115,7 +115,7 @@ ppo_tensorboard/
 decomp.mtl
 decomp.obj
 decomp.stl
-
+examples/openpi/runconfig.yaml
 
 *.hdf5
 *.h5
