@@ -131,6 +131,20 @@ def register_env(orcagym_addr : str,
     )
     return env_id, kwargs
 
+def load_sb3_model(model_file: dict):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    models = {}
+    for key, value in model_file.items(): 
+        models[key] = PPO.load(value, device=device)
+    return models
+
+def load_onnx_model(model_file: dict):
+    import onnxruntime as ort
+    models = {}
+    for key, value in model_file.items():
+        models[key] = ort.InferenceSession(value)
+    return models
+
 
 def main(
     config: dict,
@@ -144,12 +158,21 @@ def main(
 
         agent_name = config['agent_name']
         model_file = config['model_file']
+        model_type = config['model_type']
         ctrl_device = config['ctrl_device']
         terrain_spawnable_names = config['terrain_spawnable_names']
         agent_spawnable_name = config['agent_spawnable_name']
 
-        model_dir = os.path.dirname(list(model_file.values())[0])
+        model_dir = os.path.dirname(list(model_file[model_type].values())[0])
         command_model = config['command_model']
+
+        assert model_type in ["sb3", "onnx", "torch"], f"Invalid model type: {model_type}"
+
+        models = {}
+        if "sb3" in model_file:
+            models["sb3"] = load_sb3_model(model_file["sb3"])
+        if "onnx" in model_file:
+            models["onnx"] = load_onnx_model(model_file["onnx"])
 
         # 清空场景
         clear_scene(
@@ -195,10 +218,7 @@ def main(
         env = gym.make(env_id)
         print("Starting simulation...")
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        models = {}
-        for key, value in model_file.items():
-            models[key] = PPO.load(value, device=device)
+
 
         keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name])
 
@@ -207,6 +227,7 @@ def main(
             env=env,
             agent_name_list=agent_name_list,
             models=models,
+            model_type=model_type,
             time_step=TIME_STEP,
             frame_skip=FRAME_SKIP,
             action_skip=ACTION_SKIP,
@@ -299,7 +320,8 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
 
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
-                 models: dict[str, nn.Module], 
+                 models: dict, 
+                 model_type: str,
                  time_step: float, 
                  frame_skip: int,
                  action_skip: int,
@@ -332,16 +354,21 @@ def run_simulation(env: gym.Env,
             else:
                 brake_time = 0.0
 
+            model = {"sb3": None, "onnx": None}
             if np.linalg.norm(lin_vel) == 0.0 and brake_time > 1.0:
                 if ang_vel != 0.0:
-                    model = models[command_model[terrain_type]["trun"]]
+                    model["sb3"] = models["sb3"][command_model[terrain_type]["trun"]]
+                    model["onnx"] = models["onnx"][command_model[terrain_type]["trun"]]
                 else:
-                    model = models[command_model[terrain_type]["stand_still"]]
+                    model["sb3"] = models["sb3"][command_model[terrain_type]["stand_still"]]
+                    model["onnx"] = models["onnx"][command_model[terrain_type]["stand_still"]]
             else:
                 if lin_vel[0] >= 0:
-                    model = models[command_model[terrain_type]["forward"]]
+                    model["sb3"] = models["sb3"][command_model[terrain_type]["forward"]]
+                    model["onnx"] = models["onnx"][command_model[terrain_type]["forward"]]
                 elif lin_vel[0] < 0:
-                    model = models[command_model[terrain_type]["backward"]]
+                    model["sb3"] = models["sb3"][command_model[terrain_type]["backward"]]
+                    model["onnx"] = models["onnx"][command_model[terrain_type]["backward"]]
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
             if hasattr(env, "setup_command"):
@@ -352,7 +379,30 @@ def run_simulation(env: gym.Env,
             segmented_obs = segment_obs(obs, agent_name_list)
             action_list = []
             for agent_obs in segmented_obs.values():
-                action, _states = model.predict(agent_obs, deterministic=True)
+                if model_type == "sb3":
+                    # print("sb3 obs: ", agent_obs)
+                    sb3_action, _states = model["sb3"].predict(agent_obs, deterministic=True)
+                    # print("sb3 action: ", sb3_action)
+                    # print("--------------------------------")
+                    action = sb3_action
+
+                elif model_type == "onnx":
+                    agent_obs = {
+                        "observation_achieved_goal": np.array([agent_obs["achieved_goal"]], dtype=np.float32),
+                        "observation_desired_goal": np.array([agent_obs["desired_goal"]], dtype=np.float32),
+                        "observation_observation": np.array([agent_obs["observation"]], dtype=np.float32)
+                    }
+                    # print("onnx obs: ", agent_obs)
+                    onnx_actions = model["onnx"].run(None, agent_obs)[0]
+                    onnx_action = onnx_actions[0]
+                    onnx_action = np.clip(onnx_action, -1, 1)
+                    # print("onnx action: ", onnx_action)
+                    # print("--------------------------------")
+                    action = onnx_action
+
+                else:
+                    raise ValueError(f"Invalid model type: {model_type}")
+
                 action_list.append(action)
 
             action = np.concatenate(action_list).flatten()
