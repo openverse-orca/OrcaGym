@@ -17,7 +17,7 @@ if project_root not in sys.path:
 
 from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
 from orca_gym.utils.dir_utils import create_tmp_dir
-from scene_util import generate_height_map_file, clear_scene, publish_terrain, publish_scene
+from scripts.scene_util import generate_height_map_file, clear_scene, publish_terrain, publish_scene
 
 TIME_STEP = LeggedEnvConfig["TIME_STEP"]
 FRAME_SKIP = LeggedEnvConfig["FRAME_SKIP"]
@@ -150,12 +150,12 @@ def run_sb3_ppo_rl(
         model_dir=model_dir,
     )
 
-    import orca_gym.scripts.sb3_ppo_vecenv_rl as sb3_ppo_vecenv_rl
+    import examples.legged_gym.scripts.sb3_ppo_vecenv_rl as sb3_rl
 
     if run_mode == "training":
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
         print("Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", FRAME_SKIP, " Action Skip: ", ACTION_SKIP)
-        sb3_ppo_vecenv_rl.train_model(
+        sb3_rl.train_model(
             orcagym_addresses=orcagym_addresses, 
             subenv_num=subenv_num, 
             agent_num=agent_num, 
@@ -176,7 +176,7 @@ def run_sb3_ppo_rl(
     elif run_mode in ["testing", "play"]:
         print("Start Testing! Run mode: ", run_mode, "task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name)
         print(" Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", FRAME_SKIP, " Action Skip: ", ACTION_SKIP)
-        sb3_ppo_vecenv_rl.test_model(
+        sb3_rl.test_model(
             orcagym_addresses=orcagym_addresses, 
             agent_num=agent_num, 
             agent_name=agent_name, 
@@ -206,7 +206,7 @@ def run_rllib_appo_rl(
 ):
 
     # 在脚本开头调用
-    if rllib_appo_rl.setup_cuda_environment():
+    if rllib_rl.setup_cuda_environment():
         print("CUDA 环境验证通过")
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
@@ -250,10 +250,10 @@ def run_rllib_appo_rl(
         model_dir=model_dir,
     )
 
-    import orca_gym.scripts.rllib_appo_rl as rllib_appo_rl
+    import examples.legged_gym.scripts.rllib_appo_rl as rllib_rl
     
     if run_mode == 'training':
-        rllib_appo_rl.run_training(
+        rllib_rl.run_training(
             orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
             agent_name=agent_name,
@@ -270,7 +270,7 @@ def run_rllib_appo_rl(
     elif run_mode == 'testing':
         if not ckpt:
             raise ValueError("Checkpoint path must be provided for testing.")
-        rllib_appo_rl.test_model(
+        rllib_rl.test_model(
             checkpoint_path=ckpt,
             orcagym_addr=config['orcagym_addr'],
             env_name=config['env_name'],
@@ -302,6 +302,10 @@ if __name__ == "__main__":
     parser.add_argument('--remote', type=str, help='[Optional] The remote address of the ORCA Lab Simulator. Example: 192.198.1.123:50051')
     parser.add_argument('--visualize', action='store_true', help='Visualize the training process')
     args = parser.parse_args()
+
+    if args.config is None:
+        raise ValueError("Config file is required")
+    
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 

@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import csv
 import yaml
-from scene_util import clear_scene, publish_terrain, generate_height_map_file, publish_scene
+from scripts.scene_util import clear_scene, publish_terrain, generate_height_map_file, publish_scene
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 from envs.legged_gym.legged_sim_env import LeggedSimEnv
 from envs.legged_gym.legged_config import LeggedRobotConfig
@@ -315,10 +315,12 @@ def run_simulation(env: gym.Env,
     physics_step = 0
     control_step = 0
     sim_time = 0.0
+    brake_time = 0.0
         
     try:
         while True:
             start_time = datetime.now()
+
 
             lin_vel, ang_vel, reborn, terrain_type = keyboard_control.update()
             if reborn:
@@ -326,6 +328,11 @@ def run_simulation(env: gym.Env,
                 continue
 
             if np.linalg.norm(lin_vel) == 0.0:
+                brake_time += dt
+            else:
+                brake_time = 0.0
+
+            if np.linalg.norm(lin_vel) == 0.0 and brake_time > 1.0:
                 if ang_vel != 0.0:
                     model = models[command_model[terrain_type]["trun"]]
                 else:
@@ -378,10 +385,13 @@ def run_simulation(env: gym.Env,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run multiple instances of the script with different gRPC addresses.')
-    parser.add_argument('--config', type=str, default='go2_sim_config.yaml', help='The path of the config file')
+    parser.add_argument('--config', type=str, help='The path of the config file')
     parser.add_argument('--remote', type=str, help='The remote address of the orca studio')
     args = parser.parse_args()
 
+    if args.config is None:
+        raise ValueError("Config file is required")
+    
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
