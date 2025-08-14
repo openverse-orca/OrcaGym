@@ -8,7 +8,7 @@ import numpy as np
 
 def generate_height_map_file(
     orcagym_addresses: list[str],
-    model_dir: str,
+    height_map_dir: str,
 ):
     print("=============> Generate height map file ...")
 
@@ -16,8 +16,8 @@ def generate_height_map_file(
     os.system(f"python ../../orca_gym/tools/height_map_generater.py --orcagym_addresses {orcagym_addresses[0]}")
 
     # 用UUID生成一个唯一的文件名，并重命名 height_map.npy
-    height_map_file = os.path.join(model_dir, f"height_map_{uuid.uuid4()}.npy")
-    os.makedirs(model_dir, exist_ok=True)
+    height_map_file = os.path.join(height_map_dir, f"height_map_{uuid.uuid4()}.npy")
+    os.makedirs(height_map_dir, exist_ok=True)
     shutil.move("height_map.npy", height_map_file)
 
     print("=============> Generate height map file done. Height map file: ", height_map_file)

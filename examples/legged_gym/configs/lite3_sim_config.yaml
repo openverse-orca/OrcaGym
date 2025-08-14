@@ -1,17 +1,21 @@
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
-model_type: "sb3"
+model_type: "grpc"
 
 model_file: 
   "sb3":
-    "flat_terrain": "test/Lite3_follow_command.zip_iteration_300.zip"
+    "flat_terrain": "test/Lite3_flat_terrain.zip"
     "rough_terrain": "test/Lite3_rough_terrain.zip"
     "stand_still": "test/Lite3_stand_still.zip"
   "onnx":
     "flat_terrain": "test/Lite3_flat_terrain.onnx"
     "rough_terrain": "test/Lite3_rough_terrain.onnx"
     "stand_still": "test/Lite3_stand_still.onnx"
+  "grpc":
+    "flat_terrain": "localhost:50151"  # 远程服务器地址
+    "rough_terrain": "localhost:50151"
+    "stand_still": "localhost:50151"
 
 ctrl_device: "keyboard"
 

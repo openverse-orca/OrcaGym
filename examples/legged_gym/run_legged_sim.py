@@ -17,6 +17,9 @@ from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 from envs.legged_gym.legged_sim_env import LeggedSimEnv
 from envs.legged_gym.legged_config import LeggedRobotConfig
 
+from scripts.grpc_client import GrpcInferenceClient, create_grpc_client
+
+
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
 
@@ -42,14 +45,15 @@ MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
 
 
 class KeyboardControl:
-    def __init__(self, orcagym_addr: str, env: LeggedSimEnv, robot_config: dict):
+    def __init__(self, orcagym_addr: str, env: LeggedSimEnv, robot_config: dict, model_type: str):
         self.keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
-        self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0, "R": 0, "F": 0}   
+        self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0, "R": 0, "F": 0, "M": 0}   
         self.env = env
         self.player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_x"]) / 2
         self.player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_y"]) / 2
         self.player_agent_turn_angel = np.array(robot_config["curriculum_commands"]["move_fast"]["command_ang_vel_range"])
         self.terrain_type = "flat_terrain"
+        self.model_type = model_type
 
     def update(self):
         self.keyboard_controller.update()
@@ -87,10 +91,16 @@ class KeyboardControl:
             else:
                 self.terrain_type = "flat_terrain"
                 print("Switch to flat terrain")
+        if key_status["M"] == 0 and self._last_key_status["M"] == 1:
+            supported_model_types = ["sb3", "onnx", "grpc"]
+            if self.model_type in supported_model_types:
+                current_index = supported_model_types.index(self.model_type)
+                self.model_type = supported_model_types[(current_index + 1) % len(supported_model_types)]
+                print(f"Switch to {self.model_type} model")
 
         self._last_key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", ang_vel, "Reborn: ", reborn, "Terrain type: ", self.terrain_type)
-        return lin_vel, ang_vel, reborn, self.terrain_type
+        return lin_vel, ang_vel, reborn, self.terrain_type, self.model_type
 
     def get_state(self):
         return self.key_status
@@ -146,6 +156,30 @@ def load_onnx_model(model_file: dict):
     return models
 
 
+def load_grpc_model(model_file: dict):
+    """加载gRPC模型客户端"""
+    
+    models = {}
+    for key, value in model_file.items():
+        # value应该是服务器地址，格式为 "host:port"
+        if isinstance(value, str):
+            server_address = value
+            timeout = 5.0
+            max_retries = 3
+        else:
+            # 如果value是字典，提取服务器地址
+            server_address = value.get("server_address", "localhost:50051")
+            timeout = value.get("timeout", 5.0)
+            max_retries = value.get("max_retries", 3)
+        
+        models[key] = create_grpc_client(
+            server_address=server_address,
+            timeout=timeout,
+            max_retries=max_retries
+        )
+    return models
+
+
 def main(
     config: dict,
     remote: str,
@@ -163,16 +197,18 @@ def main(
         terrain_spawnable_names = config['terrain_spawnable_names']
         agent_spawnable_name = config['agent_spawnable_name']
 
-        model_dir = os.path.dirname(list(model_file[model_type].values())[0])
+        height_map_dir = "./height_map"
         command_model = config['command_model']
 
-        assert model_type in ["sb3", "onnx", "torch"], f"Invalid model type: {model_type}"
+        assert model_type in ["sb3", "onnx", "torch", "grpc"], f"Invalid model type: {model_type}"
 
         models = {}
         if "sb3" in model_file:
             models["sb3"] = load_sb3_model(model_file["sb3"])
         if "onnx" in model_file:
             models["onnx"] = load_onnx_model(model_file["onnx"])
+        if "grpc" in model_file:
+            models["grpc"] = load_grpc_model(model_file["grpc"])
 
         # 清空场景
         clear_scene(
@@ -188,7 +224,7 @@ def main(
         # 空场景生成高度图
         height_map_file = generate_height_map_file(
             orcagym_addresses=orcagym_addresses,
-            model_dir=model_dir,
+            height_map_dir=height_map_dir,
         )
 
         # 放置机器人
@@ -220,7 +256,7 @@ def main(
 
 
 
-        keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name])
+        keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name], model_type)
 
         agent_name_list = [agent_name]
         run_simulation(
@@ -236,6 +272,11 @@ def main(
         )
     finally:
         print("退出仿真环境")
+        # 清理gRPC客户端连接
+        if model_type == "grpc" and models and "grpc" in models:
+            for client in models["grpc"].values():
+                if hasattr(client, 'close'):
+                    client.close()
         env.close()
 
 def segment_obs(obs: dict[str, np.ndarray], agent_name_list: list[str]) -> dict[str, dict[str, np.ndarray]]:
@@ -344,7 +385,7 @@ def run_simulation(env: gym.Env,
             start_time = datetime.now()
 
 
-            lin_vel, ang_vel, reborn, terrain_type = keyboard_control.update()
+            lin_vel, ang_vel, reborn, terrain_type, model_type = keyboard_control.update()
             if reborn:
                 obs, info = env.reset()
                 continue
@@ -354,21 +395,18 @@ def run_simulation(env: gym.Env,
             else:
                 brake_time = 0.0
 
-            model = {"sb3": None, "onnx": None}
             if np.linalg.norm(lin_vel) == 0.0 and brake_time > 1.0:
                 if ang_vel != 0.0:
-                    model["sb3"] = models["sb3"][command_model[terrain_type]["trun"]]
-                    model["onnx"] = models["onnx"][command_model[terrain_type]["trun"]]
+                    command_model_type = command_model[terrain_type]["trun"]
                 else:
-                    model["sb3"] = models["sb3"][command_model[terrain_type]["stand_still"]]
-                    model["onnx"] = models["onnx"][command_model[terrain_type]["stand_still"]]
+                    command_model_type = command_model[terrain_type]["stand_still"]
             else:
                 if lin_vel[0] >= 0:
-                    model["sb3"] = models["sb3"][command_model[terrain_type]["forward"]]
-                    model["onnx"] = models["onnx"][command_model[terrain_type]["forward"]]
-                elif lin_vel[0] < 0:
-                    model["sb3"] = models["sb3"][command_model[terrain_type]["backward"]]
-                    model["onnx"] = models["onnx"][command_model[terrain_type]["backward"]]
+                    command_model_type = command_model[terrain_type]["forward"]
+                else:
+                    command_model_type = command_model[terrain_type]["backward"]
+
+            model = models[model_type][command_model_type]
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
             if hasattr(env, "setup_command"):
@@ -381,7 +419,7 @@ def run_simulation(env: gym.Env,
             for agent_obs in segmented_obs.values():
                 if model_type == "sb3":
                     # print("sb3 obs: ", agent_obs)
-                    sb3_action, _states = model["sb3"].predict(agent_obs, deterministic=True)
+                    sb3_action, _states = model.predict(agent_obs, deterministic=True)
                     # print("sb3 action: ", sb3_action)
                     # print("--------------------------------")
                     action = sb3_action
@@ -393,12 +431,27 @@ def run_simulation(env: gym.Env,
                         "observation_observation": np.array([agent_obs["observation"]], dtype=np.float32)
                     }
                     # print("onnx obs: ", agent_obs)
-                    onnx_actions = model["onnx"].run(None, agent_obs)[0]
+                    onnx_actions = model.run(None, agent_obs)[0]
                     onnx_action = onnx_actions[0]
                     onnx_action = np.clip(onnx_action, -1, 1)
                     # print("onnx action: ", onnx_action)
                     # print("--------------------------------")
                     action = onnx_action
+
+                elif model_type == "grpc":
+                    # 准备gRPC请求的观察数据
+                    grpc_obs = {
+                        "observation": agent_obs["observation"].astype(np.float32),
+                        "desired_goal": agent_obs["desired_goal"].astype(np.float32),
+                        "achieved_goal": agent_obs["achieved_goal"].astype(np.float32)
+                    }
+                    # print("grpc obs: ", grpc_obs)
+                    grpc_action, _states = model.predict(grpc_obs, model_type=command_model_type, deterministic=True)
+                    if grpc_action is None:
+                        grpc_action = np.zeros(env.action_space.shape[0])
+                    # print("grpc action: ", grpc_action)
+                    # print("--------------------------------")
+                    action = grpc_action
 
                 else:
                     raise ValueError(f"Invalid model type: {model_type}")
