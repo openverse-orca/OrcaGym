@@ -2,8 +2,8 @@ framework: "sb3"
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
-training_episode: 200
-task: "follow_command"
+training_episode: 100
+task: "stand_still"
 
 training:
   subenv_num: 64
@@ -17,9 +17,9 @@ training:
       - name: "basic_moving"
         milestone: 100
       - name: "flat_terrain"
-        milestone: 300
+        milestone: 500
       - name: "rough_terrain"
-        milestone: 1000
+        milestone: 1200
     stand_still:
       - name: "stand_still"
         milestone: 500
