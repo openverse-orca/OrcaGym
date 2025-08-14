@@ -239,7 +239,7 @@ class DatasetWriter:
                 if key == 'camera_frames' and 'camera_frames' in demo_data:
                     # 如果存在 camera_frames，则创建相机帧数据集
                     demo_group.create_dataset('camera_frames', data=demo_data['camera_frames'], compression="gzip", compression_opts=4)
-                if key == 'camera_time_stamp' and 'camera_frames' in demo_data:
+                if key == 'camera_time_stamp' and 'camera_time_stamp' in demo_data:
                     for camera_name, time_stamps in demo_data['camera_time_stamp'].items():
                         camera_group.create_dataset(camera_name, data=time_stamps, compression="gzip", compression_opts=4)
 

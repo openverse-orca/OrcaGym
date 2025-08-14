@@ -381,11 +381,13 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
 
                 if task_status == TaskStatus.SUCCESS:
                     camera_frame_index.append(env.get_current_frame())
+                    print(f"camera_frame_index: {camera_frame_index[-1]}")
                     is_success = env._task.is_success(env)
                     is_success_list.append(is_success)
-                    time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
-                    for camera_name, time_list in time_stamp_dict.items():
-                        camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
+                    # if is_success:
+                    #     time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
+                    #     for camera_name, time_list in time_stamp_dict.items():
+                    #         camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
                     env.stop_save_video()
                     saving_mp4 = False
                     if not is_success:
@@ -1155,9 +1157,9 @@ def do_augmentation(
                 if  is_success:
                     camera_time_stamp = {}
                     if output_video == True:
-                        time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1])
-                        for camera_name, time_list in time_stamp_dict.items():
-                            camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
+                        # time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1])
+                        # for camera_name, time_list in time_stamp_dict.items():
+                        #     camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
                         env.stop_save_video()
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
                                         camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
