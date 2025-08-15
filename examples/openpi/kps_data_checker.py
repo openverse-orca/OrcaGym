@@ -1,7 +1,10 @@
 import argparse
 import json
 import os, sys, shutil
+import subprocess
 import time
+
+import cv2
 import h5py
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pymediainfo import MediaInfo
@@ -26,8 +29,43 @@ class BasicUnitChecker:
         self.proprio_stats = proprio_stats
         self.duration = 0.0
 
+
+    def truncate_video_frames(self, mp4_path, frames_counts:int, max_frames: int, isColor: bool):
+        min_frames = max_frames - 3
+        if frames_counts < min_frames:
+            return ErrorType.MP4FrameCountError
+        elif frames_counts <= max_frames:
+            return ErrorType.Qualified
+        elif frames_counts > max_frames:
+            tmp_name = mp4_path.replace('.mp4', '_tmp.mp4')
+            cmd = ['ffmpeg',
+                   '-v', 'error',
+                   '-i', mp4_path,
+                   '-c:v', 'copy',
+                   '-c:a', 'copy',
+                   '-frames:v', str(max_frames),
+                   '-y',
+                   tmp_name
+                   ]
+
+            try:
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as e:
+                if os.path.exists(tmp_name):
+                    os.remove(tmp_name)
+                    return ErrorType.MP4FrameCountError
+
+            shutil.move(tmp_name, mp4_path)
+        return ErrorType.Qualified
+
     def camera_checker(self):
-        frame_counts_list = []
+        frame_counts_list = {}
         for camera_name in self.camera_name_list:
             mp4_video_filepath = os.path.join(self.basic_unit_path, "camera", "video", f"{camera_name}_color.mp4")
             mp4_depth_filepath = os.path.join(self.basic_unit_path, "camera", "depth", f"{camera_name}_depth.mp4")
@@ -37,24 +75,24 @@ class BasicUnitChecker:
             ret, frame_counts = self.mp4_metadata_checker(mp4_video_filepath)
             if ret is not ErrorType.Qualified:
                 return ret
-            frame_counts_list.append(frame_counts)
+            frame_counts_list[mp4_video_filepath] = frame_counts
 
             ret, frame_counts = self.mp4_metadata_checker(mp4_depth_filepath)
             if ret is not ErrorType.Qualified:
                 return ret
 
-            frame_counts_list.append(frame_counts)
+            frame_counts_list[mp4_depth_filepath] = frame_counts
 
         with h5py.File(os.path.join(self.basic_unit_path, "proprio_stats", self.proprio_stats), 'r' ) as f:
             demo_group = f['data']['demo_00000']
             camera_frames = demo_group['camera_frames']
             last_frames = camera_frames[-1]
-            frame_counts_list.append(last_frames)
 
-        min_frame_count, max_frame_count = min(frame_counts_list), max(frame_counts_list)
-        if (max_frame_count - min_frame_count) > 3:
-            return ErrorType.MP4FrameCountError
-        return ErrorType.Qualified
+        for mp4_filepath, frame_counts in frame_counts_list.items():
+            isColor = mp4_filepath.find('_color') != -1
+            ret = self.truncate_video_frames(mp4_filepath, frame_counts, last_frames + 1, isColor)
+
+        return ret
 
     def mp4_metadata_checker(self, media_path) :
         media = MediaInfo.parse(media_path)
@@ -283,6 +321,9 @@ class KPSDataExport:
             subir_path = os.path.join(self.dataset_path, subdir)
             future = self.executor.submit(shutil.rmtree, subir_path)
             self.futures.append(future)
+
+        for future in as_completed(self.futures):
+            future.result()
 
     def _export_mp4_files(self, output_filepath: str, source_paths: list):
         for subdir in source_paths:
