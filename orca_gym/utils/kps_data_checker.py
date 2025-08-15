@@ -112,7 +112,7 @@ class BasicUnitChecker:
         if duration < 8 or duration > 30:
            return ErrorType.MP4DurationError, frame_count
         fps = frame_count / duration
-        if 29 < float(fps) < 30:
+        if 29 < float(fps) < 31:
             self.duration = duration
             return ErrorType.Qualified, frame_count
         else:
