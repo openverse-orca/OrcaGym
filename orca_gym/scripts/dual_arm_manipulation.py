@@ -15,6 +15,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime, timedelta, timezone
 
 import h5py
+from orca_gym.utils.kps_data_checker import BasicUnitChecker, ErrorType
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
@@ -384,10 +385,13 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     print(f"camera_frame_index: {camera_frame_index[-1]}")
                     is_success = env._task.is_success(env)
                     is_success_list.append(is_success)
-                    # if is_success:
-                    #     time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
-                    #     for camera_name, time_list in time_stamp_dict.items():
-                    #         camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
+                    if is_success:
+                        time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
+                        for camera_name, time_list in time_stamp_dict.items():
+                            try:
+                                camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
+                            except IndexError:
+                                is_success = False
                     env.stop_save_video()
                     saving_mp4 = False
                     if not is_success:
@@ -580,8 +584,6 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     uuid_dir   = dataset_writer.get_UUIDPath()
     dump_static_camera_params(uuid_dir, lvl)
 
-
-
 def do_teleoperation(env, 
                      dataset_writer : DatasetWriter, 
                      teleoperation_rounds : int, 
@@ -612,6 +614,15 @@ def do_teleoperation(env,
             current_round += 1
 
             add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"],level_name = env._task.level_name)
+            uuid_path = dataset_writer.get_UUIDPath()
+            camera_name_list = []
+            for camera_name in camera_time_stamp.keys():
+                if camera_name.endswith("_color"):
+                    camera_name_list.append(camera_name.replace("_color", ""))
+            unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
+            ret, _ = unitCheack.check()
+            if ret != ErrorType.Qualified:
+                dataset_writer.remove_path()
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -1156,16 +1167,27 @@ def do_augmentation(
                                                                     action_step=action_step, sync_codec=sync_codec)
                 if  is_success:
                     camera_time_stamp = {}
+                    camera_name_list = []
                     if output_video == True:
-                        # time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1])
-                        # for camera_name, time_list in time_stamp_dict.items():
-                        #     camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
+                        time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1] + 1)
+                        for camera_name, time_list in time_stamp_dict.items():
+                            camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
+                            if camera_name.endswith("_color"):
+                                camera_name_list.append(camera_name.replace("_color", ""))
                         env.stop_save_video()
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
                                         camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
-                    done_demo_count += 1
-                    print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
-                    done = True
+                    uuid_path = dataset_writer.get_UUIDPath()
+
+                    unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
+                    ret, _ = unitCheack.check()
+                    if ret != ErrorType.Qualified:
+                        print(f"ret = {ret}")
+                        dataset_writer.remove_path()
+                    else:
+                        done_demo_count += 1
+                        print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
+                        done = True
                 else:
                     if output_video == True:
                         env.stop_save_video()

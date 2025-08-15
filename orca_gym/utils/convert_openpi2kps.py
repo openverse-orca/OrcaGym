@@ -58,7 +58,7 @@ class KPSDataSet:
             action_head_position = action_head.create_dataset('position', data=np.zeros((len, 2)), compression="gzip", compression_opts=4)
             action_head_index = action_head.create_dataset('index', data=index, compression="gzip", compression_opts=4)
 
-            action_joint = action_group.create_group('joints')
+            action_joint = action_group.create_group('joint')
             action_joint_position = action_joint.create_dataset('position', data=kps_action_joint_position, compression="gzip", compression_opts=4)
             action_joint_index = action_joint.create_dataset('index', data=index, compression="gzip", compression_opts=4)
 
