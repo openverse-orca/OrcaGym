@@ -4,6 +4,9 @@ import h5py
 import numpy as np
 import os
 from pathlib import Path
+
+from nlopt import exception
+
 from orca_gym.adapters.robomimic.dataset_util import DatasetReader
 
 class KPSDataSet:
@@ -126,12 +129,16 @@ if __name__ == '__main__':
             if entry.is_dir():
                 basic_dataset_list.append(entry)
 
+    exception_count = 0
     for basic_dataset in basic_dataset_list:
-        openpi_dataset_path = os.path.join(dataset_path, basic_dataset, "proprio_stats", "proprio_stats.hdf5")
-        openpi_dataset_reader = DatasetReader(openpi_dataset_path)
-        demo_names = openpi_dataset_reader.get_demo_names()
-        demo_data = openpi_dataset_reader.get_demo_data(demo_names[0])
-
-        kps_dataset_path = os.path.join(dataset_path, basic_dataset, "proprio_stats", "proprio_stats_kps.hdf5")
-        kps_dataset = KPSDataSet(kps_dataset_path)
-        kps_dataset.create(demo_data)
+        try:
+            openpi_dataset_path = os.path.join(dataset_path, basic_dataset, "proprio_stats", "proprio_stats.hdf5")
+            openpi_dataset_reader = DatasetReader(openpi_dataset_path)
+            demo_names = openpi_dataset_reader.get_demo_names()
+            demo_data = openpi_dataset_reader.get_demo_data(demo_names[0])
+            kps_dataset_path = os.path.join(dataset_path, basic_dataset, "proprio_stats", "proprio_stats_kps.hdf5")
+            kps_dataset = KPSDataSet(kps_dataset_path)
+            kps_dataset.create(demo_data)
+        except Exception:
+            exception_count += 1
+    print(f"exception count: {exception_count}")

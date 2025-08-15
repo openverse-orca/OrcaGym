@@ -85,7 +85,9 @@ class BasicUnitChecker:
             frame_counts_list[mp4_depth_filepath] = frame_counts
 
         with h5py.File(os.path.join(self.basic_unit_path, "proprio_stats", self.proprio_stats), 'r' ) as f:
-            demo_group = f['data']['demo_00000']
+            demo_group = f['data'].get('demo_00000', None)
+            if demo_group is None:
+                return ErrorType.ProprioStatsError
             camera_frames = demo_group['camera_frames']
             last_frames = camera_frames[-1]
 
@@ -111,10 +113,12 @@ class BasicUnitChecker:
            return ErrorType.MP4DurationError, frame_count
         fps = frame_count / duration
         if 29 < float(fps) < 30:
+            self.duration = duration
+            return ErrorType.Qualified, frame_count
+        else:
             return ErrorType.MP4FPSError, frame_count
 
-        self.duration = duration
-        return ErrorType.Qualified, frame_count
+
 
     def parameters_checker(self) -> bool:
         for camera_name in self.camera_name_list:
@@ -279,7 +283,7 @@ class KPSDataExport:
         now = time.time()
         filter_json_path = os.path.join(self.dataset_path, self.json_file)
         filter_json_list = self._generate_output_json_list_(qualified_path)
-        self._filter_data(unqualified_path)
+        # self._filter_data(unqualified_path)
         with open(filter_json_path, 'w', encoding='utf-8') as f:
             json.dump(filter_json_list, f, ensure_ascii=False, indent=4)
         end = time.time()

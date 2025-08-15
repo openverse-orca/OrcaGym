@@ -85,7 +85,9 @@ class BasicUnitChecker:
             frame_counts_list[mp4_depth_filepath] = frame_counts
 
         with h5py.File(os.path.join(self.basic_unit_path, "proprio_stats", self.proprio_stats), 'r' ) as f:
-            demo_group = f['data']['demo_00000']
+            demo_group = f['data'].get('demo_00000', None)
+            if demo_group is None:
+                return ErrorType.ProprioStatsError
             camera_frames = demo_group['camera_frames']
             last_frames = camera_frames[-1]
 
@@ -111,10 +113,10 @@ class BasicUnitChecker:
            return ErrorType.MP4DurationError, frame_count
         fps = frame_count / duration
         if 29 < float(fps) < 30:
+            self.duration = duration
+            return ErrorType.Qualified, frame_count
+        else:
             return ErrorType.MP4FPSError, frame_count
-
-        self.duration = duration
-        return ErrorType.Qualified, frame_count
 
     def parameters_checker(self) -> bool:
         for camera_name in self.camera_name_list:
