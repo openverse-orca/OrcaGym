@@ -84,7 +84,12 @@ class ONNXInferenceService(inference_pb2_grpc.InferenceServiceServicer):
                 
                 # 加载ONNX模型
                 logger.info(f"Loading ONNX model: {model_path}")
-                session = ort.InferenceSession(model_path)
+                # 显式指定GPU优先
+                providers = [
+                    'CUDAExecutionProvider',  # 优先尝试GPU
+                    'CPUExecutionProvider'    # GPU不可用时回退到CPU
+                ]
+                session = ort.InferenceSession(model_path, providers=providers)
                 
                 # 获取模型输入输出信息
                 input_names = [input.name for input in session.get_inputs()]

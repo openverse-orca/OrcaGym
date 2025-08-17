@@ -56,7 +56,7 @@ def process_scene(
     # 空场景生成高度图
     height_map_file = generate_height_map_file(
         orcagym_addresses=orcagym_addresses,
-        model_dir=model_dir,
+        height_map_dir=model_dir,
     )
 
     # 放置机器人

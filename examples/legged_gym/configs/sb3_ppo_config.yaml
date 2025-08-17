@@ -3,7 +3,7 @@ orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
 training_episode: 100
-task: "stand_still"
+task: "follow_command"
 
 training:
   subenv_num: 64

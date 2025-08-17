@@ -243,7 +243,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._last_leg_joint_qpos[:] = self._leg_joint_qpos
 
 
-        self._body_lin_vel, self._body_ang_vel, self._body_orientation, self._body_pos = self._get_body_local(qpos_buffer, qvel_buffer)
+        self._body_lin_vel, self._body_lin_acc, self._body_ang_vel, self._body_orientation, self._body_pos = self._get_body_local(qpos_buffer, qvel_buffer, qacc_buffer)
 
         self._body_height, orientation_quat = self._get_body_height_orientation(qpos_buffer, height_map)
         self._target_orientation = rotations.quat2euler(orientation_quat)
@@ -266,7 +266,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # sin_phase, cos_phase = self._compute_leg_period()
         obs = np.concatenate(
                 [
-                    self._body_lin_vel,
+                    # self._body_lin_vel,       # Lite3 的 IMU 没有线速度计，改用加速度，缩放和噪声维持
+                    self._body_lin_acc,         # 重力补偿后的纯加速度
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
@@ -1139,7 +1140,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         if self._reward_printer is not None:
             self._reward_printer.print_reward(message, reward, coeff)
 
-    def _get_body_local(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _get_body_local(self, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Robots have a local coordinate system that is defined by the orientation of the base.
         Observations and rewards are given in the local coordinate system. 
@@ -1148,17 +1149,21 @@ class LeggedRobot(OrcaGymAsyncAgent):
         body_joint_qpos = qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
         body_qvel_index = self._qvel_index[self._base_joint_name]
         body_joint_qvel = qvel_buffer[body_qvel_index["offset"] : body_qvel_index["offset"] + body_qvel_index["len"]]
-
+        body_qacc_index = self._qacc_index[self._base_joint_name]
+        body_joint_qacc = qacc_buffer[body_qacc_index["offset"] : body_qacc_index["offset"] + body_qacc_index["len"]]
+        
         body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
         body_lin_vel_vec_global = body_joint_qvel[:3].copy()    # 全局坐标系下的线速度
+        body_lin_acc_vec_global = body_joint_qacc[:3].copy()    # 全局坐标系下的线加速度
+        body_lin_acc_vec_global = body_lin_acc_vec_global - np.array([0, 0, 9.81]) # 减去重力加速度
         body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度四元数
         # print("body_ang_vel_quat_global: ", body_ang_vel_vec_global, "body_joint_qvel: ", body_joint_qvel)
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
-        body_lin_vel, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_ang_vel_vec_global)
+        body_lin_vel, body_lin_acc, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_lin_acc_vec_global, body_ang_vel_vec_global)
         body_orientation = rotations.quat2euler(body_orientation_quat)
         body_orientation[2] = 0
 
-        return body_lin_vel, body_ang_vel, body_orientation, body_joint_qpos
+        return body_lin_vel, body_lin_acc, body_ang_vel, body_orientation, body_joint_qpos
     
     def _get_obs_scale_vec(self):
         """ Sets a vector used to scale the observations.

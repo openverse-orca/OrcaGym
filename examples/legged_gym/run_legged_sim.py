@@ -152,7 +152,12 @@ def load_onnx_model(model_file: dict):
     import onnxruntime as ort
     models = {}
     for key, value in model_file.items():
-        models[key] = ort.InferenceSession(value)
+        # 显式指定GPU优先
+        providers = [
+            'CUDAExecutionProvider',  # 优先尝试GPU
+            'CPUExecutionProvider'    # GPU不可用时回退到CPU
+        ]
+        models[key] = ort.InferenceSession(value, providers=providers)
     return models
 
 

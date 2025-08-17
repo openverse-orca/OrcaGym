@@ -17,7 +17,7 @@ def local2global(q_global_to_local, v_local, v_omega_local) -> tuple[np.ndarray,
 
     return v_global, q_omega_global
 
-def global2local(q_global_to_local, v_global, v_omega_global) -> tuple[np.ndarray, np.ndarray]:
+def global2local(q_global_to_local, v_global, v_acc_global, v_omega_global) -> tuple[np.ndarray, np.ndarray]:
     # Vl = Q*VgQ
 
     # 将速度向量从全局坐标系转换到局部坐标系
@@ -25,13 +25,18 @@ def global2local(q_global_to_local, v_global, v_omega_global) -> tuple[np.ndarra
     q_v_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_v_global, q_global_to_local))
     v_local = np.array(q_v_local[1:])  # 提取虚部作为局部坐标系下的线速度
 
+    # 将加速度向量从全局坐标系转换到局部坐标系
+    q_acc_global = np.array([0, v_acc_global[0], v_acc_global[1], v_acc_global[2]])  # 加速度向量表示为四元数
+    q_acc_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_acc_global, q_global_to_local))
+    v_acc_local = np.array(q_acc_local[1:])  # 提取虚部作为局部坐标系下的线加速度
+
     # 将角速度从全局坐标系转换到局部坐标系
     # print("q_omega_global: ", v_omega_global, "q_global_to_local: ", q_global_to_local)
     q_omega_global = np.array([0, v_omega_global[0], v_omega_global[1], v_omega_global[2]])  # 角速度向量表示为四元数
     q_omega_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_omega_global, q_global_to_local))
     v_omega_local = np.array(q_omega_local[1:])  # 提取虚部作为局部坐标系下的角速度
 
-    return v_local, v_omega_local
+    return v_local, v_acc_local, v_omega_local
 
 def quat_angular_velocity(q1, q2, dt):
     # q1 = q1 / np.linalg.norm(q1)

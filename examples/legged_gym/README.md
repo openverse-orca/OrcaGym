@@ -4,10 +4,16 @@
 
 ## 导出ONNX模型
 
-1. 需要安装onnx包
+1. 安装依赖
+- 安装onnx包
 ```bash
-pip install onnx onnxruntime
+pip install onnx onnxruntime-gpu
 ```
+- 安装cudnn（如果还没有装过的话）
+```bash
+conda install -y -c conda-forge cudnn=9.*
+```
+
 
 2. 导出ONNX模型
 ```bash

@@ -1,7 +1,7 @@
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
-model_type: "grpc"
+model_type: "sb3"
 
 model_file: 
   "sb3":
