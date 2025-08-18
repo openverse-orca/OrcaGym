@@ -1,8 +1,13 @@
 {
-  "device_id": "JZ-003",
+  "device_id": "",
   "server_url": "http://192.168.110.23:8000",
+  "nodata_timeout": 300,
+  "auto_restart": true,
+  "server_ws_url": "ws://192.168.110.23:8000/ws",
+  "start_processscripts":  "parallelism_config.py",
+  "start_processsparam":  "runconfig.yaml",
   "monitor_directory": "/home/orcash/OrcaGym/OrcaGym/examples/openpi/augmented_datasets_tmp/yaodian00802_sh_f05_2_shijue",
-  "report_interval": 100,
+  "report_interval": 30,
   "heartbeat_interval": 60,
   "file_extensions": [".txt", ".csv", ".json", ".xml", ".log", ".dat", ".bin"]
 }

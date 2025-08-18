@@ -64,10 +64,12 @@ nano client_config.json
 
 ```bash
 # 前台启动（调试用）
-./start.sh
+#./start.sh
+在openpi 目录下 执行
+python ./device_client/client.py --configfile ./device_client/client_config.json
 
 # 后台启动
-nohup ./start.sh > client.log 2>&1 &
+nohup ./start.sh > client.log 2>&1 &s
 
 # 使用systemd管理（推荐）
 sudo cp data-collector-client.service /etc/systemd/system/

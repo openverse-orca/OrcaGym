@@ -19,22 +19,78 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 
+import psutil # 导入 psutil 库  
+
+import argparse
+import subprocess
+import threading
+import time
+import sys
+
+import logging
+import requests
+import websocket
+import yaml
+
 class DeviceClient:
     """
     采集设备客户端主类
     """
     
     def __init__(self, config_file: str = "client_config.json"):
+        # 获取当前脚本的目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # 获取上层目录
+        parent_dir = os.path.dirname(current_dir)
+
+        print("parent_dir:",parent_dir)
+
+
+
+
+
         self.config = self._load_config(config_file)
         self.device_id = self.config.get('device_id')
-        self.server_url = self.config.get('server_url', 'http://192.168.110.37:8000')
+        self.server_url = self.config.get('server_url', 'http://localhost:8000')
+        self.server_ws_url = self.config.get('server_ws_url', 'ws://localhost:8000/ws')
         self.monitor_directory = self.config.get('monitor_directory', '/data')
         self.report_interval = self.config.get('report_interval', 30)
         self.heartbeat_interval = self.config.get('heartbeat_interval', 60)
-        
+        self.nodata_timeout = self.config.get('nodata_timeout', 300)
+        self.auto_restart = self.config.get('auto_restart', False)
+        self.start_processscripts = self.config.get('start_processscripts', "parallelism_config_test.py")
+        self.start_processsparam = self.config.get('start_processsparam', "runconfig.yaml")
+
+        if not self.device_id or self.device_id.strip() == "":
+            print("Device ID is not set.")
+            sys.exit(1)
+        config_file_path = os.path.join(parent_dir, self.start_processsparam)
+        scanpath = None
+        with open(config_file_path, 'r', encoding='utf-8') as file:
+            config = yaml.safe_load(file)
+            
+            # 检查 'basic' 键是否存在，以及 'levelorca' 键是否存在于 'basic' 下
+            if 'basic' in config and 'levelorca' in config['basic']:
+                scanpath =  config['basic']['levelorca']
+            else:
+                print(f"键 'basic' 或 'levelorca' 在文件中不存在。")
+
+        if scanpath:
+            print("scanpath :",scanpath)
+            self.monitor_directory = os.path.join(parent_dir, "augmented_datasets_tmp", scanpath)
+            print("self.monitor_directory :",self.monitor_directory)
+
         self.running = False
         self.last_subdir_count = 0
         self.last_scan_time = datetime.now()
+
+        self.last_have_data= datetime.now()
+
+        self.is_starttingdevice = False
+
+        print("self.device_id:",  self.device_id)
+
+        self.scripmonitor = None
         
         print(f"📱 设备客户端初始化完成")
         print(f"🆔 设备ID: {self.device_id}")
@@ -57,7 +113,7 @@ class DeviceClient:
         """创建默认配置文件"""
         default_config = {
             "device_id": f"device-{socket.gethostname()}",
-            "server_url": "http://192.168.110.37:8000",
+            "server_url": "http://localhost:8000",
             "monitor_directory": "/data",
             "report_interval": 30,
             "heartbeat_interval": 60,
@@ -79,8 +135,8 @@ class DeviceClient:
         
         # 注册设备
         if not self._register_device():
-            print("❌ 设备注册失败，退出程序")
-            return
+           print("❌ 设备注册失败，退出程序")
+           return
         
         self.running = True
         
@@ -95,20 +151,83 @@ class DeviceClient:
         # 启动心跳线程
         heartbeat_thread = threading.Thread(target=self._start_heartbeat, daemon=True)
         heartbeat_thread.start()
+
+        self.connect_websocket()
+
+
+
+        self.DoStartProcess()
+
         
         print("✅ 设备客户端启动成功")
         print("⏹️  按 Ctrl+C 停止客户端")
         
         try:
             while self.running:
+                # 保持主线程运行，等待停止信号
+                if self.auto_restart:
+                    if self._check_devicestatus() == "error"  and self.is_starttingdevice == False:
+                        print("❌ 设备状态异常，准备重启")
+                        self.is_starttingdevice = True
+                        self.DoStopSubProcess()
+                        time.sleep(15)
+                        self.DoStartProcess()
+                        time.sleep(30)
+                        self.last_have_data = datetime.now()
+                        #self.last_scan_time = datetime.now()
+                        self.is_starttingdevice = False
+
                 time.sleep(1)
         except KeyboardInterrupt:
             print("\\n🛑 收到停止信号，正在关闭客户端...")
+           
             self.stop()
-    
+
+    def DoStopSubProcess(self):
+         if self.scripmonitor is not None:
+            pid = self.scripmonitor.pid
+
+            # 将父进程也添加到要终止的列表中（如果它还在运行） 
+            try: 
+                parent_process = psutil.Process(self.scripmonitor.pid)
+                children_processes = parent_process.children(recursive=False) 
+                processes_to_terminate = [parent_process] + children_processes  
+
+                for proc in processes_to_terminate:  
+                    print(f"  Attempting to terminate PID {proc.pid} (Name: {proc.name()})...")  
+                    try:  
+                        proc.terminate() # 先尝试温柔地终止  
+                    except psutil.NoSuchProcess:  
+                        print(f"  Warning: PID {proc.pid} already gone during terminate attempt.")  
+                        pass # Process might have already terminated  
+                
+
+                gone, alive = psutil.wait_procs(processes_to_terminate, timeout=10)  
+
+                for p in alive:  
+                    # 如果超时后仍然存活，则强制杀死  
+                    print(f"  PID {p.pid} did not terminate gracefully, killing...")  
+                    try:  
+                        p.kill() # 强制杀死  
+                    except psutil.NoSuchProcess:  
+                        print(f"  Warning: PID {p.pid} already gone during kill attempt.")  
+                        pass  
+            
+            except psutil.NoSuchProcess:  
+                print(f"Process with PID {pid} not found, likely already terminated.")  
+            except Exception as e:  
+                print(f"Error terminating process tree for PID {pid}: {e}") 
+        
+
+    def DoStartProcess(self):
+        self.scripmonitor = subprocess.Popen(["python", self.start_processscripts, 
+                                              "--config", self.start_processsparam
+                                              ],  stdout=sys.stdout, stderr=sys.stderr, text=True)
+
     def stop(self):
         """停止客户端"""
         self.running = False
+        self.DoStopSubProcess()
         print("✅ 设备客户端已停止")
     
     def _register_device(self) -> bool:
@@ -121,6 +240,7 @@ class DeviceClient:
                 "monitor_directory": self.monitor_directory
             }
             
+            print("client_info:",client_info)
             response = requests.post(
                 f"{self.server_url}/api/collection/devices/{self.device_id}/register",
                 json=client_info,
@@ -221,6 +341,26 @@ class DeviceClient:
     
 
 
+    def _get_start_time(self):
+        try:
+            with open("file_stats.json", 'r') as f:
+                data = json.load(f)
+                #获取上次运行结束时间，比较上次运行结束时间日期和当前时间日期，如果相同，则返回上次运行结束时间，否则将日期设置为当天的AM 08:00
+                current_time = datetime.now()
+                datetime_obj = datetime.strptime(data['last_end'], "%Y-%m-%d %H:%M:%S")
+                return datetime_obj
+                #获取上次运行结束时间
+                #return datetime.strptime(data['last_end'], "%Y-%m-%d %H:%M:%S")
+        except (FileNotFoundError, KeyError, json.JSONDecodeError):
+                return None
+        
+    def _save_last_run(self,end_time):
+        data = {'last_end': end_time.strftime("%Y-%m-%d %H:%M:%S")}
+        with open("file_stats.json", 'w') as f:
+            json.dump(data, f)
+
+
+
     def _scan_directory(self) -> Dict:
         """扫描监控目录下的第一层子目录"""
         try:
@@ -235,17 +375,36 @@ class DeviceClient:
             # 获取第一层子目录
             subdirs = [d for d in os.listdir(self.monitor_directory) if os.path.isdir(os.path.join(self.monitor_directory, d))]
             subdir_count = len(subdirs)
-            
+
+            start_time = self._get_start_time()
+            addnum = 0
+
+            for subdir in subdirs:
+                #print("Found subdirectory:", subdir)
+                createtime = os.path.getctime(os.path.join(self.monitor_directory, subdir))
+                #print("Creation time:", datetime.fromtimestamp(createtime))
+                if start_time and createtime < start_time.timestamp():
+                   # print("Skipping subdirectory:", subdir)
+                    continue
+                  
+                addnum += 1
+                #print("Adding subdirectory:", subdir)
+
             # 计算生产效率（子目录/小时）
             current_time = datetime.now()
             time_diff = (current_time - self.last_scan_time).total_seconds() / 3600
-            new_subdirs = subdir_count - self.last_subdir_count
+            new_subdirs = addnum  #subdir_count - self.last_subdir_count
             production_rate = new_subdirs / time_diff if time_diff > 0 else 0
             
             # 更新记录
             self.last_subdir_count = subdir_count
             self.last_scan_time = current_time
+            if(new_subdirs > 0):
+                self.last_have_data = current_time
+            print("new_subdirs.................",new_subdirs)
             
+            self._save_last_run(current_time)
+
             return {
                 'subdir_count': new_subdirs,  # 新增子目录数
                 'total_subdirs': subdir_count,  # 总子目录数
@@ -299,12 +458,23 @@ class DeviceClient:
         except Exception as e:
             print(f"❌ 数据上报异常  2222222222222222: {str(e)}")
     
+    def _check_devicestatus(self):
+        """检查设备状态"""
+
+        diff_have_data = datetime.now() - self.last_have_data
+
+        if diff_have_data.total_seconds() > self.nodata_timeout:
+            print("❌ 设备长时间没有数据，检查设备状态")
+            return "error"
+        else:
+            return "online"
+
     def _send_heartbeat(self):
         """发送心跳到服务器"""
         try:
             heartbeat_data = {
                 "device_id": self.device_id,
-                "status": "online",
+                "status": self._check_devicestatus(),
                 "timestamp": datetime.now().isoformat(),
                 "system_info": {
                     "hostname": socket.gethostname(),
@@ -378,6 +548,110 @@ class DeviceClient:
                 print(f"❌ 心跳发送异常: {e}")
                 time.sleep(self.heartbeat_interval)
 
+    def connect_websocket(self):
+        """连接WebSocket"""
+        try:
+            print(f"连接WebSocket: {self.server_ws_url}")
+            self.ws = websocket.WebSocketApp(
+                self.server_ws_url,
+                on_open=self._on_websocket_open,
+                on_message=self._on_websocket_message,
+                on_error=self._on_websocket_error,
+                on_close=self._on_websocket_close
+            )
+            
+            # 在后台线程中运行WebSocket
+            ws_thread = threading.Thread(target=self.ws.run_forever, daemon=True)
+            ws_thread.start()
+            
+        except Exception as e:
+            print(f"WebSocket连接失败: {str(e)}")
+    
+    def _on_websocket_open(self, ws):
+        """WebSocket连接打开"""
+        self.connected = True
+        self.retry_count = 0
+        print("WebSocket连接成功")
+        
+        # 发送设备身份认证
+        auth_message = {
+            "type": "auth",
+            "device_id":   self.device_id,
+            "device_name":   self.device_id,#settings.DEVICE_NAME,
+            "timestamp": datetime.now().isoformat()
+        }
+        ws.send(json.dumps(auth_message))
+    
+    def _on_websocket_message(self, ws, message):
+        """接收WebSocket消息"""
+        try:
+            data = json.loads(message)
+            print(f"收到服务器消息: {data}")
+            
+            # 处理服务器指令
+            if data.get("type") == "command":
+                self._handle_server_command(data)
+            elif data.get("type") == "config_update":
+                self._handle_config_update(data)
+                
+        except Exception as e:
+            print(f"处理WebSocket消息失败: {str(e)}")
+
+    def _on_websocket_error(self, ws, error):
+        """WebSocket错误"""
+        print(f"WebSocket错误: {error}")
+        self.connected = False
+    
+    def _on_websocket_close(self, ws, close_status_code, close_msg):
+        """WebSocket连接关闭"""
+        self.connected = False
+        print("WebSocket连接关闭，尝试重连...")
+        
+        # 重连逻辑
+        if self.retry_count < 3:
+            self.retry_count += 1
+            time.sleep(10)
+            self.connect_websocket()
+    
+    def _handle_server_command(self, command_data: Dict):
+        """处理服务器指令"""
+        command = command_data.get("command")
+        
+        if command == "restart_collection":
+            print("收到重启采集指令")
+            self.DoStopSubProcess()
+            time.sleep(15)
+            self.DoStartProcess()
+
+            # if self.data_callback:
+            #     self.data_callback("restart")
+        elif command == "update_config":
+            print("收到配置更新指令")
+            # 处理配置更新逻辑
+        else:
+            print(f"未知服务器指令: {command}")
+
+    def _handle_config_update(self, config_data: Dict):
+        """处理配置更新"""
+        print("处理配置更新")
+        # 实现配置更新逻辑
+    
+    def send_websocket_message(self, message_data: Dict):
+        """发送WebSocket消息"""
+        if self.ws and self.connected:
+            try:
+                self.ws.send(json.dumps(message_data))
+                return True
+            except Exception as e:
+                print(f"发送WebSocket消息失败: {str(e)}")
+                return False
+        return False
+    
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return self.connected and self.registered
+    
+
 class FileChangeHandler(FileSystemEventHandler):
     """文件变化处理器"""
     
@@ -403,6 +677,8 @@ class FileChangeHandler(FileSystemEventHandler):
             self.last_report = current_time
             threading.Thread(target=self.client._report_production_data, daemon=True).start()
 
+    
+
 def main():
     """主函数"""
     print("🚀 数据采集设备客户端启动")
@@ -411,8 +687,8 @@ def main():
     # 解析命令行参数
   #  config_file = sys.argv[1] if len(sys.argv) > 1 else "client_config.json"
 
-    parser.add_argument('--monitorpath', type=str, 
-                                help='Configuration file path (YAML or JSON)')
+   # parser.add_argument('--monitorpath', type=str, 
+    #                            help='Configuration file path (YAML or JSON)')
     parser.add_argument('--configfile', type=str, 
                                 help='Configuration file path (YAML or JSON)')
     
@@ -423,8 +699,18 @@ def main():
     # 创建并启动客户端
     client = DeviceClient(args.configfile)
 
-    client.monitor_directory = args.monitorpath
+  #  client.monitor_directory = args.monitorpath
     client.start()
+
+
+        # 3. 连接WebSocket
+ 
+   # client.data_callback = self._handle_server_callback
+
+
+
+    #augmented_path = f"{current_file_path}/augmented_datasets_tmp/{args.levelorca}"
+   # print("augmented_path:",augmented_path)
 
 if __name__ == "__main__":
     main()
