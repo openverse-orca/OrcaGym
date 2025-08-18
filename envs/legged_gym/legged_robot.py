@@ -659,28 +659,17 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return reward
     
     def _compute_feet_air_time(self, coeff) -> SupportsFloat:
-        # if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
-        #     return 0.0
+        if np.linalg.norm(self._command_values) == 0.0:
+            return 0.0
         
-        reward = 0.0
         # Penalty if the feet touch the ground too fast.
         # If air time is longer than the ideal air time, reward is still 0. 
         # The agent need to put it's feet on the ground to get the reward. 
         # So the agent will learn to keep the feet in the air for the ideal air time, go get the maximum reward in one episode.
-        
+        reward = 0.0
         for i in range(len(self._foot_touch_air_time)):
             if self._foot_touch_air_time[i] > 0:
                 reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0) * coeff * self.dt
-
-
-        # print("feet air time: ", self._foot_touch_air_time)
-        # for i in range(len(self._foot_touch_air_time)):
-        #     if self._foot_in_air_time[i] > self._foot_touch_air_time_ideal:
-        #         reward -= (self._foot_in_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
-        #     if self._foot_touch_air_time[i] > 0:
-        #         # reward += min((self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal), 0)  * coeff * self.dt
-        #         reward += (self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal) * coeff * self.dt
-        #         # reward += -(self._foot_touch_air_time[i] - self._foot_touch_air_time_ideal)**2  * coeff * self.dt
 
         self._print_reward("Feet air time reward: ", reward, coeff * self.dt)
         return reward
