@@ -11,7 +11,7 @@ import copy
 import sys
 import numpy as np
 
-from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np
+from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np, quat_to_euler
 
 from .legged_config import LeggedRobotConfig, LeggedObsConfig
 from orca_gym.utils.joint_controller import pd_control
@@ -1146,12 +1146,17 @@ class LeggedRobot(OrcaGymAsyncAgent):
         body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
         body_lin_vel_vec_global = body_joint_qvel[:3].copy()    # 全局坐标系下的线速度
         body_lin_acc_vec_global = body_joint_qacc[:3].copy()    # 全局坐标系下的线加速度
-        body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度四元数
+        body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度
         # print("body_ang_vel_quat_global: ", body_ang_vel_vec_global, "body_joint_qvel: ", body_joint_qvel)
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
         body_lin_vel, body_lin_acc, body_ang_vel = global2local(body_orientation_quat, body_lin_vel_vec_global, body_lin_acc_vec_global, body_ang_vel_vec_global)
-        body_orientation = rotations.quat2euler(body_orientation_quat)
+        body_yaw, body_pitch, body_roll = quat_to_euler(body_orientation_quat)
+
+        # NOTE: 这里取与qvel的正负方向一致：身体向左倾斜，roll为负；抬头，pitch为负，向左转，yaw为正
+        body_orientation = np.array([body_roll, -body_pitch, body_yaw])
         body_orientation[2] = 0
+        # body_orientation = rotations.quat2euler(body_orientation_quat)
+        # body_orientation[2] = 0
 
         return body_lin_vel, body_lin_acc, body_ang_vel, body_orientation, body_joint_qpos
     

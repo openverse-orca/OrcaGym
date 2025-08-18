@@ -32,11 +32,11 @@ def global2local(q_global_to_local, v_global, v_acc_global, v_omega_global) -> t
 
     # 将角速度从全局坐标系转换到局部坐标系
     # print("q_omega_global: ", v_omega_global, "q_global_to_local: ", q_global_to_local)
-    q_omega_global = np.array([0, v_omega_global[0], v_omega_global[1], v_omega_global[2]])  # 角速度向量表示为四元数
-    q_omega_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_omega_global, q_global_to_local))
-    v_omega_local = np.array(q_omega_local[1:])  # 提取虚部作为局部坐标系下的角速度
+    # q_omega_global = np.array([0, v_omega_global[0], v_omega_global[1], v_omega_global[2]])  # 角速度向量表示为四元数
+    # q_omega_local = rotations.quat_mul(rotations.quat_conjugate(q_global_to_local), rotations.quat_mul(q_omega_global, q_global_to_local))
+    # v_omega_local = np.array(q_omega_local[1:])  # 提取虚部作为局部坐标系下的角速度
 
-    return v_local, v_acc_local, v_omega_local
+    return v_local, v_acc_local, v_omega_global
 
 def quat_angular_velocity(q1, q2, dt):
     # q1 = q1 / np.linalg.norm(q1)
@@ -54,6 +54,31 @@ def quat_angular_velocity(q1, q2, dt):
     return angle / dt
 
 import math
+
+def quat_to_euler(quat):
+    """
+    将四元数转换为Z-Y-X顺序的欧拉角（yaw, pitch, roll）
+    输入：quat = [w, x, y, z]
+    输出：(yaw, pitch, roll) 单位为弧度
+    """
+    w, x, y, z = quat
+    
+    # 1. Yaw (Z轴旋转)
+    sin_yaw = 2.0 * (x*y + w*z)
+    cos_yaw = 1.0 - 2.0 * (y*y + z*z)
+    yaw = np.arctan2(sin_yaw, cos_yaw)
+    
+    # 2. Pitch (Y轴旋转)
+    sin_pitch = 2.0 * (x*z - w*y)
+    # 处理pitch超过±90°的情况
+    pitch = np.arcsin(np.clip(sin_pitch, -1.0, 1.0))
+    
+    # 3. Roll (X轴旋转)
+    sin_roll = 2.0 * (w*x + y*z)
+    cos_roll = 1.0 - 2.0 * (x*x + y*y)
+    roll = np.arctan2(sin_roll, cos_roll)
+    
+    return yaw, pitch, roll
 
 def smooth_sqr_wave_np(phase, phase_freq, eps):
     """
