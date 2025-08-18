@@ -300,69 +300,75 @@ def segment_obs(obs: dict[str, np.ndarray], agent_name_list: list[str]) -> dict[
 
 def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: int, control_step: int, sim_time: float):
     """
-    Log observations and actions to a CSV file.
+    Log observations and actions to CSV files in the format matching the reference files.
     
     Args:
         obs (dict): Observation dictionary containing IMU and joint data
         action (np.ndarray): Action array
-        filename (str): Path to the CSV file
+        filename (str): Base path for the CSV files (without extension)
         physics_step (int): Current physics simulation step count
         control_step (int): Current control/policy step count
         sim_time (float): Current simulation time in seconds
     """
-    # Define CSV headers
-    headers = [
-        "timestamp",
-        "sim_time",
-        "physics_step",
-        "control_step",
-        # IMU data
-        "imu_angle_roll", "imu_angle_pitch", "imu_angle_yaw",
-        "imu_angular_velocity_roll", "imu_angular_velocity_pitch", "imu_angular_velocity_yaw",
-        "imu_acc_x", "imu_acc_y", "imu_acc_z",
-        # Joint data - Front Left Leg
-        "fl_joint1_pos", "fl_joint1_vel", "fl_joint1_torque",
-        "fl_joint2_pos", "fl_joint2_vel", "fl_joint2_torque",
-        "fl_joint3_pos", "fl_joint3_vel", "fl_joint3_torque",
-        # Joint data - Front Right Leg
-        "fr_joint1_pos", "fr_joint1_vel", "fr_joint1_torque",
-        "fr_joint2_pos", "fr_joint2_vel", "fr_joint2_torque",
-        "fr_joint3_pos", "fr_joint3_vel", "fr_joint3_torque",
-        # Joint data - Hind Left Leg
-        "hl_joint1_pos", "hl_joint1_vel", "hl_joint1_torque",
-        "hl_joint2_pos", "hl_joint2_vel", "hl_joint2_torque",
-        "hl_joint3_pos", "hl_joint3_vel", "hl_joint3_torque",
-        # Joint data - Hind Right Leg
-        "hr_joint1_pos", "hr_joint1_vel", "hr_joint1_torque",
-        "hr_joint2_pos", "hr_joint2_vel", "hr_joint2_torque",
-        "hr_joint3_pos", "hr_joint3_vel", "hr_joint3_torque",
-        # Contact forces
-        "fl_force_x", "fl_force_y", "fl_force_z",
-        "fr_force_x", "fr_force_y", "fr_force_z",
-        "hl_force_x", "hl_force_y", "hl_force_z",
-        "hr_force_x", "hr_force_y", "hr_force_z",
-        # Actions
-        "fl_hip_action", "fl_thigh_action", "fl_calf_action",
-        "fr_hip_action", "fr_thigh_action", "fr_calf_action",
-        "hl_hip_action", "hl_thigh_action", "hl_calf_action",
-        "hr_hip_action", "hr_thigh_action", "hr_calf_action"
-    ]
+    import os
+    import csv
+    from datetime import datetime
     
-    # Create file and write headers if it doesn't exist
-    file_exists = os.path.exists(filename)
+    # Create base directory if it doesn't exist
+    base_dir = os.path.dirname(filename)
+    if base_dir and not os.path.exists(base_dir):
+        os.makedirs(base_dir)
     
-    with open(filename, 'a', newline='') as f:
+    # Generate timestamp for this step (using physics_step as timestamp)
+    timestamp = physics_step
+    
+    # Extract base filename without extension
+    base_filename = os.path.splitext(filename)[0]
+    
+    # 1. Log observation data
+    obs_filename = f"{base_filename}_observation.csv"
+    obs_file_exists = os.path.exists(obs_filename)
+    
+    with open(obs_filename, 'a', newline='') as f:
         writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(headers)
+        if not obs_file_exists:
+            # Write header: timestamp, obs_0, obs_1, ..., obs_64
+            obs_headers = ["timestamp"] + [f"obs_{i}" for i in range(65)]
+            writer.writerow(obs_headers)
         
-        # Prepare data row
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        # Write observation data
+        obs_data = [timestamp] + list(obs["observation"])
+        writer.writerow(obs_data)
+    
+    # 2. Log action data (processed actions)
+    action_filename = f"{base_filename}_action.csv"
+    action_file_exists = os.path.exists(action_filename)
+    
+    with open(action_filename, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not action_file_exists:
+            # Write header: timestamp, action_0, action_1, ..., action_11
+            action_headers = ["timestamp"] + [f"action_{i}" for i in range(12)]
+            writer.writerow(action_headers)
         
-        # Combine all data
-        row = [current_time, sim_time, physics_step, control_step] + list(obs["observation"]) + list(action)
+        # Write action data
+        action_data = [timestamp] + list(action)
+        writer.writerow(action_data)
+    
+    # 3. Log raw action data (same as action for now, but could be different if needed)
+    raw_action_filename = f"{base_filename}_raw_action.csv"
+    raw_action_file_exists = os.path.exists(raw_action_filename)
+    
+    with open(raw_action_filename, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not raw_action_file_exists:
+            # Write header: timestamp, raw_action_0, raw_action_1, ..., raw_action_11
+            raw_action_headers = ["timestamp"] + [f"raw_action_{i}" for i in range(12)]
+            writer.writerow(raw_action_headers)
         
-        writer.writerow(row)
+        # Write raw action data (currently same as processed action)
+        raw_action_data = [timestamp] + list(action)
+        writer.writerow(raw_action_data)
 
 def run_simulation(env: gym.Env, 
                  agent_name_list: list[str],
@@ -377,7 +383,9 @@ def run_simulation(env: gym.Env,
     dt = time_step * frame_skip * action_skip
     if not os.path.exists("./log"):
         os.makedirs("./log")
-    log_file = f"./log/simulation_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    # Generate base filename for robot data files
+    timestamp_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    log_file = f"./log/robot_data_{timestamp_str}"
     
     # Add step counting
     physics_step = 0

@@ -1146,7 +1146,6 @@ class LeggedRobot(OrcaGymAsyncAgent):
         body_orientation_quat = body_joint_qpos[3:7].copy()    # 全局坐标转局部坐标的旋转四元数
         body_lin_vel_vec_global = body_joint_qvel[:3].copy()    # 全局坐标系下的线速度
         body_lin_acc_vec_global = body_joint_qacc[:3].copy()    # 全局坐标系下的线加速度
-        body_lin_acc_vec_global = body_lin_acc_vec_global - np.array([0, 0, 9.81]) # 减去重力加速度
         body_ang_vel_vec_global = body_joint_qvel[3:6].copy()  # 全局坐标系下的角速度四元数
         # print("body_ang_vel_quat_global: ", body_ang_vel_vec_global, "body_joint_qvel: ", body_joint_qvel)
         # 获取局部坐标系下的线速度和角速度，用向量表示，角速度为 x,y,z 轴分量
