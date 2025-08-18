@@ -71,12 +71,12 @@ class KeyboardControl:
         if key_status["E"] == 1:
             lin_vel[1] = self.player_agent_lin_vel_y[0]
         if key_status["A"] == 1:
-            if lin_vel[0] > 0:
+            if lin_vel[0] >= 0:
                 ang_vel = self.player_agent_turn_angel
             elif lin_vel[0] < 0:
                 ang_vel = -self.player_agent_turn_angel
         if key_status["D"] == 1:
-            if lin_vel[0] > 0:
+            if lin_vel[0] >= 0:
                 ang_vel = -self.player_agent_turn_angel
             elif lin_vel[0] < 0:
                 ang_vel = self.player_agent_turn_angel

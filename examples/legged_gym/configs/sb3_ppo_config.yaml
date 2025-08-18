@@ -17,9 +17,9 @@ training:
       - name: "basic_moving"
         milestone: 100
       - name: "flat_terrain"
-        milestone: 500
+        milestone: 700
       - name: "rough_terrain"
-        milestone: 1200
+        milestone: 1500
     stand_still:
       - name: "stand_still"
         milestone: 500

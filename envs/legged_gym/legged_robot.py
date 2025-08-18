@@ -64,6 +64,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._actuator_type = robot_config["actuator_type"]
         self._action_scale = np.array(robot_config["action_scale"]).flatten()
         self._soft_joint_qpos_limit = robot_config["soft_joint_qpos_limit"]
+        self._soft_joint_qvel_limit = robot_config["soft_joint_qvel_limit"]
+        self._soft_torque_limit = robot_config["soft_torque_limit"]
+
+        self._joint_qvel_range = robot_config["joint_qvel_range"]
 
         self._kps = np.array(robot_config["kps"]).flatten()
         self._kds = np.array(robot_config["kds"]).flatten()
@@ -228,11 +232,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
         self._leg_joint_qvel[:] = qvel_buffer[self._qvel_index["leg_start"] : self._qvel_index["leg_start"] + self._qvel_index["leg_length"]]
         
-        torques = pd_control(self._position_ctrl, self._leg_joint_qpos, self.kps, self.target_dq, self._leg_joint_qvel, self.kds)
-        # print("pd control torques: ", torques)
-        self._torques = np.clip(torques, self._torques_range[:, 0], self._torques_range[:, 1])
-        # print("clip torques: ", self._torques)
-        return self._torques
+        self._row_torques = pd_control(self._position_ctrl, self._leg_joint_qpos, self.kps, self.target_dq, self._leg_joint_qvel, self.kds)
+        self._cliped_torques = np.clip(self._row_torques, self._torques_range[:, 0], self._torques_range[:, 1])
+        return self._cliped_torques
 
     def get_obs(self, sensor_data : dict, qpos_buffer : np.ndarray, qvel_buffer : np.ndarray, qacc_buffer : np.ndarray, contact_dict : dict, site_pos_quat : dict, height_map : np.ndarray) -> dict:
         # self._leg_joint_qpos[:] = qpos_buffer[self._qpos_index["leg_start"] : self._qpos_index["leg_start"] + self._qpos_index["leg_length"]]
@@ -813,7 +815,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
     def _compute_reward_torques(self, coeff) -> SupportsFloat:
         # Penalize torques
-        reward = -np.sum(np.square(self._torques)) * coeff * self.dt
+        reward = -np.sum(np.square(self._row_torques)) * coeff * self.dt
         self._print_reward("Torques reward: ", reward, coeff * self.dt)
         return reward
 
@@ -825,18 +827,18 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._print_reward("Dof pos limits reward: ", reward, coeff * self.dt)
         return reward
 
-    # def _compute_reward_joint_qvel_limits(self, coeff) -> SupportsFloat:
-    #     # Penalize dof velocities too close to the limit
-    #     # clip to max error = 1 rad/s per joint to avoid huge penalties
-    #     reward = -np.sum((np.abs(self._leg_joint_qvel) - self.joint_qvel_limits*self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.)) * coeff * self.dt
-    #     self._print_reward("Dof vel limits reward: ", reward, coeff * self.dt)
-    #     return reward
+    def _compute_reward_joint_qvel_limits(self, coeff) -> SupportsFloat:
+        # Penalize dof velocities too close to the limit
+        # clip to max error = 1 rad/s per joint to avoid huge penalties
+        reward = -np.sum((np.abs(self._leg_joint_qvel) - self._joint_qvel_limit).clip(min=0., max=1.)) * coeff * self.dt
+        self._print_reward("Dof vel limits reward: ", reward, coeff * self.dt)
+        return reward
 
-    # def _compute_reward_torque_limits(self, coeff) -> SupportsFloat:
-    #     # penalize torques too close to the limit
-    #     reward = -np.sum((np.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.)) * coeff * self.dt
-    #     self._print_reward("Torque limits reward: ", reward, coeff * self.dt)
-    #     return reward
+    def _compute_reward_torque_limits(self, coeff) -> SupportsFloat:
+        # penalize torques too close to the limit
+        reward = -np.sum((np.abs(self._row_torques) - self._torques_limit).clip(min=0.)) * coeff * self.dt
+        self._print_reward("Torque limits reward: ", reward, coeff * self.dt)
+        return reward
 
 
     ## useless
@@ -1299,6 +1301,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["phase_contact"] if "phase_contact" in reward_coeff else 0},  
             {"function": self._compute_reward_joint_qpos_limits, "coeff": reward_coeff["joint_qpos_limits"] if "joint_qpos_limits" in reward_coeff else 0},
             {"function": self._compute_reward_torques, "coeff": reward_coeff["torques"] if "torques" in reward_coeff else 0},
+            {"function": self._compute_reward_joint_qvel_limits, "coeff": reward_coeff["joint_qvel_limits"] if "joint_qvel_limits" in reward_coeff else 0},
+            {"function": self._compute_reward_torque_limits, "coeff": reward_coeff["torque_limits"] if "torque_limits" in reward_coeff else 0},
         ]
         
     def _setup_curriculum_functions(self):
