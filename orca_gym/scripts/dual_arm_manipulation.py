@@ -58,10 +58,9 @@ INIT_SCENE_TEXT = {
     "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
-    # "guizi":   ("一个机器人站在阴凉柜前",  "A robot stands in front of a shady cabinet​​.")
     "pharmacy":   ("机器人站在阴凉柜前，蓝色的框子位于机器人前，1-5个可抓取药盒随机分布在阴凉柜架子上。",  "The robot stands in front of the cooler, and the blue box is located in front of the robot，and 1-5 grabbable pill boxes are randomly distributed on the cooler shelves."),
-    "housekeeping":   ("机器人站在双开门冰箱前，冰箱门状态为以下四种状态（左开、左闭、右开、右闭）之一。",  "The robot stands in front of the double-door refrigerator, and the refrigerator door state is one of the following four states (left open, left closed, right open, right closed)."),
-    "3c_fabrication": ("机器人站在操作台前，1-4个可抓取物体随机分布在蓝色箱子中，扫码枪位于机器人右手边。",  "The robot stands in front of the console, 1-4 grabbable objects are randomly distributed on the blue box, and the code scanner is located on the right side of the robot."),
+    "housekeeping":   ("机器人站在双开门冰箱前，冰箱门状态为以下四种状态（左开右闭、左闭右开、双门全闭、双门全开）之一。",  "The robot stands in front of the double-door refrigerator, and the refrigerator door state is one of the following four states (left open & right closed, left closed & right open, both doors closed, both doors open)."),
+    "3c_fabrication": ("机器人站在操作台前，1-5个可抓取物体随机分布在黄色框子中，扫码枪位于机器人右手边。",  "The robot stands in front of the console, 1-5 grabbable objects are randomly distributed on the yellow box, and the code scanner is located on the right side of the robot."),
 }
 _light_counter = 0
 
@@ -99,6 +98,11 @@ OBJ_CN = {
     "kitchen": "厨房",
     "yaodian": "药店",
     "3c_fabrication": "3c制造",
+    "battery_01": "电池",
+    "intel_box":"英特尔处理器",
+    "intelcore_i5":"英特尔i5",
+    "wifi_box":"路由器",
+    "cpu_fan":"cpu风扇",
     "fridge":"冰箱",
     "housekeeping":"家政",
     "Guizi": "柜子",
