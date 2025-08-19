@@ -1021,7 +1021,9 @@ def augment_episode(env : DualArmEnv,
                     sample_range : float, 
                     realtime : bool = False,
                     action_step : int = 1,
-                    sync_codec: bool = False) -> tuple:
+                    sync_codec: bool = False,
+                    output_video: bool = True,
+                    output_video_path: str = "") -> tuple:
     env._task.data = demo_data
     env._task.spawn_scene(env)
     env._task.sample_range = sample_range
@@ -1048,7 +1050,10 @@ def augment_episode(env : DualArmEnv,
     action_index_list = np.concatenate([action_index_list, holdon_action_index_list]).flatten()
     original_dones = np.array(demo_data['dones'], dtype=int)
     T = len(original_dones)
-    
+
+    if output_video:
+        print(f"video save path: {output_video_path}")
+        env.begin_save_video(output_video_path)
     for i in action_index_list:
         action = action_list[i]
         last_action = action_list[i - 1] if i > 0 else action
@@ -1102,10 +1107,16 @@ def augment_episode(env : DualArmEnv,
         info_list.append(info)
 
         if terminated_times >= 5 or truncated:
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success
-        
-    return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success
- 
+            if output_video:
+                env.stop_save_video()
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success, {}
+
+    if output_video:
+        time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1] + 1)
+        env.stop_save_video()
+        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, time_stamp_dict
+    else:
+        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, {}
 
 def do_augmentation(
         env : DualArmEnv, 
@@ -1156,26 +1167,21 @@ def do_augmentation(
                 language_instruction = demo_data['language_instruction']
                 level_name = env._task.level_name
                 dataset_writer.set_UUIDPATH()
-                if output_video == True:
-                    mp4_save_path = dataset_writer.get_mp4_save_path()
-                    env.begin_save_video(mp4_save_path)             
-                    print("augmentation mp4 path:",mp4_save_path)
                 obs_list, reward_list, done_list, info_list\
-                    , camera_frames, timestep_list, is_success = augment_episode(env, cameras,rgb_size,
+                    , camera_frames, timestep_list, is_success, time_stamp_dict = augment_episode(env, cameras,rgb_size,
                                                                     demo_data, noise_scale=augmented_noise, 
                                                                     sample_range=sample_range, realtime=realtime, 
-                                                                    action_step=action_step, sync_codec=sync_codec)
+                                                                    action_step=action_step, sync_codec=sync_codec,
+                                                                    output_video=output_video, output_video_path=dataset_writer.get_mp4_save_path())
                 if  is_success:
                     camera_time_stamp = {}
                     camera_name_list = []
                     if output_video == True:
-                        time_stamp_dict = env.get_camera_time_stamp(camera_frames[-1] + 1)
                         for camera_name, time_list in time_stamp_dict.items():
                             camera_time_stamp[camera_name] = [time_list[index] for index in camera_frames]
                             if camera_name.endswith("_color"):
                                 camera_name_list.append(camera_name.replace("_color", ""))
-                        env.stop_save_video()
-                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, 
+                    add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list,
                                         camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
                     uuid_path = dataset_writer.get_UUIDPath()
 
@@ -1189,8 +1195,6 @@ def do_augmentation(
                         print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                         done = True
                 else:
-                    if output_video == True:
-                        env.stop_save_video()
                     dataset_writer.remove_path()
                     print("Episode failed! Retrying...")
                     trial_count += 1
