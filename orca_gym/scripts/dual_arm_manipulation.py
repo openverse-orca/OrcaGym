@@ -550,7 +550,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     # 5) 时间戳、帧信息照旧
     start_frame = 0
     max_len     = max(len(frames) for frames in camera_frames.values()) if isinstance(camera_frames, dict) else len(camera_frames)
-    end_frame   = max_len - 1
+    end_frame   = camera_frames[-1]
     from datetime import datetime, timezone, timedelta
     CST = timezone(timedelta(hours=8))
     timestamp_cst = datetime.now(CST).isoformat()
