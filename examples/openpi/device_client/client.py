@@ -341,21 +341,23 @@ class DeviceClient:
     
 
 
+  
     def _get_start_time(self):
         try:
             with open("file_stats.json", 'r') as f:
                 data = json.load(f)
                 #获取上次运行结束时间，比较上次运行结束时间日期和当前时间日期，如果相同，则返回上次运行结束时间，否则将日期设置为当天的AM 08:00
-                current_time = datetime.now()
                 datetime_obj = datetime.strptime(data['last_end'], "%Y-%m-%d %H:%M:%S")
-                return datetime_obj
+                last_file = data['last_file']
+                return datetime_obj, last_file
                 #获取上次运行结束时间
                 #return datetime.strptime(data['last_end'], "%Y-%m-%d %H:%M:%S")
         except (FileNotFoundError, KeyError, json.JSONDecodeError):
-                return None
+                return None,None
         
-    def _save_last_run(self,end_time):
-        data = {'last_end': end_time.strftime("%Y-%m-%d %H:%M:%S")}
+    def _save_last_run(self,end_time,lastfile):
+        data = {'last_end': end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                'last_file': lastfile}
         with open("file_stats.json", 'w') as f:
             json.dump(data, f)
 
@@ -376,20 +378,31 @@ class DeviceClient:
             subdirs = [d for d in os.listdir(self.monitor_directory) if os.path.isdir(os.path.join(self.monitor_directory, d))]
             subdir_count = len(subdirs)
 
-            start_time = self._get_start_time()
+            start_time,lastfileorig = self._get_start_time()
             addnum = 0
+            lastfile = None
+            lastfiletime = None
+
+            findlastorig = False
 
             for subdir in subdirs:
                 #print("Found subdirectory:", subdir)
                 createtime = os.path.getctime(os.path.join(self.monitor_directory, subdir))
+                if (lastfiletime and createtime  > lastfiletime.timestamp()) or lastfile is None:
+                    lastfile = subdir
+                    lastfiletime = datetime.fromtimestamp(createtime)
+                if lastfileorig == subdir:
+                    findlastorig = True 
                 #print("Creation time:", datetime.fromtimestamp(createtime))
                 if start_time and createtime < start_time.timestamp():
                    # print("Skipping subdirectory:", subdir)
-                    continue
-                  
+                    continue                  
                 addnum += 1
                 #print("Adding subdirectory:", subdir)
-
+            if addnum > 0:
+                addnum -= 1
+            if findlastorig and lastfile != lastfileorig:
+                addnum += 1
             # 计算生产效率（子目录/小时）
             current_time = datetime.now()
             time_diff = (current_time - self.last_scan_time).total_seconds() / 3600
@@ -403,7 +416,7 @@ class DeviceClient:
                 self.last_have_data = current_time
             print("new_subdirs.................",new_subdirs)
             
-            self._save_last_run(current_time)
+            self._save_last_run(current_time,lastfile)
 
             return {
                 'subdir_count': new_subdirs,  # 新增子目录数
@@ -423,11 +436,12 @@ class DeviceClient:
                 'error': str(e)
             }
     
+    
     def _report_production_data(self):
         """上报产量数据到服务器"""
         try:
             scan_result = self._scan_directory()
-            print("scan_result:",scan_result)
+           # print("scan_result:",scan_result)
             
             report_data = {
                 "device_id": self.device_id,
@@ -440,7 +454,7 @@ class DeviceClient:
             }
             
 
-            print("report_data:",report_data)
+          #  print("report_data:",report_data)
             response = requests.post(
                 f"{self.server_url}/api/collection/report",
                 json=report_data,
@@ -586,8 +600,8 @@ class DeviceClient:
         """接收WebSocket消息"""
         try:
             data = json.loads(message)
-            print(f"收到服务器消息: {data}")
-            
+            # print(f"收到服务器消息: {data}")
+
             # 处理服务器指令
             if data.get("type") == "command":
                 self._handle_server_command(data)
@@ -661,21 +675,21 @@ class FileChangeHandler(FileSystemEventHandler):
     
     def on_created(self, event):
         """文件创建事件"""
-        if not event.is_directory:
-            print(f"📁 新文件: {event.src_path}")
-            self._trigger_report()
+        #if not event.is_directory:
+           # print(f"📁 新文件: {event.src_path}")
+          #  self._trigger_report()
     
     def on_modified(self, event):
         """文件修改事件"""
-        if not event.is_directory:
-            self._trigger_report()
+        #if not event.is_directory:
+        #    self._trigger_report()
     
     def _trigger_report(self):
         """触发数据上报（限制频率）"""
-        current_time = time.time()
-        if current_time - self.last_report > 10:  # 10秒内最多上报一次
-            self.last_report = current_time
-            threading.Thread(target=self.client._report_production_data, daemon=True).start()
+      #  current_time = time.time()
+       # if current_time - self.last_report > 10:  # 10秒内最多上报一次
+      #      self.last_report = current_time
+     #       threading.Thread(target=self.client._report_production_data, daemon=True).start()
 
     
 
