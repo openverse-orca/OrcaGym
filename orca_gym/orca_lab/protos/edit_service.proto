@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package SceneEdit;
+
+enum StatusCode {
+    Success = 0;
+    Error = 1;
+}
+
+message SimpleResponse {
+    StatusCode status_code = 1; // 状态码字段
+    string error_message = 2;   // 错误详情（可选）
+}
+
+message AlohaRequest {
+    int32 value = 1;
+}
+message AlohaResponse {
+    int32 value = 1;
+}
+
+enum Space {
+    Local = 0;
+    World = 1;
+}
+
+message Transform {
+    repeated double pos = 1;        // 位置 (3 elements)
+    repeated double quat = 2;       // 旋转四元数 (4 elements)
+    double scale = 3;               // 等比缩放 (1 elements)
+}
+
+message AddActorRequest {
+    string spawnable_name = 1;      // Actor 使用的 spawnable 名字
+    string actor_name = 2;          // Actor Entity 的名字
+    string parent_actor_path = 3;   // Parent Actor 的路径
+    Transform transform = 4;
+    Space space = 5;
+}
+
+message SetActorTransformRequest {
+    string actor_path = 1;
+    Transform transform = 2;
+    Space space = 3;
+}
+
+message GetPendingOperationsRequest {
+}
+message GetPendingOperationsResponse {
+    repeated string operations = 1;
+}
+
+message GetPendingActorTransformRequest {
+    string actor_path = 1;
+    Space space = 2;
+}
+message GetPendingActorTransformResponse {
+    Transform transform = 1;
+    StatusCode status_code = 2;
+}
+
+service GrpcService {
+    rpc Aloha(AlohaRequest) returns (AlohaResponse);
+    
+    rpc AddActor(AddActorRequest) returns (SimpleResponse);
+    rpc SetActorTransform(SetActorTransformRequest) returns (SimpleResponse);
+
+    rpc GetPendingOperations(GetPendingOperationsRequest) returns (GetPendingOperationsResponse);
+    rpc GetPendingActorTransform(GetPendingActorTransformRequest) returns (GetPendingActorTransformResponse);
+}
