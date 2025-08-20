@@ -195,7 +195,7 @@ def main():
                     "--adapterIndex", str(adapterIndex),
                     "--r_width", "128", "--r_height", "128",
                     "--useNvenc", "1",
-                    "--lockFps60",
+                    "--lockFps30",
                     f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         else:
@@ -204,7 +204,7 @@ def main():
                     "--forceAdapter", " NVIDIA GeForce RTX 4090",
                     "--adapterIndex", str(adapterIndex),
                     "--r_width", "128", "--r_height", "128",
-                    "--lockFps60",
+                    "--lockFps30",
                     f"--regset=\"/O3DE/Autoexec/ConsoleCommands/LoadLevel={level}\""], 
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
