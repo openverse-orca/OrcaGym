@@ -103,7 +103,7 @@ OBJ_CN = {
     "intelcore_i5":"英特尔i5",
     "wifi_box":"路由器",
     "cpu_fan":"cpu风扇",
-    "fridge":"冰箱",
+    "fridge":"冰箱", 
     "housekeeping":"家政",
     "Guizi": "柜子",
     "guizi": "柜子",
@@ -119,7 +119,7 @@ SCENE_SUBSCENE_MAPPING = {
     # "guizi": ("Cooler","Shelf_Operation")
     "pharmacy": ("pharmacy","Cooler_Operation"),
     "housekeeping": ("fridge","Fridge_Operation"),
-    "3c_fabrication": ("3c_scan","3cscan_Operation")
+    "3c_fabrication": ("3c_scan","3C_Scan_Operation")
 }
 
 with open("camera_config.yaml", "r") as f:

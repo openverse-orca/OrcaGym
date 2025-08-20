@@ -2,7 +2,7 @@
 
 level_name: "3c_fabrication"
 type: "scan"
-range: {x: [0.33, 0.62], y: [0.02, 0.60], z: -0.3, r: 0.3}
+range: {x: [0.30, 0.62], y: [0.15, 0.78], z: -0.3, r: 0.3}
 
 # body, site, joint 的顺序需要保持一致
 object_bodys: [ "battery_01", "wifi_box","intel_box","intelcore_i5", "cpu_fan"]
