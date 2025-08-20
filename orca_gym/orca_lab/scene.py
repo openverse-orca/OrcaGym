@@ -6,6 +6,8 @@ import asyncio
 import numpy as np
 
 from typing import Tuple, Dict
+from datetime import datetime
+import time
 
 
 class Actor:
@@ -156,6 +158,8 @@ class OrcaLabScene:
         if not self.aloha():
             raise Exception("Failed to connect to server.")
 
+        self.last_query_time = None
+        self.query_frequency = 30
         self.loop.create_task(self._query_pending_operation_loop())
 
         self.running = True
@@ -193,8 +197,17 @@ class OrcaLabScene:
     async def _query_pending_operation_loop(self):
         while True:
             if self.running:
+                if self.last_query_time is not None:
+                    now = time.time()
+                    delta = 1 / self.query_frequency
+                    if (now - self.last_query_time) < delta:
+                        continue
+
+                print("query")
                 request = edit_service_pb2.GetPendingOperationsRequest()
                 response = await self.stub.GetPendingOperations(request)
+
+                self.last_query_time = time.time()
 
                 operations = response.operations
                 for op in operations:
