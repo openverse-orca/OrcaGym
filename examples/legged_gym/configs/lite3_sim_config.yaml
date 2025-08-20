@@ -23,8 +23,8 @@ command_model:
   "flat_terrain":
     "forward": "flat_terrain"
     "backward": "flat_terrain"
-    "stand_still": "stand_still"
-    "trun": "stand_still"
+    "stand_still": "flat_terrain"
+    "trun": "flat_terrain"
   "rough_terrain":
     "forward": "rough_terrain"
     "backward": "rough_terrain"

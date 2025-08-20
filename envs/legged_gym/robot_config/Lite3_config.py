@@ -9,7 +9,7 @@ RewardConfig = {
         "leg_contact" : 1,               # 腿部身体接触惩罚
         "body_contact" : 1,              # 身体接触惩罚
         "foot_touch" : 0,                # 重踏惩罚
-        "joint_angles" : 0.0,            # 关节偏离自然站立角度惩罚
+        "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
         "limit" : 0.01,                 # Action极限值惩罚
         "action_rate" : 0.01,           # Action平滑
@@ -25,13 +25,13 @@ RewardConfig = {
         "feet_self_contact" : 0,        # 足底自接触惩罚
         "feet_slip" : 0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.00,    # 鼓励对角步态，避免单侧滑步
-        "fly" : 0.0,                    # 四足离地惩罚
-        "stepping" : 0.0,                 # 无指令时，踏步惩罚
+        "feet_fitted_ground" : 0.01,    # 鼓励对角步态，避免单侧滑步
+        "fly" : 0.1,                    # 四足离地惩罚
+        "stepping" : 0.1,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
-        "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
-        "torque_limits" : 1.0,          # 避免关节力矩过大
+        # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
+        # "torque_limits" : 1.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
     "stand_still": {
@@ -60,7 +60,7 @@ RewardConfig = {
         "feet_fitted_ground" : 0,    # 鼓励对角步态，避免单侧滑步
         "fly" : 0.01,                    # 四足离地惩罚0, 0
         "stepping" : 0.5,                 # 无指令时，踏步惩罚
-        "torques" : 1e-5,                # 关节力矩惩罚
+        "torques" : 5e-6,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
         "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
         "torque_limits" : 1.0,       # 避免关节力矩过大
@@ -184,10 +184,10 @@ Lite3Config = {
         "curriculum_learning" :     True,
         "curriculum_levels" : {
             "stand_still" : [
-                {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
+                # {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
                 {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
                 {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
-                {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
+                # {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
                 {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
                 {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
             ],
@@ -205,10 +205,16 @@ Lite3Config = {
             "rough_terrain" : [
                 {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
                 {"name" : "smooth_slope" ,          "offset" : [0, -30, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
                 {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
                 {"name" : "rough_slope" ,           "offset" : [30, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
                 {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
                 {"name" : "terrain_stairs_low" ,    "offset" : [-30, -30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
+                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
            ],
         },
         "curriculum_commands" : {
