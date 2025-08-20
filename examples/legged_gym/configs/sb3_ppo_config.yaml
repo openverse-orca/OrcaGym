@@ -15,7 +15,7 @@ training:
   curriculum_list:
     follow_command:
       - name: "basic_moving"
-        milestone: 100
+        milestone: 200
       - name: "flat_terrain"
         milestone: 500
       - name: "rough_terrain"

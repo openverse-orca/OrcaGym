@@ -20,14 +20,14 @@ RewardConfig = {
         "height" : 0,                   # 身体高度惩罚
         "body_lin_vel" : 2,             # 身体上下线速度惩罚
         "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
-        "body_orientation" : 0,         # 身体姿态惩罚
+        "body_orientation" : 1,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
         "feet_slip" : 0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.01,    # 鼓励对角步态，避免单侧滑步
-        "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 0.1,                 # 无指令时，踏步惩罚
+        "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
+        "fly" : 0.5,                    # 四足离地惩罚
+        "stepping" : 0.3,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
         # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
@@ -97,8 +97,8 @@ Lite3Config = {
 
         "actuator_type" :        "position",  # "torque" or "position"
         # "kps" :                  [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-        "kps" :                  [25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
-        "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        "kps" :                  [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+        "kds" :                  [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7],
 
         "action_scale" :         [
             0.2,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
@@ -132,6 +132,10 @@ Lite3Config = {
         "sensor_imu_accelerometer_name" :       "imu_acc",
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "HL_touch", "HR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
+
+        "compute_body_height" : False,      # 真机没有激光雷达，无法计算body高度
+        "compute_body_orientation" : False, # TODO:目前只支持水平方向的orientation奖励
+        "compute_foot_height" : False,      # 真机没有激光雷达，无法计算foot高度
 
         "ground_contact_body_names" : ["Floor_Floor", 
                                         "terrain_perlin_smooth_usda_terrain",
@@ -176,7 +180,7 @@ Lite3Config = {
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
-        "push_interval_s" :         5,
+        "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,
         "pos_random_range" :        0.5,    # randomize the x,y position of the robot in each episode
         
@@ -194,13 +198,16 @@ Lite3Config = {
             "basic_moving" : [
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "move_medium", "terminate_threshold": 10},
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
             ],
             "flat_terrain" : [
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 1.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},                
                 {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
+                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 1.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
+                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
             ],
             "rough_terrain" : [
                 {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},

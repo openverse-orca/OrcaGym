@@ -157,9 +157,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._is_playable = False
         self._player_control = False
 
-        self._compute_body_height = True if robot_config["reward_coeff"][self._task]["height"] > 0 else False
-        self._compute_body_orientation = True if robot_config["reward_coeff"][self._task]["body_orientation"] > 0 else False
-        self._compute_foot_height = True if "feet_swing_height" in robot_config["reward_coeff"][self._task] and robot_config["reward_coeff"][self._task]["feet_swing_height"] > 0 else False
+        self._compute_body_height = robot_config["compute_body_height"]
+        self._compute_body_orientation = robot_config["compute_body_orientation"]
+        self._compute_foot_height = robot_config["compute_foot_height"]
 
         self._is_obs_updated = False
         self._setup_reward_functions(robot_config)
@@ -248,6 +248,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._body_lin_vel, self._body_lin_acc, self._body_ang_vel, self._body_orientation, self._body_pos = self._get_body_local(qpos_buffer, qvel_buffer, qacc_buffer)
 
         self._body_height, orientation_quat = self._get_body_height_orientation(qpos_buffer, height_map)
+        # TODO: 这里没有处理局部坐标系转换，目前只支持水平orientation奖励。
         self._target_orientation = rotations.quat2euler(orientation_quat)
         # print("body_height: ", self._body_height)
         # print("target_orientation: ", self._target_orientation)
@@ -954,7 +955,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
 
     def _get_body_height_orientation(self, qpos_buffer: np.ndarray, height_map: np.ndarray) -> tuple:
-        if not self._compute_body_height:
+        if not self._compute_body_height and not self._compute_body_orientation:
             return np.zeros(16), np.array([1.0, 0.0, 0.0, 0.0])  # 返回单位四元数
 
         # 获取机器人本体位置（x, y, z）
