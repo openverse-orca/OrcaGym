@@ -408,17 +408,7 @@ def run_simulation(env: gym.Env,
             else:
                 brake_time = 0.0
 
-            if np.linalg.norm(lin_vel) == 0.0 and brake_time > 1.0:
-                if ang_vel != 0.0:
-                    command_model_type = command_model[terrain_type]["trun"]
-                else:
-                    command_model_type = command_model[terrain_type]["stand_still"]
-            else:
-                if lin_vel[0] >= 0:
-                    command_model_type = command_model[terrain_type]["forward"]
-                else:
-                    command_model_type = command_model[terrain_type]["backward"]
-
+            command_model_type = command_model[terrain_type]
             model = models[model_type][command_model_type]
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}

@@ -377,7 +377,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # Use curriculum learning to set the initial position
         if self._curriculum_learning:
             # print("Curriculum level: ", curriculum_level)
-            level_offset = np.array([self._curriculum_levels[self._current_level]["offset"]]).flatten()
+            terrain_info = self._terrain[self._curriculum_levels[self._current_level]["terrain"]]
+            level_offset = np.array([terrain_info["offset"]]).flatten()
         else:
             level_offset = np.zeros(3)
             
@@ -422,7 +423,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         # print("Command: ", self._command)
 
         self._terminated_times = 0
-        self._terminated_times_threshold = self._curriculum_levels[self._current_level]["terminate_threshold"]
+        self._terminated_times_threshold = self._curriculum_commands[self._curriculum_levels[self._current_level]["command_type"]]["terminate_threshold"]
         
         self._last_push_duration = 0.0
         self._last_contact_site_xpos = None
@@ -1325,7 +1326,8 @@ class LeggedRobot(OrcaGymAsyncAgent):
         
         # 低于奖励阈值，或者摔倒，降级
         # 高于奖励阈值，并达到行走距离，升级
-        if mean_rating < self._curriculum_levels[self._current_level]["rating"] + self._curriculum_clear_times * 0.01:
+        curriculum_command_info = self._curriculum_commands[self._curriculum_levels[self._current_level]["command_type"]]
+        if mean_rating < curriculum_command_info["rating"] + self._curriculum_clear_times * 0.01:
             self._current_level = max(self._current_level - 1, 0)
             if self.playable:
                 print("Agent: ", self._env_id + self.name, "Level Downgrade! Curriculum level: ", self._current_level, "mena rating: ", mean_rating)
@@ -1339,7 +1341,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             if self.playable:
                 print("Agent: ", self._env_id + self.name, "Move distance: ", move_distance)
 
-            if move_distance > self._curriculum_levels[self._current_level]["distance"] + self._curriculum_clear_times * 0.5:
+            if move_distance > curriculum_command_info["distance"] + self._curriculum_clear_times * 0.5:
                 self._current_level += 1
                 if self._current_level >= len(self._curriculum_levels):
                     self._curriculum_clear_times += 1
@@ -1357,7 +1359,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             buffer["index"] = 0
         # print("Curriculum reward buffer: ", self._curriculum_reward_buffer)
 
-        self._terminated_times_threshold = self._curriculum_levels[self._current_level]["terminate_threshold"]
+        self._terminated_times_threshold = curriculum_command_info["terminate_threshold"]
         
         # Update the command config for different levels
         self._reset_commands_config(self._current_level)
@@ -1466,6 +1468,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         print("Agent: ", self._env_id + self.name, "Setup curriculum: ", curriculum)
 
         robot_config = LeggedRobotConfig[get_legged_robot_name(self.name)]
+        self._terrain = robot_config["terrain"]
         self._curriculum_levels =  robot_config["curriculum_levels"][curriculum]
         self._curriculum_learning = robot_config["curriculum_learning"]
         self._curriculum_commands = robot_config["curriculum_commands"]

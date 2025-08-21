@@ -309,7 +309,7 @@ class AgentBase:
         self._legged_agent = LeggedRobot(
             env_id = env.env_id,
             agent_name=self.name,
-            task="follow_command",
+            task="flat_terrain",
             max_episode_steps=env.max_episode_steps,
             dt=env.dt,
         )

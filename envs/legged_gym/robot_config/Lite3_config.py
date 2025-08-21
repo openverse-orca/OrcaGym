@@ -2,7 +2,7 @@
 import numpy as np
 
 RewardConfig = {
-    "follow_command": {
+    "flat_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
@@ -26,7 +26,7 @@ RewardConfig = {
         "feet_slip" : 0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
-        "fly" : 0.5,                    # 四足离地惩罚
+        "fly" : 0.1,                    # 四足离地惩罚
         "stepping" : 0.3,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
@@ -34,7 +34,7 @@ RewardConfig = {
         # "torque_limits" : 1.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
-    "stand_still": {
+    "rough_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
@@ -98,7 +98,7 @@ Lite3Config = {
         "actuator_type" :        "position",  # "torque" or "position"
         # "kps" :                  [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
         "kps" :                  [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
-        "kds" :                  [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7],
+        "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
 
         "action_scale" :         [
             0.2,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
@@ -144,7 +144,12 @@ Lite3Config = {
                                         "terrain_perlin_rough_slope_usda_terrain",
                                         "terrain_stair_low_usda_terrain", 
                                         "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",                                     
+                                        "terrain_brics_usda_terrain",        
+                                        "terrain_stair_low_flat_usda_terrain",  
+                                        "terrain_brics_low_usda_terrain",      
+                                        "terrain_brics_high_usda_terrain",     
+                                        "terrain_slop_10_usda_terrain",        
+                                        "terrain_slop_20_usda_terrain",       
                                         ],
         
         "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
@@ -184,44 +189,72 @@ Lite3Config = {
         "max_push_vel_xy" :         1.0,
         "pos_random_range" :        0.5,    # randomize the x,y position of the robot in each episode
         
+
+        "terrain" : {
+            "default" : {
+                "offset" : [0, 0, 0],
+            },
+            "brics_low" : {
+                "offset" : [0, -30, 0],
+            },
+            "brics_high" : {
+                "offset" : [0, 30, 0],
+            },
+            "stair_low" : {
+                "offset" : [-30, -30, 0],
+            },
+            "stair_high" : {
+                "offset" : [-30, 0, 0],
+            },
+            "slop_10" : {
+                "offset" : [60, -30, 0],
+            },
+            "slop_20" : {
+                "offset" : [60, 30, 0],
+            },
+            "stair_low_flat" : {
+                "offset" : [-30, 30, 0],
+            },
+        },
+
         # Config for ccurriculum learning
         "curriculum_learning" :     True,
         "curriculum_levels" : {
-            "stand_still" : [
-                # {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
-                {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
-                {"name" : "default" ,           "offset" : [0, 0, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
-                # {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
-                {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "stand_still", "terminate_threshold": 10},
-                {"name" : "smooth" ,           "offset" : [-30, 30, 0],       "distance": 0.0, "rating": 0.5, "command_type": "spot_turn", "terminate_threshold": 10},
-            ],
             "basic_moving" : [
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 1.0, "rating": 0.5, "command_type": "move_slowly", "terminate_threshold": 10},
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 3.0, "rating": 0.5, "command_type": "move_medium", "terminate_threshold": 10},
+                {"terrain" : "default" ,          "command_type": "move_slowly",},
+                {"terrain" : "default" ,          "command_type": "move_medium",},
             ],
             "flat_terrain" : [
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 1.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},                
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 1.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_slowly",  "terminate_threshold": 10},
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_low" ,        "command_type": "move_fast",},
+                {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
+                {"terrain" : "slop_10" ,          "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "slop_10" ,          "command_type": "move_fast",},
             ],
             "rough_terrain" : [
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "smooth_slope" ,          "offset" : [0, -30, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "rough_slope" ,           "offset" : [30, 0, 0],    "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
-                {"name" : "rough" ,                 "offset" : [-0, 30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "terrain_stairs_low" ,    "offset" : [-30, -30, 0],   "distance": 3.0, "rating": 0.5, "command_type": "move_medium",  "terminate_threshold": 10},
-                {"name" : "default" ,               "offset" : [0, 0, 0],       "distance": 5.0, "rating": 0.5, "command_type": "move_fast", "terminate_threshold": 10},
-                {"name" : "smooth" ,                "offset" : [-30, 30, 0],   "distance": 5.0, "rating": 0.5, "command_type": "move_fast",  "terminate_threshold": 10},
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_low" ,        "command_type": "move_fast",},
+                {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
+                {"terrain" : "slop_10" ,          "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "slop_10" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_high" ,       "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "brics_high" ,       "command_type": "move_medium",},
+                {"terrain" : "stair_high" ,       "command_type": "move_slowly",},
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "slop_20" ,          "command_type": "move_slowly", },
+                {"terrain" : "default" ,          "command_type": "move_fast",},
+                {"terrain" : "slop_20" ,          "command_type": "move_medium",},
            ],
         },
         "curriculum_commands" : {
@@ -231,6 +264,9 @@ Lite3Config = {
                 "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
                 "command_ang_vel_range" : 0.0,  # max turning rate
                 "command_resample_interval" : 20, # second to resample the command
+                "distance" : 0.0,
+                "rating" : 0.5,
+                "terminate_threshold" : 10,
             },
 
             "spot_turn" : {
@@ -239,6 +275,9 @@ Lite3Config = {
                 "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 2, # second to resample the command
+                "distance" : 0.0,
+                "rating" : 0.5,
+                "terminate_threshold" : 10,
             },
 
             "move_slowly" : {
@@ -247,6 +286,9 @@ Lite3Config = {
                 "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 4, # second to resample the command
+                "distance" : 1.0,
+                "rating" : 0.5,
+                "terminate_threshold" : 10,
             },
 
             "move_medium" : {
@@ -255,6 +297,9 @@ Lite3Config = {
                 "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 4, # second to resample the command
+                "distance" : 3.0,
+                "rating" : 0.5,
+                "terminate_threshold" : 10,
             },
 
             "move_fast" : {
@@ -263,6 +308,9 @@ Lite3Config = {
                 "command_lin_vel_threshold" : [-0.2, 0.3], # min linear velocity to trigger moving
                 "command_ang_vel_range" : np.pi / 4,  # max turning rate
                 "command_resample_interval" : 4, # second to resample the command
+                "distance" : 5.0,
+                "rating" : 0.5,
+                "terminate_threshold" : 10,
             },
         },
 

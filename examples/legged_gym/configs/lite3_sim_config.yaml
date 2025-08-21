@@ -7,28 +7,17 @@ model_file:
   "sb3":
     "flat_terrain": "test/Lite3_flat_terrain.zip"
     "rough_terrain": "test/Lite3_rough_terrain.zip"
-    "stand_still": "test/Lite3_stand_still.zip"
   "onnx":
     "flat_terrain": "test/Lite3_flat_terrain.onnx"
     "rough_terrain": "test/Lite3_rough_terrain.onnx"
-    "stand_still": "test/Lite3_stand_still.onnx"
   "grpc":
     "flat_terrain": "localhost:50151"  # 远程服务器地址
     "rough_terrain": "localhost:50151"
-    "stand_still": "localhost:50151"
 
 ctrl_device: "keyboard"
 
 command_model:
   "flat_terrain":
-    "forward": "flat_terrain"
-    "backward": "flat_terrain"
-    "stand_still": "flat_terrain"
-    "trun": "flat_terrain"
   "rough_terrain":
-    "forward": "rough_terrain"
-    "backward": "rough_terrain"
-    "stand_still": "rough_terrain"
-    "trun": "rough_terrain"
   
 terrain_spawnable_names: ["terrain_test_usda"]

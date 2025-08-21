@@ -124,7 +124,7 @@ def run_sb3_ppo_rl(
     terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
-    if task == 'stand_still' or task == 'no_action' or task == 'follow_command':
+    if task == 'rough_terrain' or task == 'no_action' or task == 'flat_terrain':
         max_episode_steps = int(1 / (TIME_STEP * FRAME_SKIP * ACTION_SKIP) * EPISODE_TIME)
     else:
         raise ValueError("Invalid task")
@@ -204,9 +204,10 @@ def run_rllib_appo_rl(
     remote: str,
     visualize: bool,
 ):
+    import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
 
     # 在脚本开头调用
-    if rllib_rl.setup_cuda_environment():
+    if rllib_appo_rl.setup_cuda_environment():
         print("CUDA 环境验证通过")
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
@@ -250,10 +251,10 @@ def run_rllib_appo_rl(
         model_dir=model_dir,
     )
 
-    import examples.legged_gym.scripts.rllib_appo_rl as rllib_rl
+    import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
     
     if run_mode == 'training':
-        rllib_rl.run_training(
+        rllib_appo_rl.run_training(
             orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
             agent_name=agent_name,
@@ -270,7 +271,7 @@ def run_rllib_appo_rl(
     elif run_mode == 'testing':
         if not ckpt:
             raise ValueError("Checkpoint path must be provided for testing.")
-        rllib_rl.test_model(
+        rllib_appo_rl.test_model(
             checkpoint_path=ckpt,
             orcagym_addr=config['orcagym_addr'],
             env_name=config['env_name'],

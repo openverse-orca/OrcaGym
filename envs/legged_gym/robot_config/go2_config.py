@@ -1,7 +1,7 @@
 import numpy as np
 
 RewardConfig = {
-    "follow_command": {
+    "flat_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
@@ -33,7 +33,7 @@ RewardConfig = {
         # "soft_torque_limit" : 1.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
-    "stand_still": {
+    "rough_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚

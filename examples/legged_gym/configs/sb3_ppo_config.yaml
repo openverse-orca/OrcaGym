@@ -3,35 +3,35 @@ orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
 training_episode: 200
-task: "follow_command"
+task: "flat_terrain"
 
 training:
-  subenv_num: 64
+  subenv_num: 16
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 
-    follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
-    stand_still: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+    flat_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_10_usda"]
+    rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_10_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slop_20_usda"]
   curriculum_list:
-    follow_command:
+    flat_terrain:
       - name: "basic_moving"
-        milestone: 200
+        milestone: 100
       - name: "flat_terrain"
-        milestone: 500
+        milestone: 2000
+    rough_terrain:
+      - name: "basic_moving"
+        milestone: 100
       - name: "rough_terrain"
-        milestone: 1500
-    stand_still:
-      - name: "stand_still"
-        milestone: 500
+        milestone: 3000
 
 testing:
   subenv_num: 1
   agent_num: 8
   render_mode: "human"
   terrain_spawnable_names: 
-    follow_command: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+    flat_terrain: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
   curriculum_list:
-    follow_command:
+    flat_terrain:
       - name: "flat_terrain"
         milestone: 2000
 
@@ -40,8 +40,8 @@ play:
   agent_num: 1
   render_mode: "human"
   terrain_spawnable_names: 
-    follow_command: ["terrain_test_usda"]
+    flat_terrain: ["terrain_test_usda"]
   curriculum_list:
-    follow_command:
+    flat_terrain:
       - name: "flat_terrain"
         milestone: 2000
