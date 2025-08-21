@@ -1,6 +1,9 @@
 import grpc
+import orca_gym.orca_lab.protos.edit_service_pb2_grpc as edit_service_pb2_grpc
 import orca_gym.orca_lab.protos.edit_service_pb2 as edit_service_pb2
-from orca_gym.orca_lab.protos.edit_service_pb2_grpc import GrpcServiceStub
+import orca_gym.protos.mjc_message_pb2_grpc as mjc_message_pb2_grpc
+import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
+
 from orca_gym.orca_lab.path import Path
 import asyncio
 import numpy as np
@@ -45,98 +48,22 @@ class Actor:
             raise ValueError("Actor scale must be a float.")
 
 
-class LightInfo:
-    """
-    A class to represent light information in the ORCA Gym environment.
-    """
-
-    def __init__(
-        self,
-        color: np.ndarray,
-        intensity: float,
-    ):
-        self.color = color
-        self.intensity = intensity
-        self._check_light_info()
-
-    def _check_light_info(self):
-        if self.color is None or len(self.color) != 3:
-            raise ValueError("Light color must be a 3D vector.")
-        if self.intensity is None or not isinstance(self.intensity, float):
-            raise ValueError("Light intensity must be a float.")
-
-
-class CameraSensorInfo:
-    """
-    A class to represent camera sensor information in the ORCA Gym environment.
-    """
-
-    def __init__(
-        self,
-        capture_rgb: bool,
-        capture_depth: bool,
-        save_mp4_file: bool,
-        use_dds: bool,
-    ):
-        self.capture_rgb = capture_rgb
-        self.capture_depth = capture_depth
-        self.save_mp4_file = save_mp4_file
-        self.use_dds = use_dds
-        self._check_camera_sensor_info()
-
-    def _check_camera_sensor_info(self):
-        if self.capture_rgb is None or not isinstance(self.capture_rgb, bool):
-            raise ValueError("Capture RGB must be a boolean.")
-        if self.capture_depth is None or not isinstance(self.capture_depth, bool):
-            raise ValueError("Capture depth must be a boolean.")
-        if self.save_mp4_file is None or not isinstance(self.save_mp4_file, bool):
-            raise ValueError("Save MP4 file must be a boolean.")
-        if self.use_dds is None or not isinstance(self.use_dds, bool):
-            raise ValueError("Use DDS must be a boolean.")
-
-
-class MaterialInfo:
-    """
-    A class to represent material information in the ORCA Gym environment.
-    """
-
-    def __init__(
-        self,
-        base_color: np.ndarray,
-    ):
-        self.base_color = base_color
-        self._check_material_info()
-
-    def _check_material_info(self):
-        if self.base_color is None or len(self.base_color) != 4:
-            raise ValueError("Base color must be a 4D vector.")
-
-
 Success = edit_service_pb2.StatusCode.Success
 Error = edit_service_pb2.StatusCode.Error
 
 
 class OrcaLabScene:
-    """
-    A class to represent a scene in the ORCA lab environment.
-    """
 
-    def __init__(
-        self,
-        grpc_addr: str,
-    ):
-        """
-        Initialize the ORCA lab scene.
+    def __init__(self, edit_grpc_addr: str, sim_grpc_addr: str):
+        self.edit_grpc_addr = edit_grpc_addr
+        self.sim_grpc_addr = sim_grpc_addr
 
-        Args:
-            scene_id (int): The ID of the scene.
-            scene_name (str): The name of the scene.
-        """
-        self.grpc_addr = grpc_addr
         self.loop = asyncio.get_event_loop()
-        self.actors: Dict[Path, Actor] = {}
-        self.initialize_grpc()
 
+        self.last_query_time = None
+        self.query_frequency = 30
+
+        # 作为根节点，不可见， 路径是"/"。下面挂着所有的顶层Actor。
         self.root_actor = Actor(
             name="root",
             spawnable_name="root",
@@ -144,51 +71,55 @@ class OrcaLabScene:
             rotation=np.array([1, 0, 0, 0]),
             scale=1.0,
         )
+        self.actors: Dict[Path, Actor] = {}
         self.actors[Path.root_path()] = self.root_actor
 
+        self.initialize_grpc()
+
     def initialize_grpc(self):
-        self.channel = grpc.aio.insecure_channel(
-            self.grpc_addr,
-            options=[
-                ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
-                ("grpc.max_send_message_length", 1024 * 1024 * 1024),
-            ],
+        options = [
+            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+            ("grpc.max_send_message_length", 1024 * 1024 * 1024),
+        ]
+        self.edit_channel = grpc.aio.insecure_channel(
+            self.edit_grpc_addr,
+            options=options,
         )
-        self.stub = GrpcServiceStub(self.channel)
+        self.sim_channel = grpc.aio.insecure_channel(
+            self.sim_grpc_addr,
+            options=options,
+        )
+        self.edit_stub = edit_service_pb2_grpc.GrpcServiceStub(self.edit_channel)
+        self.sim_stub = mjc_message_pb2_grpc.GrpcServiceStub(self.sim_channel)
+
         if not self.aloha():
             raise Exception("Failed to connect to server.")
 
-        self.last_query_time = None
-        self.query_frequency = 30
         self.loop.create_task(self._query_pending_operation_loop())
 
         self.running = True
 
     async def close_grpc_async(self):
         self.running = False
-        if self.channel:
-            await self.channel.close()
-        self.stub = None
-        self.channel = None
+        if self.edit_channel:
+            await self.edit_channel.close()
+        self.edit_stub = None
+        self.edit_channel = None
 
     def close_grpc(self):
         self.loop.run_until_complete(self.close_grpc_async())
 
-    def start_simulation():
-        pass
+    def start_sim(self):
+        self.publish_scene()
 
-    def stop_simulation():
-        pass
-
-    def pause_simulation():
-        pass
-
-    def resume_simulation():
-        pass
+    def _check_response(self, response):
+        if response.status_code != Success:
+            raise Exception(f"Request failed. {response.error_message}")
 
     async def aloha_async(self) -> bool:
         request = edit_service_pb2.AlohaRequest(value=1)
-        response = await self.stub.Aloha(request)
+        response = await self.edit_stub.Aloha(request)
+        self._check_response(response)
         return response.value == 2
 
     def aloha(self) -> bool:
@@ -203,9 +134,10 @@ class OrcaLabScene:
                     if (now - self.last_query_time) < delta:
                         continue
 
-                print("query")
+                # print("query")
                 request = edit_service_pb2.GetPendingOperationsRequest()
-                response = await self.stub.GetPendingOperations(request)
+                response = await self.edit_stub.GetPendingOperations(request)
+                self._check_response(response)
 
                 self.last_query_time = time.time()
 
@@ -258,10 +190,8 @@ class OrcaLabScene:
             space=space,
         )
 
-        response = await self.stub.GetPendingActorTransform(request)
-        if response.status_code != Success:
-            print("GetPendingActorTransform failed")
-            raise Exception("GetPendingActorTransform failed.")
+        response = await self.edit_stub.GetPendingActorTransform(request)
+        self._check_response(response)
 
         transform = response.transform
         return transform.pos, transform.quat, transform.scale
@@ -289,10 +219,8 @@ class OrcaLabScene:
             space=edit_service_pb2.Space.Local,
         )
 
-        response = await self.stub.AddActor(request)
-        if response.status_code != Success:
-            print("Add actor failed: ", response.error_message)
-            raise Exception("Add actor failed.")
+        response = await self.edit_stub.AddActor(request)
+        self._check_response(response)
 
         actor.path = path
         self.actors[path] = actor
@@ -313,12 +241,40 @@ class OrcaLabScene:
             space=space,
         )
 
-        response = await self.stub.SetActorTransform(request)
-        if response.status_code != Success:
-            print("Set actor transform failed: ", response.error_message)
-            raise Exception("Set actor transform failed.")
+        response = await self.edit_stub.SetActorTransform(request)
+        self._check_response(response)
 
     def set_actor_transform(self, path: str, pos, rot, scale, local: bool):
         self.loop.run_until_complete(
             self.set_actor_transform_async(path, pos, rot, scale, local)
+        )
+
+    async def publish_scene_async(self):
+        request = mjc_message_pb2.PublishSceneRequest()
+        response = await self.sim_stub.PublishScene(request)
+        if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
+            print("Publish scene failed: ", response.error_message)
+            raise Exception("Publish scene failed.")
+
+    def publish_scene(self):
+        self.loop.run_until_complete(self.publish_scene_async())
+
+    async def get_sync_from_mujoco_to_scene_async(self) -> bool:
+        request = edit_service_pb2.GetSyncFromMujocoToSceneRequest()
+        response = await self.edit_stub.GetSyncFromMujocoToScene(request)
+        self._check_response(response)
+        return response.value
+
+    def get_sync_from_mujoco_to_scene(self) -> bool:
+        return self.loop.run_until_complete(self.get_sync_from_mujoco_to_scene_async())
+
+    async def set_sync_from_mujoco_to_scene_async(self, value: bool):
+        request = edit_service_pb2.SetSyncFromMujocoToSceneRequest(value=value)
+        response = await self.edit_stub.SetSyncFromMujocoToScene(request)
+        self._check_response(response)
+        return response
+
+    def set_sync_from_mujoco_to_scene(self, value: bool):
+        return self.loop.run_until_complete(
+            self.set_sync_from_mujoco_to_scene_async(value)
         )

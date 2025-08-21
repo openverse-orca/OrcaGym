@@ -42,12 +42,12 @@ class GrpcServiceStub(object):
         self.AddActor = channel.unary_unary(
                 '/SceneEdit.GrpcService/AddActor',
                 request_serializer=edit__service__pb2.AddActorRequest.SerializeToString,
-                response_deserializer=edit__service__pb2.SimpleResponse.FromString,
+                response_deserializer=edit__service__pb2.AddActorResponse.FromString,
                 _registered_method=True)
         self.SetActorTransform = channel.unary_unary(
                 '/SceneEdit.GrpcService/SetActorTransform',
                 request_serializer=edit__service__pb2.SetActorTransformRequest.SerializeToString,
-                response_deserializer=edit__service__pb2.SimpleResponse.FromString,
+                response_deserializer=edit__service__pb2.SetActorTransformResponse.FromString,
                 _registered_method=True)
         self.GetPendingOperations = channel.unary_unary(
                 '/SceneEdit.GrpcService/GetPendingOperations',
@@ -58,6 +58,16 @@ class GrpcServiceStub(object):
                 '/SceneEdit.GrpcService/GetPendingActorTransform',
                 request_serializer=edit__service__pb2.GetPendingActorTransformRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.GetPendingActorTransformResponse.FromString,
+                _registered_method=True)
+        self.GetSyncFromMujocoToScene = channel.unary_unary(
+                '/SceneEdit.GrpcService/GetSyncFromMujocoToScene',
+                request_serializer=edit__service__pb2.GetSyncFromMujocoToSceneRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.GetSyncFromMujocoToSceneResponse.FromString,
+                _registered_method=True)
+        self.SetSyncFromMujocoToScene = channel.unary_unary(
+                '/SceneEdit.GrpcService/SetSyncFromMujocoToScene',
+                request_serializer=edit__service__pb2.SetSyncFromMujocoToSceneRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.SetSyncFromMujocoToSceneResponse.FromString,
                 _registered_method=True)
 
 
@@ -94,6 +104,18 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetSyncFromMujocoToScene(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetSyncFromMujocoToScene(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -105,12 +127,12 @@ def add_GrpcServiceServicer_to_server(servicer, server):
             'AddActor': grpc.unary_unary_rpc_method_handler(
                     servicer.AddActor,
                     request_deserializer=edit__service__pb2.AddActorRequest.FromString,
-                    response_serializer=edit__service__pb2.SimpleResponse.SerializeToString,
+                    response_serializer=edit__service__pb2.AddActorResponse.SerializeToString,
             ),
             'SetActorTransform': grpc.unary_unary_rpc_method_handler(
                     servicer.SetActorTransform,
                     request_deserializer=edit__service__pb2.SetActorTransformRequest.FromString,
-                    response_serializer=edit__service__pb2.SimpleResponse.SerializeToString,
+                    response_serializer=edit__service__pb2.SetActorTransformResponse.SerializeToString,
             ),
             'GetPendingOperations': grpc.unary_unary_rpc_method_handler(
                     servicer.GetPendingOperations,
@@ -121,6 +143,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.GetPendingActorTransform,
                     request_deserializer=edit__service__pb2.GetPendingActorTransformRequest.FromString,
                     response_serializer=edit__service__pb2.GetPendingActorTransformResponse.SerializeToString,
+            ),
+            'GetSyncFromMujocoToScene': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSyncFromMujocoToScene,
+                    request_deserializer=edit__service__pb2.GetSyncFromMujocoToSceneRequest.FromString,
+                    response_serializer=edit__service__pb2.GetSyncFromMujocoToSceneResponse.SerializeToString,
+            ),
+            'SetSyncFromMujocoToScene': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetSyncFromMujocoToScene,
+                    request_deserializer=edit__service__pb2.SetSyncFromMujocoToSceneRequest.FromString,
+                    response_serializer=edit__service__pb2.SetSyncFromMujocoToSceneResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -176,7 +208,7 @@ class GrpcService(object):
             target,
             '/SceneEdit.GrpcService/AddActor',
             edit__service__pb2.AddActorRequest.SerializeToString,
-            edit__service__pb2.SimpleResponse.FromString,
+            edit__service__pb2.AddActorResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -203,7 +235,7 @@ class GrpcService(object):
             target,
             '/SceneEdit.GrpcService/SetActorTransform',
             edit__service__pb2.SetActorTransformRequest.SerializeToString,
-            edit__service__pb2.SimpleResponse.FromString,
+            edit__service__pb2.SetActorTransformResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -258,6 +290,60 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/GetPendingActorTransform',
             edit__service__pb2.GetPendingActorTransformRequest.SerializeToString,
             edit__service__pb2.GetPendingActorTransformResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSyncFromMujocoToScene(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/GetSyncFromMujocoToScene',
+            edit__service__pb2.GetSyncFromMujocoToSceneRequest.SerializeToString,
+            edit__service__pb2.GetSyncFromMujocoToSceneResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetSyncFromMujocoToScene(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/SetSyncFromMujocoToScene',
+            edit__service__pb2.SetSyncFromMujocoToSceneRequest.SerializeToString,
+            edit__service__pb2.SetSyncFromMujocoToSceneResponse.FromString,
             options,
             channel_credentials,
             insecure,

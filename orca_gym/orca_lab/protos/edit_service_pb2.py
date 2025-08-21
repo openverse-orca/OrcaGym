@@ -24,37 +24,47 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x65\x64it_service.proto\x12\tSceneEdit\"S\n\x0eSimpleResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\"\x1d\n\x0c\x41lohaRequest\x12\r\n\x05value\x18\x01 \x01(\x05\"\x1e\n\rAlohaResponse\x12\r\n\x05value\x18\x01 \x01(\x05\"5\n\tTransform\x12\x0b\n\x03pos\x18\x01 \x03(\x01\x12\x0c\n\x04quat\x18\x02 \x03(\x01\x12\r\n\x05scale\x18\x03 \x01(\x01\"\xa2\x01\n\x0f\x41\x64\x64\x41\x63torRequest\x12\x16\n\x0espawnable_name\x18\x01 \x01(\t\x12\x12\n\nactor_name\x18\x02 \x01(\t\x12\x19\n\x11parent_actor_path\x18\x03 \x01(\t\x12\'\n\ttransform\x18\x04 \x01(\x0b\x32\x14.SceneEdit.Transform\x12\x1f\n\x05space\x18\x05 \x01(\x0e\x32\x10.SceneEdit.Space\"x\n\x18SetActorTransformRequest\x12\x12\n\nactor_path\x18\x01 \x01(\t\x12\'\n\ttransform\x18\x02 \x01(\x0b\x32\x14.SceneEdit.Transform\x12\x1f\n\x05space\x18\x03 \x01(\x0e\x32\x10.SceneEdit.Space\"\x1d\n\x1bGetPendingOperationsRequest\"2\n\x1cGetPendingOperationsResponse\x12\x12\n\noperations\x18\x01 \x03(\t\"V\n\x1fGetPendingActorTransformRequest\x12\x12\n\nactor_path\x18\x01 \x01(\t\x12\x1f\n\x05space\x18\x02 \x01(\x0e\x32\x10.SceneEdit.Space\"w\n GetPendingActorTransformResponse\x12\'\n\ttransform\x18\x01 \x01(\x0b\x32\x14.SceneEdit.Transform\x12*\n\x0bstatus_code\x18\x02 \x01(\x0e\x32\x15.SceneEdit.StatusCode*$\n\nStatusCode\x12\x0b\n\x07Success\x10\x00\x12\t\n\x05\x45rror\x10\x01*\x1d\n\x05Space\x12\t\n\x05Local\x10\x00\x12\t\n\x05World\x10\x01\x32\xbf\x03\n\x0bGrpcService\x12:\n\x05\x41loha\x12\x17.SceneEdit.AlohaRequest\x1a\x18.SceneEdit.AlohaResponse\x12\x41\n\x08\x41\x64\x64\x41\x63tor\x12\x1a.SceneEdit.AddActorRequest\x1a\x19.SceneEdit.SimpleResponse\x12S\n\x11SetActorTransform\x12#.SceneEdit.SetActorTransformRequest\x1a\x19.SceneEdit.SimpleResponse\x12g\n\x14GetPendingOperations\x12&.SceneEdit.GetPendingOperationsRequest\x1a\'.SceneEdit.GetPendingOperationsResponse\x12s\n\x18GetPendingActorTransform\x12*.SceneEdit.GetPendingActorTransformRequest\x1a+.SceneEdit.GetPendingActorTransformResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x65\x64it_service.proto\x12\tSceneEdit\"5\n\tTransform\x12\x0b\n\x03pos\x18\x01 \x03(\x01\x12\x0c\n\x04quat\x18\x02 \x03(\x01\x12\r\n\x05scale\x18\x03 \x01(\x01\"\x1d\n\x0c\x41lohaRequest\x12\r\n\x05value\x18\x01 \x01(\x05\"a\n\rAlohaResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\x05\"\xa2\x01\n\x0f\x41\x64\x64\x41\x63torRequest\x12\x16\n\x0espawnable_name\x18\x01 \x01(\t\x12\x12\n\nactor_name\x18\x02 \x01(\t\x12\x19\n\x11parent_actor_path\x18\x03 \x01(\t\x12\'\n\ttransform\x18\x04 \x01(\x0b\x32\x14.SceneEdit.Transform\x12\x1f\n\x05space\x18\x05 \x01(\x0e\x32\x10.SceneEdit.Space\"U\n\x10\x41\x64\x64\x41\x63torResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\"x\n\x18SetActorTransformRequest\x12\x12\n\nactor_path\x18\x01 \x01(\t\x12\'\n\ttransform\x18\x02 \x01(\x0b\x32\x14.SceneEdit.Transform\x12\x1f\n\x05space\x18\x03 \x01(\x0e\x32\x10.SceneEdit.Space\"^\n\x19SetActorTransformResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\"\x1d\n\x1bGetPendingOperationsRequest\"u\n\x1cGetPendingOperationsResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x12\n\noperations\x18\x03 \x03(\t\"\x99\x01\n\x1fGetPendingActorTransformRequest\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x12\n\nactor_path\x18\x03 \x01(\t\x12\x1f\n\x05space\x18\x04 \x01(\x0e\x32\x10.SceneEdit.Space\"\x8e\x01\n GetPendingActorTransformResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\'\n\ttransform\x18\x03 \x01(\x0b\x32\x14.SceneEdit.Transform\"!\n\x1fGetSyncFromMujocoToSceneRequest\"t\n GetSyncFromMujocoToSceneResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\x08\"0\n\x1fSetSyncFromMujocoToSceneRequest\x12\r\n\x05value\x18\x01 \x01(\x08\"t\n SetSyncFromMujocoToSceneResponse\x12*\n\x0bstatus_code\x18\x01 \x01(\x0e\x32\x15.SceneEdit.StatusCode\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\x08*$\n\nStatusCode\x12\x0b\n\x07Success\x10\x00\x12\t\n\x05\x45rror\x10\x01*\x1d\n\x05Space\x12\t\n\x05Local\x10\x00\x12\t\n\x05World\x10\x01\x32\xb6\x05\n\x0bGrpcService\x12:\n\x05\x41loha\x12\x17.SceneEdit.AlohaRequest\x1a\x18.SceneEdit.AlohaResponse\x12\x43\n\x08\x41\x64\x64\x41\x63tor\x12\x1a.SceneEdit.AddActorRequest\x1a\x1b.SceneEdit.AddActorResponse\x12^\n\x11SetActorTransform\x12#.SceneEdit.SetActorTransformRequest\x1a$.SceneEdit.SetActorTransformResponse\x12g\n\x14GetPendingOperations\x12&.SceneEdit.GetPendingOperationsRequest\x1a\'.SceneEdit.GetPendingOperationsResponse\x12s\n\x18GetPendingActorTransform\x12*.SceneEdit.GetPendingActorTransformRequest\x1a+.SceneEdit.GetPendingActorTransformResponse\x12s\n\x18GetSyncFromMujocoToScene\x12*.SceneEdit.GetSyncFromMujocoToSceneRequest\x1a+.SceneEdit.GetSyncFromMujocoToSceneResponse\x12s\n\x18SetSyncFromMujocoToScene\x12*.SceneEdit.SetSyncFromMujocoToSceneRequest\x1a+.SceneEdit.SetSyncFromMujocoToSceneResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'edit_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_STATUSCODE']._serialized_start=815
-  _globals['_STATUSCODE']._serialized_end=851
-  _globals['_SPACE']._serialized_start=853
-  _globals['_SPACE']._serialized_end=882
-  _globals['_SIMPLERESPONSE']._serialized_start=33
-  _globals['_SIMPLERESPONSE']._serialized_end=116
-  _globals['_ALOHAREQUEST']._serialized_start=118
-  _globals['_ALOHAREQUEST']._serialized_end=147
-  _globals['_ALOHARESPONSE']._serialized_start=149
-  _globals['_ALOHARESPONSE']._serialized_end=179
-  _globals['_TRANSFORM']._serialized_start=181
-  _globals['_TRANSFORM']._serialized_end=234
-  _globals['_ADDACTORREQUEST']._serialized_start=237
-  _globals['_ADDACTORREQUEST']._serialized_end=399
-  _globals['_SETACTORTRANSFORMREQUEST']._serialized_start=401
-  _globals['_SETACTORTRANSFORMREQUEST']._serialized_end=521
-  _globals['_GETPENDINGOPERATIONSREQUEST']._serialized_start=523
-  _globals['_GETPENDINGOPERATIONSREQUEST']._serialized_end=552
-  _globals['_GETPENDINGOPERATIONSRESPONSE']._serialized_start=554
-  _globals['_GETPENDINGOPERATIONSRESPONSE']._serialized_end=604
-  _globals['_GETPENDINGACTORTRANSFORMREQUEST']._serialized_start=606
-  _globals['_GETPENDINGACTORTRANSFORMREQUEST']._serialized_end=692
-  _globals['_GETPENDINGACTORTRANSFORMRESPONSE']._serialized_start=694
-  _globals['_GETPENDINGACTORTRANSFORMRESPONSE']._serialized_end=813
-  _globals['_GRPCSERVICE']._serialized_start=885
-  _globals['_GRPCSERVICE']._serialized_end=1332
+  _globals['_STATUSCODE']._serialized_start=1460
+  _globals['_STATUSCODE']._serialized_end=1496
+  _globals['_SPACE']._serialized_start=1498
+  _globals['_SPACE']._serialized_end=1527
+  _globals['_TRANSFORM']._serialized_start=33
+  _globals['_TRANSFORM']._serialized_end=86
+  _globals['_ALOHAREQUEST']._serialized_start=88
+  _globals['_ALOHAREQUEST']._serialized_end=117
+  _globals['_ALOHARESPONSE']._serialized_start=119
+  _globals['_ALOHARESPONSE']._serialized_end=216
+  _globals['_ADDACTORREQUEST']._serialized_start=219
+  _globals['_ADDACTORREQUEST']._serialized_end=381
+  _globals['_ADDACTORRESPONSE']._serialized_start=383
+  _globals['_ADDACTORRESPONSE']._serialized_end=468
+  _globals['_SETACTORTRANSFORMREQUEST']._serialized_start=470
+  _globals['_SETACTORTRANSFORMREQUEST']._serialized_end=590
+  _globals['_SETACTORTRANSFORMRESPONSE']._serialized_start=592
+  _globals['_SETACTORTRANSFORMRESPONSE']._serialized_end=686
+  _globals['_GETPENDINGOPERATIONSREQUEST']._serialized_start=688
+  _globals['_GETPENDINGOPERATIONSREQUEST']._serialized_end=717
+  _globals['_GETPENDINGOPERATIONSRESPONSE']._serialized_start=719
+  _globals['_GETPENDINGOPERATIONSRESPONSE']._serialized_end=836
+  _globals['_GETPENDINGACTORTRANSFORMREQUEST']._serialized_start=839
+  _globals['_GETPENDINGACTORTRANSFORMREQUEST']._serialized_end=992
+  _globals['_GETPENDINGACTORTRANSFORMRESPONSE']._serialized_start=995
+  _globals['_GETPENDINGACTORTRANSFORMRESPONSE']._serialized_end=1137
+  _globals['_GETSYNCFROMMUJOCOTOSCENEREQUEST']._serialized_start=1139
+  _globals['_GETSYNCFROMMUJOCOTOSCENEREQUEST']._serialized_end=1172
+  _globals['_GETSYNCFROMMUJOCOTOSCENERESPONSE']._serialized_start=1174
+  _globals['_GETSYNCFROMMUJOCOTOSCENERESPONSE']._serialized_end=1290
+  _globals['_SETSYNCFROMMUJOCOTOSCENEREQUEST']._serialized_start=1292
+  _globals['_SETSYNCFROMMUJOCOTOSCENEREQUEST']._serialized_end=1340
+  _globals['_SETSYNCFROMMUJOCOTOSCENERESPONSE']._serialized_start=1342
+  _globals['_SETSYNCFROMMUJOCOTOSCENERESPONSE']._serialized_end=1458
+  _globals['_GRPCSERVICE']._serialized_start=1530
+  _globals['_GRPCSERVICE']._serialized_end=2224
 # @@protoc_insertion_point(module_scope)

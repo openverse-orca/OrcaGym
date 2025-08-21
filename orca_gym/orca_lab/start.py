@@ -8,6 +8,8 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation
 
+import examples.replicator.run_simulation as sim
+
 # class AppWidget(QtWidgets.QWidget):
 #     def __init__(self):
 #         super().__init__()
@@ -48,8 +50,10 @@ from scipy.spatial.transform import Rotation
 
 
 if __name__ == "__main__":
-    grpc_addr = "localhost:50151"
-    scene = OrcaLabScene(grpc_addr)
+    edit_grpc_addr = "localhost:50151"
+    sim_grpc_addr = "localhost:50051"
+
+    edit_scene = OrcaLabScene(edit_grpc_addr, sim_grpc_addr)
 
     rot = Rotation.from_euler("xyz", [90, 45, 30], degrees=True)
     q = rot.as_quat()  # x,y,z,w
@@ -62,11 +66,19 @@ if __name__ == "__main__":
         scale=1.0,
     )
 
-    scene.add_actor(actor, Path.root_path())
+    edit_scene.add_actor(actor, Path.root_path())
 
-    scene.loop.run_forever()
+    edit_scene.publish_scene()
+    edit_scene.set_sync_from_mujoco_to_scene(True)
 
-    scene.close_grpc()
+
+    agent_name = "NoRobot"
+    env_name = "Actors"
+    sim.run_simulation(sim_grpc_addr, agent_name, env_name)
+
+    edit_scene.loop.run_forever()
+
+    edit_scene.close_grpc()
 
     # magic!
     # AttributeError: 'NoneType' object has no attribute 'POLLER'

@@ -7,18 +7,6 @@ enum StatusCode {
     Error = 1;
 }
 
-message SimpleResponse {
-    StatusCode status_code = 1; // 状态码字段
-    string error_message = 2;   // 错误详情（可选）
-}
-
-message AlohaRequest {
-    int32 value = 1;
-}
-message AlohaResponse {
-    int32 value = 1;
-}
-
 enum Space {
     Local = 0;
     World = 1;
@@ -30,6 +18,17 @@ message Transform {
     double scale = 3;               // 等比缩放 (1 elements)
 }
 
+
+message AlohaRequest {
+    int32 value = 1;
+}
+message AlohaResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    int32 value = 3;
+}
+
+
 message AddActorRequest {
     string spawnable_name = 1;      // Actor 使用的 spawnable 名字
     string actor_name = 2;          // Actor Entity 的名字
@@ -37,34 +36,70 @@ message AddActorRequest {
     Transform transform = 4;
     Space space = 5;
 }
+message AddActorResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
 
 message SetActorTransformRequest {
     string actor_path = 1;
     Transform transform = 2;
     Space space = 3;
 }
+message SetActorTransformResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
 
 message GetPendingOperationsRequest {
 }
 message GetPendingOperationsResponse {
-    repeated string operations = 1;
+    StatusCode status_code = 1;
+    string error_message = 2;
+    repeated string operations = 3;
 }
 
 message GetPendingActorTransformRequest {
-    string actor_path = 1;
-    Space space = 2;
+    StatusCode status_code = 1;
+    string error_message = 2;
+    string actor_path = 3;
+    Space space = 4;
 }
 message GetPendingActorTransformResponse {
-    Transform transform = 1;
-    StatusCode status_code = 2;
+    StatusCode status_code = 1;
+    string error_message = 2;
+    Transform transform = 3;
+}
+
+
+message GetSyncFromMujocoToSceneRequest {
+}
+message GetSyncFromMujocoToSceneResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    bool value = 3;
+}
+
+
+message SetSyncFromMujocoToSceneRequest {
+    bool value = 1;
+}
+message SetSyncFromMujocoToSceneResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    bool value = 3;
 }
 
 service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
-    rpc AddActor(AddActorRequest) returns (SimpleResponse);
-    rpc SetActorTransform(SetActorTransformRequest) returns (SimpleResponse);
+    rpc AddActor(AddActorRequest) returns (AddActorResponse);
+    rpc SetActorTransform(SetActorTransformRequest) returns (SetActorTransformResponse);
 
     rpc GetPendingOperations(GetPendingOperationsRequest) returns (GetPendingOperationsResponse);
     rpc GetPendingActorTransform(GetPendingActorTransformRequest) returns (GetPendingActorTransformResponse);
+
+    rpc GetSyncFromMujocoToScene(GetSyncFromMujocoToSceneRequest) returns (GetSyncFromMujocoToSceneResponse);
+    rpc SetSyncFromMujocoToScene(SetSyncFromMujocoToSceneRequest) returns (SetSyncFromMujocoToSceneResponse);
 }
