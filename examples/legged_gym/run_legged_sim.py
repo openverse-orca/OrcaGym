@@ -45,13 +45,14 @@ MAX_EPISODE_STEPS = int(EPISODE_TIME_SHORT / REALTIME_STEP)  # 10 seconds
 
 
 class KeyboardControl:
-    def __init__(self, orcagym_addr: str, env: LeggedSimEnv, robot_config: dict, model_type: str):
+    def __init__(self, orcagym_addr: str, env: LeggedSimEnv, command_model: dict, model_type: str):
         self.keyboard_controller = KeyboardInput(KeyboardInputSourceType.ORCASTUDIO, orcagym_addr)
         self._last_key_status = {"W": 0, "A": 0, "S": 0, "D": 0, "Space": 0, "Up": 0, "Down": 0, "LShift": 0, "RShift": 0, "R": 0, "F": 0, "M": 0}   
         self.env = env
-        self.player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_x"]) / 2
-        self.player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_fast"]["command_lin_vel_range_y"]) / 2
-        self.player_agent_turn_angel = np.array(robot_config["curriculum_commands"]["move_fast"]["command_ang_vel_range"])
+        self.player_agent_lin_vel_x = {terrain_type: np.array(command_model[terrain_type]["forward_speed"]) for terrain_type in command_model.keys()}
+        self.player_agent_lin_vel_y = {terrain_type: np.array(command_model[terrain_type]["left_speed"]) for terrain_type in command_model.keys()}
+        self.player_agent_turn_angel = {terrain_type: np.array(command_model[terrain_type]["turn_speed"]) for terrain_type in command_model.keys()}
+        self.player_agent_turbo_scale = {terrain_type: np.array(command_model[terrain_type]["turbo_scale"]) for terrain_type in command_model.keys()}
         self.terrain_type = "flat_terrain"
         self.model_type = model_type
 
@@ -63,27 +64,27 @@ class KeyboardControl:
         reborn = False
         
         if key_status["W"] == 1:
-            lin_vel[0] = self.player_agent_lin_vel_x[1]
+            lin_vel[0] = self.player_agent_lin_vel_x[self.terrain_type][1]
         if key_status["S"] == 1:
-            lin_vel[0] = self.player_agent_lin_vel_x[0]
+            lin_vel[0] = self.player_agent_lin_vel_x[self.terrain_type][0]
         if key_status["Q"] == 1:
-            lin_vel[1] = self.player_agent_lin_vel_y[1]
+            lin_vel[1] = self.player_agent_lin_vel_y[self.terrain_type][0]
         if key_status["E"] == 1:
-            lin_vel[1] = self.player_agent_lin_vel_y[0]
+            lin_vel[1] = self.player_agent_lin_vel_y[self.terrain_type][1]
         if key_status["A"] == 1:
             if lin_vel[0] >= 0:
-                ang_vel = self.player_agent_turn_angel
+                ang_vel = self.player_agent_turn_angel[self.terrain_type]
             elif lin_vel[0] < 0:
-                ang_vel = -self.player_agent_turn_angel
+                ang_vel = -self.player_agent_turn_angel[self.terrain_type]
         if key_status["D"] == 1:
             if lin_vel[0] >= 0:
-                ang_vel = -self.player_agent_turn_angel
+                ang_vel = -self.player_agent_turn_angel[self.terrain_type]
             elif lin_vel[0] < 0:
-                ang_vel = self.player_agent_turn_angel
+                ang_vel = self.player_agent_turn_angel[self.terrain_type]
         if self._last_key_status["R"] == 0 and key_status["R"] == 1:
             reborn = True
         if key_status["LShift"] == 1:
-            lin_vel[:2] *= 2
+            lin_vel[:2] *= self.player_agent_turbo_scale[self.terrain_type]
         if key_status["Space"] == 0 and self._last_key_status["Space"] == 1:
             if self.terrain_type == "flat_terrain":
                 self.terrain_type = "rough_terrain"
@@ -261,7 +262,7 @@ def main(
 
 
 
-        keyboard_control = KeyboardControl(orcagym_addresses[0], env, LeggedRobotConfig[agent_name], model_type)
+        keyboard_control = KeyboardControl(orcagym_addresses[0], env, command_model, model_type)
 
         agent_name_list = [agent_name]
         run_simulation(
@@ -408,8 +409,7 @@ def run_simulation(env: gym.Env,
             else:
                 brake_time = 0.0
 
-            command_model_type = command_model[terrain_type]
-            model = models[model_type][command_model_type]
+            model = models[model_type][terrain_type]
 
             command_dict = {"lin_vel": lin_vel, "ang_vel": ang_vel}
             if hasattr(env, "setup_command"):

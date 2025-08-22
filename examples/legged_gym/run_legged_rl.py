@@ -246,7 +246,7 @@ def run_rllib_appo_rl(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
         agent_spawnable_name=agent_spawnable_name,
-        agent_num=num_envs_per_env_runner,
+        agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
         terrain_spawnable_names=terrain_spawnable_names,
         model_dir=model_dir,
     )

@@ -13,7 +13,7 @@ import numpy as np
 
 from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np, quat_to_euler
 
-from .legged_config import LeggedRobotConfig, LeggedObsConfig
+from .legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig
 from orca_gym.utils.joint_controller import pd_control
 from numpy.linalg import norm, lstsq
 
@@ -136,7 +136,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._pos_random_range = robot_config["pos_random_range"]
         
         # Curriculum learning
-        self.setup_curriculum(list(robot_config["curriculum_levels"].keys())[0])
+        self.setup_curriculum(list(CurriculumConfig["curriculum_levels"].keys())[0])
         
         self._init_commands_config()
    
@@ -1468,10 +1468,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
         print("Agent: ", self._env_id + self.name, "Setup curriculum: ", curriculum)
 
         robot_config = LeggedRobotConfig[get_legged_robot_name(self.name)]
-        self._terrain = robot_config["terrain"]
-        self._curriculum_levels =  robot_config["curriculum_levels"][curriculum]
+        self._terrain = CurriculumConfig["terrain"]
+        self._curriculum_levels =  CurriculumConfig["curriculum_levels"][curriculum]
         self._curriculum_learning = robot_config["curriculum_learning"]
-        self._curriculum_commands = robot_config["curriculum_commands"]
+        self._curriculum_commands = CurriculumConfig["curriculum_commands"]
         if self._curriculum_learning:
             buffer_size = min(self._max_episode_steps, 1000)
             self._curriculum_reward_buffer = {

@@ -10,8 +10,8 @@ training:
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 
-    flat_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_10_usda"]
-    rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_10_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slop_20_usda"]
+    flat_terrain: ["terrain_stair_low_flat_usda", "terrain_brics_low_usda"]
+    rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_5_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slope_10_usda"]
   curriculum_list:
     flat_terrain:
       - name: "basic_moving"

@@ -178,8 +178,8 @@ def get_config(
             env_runner_cls=ENV_RUNNER_CLS[env_name],
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
-            num_cpus_per_env_runner=1,
-            num_gpus_per_env_runner=(num_gpus_available - 0.1) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
+            num_cpus_per_env_runner=1.0,
+            num_gpus_per_env_runner=(num_gpus_available - 0.5) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
             rollout_fragment_length=64,
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
         )
@@ -190,7 +190,7 @@ def get_config(
                 module_class=DefaultAPPOTorchRLModule,
                 model_config={
                     "fcnet_hiddens": agent_config["pi"],
-                    "fcnet_activation": "relu",
+                    "fcnet_activation": "swish",
                     "post_fcnet_activation": "tanh",
                     # "vf_share_layers": False,
                     "use_gpu": num_gpus_available > 0,
@@ -199,7 +199,7 @@ def get_config(
         )
         .learners(
             num_learners=0,
-            num_gpus_per_learner=num_gpus_available * 0.1,
+            num_gpus_per_learner=num_gpus_available * 0.5,
         )
         .training(
             train_batch_size_per_learner=agent_config["batch_size"],
@@ -489,7 +489,7 @@ def run_training(
             orcagym_addr=orcagym_addr,
             env_name=env_name,
             agent_name=agent_name,
-            agent_num=num_envs_per_env_runner,
+            agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
             async_env_runner=async_env_runner,
@@ -524,7 +524,7 @@ def run_training(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        agent_num=num_envs_per_env_runner,
+        agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
         max_episode_steps=max_episode_steps,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,

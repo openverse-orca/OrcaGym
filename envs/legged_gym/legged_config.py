@@ -61,3 +61,134 @@ LeggedRobotConfig = {
     "AzureLoong": AzureLoongConfig,
     "g1": g1Config,     
 }
+
+CurriculumConfig = {
+    "terrain" : {
+        "default" : {
+            "offset" : [0, 0, 0],
+        },
+        "brics_low" : {
+            "offset" : [0, -30, 0],
+        },
+        "brics_high" : {
+            "offset" : [0, 30, 0],
+        },
+        "stair_low" : {
+            "offset" : [-30, -30, 0],
+        },
+        "stair_high" : {
+            "offset" : [-30, 0, 0],
+        },
+        "slop_10" : {
+            "offset" : [60, -30, 0],
+        },
+        "slop_5" : {
+            "offset" : [60, 30, 0],
+        },
+        "stair_low_flat" : {
+            "offset" : [-30, 30, 0],
+        },
+    },
+
+    "curriculum_levels" : {
+        "basic_moving" : [
+            {"terrain" : "default" ,          "command_type": "move_slowly",},
+            {"terrain" : "default" ,          "command_type": "move_medium",},
+        ],
+        "flat_terrain" : [
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "brics_low" ,        "command_type": "move_fast",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
+            # {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
+            # {"terrain" : "default" ,          "command_type": "move_fast",},
+            # {"terrain" : "slop_5" ,          "command_type": "move_fast",},
+            # {"terrain" : "stair_low",       "command_type": "move_slowly",},
+            # {"terrain" : "default" ,          "command_type": "move_fast",},
+            # {"terrain" : "stair_low" ,       "command_type": "move_medium",},
+        ],
+        "rough_terrain" : [
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "brics_low" ,        "command_type": "move_fast",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
+            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "slop_5" ,          "command_type": "move_fast",},
+            {"terrain" : "stair_low",       "command_type": "move_slowly",},
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "stair_low" ,       "command_type": "move_medium",},
+            {"terrain" : "brics_high" ,       "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "brics_high" ,       "command_type": "move_medium",},
+            {"terrain" : "stair_high" ,       "command_type": "move_slowly",},
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "slop_10" ,          "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "slop_10" ,          "command_type": "move_medium",},
+        ],
+    },
+
+    "curriculum_commands" : {
+        "stand_still" : {
+            "command_lin_vel_range_x" : [-0.0, 0.0], # x direction for forward max speed
+            "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+            "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
+            "command_ang_vel_range" : 0.0,  # max turning rate
+            "command_resample_interval" : 20, # second to resample the command
+            "distance" : 0.0,
+            "rating" : 0.5,
+            "terminate_threshold" : 10,
+        },
+
+        "spot_turn" : {
+            "command_lin_vel_range_x" : [-0.1, 0.1], # x direction for forward max speed
+            "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+            "command_lin_vel_threshold" : [-0.0, 0.0], # min linear velocity to trigger moving
+            "command_ang_vel_range" : np.pi / 4,  # max turning rate
+            "command_resample_interval" : 2, # second to resample the command
+            "distance" : 0.0,
+            "rating" : 0.5,
+            "terminate_threshold" : 10,
+        },
+
+        "move_slowly" : {
+            "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
+            "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
+            "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
+            "command_ang_vel_range" : np.pi / 4,  # max turning rate
+            "command_resample_interval" : 4, # second to resample the command
+            "distance" : 1.0,
+            "rating" : 0.5,
+            "terminate_threshold" : 10,
+        },
+
+        "move_medium" : {
+            "command_lin_vel_range_x" : [-1.0, 1.0], # x direction for forward
+            "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
+            "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
+            "command_ang_vel_range" : np.pi / 4,  # max turning rate
+            "command_resample_interval" : 4, # second to resample the command
+            "distance" : 3.0,
+            "rating" : 0.5,
+            "terminate_threshold" : 10,
+        },
+
+        "move_fast" : {
+            "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward max speed
+            "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
+            "command_lin_vel_threshold" : [-0.2, 0.3], # min linear velocity to trigger moving
+            "command_ang_vel_range" : np.pi / 4,  # max turning rate
+            "command_resample_interval" : 4, # second to resample the command
+            "distance" : 5.0,
+            "rating" : 0.5,
+            "terminate_threshold" : 10,
+        },
+    },
+}

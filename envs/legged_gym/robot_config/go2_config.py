@@ -177,7 +177,7 @@ Go2Config = {
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
-        "push_interval_s" :         5,
+        "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,
         "pos_random_range" :        0.5,    # randomize the x,y position of the robot in each episode
         

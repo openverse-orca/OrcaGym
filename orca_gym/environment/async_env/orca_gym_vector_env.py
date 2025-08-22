@@ -88,32 +88,45 @@ class OrcaGymVectorEnv(VectorEnv):
         **kwargs
     ):
         self.agent_num = num_envs
+        assert num_envs % 32 == 0, "num_envs must be a multiple of 32"
+        self.env_num = num_envs // 32
+
         self.worker_index = worker_index
         env_id = kwargs.get("env_id", "")
         env_id_prefix = "-".join(env_id.split("-")[:-1])
-        worker_env_id = f"{env_id_prefix}-{worker_index:03d}"
-        kwargs["env_id"] = worker_env_id
-        if worker_index == 1:
-            kwargs["is_subenv"] = False
 
-        print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
+        self.envs = []
+        for i in range(self.env_num):
+            worker_env_id = f"{env_id_prefix}-{i:03d}-{worker_index:03d}"
+            kwargs["env_id"] = worker_env_id
+            if worker_index == 1 and i == 0:
+                kwargs["is_subenv"] = False
+            else:
+                kwargs["is_subenv"] = True
 
-        gym.register(
-            id=worker_env_id,
-            entry_point=entry_point,
-            kwargs=kwargs
-        )
+            print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
 
-        self.env : OrcaGymAsyncEnv = gym.make(worker_env_id, **kwargs)
+            gym.register(
+                id=worker_env_id,
+                entry_point=entry_point,
+                kwargs=kwargs
+            )
+
+            self.envs.append(gym.make(worker_env_id, **kwargs))
 
         # OrcaGymAsyncEnv 的 obs 是 字典形式，不符合rllib的格式，需要转换为np形式
-        unwrapped_env : OrcaGymAsyncEnv = self.env.unwrapped
-        env_obs, _, _, _ = unwrapped_env.get_obs()
-        obs = env_obs["observation"]
+        obs_list = []
+        for env in self.envs:
+            unwrapped_env : OrcaGymAsyncEnv = env.unwrapped
+            env_obs, _, _, _ = unwrapped_env.get_obs()
+            obs_list.append(env_obs["observation"])
+
+        # 将所有 env 的 obs 合并成一个 np.ndarray
+        obs = np.concatenate(obs_list, axis=0)
         self.observation_space = unwrapped_env.generate_observation_space(obs)
         self.single_observation_space = unwrapped_env.generate_observation_space(obs[0])
 
-        self.single_action_space = self.env.action_space
+        self.single_action_space = self.envs[0].action_space
         # 将 single_action_space 扩展到 env_num 维度
         self.action_space = gym.spaces.Box(
             low=np.tile(self.single_action_space.low, (self.agent_num, 1)),
@@ -125,7 +138,7 @@ class OrcaGymVectorEnv(VectorEnv):
         print("OrcaGymVectorEnv single_observation_space: ", self.single_observation_space)
         print("OrcaGymVectorEnv action_space: ", self.action_space)
         print("OrcaGymVectorEnv single_action_space: ", self.single_action_space)
-   
+
         self.num_envs = num_envs
         self.closed = False
         self._np_random = None
@@ -161,9 +174,12 @@ class OrcaGymVectorEnv(VectorEnv):
             self._np_random, self._np_random_seed = seeding.np_random(seed)
 
         # obs 只取第一个 agent 的观测数据，实际所有 agent 的观测数据在 info 中
-        _, async_env_info = self.env.reset()
+        obs_list = []
+        for env in self.envs:
+            _, async_env_info = env.reset()
+            obs_list.append(async_env_info["env_obs"]["observation"])
 
-        obs = async_env_info["env_obs"]["observation"]
+        obs = np.concatenate(obs_list, axis=0)
         infos = [{} for _ in range(self.agent_num)]
 
         # print("OrcaGymVectorEnv reset obs shape: ", obs.shape)
@@ -208,13 +224,31 @@ class OrcaGymVectorEnv(VectorEnv):
         """
         # raise NotImplementedError(f"{self.__str__()} step function is not implemented.")
         # print("OrcaGymVectorEnv step actions shape: ", actions.shape)
-        actions = actions.flatten()
-        _, _, _, _, info = self.env.step(actions)
 
-        obs = info["env_obs"]["observation"]
-        reward = info["reward"]
-        terminated = info["terminated"]
-        truncated = info["truncated"]
+        # 假设原数组 action_array 形状为 (N, 12)，N 是第一维大小
+        N = actions.shape[0]  # 获取第一维长度
+
+        # 计算整除32后的分组数量
+        num_groups = N // 32  # 整数除法（自动舍去余数）
+
+        # 重塑为 (num_groups, 32, 12) 形状
+        reshaped_action = actions.reshape(num_groups, 32, actions.shape[1])
+
+        obs_list = []
+        reward_list = []
+        terminated_list = []
+        truncated_list = []
+        for i, env in enumerate(self.envs):
+            _, _, _, _, info = env.step(reshaped_action[i].flatten())
+            obs_list.append(info["env_obs"]["observation"])
+            reward_list.append(info["reward"])
+            terminated_list.append(info["terminated"])
+            truncated_list.append(info["truncated"])
+
+        obs = np.concatenate(obs_list, axis=0)
+        reward = np.concatenate(reward_list, axis=0)
+        terminated = np.concatenate(terminated_list, axis=0)
+        truncated = np.concatenate(truncated_list, axis=0)
         infos = [{} for _ in range(self.agent_num)]
 
         # print("OrcaGymVectorEnv step obs shape: ", obs.shape)
@@ -230,10 +264,9 @@ class OrcaGymVectorEnv(VectorEnv):
         Returns:
             A tuple of rendered frames from the parallel environments
         """
-        # raise NotImplementedError(
-        #     f"{self.__str__()} render function is not implemented."
-        # )
-        self.env.render()
+
+        # Render 不需要都调用，反正只有第一个需要执行Render
+        self.envs[0].render()
 
     def close(self, **kwargs: Any):
         """Close all parallel environments and release resources.
@@ -255,7 +288,8 @@ class OrcaGymVectorEnv(VectorEnv):
         if self.closed:
             return
 
-        self.env.close()
+        for env in self.envs:
+            env.close()
 
         self.close_extras(**kwargs)
         self.closed = True
