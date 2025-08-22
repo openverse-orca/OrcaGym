@@ -103,12 +103,12 @@ CurriculumConfig = {
             {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
-            # {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
-            # {"terrain" : "default" ,          "command_type": "move_fast",},
-            # {"terrain" : "slop_5" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low",       "command_type": "move_slowly",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low" ,       "command_type": "move_medium",},
+            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "slop_5" ,          "command_type": "move_fast",},
         ],
         "rough_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},
@@ -118,12 +118,12 @@ CurriculumConfig = {
             {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
-            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
-            {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "slop_5" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low",       "command_type": "move_slowly",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low" ,       "command_type": "move_medium",},
+            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
+            {"terrain" : "default" ,          "command_type": "move_fast",},
+            {"terrain" : "slop_5" ,          "command_type": "move_fast",},
             {"terrain" : "brics_high" ,       "command_type": "move_slowly", },
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "brics_high" ,       "command_type": "move_medium",},
@@ -155,13 +155,13 @@ CurriculumConfig = {
             "command_resample_interval" : 2, # second to resample the command
             "distance" : 0.0,
             "rating" : 0.5,
-            "terminate_threshold" : 10,
+            "terminate_threshold" : 3,
         },
 
         "move_slowly" : {
             "command_lin_vel_range_x" : [-0.5, 0.5], # x direction for forward max speed
             "command_lin_vel_range_y" : [-0.0, 0.0], # y direction for left/right max speed
-            "command_lin_vel_threshold" : [-0.1, 0.1], # min linear velocity to trigger moving
+            "command_lin_vel_threshold" : [-0.25, 0.25], # min linear velocity to trigger moving
             "command_ang_vel_range" : np.pi / 4,  # max turning rate
             "command_resample_interval" : 4, # second to resample the command
             "distance" : 1.0,
@@ -172,23 +172,23 @@ CurriculumConfig = {
         "move_medium" : {
             "command_lin_vel_range_x" : [-1.0, 1.0], # x direction for forward
             "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
-            "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
+            "command_lin_vel_threshold" : [-0.3, 0.3], # min linear velocity to trigger moving
             "command_ang_vel_range" : np.pi / 4,  # max turning rate
-            "command_resample_interval" : 4, # second to resample the command
+            "command_resample_interval" : 7, # second to resample the command
             "distance" : 3.0,
             "rating" : 0.5,
-            "terminate_threshold" : 10,
+            "terminate_threshold" : 3,
         },
 
         "move_fast" : {
             "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward max speed
             "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
-            "command_lin_vel_threshold" : [-0.2, 0.3], # min linear velocity to trigger moving
+            "command_lin_vel_threshold" : [-0.3, 0.5], # min linear velocity to trigger moving
             "command_ang_vel_range" : np.pi / 4,  # max turning rate
-            "command_resample_interval" : 4, # second to resample the command
+            "command_resample_interval" : 7, # second to resample the command
             "distance" : 5.0,
             "rating" : 0.5,
-            "terminate_threshold" : 10,
+            "terminate_threshold" : 3,
         },
     },
 }

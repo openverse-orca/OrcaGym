@@ -195,7 +195,6 @@ class OrcaGymAsyncAgent:
         reset_info = self.on_reset(**kwargs)
         return reset_info
 
-
     def is_success(self, achieved_goal, desired_goal) -> np.float32:
         raise NotImplementedError
 

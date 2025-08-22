@@ -132,6 +132,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._friction_range = robot_config["friction_range"]
         self._randomize_base_mass = robot_config["randomize_base_mass"]
         self._added_mass_range = robot_config["added_mass_range"]
+        self._added_mass_pos_range = robot_config["added_mass_pos_range"]
         
         self._pos_random_range = robot_config["pos_random_range"]
         
@@ -184,6 +185,10 @@ class LeggedRobot(OrcaGymAsyncAgent):
     @property
     def added_mass_range(self) -> np.ndarray:
         return self._added_mass_range
+
+    @property
+    def added_mass_pos_range(self) -> np.ndarray:
+        return self._added_mass_pos_range
     
     @property
     def base_joint_name(self) -> str:
@@ -507,25 +512,22 @@ class LeggedRobot(OrcaGymAsyncAgent):
             self._last_push_duration += self.dt
             return {}
         
-    def randomize_foot_friction(self, random_friction : float, geom_dict : dict) -> dict:
+    def randomize_foot_friction(self, geom_dict: dict) -> dict:
         if not self._randomize_friction:
             return {}
         
-        # 缩放到指定范围
         min_friction, max_friction = self._friction_range
         assert min_friction < max_friction, "min_friction should be less than max_friction"
-        random_friction = max(min(random_friction, 1.0), 0.0)
-        scaled_random_friction = min_friction + random_friction * (max_friction - min_friction)
+        
+        scaled_random_friction = self._np_random.uniform(min_friction, max_friction)
+        return self.scale_foot_friction(geom_dict, scaled_random_friction)
 
-        geom_friction_dict = self.setup_foot_friction(geom_dict, scaled_random_friction)
-        return geom_friction_dict
-
-    def setup_foot_friction(self, geom_dict : dict, friction_value : float) -> dict:
+    def scale_foot_friction(self, geom_dict : dict, scale : float) -> dict:
         geom_friction_dict : dict[str, np.ndarray] = {}
         for name, geom in geom_dict.items():
             if geom["BodyName"] in self._foot_body_names:
                 friction = geom["Friction"]
-                friction[0] = friction_value
+                friction *= scale
                 geom_friction_dict[name] = friction
 
         return geom_friction_dict

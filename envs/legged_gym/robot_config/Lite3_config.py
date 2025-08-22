@@ -9,7 +9,7 @@ RewardConfig = {
         "leg_contact" : 1,               # 腿部身体接触惩罚
         "body_contact" : 1,              # 身体接触惩罚
         "foot_touch" : 0.03,                # 重踏惩罚
-        "joint_angles" : 0.05,            # 关节偏离自然站立角度惩罚
+        "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
         "limit" : 0.01,                 # Action极限值惩罚
         "action_rate" : 0.1,           # Action平滑
@@ -101,20 +101,20 @@ Lite3Config = {
 
         "action_scale" :         [
             0.3,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.2,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            1.0,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.8,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.5,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
             0.3,    # joint name="FR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.2,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            1.0,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.8,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.5,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
             0.3,    # joint name="HL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.2,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            1.0,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.8,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.5,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
             0.3,    # joint name="HR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.2,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            1.0,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.8,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.5,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
         ],
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
         "soft_joint_qvel_limit": 1.0,       # percentage of urdf limits, values above this limit are penalized
@@ -183,6 +183,7 @@ Lite3Config = {
         "friction_range" :          [0.5, 1.5],
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
+        "added_mass_pos_range" :    [-0.05, 0.05],
         "push_robots" :             True,
         "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,

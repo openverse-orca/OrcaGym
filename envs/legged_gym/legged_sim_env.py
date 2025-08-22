@@ -417,7 +417,7 @@ class AgentBase:
     def _setup_friction(self, env: LeggedSimEnv) -> None:
         # for debug use.
         geom_dict = env.model.get_geom_dict()
-        geom_friction_dict = self.agent.setup_foot_friction(geom_dict, 1.0)
+        geom_friction_dict = self.agent.scale_foot_friction(geom_dict, 1.0)
         env.set_geom_friction(geom_friction_dict)
 
         print("Setup friction: ", geom_friction_dict)
