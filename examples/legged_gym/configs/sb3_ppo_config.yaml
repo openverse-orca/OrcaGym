@@ -2,27 +2,27 @@ framework: "sb3"
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
-training_episode: 200
+training_episode: 100
 task: "flat_terrain"
 
 training:
-  subenv_num: 16
+  subenv_num: 64
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 
-    flat_terrain: ["terrain_stair_low_flat_usda", "terrain_brics_low_usda"]
+    flat_terrain: ["terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_stair_low_usda"]
     rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_5_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slope_10_usda"]
   curriculum_list:
     flat_terrain:
       - name: "basic_moving"
         milestone: 100
       - name: "flat_terrain"
-        milestone: 2000
+        milestone: 1500
     rough_terrain:
       - name: "basic_moving"
         milestone: 100
       - name: "rough_terrain"
-        milestone: 3000
+        milestone: 1500
 
 testing:
   subenv_num: 1

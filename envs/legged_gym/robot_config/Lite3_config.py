@@ -8,11 +8,11 @@ RewardConfig = {
         "failure" : 0,                   # 失败惩罚
         "leg_contact" : 1,               # 腿部身体接触惩罚
         "body_contact" : 1,              # 身体接触惩罚
-        "foot_touch" : 0,                # 重踏惩罚
-        "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
+        "foot_touch" : 0.03,                # 重踏惩罚
+        "joint_angles" : 0.05,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
         "limit" : 0.01,                 # Action极限值惩罚
-        "action_rate" : 0.01,           # Action平滑
+        "action_rate" : 0.1,           # Action平滑
         "base_gyro" : 0,                
         "base_accelerometer" : 0,
         "follow_command_linvel" : 1,    # 跟随指令速度奖励
@@ -79,10 +79,10 @@ Lite3Config = {
         
         # Init the robot in a standing position. Keep the order of the joints same as the joint_names 
         # for reset basic pos or computing the reward easily.
-        "neutral_joint_angles" : {"FL_HipX_joint": 0.0, "FL_HipY_joint": -0.8, "FL_Knee_joint": 1.5,
-                                "FR_HipX_joint": 0.0, "FR_HipY_joint": -0.8, "FR_Knee_joint": 1.5,
-                                "HL_HipX_joint": 0.0, "HL_HipY_joint": -1.0, "HL_Knee_joint": 1.5,
-                                "HR_HipX_joint": 0.0, "HR_HipY_joint": -1.0, "HR_Knee_joint": 1.5},
+        "neutral_joint_angles" : {"FL_HipX_joint": 0.0, "FL_HipY_joint": -1.0, "FL_Knee_joint": 1.8,
+                                "FR_HipX_joint": 0.0, "FR_HipY_joint": -1.0, "FR_Knee_joint": 1.8,
+                                "HL_HipX_joint": 0.0, "HL_HipY_joint": -1.0, "HL_Knee_joint": 1.8,
+                                "HR_HipX_joint": 0.0, "HR_HipY_joint": -1.0, "HR_Knee_joint": 1.8},
         
         "base_neutral_height_offset" : 0.16,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -96,26 +96,25 @@ Lite3Config = {
                                 "HR_HipX_actuator", "HR_HipY_actuator", "HR_Knee_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        # "kps" :                  [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-        "kps" :                  [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+        "kps" :                  [25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
         "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
 
         "action_scale" :         [
-            0.2,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.0,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.8,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.3,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            1.2,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            1.0,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.2,    # joint name="FR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.0,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.8,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.3,    # joint name="FR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            1.2,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            1.0,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.2,    # joint name="HL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.0,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.8,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.3,    # joint name="HL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            1.2,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            1.0,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.2,    # joint name="HR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            1.0,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.8,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.3,    # joint name="HR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            1.2,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            1.0,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
         ],
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
         "soft_joint_qvel_limit": 1.0,       # percentage of urdf limits, values above this limit are penalized
@@ -172,7 +171,7 @@ Lite3Config = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 5.0,
-        "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_air_time_ideal" : 0.5,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
             "phase_freq" :  0.8,
@@ -181,7 +180,7 @@ Lite3Config = {
 
         # Config for randomization
         "randomize_friction" :      True,
-        "friction_range" :          [0.5, 1.25],
+        "friction_range" :          [0.5, 1.5],
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
@@ -208,9 +207,17 @@ Lite3Config = {
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 64,  # 每个环境采样步数
         "batch_size" : 4096,  # 批次大小            
-        "learning_rate" : 0.0003,  # 学习率
+        "learning_rate": {
+            "initial_value": 3e-4,    # 初始学习率
+            "end_fraction": 0.5,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
+            "final_value": 1e-4       # 最终学习率
+        },
         "gamma" : 0.99,  # 折扣因子
-        "clip_range" : 0.2,  # PPO剪切范围
+        "clip_range": {
+            "initial_value": 0.2,     # 初始clip范围
+            "end_fraction": 0.5,      # 线性衰减，0.1表示在训练结束前10%时达到最终clip范围
+            "final_value": 0.1        # 最终clip范围
+        },
         "ent_coef" : 0.01,  # 熵系数
         "max_grad_norm" : 1,  # 最大梯度范数
     }

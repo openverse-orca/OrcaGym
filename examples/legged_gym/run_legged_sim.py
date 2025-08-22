@@ -449,7 +449,7 @@ def run_simulation(env: gym.Env,
                         "achieved_goal": agent_obs["achieved_goal"].astype(np.float32)
                     }
                     # print("grpc obs: ", grpc_obs)
-                    grpc_action, _states = model.predict(grpc_obs, model_type=command_model_type, deterministic=True)
+                    grpc_action, _states = model.predict(grpc_obs, model_type=terrain_type, deterministic=True)
                     if grpc_action is None:
                         grpc_action = np.zeros(env.action_space.shape[0])
                     # print("grpc action: ", grpc_action)
@@ -472,7 +472,7 @@ def run_simulation(env: gym.Env,
             sim_time += dt
 
             # no action testing
-            # action = np.zeros(env.action_space.shape[0])
+            action = np.zeros(env.action_space.shape[0])
             
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()

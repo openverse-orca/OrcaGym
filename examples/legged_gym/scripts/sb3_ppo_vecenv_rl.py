@@ -16,6 +16,7 @@ import sys
 import time
 
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.utils import get_schedule_fn, get_linear_fn
 class SnapshotCallback(BaseCallback):
     def __init__(self, 
                  save_interval : int, 
@@ -198,26 +199,22 @@ def setup_model_ppo(
 ) -> PPO:
     """
     设置或加载 PPO 模型。
-
-    参数:
-    - env: 训练环境
-    - env_num: 环境数量
-    - agent_num: 每个环境中的智能体数量
-    - model_file: 模型文件路径
-    - load_existing_model: 是否加载现有模型标志
-
-    返回:
-    - model: 初始化的或加载的 PPO 模型
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # 根据环境数量和智能体数量计算批次大小和采样步数
     total_envs = env_num * agent_num
-    n_steps = agent_config["n_steps"]  # 每个环境采样步数
-    batch_size = agent_config["batch_size"]  # 批次大小
+    n_steps = agent_config["n_steps"]
+    batch_size = agent_config["batch_size"]
+    
     # 确保 batch_size 是 total_envs * n_steps 的因数
+    min_batch_size = 32
     if (total_envs * n_steps) % batch_size != 0:
+        suitable_batch_size = (total_envs * n_steps) // 4
+        suitable_batch_size = max(min_batch_size, suitable_batch_size)
         print(f"Warning: batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
-        batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
+        print(f"自动调整为: {suitable_batch_size}")
+        batch_size = suitable_batch_size
         
     # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}"):
@@ -225,35 +222,62 @@ def setup_model_ppo(
         model = PPO.load(model_file, env=env, device=device)
     else:
         print("初始化新模型")
-        # 定义自定义策略网络
         
+        # 处理学习率调度
+        if isinstance(agent_config["learning_rate"], dict):
+            lr_schedule = get_linear_fn(
+                agent_config["learning_rate"]["initial_value"],
+                agent_config["learning_rate"]["final_value"],
+                agent_config["learning_rate"]["end_fraction"]
+            )
+            print(f"学习率调度: {agent_config['learning_rate']}")
+        else:
+            lr_schedule = agent_config["learning_rate"]
+            
+        # 处理clip_range调度
+        if isinstance(agent_config["clip_range"], dict):
+            clip_range_schedule = get_linear_fn(
+                agent_config["clip_range"]["initial_value"],
+                agent_config["clip_range"]["final_value"],
+                agent_config["clip_range"]["end_fraction"]
+            )
+            print(f"clip_range调度: {agent_config['clip_range']}")
+        else:
+            clip_range_schedule = agent_config["clip_range"]
+        
+        # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
-                pi=agent_config["pi"],  # 策略网络结构
-                vf=agent_config["vf"]   # 值函数网络结构
+                pi=agent_config["pi"],
+                vf=agent_config["vf"]
             ),
-            ortho_init=True,       # 正交初始化
-            activation_fn=nn.ELU,  # 激活函数
+            ortho_init=True,
+            activation_fn=nn.SiLU,  # 改为更合适的激活函数
         )
 
         model = PPO(
-            policy="MultiInputPolicy",  # 多输入策略
+            policy="MultiInputPolicy",
             env=env, 
             verbose=1, 
-            learning_rate=agent_config["learning_rate"], 
+            learning_rate=lr_schedule, 
             n_steps=n_steps, 
             batch_size=batch_size, 
             gamma=agent_config["gamma"], 
-            clip_range=agent_config["clip_range"], 
+            clip_range=clip_range_schedule, 
             ent_coef=agent_config["ent_coef"], 
             max_grad_norm=agent_config["max_grad_norm"],
             policy_kwargs=policy_kwargs, 
             device=device,
-            tensorboard_log="./ppo_tensorboard/",  # TensorBoard 日志目录
+            tensorboard_log="./ppo_tensorboard/",
         )
 
     # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}")
+    print(f"- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"- Learning Rate: {agent_config['learning_rate']}")
+    print(f"- Activation Function: {policy_kwargs['activation_fn'].__name__}")
+    print(f"- Policy Network: {agent_config['pi']}")
+    print(f"- Value Network: {agent_config['vf']}")
 
     return model
 
@@ -291,6 +315,8 @@ def train_model(
     curriculum_list: list[dict[str, int]],
     render_mode: str,
 ):
+    model = None
+    env = None
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -334,9 +360,11 @@ def train_model(
 
     finally:
         print("退出仿真环境")
-        print(f"-----------------Save Model-----------------")
-        model.save(model_file)
-        env.close()
+        if model is not None:
+            print(f"-----------------Save Model-----------------")
+            model.save(model_file)
+        if env is not None:
+            env.close()
 
 def test_model(
     orcagym_addresses: str,

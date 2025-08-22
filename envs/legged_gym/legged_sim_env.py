@@ -329,6 +329,8 @@ class AgentBase:
         self.agent.set_action_space() 
         self.generate_action_scale_array(self._query_ctrl_info())
         self._init_playable(env)
+        self._setup_friction(env)
+
 
     @property
     def agent(self) -> LeggedRobot:
@@ -411,6 +413,15 @@ class AgentBase:
     def _init_playable(self, env: LeggedSimEnv) -> None:
         self.agent.init_playable()
         self.agent.player_control = True
+
+    def _setup_friction(self, env: LeggedSimEnv) -> None:
+        # for debug use.
+        geom_dict = env.model.get_geom_dict()
+        geom_friction_dict = self.agent.setup_foot_friction(geom_dict, 1.0)
+        env.set_geom_friction(geom_friction_dict)
+
+        print("Setup friction: ", geom_friction_dict)
+
 class Lite3Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)

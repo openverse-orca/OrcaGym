@@ -517,11 +517,15 @@ class LeggedRobot(OrcaGymAsyncAgent):
         random_friction = max(min(random_friction, 1.0), 0.0)
         scaled_random_friction = min_friction + random_friction * (max_friction - min_friction)
 
+        geom_friction_dict = self.setup_foot_friction(geom_dict, scaled_random_friction)
+        return geom_friction_dict
+
+    def setup_foot_friction(self, geom_dict : dict, friction_value : float) -> dict:
         geom_friction_dict : dict[str, np.ndarray] = {}
         for name, geom in geom_dict.items():
             if geom["BodyName"] in self._foot_body_names:
                 friction = geom["Friction"]
-                friction[0] = scaled_random_friction
+                friction[0] = friction_value
                 geom_friction_dict[name] = friction
 
         return geom_friction_dict
