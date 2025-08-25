@@ -1,93 +1,147 @@
-# import sys
-# import random
-# from PySide6 import QtCore, QtWidgets, QtGui
+import asyncio
+import random
+from PySide6 import QtCore, QtWidgets, QtGui
 from orca_gym.orca_lab.path import Path
-from orca_gym.orca_lab.protos.edit_service_pb2_grpc import GrpcServiceStub
-from orca_gym.orca_lab.scene import OrcaLabScene, Actor
+from orca_gym.orca_lab.scene import OrcaLabScene, AssetActor
 import numpy as np
-
 from scipy.spatial.transform import Rotation
+import subprocess
 
-import examples.replicator.run_simulation as sim
+from orca_gym.orca_lab.ui.actor_outline import ActorOutline
+from orca_gym.orca_lab.ui.asset_browser import AssetBrowser
+from orca_gym.orca_lab.math import Transform, Vec3
 
-# class AppWidget(QtWidgets.QWidget):
-#     def __init__(self):
-#         super().__init__()
-
-#         self.hello = ["Hallo Welt", "Hei maailma", "Hola Mundo", "Привет мир"]
-
-#         self.button = QtWidgets.QPushButton("Click me!")
-#         self.text = QtWidgets.QLabel("Hello World", alignment=QtCore.Qt.AlignCenter)
-
-#         self.layout = QtWidgets.QVBoxLayout(self)
-#         self.layout.addWidget(self.text)
-#         self.layout.addWidget(self.button)
-
-#         self.button.clicked.connect(self.magic)
-
-#     @QtCore.Slot()
-#     def magic(self):
-#         self.text.setText(random.choice(self.hello))
+import PySide6.QtAsyncio as QtAsyncio
 
 
-# class App:
+async def empty_task():
+    pass
 
-#     def __init__(self, grpc_addr: str):
-#         self.q_app = QtWidgets.QApplication([])
-#         self.scene = OrcaLabScene(grpc_addr)
-#         self.scene.publish_scene()
 
-#     def active(self):
-#         self.app_widget = AppWidget()
-#         self.app_widget.resize(800, 600)
-#         self.app_widget.show()
+class ToolBar(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
-#     def deactivate(self):
-#         self.scene.close_grpc()
+        self.layout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.layout)
 
-#     def exec(self) -> int:
-#         return self.q_app.exec()
+        self.run_button = QtWidgets.QPushButton("Run Sim")
+        self.stop_button = QtWidgets.QPushButton("Stop Sim")
+
+        self.layout.addWidget(self.run_button)
+        self.layout.addWidget(self.stop_button)
+
+
+class App:
+
+    def __init__(self):
+
+        self.sim_process_running = False
+        self._init_scene()
+        self._init_ui()
+
+    def _init_scene(self):
+        self.edit_grpc_addr = "localhost:50151"
+        self.sim_grpc_addr = "localhost:50051"
+        self.scene = OrcaLabScene(self.edit_grpc_addr, self.sim_grpc_addr)
+        self._sim_process_check_lock = asyncio.Lock()
+
+        self.scene.set_sync_from_mujoco_to_scene(False)
+        self.scene.clear_scene()
+
+        # # Add a actor, for testing.
+        # rot = Rotation.from_euler("xyz", [90, 45, 30], degrees=True)
+        # q = rot.as_quat()  # x,y,z,w
+
+        transform = Transform()
+        transform.position = Vec3(0, 0, 2)
+
+        actor = AssetActor(name=f"box1", spawnable_name="box")
+        actor.transform = transform
+
+        self.scene.add_actor(actor, Path.root_path())
+
+    def _init_ui(self):
+        self.q_app = QtWidgets.QApplication([])
+        # self.actor_outline = ActorOutline()
+        # self.asset_browser = AssetBrowser()
+        # self.actor_outline.show()
+        # self.asset_browser.show()
+
+        self.tool_bar = ToolBar()
+        self.tool_bar.run_button.clicked.connect(self.run_sim)
+        self.tool_bar.stop_button.clicked.connect(self.stop_sim)
+        self.tool_bar.show()
+
+    def exec(self) -> int:
+
+        # edit_scene.loop.run_forever()
+        code = self.q_app.exec()
+
+        self.scene.close_grpc()
+
+        return code
+
+    def drain_event_loop(self):
+        self.scene.loop.run_until_complete(empty_task())
+
+    async def run_sim_async(self):
+        if self.sim_process_running:
+            return
+
+        await self.scene.publish_scene_async()
+        cmd = [
+            "python",
+            "-m",
+            "orca_gym.orca_lab.sim_process",
+            "--sim_addr",
+            self.sim_grpc_addr,
+        ]
+        self.sim_process = subprocess.Popen(cmd)
+        self.sim_process_running = True
+        self.scene.loop.create_task(self._sim_process_check_loop())
+        await self.scene.set_sync_from_mujoco_to_scene_async(True)
+
+    def run_sim(self):
+        self.scene.loop.run_until_complete(self.run_sim_async())
+
+    async def stop_sim_async(self):
+        if not self.sim_process_running:
+            return
+
+        async with self._sim_process_check_lock:
+            await self.scene.set_sync_from_mujoco_to_scene_async(False)
+            self.sim_process_running = False
+            self.sim_process.terminate()
+
+    def stop_sim(self):
+        self.scene.loop.run_until_complete(self.stop_sim_async())
+
+    async def _sim_process_check_loop(self):
+        async with self._sim_process_check_lock:
+            if not self.sim_process_running:
+                return
+
+            code = self.sim_process.poll()
+            if code is not None:
+                print("Simulation process exit with {code}")
+                self.sim_process_running = False
+                # TODO notify ui.
+
+            
+        QtWidgets.QApplication.processEvents()
+        frequency = 0.5  # Hz
+        asyncio.sleep(1 / frequency)
+        self.scene.loop.create_task(self._sim_process_check_loop())
 
 
 if __name__ == "__main__":
-    edit_grpc_addr = "localhost:50151"
-    sim_grpc_addr = "localhost:50051"
 
-    edit_scene = OrcaLabScene(edit_grpc_addr, sim_grpc_addr)
+    app = App()
 
-    rot = Rotation.from_euler("xyz", [90, 45, 30], degrees=True)
-    q = rot.as_quat()  # x,y,z,w
-
-    actor = Actor(
-        name=f"box1",
-        spawnable_name="box",
-        position=np.array([0, 0, 2]),
-        rotation=np.array([1, 0, 0, 0]),
-        scale=1.0,
-    )
-
-    edit_scene.add_actor(actor, Path.root_path())
-
-    edit_scene.publish_scene()
-    edit_scene.set_sync_from_mujoco_to_scene(True)
-
-
-    agent_name = "NoRobot"
-    env_name = "Actors"
-    sim.run_simulation(sim_grpc_addr, agent_name, env_name)
-
-    edit_scene.loop.run_forever()
-
-    edit_scene.close_grpc()
+    code = app.exec()
 
     # magic!
     # AttributeError: 'NoneType' object has no attribute 'POLLER'
     # https://github.com/google-gemini/deprecated-generative-ai-python/issues/207#issuecomment-2601058191
-    exit()
-
-    # sys.exit(0)
-    # app = App(grpc_addr)
-
-    # app.active()
-    # code = app.exec()
-    # sys.exit(code)
+    exit(code)

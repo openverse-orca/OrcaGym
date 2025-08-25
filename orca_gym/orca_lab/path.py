@@ -43,7 +43,7 @@ class Path:
     @classmethod
     def is_valid_name(cls, name: str) -> bool:
         # An identifier can only contain alphanumeric characters (a-z, A-Z, 0-9) and underscores (_)
-        # We ignore unicode here.
+        # We ignore Unicode here.
         return name.isascii() and name.isidentifier()
 
     @classmethod
@@ -66,3 +66,5 @@ class Path:
     @classmethod
     def root_path(cls):
         return Path("/")
+
+

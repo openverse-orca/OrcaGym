@@ -91,6 +91,39 @@ message SetSyncFromMujocoToSceneResponse {
     bool value = 3;
 }
 
+message ClearSceneRequest {
+}
+message ClearSceneResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+message GetActorAssetsRequest {
+}
+message GetActorAssetsResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    string actor_asset_names = 3;
+}
+
+message GetSelectionRequest {
+}
+message GetSelectionResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    repeated string actor_paths = 3;
+}
+
+
+message SetSelectionRequest {
+    repeated string actor_paths = 1;
+}
+
+message SetSelectionResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
 service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
@@ -102,4 +135,10 @@ service GrpcService {
 
     rpc GetSyncFromMujocoToScene(GetSyncFromMujocoToSceneRequest) returns (GetSyncFromMujocoToSceneResponse);
     rpc SetSyncFromMujocoToScene(SetSyncFromMujocoToSceneRequest) returns (SetSyncFromMujocoToSceneResponse);
+
+    rpc ClearScene(ClearSceneRequest) returns (ClearSceneResponse);
+    rpc GetActorAssets(GetActorAssetsRequest) returns (GetActorAssetsResponse);
+
+    rpc GetSelection(GetSelectionRequest) returns (GetSelectionResponse);
+    rpc SetSelection(SetSelectionRequest) returns (SetSelectionResponse);
 }

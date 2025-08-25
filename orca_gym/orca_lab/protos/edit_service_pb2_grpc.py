@@ -69,6 +69,26 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.SetSyncFromMujocoToSceneRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.SetSyncFromMujocoToSceneResponse.FromString,
                 _registered_method=True)
+        self.ClearScene = channel.unary_unary(
+                '/SceneEdit.GrpcService/ClearScene',
+                request_serializer=edit__service__pb2.ClearSceneRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.ClearSceneResponse.FromString,
+                _registered_method=True)
+        self.GetActorAssets = channel.unary_unary(
+                '/SceneEdit.GrpcService/GetActorAssets',
+                request_serializer=edit__service__pb2.GetActorAssetsRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.GetActorAssetsResponse.FromString,
+                _registered_method=True)
+        self.GetSelection = channel.unary_unary(
+                '/SceneEdit.GrpcService/GetSelection',
+                request_serializer=edit__service__pb2.GetSelectionRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.GetSelectionResponse.FromString,
+                _registered_method=True)
+        self.SetSelection = channel.unary_unary(
+                '/SceneEdit.GrpcService/SetSelection',
+                request_serializer=edit__service__pb2.SetSelectionRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.SetSelectionResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -116,6 +136,30 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ClearScene(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetActorAssets(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSelection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetSelection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -153,6 +197,26 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetSyncFromMujocoToScene,
                     request_deserializer=edit__service__pb2.SetSyncFromMujocoToSceneRequest.FromString,
                     response_serializer=edit__service__pb2.SetSyncFromMujocoToSceneResponse.SerializeToString,
+            ),
+            'ClearScene': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClearScene,
+                    request_deserializer=edit__service__pb2.ClearSceneRequest.FromString,
+                    response_serializer=edit__service__pb2.ClearSceneResponse.SerializeToString,
+            ),
+            'GetActorAssets': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetActorAssets,
+                    request_deserializer=edit__service__pb2.GetActorAssetsRequest.FromString,
+                    response_serializer=edit__service__pb2.GetActorAssetsResponse.SerializeToString,
+            ),
+            'GetSelection': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSelection,
+                    request_deserializer=edit__service__pb2.GetSelectionRequest.FromString,
+                    response_serializer=edit__service__pb2.GetSelectionResponse.SerializeToString,
+            ),
+            'SetSelection': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetSelection,
+                    request_deserializer=edit__service__pb2.SetSelectionRequest.FromString,
+                    response_serializer=edit__service__pb2.SetSelectionResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -344,6 +408,114 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/SetSyncFromMujocoToScene',
             edit__service__pb2.SetSyncFromMujocoToSceneRequest.SerializeToString,
             edit__service__pb2.SetSyncFromMujocoToSceneResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClearScene(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/ClearScene',
+            edit__service__pb2.ClearSceneRequest.SerializeToString,
+            edit__service__pb2.ClearSceneResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetActorAssets(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/GetActorAssets',
+            edit__service__pb2.GetActorAssetsRequest.SerializeToString,
+            edit__service__pb2.GetActorAssetsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSelection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/GetSelection',
+            edit__service__pb2.GetSelectionRequest.SerializeToString,
+            edit__service__pb2.GetSelectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetSelection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/SetSelection',
+            edit__service__pb2.SetSelectionRequest.SerializeToString,
+            edit__service__pb2.SetSelectionResponse.FromString,
             options,
             channel_credentials,
             insecure,
