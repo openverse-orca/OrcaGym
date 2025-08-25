@@ -23,19 +23,12 @@ class OrcaLabScene:
         self.edit_grpc_addr = edit_grpc_addr
         self.sim_grpc_addr = sim_grpc_addr
 
-        self.loop = asyncio.get_event_loop()
-
-        self.last_query_time = None
-        self.query_frequency = 30
-
         # 作为根节点，不可见， 路径是"/"。下面挂着所有的顶层Actor。
         self.root_actor = GroupActor(name="root", parent=None)
         self.actors: Dict[Path, BaseActor] = {}
         self.actors[Path.root_path()] = self.root_actor
 
-        self.initialize_grpc()
-
-    def initialize_grpc(self):
+    async def init_grpc_async(self):
         options = [
             ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
             ("grpc.max_send_message_length", 1024 * 1024 * 1024),
@@ -52,25 +45,27 @@ class OrcaLabScene:
         self.sim_stub = mjc_message_pb2_grpc.GrpcServiceStub(self.sim_channel)
         self.timeout = 3
 
-        if not self.aloha():
+        self.c = 0
+
+        if not await self.aloha_async():
             raise Exception("Failed to connect to server.")
 
-        self.loop.create_task(self._query_pending_operation_loop())
-
-        self.running = True
+        self._query_pending_operation_lock = asyncio.Lock()
+        self._query_pending_operation_running = False
+        await self._start_query_pending_operation_loop()
 
     async def close_grpc_async(self):
-        self.running = False
+        await self._stop_query_pending_operation_loop()
+
         if self.edit_channel:
             await self.edit_channel.close()
         self.edit_stub = None
         self.edit_channel = None
 
-    def close_grpc(self):
-        self.loop.run_until_complete(self.close_grpc_async())
-
-    def start_sim(self):
-        self.publish_scene()
+        if self.sim_channel:
+            await self.sim_channel.close()
+        self.sim_stub = None
+        self.sim_channel = None
 
     def create_transform_message(self, transform: Transform):
         msg = edit_service_pb2.Transform(
@@ -96,28 +91,36 @@ class OrcaLabScene:
         self._check_response(response)
         return response.value == 2
 
-    def aloha(self) -> bool:
-        return self.loop.run_until_complete(self.aloha_async())
+    async def _start_query_pending_operation_loop(self):
+        async with self._query_pending_operation_lock:
+            if self._query_pending_operation_running:
+                return
+            asyncio.create_task(self._query_pending_operation_loop())
+            self._query_pending_operation_running = True
+
+    async def _stop_query_pending_operation_loop(self):
+        async with self._query_pending_operation_lock:
+            self._query_pending_operation_running = False
 
     async def _query_pending_operation_loop(self):
-        while True:
-            if self.running:
-                if self.last_query_time is not None:
-                    now = time.time()
-                    delta = 1 / self.query_frequency
-                    if (now - self.last_query_time) < delta:
-                        continue
+        async with self._query_pending_operation_lock:
+            if not self._query_pending_operation_running:
+                return
 
-                # print("query")
-                request = edit_service_pb2.GetPendingOperationsRequest()
-                response = await self.edit_stub.GetPendingOperations(request)
-                self._check_response(response)
+            # print(f"query {self.c}")
+            # self.c += 1
+            request = edit_service_pb2.GetPendingOperationsRequest()
+            response = await self.edit_stub.GetPendingOperations(request)
+            self._check_response(response)
 
-                self.last_query_time = time.time()
+            operations = response.operations
+            for op in operations:
+                await self._process_pending_operation(op)
 
-                operations = response.operations
-                for op in operations:
-                    await self._process_pending_operation(op)
+        # self.pump_qt_loop()
+        frequency = 10  # Hz
+        asyncio.sleep(1 / frequency)
+        asyncio.create_task(self._query_pending_operation_loop())
 
     async def _process_pending_operation(self, op: str):
         local_transform_change = "local_transform_change:"
@@ -188,9 +191,6 @@ class OrcaLabScene:
         actor.parent = self.actors[parent_path]
         self.actors[path] = actor
 
-    def add_actor(self, actor: BaseActor, parent_path: Path):
-        self.loop.run_until_complete(self.add_actor_async(actor, parent_path))
-
     async def set_actor_transform_async(
         self, path: Path, transform: Transform, local: bool
     ):
@@ -206,11 +206,6 @@ class OrcaLabScene:
 
         response = await self.edit_stub.SetActorTransform(request, timeout=self.timeout)
         self._check_response(response)
-
-    def set_actor_transform(self, path: str, transform: Transform, local: bool):
-        self.loop.run_until_complete(
-            self.set_actor_transform_async(path, transform, local)
-        )
 
     async def publish_scene_async(self):
         print(f"publish_scene_async")
@@ -230,9 +225,6 @@ class OrcaLabScene:
         self._check_response(response)
         return response.value
 
-    def get_sync_from_mujoco_to_scene(self) -> bool:
-        return self.loop.run_until_complete(self.get_sync_from_mujoco_to_scene_async())
-
     async def set_sync_from_mujoco_to_scene_async(self, value: bool):
         print(f"set_sync_from_mujoco_to_scene_async {value}")
         request = edit_service_pb2.SetSyncFromMujocoToSceneRequest(value=value)
@@ -241,25 +233,14 @@ class OrcaLabScene:
         print("done")
         return response
 
-    def set_sync_from_mujoco_to_scene(self, value: bool):
-        return self.loop.run_until_complete(
-            self.set_sync_from_mujoco_to_scene_async(value)
-        )
-
     async def clear_scene_async(self):
         request = edit_service_pb2.ClearSceneRequest()
         response = await self.edit_stub.ClearScene(request)
         self._check_response(response)
         return response
 
-    def clear_scene(self):
-        return self.loop.run_until_complete(self.clear_scene_async())
-
     async def get_actor_assets_async(self):
         request = edit_service_pb2.GetActorAssetsRequest()
         response = await self.edit_stub.GetActorAssets(request)
         self._check_response(response)
         return response
-
-    def get_actor_assets(self):
-        return self.loop.run_until_complete(self.get_actor_assets_async())

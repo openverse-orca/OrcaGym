@@ -37,17 +37,18 @@ class App:
     def __init__(self):
 
         self.sim_process_running = False
-        self._init_scene()
+
         self._init_ui()
 
-    def _init_scene(self):
+    async def _init_scene(self):
         self.edit_grpc_addr = "localhost:50151"
         self.sim_grpc_addr = "localhost:50051"
         self.scene = OrcaLabScene(self.edit_grpc_addr, self.sim_grpc_addr)
         self._sim_process_check_lock = asyncio.Lock()
 
-        self.scene.set_sync_from_mujoco_to_scene(False)
-        self.scene.clear_scene()
+        await self.scene.init_grpc_async()
+        await self.scene.set_sync_from_mujoco_to_scene_async(False)
+        await self.scene.clear_scene_async()
 
         # # Add a actor, for testing.
         # rot = Rotation.from_euler("xyz", [90, 45, 30], degrees=True)
@@ -59,7 +60,7 @@ class App:
         actor = AssetActor(name=f"box1", spawnable_name="box")
         actor.transform = transform
 
-        self.scene.add_actor(actor, Path.root_path())
+        await self.scene.add_actor_async(actor, Path.root_path())
 
     def _init_ui(self):
         self.q_app = QtWidgets.QApplication([])
@@ -69,21 +70,24 @@ class App:
         # self.asset_browser.show()
 
         self.tool_bar = ToolBar()
-        self.tool_bar.run_button.clicked.connect(self.run_sim)
-        self.tool_bar.stop_button.clicked.connect(self.stop_sim)
+        self.tool_bar.run_button.clicked.connect(
+            lambda: asyncio.ensure_future(self.run_sim_async())
+        )
+        self.tool_bar.stop_button.clicked.connect(
+            lambda: asyncio.ensure_future(self.stop_sim_async())
+        )
         self.tool_bar.show()
 
     def exec(self) -> int:
 
-        # edit_scene.loop.run_forever()
-        code = self.q_app.exec()
+        # asyncio.run_forever()
+        # code = self.q_app.exe()
+
+        QtAsyncio.run(self._init_scene())
 
         self.scene.close_grpc()
 
         return code
-
-    def drain_event_loop(self):
-        self.scene.loop.run_until_complete(empty_task())
 
     async def run_sim_async(self):
         if self.sim_process_running:
@@ -99,11 +103,8 @@ class App:
         ]
         self.sim_process = subprocess.Popen(cmd)
         self.sim_process_running = True
-        self.scene.loop.create_task(self._sim_process_check_loop())
+        asyncio.create_task(self._sim_process_check_loop())
         await self.scene.set_sync_from_mujoco_to_scene_async(True)
-
-    def run_sim(self):
-        self.scene.loop.run_until_complete(self.run_sim_async())
 
     async def stop_sim_async(self):
         if not self.sim_process_running:
@@ -114,8 +115,9 @@ class App:
             self.sim_process_running = False
             self.sim_process.terminate()
 
-    def stop_sim(self):
-        self.scene.loop.run_until_complete(self.stop_sim_async())
+            # reset actors transform.
+            for path, actor in self.scene.actors.items():
+                await self.scene.set_actor_transform_async(path, actor.transform, True)
 
     async def _sim_process_check_loop(self):
         async with self._sim_process_check_lock:
@@ -128,11 +130,9 @@ class App:
                 self.sim_process_running = False
                 # TODO notify ui.
 
-            
-        QtWidgets.QApplication.processEvents()
         frequency = 0.5  # Hz
         asyncio.sleep(1 / frequency)
-        self.scene.loop.create_task(self._sim_process_check_loop())
+        asyncio.create_task(self._sim_process_check_loop())
 
 
 if __name__ == "__main__":
