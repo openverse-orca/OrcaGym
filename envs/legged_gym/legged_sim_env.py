@@ -278,6 +278,13 @@ class LeggedSimEnv(OrcaGymLocalEnv):
     def setup_command(self, command_dict : dict) -> None:
         [agent.agent.setup_command(command_dict) for agent in self._agents.values()]
 
+    def setup_base_friction(self, base_friction: float) -> None:
+        geom_dict = self.model.get_geom_dict()
+        geom_friction_dict = self._agents[self._agent_names[0]].agent.scale_foot_friction(geom_dict, base_friction)
+        self.set_geom_friction(geom_friction_dict)
+
+        print("Setup base friction: ", geom_friction_dict)
+
 
 
 ## --------------------------------            
@@ -329,7 +336,6 @@ class AgentBase:
         self.agent.set_action_space() 
         self.generate_action_scale_array(self._query_ctrl_info())
         self._init_playable(env)
-        self._setup_friction(env)
 
 
     @property
@@ -413,14 +419,6 @@ class AgentBase:
     def _init_playable(self, env: LeggedSimEnv) -> None:
         self.agent.init_playable()
         self.agent.player_control = True
-
-    def _setup_friction(self, env: LeggedSimEnv) -> None:
-        # for debug use.
-        geom_dict = env.model.get_geom_dict()
-        geom_friction_dict = self.agent.scale_foot_friction(geom_dict, 1.0)
-        env.set_geom_friction(geom_friction_dict)
-
-        print("Setup friction: ", geom_friction_dict)
 
 class Lite3Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:

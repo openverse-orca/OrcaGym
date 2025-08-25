@@ -103,7 +103,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
-        self._ground_contact_body_names = robot_config["ground_contact_body_names"]  # gound body is not included in the agent's namespace
+        self._ground_contact_body_names = CurriculumConfig["ground_contact_body_names"]  # gound body is not included in the agent's namespace
         self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
         self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
         self._all_contact_body_names = self._base_contact_body_names + self._leg_contact_body_names + self._foot_body_names
@@ -270,7 +270,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._achieved_goal = np.array([1.0 if np.any(self._body_contact) else 0.0]).astype(np.float32)
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
-        # square_wave = self._compute_square_wave()
+        square_wave = self._compute_square_wave()
         # sin_phase, cos_phase = self._compute_leg_period()
         obs = np.concatenate(
                 [
@@ -279,7 +279,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
-                    # np.array([square_wave]),
+                    np.array([square_wave]),
                     # np.array([sin_phase, cos_phase]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
@@ -753,51 +753,51 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._print_reward("Feet swing height reward: ", reward, coeff * self.dt)
         return reward
 
-    def _compute_reward_feet_swing_height_v2(self, coeff) -> SupportsFloat:
-        # avoid stepping when no command is given
-        if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
-            return 0.0
+    # def _compute_reward_feet_swing_height_v2(self, coeff) -> SupportsFloat:
+    #     # avoid stepping when no command is given
+    #     if self._command["lin_vel"][0] == 0.0 and self._command["lin_vel"][1] == 0.0:
+    #         return 0.0
 
-        # Get target swing height from config
-        swing_height = self._foot_leg_period["swing_height"]
+    #     # Get target swing height from config
+    #     swing_height = self._foot_leg_period["swing_height"]
         
-        # Get foot positions in world frame
-        foot_site_pos = [self._last_contact_site_xpos[foot_site_name] for foot_site_name in self._contact_site_names]
+    #     # Get foot positions in world frame
+    #     foot_site_pos = [self._last_contact_site_xpos[foot_site_name] for foot_site_name in self._contact_site_names]
         
-        # Get base position and orientation
-        # body_qpos_index = self._qpos_index[self._base_joint_name]
-        # body_joint_qpos = self._qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
-        body_pos = self._body_pos[0:3]
-        body_quat = self._body_pos[3:7]
+    #     # Get base position and orientation
+    #     # body_qpos_index = self._qpos_index[self._base_joint_name]
+    #     # body_joint_qpos = self._qpos_buffer[body_qpos_index["offset"] : body_qpos_index["offset"] + body_qpos_index["len"]]
+    #     body_pos = self._body_pos[0:3]
+    #     body_quat = self._body_pos[3:7]
         
-        # Transform foot positions to body frame using global2local
-        foot_pos_local = []
-        for foot_pos in foot_site_pos:
-            # Get relative position in global frame
-            pos_relative = foot_pos - body_pos
-            # Convert to local frame using global2local
-            # We pass zero angular velocity since we only care about position
-            local_pos, _ = global2local(body_quat, pos_relative, np.zeros(3))
-            foot_pos_local.append(local_pos)
+    #     # Transform foot positions to body frame using global2local
+    #     foot_pos_local = []
+    #     for foot_pos in foot_site_pos:
+    #         # Get relative position in global frame
+    #         pos_relative = foot_pos - body_pos
+    #         # Convert to local frame using global2local
+    #         # We pass zero angular velocity since we only care about position
+    #         local_pos, _ = global2local(body_quat, pos_relative, np.zeros(3))
+    #         foot_pos_local.append(local_pos)
         
-        # Calculate height error in body frame for each foot
-        contact = self._feet_contact[:] > 0
-        pos_error = np.zeros(len(foot_pos_local))
+    #     # Calculate height error in body frame for each foot
+    #     contact = self._feet_contact[:] > 0
+    #     pos_error = np.zeros(len(foot_pos_local))
         
-        for i, local_pos in enumerate(foot_pos_local):
-            if not contact[i]:  # Only penalize feet in swing phase
-                # Use z-coordinate in body frame
-                current_height = local_pos[2]
-                # Square error from desired swing height
-                pos_error[i] = (current_height - swing_height) ** 2
+    #     for i, local_pos in enumerate(foot_pos_local):
+    #         if not contact[i]:  # Only penalize feet in swing phase
+    #             # Use z-coordinate in body frame
+    #             current_height = local_pos[2]
+    #             # Square error from desired swing height
+    #             pos_error[i] = (current_height - swing_height) ** 2
                 
-                # # Additional penalty for negative height (foot above body)
-                # if current_height < 0:
-                #     pos_error[i] *= 2.0
+    #             # # Additional penalty for negative height (foot above body)
+    #             # if current_height < 0:
+    #             #     pos_error[i] *= 2.0
         
-        reward = -np.sum(pos_error) * coeff * self.dt
-        self._print_reward("Feet swing height v2 reward: ", reward, coeff * self.dt)
-        return reward
+    #     reward = -np.sum(pos_error) * coeff * self.dt
+    #     self._print_reward("Feet swing height v2 reward: ", reward, coeff * self.dt)
+    #     return reward
     
     def _compute_reward_contact_no_vel(self, coeff) -> SupportsFloat:
         # Penalize contact with no velocity
@@ -1194,7 +1194,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             scale_ang_vel, 
             scale_orientation, 
             scale_command, 
-            # scale_square_wave,
+            scale_square_wave,
             # scale_leg_phase,
             scale_leg_joint_qpos, 
             scale_leg_joint_qvel, 
@@ -1231,7 +1231,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             noise_ang_vel, 
             noise_orientation, 
             noise_command, 
-            # noise_square_wave,
+            noise_square_wave,
             # scale_leg_phase,
             noise_leg_joint_qpos, 
             noise_leg_joint_qvel, 
@@ -1297,7 +1297,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             {"function": self._compute_reward_fly, "coeff": reward_coeff["fly"] if "fly" in reward_coeff else 0},
             {"function": self._compute_reward_stepping, "coeff": reward_coeff["stepping"] if "stepping" in reward_coeff else 0},
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["feet_contact"] if "feet_contact" in reward_coeff else 0},
-            {"function": self._compute_reward_feet_swing_height_v2, "coeff": reward_coeff["feet_swing_height"] if "feet_swing_height" in reward_coeff else 0},
+            {"function": self._compute_reward_feet_swing_height, "coeff": reward_coeff["feet_swing_height"] if "feet_swing_height" in reward_coeff else 0},
             {"function": self._compute_reward_contact_no_vel, "coeff": reward_coeff["contact_no_vel"] if "contact_no_vel" in reward_coeff else 0},
             {"function": self._compute_reward_feet_contact, "coeff": reward_coeff["phase_contact"] if "phase_contact" in reward_coeff else 0},  
             {"function": self._compute_reward_joint_qpos_limits, "coeff": reward_coeff["joint_qpos_limits"] if "joint_qpos_limits" in reward_coeff else 0},

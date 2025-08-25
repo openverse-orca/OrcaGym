@@ -6,8 +6,8 @@ from envs.legged_gym.robot_config.AzureLoong_config import AzureLoongConfig
 from envs.legged_gym.robot_config.g1_config import g1Config
 
 LeggedEnvConfig = {
-    "TIME_STEP" : 0.005,                 # 仿真步长1000Hz ~ 200Hz
-    "FRAME_SKIP" : 1,                    # PD函数计算步长200Hz
+    "TIME_STEP" : 0.0025,                 # 仿真步长1000Hz ~ 200Hz
+    "FRAME_SKIP" : 2,                    # PD函数计算步长200Hz
     "ACTION_SKIP" : 4,                  # 训练和推理步长50Hz
 
     "EPISODE_TIME_VERY_SHORT" : 2,       # 每个episode的时间长度
@@ -88,6 +88,18 @@ CurriculumConfig = {
         "stair_low_flat" : {
             "offset" : [-30, 30, 0],
         },
+        "stair_mid_flat" : {
+            "offset" : [10, 30, 0],
+        },
+        "perlin_smooth" : {
+            "offset" : [-30, 30, 0],
+        },
+        "perlin_rough" : {
+            "offset" : [0, 30, 0],
+        },
+        "ellipsoid_low" : {
+            "offset" : [-30, 30, 0],
+        },
     },
 
     "curriculum_levels" : {
@@ -97,43 +109,52 @@ CurriculumConfig = {
         ],
         "flat_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
-            {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "brics_low" ,        "command_type": "move_fast",},
-            {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
-            {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
-            {"terrain" : "stair_low",       "command_type": "move_slowly",},
-            {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "stair_low" ,       "command_type": "move_medium",},
-            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
-            {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "slop_5" ,          "command_type": "move_fast",},
+            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
+            {"terrain" : "ellipsoid_low" ,    "command_type": "move_fast",},
         ],
         "rough_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "brics_low" ,        "command_type": "move_slowly", },
+            {"terrain" : "brics_low" ,        "command_type": "move_medium", },
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "brics_low" ,        "command_type": "move_fast",},
-            {"terrain" : "stair_low_flat" ,   "command_type": "move_slowly",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_medium",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
-            {"terrain" : "stair_low",       "command_type": "move_slowly",},
+            {"terrain" : "stair_low",       "command_type": "move_medium",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "stair_low" ,       "command_type": "move_medium",},
-            {"terrain" : "slop_5" ,          "command_type": "move_slowly", },
+            {"terrain" : "slop_5" ,          "command_type": "move_medium", },
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "slop_5" ,          "command_type": "move_fast",},
-            {"terrain" : "brics_high" ,       "command_type": "move_slowly", },
+            {"terrain" : "brics_high" ,       "command_type": "move_medium", },
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "brics_high" ,       "command_type": "move_medium",},
-            {"terrain" : "stair_high" ,       "command_type": "move_slowly",},
+            {"terrain" : "stair_high" ,       "command_type": "move_medium",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
-            {"terrain" : "slop_10" ,          "command_type": "move_slowly", },
+            {"terrain" : "slop_10" ,          "command_type": "move_medium", },
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "slop_10" ,          "command_type": "move_medium",},
         ],
     },
+
+
+    "ground_contact_body_names" : ["Floor_Floor", 
+                                    "terrain_perlin_smooth_usda_terrain",
+                                    "terrain_perlin_rough_usda_terrain",
+                                    "terrain_perlin_smooth_slope_usda_terrain",
+                                    "terrain_perlin_rough_slope_usda_terrain",
+                                    "terrain_stair_low_usda_terrain", 
+                                    "terrain_stair_high_usda_terrain",    
+                                    "terrain_brics_usda_terrain",        
+                                    "terrain_stair_low_flat_usda_terrain",  
+                                    "terrain_stair_mid_flat_usda_terrain",  
+                                    "terrain_brics_low_usda_terrain",      
+                                    "terrain_brics_high_usda_terrain",     
+                                    "terrain_slop_10_usda_terrain",        
+                                    "terrain_slop_20_usda_terrain",       
+                                    "terrain_ellipsoid_low_usda_terrain",
+                                    ],
+        
 
     "curriculum_commands" : {
         "stand_still" : {
@@ -170,11 +191,11 @@ CurriculumConfig = {
         },
 
         "move_medium" : {
-            "command_lin_vel_range_x" : [-1.0, 1.0], # x direction for forward
+            "command_lin_vel_range_x" : [-0.8, 0.8], # x direction for forward
             "command_lin_vel_range_y" : [-0.1, 0.1], # y direction for left/right
-            "command_lin_vel_threshold" : [-0.3, 0.3], # min linear velocity to trigger moving
+            "command_lin_vel_threshold" : [-0.2, 0.2], # min linear velocity to trigger moving
             "command_ang_vel_range" : np.pi / 4,  # max turning rate
-            "command_resample_interval" : 7, # second to resample the command
+            "command_resample_interval" : 4, # second to resample the command
             "distance" : 3.0,
             "rating" : 0.5,
             "terminate_threshold" : 3,
@@ -183,9 +204,9 @@ CurriculumConfig = {
         "move_fast" : {
             "command_lin_vel_range_x" : [-1.0, 1.5], # x direction for forward max speed
             "command_lin_vel_range_y" : [-0.3, 0.3], # y direction for left/right max speed
-            "command_lin_vel_threshold" : [-0.3, 0.5], # min linear velocity to trigger moving
+            "command_lin_vel_threshold" : [-0.2, 0.3], # min linear velocity to trigger moving
             "command_ang_vel_range" : np.pi / 4,  # max turning rate
-            "command_resample_interval" : 7, # second to resample the command
+            "command_resample_interval" : 4, # second to resample the command
             "distance" : 5.0,
             "rating" : 0.5,
             "terminate_threshold" : 3,

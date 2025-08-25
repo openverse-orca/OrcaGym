@@ -260,7 +260,9 @@ def main(
         env = gym.make(env_id)
         print("Starting simulation...")
 
-
+        friction_scale = config['friction_scale']
+        if friction_scale is not None:
+            env.unwrapped.setup_base_friction(friction_scale)
 
         keyboard_control = KeyboardControl(orcagym_addresses[0], env, command_model, model_type)
 
@@ -381,6 +383,7 @@ def run_simulation(env: gym.Env,
                  keyboard_control: KeyboardControl,
                  command_model: dict[str, str]):
     obs, info = env.reset()
+
     dt = time_step * frame_skip * action_skip
     if not os.path.exists("./log"):
         os.makedirs("./log")
@@ -472,7 +475,7 @@ def run_simulation(env: gym.Env,
             sim_time += dt
 
             # no action testing
-            action = np.zeros(env.action_space.shape[0])
+            # action = np.zeros(env.action_space.shape[0])
             
             obs, reward, terminated, truncated, info = env.step(action)
             env.render()

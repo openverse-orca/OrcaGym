@@ -8,16 +8,16 @@ RewardConfig = {
         "failure" : 0,                   # 失败惩罚
         "leg_contact" : 1,               # 腿部身体接触惩罚
         "body_contact" : 1,              # 身体接触惩罚
-        "foot_touch" : 0.03,                # 重踏惩罚
-        "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
+        "foot_touch" : 0.05,             # 重踏惩罚
+        "joint_angles" : 0.0,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
         "limit" : 0.01,                 # Action极限值惩罚
-        "action_rate" : 0.1,           # Action平滑
+        "action_rate" : 0.05,           # Action平滑
         "base_gyro" : 0,                
         "base_accelerometer" : 0,
         "follow_command_linvel" : 1,    # 跟随指令速度奖励
         "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
-        "height" : 0,                   # 身体高度惩罚
+        "height" : 0.5,                   # 身体高度惩罚
         "body_lin_vel" : 2,             # 身体上下线速度惩罚
         "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
         "body_orientation" : 1,         # 身体姿态惩罚
@@ -26,6 +26,7 @@ RewardConfig = {
         "feet_slip" : 0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
+        "feet_swing_height" : 0,    # 鼓励足底离地高度在理想范围内
         "fly" : 0.1,                    # 四足离地惩罚
         "stepping" : 0.3,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
@@ -34,38 +35,6 @@ RewardConfig = {
         # "torque_limits" : 1.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
-    "rough_terrain": {
-        "alive" : 0,                     # 存活奖励
-        "success" : 0,                   # 成功奖励
-        "failure" : 0,                   # 失败惩罚
-        "leg_contact" : 1,               # 腿部身体接触惩罚
-        "body_contact" : 1,              # 身体接触惩罚
-        "foot_touch" : 0,                # 重踏惩罚
-        "joint_angles" : 0.1,            # 关节偏离自然站立角度惩罚
-        "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
-        "limit" : 0.01,                 # Action极限值惩罚
-        "action_rate" : 0.01,           # Action平滑
-        "base_gyro" : 0,                
-        "base_accelerometer" : 0,
-        "follow_command_linvel" : 1,    # 跟随指令速度奖励
-        "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
-        "height" : 0,                   # 身体高度惩罚
-        "body_lin_vel" : 2,             # 身体上下线速度惩罚
-        "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
-        "body_orientation" : 1,         # 身体姿态惩罚
-        "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
-        "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0,             # 接触时，足底线速度
-        "feet_wringing" : 0,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
-        "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 0.3,                 # 无指令时，踏步惩罚
-        "torques" : 1e-5,                # 关节力矩惩罚
-        "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
-        # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
-        # "torque_limits" : 1.0,       # 避免关节力矩过大
-        "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
-    }
 }
 
 Lite3Config = {
@@ -132,25 +101,10 @@ Lite3Config = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "HL_touch", "HR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "compute_body_height" : False,      # 真机没有激光雷达，无法计算body高度
+        "compute_body_height" : True,      # 真机没有激光雷达，无法计算body高度
         "compute_body_orientation" : False, # TODO:目前只支持水平方向的orientation奖励
         "compute_foot_height" : False,      # 真机没有激光雷达，无法计算foot高度
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",        
-                                        "terrain_stair_low_flat_usda_terrain",  
-                                        "terrain_brics_low_usda_terrain",      
-                                        "terrain_brics_high_usda_terrain",     
-                                        "terrain_slop_10_usda_terrain",        
-                                        "terrain_slop_20_usda_terrain",       
-                                        ],
-        
         "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
         "leg_contact_body_names" : ["FL_THIGH", "FL_SHANK", 
                                     "FR_THIGH", "FR_SHANK", 
@@ -170,8 +124,8 @@ Lite3Config = {
         # Front vs. Rear Legs: Front legs bear more force due to weight distribution and dynamics. 
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
-        "foot_touch_force_step_threshold" : 5.0,
-        "foot_touch_air_time_ideal" : 0.5,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_force_step_threshold" : 0.01,
+        "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
             "phase_freq" :  0.8,
@@ -180,7 +134,7 @@ Lite3Config = {
 
         # Config for randomization
         "randomize_friction" :      True,
-        "friction_range" :          [0.5, 1.5],
+        "friction_range" :          [0.75, 1.25],
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "added_mass_pos_range" :    [-0.05, 0.05],

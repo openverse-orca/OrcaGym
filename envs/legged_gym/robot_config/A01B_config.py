@@ -36,15 +36,6 @@ A01BConfig = {
         "sensor_foot_touch_names" : ["fr_touch", "fl_touch", "rr_touch", "rl_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",           
-                                        "terrain_brics_usda_terrain",                              
-                                        ],
         
         "base_contact_body_names" : ["trunk_link", "fl_abad", "fr_abad", "hl_abad", "hr_abad"],
 

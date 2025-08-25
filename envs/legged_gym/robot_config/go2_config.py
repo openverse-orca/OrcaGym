@@ -136,15 +136,6 @@ Go2Config = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",                                     
-                                        ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
         "leg_contact_body_names" : ["FL_thigh", "FL_calf", 

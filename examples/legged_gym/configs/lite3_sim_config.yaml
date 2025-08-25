@@ -29,3 +29,5 @@ command_model:
     "turbo_scale" : 2.0        # turbo mode scale
 
 terrain_spawnable_names: ["terrain_test_usda"]
+
+friction_scale: 1.0

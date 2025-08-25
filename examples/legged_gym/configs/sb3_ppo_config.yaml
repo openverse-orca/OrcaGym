@@ -10,7 +10,7 @@ training:
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 
-    flat_terrain: ["terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_stair_low_usda", "terrain_slope_5_usda"]
+    flat_terrain: ["terrain_ellipsoid_low_usda", "terrain_brics_low_usda"]
     rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_5_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slope_10_usda"]
   curriculum_list:
     flat_terrain:
@@ -22,7 +22,7 @@ training:
       - name: "basic_moving"
         milestone: 100
       - name: "rough_terrain"
-        milestone: 1500
+        milestone: 3000
 
 testing:
   subenv_num: 1
