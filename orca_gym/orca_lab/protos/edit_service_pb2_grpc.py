@@ -89,6 +89,16 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.SetSelectionRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.SetSelectionResponse.FromString,
                 _registered_method=True)
+        self.SaveBodyTransform = channel.unary_unary(
+                '/SceneEdit.GrpcService/SaveBodyTransform',
+                request_serializer=edit__service__pb2.SaveBodyTransformRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.SaveBodyTransformResponse.FromString,
+                _registered_method=True)
+        self.RestoreBodyTransform = channel.unary_unary(
+                '/SceneEdit.GrpcService/RestoreBodyTransform',
+                request_serializer=edit__service__pb2.RestoreBodyTransformRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.RestoreBodyTransformResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -160,6 +170,18 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SaveBodyTransform(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RestoreBodyTransform(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -217,6 +239,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetSelection,
                     request_deserializer=edit__service__pb2.SetSelectionRequest.FromString,
                     response_serializer=edit__service__pb2.SetSelectionResponse.SerializeToString,
+            ),
+            'SaveBodyTransform': grpc.unary_unary_rpc_method_handler(
+                    servicer.SaveBodyTransform,
+                    request_deserializer=edit__service__pb2.SaveBodyTransformRequest.FromString,
+                    response_serializer=edit__service__pb2.SaveBodyTransformResponse.SerializeToString,
+            ),
+            'RestoreBodyTransform': grpc.unary_unary_rpc_method_handler(
+                    servicer.RestoreBodyTransform,
+                    request_deserializer=edit__service__pb2.RestoreBodyTransformRequest.FromString,
+                    response_serializer=edit__service__pb2.RestoreBodyTransformResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -516,6 +548,60 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/SetSelection',
             edit__service__pb2.SetSelectionRequest.SerializeToString,
             edit__service__pb2.SetSelectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SaveBodyTransform(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/SaveBodyTransform',
+            edit__service__pb2.SaveBodyTransformRequest.SerializeToString,
+            edit__service__pb2.SaveBodyTransformResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RestoreBodyTransform(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/RestoreBodyTransform',
+            edit__service__pb2.RestoreBodyTransformRequest.SerializeToString,
+            edit__service__pb2.RestoreBodyTransformResponse.FromString,
             options,
             channel_credentials,
             insecure,

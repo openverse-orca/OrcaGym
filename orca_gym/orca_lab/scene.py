@@ -42,8 +42,6 @@ class OrcaLabScene:
             options=options,
         )
         self.edit_stub = edit_service_pb2_grpc.GrpcServiceStub(self.edit_channel)
-
-        # For publish_scene
         self.sim_stub = mjc_message_pb2_grpc.GrpcServiceStub(self.sim_channel)
 
         self.timeout = 3
@@ -193,7 +191,6 @@ class OrcaLabScene:
         self.actors[path] = actor
 
     async def set_actor_transform(self, path: Path, transform: Transform, local: bool):
-
         transform_msg = self._create_transform_message(transform)
         space = edit_service_pb2.Space.Local if local else edit_service_pb2.Space.World
 
@@ -207,12 +204,18 @@ class OrcaLabScene:
         self._check_response(response)
 
     async def publish_scene(self):
-        print(f"publish_scene_async")
+        print(f"publish_scene")
         request = mjc_message_pb2.PublishSceneRequest()
         response = await self.sim_stub.PublishScene(request)
         if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
             print("Publish scene failed: ", response.error_message)
             raise Exception("Publish scene failed.")
+        print("done")
+
+    async def forward_scene(self):
+        print(f"forward_scene")
+        request = mjc_message_pb2.MJ_ForwardRequest()
+        response = await self.sim_stub.MJ_Forward(request)
         print("done")
 
     async def get_sync_from_mujoco_to_scene(self) -> bool:
@@ -222,21 +225,29 @@ class OrcaLabScene:
         return response.value
 
     async def set_sync_from_mujoco_to_scene(self, value: bool):
-        print(f"set_sync_from_mujoco_to_scene_async {value}")
+        print(f"set_sync_from_mujoco_to_scene {value}")
         request = edit_service_pb2.SetSyncFromMujocoToSceneRequest(value=value)
         response = await self.edit_stub.SetSyncFromMujocoToScene(request)
         self._check_response(response)
         print("done")
-        return response
 
     async def clear_scene(self):
         request = edit_service_pb2.ClearSceneRequest()
         response = await self.edit_stub.ClearScene(request)
         self._check_response(response)
-        return response
 
     async def get_actor_assets(self):
         request = edit_service_pb2.GetActorAssetsRequest()
         response = await self.edit_stub.GetActorAssets(request)
         self._check_response(response)
-        return response
+        return response.actor_asset_names
+
+    async def save_body_transform(self):
+        request = edit_service_pb2.SaveBodyTransformRequest()
+        response = await self.edit_stub.SaveBodyTransform(request)
+        self._check_response(response)
+
+    async def restore_body_transform(self):
+        request = edit_service_pb2.RestoreBodyTransformRequest()
+        response = await self.edit_stub.RestoreBodyTransform(request)
+        self._check_response(response)

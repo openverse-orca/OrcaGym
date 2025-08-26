@@ -103,7 +103,7 @@ message GetActorAssetsRequest {
 message GetActorAssetsResponse {
     StatusCode status_code = 1;
     string error_message = 2;
-    string actor_asset_names = 3;
+    repeated string actor_asset_names = 3;
 }
 
 message GetSelectionRequest {
@@ -118,8 +118,22 @@ message GetSelectionResponse {
 message SetSelectionRequest {
     repeated string actor_paths = 1;
 }
-
 message SetSelectionResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+
+message SaveBodyTransformRequest {
+}
+message SaveBodyTransformResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+message RestoreBodyTransformRequest {
+}
+message RestoreBodyTransformResponse {
     StatusCode status_code = 1;
     string error_message = 2;
 }
@@ -141,4 +155,7 @@ service GrpcService {
 
     rpc GetSelection(GetSelectionRequest) returns (GetSelectionResponse);
     rpc SetSelection(SetSelectionRequest) returns (SetSelectionResponse);
+
+    rpc SaveBodyTransform(SaveBodyTransformRequest) returns (SaveBodyTransformResponse);
+    rpc RestoreBodyTransform(RestoreBodyTransformRequest) returns (RestoreBodyTransformResponse);
 }

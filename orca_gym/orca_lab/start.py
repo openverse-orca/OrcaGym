@@ -31,6 +31,8 @@ class ToolBar(QtWidgets.QWidget):
         self.layout.addWidget(self.run_button)
         self.layout.addWidget(self.stop_button)
 
+        self.resize(400, 200)
+
 
 class App:
 
@@ -98,6 +100,7 @@ class App:
             return
 
         await self.scene.publish_scene()
+        await self.scene.save_body_transform()
 
         cmd = [
             "python",
@@ -110,7 +113,7 @@ class App:
         self.sim_process_running = True
         asyncio.create_task(self._sim_process_check_loop())
 
-        # await asyncio.sleep(0.2)
+        # await asyncio.sleep(2)
         await self.scene.set_sync_from_mujoco_to_scene(True)
 
     async def stop_sim(self):
@@ -121,10 +124,7 @@ class App:
             await self.scene.set_sync_from_mujoco_to_scene(False)
             self.sim_process_running = False
             self.sim_process.terminate()
-
-            # reset actors transform.
-            for path, actor in self.scene.actors.items():
-                await self.scene.set_actor_transform(path, actor.transform, True)
+            await self.scene.restore_body_transform()
 
     async def _sim_process_check_loop(self):
         async with self._sim_process_check_lock:
