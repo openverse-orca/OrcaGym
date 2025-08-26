@@ -46,9 +46,9 @@ class App:
         self.scene = OrcaLabScene(self.edit_grpc_addr, self.sim_grpc_addr)
         self._sim_process_check_lock = asyncio.Lock()
 
-        await self.scene.init_grpc_async()
-        await self.scene.set_sync_from_mujoco_to_scene_async(False)
-        await self.scene.clear_scene_async()
+        await self.scene.init_grpc()
+        await self.scene.set_sync_from_mujoco_to_scene(False)
+        await self.scene.clear_scene()
 
         # # Add a actor, for testing.
         # rot = Rotation.from_euler("xyz", [90, 45, 30], degrees=True)
@@ -60,7 +60,7 @@ class App:
         actor = AssetActor(name=f"box1", spawnable_name="box")
         actor.transform = transform
 
-        await self.scene.add_actor_async(actor, Path.root_path())
+        await self.scene.add_actor(actor, Path.root_path())
 
     def _init_ui(self):
         self.q_app = QtWidgets.QApplication([])
@@ -71,10 +71,10 @@ class App:
 
         self.tool_bar = ToolBar()
         self.tool_bar.run_button.clicked.connect(
-            lambda: asyncio.ensure_future(self.run_sim_async())
+            lambda: asyncio.ensure_future(self.run_sim())
         )
         self.tool_bar.stop_button.clicked.connect(
-            lambda: asyncio.ensure_future(self.stop_sim_async())
+            lambda: asyncio.ensure_future(self.stop_sim())
         )
         self.tool_bar.show()
 
@@ -83,17 +83,22 @@ class App:
         # asyncio.run_forever()
         # code = self.q_app.exe()
 
+        # 在这之后，Qt的event_loop变成asyncio的event_loop。
+        # 这是目前统一Qt和asyncio最好的方法。
+        # 所以不要保存loop，统一使用asyncio.xxx()。
+        # https://doc.qt.io/qtforpython-6/PySide6/QtAsyncio/index.html
         QtAsyncio.run(self._init_scene())
 
-        self.scene.close_grpc()
+        self.scene.destroy_grpc()
 
-        return code
+        return 0
 
-    async def run_sim_async(self):
+    async def run_sim(self):
         if self.sim_process_running:
             return
 
-        await self.scene.publish_scene_async()
+        await self.scene.publish_scene()
+
         cmd = [
             "python",
             "-m",
@@ -104,20 +109,22 @@ class App:
         self.sim_process = subprocess.Popen(cmd)
         self.sim_process_running = True
         asyncio.create_task(self._sim_process_check_loop())
-        await self.scene.set_sync_from_mujoco_to_scene_async(True)
 
-    async def stop_sim_async(self):
+        # await asyncio.sleep(0.2)
+        await self.scene.set_sync_from_mujoco_to_scene(True)
+
+    async def stop_sim(self):
         if not self.sim_process_running:
             return
 
         async with self._sim_process_check_lock:
-            await self.scene.set_sync_from_mujoco_to_scene_async(False)
+            await self.scene.set_sync_from_mujoco_to_scene(False)
             self.sim_process_running = False
             self.sim_process.terminate()
 
             # reset actors transform.
             for path, actor in self.scene.actors.items():
-                await self.scene.set_actor_transform_async(path, actor.transform, True)
+                await self.scene.set_actor_transform(path, actor.transform, True)
 
     async def _sim_process_check_loop(self):
         async with self._sim_process_check_lock:

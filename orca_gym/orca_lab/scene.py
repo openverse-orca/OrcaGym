@@ -10,13 +10,13 @@ from orca_gym.orca_lab.actor import AssetActor, BaseActor, GroupActor
 import asyncio
 
 from typing import Tuple, Dict
-import time
 
 
 Success = edit_service_pb2.StatusCode.Success
 Error = edit_service_pb2.StatusCode.Error
 
 
+# 由于Qt是异步的，所以这里只提供异步接口。
 class OrcaLabScene:
 
     def __init__(self, edit_grpc_addr: str, sim_grpc_addr: str):
@@ -28,7 +28,7 @@ class OrcaLabScene:
         self.actors: Dict[Path, BaseActor] = {}
         self.actors[Path.root_path()] = self.root_actor
 
-    async def init_grpc_async(self):
+    async def init_grpc(self):
         options = [
             ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
             ("grpc.max_send_message_length", 1024 * 1024 * 1024),
@@ -42,19 +42,22 @@ class OrcaLabScene:
             options=options,
         )
         self.edit_stub = edit_service_pb2_grpc.GrpcServiceStub(self.edit_channel)
+
+        # For publish_scene
         self.sim_stub = mjc_message_pb2_grpc.GrpcServiceStub(self.sim_channel)
+
         self.timeout = 3
 
         self.c = 0
 
-        if not await self.aloha_async():
+        if not await self.aloha():
             raise Exception("Failed to connect to server.")
 
         self._query_pending_operation_lock = asyncio.Lock()
         self._query_pending_operation_running = False
         await self._start_query_pending_operation_loop()
 
-    async def close_grpc_async(self):
+    async def destroy_grpc(self):
         await self._stop_query_pending_operation_loop()
 
         if self.edit_channel:
@@ -67,7 +70,7 @@ class OrcaLabScene:
         self.sim_stub = None
         self.sim_channel = None
 
-    def create_transform_message(self, transform: Transform):
+    def _create_transform_message(self, transform: Transform):
         msg = edit_service_pb2.Transform(
             pos=transform.position,
             quat=transform.rotation,
@@ -75,7 +78,7 @@ class OrcaLabScene:
         )
         return msg
 
-    def get_transform_from_message(self, msg) -> Transform:
+    def _get_transform_from_message(self, msg) -> Transform:
         transform = Transform()
         transform.position = msg.pos
         transform.rotation = msg.quat
@@ -85,7 +88,7 @@ class OrcaLabScene:
         if response.status_code != Success:
             raise Exception(f"Request failed. {response.error_message}")
 
-    async def aloha_async(self) -> bool:
+    async def aloha(self) -> bool:
         request = edit_service_pb2.AlohaRequest(value=1)
         response = await self.edit_stub.Aloha(request)
         self._check_response(response)
@@ -130,9 +133,9 @@ class OrcaLabScene:
             if not actor_path in self.actors:
                 raise Exception(f"actor not exist")
 
-            transform = await self.get_pending_actor_transform_async(actor_path, True)
+            transform = await self.get_pending_actor_transform(actor_path, True)
 
-            await self.set_actor_transform_async(actor_path, transform, True)
+            await self.set_actor_transform(actor_path, transform, True)
 
             actor = self.actors[actor_path]
             actor.transform = transform
@@ -144,16 +147,14 @@ class OrcaLabScene:
             if not actor_path in self.actors:
                 raise Exception(f"actor not exist")
 
-            transform = await self.get_pending_actor_transform_async(actor_path, False)
+            transform = await self.get_pending_actor_transform(actor_path, False)
 
-            await self.set_actor_transform_async(actor_path, transform, False)
+            await self.set_actor_transform(actor_path, transform, False)
 
             actor = self.actors[actor_path]
             actor.transform = transform
 
-    async def get_pending_actor_transform_async(
-        self, path: Path, local: bool
-    ) -> Transform:
+    async def get_pending_actor_transform(self, path: Path, local: bool) -> Transform:
         space = edit_service_pb2.Space.Local if local else edit_service_pb2.Space.World
 
         request = edit_service_pb2.GetPendingActorTransformRequest(
@@ -165,9 +166,9 @@ class OrcaLabScene:
         self._check_response(response)
 
         transform = response.transform
-        return self.get_transform_from_message(transform)
+        return self._get_transform_from_message(transform)
 
-    async def add_actor_async(self, actor: BaseActor, parent_path: Path):
+    async def add_actor(self, actor: BaseActor, parent_path: Path):
         if not parent_path.is_valid():
             raise Exception("Invalid path")
 
@@ -176,7 +177,7 @@ class OrcaLabScene:
 
         path = parent_path / actor.name
 
-        transform_msg = self.create_transform_message(actor.transform)
+        transform_msg = self._create_transform_message(actor.transform)
         request = edit_service_pb2.AddActorRequest(
             actor_name=actor.name,
             spawnable_name=actor.spawnable_name,
@@ -191,11 +192,9 @@ class OrcaLabScene:
         actor.parent = self.actors[parent_path]
         self.actors[path] = actor
 
-    async def set_actor_transform_async(
-        self, path: Path, transform: Transform, local: bool
-    ):
+    async def set_actor_transform(self, path: Path, transform: Transform, local: bool):
 
-        transform_msg = self.create_transform_message(transform)
+        transform_msg = self._create_transform_message(transform)
         space = edit_service_pb2.Space.Local if local else edit_service_pb2.Space.World
 
         request = edit_service_pb2.SetActorTransformRequest(
@@ -207,7 +206,7 @@ class OrcaLabScene:
         response = await self.edit_stub.SetActorTransform(request, timeout=self.timeout)
         self._check_response(response)
 
-    async def publish_scene_async(self):
+    async def publish_scene(self):
         print(f"publish_scene_async")
         request = mjc_message_pb2.PublishSceneRequest()
         response = await self.sim_stub.PublishScene(request)
@@ -216,16 +215,13 @@ class OrcaLabScene:
             raise Exception("Publish scene failed.")
         print("done")
 
-    def publish_scene(self):
-        self.publish_scene_async()
-
-    async def get_sync_from_mujoco_to_scene_async(self) -> bool:
+    async def get_sync_from_mujoco_to_scene(self) -> bool:
         request = edit_service_pb2.GetSyncFromMujocoToSceneRequest()
         response = await self.edit_stub.GetSyncFromMujocoToScene(request)
         self._check_response(response)
         return response.value
 
-    async def set_sync_from_mujoco_to_scene_async(self, value: bool):
+    async def set_sync_from_mujoco_to_scene(self, value: bool):
         print(f"set_sync_from_mujoco_to_scene_async {value}")
         request = edit_service_pb2.SetSyncFromMujocoToSceneRequest(value=value)
         response = await self.edit_stub.SetSyncFromMujocoToScene(request)
@@ -233,13 +229,13 @@ class OrcaLabScene:
         print("done")
         return response
 
-    async def clear_scene_async(self):
+    async def clear_scene(self):
         request = edit_service_pb2.ClearSceneRequest()
         response = await self.edit_stub.ClearScene(request)
         self._check_response(response)
         return response
 
-    async def get_actor_assets_async(self):
+    async def get_actor_assets(self):
         request = edit_service_pb2.GetActorAssetsRequest()
         response = await self.edit_stub.GetActorAssets(request)
         self._check_response(response)
