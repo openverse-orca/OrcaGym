@@ -209,7 +209,7 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         if m_lvl:
             level_name = m_lvl.group(1)
     
-    # 1) 先试“object … to goal …” 的结构
+    # 1) 先试"object … to goal …" 的结构
     m = re.search(r'object[:\s]+([\w_]+)\s+to\s+goal[:\s]+([\w_]+)', text)
     if m:
         obj_key  = normalize_key(m.group(1))
@@ -1123,6 +1123,7 @@ def augment_episode(env : DualArmEnv,
         return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, {}
 
 def do_augmentation(
+        # json_path,
         env : DualArmEnv, 
         cameras : list[CameraWrapper], 
         rgb_size : tuple,                    
@@ -1151,6 +1152,25 @@ def do_augmentation(
                                     env_version=dataset_reader.get_env_version(),
                                     env_kwargs=env_kwargs)
 
+    # 构造 JSON 路径（与 add_demo_to_dataset 函数保持一致）
+    # 1) 获取 level_name
+    level_name = env._task.level_name
+    lvl = level_name.decode() if isinstance(level_name, (bytes, bytearray)) else level_name
+    
+    # 2) 映射出 scene_name / sub_scene_name
+    scene_name, sub_scene_name = SCENE_SUBSCENE_MAPPING.get(
+        lvl, (lvl.title(), lvl.title()+"_Operation")
+    )
+    
+    # 3) 构造 JSON 目录
+    scene_dir = os.path.join(
+        dataset_writer.basedir  # parent of HDF5 filename
+    )
+    os.makedirs(scene_dir, exist_ok=True)
+    
+    # 4) JSON 路径
+    json_fname = f"{scene_name}-{sub_scene_name}.json"
+    json_path = os.path.join(scene_dir, json_fname)
    
     for camera in cameras:
         camera.start()
@@ -1188,12 +1208,13 @@ def do_augmentation(
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list,
                                         camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
                     uuid_path = dataset_writer.get_UUIDPath()
-
                     unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
                     ret, _ = unitCheack.check()
                     if ret != ErrorType.Qualified:
+                        trial_count += 1
                         print(f"ret = {ret}")
                         dataset_writer.remove_path()
+                        dataset_writer.remove_episode_from_json(json_path, dataset_writer.experiment_id)
                     else:
                         done_demo_count += 1
                         print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")

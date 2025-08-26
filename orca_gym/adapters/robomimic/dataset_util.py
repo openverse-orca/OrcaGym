@@ -137,6 +137,25 @@ class DatasetWriter:
         self.pathremoved = True
 
 
+    @staticmethod
+    def remove_episode_from_json(json_path, episode_id):
+    # 删除 JSON 文件中指定 episode_id 的记录
+        if not os.path.exists(json_path):
+            print(f"JSON file {json_path} not found!")
+            return
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 保留不是这个 episode_id 的条目
+        new_data = [item for item in data if item["episode_id"] != episode_id]
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(new_data, f, ensure_ascii=False, indent=4)
+        
+        print(f"Removed episode {episode_id} from {json_path}")
+
+
         
 
 
