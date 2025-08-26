@@ -100,6 +100,9 @@ CurriculumConfig = {
         "ellipsoid_low" : {
             "offset" : [-30, 30, 0],
         },
+        "ellipsoid_high" : {
+            "offset" : [0, 30, 0],
+        },
     },
 
     "curriculum_levels" : {
@@ -111,6 +114,11 @@ CurriculumConfig = {
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_fast",},
+            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
+            {"terrain" : "ellipsoid_high" ,    "command_type": "move_fast",},
+            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
+            {"terrain" : "brics_low" ,        "command_type": "move_fast", },
+            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
         ],
         "rough_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},

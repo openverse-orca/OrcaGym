@@ -7,7 +7,7 @@
 1. 安装依赖
 - 安装onnx包
 ```bash
-pip install onnx onnxruntime-gpu
+pip install onnx onnxruntime-gpu onnxscript
 ```
 - 安装cudnn（如果还没有装过的话）
 ```bash

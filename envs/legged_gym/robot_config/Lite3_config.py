@@ -17,16 +17,16 @@ RewardConfig = {
         "base_accelerometer" : 0,
         "follow_command_linvel" : 1,    # 跟随指令速度奖励
         "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
-        "height" : 0.5,                   # 身体高度惩罚
+        "height" : 2,                   # 身体高度惩罚
         "body_lin_vel" : 2,             # 身体上下线速度惩罚
         "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
         "body_orientation" : 1,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0,             # 接触时，足底线速度
+        "feet_slip" : 0.1,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
-        "feet_swing_height" : 0,    # 鼓励足底离地高度在理想范围内
+        "feet_swing_height" : 5,    # 鼓励足底离地高度在理想范围内
         "fly" : 0.1,                    # 四足离地惩罚
         "stepping" : 0.3,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
@@ -103,7 +103,7 @@ Lite3Config = {
 
         "compute_body_height" : True,      # 真机没有激光雷达，无法计算body高度
         "compute_body_orientation" : False, # TODO:目前只支持水平方向的orientation奖励
-        "compute_foot_height" : False,      # 真机没有激光雷达，无法计算foot高度
+        "compute_foot_height" : True,      # 真机没有激光雷达，无法计算foot高度
 
         "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
         "leg_contact_body_names" : ["FL_THIGH", "FL_SHANK", 
@@ -130,6 +130,12 @@ Lite3Config = {
             "p5" :          0.5,
             "phase_freq" :  0.8,
             "eps" :         0.2,
+        },
+        "foot_leg_period" : {
+            "period" : 0.8,
+            "offset" : 0.5,
+            "stance_threshold" : 0.55,
+            "swing_height" : 0.1,
         },
 
         # Config for randomization
@@ -164,15 +170,11 @@ Lite3Config = {
         "batch_size" : 4096,  # 批次大小            
         "learning_rate": {
             "initial_value": 3e-4,    # 初始学习率
-            "end_fraction": 0.5,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
+            "end_fraction": 0.8,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
             "final_value": 1e-4       # 最终学习率
         },
         "gamma" : 0.99,  # 折扣因子
-        "clip_range": {
-            "initial_value": 0.2,     # 初始clip范围
-            "end_fraction": 0.5,      # 线性衰减，0.1表示在训练结束前10%时达到最终clip范围
-            "final_value": 0.1        # 最终clip范围
-        },
+        "clip_range": 0.2,  # 裁剪范围
         "ent_coef" : 0.01,  # 熵系数
         "max_grad_norm" : 1,  # 最大梯度范数
     }
