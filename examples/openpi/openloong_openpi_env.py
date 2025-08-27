@@ -88,8 +88,8 @@ class OpenLoongOpenpiEnv(_environment.Environment):
         self._episode_reward = max(self._episode_reward, reward)
         
         # 记录动作
-        self._log_action_csv(joint_pos)
-        self._log_state_csv(self._last_obs["state"])
+        # self._log_action_csv(joint_pos)
+        # self._log_state_csv(self._last_obs["state"])
         
     def _log_action_csv(self, action: np.ndarray) -> None:
         # np.zeros(6),                # left hand ee pos and angle euler
@@ -157,64 +157,4 @@ class OpenLoongOpenpiEnv(_environment.Environment):
             "images": {"cam_high": img},
             "prompt": self._prompt,
         }
-        
-    def fake_convert_observation(self, gym_obs: dict) -> dict:
-        # read from hdf5 file
-        import h5py
-        import pandas as pd
-        
-        # read mp4 file and return list of frames
-        def read_mp4_file(file_path):
-            cap = cv2.VideoCapture(file_path)
-            frames = []
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frames.append(frame)
-            return frames
-        
-        path = "/home/user/Desktop/manipulation/OrcaGym/examples/openpi/records_tmp/tmp/a7419694_1755250755"
-        step = 10
-        
-        frames = read_mp4_file(os.path.join(path, "camera", "video", "camera_head_color.mp4"))
-
-        with h5py.File(os.path.join(path, "proprio_stats", "proprio_stats.hdf5"), "r") as f:
-            action_data = f["data"]["demo_00000"]["actions"]
-            camera_data = f["data"]["demo_00000"]["camera_frames"]
-            state_data = f["data"]["demo_00000"]["states"]
-            # turn to pandas dataframe
-            action_df = pd.DataFrame(action_data)
-            camera_df = pd.DataFrame(camera_data)
-            state_df = pd.DataFrame(state_data)
-        
-        # get the frame number
-        frame_num = camera_df.iloc[step, 0]
-        # get the frame
-        img = frames[frame_num]
-        # save img to file
-        cv2.imwrite("img.png", img)
-        # img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
-        img = cv2.resize(img, (224, 224))
-        
-        # Convert axis order from [H, W, C] --> [C, H, W]
-        img = np.transpose(img, (2, 0, 1))
-        
-        # get the action in numpy array
-        a = action_df.iloc[step].to_numpy()
-        # get the state in numpy array
-        s = state_df.iloc[step].to_numpy()
-
-        s = np.concatenate([s[26:33], s[82:83], s[54:61], s[83:84], s[0:3], s[7:10], np.zeros(10)], dtype=np.float32)
-        a = np.concatenate([a[6:14], a[20:28], np.zeros(12)], dtype=np.float32)
-
-        out = {
-            "state": s,
-            "images": {"cam_high": img},
-            "prompt": "level: tmp  object: Box1 to goal: basket",
-        }
-        print(out["state"])
-        print("action", a)
-
-        return out
 
