@@ -5,9 +5,6 @@ class Path:
             raise Exception("Invalid path.")
         self._p = p
 
-    def is_valid(self):
-        return len(self._p) > 0
-
     def append(self, name: str):
         if not isinstance(name, str):
             raise Exception("Invalid argument.")
@@ -28,6 +25,9 @@ class Path:
 
     def __str__(self):
         return self._p
+
+    def __repr__(self):
+        return f'Path("{self._p}")'
 
     def __hash__(self):
         return hash(self._p)
@@ -66,5 +66,3 @@ class Path:
     @classmethod
     def root_path(cls):
         return Path("/")
-
-

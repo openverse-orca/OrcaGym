@@ -8,7 +8,9 @@ from scipy.spatial.transform import Rotation
 import subprocess
 
 from orca_gym.orca_lab.ui.actor_outline import ActorOutline
+from orca_gym.orca_lab.ui.actor_outline_model import ActorOutlineModel
 from orca_gym.orca_lab.ui.asset_browser import AssetBrowser
+from orca_gym.orca_lab.ui.tool_bar import ToolBar
 from orca_gym.orca_lab.math import Transform, Vec3
 
 import PySide6.QtAsyncio as QtAsyncio
@@ -67,6 +69,7 @@ class App:
 
         await self.scene.init_grpc()
         await self.scene.set_sync_from_mujoco_to_scene(False)
+        await self.scene.set_selection([])
         await self.scene.clear_scene()
 
         # # Add a actor, for testing.
@@ -87,6 +90,16 @@ class App:
         #self.myUIWindow.add_item_to_scene
 
 
+        self.actor_outline_model.set_root_group(self.scene.root_actor)
+        self.actor_outline.actor_selection_changed.connect(
+            lambda actors: asyncio.ensure_future(self.set_scene_selection(actors))
+        )
+        self.scene.selection_changed.connect(
+            lambda actor_paths: asyncio.ensure_future(
+                self.set_actor_outline_selection(actor_paths)
+            )
+        )
+
     def _init_ui(self):
         self.q_app = QtWidgets.QApplication([])
 
@@ -94,14 +107,13 @@ class App:
         
         # self.actor_outline = ActorOutline()
         # self.asset_browser = AssetBrowser()
-        # self.actor_outline.show()
         # self.asset_browser.show()
         '''
         self.tool_bar = ToolBar()
-        self.tool_bar.run_button.clicked.connect(
+        self.tool_bar.action_start.triggered.connect(
             lambda: asyncio.ensure_future(self.run_sim())
         )
-        self.tool_bar.stop_button.clicked.connect(
+        self.tool_bar.action_stop.triggered.connect(
             lambda: asyncio.ensure_future(self.stop_sim())
         )
         # self.tool_bar.show()
@@ -119,6 +131,12 @@ class App:
         )
         
         self.myUIWindow.show()
+
+        self.actor_outline = ActorOutline()
+        self.actor_outline_model = ActorOutlineModel()
+        self.actor_outline.set_actor_model(self.actor_outline_model)
+        self.actor_outline.resize(200, 400)
+        self.actor_outline.show()
 
     def exec(self) -> int:
 
@@ -177,7 +195,7 @@ class App:
                 # TODO notify ui.
 
         frequency = 0.5  # Hz
-        asyncio.sleep(1 / frequency)
+        await asyncio.sleep(1 / frequency)
         asyncio.create_task(self._sim_process_check_loop())
 
     async def add_item_to_scene(self, item_name):
@@ -195,6 +213,27 @@ class App:
         self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
         
+
+    async def set_actor_outline_selection(self, actor_paths: list[Path]):
+        actors = []
+        for path in actor_paths:
+            actor = self.scene.find_actor_by_path(path)
+            if actor is None:
+                raise Exception(f"Actor doest not exist at path: {path}")
+
+            actors.append(actor)
+
+        self.actor_outline.set_actor_selection(actors)
+
+    async def set_scene_selection(self, actors: list[AssetActor]):
+        actor_paths = []
+        for actor in actors:
+            path = self.scene.get_actor_path(actor)
+            if path is None:
+                raise Exception(f"Invalid actor: {actor}")
+
+            actor_paths.append(path)
+        await self.scene.set_selection(actor_paths)
 
 
 if __name__ == "__main__":

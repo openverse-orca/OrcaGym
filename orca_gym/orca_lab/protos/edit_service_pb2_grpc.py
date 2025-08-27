@@ -79,10 +79,10 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.GetActorAssetsRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.GetActorAssetsResponse.FromString,
                 _registered_method=True)
-        self.GetSelection = channel.unary_unary(
-                '/SceneEdit.GrpcService/GetSelection',
-                request_serializer=edit__service__pb2.GetSelectionRequest.SerializeToString,
-                response_deserializer=edit__service__pb2.GetSelectionResponse.FromString,
+        self.GetPendingSelectionChange = channel.unary_unary(
+                '/SceneEdit.GrpcService/GetPendingSelectionChange',
+                request_serializer=edit__service__pb2.GetPendingSelectionChangeRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.GetPendingSelectionChangeResponse.FromString,
                 _registered_method=True)
         self.SetSelection = channel.unary_unary(
                 '/SceneEdit.GrpcService/SetSelection',
@@ -158,7 +158,7 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetSelection(self, request, context):
+    def GetPendingSelectionChange(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -230,10 +230,10 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     request_deserializer=edit__service__pb2.GetActorAssetsRequest.FromString,
                     response_serializer=edit__service__pb2.GetActorAssetsResponse.SerializeToString,
             ),
-            'GetSelection': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetSelection,
-                    request_deserializer=edit__service__pb2.GetSelectionRequest.FromString,
-                    response_serializer=edit__service__pb2.GetSelectionResponse.SerializeToString,
+            'GetPendingSelectionChange': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPendingSelectionChange,
+                    request_deserializer=edit__service__pb2.GetPendingSelectionChangeRequest.FromString,
+                    response_serializer=edit__service__pb2.GetPendingSelectionChangeResponse.SerializeToString,
             ),
             'SetSelection': grpc.unary_unary_rpc_method_handler(
                     servicer.SetSelection,
@@ -505,7 +505,7 @@ class GrpcService(object):
             _registered_method=True)
 
     @staticmethod
-    def GetSelection(request,
+    def GetPendingSelectionChange(request,
             target,
             options=(),
             channel_credentials=None,
@@ -518,9 +518,9 @@ class GrpcService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/SceneEdit.GrpcService/GetSelection',
-            edit__service__pb2.GetSelectionRequest.SerializeToString,
-            edit__service__pb2.GetSelectionResponse.FromString,
+            '/SceneEdit.GrpcService/GetPendingSelectionChange',
+            edit__service__pb2.GetPendingSelectionChangeRequest.SerializeToString,
+            edit__service__pb2.GetPendingSelectionChangeResponse.FromString,
             options,
             channel_credentials,
             insecure,
