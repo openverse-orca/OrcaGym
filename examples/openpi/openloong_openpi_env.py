@@ -124,7 +124,7 @@ class OpenLoongOpenpiEnv(_environment.Environment):
     def _convert_observation(self, gym_obs: dict) -> dict:
         img, _ = self._camera.get_frame(format="rgb24", size=RGB_SIZE)
         # save img to file
-        cv2.imwrite("img.png", img)
+        # cv2.imwrite("img.png", img)
         
         # img = image_tools.convert_to_uint8(image_tools.resize_with_pad(img, 224, 224))
         img = cv2.resize(img, (224, 224))
