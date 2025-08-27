@@ -16,56 +16,17 @@ from orca_gym.orca_lab.math import Transform, Vec3
 import PySide6.QtAsyncio as QtAsyncio
 
 
-async def empty_task():
-    pass
-
-
-class UIWindow(QtWidgets.QWidget):
-    def __init__(self, parent=None, add_item_to_scene_callback=None):
-        super().__init__(parent)
-        self.add_item_to_scene = add_item_to_scene_callback
-        self.layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.layout)
-
-        self.asset_list = AssetBrowser()
-        self.tool_bar = ToolBar()
-
-        self.layout.addWidget(self.asset_list)
-        self.layout.addWidget(self.tool_bar)
-
-        self.resize(400, 200)
-
-
-class ToolBar(QtWidgets.QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.layout)
-
-        self.run_button = QtWidgets.QPushButton("Run Sim")
-        self.stop_button = QtWidgets.QPushButton("Stop Sim")
-
-        self.layout.addWidget(self.run_button)
-        self.layout.addWidget(self.stop_button)
-
-        self.resize(400, 200)
-
-
-class App:
+class MainWindow(QtWidgets.QWidget):
 
     def __init__(self):
+        super().__init__()
 
-        self.sim_process_running = False
-
-        self._init_ui()
-        self.asset_map_counter = {}
-
-    async def _init_scene(self):
+    async def init(self):
         self.edit_grpc_addr = "localhost:50151"
         self.sim_grpc_addr = "localhost:50051"
         self.scene = OrcaLabScene(self.edit_grpc_addr, self.sim_grpc_addr)
         self._sim_process_check_lock = asyncio.Lock()
+        self.sim_process_running = False
 
         await self.scene.init_grpc()
         await self.scene.set_sync_from_mujoco_to_scene(False)
@@ -84,12 +45,28 @@ class App:
 
         await self.scene.add_actor(actor, Path.root_path())
 
-        assets = await self.scene.get_actor_assets()
-        self.myUIWindow.asset_list.set_assets(assets)
+        self.asset_map_counter = {}
         self.asset_map_counter[actor.spawnable_name] = 2
-        #self.myUIWindow.add_item_to_scene
+
+        await self._init_ui()
+
+        self.resize(400, 200)
+        self.show()
+
+    async def _init_ui(self):
+
+        self.tool_bar = ToolBar()
+        self.tool_bar.action_start.triggered.connect(
+            lambda: asyncio.ensure_future(self.run_sim())
+        )
+        self.tool_bar.action_stop.triggered.connect(
+            lambda: asyncio.ensure_future(self.stop_sim())
+        )
 
 
+        self.actor_outline = ActorOutline()
+        self.actor_outline_model = ActorOutlineModel()
+        self.actor_outline.set_actor_model(self.actor_outline_model)
         self.actor_outline_model.set_root_group(self.scene.root_actor)
         self.actor_outline.actor_selection_changed.connect(
             lambda actors: asyncio.ensure_future(self.set_scene_selection(actors))
@@ -100,57 +77,27 @@ class App:
             )
         )
 
-    def _init_ui(self):
-        self.q_app = QtWidgets.QApplication([])
+        self.asset_browser = AssetBrowser()
+        assets = await self.scene.get_actor_assets()
+        self.asset_browser.set_assets(assets)
+        self.asset_browser.add_item.connect(
+            lambda item_name: asyncio.ensure_future(self.add_item_to_scene(item_name))
+        )
 
-        self.myUIWindow = UIWindow(add_item_to_scene_callback=self.add_item_to_scene)
+        self.menu_bar = QtWidgets.QMenuBar()
         
-        # self.actor_outline = ActorOutline()
-        # self.asset_browser = AssetBrowser()
-        # self.asset_browser.show()
-        '''
-        self.tool_bar = ToolBar()
-        self.tool_bar.action_start.triggered.connect(
-            lambda: asyncio.ensure_future(self.run_sim())
-        )
-        self.tool_bar.action_stop.triggered.connect(
-            lambda: asyncio.ensure_future(self.stop_sim())
-        )
-        # self.tool_bar.show()
-        layout.addWidget(self.tool_bar)
-        layout.addWidget(self.asset_browser)
-        '''
-        self.myUIWindow.tool_bar.run_button.clicked.connect(
-            lambda: asyncio.ensure_future(self.run_sim())
-        )
-        self.myUIWindow.tool_bar.stop_button.clicked.connect(
-            lambda: asyncio.ensure_future(self.stop_sim())
-        )
-        self.myUIWindow.asset_list.add_item.connect(
-            lambda item_name: asyncio.ensure_future( self.add_item_to_scene(item_name))
-        )
-        
-        self.myUIWindow.show()
 
-        self.actor_outline = ActorOutline()
-        self.actor_outline_model = ActorOutlineModel()
-        self.actor_outline.set_actor_model(self.actor_outline_model)
-        self.actor_outline.resize(200, 400)
-        self.actor_outline.show()
+        layout1 = QtWidgets.QHBoxLayout()
+        layout1.addWidget(self.actor_outline)
+        layout1.addWidget(self.asset_browser)
+        layout1.addWidget(self.tool_bar)
 
-    def exec(self) -> int:
+        layout2 = QtWidgets.QVBoxLayout()
+        layout2.addWidget(self.menu_bar)
+        layout2.addWidget(self.tool_bar)
+        layout2.addLayout(layout1)
 
-        # asyncio.run_forever()
-        # code = self.q_app.exe()
-
-        # 在这之后，Qt的event_loop变成asyncio的event_loop。
-        # 这是目前统一Qt和asyncio最好的方法。
-        # 所以不要保存loop，统一使用asyncio.xxx()。
-        # https://doc.qt.io/qtforpython-6/PySide6/QtAsyncio/index.html
-        QtAsyncio.run(self._init_scene())
-        self.scene.destroy_grpc()
-
-        return 0
+        self.setLayout(layout2)
 
     async def run_sim(self):
         if self.sim_process_running:
@@ -203,16 +150,15 @@ class App:
 
         index = self.asset_map_counter[item_name]
         transform = Transform()
-        transform.position = Vec3(1*index, 0, 2)
-        new_item_name = item_name+str(index)
+        transform.position = Vec3(1 * index, 0, 2)
+        new_item_name = item_name + str(index)
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
         actor.transform = transform
-        
+
         await self.scene.add_actor(actor, Path.root_path())
-        
+
         self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
-        
 
     async def set_actor_outline_selection(self, actor_paths: list[Path]):
         actors = []
@@ -238,11 +184,17 @@ class App:
 
 if __name__ == "__main__":
 
-    app = App()
+    q_app = QtWidgets.QApplication([])
 
-    code = app.exec()
+    main_window = MainWindow()
+
+    # 在这之后，Qt的event_loop变成asyncio的event_loop。
+    # 这是目前统一Qt和asyncio最好的方法。
+    # 所以不要保存loop，统一使用asyncio.xxx()。
+    # https://doc.qt.io/qtforpython-6/PySide6/QtAsyncio/index.html
+    QtAsyncio.run(main_window.init())
 
     # magic!
     # AttributeError: 'NoneType' object has no attribute 'POLLER'
     # https://github.com/google-gemini/deprecated-generative-ai-python/issues/207#issuecomment-2601058191
-    exit(code)
+    exit(0)
