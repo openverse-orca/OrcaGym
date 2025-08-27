@@ -1,5 +1,9 @@
 # model files
 trained_models_tmp/
 reward_history/
+test/
+height_map/
 play.sh
 log/
+*.npy
+*.zip

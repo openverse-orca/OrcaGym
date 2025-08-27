@@ -30,18 +30,10 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         run_mode: str,
         env_id: str,
         task: str,
-        port:int = 15632, 
-        ip:str="localhost",
         **kwargs,
     ):
         self._init_height_map(height_map_file)
         self._run_mode = run_mode       
-        
-        if self._run_mode == "nav":
-            self.url = "http://"+ip+f":{port}/posyaw"  
-            self.rec_action = RecAction(ip=ip)
-        print("------------------------------")
-        print("ip:", ip, "port:", port)
         
         super().__init__(
             frame_skip = frame_skip,
@@ -229,11 +221,10 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             print("Skip randomize foot friction in testing or play mode")
             return
 
-        random_friction = self.np_random.uniform(0, 1.0)
         geom_friction_dict = {}
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
-            agent_geom_friction_dict = agent.randomize_foot_friction(random_friction, self.model.get_geom_dict())
+            agent_geom_friction_dict = agent.randomize_foot_friction(self.model.get_geom_dict())
             geom_friction_dict.update(agent_geom_friction_dict)
 
         # print("Set geom friction: ", geom_friction_dict)
@@ -245,13 +236,15 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             print("Skip randomized weight load in testing or play mode")
             return   
 
-        pos_scale = 0.01
         weight_load_dict = {}
         all_joint_dict = self.model.get_joint_dict()        
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
             random_weight = self.np_random.uniform(agent.added_mass_range[0], agent.added_mass_range[1])
-            random_weight_pos = [self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0]
+            random_weight_pos = [
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1]),
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1]), 
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1])]
 
             base_body_id = all_joint_dict[agent.base_joint_name]["BodyID"]
             weight_load_tmp = {base_body_id : {"weight": random_weight, "pos": random_weight_pos}}
@@ -322,8 +315,8 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         elif "g1" in self._player_agent.name:
             robot_config = LeggedRobotConfig["g1"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["flat_plane"]["command_lin_vel_range_y"]) / 2
+        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
@@ -404,6 +397,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
         self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
         self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
+        self.gym.opt.filterparent = LeggedEnvConfig[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)

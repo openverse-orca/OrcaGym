@@ -17,3 +17,4 @@ def create_tmp_dir(dir_name):
 
 def formate_now():
     return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+

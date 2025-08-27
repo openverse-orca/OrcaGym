@@ -16,6 +16,7 @@ import sys
 import time
 
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.utils import get_schedule_fn, get_linear_fn
 class SnapshotCallback(BaseCallback):
     def __init__(self, 
                  save_interval : int, 
@@ -42,6 +43,45 @@ class SnapshotCallback(BaseCallback):
             self.model.save(model_path)
         return True  # 确保训练继续
 
+class CurriculumCallback(BaseCallback):
+    def __init__(self, 
+                 save_path : str,
+                 model_nstep : int,
+                 curriculum_list : list[dict[str, int]],
+                 verbose=0):
+        super().__init__(verbose)
+        self.steps_count = 0                # 步数计数器
+        self.iteration_count = 0            # 迭代计数器
+        self.save_path = save_path          # 保存路径前缀
+        self.model_nstep = model_nstep      # 模型每迭代执行步数
+        self.curriculum_list = curriculum_list        # 课程名称和持续迭代数
+        self.curriculum_index = 0
+        
+    def _on_step(self) -> bool:
+        # 每步递增计数器
+        self.steps_count += 1
+        if self.steps_count % self.model_nstep == 0:
+            self.iteration_count += 1
+        # print("callback step: ", self.steps_count, " iteration: ", self.iteration_count)
+        # 满足间隔条件时保存
+        if self.iteration_count > 0 and self.iteration_count % self.curriculum_list[self.curriculum_index]["milestone"] == 0 and self.steps_count % self.model_nstep == 0:
+            # 保存模型
+            model_path = f"{self.save_path}_{self.curriculum_list[self.curriculum_index]['name']}_iteration_{self.iteration_count}.zip"
+            self.logger.info(f"保存模型到 {model_path}")
+            self.model.save(model_path)
+
+            # 更新课程
+            self.curriculum_index += 1
+            if self.curriculum_index >= len(self.curriculum_list):
+                self.curriculum_index = 0
+            self.logger.info(f"更新课程: {self.curriculum_list[self.curriculum_index]['name']}")
+            self.model.env.setup_curriculum(self.curriculum_list[self.curriculum_index]["name"])
+            self.model.env.reset()
+
+            
+        return True  # 确保训练继续
+
+
 def register_env(
     orcagym_addr: str,
     env_name: str,
@@ -50,14 +90,14 @@ def register_env(
     agent_name: str,
     task: str,
     run_mode: str,
-    nav_ip: str,
     entry_point: str,
     time_step: float,
     max_episode_steps: int,
-    render_mode: str,
     frame_skip: int,
+    action_skip: int,
     is_subenv: bool,
-    height_map_file: str
+    height_map_file: str,
+    render_mode: str
 ) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
@@ -66,6 +106,7 @@ def register_env(
         entry_point=entry_point,
         kwargs={
             'frame_skip': frame_skip,
+            'action_skip': action_skip,
             'task': task,
             'orcagym_addr': orcagym_addr,
             'agent_names': [f"{agent_name}_{agent_id:03d}" for agent_id in range(agent_num)],
@@ -75,7 +116,6 @@ def register_env(
             'is_subenv': is_subenv,
             'height_map_file': height_map_file,
             'run_mode': run_mode,
-            'ip': nav_ip,
             'env_id': env_id
         },
         max_episode_steps=sys.maxsize,  # 环境永不停止，agent有最大步数
@@ -92,14 +132,14 @@ def make_env(
     agent_name: str, 
     task: str, 
     run_mode: str, 
-    nav_ip: str, 
     entry_point: str, 
     time_step: float, 
     max_episode_steps: int, 
-    render_mode: str,
     frame_skip: int, 
+    action_skip: int,
     is_subenv: bool, 
-    height_map_file: str
+    height_map_file: str,
+    render_mode: str
 ) -> callable:
     def _init():
         # 注册环境，确保子进程中也能访问
@@ -111,14 +151,14 @@ def make_env(
             agent_name=agent_name, 
             task=task, 
             run_mode=run_mode, 
-            nav_ip=nav_ip, 
             entry_point=entry_point, 
             time_step=time_step, 
             max_episode_steps=max_episode_steps, 
-            render_mode=render_mode,
             frame_skip=frame_skip, 
+            action_skip=action_skip,
             is_subenv=is_subenv, 
-            height_map_file=height_map_file
+            height_map_file=height_map_file,
+            render_mode=render_mode
         )
         print("Registering environment with id: ", env_id)
 
@@ -132,15 +172,20 @@ def training_model(
     model : PPO, 
     total_timesteps: int, 
     model_file: str,
+    curriculum_list: list[dict[str, int]],
 ):
     try:
         snapshot_callback = SnapshotCallback(save_interval=100, 
                                              save_path=model_file,
                                              model_nstep=model.n_steps)
+
+        curriculum_callback = CurriculumCallback(save_path=model_file, 
+                                                 model_nstep=model.n_steps, 
+                                                 curriculum_list=curriculum_list)
         
         
         model.learn(total_timesteps=total_timesteps, 
-                    callback=snapshot_callback)
+                    callback=[snapshot_callback, curriculum_callback])
     finally:
         print(f"-----------------Save Model-----------------")
         model.save(model_file)
@@ -154,26 +199,22 @@ def setup_model_ppo(
 ) -> PPO:
     """
     设置或加载 PPO 模型。
-
-    参数:
-    - env: 训练环境
-    - env_num: 环境数量
-    - agent_num: 每个环境中的智能体数量
-    - model_file: 模型文件路径
-    - load_existing_model: 是否加载现有模型标志
-
-    返回:
-    - model: 初始化的或加载的 PPO 模型
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # 根据环境数量和智能体数量计算批次大小和采样步数
     total_envs = env_num * agent_num
-    n_steps = agent_config["n_steps"]  # 每个环境采样步数
-    batch_size = agent_config["batch_size"]  # 批次大小
+    n_steps = agent_config["n_steps"]
+    batch_size = agent_config["batch_size"]
+    
     # 确保 batch_size 是 total_envs * n_steps 的因数
+    min_batch_size = 32
     if (total_envs * n_steps) % batch_size != 0:
+        suitable_batch_size = (total_envs * n_steps) // 4
+        suitable_batch_size = max(min_batch_size, suitable_batch_size)
         print(f"Warning: batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
-        batch_size = (total_envs * n_steps) // 4  # 设置为总环境数量的四分之一
+        print(f"自动调整为: {suitable_batch_size}")
+        batch_size = suitable_batch_size
         
     # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}"):
@@ -181,35 +222,62 @@ def setup_model_ppo(
         model = PPO.load(model_file, env=env, device=device)
     else:
         print("初始化新模型")
-        # 定义自定义策略网络
         
+        # 处理学习率调度
+        if isinstance(agent_config["learning_rate"], dict):
+            lr_schedule = get_linear_fn(
+                agent_config["learning_rate"]["initial_value"],
+                agent_config["learning_rate"]["final_value"],
+                agent_config["learning_rate"]["end_fraction"]
+            )
+            print(f"学习率调度: {agent_config['learning_rate']}")
+        else:
+            lr_schedule = agent_config["learning_rate"]
+            
+        # 处理clip_range调度
+        if isinstance(agent_config["clip_range"], dict):
+            clip_range_schedule = get_linear_fn(
+                agent_config["clip_range"]["initial_value"],
+                agent_config["clip_range"]["final_value"],
+                agent_config["clip_range"]["end_fraction"]
+            )
+            print(f"clip_range调度: {agent_config['clip_range']}")
+        else:
+            clip_range_schedule = agent_config["clip_range"]
+        
+        # 定义自定义策略网络
         policy_kwargs = dict(
             net_arch=dict(
-                pi=agent_config["pi"],  # 策略网络结构
-                vf=agent_config["vf"]   # 值函数网络结构
+                pi=agent_config["pi"],
+                vf=agent_config["vf"]
             ),
-            ortho_init=True,       # 正交初始化
-            activation_fn=nn.ELU,  # 激活函数
+            ortho_init=True,
+            activation_fn=nn.SiLU,  # 改为更合适的激活函数
         )
 
         model = PPO(
-            policy="MultiInputPolicy",  # 多输入策略
+            policy="MultiInputPolicy",
             env=env, 
             verbose=1, 
-            learning_rate=agent_config["learning_rate"], 
+            learning_rate=lr_schedule, 
             n_steps=n_steps, 
             batch_size=batch_size, 
             gamma=agent_config["gamma"], 
-            clip_range=agent_config["clip_range"], 
+            clip_range=clip_range_schedule, 
             ent_coef=agent_config["ent_coef"], 
             max_grad_norm=agent_config["max_grad_norm"],
             policy_kwargs=policy_kwargs, 
             device=device,
-            tensorboard_log="./ppo_tensorboard/",  # TensorBoard 日志目录
+            tensorboard_log="./ppo_tensorboard/",
         )
 
     # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}\n- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}")
+    print(f"- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    print(f"- Learning Rate: {agent_config['learning_rate']}")
+    print(f"- Activation Function: {policy_kwargs['activation_fn'].__name__}")
+    print(f"- Policy Network: {agent_config['pi']}")
+    print(f"- Value Network: {agent_config['vf']}")
 
     return model
 
@@ -239,12 +307,16 @@ def train_model(
     entry_point: str,
     time_step: float,
     max_episode_steps: int,
-    render_mode: str,
     frame_skip: int,
+    action_skip: int,
     total_timesteps: int,
     model_file: str,
     height_map_file: str,
+    curriculum_list: list[dict[str, int]],
+    render_mode: str,
 ):
+    model = None
+    env = None
     try:
         print("simulation running... , orcagym_addresses: ", orcagym_addresses)
 
@@ -261,18 +333,19 @@ def train_model(
                 agent_name=agent_name,
                 task=task,
                 run_mode="training",
-                nav_ip="localhost",
                 entry_point=entry_point,
                 time_step=time_step,
                 max_episode_steps=max_episode_steps,
-                render_mode=render_mode,
                 frame_skip=frame_skip,
+                action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
+                render_mode=render_mode,
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
         env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
+        env.setup_curriculum(curriculum_list[0]["name"])
 
         print("Start Simulation!")
         model = setup_model_ppo(
@@ -283,13 +356,15 @@ def train_model(
             model_file=model_file,
         )
 
-        training_model(model, total_timesteps, model_file)
+        training_model(model, total_timesteps, model_file, curriculum_list)
 
     finally:
         print("退出仿真环境")
-        print(f"-----------------Save Model-----------------")
-        model.save(model_file)
-        env.close()
+        if model is not None:
+            print(f"-----------------Save Model-----------------")
+            model.save(model_file)
+        if env is not None:
+            env.close()
 
 def test_model(
     orcagym_addresses: str,
@@ -297,15 +372,16 @@ def test_model(
     agent_name: str,
     task: str,
     run_mode: str,
-    nav_ip: str,
     entry_point: str,
     time_step: float,
     max_episode_steps: int,
-    render_mode: str,
     frame_skip: int,
+    action_skip: int,
     model_file: str,
-    height_map_file: str
-):
+    height_map_file: str,
+    curriculum_list: list[dict[str, int]],
+    render_mode: str,
+    ):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
 
@@ -322,18 +398,19 @@ def test_model(
                 agent_name=agent_name,
                 task=task,
                 run_mode=run_mode,
-                nav_ip=nav_ip,
                 entry_point=entry_point,
                 time_step=time_step,
                 max_episode_steps=max_episode_steps,
-                render_mode=render_mode,
                 frame_skip=frame_skip,
+                action_skip=action_skip,
                 is_subenv=is_subenv,
                 height_map_file=height_map_file,
+                render_mode=render_mode,
             )
             for orcagym_addr, env_index, is_subenv in zip(orcagym_addr_list, env_index_list, render_mode_list)
         ]
         env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
+        env.setup_curriculum(curriculum_list[0]["name"])
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         model: PPO = PPO.load(model_file, env=env, device=device)
@@ -344,7 +421,8 @@ def test_model(
             model=model,
             time_step=time_step,
             max_episode_steps=max_episode_steps,
-            frame_skip=frame_skip
+            frame_skip=frame_skip,
+            action_skip=action_skip
         )
 
     except KeyboardInterrupt:
@@ -382,7 +460,8 @@ def testing_model(
     model, 
     time_step: float, 
     max_episode_steps: int, 
-    frame_skip: int
+    frame_skip: int,
+    action_skip: int
 ):
     """
     测试模型。
@@ -406,14 +485,12 @@ def testing_model(
     test = 0
     total_rewards = np.zeros(agent_num)
     step = 0
-    dt = time_step * frame_skip
+    dt = time_step * frame_skip * action_skip
     print("Start Testing!")
     try:
         while True:
             step += 1
             start_time = datetime.now()
-
-
 
             obs_list = _segment_observation(observations, agent_num)
             action_list = []

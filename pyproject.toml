@@ -30,6 +30,7 @@ dependencies = [
     "opencv-python",
     "aiofiles",
     "requests",
+    "grpcio",
     "flask",
     "tensorboard",
     "trimesh",

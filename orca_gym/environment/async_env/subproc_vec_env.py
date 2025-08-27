@@ -69,6 +69,13 @@ def _worker(
                 remote.send(setattr(env, data[0], data[1]))  # type: ignore[func-returns-value]
             elif cmd == "is_wrapped":
                 remote.send(is_wrapped(env, data))
+            elif cmd == "setup_curriculum":
+                if not hasattr(env, "setup_curriculum"):
+                    unwraped_env = env.unwrapped
+                    unwraped_env.setup_curriculum(data)
+                else:
+                    env.setup_curriculum(data)
+                remote.send(True)
             else:
                 raise NotImplementedError(f"`{cmd}` is not implemented in the worker")
         except EOFError:
@@ -270,6 +277,12 @@ class OrcaGymAsyncSubprocVecEnv(VecEnv):
             if any(i >= remote_num for i in indices):
                 raise ValueError("Out of range indices")
         return indices
+
+    def setup_curriculum(self, curriculum_name: str) -> None:
+        for env_idx, remote in enumerate(self.remotes):
+            remote.send(("setup_curriculum", curriculum_name))
+        results = [remote.recv() for remote in self.remotes]
+        print("Subproc setup curriculum, results: ", results)
     
 def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvObs]:
     """

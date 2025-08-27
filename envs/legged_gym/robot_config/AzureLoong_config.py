@@ -66,15 +66,6 @@ AzureLoongConfig = {
         "sensor_foot_touch_names" : ["rf-touch-front", "rf-touch-back", "lf-touch-front", "lf-touch-back"],  # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",                                    
-                                        ],
         
         "base_contact_body_names" : ["base_link", 
                                      "Link_arm_r_01", "Link_arm_r_02", "Link_arm_r_03", "Link_arm_r_04", "Link_arm_r_05", "Link_arm_r_06", "Link_arm_r_07",

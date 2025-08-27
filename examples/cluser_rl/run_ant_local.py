@@ -14,6 +14,8 @@ def main(config: dict,
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
 
+    assert config['num_envs_per_env_runner'] % 32 == 0, "num_envs_per_env_runner must be a multiple of 32"
+
     if run_mode == 'training':
         run_training(
             orcagym_addr=config['orcagym_addr'],
@@ -36,7 +38,8 @@ def main(config: dict,
             agent_name=config['agent_name'],
             max_episode_steps=config['max_episode_steps'],
             use_onnx_for_inference=False,
-            explore_during_inference=False   
+            explore_during_inference=False,
+            render_mode=config['render_mode']
         )
     else:
         raise ValueError("Invalid run mode. Use 'training' or 'testing'.")
