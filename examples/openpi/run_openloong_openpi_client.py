@@ -28,14 +28,14 @@ RGB_SIZE = dual_arm_manipulation.RGB_SIZE
 
 @dataclasses.dataclass
 class Args:
-    orca_gym_address: str = '192.168.1.164:50051'
+    orca_gym_address: str = '192.168.1.220:50051'
     env_name: str = "DualArmEnv"
     seed: int = 0
-    agent_names: str = "openloong_gripper_2f85_fix_base"
+    agent_names: str = "openloong_gripper_2f85_fix_base_usda"
     record_time: int = 20
     task: str = "Manipulation"
     obs_type: str = "pixels_agent_pos"
-    prompt: str = "Do something."
+    prompt: str = "level: tmp  object: Box1 to goal: basket"
 
     action_horizon: int = 10
 
@@ -50,7 +50,7 @@ class Args:
 
     display: bool = False
     
-    task_config: str = "shop_task.yaml"
+    task_config: str = "jiazi_task.yaml"
 
 def main(args: Args) -> None:
     max_episode_steps = int(args.record_time * CONTROL_FREQ)    
@@ -102,6 +102,11 @@ def main(args: Args) -> None:
                 action_horizon=args.action_horizon,
             )
         ),
+        # agent=_policy_agent.PolicyAgent(
+        #     policy=test_policy.TestPolicy(
+        #         demo_path="/home/user/Desktop/manipulation/OrcaGym/examples/openpi/records_tmp/tmp/a7419694_1755250755"
+        #     )
+        # ),
         subscribers=[
         ],
         max_hz=50,
@@ -113,6 +118,84 @@ def main(args: Args) -> None:
     for process in monitor_processes:
         camera_monitor.terminate_monitor(process)
 
+def draw_action_csv(path: str) -> None:
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    df = pd.read_csv(path)
+    # Plot all columns
+    plt.figure(figsize=(12, 6))
+    # filter columns
+    for col in df.columns[0:]:
+        if "right" in col:
+            continue
+        print(col)
+        print(df[col])
+        plt.plot(df.index, df[col], marker='o', label=col)
+    plt.legend()
+    plt.show()
+    plt.savefig("y_p_left_2.png")
+    
+def draw_from_original_data(path: str) -> None:
+    # read from hdf5 file
+    import h5py
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    with h5py.File(path, "r") as f:
+        data = f["data"]["demo_00000"]["actions"]
+        # turn to pandas dataframe
+        df = pd.DataFrame(data)
+    # Plot all columns
+    plt.figure(figsize=(12, 6))
+    # for col in df.columns[6:14]:
+    #     plt.plot(df.index, df[col], marker='o', label=col)
+    for col in df.columns[20:28]:
+        plt.plot(df.index, df[col], marker='o', label=col)
+    plt.legend()
+    # plt.show()
+    plt.savefig("y_right.png")
+    
+
+def draw_comparison(path: str, joint_num: int) -> None:
+    import matplotlib.pyplot as plt
+    # read from hdf5 file
+    import h5py
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    with h5py.File(path, "r") as f:
+        data = f["data"]["demo_00000"]["actions"]
+        # turn to pandas dataframe
+        df = pd.DataFrame(data)
+    count = 0
+    for col in df.columns[6:14]:
+        if count!= joint_num:
+            count += 1
+            continue
+        plt.plot(df.index, df[col], marker='o', label=col)
+        count += 1
+    for col in df.columns[20:28]:
+        if count!= joint_num:
+            count += 1
+            continue
+        plt.plot(df.index, df[col], marker='o', label=col)
+        count += 1
+
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    df = pd.read_csv("action.csv")
+    # filter columns
+    for col in df.columns[joint_num: joint_num+1]:
+        plt.plot(df.index, df[col], marker='o', label=col)
+    
+
+    plt.savefig(f"logs/y_comparison_{joint_num}.png")
+    # clear plt
+    plt.clf()
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, force=True)
     tyro.cli(main)
+    # draw_action_csv("state.csv")
+    # for joint_num in range(0, 16):
+    #     draw_comparison("/home/user/Desktop/manipulation/OrcaGym/examples/openpi/records_tmp/tmp/e9a532a3_1755250723/proprio_stats/proprio_stats.hdf5", joint_num)
+    # draw_from_original_data("/home/user/Desktop/manipulation/OrcaGym/examples/openpi/records_tmp/tmp/e9a532a3_1755250723/proprio_stats/proprio_stats.hdf5")
