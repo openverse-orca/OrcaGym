@@ -403,7 +403,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_path', type=str, required=True, help='The dataset path to check')
     parser.add_argument('--output_filepath', type=str, help='The output filepath')
     parser.add_argument('--mode', type=str, required=True, choices=['export', 'filter'], help='The mode to run' )
-    parser.add_argument("--json_files", type=str, nargs='+', default=["Shop-Cashier_Operation.json", "Shop-Shelf_Operation.json", "Kitchen-Countertop_Operation.json", "Pharmacy-Shelf_Operation.json","fridge-Fridge_Operation.json","pharmacy-Cooler_Operation.json","3C_Fabrication-3C_Scan_Operation-pick_and_place.json","guizi_Cooler"], help='The json files to check')
+    parser.add_argument("--json_files", type=str, nargs='+', default=["Shop-Cashier_Operation.json", "Shop-Shelf_Operation.json", "Kitchen-Countertop_Operation.json", "Pharmacy-Shelf_Operation.json","fridge-Fridge_Operation.json","pharmacy-Cooler_Operation.json","3c_scan-3C_Scan_Operation.json","guizi_Cooler"], help='The json files to check')
 
     args = parser.parse_args()
     output_filepath = args.output_filepath
