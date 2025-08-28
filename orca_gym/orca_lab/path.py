@@ -1,3 +1,6 @@
+from typing import Self
+
+
 class Path:
 
     def __init__(self, p: str = "/"):
@@ -16,6 +19,19 @@ class Path:
             return Path(self._p + name)
 
         return Path(self._p + "/" + name)
+
+    def is_descendant_of(self, parent_path: Self) -> bool:
+        if not isinstance(parent_path, Path):
+            raise TypeError("parent_path must be an instance of Path.")
+
+        if parent_path == self.root_path():
+            if self != self.root_path():
+                return True
+        else:
+            if self._p.startswith(parent_path._p + "/"):
+                return True
+
+        return False
 
     def __truediv__(self, other):
         return self.append(other)

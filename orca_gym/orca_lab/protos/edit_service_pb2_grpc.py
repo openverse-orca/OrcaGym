@@ -99,6 +99,16 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.RestoreBodyTransformRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.RestoreBodyTransformResponse.FromString,
                 _registered_method=True)
+        self.DeleteActor = channel.unary_unary(
+                '/SceneEdit.GrpcService/DeleteActor',
+                request_serializer=edit__service__pb2.DeleteActorRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.DeleteActorResponse.FromString,
+                _registered_method=True)
+        self.RenameActor = channel.unary_unary(
+                '/SceneEdit.GrpcService/RenameActor',
+                request_serializer=edit__service__pb2.RenameActorRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.RenameActorResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -182,6 +192,18 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteActor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RenameActor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -249,6 +271,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.RestoreBodyTransform,
                     request_deserializer=edit__service__pb2.RestoreBodyTransformRequest.FromString,
                     response_serializer=edit__service__pb2.RestoreBodyTransformResponse.SerializeToString,
+            ),
+            'DeleteActor': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteActor,
+                    request_deserializer=edit__service__pb2.DeleteActorRequest.FromString,
+                    response_serializer=edit__service__pb2.DeleteActorResponse.SerializeToString,
+            ),
+            'RenameActor': grpc.unary_unary_rpc_method_handler(
+                    servicer.RenameActor,
+                    request_deserializer=edit__service__pb2.RenameActorRequest.FromString,
+                    response_serializer=edit__service__pb2.RenameActorResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -602,6 +634,60 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/RestoreBodyTransform',
             edit__service__pb2.RestoreBodyTransformRequest.SerializeToString,
             edit__service__pb2.RestoreBodyTransformResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteActor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/DeleteActor',
+            edit__service__pb2.DeleteActorRequest.SerializeToString,
+            edit__service__pb2.DeleteActorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RenameActor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/RenameActor',
+            edit__service__pb2.RenameActorRequest.SerializeToString,
+            edit__service__pb2.RenameActorResponse.FromString,
             options,
             channel_credentials,
             insecure,

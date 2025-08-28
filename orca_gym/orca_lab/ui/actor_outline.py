@@ -1,18 +1,49 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from enum import Enum
+import typing
 
 from orca_gym.orca_lab.actor import BaseActor
 from orca_gym.orca_lab.path import Path
 
 
+class ActorOutlineDelegate(QtWidgets.QStyledItemDelegate):
+
+    def __init__(self, /, parent=...):
+        super().__init__(parent)
+
+    # @typing.override
+    # def createEditor(self, parent, option, index):
+    #     return QtWidgets.QLineEdit(text="aaaa", parent=parent)
+
+    # def setEditorData(self, editor: QtWidgets.QLineEdit, index):
+    #     print("set data")
+
+    # def updateEditorGeometry(
+    #     self, editor: QtWidgets.QLineEdit, option: QtWidgets.QStyleOptionViewItem, index
+    # ):
+    #     print(option.rect)
+    #     editor.setGeometry(option.rect)
+
+    # def setModelData(self, editor: QtWidgets.QLineEdit, model, index):
+    #     print(editor.text())
+
+
 class ActorOutline(QtWidgets.QTreeView):
     actor_selection_changed = QtCore.Signal(list)
+    request_delete = QtCore.Signal(BaseActor)
+    request_rename = QtCore.Signal(BaseActor, str)
 
     def __init__(self):
         super().__init__()
         self.setHeaderHidden(True)
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+        self.setItemDelegate(ActorOutlineDelegate(self))
+
         self._change_from_inside = False
         self._change_from_outside = False
+        self._current_index = QtCore.QModelIndex()
+        self._current_actor: BaseActor | None = None
 
     def set_actor_model(self, model):
         self.setModel(model)
@@ -58,6 +89,38 @@ class ActorOutline(QtWidgets.QTreeView):
             self.scrollTo(index)
 
         self._change_from_outside = False
+
+    @QtCore.Slot()
+    def show_context_menu(self, position):
+        self._current_index = self.indexAt(position)
+        self._current_actor = self.model().get_actor(self._current_index)
+
+        menu = QtWidgets.QMenu()
+
+        action_add = QtGui.QAction("Add")
+        action_add.triggered.connect(self._delete_actor)
+        menu.addAction(action_add)
+
+        if self._current_actor is not None:
+            menu.addSeparator()
+
+            action_delete = QtGui.QAction("Delete")
+            action_delete.triggered.connect(self._delete_actor)
+            menu.addAction(action_delete)
+
+            action_rename = QtGui.QAction("Rename")
+            action_rename.triggered.connect(self._rename_actor)
+            menu.addAction(action_rename)
+
+        menu.exec_(self.mapToGlobal(position))
+
+    @QtCore.Slot()
+    def _delete_actor(self):
+        self.request_delete.emit(self._current_actor)
+
+    @QtCore.Slot()
+    def _rename_actor(self):
+        pass
 
 
 if __name__ == "__main__":

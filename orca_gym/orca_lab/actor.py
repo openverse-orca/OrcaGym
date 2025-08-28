@@ -15,7 +15,7 @@ class BaseActor:
         self.parent = parent
 
     def __repr__(self):
-        return f"BaseActor(name={self._name}, parent={self._parent})"
+        return f"BaseActor(name={self._name})"
 
     @property
     def name(self):
@@ -32,18 +32,18 @@ class BaseActor:
         return self._parent
 
     @parent.setter
-    def parent(self, value):
-        if value is not None and not isinstance(value, GroupActor):
+    def parent(self, parent_actor):
+        if parent_actor is not None and not isinstance(parent_actor, GroupActor):
             raise TypeError("parent must be an instance of GroupActor or None.")
 
-        if value == self._parent:
+        if parent_actor == self._parent:
             return
 
         if self._parent is not None:
             self._parent.remove_child(self)
 
-        self._parent = value
-        value.add_child(self)
+        self._parent = parent_actor
+        parent_actor.add_child(self)
 
     @property
     def transform(self):
@@ -62,7 +62,7 @@ class GroupActor(BaseActor):
         super().__init__(name, parent)
 
     def __repr__(self):
-        return f"GroupActor(name={self.name}, parent={self.parent}, children_count={len(self._children)})"
+        return f"GroupActor(name={self.name}, children_count={len(self._children)})"
 
     @property
     def children(self):
@@ -92,7 +92,7 @@ class AssetActor(BaseActor):
         self.spawnable_name = spawnable_name
 
     def __repr__(self):
-        return f"AssetActor(name={self.name}, parent={self.parent}, children_count={len(self._children)})"
+        return f"AssetActor(name={self.name})"
 
     @property
     def spawnable_name(self):

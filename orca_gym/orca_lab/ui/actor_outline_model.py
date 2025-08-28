@@ -124,6 +124,7 @@ class ActorOutlineModel(QAbstractItemModel):
             | ItemFlag.ItemIsSelectable
             | ItemFlag.ItemIsDragEnabled
             | ItemFlag.ItemIsDropEnabled
+            # | ItemFlag.ItemIsEditable
         )
 
         return f

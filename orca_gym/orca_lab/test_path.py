@@ -26,6 +26,17 @@ class TestAddFunction(unittest.TestCase):
         self.assertEqual(d[Path("/a")], 1)
         self.assertEqual(d[Path("/b")], 2)
 
+    def test_is_descendant_of(self):
+        self.assertEqual(Path("/a").is_descendant_of(Path("/")), True)
+        self.assertEqual(Path("/a/b").is_descendant_of(Path("/a")), True)
+        self.assertEqual(Path("/a/b/c").is_descendant_of(Path("/a")), True)
+
+        self.assertEqual(Path("/a").is_descendant_of(Path("/a")), False)
+        self.assertEqual(Path("/a/b").is_descendant_of(Path("/b")), False)
+        self.assertEqual(Path("/a/b").is_descendant_of(Path("/c")), False)
+        self.assertEqual(Path("/a/b").is_descendant_of(Path("/a/b/c")), False)
+        self.assertEqual(Path("/aaa").is_descendant_of(Path("/a")), False)
+
 
 if __name__ == "__main__":
     unittest.main()

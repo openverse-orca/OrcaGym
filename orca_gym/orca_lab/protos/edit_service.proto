@@ -138,6 +138,24 @@ message RestoreBodyTransformResponse {
     string error_message = 2;
 }
 
+message DeleteActorRequest {
+    string actor_path = 1;
+}
+message DeleteActorResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+message RenameActorRequest {
+    string actor_path = 1;
+    string new_name = 2;
+}
+message RenameActorResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+
 service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
@@ -158,4 +176,8 @@ service GrpcService {
 
     rpc SaveBodyTransform(SaveBodyTransformRequest) returns (SaveBodyTransformResponse);
     rpc RestoreBodyTransform(RestoreBodyTransformRequest) returns (RestoreBodyTransformResponse);
+
+    rpc DeleteActor(DeleteActorRequest) returns (DeleteActorResponse);
+    rpc RenameActor(RenameActorRequest) returns (RenameActorResponse);
+
 }

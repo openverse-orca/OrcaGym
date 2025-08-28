@@ -6,12 +6,9 @@ import orca_gym.protos.mjc_message_pb2_grpc as mjc_message_pb2_grpc
 import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
 
 from orca_gym.orca_lab.path import Path
-from orca_gym.orca_lab.actor import AssetActor, BaseActor, GroupActor
-import asyncio
+from orca_gym.orca_lab.actor import BaseActor
 
-from typing import Tuple, Dict
-
-from PySide6 import QtCore
+from typing import List
 
 
 Success = edit_service_pb2.StatusCode.Success
@@ -19,19 +16,12 @@ Error = edit_service_pb2.StatusCode.Error
 
 
 # 由于Qt是异步的，所以这里只提供异步接口。
-class OrcaLabScene(QtCore.QObject):
-    selection_changed = QtCore.Signal(list)
-
+class OrcaLabScene:
     def __init__(self, edit_grpc_addr: str, sim_grpc_addr: str):
         super().__init__()
 
         self.edit_grpc_addr = edit_grpc_addr
         self.sim_grpc_addr = sim_grpc_addr
-
-        # 作为根节点，不可见， 路径是"/"。下面挂着所有的顶层Actor。
-        self.root_actor = GroupActor(name="root", parent=None)
-        self._actors: Dict[Path, BaseActor] = {}
-        self._actors[Path.root_path()] = self.root_actor
 
     async def init_grpc(self):
         options = [
@@ -53,10 +43,6 @@ class OrcaLabScene(QtCore.QObject):
 
         if not await self.aloha():
             raise Exception("Failed to connect to server.")
-
-        self._query_pending_operation_lock = asyncio.Lock()
-        self._query_pending_operation_running = False
-        await self._start_query_pending_operation_loop()
 
     async def destroy_grpc(self):
         await self._stop_query_pending_operation_loop()
@@ -95,74 +81,13 @@ class OrcaLabScene(QtCore.QObject):
         self._check_response(response)
         return response.value == 2
 
-    async def _start_query_pending_operation_loop(self):
-        async with self._query_pending_operation_lock:
-            if self._query_pending_operation_running:
-                return
-            asyncio.create_task(self._query_pending_operation_loop())
-            self._query_pending_operation_running = True
+    async def query_pending_operation_loop(self) -> List[str]:
+        request = edit_service_pb2.GetPendingOperationsRequest()
+        response = await self.edit_stub.GetPendingOperations(request)
+        self._check_response(response)
+        return response.operations
 
-    async def _stop_query_pending_operation_loop(self):
-        async with self._query_pending_operation_lock:
-            self._query_pending_operation_running = False
-
-    async def _query_pending_operation_loop(self):
-        async with self._query_pending_operation_lock:
-            if not self._query_pending_operation_running:
-                return
-
-            request = edit_service_pb2.GetPendingOperationsRequest()
-            response = await self.edit_stub.GetPendingOperations(request)
-            self._check_response(response)
-
-            operations = response.operations
-            for op in operations:
-                await self._process_pending_operation(op)
-
-        # frequency = 30  # Hz
-        # await asyncio.sleep(1 / frequency)
-        asyncio.create_task(self._query_pending_operation_loop())
-
-    async def _process_pending_operation(self, op: str):
-        local_transform_change = "local_transform_change:"
-        if op.startswith(local_transform_change):
-            actor_path = Path(op[len(local_transform_change) :])
-
-            if not actor_path in self._actors:
-                raise Exception(f"actor not exist")
-
-            transform = await self._get_pending_actor_transform(actor_path, True)
-
-            await self.set_actor_transform(actor_path, transform, True)
-
-            actor = self._actors[actor_path]
-            actor.transform = transform
-
-        world_transform_change = "world_transform_change:"
-        if op.startswith(world_transform_change):
-            actor_path = op[len(world_transform_change) :]
-
-            if not actor_path in self._actors:
-                raise Exception(f"actor not exist")
-
-            transform = await self._get_pending_actor_transform(actor_path, False)
-
-            await self.set_actor_transform(actor_path, transform, False)
-
-            actor = self._actors[actor_path]
-            actor.transform = transform
-
-        selection_change = "selection_change"
-        if op.startswith(selection_change):
-            actor_paths = await self._get_pending_selection_change()
-
-            paths = []
-            for p in actor_paths:
-                paths.append(Path(p))
-
-            self.selection_changed.emit(paths)
-
-    async def _get_pending_actor_transform(self, path: Path, local: bool) -> Transform:
+    async def get_pending_actor_transform(self, path: Path, local: bool) -> Transform:
         space = edit_service_pb2.Space.Local if local else edit_service_pb2.Space.World
 
         request = edit_service_pb2.GetPendingActorTransformRequest(
@@ -177,11 +102,6 @@ class OrcaLabScene(QtCore.QObject):
         return self._get_transform_from_message(transform)
 
     async def add_actor(self, actor: BaseActor, parent_path: Path):
-        if not parent_path in self._actors:
-            raise Exception("parent not exist.")
-
-        path = parent_path / actor.name
-
         transform_msg = self._create_transform_message(actor.transform)
         request = edit_service_pb2.AddActorRequest(
             actor_name=actor.name,
@@ -193,9 +113,6 @@ class OrcaLabScene(QtCore.QObject):
 
         response = await self.edit_stub.AddActor(request)
         self._check_response(response)
-
-        actor.parent = self._actors[parent_path]
-        self._actors[path] = actor
 
     async def set_actor_transform(self, path: Path, transform: Transform, local: bool):
         transform_msg = self._create_transform_message(transform)
@@ -276,13 +193,7 @@ class OrcaLabScene(QtCore.QObject):
         response = await self.edit_stub.RestoreBodyTransform(request)
         self._check_response(response)
 
-    def find_actor_by_path(self, path: Path) -> BaseActor | None:
-        if path in self._actors:
-            return self._actors[path]
-        return None
-
-    def get_actor_path(self, actor: BaseActor) -> Path | None:
-        for path, a in self._actors.items():
-            if a == actor:
-                return path
-        return None
+    async def delete_actor(self, actor_path: Path):
+        request = edit_service_pb2.DeleteActorRequest(actor_path=actor_path.string())
+        response = await self.edit_stub.DeleteActor(request)
+        self._check_response(response)
