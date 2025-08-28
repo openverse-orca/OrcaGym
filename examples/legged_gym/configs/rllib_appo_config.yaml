@@ -7,13 +7,13 @@ env_name: "LeggedGym"
 
 training:
   max_episode_steps: 1000
-  num_env_runners: 16             # 每个env runner 分配一个推理GPU进程，因此数量不宜过多
-  num_envs_per_env_runner: 32    # 必须是 32 的倍数，一个Mujoco Instance支持32个agent是最合理的，这是默认配置
+  num_env_runners: 20             # 每个env runner 分配一个推理GPU进程，因此数量不宜过多
+  num_envs_per_env_runner: 64    # 必须是 32 的倍数，一个Mujoco Instance支持32个agent是最合理的，这是默认配置
   async_env_runner: True
   iter: 1000
   render_mode: none
   terrain_spawnable_names: 
-    flat_terrain: ["terrain_stair_low_flat_usda", "terrain_brics_low_usda"]
+    flat_terrain: ["terrain_ellipsoid_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda"]
     rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_5_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slope_10_usda"]
   curriculum_list:
     flat_terrain:

@@ -252,8 +252,15 @@ def run_rllib_appo_rl(
     )
 
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
-    
+
+    max_episode_steps = run_mode_config['max_episode_steps']
+    total_steps = run_mode_config['iter'] * num_env_runners * num_envs_per_env_runner * max_episode_steps
+    agent_num = 32
+    subenv_num = (num_env_runners * num_envs_per_env_runner) // agent_num
+
     if run_mode == 'training':
+        print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name, " iter: ", run_mode_config['iter'])
+        print("Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", FRAME_SKIP, " Action Skip: ", ACTION_SKIP)
         rllib_appo_rl.run_training(
             orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
@@ -265,6 +272,7 @@ def run_rllib_appo_rl(
             num_envs_per_env_runner=num_envs_per_env_runner,
             async_env_runner=run_mode_config['async_env_runner'],
             iter=run_mode_config['iter'],
+            total_steps=total_steps,
             render_mode=render_mode,
             height_map_file=height_map_file
         )

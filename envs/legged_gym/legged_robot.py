@@ -159,6 +159,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._player_control = False
 
         self._compute_body_height = robot_config["compute_body_height"]
+        self._observe_body_height = robot_config["observe_body_height"]
         self._compute_body_orientation = robot_config["compute_body_orientation"]
         self._compute_foot_height = robot_config["compute_foot_height"]
 
@@ -270,7 +271,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._achieved_goal = np.array([1.0 if np.any(self._body_contact) else 0.0]).astype(np.float32)
         self._desired_goal = np.zeros(1).astype(np.float32)      # 1.0 if the base is in contact with the ground, 0.0 otherwise
 
-        square_wave = self._compute_square_wave()
+        # square_wave = self._compute_square_wave()
         # sin_phase, cos_phase = self._compute_leg_period()
         obs = np.concatenate(
                 [
@@ -279,12 +280,12 @@ class LeggedRobot(OrcaGymAsyncAgent):
                     self._body_ang_vel,
                     self._body_orientation,
                     self._command_values,
-                    np.array([square_wave]),
+                    # np.array([square_wave]),
                     # np.array([sin_phase, cos_phase]),
                     (self._leg_joint_qpos - self._neutral_joint_values),
                     self._leg_joint_qvel,
                     self._action,
-                    self._body_height,
+                    self._body_height if self._observe_body_height else np.zeros_like(self._body_height),
                 ]).reshape(-1).astype(np.float32)
 
         obs *= self._obs_scale_vec
@@ -1194,7 +1195,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             scale_ang_vel, 
             scale_orientation, 
             scale_command, 
-            scale_square_wave,
+            # scale_square_wave,
             # scale_leg_phase,
             scale_leg_joint_qpos, 
             scale_leg_joint_qvel, 
@@ -1231,7 +1232,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
             noise_ang_vel, 
             noise_orientation, 
             noise_command, 
-            noise_square_wave,
+            # noise_square_wave,
             # scale_leg_phase,
             noise_leg_joint_qpos, 
             noise_leg_joint_qvel, 

@@ -9,7 +9,7 @@ RewardConfig = {
         "leg_contact" : 1,               # 腿部身体接触惩罚
         "body_contact" : 1,              # 身体接触惩罚
         "foot_touch" : 0.05,             # 重踏惩罚
-        "joint_angles" : 0.0,            # 关节偏离自然站立角度惩罚
+        "joint_angles" : 0.5,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
         "limit" : 0.01,                 # Action极限值惩罚
         "action_rate" : 0.05,           # Action平滑
@@ -23,12 +23,12 @@ RewardConfig = {
         "body_orientation" : 1,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0.1,             # 接触时，足底线速度
+        "feet_slip" : 0.2,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
         "feet_swing_height" : 5,    # 鼓励足底离地高度在理想范围内
         "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 0.3,                 # 无指令时，踏步惩罚
+        "stepping" : 0,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
         # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
@@ -52,6 +52,11 @@ Lite3Config = {
                                 "FR_HipX_joint": 0.0, "FR_HipY_joint": -1.0, "FR_Knee_joint": 1.8,
                                 "HL_HipX_joint": 0.0, "HL_HipY_joint": -1.0, "HL_Knee_joint": 1.8,
                                 "HR_HipX_joint": 0.0, "HR_HipY_joint": -1.0, "HR_Knee_joint": 1.8},
+
+        "neutral_joint_angles_coeff" : {"FL_HipX_joint": 1, "FL_HipY_joint": 0, "FL_Knee_joint": 0,
+                                        "FR_HipX_joint": 1, "FR_HipY_joint": 0, "FR_Knee_joint": 0,
+                                        "HL_HipX_joint": 1, "HL_HipY_joint": 0, "HL_Knee_joint": 0,
+                                        "HR_HipX_joint": 1, "HR_HipY_joint": 0, "HR_Knee_joint": 0},
         
         "base_neutral_height_offset" : 0.16,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -101,9 +106,10 @@ Lite3Config = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "HL_touch", "HR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "compute_body_height" : True,      # 真机没有激光雷达，无法计算body高度
-        "compute_body_orientation" : False, # TODO:目前只支持水平方向的orientation奖励
-        "compute_foot_height" : True,      # 真机没有激光雷达，无法计算foot高度
+        "compute_body_height" : True,      
+        "observe_body_height" : False,       # 真机没有激光雷达，无法计算body高度，因此这里高度只用来做奖励，不用来观测
+        "compute_body_orientation" : False,  # TODO:目前只支持水平方向的orientation奖励
+        "compute_foot_height" : True,        # Foot 高度只用来做奖励，不用来观测
 
         "base_contact_body_names" : ["torso", "FL_HIP", "FR_HIP", "HL_HIP", "HR_HIP"],
         "leg_contact_body_names" : ["FL_THIGH", "FL_SHANK", 
@@ -125,7 +131,7 @@ Lite3Config = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 0.01,
-        "foot_touch_air_time_ideal" : 0.4,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_air_time_ideal" : 0.25,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
             "phase_freq" :  0.8,
@@ -135,7 +141,7 @@ Lite3Config = {
             "period" : 0.8,
             "offset" : 0.5,
             "stance_threshold" : 0.55,
-            "swing_height" : 0.1,
+            "swing_height" : 0.05,
         },
 
         # Config for randomization

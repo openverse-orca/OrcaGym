@@ -136,10 +136,10 @@ class OrcaGymAsyncSingleAgentEnvRunner(SingleAgentEnvRunner):
         gym.register("rllib-single-agent-env-v0", entry_point=entry_point)
         vectorize_mode = self.config.gym_env_vectorize_mode
 
-        print(f"Make vec env: config.env type={type(self.config.env)}, env= {self.config.env}, num_envs_per_env_runner= {self.config.num_envs_per_env_runner}, worker_index= {self.worker_index}")
+        # print(f"Make vec env: config.env type={type(self.config.env)}, env= {self.config.env}, num_envs_per_env_runner= {self.config.num_envs_per_env_runner}, worker_index= {self.worker_index}")
         env_kwargs = self.config.env_config.get("env_kwargs", {})
         entry_point = self.config.env_config.get("entry_point", "")
-        print("Make vec env: env_kwargs: ", env_kwargs)
+        # print("Make vec env: env_kwargs: ", env_kwargs)
         self.env = OrcaGymVectorEnv(
             num_envs=self.config.num_envs_per_env_runner,
             worker_index=self.worker_index,

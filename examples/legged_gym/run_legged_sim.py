@@ -323,7 +323,7 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
         os.makedirs(base_dir)
     
     # Generate timestamp for this step (using physics_step as timestamp)
-    timestamp = physics_step
+    timestamp = sim_time
     
     # Extract base filename without extension
     base_filename = os.path.splitext(filename)[0]
@@ -336,7 +336,7 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
         writer = csv.writer(f)
         if not obs_file_exists:
             # Write header: timestamp, obs_0, obs_1, ..., obs_64
-            obs_headers = ["timestamp"] + [f"obs_{i}" for i in range(65)]
+            obs_headers = ["timestamp"] + [f"obs_{i}" for i in range(len(obs["observation"]))]
             writer.writerow(obs_headers)
         
         # Write observation data
@@ -351,7 +351,7 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
         writer = csv.writer(f)
         if not action_file_exists:
             # Write header: timestamp, action_0, action_1, ..., action_11
-            action_headers = ["timestamp"] + [f"action_{i}" for i in range(12)]
+            action_headers = ["timestamp"] + [f"action_{i}" for i in range(len(action))]
             writer.writerow(action_headers)
         
         # Write action data
@@ -366,7 +366,7 @@ def log_observation(obs: dict, action: np.ndarray, filename: str, physics_step: 
         writer = csv.writer(f)
         if not raw_action_file_exists:
             # Write header: timestamp, raw_action_0, raw_action_1, ..., raw_action_11
-            raw_action_headers = ["timestamp"] + [f"raw_action_{i}" for i in range(12)]
+            raw_action_headers = ["timestamp"] + [f"raw_action_{i}" for i in range(len(action))]
             writer.writerow(raw_action_headers)
         
         # Write raw action data (currently same as processed action)

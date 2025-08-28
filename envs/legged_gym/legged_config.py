@@ -86,7 +86,7 @@ CurriculumConfig = {
             "offset" : [60, 30, 0],
         },
         "stair_low_flat" : {
-            "offset" : [-30, 30, 0],
+            "offset" : [0, 30, 0],
         },
         "stair_mid_flat" : {
             "offset" : [10, 30, 0],
@@ -111,14 +111,10 @@ CurriculumConfig = {
             {"terrain" : "default" ,          "command_type": "move_medium",},
         ],
         "flat_terrain" : [
+            {"terrain" : "default" ,          "command_type": "move_medium",},
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_fast",},
-            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
-            {"terrain" : "ellipsoid_high" ,    "command_type": "move_fast",},
-            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
-            {"terrain" : "brics_low" ,        "command_type": "move_fast", },
-            {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
         ],
         "rough_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},
@@ -206,7 +202,7 @@ CurriculumConfig = {
             "command_resample_interval" : 4, # second to resample the command
             "distance" : 3.0,
             "rating" : 0.5,
-            "terminate_threshold" : 3,
+            "terminate_threshold" : 10,
         },
 
         "move_fast" : {

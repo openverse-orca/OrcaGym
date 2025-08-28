@@ -104,7 +104,7 @@ class OrcaGymVectorEnv(VectorEnv):
             else:
                 kwargs["is_subenv"] = True
 
-            print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
+            # print("Create OrcaGymVectorEnv: env_id={}, worker_index={}, kwargs={}, entry_point={}".format(worker_env_id, worker_index, kwargs, entry_point))
 
             gym.register(
                 id=worker_env_id,

@@ -149,12 +149,24 @@ def get_config(
     num_gpus_available: int,
     async_env_runner: bool,
     env_name: str,
-    env_kwargs: dict
+    env_kwargs: dict,
+    total_steps: int
 ):
     # env_name 是用 - 分隔的字符串，去掉最后一段，保留前面的
     env_name_prefix = "-".join(env.spec.id.split("-")[:-1])
     print("env_name_prefix: ", env_name_prefix)
     print("action_space: ", env.action_space, "observation_space: ", env.observation_space)
+
+    # 将SB3的学习率缩放一个因子
+    lr_scale_factor = 1
+    rl_initial_value = agent_config["learning_rate"]["initial_value"] / lr_scale_factor
+    rl_final_value = agent_config["learning_rate"]["final_value"] / lr_scale_factor
+    rl_end_fraction = agent_config["learning_rate"]["end_fraction"]
+    rl_lr_schedule = [
+        [0, rl_initial_value],
+        [total_steps * rl_end_fraction, rl_final_value],
+    ]
+
     config = (
         APPOConfig()
         .environment(
@@ -180,8 +192,9 @@ def get_config(
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
             num_gpus_per_env_runner=(num_gpus_available - 0.5) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
-            rollout_fragment_length=64,
+            rollout_fragment_length=agent_config.get("n_steps", 64),
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
+            observation_filter="MeanStdFilter",
         )
         .rl_module(
             rl_module_spec=RLModuleSpec(
@@ -189,10 +202,55 @@ def get_config(
                 action_space=env.action_space,
                 module_class=DefaultAPPOTorchRLModule,
                 model_config={
+
+                    # ====================================================
+                    # MLP 编码器 (核心部分)
+                    # ====================================================
+                    # 3-4层的MLP通常是不错的起点，容量足以处理复杂状态
                     "fcnet_hiddens": agent_config["pi"],
-                    "fcnet_activation": "swish",
-                    "post_fcnet_activation": "tanh",
-                    # "vf_share_layers": False,
+                    # 使用Tanh激活函数：1. 提供有界输出，更稳定 2. 与最终动作的Tanh变换相契合
+                    "fcnet_activation": "silu",
+                    # 使用正交初始化，增益为1.0，非常适合与Tanh激活函数配合
+                    "fcnet_kernel_initializer": "orthogonal_",
+                    "fcnet_kernel_initializer_kwargs": {"gain": 1.0}, # gain=1.0 for tanh
+                    "fcnet_bias_initializer": "zeros_",
+                    
+                    # ====================================================
+                    # 头部网络 (策略头)
+                    # ====================================================
+                    # 策略头不需要太深，编码器已经做了大部分特征提取工作
+                    "head_fcnet_hiddens": [64], 
+                    "head_fcnet_activation": "silu",
+                    # 保持头部初始化与编码器一致
+                    "head_fcnet_kernel_initializer": "orthogonal_",
+                    "head_fcnet_kernel_initializer_kwargs": {"gain": 1.0},
+                    "head_fcnet_bias_initializer": "zeros_",
+
+                    # ====================================================
+                    # 连续动作设置 (最关键的部分!)
+                    # ====================================================
+                    # 【强烈推荐启用】为高斯分布设置独立的、可训练的log(std)参数。
+                    # 这能极大地稳定训练，因为网络只需要学习均值，方差由一个单独的参数控制。
+                    "free_log_std": True,
+                    # 严格裁剪log(std)，防止方差过大或过小，保证探索在合理范围内。
+                    # 对于动作范围被压缩到[-1,1]的任务，标准差不需要太大，因此裁剪范围可以更紧一些。
+                    "log_std_clip_param": 5.0,
+
+                    # 共享编码器层，提升学习效率和泛化能力。
+                    # 如果训练后期发现策略和价值函数性能冲突，可以尝试设为False。
+                    "vf_share_layers": True,
+
+                    # ====================================================
+                    # 明确禁用 LSTM
+                    # ====================================================
+                    "use_lstm": False, # 明确设置为False，确保不使用LSTM
+
+                    # 卷积网络无关，保持None
+                    "conv_filters": None,
+
+                    # ====================================================
+                    # 使用GPU加速
+                    # ====================================================
                     "use_gpu": num_gpus_available > 0,
                 },
             )
@@ -203,10 +261,16 @@ def get_config(
         )
         .training(
             train_batch_size_per_learner=agent_config["batch_size"],
-            lr=agent_config["learning_rate"],
+            minibatch_size=agent_config.get("minibatch_size", 128), # 新增
+            lr=rl_lr_schedule,
             grad_clip=agent_config["max_grad_norm"],
             grad_clip_by="norm",
             gamma=agent_config["gamma"],
+            lambda_=agent_config.get("gae_lambda", 0.95), # 新增
+            clip_param=agent_config.get("clip_range", 0.3), # 新增
+            vf_loss_coeff=agent_config.get("vf_coef", 1.0), # 新增
+            entropy_coeff=agent_config.get("ent_coef", 0.01), # 新增，强烈推荐
+            # adam_epsilon=1e-7, # 可选新增
         )
         .resources(
             num_cpus_for_main_process=1,
@@ -228,6 +292,7 @@ def config_appo_tuner(
         num_env_runners: int, 
         num_envs_per_env_runner: int,
         iter: int,
+        total_steps: int,
         env: gym.Env,
         async_env_runner: bool,
         env_name: str,
@@ -248,7 +313,8 @@ def config_appo_tuner(
         num_gpus_available=num_gpus_available,
         async_env_runner=async_env_runner,
         env_name=env_name,
-        env_kwargs=env_kwargs
+        env_kwargs=env_kwargs,
+        total_steps=total_steps
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -474,6 +540,7 @@ def run_training(
         num_envs_per_env_runner: int,
         async_env_runner: bool,
         iter: int,
+        total_steps: int,
         render_mode: str,
         height_map_file: str
     ):
@@ -544,6 +611,7 @@ def run_training(
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         iter=iter,
+        total_steps=total_steps,
         env=demo_env,
         async_env_runner=async_env_runner,
         env_name=env_name,
