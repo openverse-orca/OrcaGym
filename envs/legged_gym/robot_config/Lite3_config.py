@@ -131,7 +131,7 @@ Lite3Config = {
         "foot_touch_force_threshold" : 100.0,
         "foot_touch_force_air_threshold" : 0.01,
         "foot_touch_force_step_threshold" : 0.01,
-        "foot_touch_air_time_ideal" : 0.25,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
+        "foot_touch_air_time_ideal" : 0.2,  # Go2 robot standing height is 0.4m. The ideal median stride rate for a Trot is around 0.4 seconds
         "foot_square_wave" : {
             "p5" :          0.5,
             "phase_freq" :  0.8,
@@ -141,7 +141,7 @@ Lite3Config = {
             "period" : 0.8,
             "offset" : 0.5,
             "stance_threshold" : 0.55,
-            "swing_height" : 0.05,
+            "swing_height" : 0.03,
         },
 
         # Config for randomization
