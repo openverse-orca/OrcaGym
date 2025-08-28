@@ -34,7 +34,8 @@ dependencies = [
     "tensorboard",
     "trimesh",
     "colorama",
-    "pymediainfo"
+    "pymediainfo",
+    "ruamel.yaml"
 ]
 
 # 可选依赖，可用于开发调试、测试、格式化代码等用途
