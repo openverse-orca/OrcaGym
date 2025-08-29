@@ -238,7 +238,7 @@ def get_config(
 
                     # 共享编码器层，提升学习效率和泛化能力。
                     # 如果训练后期发现策略和价值函数性能冲突，可以尝试设为False。
-                    "vf_share_layers": True,
+                    "vf_share_layers": False,
 
                     # ====================================================
                     # 明确禁用 LSTM
@@ -342,7 +342,7 @@ def config_appo_tuner(
                 checkpoint_score_order="max",
                 checkpoint_at_end=True
             ),
-            verbose=3,
+            verbose=2,
         ),
         # scaling_config=ScalingConfig(
         #     num_workers=num_env_runners,

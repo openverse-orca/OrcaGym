@@ -8,7 +8,7 @@ env_name: "LeggedGym"
 training:
   max_episode_steps: 1000
   num_env_runners: 20             # 每个env runner 分配一个推理GPU进程，因此数量不宜过多
-  num_envs_per_env_runner: 64    # 必须是 32 的倍数，一个Mujoco Instance支持32个agent是最合理的，这是默认配置
+  num_envs_per_env_runner: 128    # 必须是 32 的倍数，一个Mujoco Instance支持32个agent是最合理的，这是默认配置
   async_env_runner: True
   iter: 1000
   render_mode: none

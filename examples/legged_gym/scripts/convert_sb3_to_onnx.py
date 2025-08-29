@@ -86,9 +86,13 @@ def check_onnx_model(onnx_path: str, model_path: str):
     for key, value in obs.items():
         # 添加batch维度 (1, ...)
         if isinstance(value, np.ndarray):
-            batch_obs[key] = np.expand_dims(value, axis=0)
+            obs_value = np.expand_dims(value, axis=0)
         else:
-            batch_obs[key] = np.array([value])
+            obs_value = np.array([value])
+
+        # 随机采样到 [-10, 10]区间
+        obs_value = np.array(np.random.uniform(-10, 10, obs_value.shape), dtype=np.float32)
+        batch_obs[key] = obs_value
     
     print("Fixed obs: ", batch_obs, "info: ", info)
 
@@ -96,16 +100,18 @@ def check_onnx_model(onnx_path: str, model_path: str):
     ort_session = ort.InferenceSession(onnx_path)
     onnxruntime_input = {k.name: v for k, v in zip(ort_session.get_inputs(), batch_obs.values())}
     onnxruntime_outputs, _, _ = ort_session.run(None, onnxruntime_input)
+    # 剪切到[-1, 1]
+    onnxruntime_outputs = np.clip(onnxruntime_outputs, -1, 1)
 
 
     # Run PyTorch model and compare
-    torch_outputs, _ = model.predict(obs, deterministic=True)
+    torch_outputs, _ = model.predict(batch_obs, deterministic=True)
 
 
     print("onnxruntime_outputs: ", onnxruntime_outputs)
     print("torch_outputs: ", torch_outputs)
 
-    th.testing.assert_close(torch_outputs, onnxruntime_outputs[0], rtol=1e-06, atol=1e-6)
+    th.testing.assert_close(torch_outputs[0], onnxruntime_outputs[0], rtol=1e-06, atol=1e-6)
 
 
     # Debug
