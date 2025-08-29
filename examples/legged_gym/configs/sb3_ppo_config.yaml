@@ -6,7 +6,7 @@ training_episode: 100
 task: "flat_terrain"
 
 training:
-  subenv_num: 128
+  subenv_num: 256
   agent_num: 32
   render_mode: "none"
   terrain_spawnable_names: 

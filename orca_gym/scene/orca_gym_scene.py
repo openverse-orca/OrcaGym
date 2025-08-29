@@ -150,7 +150,6 @@ class OrcaGymScene:
                 scale = actor.scale,)
         
         response = await self.stub.AddActor(request)
-        print(response)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
             print("Add actor failed: ", response.error_message)
             raise Exception("Add actor failed.")

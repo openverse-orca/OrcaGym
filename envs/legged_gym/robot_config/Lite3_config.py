@@ -6,8 +6,8 @@ RewardConfig = {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
-        "leg_contact" : 1,               # 腿部身体接触惩罚
-        "body_contact" : 1,              # 身体接触惩罚
+        "leg_contact" : 2,               # 腿部身体接触惩罚
+        "body_contact" : 10,              # 身体接触惩罚
         "foot_touch" : 0.05,             # 重踏惩罚
         "joint_angles" : 0.5,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
@@ -28,7 +28,7 @@ RewardConfig = {
         "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
         "feet_swing_height" : 5,    # 鼓励足底离地高度在理想范围内
         "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 0,                 # 无指令时，踏步惩罚
+        "stepping" : 0.2,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
         "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
         # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
@@ -53,10 +53,10 @@ Lite3Config = {
                                 "HL_HipX_joint": 0.0, "HL_HipY_joint": -1.0, "HL_Knee_joint": 1.8,
                                 "HR_HipX_joint": 0.0, "HR_HipY_joint": -1.0, "HR_Knee_joint": 1.8},
 
-        "neutral_joint_angles_coeff" : {"FL_HipX_joint": 1, "FL_HipY_joint": 0, "FL_Knee_joint": 0,
-                                        "FR_HipX_joint": 1, "FR_HipY_joint": 0, "FR_Knee_joint": 0,
-                                        "HL_HipX_joint": 1, "HL_HipY_joint": 0, "HL_Knee_joint": 0,
-                                        "HR_HipX_joint": 1, "HR_HipY_joint": 0, "HR_Knee_joint": 0},
+        "neutral_joint_angles_coeff" : {"FL_HipX_joint": 1, "FL_HipY_joint": 0.2, "FL_Knee_joint": 0,
+                                        "FR_HipX_joint": 1, "FR_HipY_joint": 0.2, "FR_Knee_joint": 0,
+                                        "HL_HipX_joint": 1, "HL_HipY_joint": 0.2, "HL_Knee_joint": 0,
+                                        "HR_HipX_joint": 1, "HR_HipY_joint": 0.2, "HR_Knee_joint": 0},
         
         "base_neutral_height_offset" : 0.16,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -70,7 +70,7 @@ Lite3Config = {
                                 "HR_HipX_actuator", "HR_HipY_actuator", "HR_Knee_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "kps" :                  [25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
+        "kps" :                  [35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35],
         "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
 
         "action_scale" :         [
