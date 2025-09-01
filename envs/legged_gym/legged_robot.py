@@ -315,7 +315,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
     
     def set_action_space(self) -> None:
         action_size = self.get_action_size()
-        self._action_range = np.array([[-1, 1]] * action_size, dtype=np.float32)
+        self._action_range = np.array([[-100, 100]] * action_size, dtype=np.float32)
         action_space = spaces.Box(
             low=self._action_range[:, 0],
             high=self._action_range[:, 1],
@@ -589,7 +589,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return reward
     
     def _compute_reward_limit(self, coeff) -> SupportsFloat:     
-        reward = -np.square(np.sum(self._action == -1.0) + np.sum(self._action == 1.0)) * coeff * self.dt
+        reward = -np.square(np.sum(self._action < -1.0) + np.sum(self._action > 1.0)) * coeff * self.dt
         self._print_reward("Limit over threshold reward: ", reward, coeff * self.dt)
         return reward
     
@@ -1457,6 +1457,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
     def _action2ctrl(self, action: np.ndarray) -> np.ndarray:
         # 缩放后的 action
+        # print("Agent: ", self._env_id + self.name, "Action: ", action)
         scaled_action = action * self._action_scale
 
         # 批量计算插值

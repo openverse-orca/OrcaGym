@@ -101,11 +101,11 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         env_action_range = np.concatenate([agent.action_range for agent in self._agents.values()], axis=0)
         self.env_action_range_min = env_action_range[:, 0]
         self.env_action_range_max = env_action_range[:, 1]
-        # print("env action range: ", action_range)
+        print("env action range: ", env_action_range)
         # 归一化到 [-1, 1]区间
-        scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
+        # scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
         # print("Scaled action range: ", scaled_action_range)
-        self.action_space = self.generate_action_space(scaled_action_range)
+        self.action_space = self.generate_action_space(env_action_range)
 
 
     def get_env_version(self):

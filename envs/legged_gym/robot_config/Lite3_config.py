@@ -8,31 +8,31 @@ RewardConfig = {
         "failure" : 0,                   # 失败惩罚
         "leg_contact" : 2,               # 腿部身体接触惩罚
         "body_contact" : 10,              # 身体接触惩罚
-        "foot_touch" : 0.05,             # 重踏惩罚
+        "foot_touch" : 0.00,             # 重踏惩罚
         "joint_angles" : 0.5,            # 关节偏离自然站立角度惩罚
         "joint_accelerations" : 2.5e-7,  # 关节加速度惩罚
-        "limit" : 0.01,                 # Action极限值惩罚
-        "action_rate" : 0.05,           # Action平滑
+        "limit" : 0.00,                 # Action极限值惩罚
+        "action_rate" : 0.01,           # Action平滑
         "base_gyro" : 0,                
         "base_accelerometer" : 0,
         "follow_command_linvel" : 1,    # 跟随指令速度奖励
         "follow_command_angvel" : 0.5,  # 跟随指令角速度奖励
-        "height" : 2,                   # 身体高度惩罚
+        "height" : 0,                   # 身体高度惩罚
         "body_lin_vel" : 2,             # 身体上下线速度惩罚
         "body_ang_vel" : 0.05,         # 身体倾斜角速度惩罚
         "body_orientation" : 1,         # 身体姿态惩罚
         "feet_air_time" : 1,          # 足底离地时间，小于给定的世间惩罚
         "feet_self_contact" : 0,        # 足底自接触惩罚
-        "feet_slip" : 0.2,             # 接触时，足底线速度
+        "feet_slip" : 0.0,             # 接触时，足底线速度
         "feet_wringing" : 0,         # 接触时，足底角速度
-        "feet_fitted_ground" : 0.1,    # 鼓励对角步态，避免单侧滑步
-        "feet_swing_height" : 5,    # 鼓励足底离地高度在理想范围内
-        "fly" : 0.1,                    # 四足离地惩罚
-        "stepping" : 0.2,                 # 无指令时，踏步惩罚
+        "feet_fitted_ground" : 0.0,    # 鼓励对角步态，避免单侧滑步
+        "feet_swing_height" : 0,    # 鼓励足底离地高度在理想范围内
+        "fly" : 0.0,                    # 四足离地惩罚
+        "stepping" : 0.0,                 # 无指令时，踏步惩罚
         "torques" : 1e-5,                # 关节力矩惩罚
-        "joint_qpos_limits" : 10.0,      # 关节角度极限值惩罚
-        # "joint_qvel_limits" : 1.0,       # 关节速度极限值惩罚
-        # "torque_limits" : 1.0,       # 避免关节力矩过大
+        "joint_qpos_limits" : 0.0,      # 关节角度极限值惩罚
+        "joint_qvel_limits" : 0.0,       # 关节速度极限值惩罚
+        "torque_limits" : 0.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
 }
@@ -53,10 +53,10 @@ Lite3Config = {
                                 "HL_HipX_joint": 0.0, "HL_HipY_joint": -1.0, "HL_Knee_joint": 1.8,
                                 "HR_HipX_joint": 0.0, "HR_HipY_joint": -1.0, "HR_Knee_joint": 1.8},
 
-        "neutral_joint_angles_coeff" : {"FL_HipX_joint": 1, "FL_HipY_joint": 0.2, "FL_Knee_joint": 0,
-                                        "FR_HipX_joint": 1, "FR_HipY_joint": 0.2, "FR_Knee_joint": 0,
-                                        "HL_HipX_joint": 1, "HL_HipY_joint": 0.2, "HL_Knee_joint": 0,
-                                        "HR_HipX_joint": 1, "HR_HipY_joint": 0.2, "HR_Knee_joint": 0},
+        "neutral_joint_angles_coeff" : {"FL_HipX_joint": 1, "FL_HipY_joint": 0.0, "FL_Knee_joint": 0,
+                                        "FR_HipX_joint": 1, "FR_HipY_joint": 0.0, "FR_Knee_joint": 0,
+                                        "HL_HipX_joint": 1, "HL_HipY_joint": 0.0, "HL_Knee_joint": 0,
+                                        "HR_HipX_joint": 1, "HR_HipY_joint": 0.0, "HR_Knee_joint": 0},
         
         "base_neutral_height_offset" : 0.16,    # the offset from max height to standing natural height
         "base_born_height_offset" : 0.001,       # the offset from max height to standing natural height
@@ -70,25 +70,25 @@ Lite3Config = {
                                 "HR_HipX_actuator", "HR_HipY_actuator", "HR_Knee_actuator"],
 
         "actuator_type" :        "position",  # "torque" or "position"
-        "kps" :                  [35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35],
-        "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        "kps" :                  [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+        "kds" :                  [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7],
 
         "action_scale" :         [
-            0.3,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            0.8,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.5,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.25,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            0.25,    # joint name="FL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.25,    # joint name="FL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.3,    # joint name="FR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            0.8,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.5,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.25,    # joint name="FR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            0.25,    # joint name="FR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.25,    # joint name="FR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.3,    # joint name="HL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            0.8,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.5,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.25,    # joint name="HL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            0.25,    # joint name="HL_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.25,    # joint name="HL_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
 
-            0.3,    # joint name="HR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
-            0.8,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
-            0.5,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
+            0.25,    # joint name="HR_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0
+            0.25,    # joint name="HR_HipY_joint" joint axis="0 -1 0" range="-2.67 0.314", neutral=-1.0
+            0.25,    # joint name="HR_Knee_joint" joint axis="0 -1 0" range="0.524 2.792", neutral=1.8
         ],
         "soft_joint_qpos_limit": 0.9,       # percentage of urdf limits, values above this limit are penalized
         "soft_joint_qvel_limit": 1.0,       # percentage of urdf limits, values above this limit are penalized
@@ -106,7 +106,7 @@ Lite3Config = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "HL_touch", "HR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "compute_body_height" : True,      
+        "compute_body_height" : False,      
         "observe_body_height" : False,       # 真机没有激光雷达，无法计算body高度，因此这里高度只用来做奖励，不用来观测
         "compute_body_orientation" : False,  # TODO:目前只支持水平方向的orientation奖励
         "compute_foot_height" : True,        # Foot 高度只用来做奖励，不用来观测

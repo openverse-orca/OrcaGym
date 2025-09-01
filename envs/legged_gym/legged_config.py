@@ -115,6 +115,10 @@ CurriculumConfig = {
             {"terrain" : "default" ,          "command_type": "move_fast",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_medium",},
             {"terrain" : "ellipsoid_low" ,    "command_type": "move_fast",},
+            {"terrain" : "brics_low" ,        "command_type": "move_medium", },
+            {"terrain" : "brics_low" ,        "command_type": "move_fast", },
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_medium",},
+            {"terrain" : "stair_low_flat" ,   "command_type": "move_fast",},
         ],
         "rough_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_fast",},

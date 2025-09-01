@@ -72,13 +72,13 @@ def publish_scene(
 ):
     print("=============> Publish scene ...")
     scene = OrcaGymScene(orcagym_addresses[0])
-    # 排列成一个方阵，每个机器人间隔1米
+    # 排列成一个方阵，每个机器人间隔0.5米
     sqrt_width = int(np.ceil(np.sqrt(agent_num)))  # 向上取整
     base_offset_x = -(sqrt_width) / 2
     base_offset_y = -(sqrt_width) / 2
     for i in range(agent_num):
-        x_pos = (i % sqrt_width) + base_offset_x
-        y_pos = (i // sqrt_width) + base_offset_y
+        x_pos = (i % sqrt_width) * 0.5 + base_offset_x
+        y_pos = (i // sqrt_width) * 0.5 + base_offset_y
         actor = Actor(
             name=f"{agent_name}_{i:03d}",
             spawnable_name=agent_spawnable_name,
