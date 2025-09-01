@@ -1,0 +1,52 @@
+# RLlib APPO Configuration for Legged Gym
+# Asynchronous Proximal Policy Optimization configuration
+
+# OrcaGym cluster addresses for distributed training
+orcagym_addresses:
+  head_node: "127.0.0.1"  # Head node IP address - workers will connect to this
+  port: 10001             # Port for Ray cluster communication
+  
+# Ray cluster configuration
+ray_cluster:
+  num_cpus: 8
+  num_gpus: 1
+  object_store_memory: 2000000000  # 2GB
+  
+# APPO Algorithm Configuration
+algorithm: "APPO"
+framework: "torch"
+
+# Training parameters
+train_batch_size: 1000
+mini_batch_size: 128
+num_sgd_iter: 2
+learning_rate: 0.0003
+gamma: 0.99
+lambda: 0.95
+clip_param: 0.2
+vf_loss_coeff: 0.5
+entropy_coeff: 0.01
+
+# Environment configuration
+env_config:
+  env_name: "legged_gym"
+  episode_length: 1000
+  action_space_dim: 12
+  observation_space_dim: 48
+
+# Rollout configuration
+num_workers: 4
+num_envs_per_worker: 8
+rollout_fragment_length: 128
+batch_mode: "truncate_episodes"
+
+# Evaluation
+evaluation_interval: 10
+evaluation_num_episodes: 10
+
+# Checkpointing
+checkpoint_freq: 50
+checkpoint_at_end: true
+
+# Logging
+log_level: "INFO"
