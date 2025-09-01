@@ -1,5 +1,5 @@
 framework: "rllib"
-orcagym_addresses: ["localhost:50051"]
+orcagym_addresses: ["192.168.1.100:50051"]    # 配置成你的头结点ip地址
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
 task: "flat_terrain"
