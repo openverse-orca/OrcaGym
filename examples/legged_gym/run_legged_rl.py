@@ -246,7 +246,7 @@ def run_rllib_appo_rl(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
         agent_spawnable_name=agent_spawnable_name,
-        agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
+        agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
         terrain_spawnable_names=terrain_spawnable_names,
         model_dir=model_dir,
     )
@@ -255,7 +255,7 @@ def run_rllib_appo_rl(
 
     max_episode_steps = run_mode_config['max_episode_steps']
     total_steps = run_mode_config['iter'] * num_env_runners * num_envs_per_env_runner * max_episode_steps
-    agent_num = 32
+    agent_num = 64
     subenv_num = (num_env_runners * num_envs_per_env_runner) // agent_num
 
     if run_mode == 'training':
@@ -274,20 +274,29 @@ def run_rllib_appo_rl(
             iter=run_mode_config['iter'],
             total_steps=total_steps,
             render_mode=render_mode,
-            height_map_file=height_map_file
+            height_map_file=height_map_file,
+            frame_skip=FRAME_SKIP,
+            action_skip=ACTION_SKIP,
+            time_step=TIME_STEP,
         )
     elif run_mode == 'testing':
         if not ckpt:
             raise ValueError("Checkpoint path must be provided for testing.")
         rllib_appo_rl.test_model(
             checkpoint_path=ckpt,
-            orcagym_addr=config['orcagym_addr'],
+            orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
-            agent_name=config['agent_name'],
-            max_episode_steps=config['max_episode_steps'],
+            agent_name=agent_name,
+            max_episode_steps=run_mode_config['max_episode_steps'],
             use_onnx_for_inference=False,
             explore_during_inference=False,
             render_mode=render_mode,
+            async_env_runner=run_mode_config['async_env_runner'],
+            height_map_file=height_map_file,
+            task=task,
+            frame_skip=FRAME_SKIP,
+            action_skip=ACTION_SKIP,
+            time_step=TIME_STEP,
         )
     else:
         raise ValueError("Invalid run mode. Use 'training' or 'testing'.")

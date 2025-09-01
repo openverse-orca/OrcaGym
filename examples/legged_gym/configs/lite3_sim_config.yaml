@@ -1,7 +1,7 @@
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
-model_type: "sb3"
+model_type: "rllib"
 
 model_file: 
   "sb3":
@@ -13,6 +13,9 @@ model_file:
   "grpc":
     "flat_terrain": "localhost:50151"  # 远程服务器地址
     "rough_terrain": "localhost:50151"
+  "rllib":
+    "flat_terrain": "test/checkpoint_Lite3_flat_terrain"
+    "rough_terrain": "test/checkpoint_Lite3_rough_terrain"
 
 ctrl_device: "keyboard"
 

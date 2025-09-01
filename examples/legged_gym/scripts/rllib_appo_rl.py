@@ -38,12 +38,6 @@ ENV_RUNNER_CLS = {
     "LeggedGym": OrcaGymAsyncSingleAgentEnvRunner,
 }
 
-TIME_STEP = 0.001
-FRAME_SKIP = 5
-ACTION_SKIP = 4
-REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP
-CONTROL_FREQ = 1 / REALTIME_STEP
-
 from ray.rllib.utils.metrics import (
     ENV_RUNNER_RESULTS,
     EPISODE_RETURN_MEAN,
@@ -62,7 +56,10 @@ def get_orca_gym_register_info(
         async_env_runner: bool,
         height_map_file: str,
         max_episode_steps: int,
-        task: str
+        task: str,
+        frame_skip: int,
+        action_skip: int,
+        time_step: float
     ) -> tuple[ str, dict ]:
 
     orcagym_addr_str = orcagym_addr.replace(":", "-")
@@ -70,19 +67,19 @@ def get_orca_gym_register_info(
     agent_names = [f"{agent_name}_{i:03d}" for i in range(agent_num)]
     kwargs = {
         'Ant_OrcaGymEnv': {
-            'frame_skip': FRAME_SKIP,
+            'frame_skip': frame_skip,
             'orcagym_addr': orcagym_addr,
             'agent_names': agent_names,
-            'time_step': TIME_STEP,
+            'time_step': time_step,
             'render_mode': render_mode,
             'max_episode_steps': max_episode_steps,
         },
         'LeggedGym': {
-            'frame_skip': FRAME_SKIP,
-            'action_skip': ACTION_SKIP,
+            'frame_skip': frame_skip,
+            'action_skip': action_skip,
             'orcagym_addr': orcagym_addr,
             'agent_names': agent_names,
-            'time_step': TIME_STEP,
+            'time_step': time_step,
             'render_mode': render_mode,
             'height_map_file': height_map_file,
             'env_id': env_id,
@@ -104,7 +101,10 @@ def create_demo_env_instance(
     async_env_runner: bool,
     height_map_file: str,
     render_mode: str,
-    task: str
+    task: str,
+    frame_skip: int,
+    action_skip: int,
+    time_step: float
 ):
     """
     创建一个演示环境实例，主要用于测试和验证。
@@ -120,7 +120,10 @@ def create_demo_env_instance(
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
         max_episode_steps=max_episode_steps,
-        task=task
+        task=task,
+        frame_skip=frame_skip,
+        action_skip=action_skip,
+        time_step=time_step
     )
 
     if env_id not in gym.envs.registry:
@@ -192,7 +195,7 @@ def get_config(
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
             num_gpus_per_env_runner=(num_gpus_available - 0.5) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
-            rollout_fragment_length=agent_config.get("n_steps", 64),
+            rollout_fragment_length=agent_config.get("rollout_fragment_length", 16),
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
             observation_filter="MeanStdFilter",
         )
@@ -363,7 +366,10 @@ def env_creator(
         render_mode: str,
         async_env_runner: bool,
         height_map_file: str,
-        task: str
+        task: str,
+        frame_skip: int,
+        action_skip: int,
+        time_step: float
     ):
 
     if env_context is None:
@@ -386,7 +392,10 @@ def env_creator(
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
         max_episode_steps=max_episode_steps,
-        task=task
+        task=task,
+        frame_skip=frame_skip,
+        action_skip=action_skip,
+        time_step=time_step
     )
 
     # if vector_idx == 0:
@@ -542,7 +551,10 @@ def run_training(
         iter: int,
         total_steps: int,
         render_mode: str,
-        height_map_file: str
+        height_map_file: str,
+        frame_skip: int,
+        action_skip: int,
+        time_step: float
     ):
 
 
@@ -556,12 +568,15 @@ def run_training(
             orcagym_addr=orcagym_addr,
             env_name=env_name,
             agent_name=agent_name,
-            agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
+            agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
             async_env_runner=async_env_runner,
             height_map_file=height_map_file,
-            task=task
+            task=task,
+            frame_skip=frame_skip,
+            action_skip=action_skip,
+            time_step=time_step
         )
     )
     @ray.remote(num_gpus=0.1)
@@ -591,12 +606,15 @@ def run_training(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        agent_num=32,   # 一个Mujoco Instance支持32个agent是最合理的，这是默认配置
+        agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
         max_episode_steps=max_episode_steps,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,
         render_mode=render_mode,
-        task=task
+        task=task,
+        frame_skip=frame_skip,
+        action_skip=action_skip,
+        time_step=time_step
     )
 
     print("\nStarting training...")
@@ -652,18 +670,29 @@ def test_model(
         use_onnx_for_inference: bool = False,
         explore_during_inference: bool = False,
         render_mode: str = 'human',
+        async_env_runner: bool = False,
+        height_map_file: str = None,
+        task: str = None,
+        frame_skip: int = 5,
+        action_skip: int = 4,
+        time_step: float = 0.001
     ):
 
 
     env = env_creator(
-        env_context=None,  # 空上下文
+        env_context=None,
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
+        agent_num=1,   
         max_episode_steps=max_episode_steps,
         render_mode=render_mode,
-        async_env_runner=False,
-        height_map_file=None
+        async_env_runner=async_env_runner,
+        height_map_file=height_map_file,
+        task=task,
+        frame_skip=frame_skip,
+        action_skip=action_skip,
+        time_step=time_step
     )
     
     # Create new RLModule and restore its state from the last algo checkpoint.
@@ -685,7 +714,8 @@ def test_model(
 
     # Create an env to do inference in.
     random_seed = np.random.randint(0, 1000000)
-    obs, info = env.reset(seed=random_seed)
+    _, info = env.reset(seed=random_seed)
+    obs = info['env_obs']['observation'][0]
 
     num_episodes = 0
     episode_return = 0.0
@@ -739,11 +769,10 @@ def test_model(
         logits = convert_to_numpy(rl_module_out[Columns.ACTION_DIST_INPUTS])
 
         # 最佳方案 (推荐)：显式拆分参数
-        mu = logits[:, :env.action_space.shape[0]]  # 前8个: 动作均值
-        # log_sigma = logits[:, 8:]  # 后8个: 标准差参数 (推理时不需要)
+        mu = logits[:, :env.action_space.shape[0]]
 
         # 直接使用均值作为最终动作
-        action = mu[0]
+        action = np.clip(mu[0], env.action_space.low, env.action_space.high)
 
         # p=softmax(logits[0])
         # print(f"logits.shape: {logits.shape}", "env.action_space.shape:", env.action_space.shape, "p.shape:", p.shape)
@@ -751,20 +780,26 @@ def test_model(
         # action = np.random.choice(a=16, size=p.shape[0], p=p)
         # print(f"action: {action}")
         # Send the computed action `a` to the env.
-        obs, reward, terminated, truncated, _ = env.step(action)
-        # print("obs: ", obs)
+        _, _, _, _, info = env.step(action)
+        env.render()
+        obs = info['env_obs']['observation'][0]
+        reward = info['reward'][0]
+        is_success = info['is_success'][0]
+        terminated = info['terminated'][0]
+        truncated = info['truncated'][0]
 
         end_time = time.time()
-        if end_time - start_time < REALTIME_STEP:
+        if end_time - start_time < time_step * frame_skip * action_skip:
             # print(f"sleep: {REALTIME_STEP - (end_time - start_time)}")
-            time.sleep(REALTIME_STEP - (end_time - start_time))
+            time.sleep(time_step * frame_skip * action_skip - (end_time - start_time))
             
         episode_return += reward
         # Is the episode `done`? -> Reset.
         if terminated or truncated:
             print(f"Episode done: Total reward = {episode_return}")
             random_seed = np.random.randint(0, 1000000)
-            obs, info = env.reset(seed=random_seed)
+            _, info = env.reset(seed=random_seed)
+            obs = info['env_obs']['observation'][0]
             num_episodes += 1
             episode_return = 0.0
 

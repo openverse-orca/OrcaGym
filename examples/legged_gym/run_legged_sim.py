@@ -93,7 +93,7 @@ class KeyboardControl:
                 self.terrain_type = "flat_terrain"
                 print("Switch to flat terrain")
         if key_status["M"] == 0 and self._last_key_status["M"] == 1:
-            supported_model_types = ["sb3", "onnx", "grpc"]
+            supported_model_types = ["sb3", "onnx", "grpc", "rllib"]
             if self.model_type in supported_model_types:
                 current_index = supported_model_types.index(self.model_type)
                 self.model_type = supported_model_types[(current_index + 1) % len(supported_model_types)]
@@ -185,6 +185,35 @@ def load_grpc_model(model_file: dict):
         )
     return models
 
+def load_rllib_model(model_file: dict):
+    from ray.rllib.core.rl_module.rl_module import RLModule
+    from ray.rllib.core import DEFAULT_MODULE_ID
+    import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
+
+    # 在脚本开头调用
+    if rllib_appo_rl.setup_cuda_environment():
+        print("CUDA 环境验证通过")
+    else:
+        print("CUDA 环境设置失败，GPU 加速可能不可用")
+
+    models = {}
+    for key, value in model_file.items():
+        print("Loading rllib model: ", value)
+        # 从字符串中提取绝对路径
+        checkpoint_path = os.path.abspath(value)
+        checkpoint_path = os.path.join(
+            checkpoint_path,
+            "learner_group",
+            "learner",
+            "rl_module",
+            DEFAULT_MODULE_ID,
+        )
+        print("Checkpoint path: ", checkpoint_path)
+        rl_module = RLModule.from_checkpoint(checkpoint_path)
+
+        models[key] = rl_module
+    return models
+
 
 def main(
     config: dict,
@@ -206,7 +235,7 @@ def main(
         height_map_dir = "./height_map"
         command_model = config['command_model']
 
-        assert model_type in ["sb3", "onnx", "torch", "grpc"], f"Invalid model type: {model_type}"
+        assert model_type in ["sb3", "onnx", "torch", "grpc", "rllib"], f"Invalid model type: {model_type}"
 
         models = {}
         if "sb3" in model_file:
@@ -215,6 +244,8 @@ def main(
             models["onnx"] = load_onnx_model(model_file["onnx"])
         if "grpc" in model_file:
             models["grpc"] = load_grpc_model(model_file["grpc"])
+        if "rllib" in model_file:
+            models["rllib"] = load_rllib_model(model_file["rllib"])
 
         # 清空场景
         clear_scene(
@@ -459,6 +490,17 @@ def run_simulation(env: gym.Env,
                     # print("--------------------------------")
                     action = grpc_action
 
+                elif model_type == "rllib":
+                    from ray.rllib.core.columns import Columns
+                    from torch import torch
+                    from ray.rllib.utils.numpy import convert_to_numpy
+                    input_dict = {Columns.OBS: torch.from_numpy(agent_obs["observation"]).unsqueeze(0)}
+                    rl_module_out = model.forward_inference(input_dict)
+                    logits = convert_to_numpy(rl_module_out[Columns.ACTION_DIST_INPUTS])
+                    mu = logits[:, :env.action_space.shape[0]]
+                    action = np.clip(mu[0], env.action_space.low, env.action_space.high)
+                    # print("rllib action: ", action)
+                    # print("--------------------------------")
                 else:
                     raise ValueError(f"Invalid model type: {model_type}")
 

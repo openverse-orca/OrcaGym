@@ -88,8 +88,8 @@ class OrcaGymVectorEnv(VectorEnv):
         **kwargs
     ):
         self.agent_num = num_envs
-        assert num_envs % 32 == 0, "num_envs must be a multiple of 32"
-        self.env_num = num_envs // 32
+        assert num_envs % 64 == 0, "num_envs must be a multiple of 64"
+        self.env_num = num_envs // 64
 
         self.worker_index = worker_index
         env_id = kwargs.get("env_id", "")
@@ -134,10 +134,10 @@ class OrcaGymVectorEnv(VectorEnv):
             dtype=self.single_action_space.dtype,
         )
 
-        print("OrcaGymVectorEnv observation_space: ", self.observation_space)
-        print("OrcaGymVectorEnv single_observation_space: ", self.single_observation_space)
-        print("OrcaGymVectorEnv action_space: ", self.action_space)
-        print("OrcaGymVectorEnv single_action_space: ", self.single_action_space)
+        # print("OrcaGymVectorEnv observation_space: ", self.observation_space)
+        # print("OrcaGymVectorEnv single_observation_space: ", self.single_observation_space)
+        # print("OrcaGymVectorEnv action_space: ", self.action_space)
+        # print("OrcaGymVectorEnv single_action_space: ", self.single_action_space)
 
         self.num_envs = num_envs
         self.closed = False
@@ -223,16 +223,16 @@ class OrcaGymVectorEnv(VectorEnv):
             {}
         """
         # raise NotImplementedError(f"{self.__str__()} step function is not implemented.")
-        # print("OrcaGymVectorEnv step actions shape: ", actions.shape)
+        # print("OrcaGymVectorEnv step actions shape: ", actions.shape, "worker_index: ", self.worker_index, "actions: ", actions)
 
         # 假设原数组 action_array 形状为 (N, 12)，N 是第一维大小
         N = actions.shape[0]  # 获取第一维长度
 
-        # 计算整除32后的分组数量
-        num_groups = N // 32  # 整数除法（自动舍去余数）
+        # 计算整除64后的分组数量
+        num_groups = N // 64  # 整数除法（自动舍去余数）
 
-        # 重塑为 (num_groups, 32, 12) 形状
-        reshaped_action = actions.reshape(num_groups, 32, actions.shape[1])
+        # 重塑为 (num_groups, 64, 12) 形状
+        reshaped_action = actions.reshape(num_groups, 64, actions.shape[1])
 
         obs_list = []
         reward_list = []
