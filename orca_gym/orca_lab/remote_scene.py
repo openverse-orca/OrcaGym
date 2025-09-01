@@ -16,7 +16,7 @@ Error = edit_service_pb2.StatusCode.Error
 
 
 # 由于Qt是异步的，所以这里只提供异步接口。
-class OrcaLabScene:
+class RemoteScene:
     def __init__(self, edit_grpc_addr: str, sim_grpc_addr: str):
         super().__init__()
 
@@ -160,7 +160,7 @@ class OrcaLabScene:
         response = await self.edit_stub.ClearScene(request)
         self._check_response(response)
 
-    async def _get_pending_selection_change(self) -> list[str]:
+    async def get_pending_selection_change(self) -> list[str]:
         request = edit_service_pb2.GetPendingSelectionChangeRequest()
         response = await self.edit_stub.GetPendingSelectionChange(request)
         self._check_response(response)
@@ -196,4 +196,20 @@ class OrcaLabScene:
     async def delete_actor(self, actor_path: Path):
         request = edit_service_pb2.DeleteActorRequest(actor_path=actor_path.string())
         response = await self.edit_stub.DeleteActor(request)
+        self._check_response(response)
+
+    async def rename_actor(self, actor_path: Path, new_name: str):
+        request = edit_service_pb2.RenameActorRequest(
+            actor_path=actor_path.string(),
+            new_name=new_name,
+        )
+        response = await self.edit_stub.RenameActor(request)
+        self._check_response(response)
+
+    async def reparent_actor(self, actor_path: Path, new_parent_path: Path):
+        request = edit_service_pb2.ReParentActorRequest(
+            actor_path=actor_path.string(),
+            new_parent_path=new_parent_path.string(),
+        )
+        response = await self.edit_stub.ReParentActor(request)
         self._check_response(response)

@@ -40,10 +40,12 @@ class BaseActor:
             return
 
         if self._parent is not None:
-            self._parent.remove_child(self)
+            self._parent._children.remove(self)
+
+        if parent_actor is not None:
+            parent_actor._children.append(self)
 
         self._parent = parent_actor
-        parent_actor.add_child(self)
 
     @property
     def transform(self):
@@ -75,13 +77,16 @@ class GroupActor(BaseActor):
         if child in self._children:
             raise ValueError(f"{child.name} is already a child of {self.name}")
 
+        if child.parent is not None:
+            child.parent.remove(child)
+
         self._children.append(child)
-        child.parent = self
+        child._parent = self
 
     def remove_child(self, child: BaseActor):
         if child in self._children:
-            self.children.remove(child)
-            child.parent = None
+            self._children.remove(child)
+            child._parent = None
         else:
             raise ValueError(f"{child.name} is not a child of {self.name}")
 

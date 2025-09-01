@@ -33,6 +33,23 @@ class Path:
 
         return False
 
+    def parent(self) -> Self | None:
+        if self == self.root_path():
+            return None
+
+        las_sep = self._p.rfind("/")
+        if las_sep < 0:
+            return None
+
+        if las_sep == 0:
+            return Path("/")
+
+        return Path(self._p[:las_sep])
+
+    def name(self) -> str:
+        last_sep = self._p.rfind("/")
+        return self._p[last_sep + 1 :]
+
     def __truediv__(self, other):
         return self.append(other)
 

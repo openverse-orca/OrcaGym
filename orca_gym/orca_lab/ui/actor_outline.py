@@ -1,6 +1,4 @@
 from PySide6 import QtCore, QtWidgets, QtGui
-from enum import Enum
-import typing
 
 from orca_gym.orca_lab.actor import BaseActor
 from orca_gym.orca_lab.path import Path
@@ -31,7 +29,7 @@ class ActorOutlineDelegate(QtWidgets.QStyledItemDelegate):
 class ActorOutline(QtWidgets.QTreeView):
     actor_selection_changed = QtCore.Signal(list)
     request_delete = QtCore.Signal(BaseActor)
-    request_rename = QtCore.Signal(BaseActor, str)
+    request_rename = QtCore.Signal(BaseActor)
 
     def __init__(self):
         super().__init__()
@@ -120,7 +118,7 @@ class ActorOutline(QtWidgets.QTreeView):
 
     @QtCore.Slot()
     def _rename_actor(self):
-        pass
+        self.request_rename.emit(self._current_actor)
 
 
 if __name__ == "__main__":
@@ -129,6 +127,7 @@ if __name__ == "__main__":
     from orca_gym.orca_lab.actor import GroupActor, AssetActor
 
     app = QtWidgets.QApplication(sys.argv)
+
     actor_outline = ActorOutline()
     model = ActorOutlineModel()
 
