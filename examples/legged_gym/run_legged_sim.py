@@ -470,7 +470,7 @@ def run_simulation(env: gym.Env,
                     # print("onnx obs: ", agent_obs)
                     onnx_actions = model.run(None, agent_obs)[0]
                     onnx_action = onnx_actions[0]
-                    onnx_action = np.clip(onnx_action, -1, 1)
+                    onnx_action = np.clip(onnx_action, -100, 100)
                     # print("onnx action: ", onnx_action)
                     # print("--------------------------------")
                     action = onnx_action

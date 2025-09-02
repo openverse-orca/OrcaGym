@@ -161,7 +161,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
     def step(self, action) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         # step_start = datetime.datetime.now()
 
-        print("Step action: ", action, "shape: ", action.shape, "action space shape: ", self.action_space.shape)
+        # print("Step action: ", action, "shape: ", action.shape, "action space shape: ", self.action_space.shape)
         if len(action) != len(self._agents) * self.action_space.shape[0]:
             raise ValueError("Action dimension mismatch")
         

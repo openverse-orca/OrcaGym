@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # 配置文件路径
-CONFIG_FILE="$SCRIPT_DIR/../configs/rllib_appo_config.yaml"
+CONFIG_FILE="$SCRIPT_DIR/../configs/rllib_appo_cluster_config.yaml"
 
 # 默认端口
 RAY_PORT=6379
@@ -63,15 +63,6 @@ check_conda_env() {
         fi
     fi
     
-    if [[ "$CONDA_DEFAULT_ENV" != "orca" ]]; then
-        print_warning "当前conda环境不是'orca'，正在激活..."
-        conda activate orca
-        if [[ "$CONDA_DEFAULT_ENV" != "orca" ]]; then
-            print_error "无法激活'orca'环境"
-            exit 1
-        fi
-    fi
-    
     print_success "使用conda环境: $CONDA_DEFAULT_ENV"
 }
 
@@ -83,7 +74,7 @@ get_head_node_ip() {
     fi
     
     # 使用grep和awk提取IP地址
-    HEAD_IP=$(grep "orcagym_addresses:" "$CONFIG_FILE" | awk -F'"' '{print $2}' | awk -F':' '{print $1}')
+    HEAD_IP=$(grep "ray_cluster_address:" "$CONFIG_FILE" | awk -F'"' '{print $2}' | awk -F'ray://' '{print $2}' | awk -F':' '{print $1}')
     
     if [[ -z "$HEAD_IP" ]]; then
         print_error "无法从配置文件中提取head节点IP地址"
@@ -123,16 +114,34 @@ start_head_node() {
         print_warning "Dashboard端口 $RAY_DASHBOARD_PORT 已被占用"
     fi
     
+    # 检测可用的GPU数量
+    local num_gpus=0
+    if command -v nvidia-smi &> /dev/null; then
+        num_gpus=$(nvidia-smi --list-gpus | wc -l)
+        print_info "检测到 $num_gpus 个GPU"
+    else
+        print_warning "未检测到nvidia-smi，GPU数量设为0"
+    fi
+    
+    # 检测可用的CPU数量并分配80%
+    local num_cpus=$(nproc)
+    local allocated_cpus=$((num_cpus * 80 / 100))
+    print_info "检测到 $num_cpus 个CPU核心，分配 $allocated_cpus 个核心给Ray"
+    
     # 启动Ray head节点
     ray start --head \
         --port=$RAY_PORT \
-        --num-cpus=0 \
+        --num-cpus=$allocated_cpus \
+        --num-gpus=$num_gpus \
         --temp-dir=/tmp/ray \
-        --block
+        --node-ip-address=$head_ip
     
     if [[ $? -eq 0 ]]; then
         print_success "Ray head节点启动成功"
-        print_info "Ray地址: ray://$head_ip:$RAY_PORT"
+        # 获取实际的本地IP地址
+        local actual_ip=$(hostname -I | awk '{print $1}')
+        print_info "Ray地址: ray://$actual_ip:$RAY_PORT"
+        print_info "GPU资源: $num_gpus"
         print_warning "注意：当前Ray安装为minimal版本，不支持Dashboard"
     else
         print_error "Ray head节点启动失败"
@@ -147,15 +156,34 @@ start_worker_node() {
     print_info "启动Ray worker节点..."
     print_info "连接到head节点: $head_ip:$RAY_PORT"
     
+    # 检测可用的GPU数量
+    local num_gpus=0
+    if command -v nvidia-smi &> /dev/null; then
+        num_gpus=$(nvidia-smi --list-gpus | wc -l)
+        print_info "检测到 $num_gpus 个GPU"
+    else
+        print_warning "未检测到nvidia-smi，GPU数量设为0"
+    fi
+    
+    # 检测可用的CPU数量并分配80%
+    local num_cpus=$(nproc)
+    local allocated_cpus=$((num_cpus * 80 / 100))
+    print_info "检测到 $num_cpus 个CPU核心，分配 $allocated_cpus 个核心给Ray"
+    
     # 启动Ray worker节点
     ray start \
         --address=$head_ip:$RAY_PORT \
-        --num-cpus=0 \
+        --num-cpus=$allocated_cpus \
+        --num-gpus=$num_gpus \
         --temp-dir=/tmp/ray
     
     if [[ $? -eq 0 ]]; then
         print_success "Ray worker节点启动成功"
         print_info "已连接到head节点: $head_ip:$RAY_PORT"
+        print_info "GPU资源: $num_gpus"
+        # 获取实际的本地IP地址
+        local actual_ip=$(hostname -I | awk '{print $1}')
+        print_info "当前节点IP: $actual_ip"
     else
         print_error "Ray worker节点启动失败"
         exit 1

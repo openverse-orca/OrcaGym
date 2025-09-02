@@ -205,12 +205,30 @@ def run_rllib_appo_rl(
     visualize: bool,
 ):
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
+    # import ray
 
     # 在脚本开头调用
     if rllib_appo_rl.setup_cuda_environment():
         print("CUDA 环境验证通过")
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
+
+    # # 初始化Ray集群
+    # if 'ray_cluster_address' in config and config['ray_cluster_address']:
+    #     print(f"连接到Ray集群: {config['ray_cluster_address']}")
+    #     ray.init(
+    #         address=config['ray_cluster_address'],
+    #         ignore_reinit_error=True,
+    #         runtime_env={"working_dir": "."}
+    #     )
+    # else:
+    #     print("使用本地Ray实例")
+    #     ray.init(ignore_reinit_error=True)
+
+    # # 打印集群信息
+    # print(f"Ray集群状态: {ray.is_initialized()}")
+    # print(f"可用节点数量: {len(ray.nodes())}")
+    # print(f"可用资源: {ray.available_resources()}")
 
     if remote is not None:
         orcagym_addresses = [remote]
@@ -261,6 +279,8 @@ def run_rllib_appo_rl(
     if run_mode == 'training':
         print("Start Training! task: ", task, " subenv_num: ", subenv_num, " agent_num: ", agent_num, " agent_name: ", agent_name, " iter: ", run_mode_config['iter'])
         print("Total Steps: ", total_steps, "Max Episode Steps: ", max_episode_steps, " Frame Skip: ", FRAME_SKIP, " Action Skip: ", ACTION_SKIP)
+        print(f"环境运行器数量: {num_env_runners}, 每个运行器的环境数量: {num_envs_per_env_runner}")
+        
         rllib_appo_rl.run_training(
             orcagym_addr=orcagym_addresses[0],
             env_name=config['env_name'],
@@ -300,6 +320,10 @@ def run_rllib_appo_rl(
         )
     else:
         raise ValueError("Invalid run mode. Use 'training' or 'testing'.")
+    
+    # 训练完成后关闭Ray
+    if ray.is_initialized():
+        ray.shutdown()
 
 def run_rl(config: dict, run_mode: str, ckpt: str, remote: str, visualize: bool):
     if config['framework'] == 'sb3':

@@ -184,7 +184,7 @@ class ONNXInferenceService(inference_pb2_grpc.InferenceServiceServicer):
             action = onnx_outputs[0][0]  # 假设第一个输出是动作
             
             # 确保动作在合理范围内
-            action = np.clip(action, -1.0, 1.0)
+            action = np.clip(action, -100, 100)
             
             # 生成状态信息（如果有的话）
             states = None
