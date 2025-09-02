@@ -149,7 +149,7 @@ def get_config(
     num_env_runners: int, 
     num_envs_per_env_runner: int,
     env: gym.Env,
-    num_gpus_available: int,
+    num_gpus_available: float,
     async_env_runner: bool,
     env_name: str,
     env_kwargs: dict,
@@ -194,8 +194,8 @@ def get_config(
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
-            num_gpus_per_env_runner=(num_gpus_available - 0.5) * 1 / num_env_runners,  # 每个环境runner分配的GPU数量
-            rollout_fragment_length=agent_config.get("rollout_fragment_length", 16),
+            num_gpus_per_env_runner=0.025,
+            rollout_fragment_length=agent_config.get("n_steps", 64),
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
             observation_filter="MeanStdFilter",
         )
@@ -260,7 +260,7 @@ def get_config(
         )
         .learners(
             num_learners=0,
-            num_gpus_per_learner=num_gpus_available * 0.5,
+            num_gpus_per_learner=0.6,
         )
         .training(
             train_batch_size_per_learner=agent_config["batch_size"],
@@ -299,13 +299,19 @@ def config_appo_tuner(
         env: gym.Env,
         async_env_runner: bool,
         env_name: str,
-        env_kwargs: dict
+        env_kwargs: dict,
+        num_gpus_available: float
     ) -> tune.Tuner:
-    # 重要：获取系统的实际GPU数量
-    num_gpus_available = torch.cuda.device_count()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
-    print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    
+    # 设置CUDA可见设备
+    # if num_gpus_available > 0:
+    #     gpu_devices = ','.join([str(i) for i in range(num_gpus_available)])
+    #     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_devices
+    #     print(f"设置CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    # else:
+    #     print("警告: 未检测到GPU，将使用CPU训练")
+    #     os.environ['CUDA_VISIBLE_DEVICES'] = ""
     
     config = get_config(
         agent_config=agent_config,
@@ -460,9 +466,24 @@ def setup_cuda_environment():
     print(f"CUDA_HOME: {conda_prefix}")
     print(f"CUDA 可用: {cuda_available}")
     if cuda_available:
-        print(f"GPU 设备: {torch.cuda.get_device_name(0)}")
+        print(f"GPU 设备数量: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
         print(f"CUDA 版本: {torch.version.cuda}")
         print(f"cuDNN 版本: {cudnn_version}")
+        
+        # 检查nvidia-smi
+        try:
+            import subprocess
+            result = subprocess.run(['nvidia-smi', '--list-gpus'], 
+                                 capture_output=True, text=True)
+            if result.returncode == 0:
+                nvidia_gpu_count = len(result.stdout.strip().split('\n'))
+                print(f"nvidia-smi检测到GPU数量: {nvidia_gpu_count}")
+            else:
+                print("nvidia-smi执行失败")
+        except Exception as e:
+            print(f"nvidia-smi检查失败: {e}")
     print("="*50)
     
     return cuda_available
@@ -476,7 +497,9 @@ def verify_pytorch_cuda():
     print(f"CUDA 可用: {torch.cuda.is_available()}")
     
     if torch.cuda.is_available():
-        print(f"GPU 设备: {torch.cuda.get_device_name(0)}")
+        print(f"GPU 设备数量: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
         print(f"CUDA 版本: {torch.version.cuda}")
         print(f"cuDNN 版本: {torch.backends.cudnn.version()}")
         
@@ -492,6 +515,53 @@ def verify_pytorch_cuda():
         print("PyTorch 无法访问 CUDA")
     
     print("="*50)
+
+
+def detect_ray_gpu_resources() -> float:
+    # 从 ray 集群获取总共可用的GPU数量
+    # 方法1: 获取集群中所有可用的GPU资源（推荐）
+    try:
+        cluster_resources = ray.available_resources()
+        num_gpus_available = int(cluster_resources.get('GPU', 0))
+        print(f"Ray集群可用GPU资源: {num_gpus_available}")
+    except Exception as e:
+        print(f"获取Ray集群资源失败: {e}")
+        num_gpus_available = 0
+    
+    # 方法2: 如果方法1失败，尝试获取集群总资源
+    if num_gpus_available == 0:
+        try:
+            total_resources = ray.cluster_resources()
+            num_gpus_available = int(total_resources.get('GPU', 0))
+            print(f"Ray集群总GPU资源: {num_gpus_available}")
+        except Exception as e:
+            print(f"获取Ray集群总资源失败: {e}")
+            num_gpus_available = 0
+    
+    # 方法3: 如果Ray方法都失败，使用PyTorch检测
+    if num_gpus_available == 0:
+        if torch.cuda.is_available():
+            num_gpus_available = torch.cuda.device_count()
+            print(f"PyTorch检测到GPU数量: {num_gpus_available}")
+        else:
+            print("PyTorch无法检测到GPU")
+    
+    # 方法4: 最后尝试使用nvidia-smi
+    if num_gpus_available == 0:
+        try:
+            import subprocess
+            result = subprocess.run(['nvidia-smi', '--list-gpus'], 
+                                 capture_output=True, text=True)
+            if result.returncode == 0:
+                num_gpus_available = len(result.stdout.strip().split('\n'))
+                print(f"nvidia-smi检测到GPU数量: {num_gpus_available}")
+            else:
+                print("nvidia-smi执行失败")
+        except Exception as e:
+            print(f"nvidia-smi检查失败: {e}")
+    
+    print(f"最终检测到的GPU数量: {num_gpus_available}")
+    return num_gpus_available
 
 
 def worker_env_check():
@@ -547,6 +617,7 @@ def run_training(
         max_episode_steps: int,
         num_env_runners: int,
         num_envs_per_env_runner: int,
+        num_gpus_available: float,
         async_env_runner: bool,
         iter: int,
         total_steps: int,
@@ -631,6 +702,7 @@ def run_training(
         iter=iter,
         total_steps=total_steps,
         env=demo_env,
+        num_gpus_available=num_gpus_available,
         async_env_runner=async_env_runner,
         env_name=env_name,
         env_kwargs=demo_env_kwargs

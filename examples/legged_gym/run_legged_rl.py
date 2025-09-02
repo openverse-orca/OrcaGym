@@ -205,30 +205,48 @@ def run_rllib_appo_rl(
     visualize: bool,
 ):
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
-    # import ray
+    import ray
+    import torch
 
     # 在脚本开头调用
     if rllib_appo_rl.setup_cuda_environment():
         print("CUDA 环境验证通过")
     else:
         print("CUDA 环境设置失败，GPU 加速可能不可用")
+    
+    # 验证 PyTorch CUDA
+    rllib_appo_rl.verify_pytorch_cuda()
 
-    # # 初始化Ray集群
-    # if 'ray_cluster_address' in config and config['ray_cluster_address']:
-    #     print(f"连接到Ray集群: {config['ray_cluster_address']}")
-    #     ray.init(
-    #         address=config['ray_cluster_address'],
-    #         ignore_reinit_error=True,
-    #         runtime_env={"working_dir": "."}
-    #     )
-    # else:
-    #     print("使用本地Ray实例")
-    #     ray.init(ignore_reinit_error=True)
+    # 初始化Ray集群
+    if 'ray_cluster_address' in config and config['ray_cluster_address']:
+        print(f"连接到Ray集群: {config['ray_cluster_address']}")
+        ray.init(
+            # address=config['ray_cluster_address'],
+            # ignore_reinit_error=True,
+            # runtime_env={"working_dir": "."}
+        )
+    else:
+        print("使用本地Ray实例")
+        ray.init(
+            ignore_reinit_error=True,
+            # 确保GPU资源被正确注册
+            num_gpus=torch.cuda.device_count() if torch.cuda.is_available() else 0
+        )
 
-    # # 打印集群信息
-    # print(f"Ray集群状态: {ray.is_initialized()}")
-    # print(f"可用节点数量: {len(ray.nodes())}")
-    # print(f"可用资源: {ray.available_resources()}")
+    # 打印集群信息
+    print(f"Ray集群状态: {ray.is_initialized()}")
+    print(f"可用节点数量: {len(ray.nodes())}")
+    print(f"可用资源: {ray.available_resources()}")
+    
+    # 检查GPU资源
+    if torch.cuda.is_available():
+        print(f"PyTorch检测到GPU数量: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+    
+    # 检测Ray集群中的GPU资源
+    num_gpus_available = rllib_appo_rl.detect_ray_gpu_resources()
+    print(f"Ray集群检测到的GPU数量: {num_gpus_available}")
 
     if remote is not None:
         orcagym_addresses = [remote]
@@ -290,6 +308,7 @@ def run_rllib_appo_rl(
             max_episode_steps=run_mode_config['max_episode_steps'],
             num_env_runners=num_env_runners,
             num_envs_per_env_runner=num_envs_per_env_runner,
+            num_gpus_available=num_gpus_available,
             async_env_runner=run_mode_config['async_env_runner'],
             iter=run_mode_config['iter'],
             total_steps=total_steps,
