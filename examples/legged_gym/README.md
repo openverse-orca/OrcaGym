@@ -42,6 +42,46 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 conda install -c conda-forge -c nvidia cuda-toolkit=12.8
 ```
 
+## 验证环境配置
+
+安装完成后，建议运行测试脚本验证CUDA和PyTorch是否正确配置：
+
+```bash
+python scripts/test_cuda_torch.py
+```
+
+这个脚本会检查：
+- Python版本
+- CUDA驱动和工具包安装
+- PyTorch安装和CUDA支持
+- GPU可用性和性能测试
+
+如果所有检查都通过，你会看到：
+```
+🎉 所有检查都通过了！环境配置正确，可以继续后续步骤。
+```
+
+如果发现问题，脚本会提供具体的修复建议。
+
+## 配置集群其他节点
+
+由于Ray要求集群节点的python版本必须与head节点一致。因此在完成head节点配置后，在head查询python具体版本号：
+
+```bash
+python --version
+```
+
+如果与worker上已有的orca环境的python版本号不一致，就需要使用这个版本号在其他节点上安装python：
+（注意，python版本号精确到第三位，如3.12.11）
+
+```bash
+conda create -n orca_env python=xxx
+```
+
+然后按照orca环境的安装方式从新安装一次，直到完成所有worker的配置
+
+
+
 ## 启动Ray集群
 
 ### 启动Head节点
@@ -49,8 +89,7 @@ conda install -c conda-forge -c nvidia cuda-toolkit=12.8
 在head节点机器上运行：
 
 ```bash
-cd examples/legged_gym/scripts
-./run_ray_node.sh head
+bash ./scripts/run_ray_node.sh head
 ```
 
 这将：
@@ -64,14 +103,13 @@ cd examples/legged_gym/scripts
 在worker节点机器上运行：
 
 ```bash
-cd examples/legged_gym/scripts
-./run_ray_node.sh worker
+bash ./scripts/run_ray_node.sh worker
 ```
 
 或者指定head节点IP：
 
 ```bash
-./run_ray_node.sh worker 192.168.1.100
+bash ./scripts/run_ray_node.sh worker 192.168.xxx.xxx
 ```
 
 ###  管理集群
@@ -79,19 +117,19 @@ cd examples/legged_gym/scripts
 #### 查看集群状态
 
 ```bash
-./run_ray_node.sh status
+bash ./scripts/run_ray_node.sh status
 ```
 
 #### 停止集群
 
 ```bash
-./run_ray_node.sh stop
+bash ./scripts/run_ray_node.sh stop
 ```
 
 #### 查看帮助
 
 ```bash
-./run_ray_node.sh help
+bash ./scripts/run_ray_node.sh help
 ```
 
 ### 配置文件
