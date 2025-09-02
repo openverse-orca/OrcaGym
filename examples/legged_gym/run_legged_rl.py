@@ -282,7 +282,7 @@ def run_rllib_appo_rl(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
         agent_spawnable_name=agent_spawnable_name,
-        agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
+        agent_num=32,   # 一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
         terrain_spawnable_names=terrain_spawnable_names,
         model_dir=model_dir,
     )
@@ -291,7 +291,7 @@ def run_rllib_appo_rl(
 
     max_episode_steps = run_mode_config['max_episode_steps']
     total_steps = run_mode_config['iter'] * num_env_runners * num_envs_per_env_runner * max_episode_steps
-    agent_num = 64
+    agent_num = 32
     subenv_num = (num_env_runners * num_envs_per_env_runner) // agent_num
 
     if run_mode == 'training':

@@ -170,6 +170,9 @@ def get_config(
         [total_steps * rl_end_fraction, rl_final_value],
     ]
 
+    timesteps_per_iteration = num_env_runners * num_envs_per_env_runner * agent_config.get("rollout_fragment_length", 32)
+    print("timesteps_per_iteration: ", timesteps_per_iteration)
+
     config = (
         APPOConfig()
         .environment(
@@ -186,7 +189,7 @@ def get_config(
             # render_env=True,
             # action_space=env.action_space,
             # observation_space=env.observation_space,
-            normalize_actions=True,
+            normalize_actions=False,
             clip_actions=True,
         )
         .env_runners(
@@ -195,7 +198,7 @@ def get_config(
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
             num_gpus_per_env_runner=0.025,
-            rollout_fragment_length=agent_config.get("n_steps", 64),
+            rollout_fragment_length=agent_config.get("rollout_fragment_length", 32),
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
             observation_filter="MeanStdFilter",
         )
@@ -209,20 +212,22 @@ def get_config(
                     # ====================================================
                     # MLP 编码器 (核心部分)
                     # ====================================================
-                    # 3-4层的MLP通常是不错的起点，容量足以处理复杂状态
                     "fcnet_hiddens": agent_config["pi"],
-                    # 使用Tanh激活函数：1. 提供有界输出，更稳定 2. 与最终动作的Tanh变换相契合
                     "fcnet_activation": "silu",
-                    # 使用正交初始化，增益为1.0，非常适合与Tanh激活函数配合
                     "fcnet_kernel_initializer": "orthogonal_",
-                    "fcnet_kernel_initializer_kwargs": {"gain": 1.0}, # gain=1.0 for tanh
+                    "fcnet_kernel_initializer_kwargs": {"gain": 1.0},
                     "fcnet_bias_initializer": "zeros_",
+
+                    "vf_net_hiddens": agent_config["vf"],
+                    "vf_net_activation": "silu",
+                    "vf_net_kernel_initializer": "orthogonal_",
+                    "vf_net_kernel_initializer_kwargs": {"gain": 1.0},
+                    "vf_net_bias_initializer": "zeros_",
                     
                     # ====================================================
                     # 头部网络 (策略头)
                     # ====================================================
-                    # 策略头不需要太深，编码器已经做了大部分特征提取工作
-                    "head_fcnet_hiddens": [64], 
+                    "head_fcnet_hiddens": agent_config["pi"], 
                     "head_fcnet_activation": "silu",
                     # 保持头部初始化与编码器一致
                     "head_fcnet_kernel_initializer": "orthogonal_",
@@ -259,11 +264,11 @@ def get_config(
             )
         )
         .learners(
-            num_learners=0,
+            num_learners=1,
             num_gpus_per_learner=0.6,
         )
         .training(
-            train_batch_size_per_learner=agent_config["batch_size"],
+            train_batch_size_per_learner=agent_config.get("train_batch_size_per_learner", 8192),
             minibatch_size=agent_config.get("minibatch_size", 128), # 新增
             lr=rl_lr_schedule,
             grad_clip=agent_config["max_grad_norm"],
@@ -285,6 +290,12 @@ def get_config(
         )
         .callbacks(
             OrcaMetricsCallback
+        )
+        .reporting(
+            min_sample_timesteps_per_iteration=timesteps_per_iteration,
+            # 0 metrics reporting delay, this makes sure timestep,
+            # which entropy coeff depends on, is updated after each worker rollout.
+            min_time_s_per_iteration=0,
         )
     )
     return config
@@ -639,7 +650,7 @@ def run_training(
             orcagym_addr=orcagym_addr,
             env_name=env_name,
             agent_name=agent_name,
-            agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
+            agent_num=32,   # 一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
             max_episode_steps=max_episode_steps,
             render_mode=render_mode,
             async_env_runner=async_env_runner,
@@ -677,7 +688,7 @@ def run_training(
         orcagym_addr=orcagym_addr,
         env_name=env_name,
         agent_name=agent_name,
-        agent_num=64,   # 一个Mujoco Instance支持64个agent是最合理的，这是默认配置
+        agent_num=32,   # 一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
         max_episode_steps=max_episode_steps,
         async_env_runner=async_env_runner,
         height_map_file=height_map_file,

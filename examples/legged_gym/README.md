@@ -75,7 +75,7 @@ python --version
 （注意，python版本号精确到第三位，如3.12.11）
 
 ```bash
-conda create -n orca_env python=xxx
+conda create -n orca_ray python=xxx
 ```
 
 然后按照orca环境的安装方式从新安装一次，直到完成所有worker的配置

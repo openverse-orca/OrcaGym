@@ -173,7 +173,10 @@ Lite3Config = {
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 64,  # 每个环境采样步数
+        "rollout_fragment_length" : 64,  # 每个rollout的片段长度(rllib)
         "batch_size" : 4096,  # 批次大小            
+        "train_batch_size_per_learner" : 8192,  # 每个learner的批次大小(rllib)
+        "minibatch_size" : 128,  # 每个learner的批次大小(rllib)
         "learning_rate": {
             "initial_value": 3e-4,    # 初始学习率
             "end_fraction": 0.8,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
