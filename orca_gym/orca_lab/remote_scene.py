@@ -6,7 +6,7 @@ import orca_gym.protos.mjc_message_pb2_grpc as mjc_message_pb2_grpc
 import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
 
 from orca_gym.orca_lab.path import Path
-from orca_gym.orca_lab.actor import BaseActor
+from orca_gym.orca_lab.actor import BaseActor, GroupActor, AssetActor
 
 from typing import List
 
@@ -103,15 +103,27 @@ class RemoteScene:
 
     async def add_actor(self, actor: BaseActor, parent_path: Path):
         transform_msg = self._create_transform_message(actor.transform)
-        request = edit_service_pb2.AddActorRequest(
-            actor_name=actor.name,
-            spawnable_name=actor.spawnable_name,
-            parent_actor_path=parent_path.string(),
-            transform=transform_msg,
-            space=edit_service_pb2.Space.Local,
-        )
 
-        response = await self.edit_stub.AddActor(request)
+        if isinstance(actor, GroupActor):
+            request = edit_service_pb2.AddGroupRequest(
+                actor_name=actor.name,
+                parent_actor_path=parent_path.string(),
+                transform=transform_msg,
+                space=edit_service_pb2.Space.Local,
+            )
+            response = await self.edit_stub.AddGroup(request)
+        elif isinstance(actor, AssetActor):
+            request = edit_service_pb2.AddActorRequest(
+                actor_name=actor.name,
+                spawnable_name=actor.spawnable_name,
+                parent_actor_path=parent_path.string(),
+                transform=transform_msg,
+                space=edit_service_pb2.Space.Local,
+            )
+            response = await self.edit_stub.AddActor(request)
+        else:
+            raise Exception(f"Unsupported actor type: {type(actor)}")
+
         self._check_response(response)
 
     async def set_actor_transform(self, path: Path, transform: Transform, local: bool):

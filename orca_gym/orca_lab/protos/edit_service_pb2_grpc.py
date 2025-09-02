@@ -44,6 +44,11 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.AddActorRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.AddActorResponse.FromString,
                 _registered_method=True)
+        self.AddGroup = channel.unary_unary(
+                '/SceneEdit.GrpcService/AddGroup',
+                request_serializer=edit__service__pb2.AddGroupRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.AddGroupResponse.FromString,
+                _registered_method=True)
         self.SetActorTransform = channel.unary_unary(
                 '/SceneEdit.GrpcService/SetActorTransform',
                 request_serializer=edit__service__pb2.SetActorTransformRequest.SerializeToString,
@@ -126,6 +131,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def AddActor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddGroup(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -227,6 +238,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.AddActor,
                     request_deserializer=edit__service__pb2.AddActorRequest.FromString,
                     response_serializer=edit__service__pb2.AddActorResponse.SerializeToString,
+            ),
+            'AddGroup': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddGroup,
+                    request_deserializer=edit__service__pb2.AddGroupRequest.FromString,
+                    response_serializer=edit__service__pb2.AddGroupResponse.SerializeToString,
             ),
             'SetActorTransform': grpc.unary_unary_rpc_method_handler(
                     servicer.SetActorTransform,
@@ -353,6 +369,33 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/AddActor',
             edit__service__pb2.AddActorRequest.SerializeToString,
             edit__service__pb2.AddActorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddGroup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/AddGroup',
+            edit__service__pb2.AddGroupRequest.SerializeToString,
+            edit__service__pb2.AddGroupResponse.FromString,
             options,
             channel_credentials,
             insecure,

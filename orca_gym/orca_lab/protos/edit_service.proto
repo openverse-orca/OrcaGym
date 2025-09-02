@@ -41,6 +41,17 @@ message AddActorResponse {
     string error_message = 2;
 }
 
+message AddGroupRequest {
+    string actor_name = 2;          // Actor Entity 的名字
+    string parent_actor_path = 3;   // Parent Actor 的路径
+    Transform transform = 4;
+    Space space = 5;
+}
+message AddGroupResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
 
 message SetActorTransformRequest {
     string actor_path = 1;
@@ -169,6 +180,7 @@ service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
     rpc AddActor(AddActorRequest) returns (AddActorResponse);
+    rpc AddGroup(AddGroupRequest) returns (AddGroupResponse);
     rpc SetActorTransform(SetActorTransformRequest) returns (SetActorTransformResponse);
 
     rpc GetPendingOperations(GetPendingOperationsRequest) returns (GetPendingOperationsResponse);

@@ -76,14 +76,22 @@ class MainWindow(QtWidgets.QWidget):
             lambda: asyncio.ensure_future(self.stop_sim())
         )
 
-        self.actor_outline = ActorOutline()
-        self.actor_outline_model = ActorOutlineModel()
+        self.actor_outline_model = ActorOutlineModel(self.local_scene)
         self.actor_outline_model.set_root_group(self.local_scene.root_actor)
+        self.actor_outline_model.request_reparent.connect(
+            lambda actor, new_parent, row: asyncio.ensure_future(
+                self.reparent_actor(actor, new_parent, row)
+            )
+        )
+
+        self.actor_outline = ActorOutline()
         self.actor_outline.set_actor_model(self.actor_outline_model)
         self.actor_outline.actor_selection_changed.connect(
             lambda actors: asyncio.ensure_future(self.set_scene_selection(actors))
         )
-
+        self.actor_outline.request_add_group.connect(
+            lambda parent: asyncio.ensure_future(self.add_group(parent))
+        )
         self.actor_outline.request_delete.connect(
             lambda actor: asyncio.ensure_future(self.delete_actor(actor))
         )
@@ -259,12 +267,30 @@ class MainWindow(QtWidgets.QWidget):
             actor_paths.append(path)
         await self.remote_scene.set_selection(actor_paths)
 
-    async def add_actor(self, actor: BaseActor, parent_path: Path):
-        parent_actor = self.local_scene.find_actor_by_path(parent_path)
-        if parent_actor is None:
-            raise Exception(f"Invalid parent path: {parent_path}")
+    def make_unique_name(self, base_name: str, parent: BaseActor) -> str:
+        existing_names = {child.name for child in parent.children}
 
-        await self.remote_scene.add_actor(actor, parent_path)
+        counter = 1
+        new_name = f"{base_name}_{counter}"
+        while new_name in existing_names:
+            counter += 1
+            new_name = f"{base_name}_{counter}"
+
+        return new_name
+
+    async def add_group(self, parent_actor: GroupActor | Path):
+        new_group_name = self.make_unique_name("group", parent_actor)
+        actor = GroupActor(name=new_group_name)
+        await self.add_actor(actor, parent_actor)
+
+    async def add_actor(self, actor: BaseActor, parent_actor: GroupActor | Path):
+        ok, err = self.local_scene.can_add_actor(actor, parent_actor)
+        if not ok:
+            raise Exception(err)
+
+        parent_actor, parent_actor_path = self.local_scene.get_actor_and_path(
+            parent_actor
+        )
 
         model = self.actor_outline_model
         parent_index = model.get_index_from_actor(parent_actor)
@@ -272,22 +298,18 @@ class MainWindow(QtWidgets.QWidget):
 
         model.beginInsertRows(parent_index, child_count, child_count)
 
-        self.local_scene.add_actor(actor, parent_path)
+        self.local_scene.add_actor(actor, parent_actor_path)
 
         model.endInsertRows()
 
+        await self.remote_scene.add_actor(actor, parent_actor_path)
+
     async def delete_actor(self, actor):
-        if actor is None:
+        ok, err = self.local_scene.can_delete_actor(actor)
+        if not ok:
             return
 
-        actor_path = self.local_scene.get_actor_path(actor)
-        if actor_path is None:
-            raise Exception("Invalid actor.")
-
-        if actor_path == actor_path.root_path():
-            raise Exception("Cannot delete root actor.")
-
-        await self.remote_scene.delete_actor(actor_path)
+        actor, actor_path = self.local_scene.get_actor_and_path(actor)
 
         model = self.actor_outline_model
         index = model.get_index_from_actor(actor)
@@ -299,18 +321,25 @@ class MainWindow(QtWidgets.QWidget):
 
         model.endRemoveRows()
 
-    async def rename_actor(self, actor: BaseActor, new_name: str):
+        await self.remote_scene.delete_actor(actor_path)
+
+    def open_rename_dialog(self, actor: BaseActor):
+
         actor_path = self.local_scene.get_actor_path(actor)
         if actor_path is None:
             raise Exception("Invalid actor.")
 
-        if actor_path == actor_path.root_path():
-            raise Exception("Cannot delete root actor.")
+        dialog = RenameDialog(actor_path, self.local_scene.can_rename_actor, self)
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            new_name = dialog.new_name
+            asyncio.create_task(self.rename_actor(actor, new_name))
 
-        if Path.is_valid_name(new_name) == False:
-            raise Exception("Invalid name.")
+    async def rename_actor(self, actor: BaseActor, new_name: str):
+        ok, err = self.local_scene.can_rename_actor(actor, new_name)
+        if not ok:
+            raise Exception(err)
 
-        await self.remote_scene.rename_actor(actor_path, new_name)
+        actor, actor_path = self.local_scene.get_actor_and_path(actor)
 
         model = self.actor_outline_model
         index = model.get_index_from_actor(actor)
@@ -319,40 +348,23 @@ class MainWindow(QtWidgets.QWidget):
 
         model.dataChanged.emit(index, index)
 
-    async def reparent_actor(self, actor: BaseActor, new_parent: BaseActor):
-        pass
+        await self.remote_scene.rename_actor(actor_path, new_name)
 
-    def can_rename_actor(self, actor_path: Path, new_name: str) -> Tuple[bool, str]:
-        if actor_path == actor_path.root_path():
-            return False, "Cannot rename pseudo root actor."
+    async def reparent_actor(self, actor: BaseActor, new_parent: BaseActor, row: int):
+        ok, err = self.local_scene.can_reparent_actor(actor, new_parent)
+        if not ok:
+            raise Exception(err)
 
-        actor = self.local_scene.find_actor_by_path(actor_path)
-        if actor is None:
-            return False, "Actor does not exist."
+        actor, actor_path = self.local_scene.get_actor_and_path(actor)
+        new_parent, new_parent_path = self.local_scene.get_actor_and_path(new_parent)
 
-        if Path.is_valid_name(new_name) == False:
-            return False, "Invalid name."
+        model = self.actor_outline_model
 
-        actor_parent = actor.parent
-        if actor_parent is None:
-            return False, "Invalid actor."
+        model.beginResetModel()
+        self.local_scene.reparent_actor(actor, new_parent, row)
+        model.endResetModel()
 
-        for sibling in actor_parent.children:
-            if sibling != actor and sibling.name == new_name:
-                return False, "Name already exists."
-
-        return True, ""
-
-    def open_rename_dialog(self, actor: BaseActor):
-
-        actor_path = self.local_scene.get_actor_path(actor)
-        if actor_path is None:
-            raise Exception("Invalid actor.")
-
-        dialog = RenameDialog(actor_path, self.can_rename_actor, self)
-        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            new_name = dialog.new_name
-            asyncio.create_task(self.rename_actor(actor, new_name))
+        await self.remote_scene.reparent_actor(actor_path, new_parent_path)
 
 
 if __name__ == "__main__":

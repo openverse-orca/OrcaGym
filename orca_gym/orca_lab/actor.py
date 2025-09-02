@@ -70,7 +70,7 @@ class GroupActor(BaseActor):
     def children(self):
         return self._children.copy()
 
-    def add_child(self, child: BaseActor):
+    def insert_child(self, index: int, child: BaseActor):
         if not isinstance(child, BaseActor):
             raise TypeError("Child must be an instance of GroupActor or AssetActor.")
 
@@ -80,8 +80,15 @@ class GroupActor(BaseActor):
         if child.parent is not None:
             child.parent.remove(child)
 
-        self._children.append(child)
+        if index < 0 or index > len(self._children):
+            self._children.append(child)
+        else:
+            self._children.insert(index, child)
+
         child._parent = self
+
+    def add_child(self, child: BaseActor):
+        self.insert_child(-1, child)
 
     def remove_child(self, child: BaseActor):
         if child in self._children:

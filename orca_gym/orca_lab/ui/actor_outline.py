@@ -1,6 +1,7 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 
 from orca_gym.orca_lab.actor import BaseActor
+from orca_gym.orca_lab.local_scene import LocalScene
 from orca_gym.orca_lab.path import Path
 
 
@@ -28,6 +29,7 @@ class ActorOutlineDelegate(QtWidgets.QStyledItemDelegate):
 
 class ActorOutline(QtWidgets.QTreeView):
     actor_selection_changed = QtCore.Signal(list)
+    request_add_group = QtCore.Signal(BaseActor)
     request_delete = QtCore.Signal(BaseActor)
     request_rename = QtCore.Signal(BaseActor)
 
@@ -37,6 +39,12 @@ class ActorOutline(QtWidgets.QTreeView):
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.setItemDelegate(ActorOutlineDelegate(self))
+
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.DragDrop)
+        self.setDefaultDropAction(QtCore.Qt.DropAction.CopyAction)
 
         self._change_from_inside = False
         self._change_from_outside = False
@@ -91,26 +99,40 @@ class ActorOutline(QtWidgets.QTreeView):
     @QtCore.Slot()
     def show_context_menu(self, position):
         self._current_index = self.indexAt(position)
-        self._current_actor = self.model().get_actor(self._current_index)
+
+        actor_outline_model: ActorOutlineModel = self.model()
+        local_scene: LocalScene = actor_outline_model.local_scene
+
+        is_root = False
+        self._current_actor = actor_outline_model.get_actor(self._current_index)
+        if self._current_actor is None:
+            self._current_actor = local_scene.root_actor
+            is_root = True
 
         menu = QtWidgets.QMenu()
 
-        action_add = QtGui.QAction("Add")
-        action_add.triggered.connect(self._delete_actor)
-        menu.addAction(action_add)
+        action_add_group = QtGui.QAction("Add Group")
+        action_add_group.triggered.connect(self._add_group)
+        menu.addAction(action_add_group)
 
-        if self._current_actor is not None:
+        if self._current_index.isValid():
             menu.addSeparator()
 
             action_delete = QtGui.QAction("Delete")
             action_delete.triggered.connect(self._delete_actor)
+            action_delete.setEnabled(not is_root)
             menu.addAction(action_delete)
 
             action_rename = QtGui.QAction("Rename")
             action_rename.triggered.connect(self._rename_actor)
+            action_rename.setEnabled(not is_root)
             menu.addAction(action_rename)
 
         menu.exec_(self.mapToGlobal(position))
+
+    @QtCore.Slot()
+    def _add_group(self):
+        self.request_add_group.emit(self._current_actor)
 
     @QtCore.Slot()
     def _delete_actor(self):
@@ -128,16 +150,25 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
 
+    local_scene = LocalScene()
+    local_scene.add_actor(GroupActor("g1"), Path("/"))
+    local_scene.add_actor(GroupActor("g2"), Path("/"))
+    local_scene.add_actor(GroupActor("g3"), Path("/"))
+    local_scene.add_actor(GroupActor("g4"), Path("/g2"))
+    local_scene.add_actor(AssetActor("a1", "spw_name"), Path("/g3"))
+
+    model = ActorOutlineModel(local_scene)
+    model.set_root_group(local_scene.root_actor)
+
+    def on_request_reparent(actor_path: Path, new_parent_path: Path, row: int):
+        if row < 0:
+            print(f"reparent {actor_path} to end of {new_parent_path}")
+        else:
+            print(f"reparent {actor_path} to row {row} of {new_parent_path}")
+
+    model.request_reparent.connect(on_request_reparent)
+
     actor_outline = ActorOutline()
-    model = ActorOutlineModel()
-
-    group1 = GroupActor("g1")
-    group2 = GroupActor("g2", group1)
-    group3 = GroupActor("g3", group1)
-    group4 = GroupActor("g4", group3)
-    asset1 = AssetActor("a1", "spw_name", group1)
-
-    model.set_root_group(group1)
     actor_outline.set_actor_model(model)
     actor_outline.show()
 
