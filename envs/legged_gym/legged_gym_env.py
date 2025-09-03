@@ -33,8 +33,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         task: str,
         **kwargs,
     ):
-        self._init_height_map(height_map_file)
-        self._run_mode = run_mode       
+
+        self._run_mode = run_mode      
+        self._height_map = np.zeros((2000, 2000))  # Set default height map before load from file, 200m x 200m 
         
         super().__init__(
             frame_skip = frame_skip,
@@ -50,6 +51,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             **kwargs,
         )
 
+        self._init_height_map(height_map_file)
         self._randomize_agent_foot_friction()
         self._add_randomized_weight()
         self._init_playable(orcagym_addr)
@@ -272,7 +274,8 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                     print("Height map file already exists: ", height_map_file_local_path)
 
                 self._height_map = np.load(height_map_file_local_path)
-            except:
+            except Exception as e:
+                print("Load height map file failed: ", e)
                 gym.logger.warn("Height map file loading failed!, use default height map 200m x 200m")
                 self._height_map = np.zeros((2000, 2000))  # default height map, 200m x 200m
         else:
