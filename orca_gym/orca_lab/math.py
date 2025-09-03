@@ -126,28 +126,29 @@ class Vec3:
 
 
 class Transform:
-    def __init__(self, position=None, rotation=None):
+    def __init__(self, position=None, rotation=None, scale=None):
         self.position = Vec3() if position is None else Vec3(*position)
         self.rotation = np.array([1,0,0,0])
+        self.scale = 1.0
 
     def __repr__(self):
-        return f"Transform(position={self.position}, rotation={self.rotation})"
+        return f"Transform(position={self.position}, rotation={self.rotation}, scale={self.scale})"
 
     def __str__(self):
-        return f"Transform(position={self.position}, rotation={self.rotation})"
+        return f"Transform(position={self.position}, rotation={self.rotation}, scale={self.scale})"
 
     def __eq__(self, other):
         if isinstance(other, Transform):
-            return self.position == other.position and self.rotation == other.rotation
+            return self.position == other.position and self.rotation == other.rotation and self.scale == other.scale
         return False
 
     def __ne__(self, other):
         if isinstance(other, Transform):
             return not (
-                self.position == other.position and self.rotation == other.rotation
+                self.position == other.position and self.rotation == other.rotation and self.scale == other.scale
             )
         return True
 
     def __hash__(self):
-        return hash((self.position, self.rotation))
+        return hash((self.position, self.rotation, self.scale))
 

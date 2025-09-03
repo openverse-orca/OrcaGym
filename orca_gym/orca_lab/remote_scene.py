@@ -61,14 +61,16 @@ class RemoteScene:
         msg = edit_service_pb2.Transform(
             pos=transform.position,
             quat=transform.rotation,
-            scale=1.0,
+            scale=transform.scale,
         )
+        print(transform)
         return msg
 
     def _get_transform_from_message(self, msg) -> Transform:
         transform = Transform()
         transform.position = msg.pos
         transform.rotation = msg.quat
+        transform.scale = msg.scale
         return transform
 
     def _check_response(self, response):

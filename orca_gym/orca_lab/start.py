@@ -161,9 +161,9 @@ class MainWindow(QtWidgets.QWidget):
 
         world_transform_change = "world_transform_change:"
         if op.startswith(world_transform_change):
-            actor_path = op[len(world_transform_change) :]
-
-            if actor_path not in self.local_scene:
+            actor_path = Path(op[len(world_transform_change) :])
+            print(actor_path)
+            if not actor_path in self.local_scene:
                 raise Exception(f"actor not exist")
 
             transform = await self.remote_scene.get_pending_actor_transform(
