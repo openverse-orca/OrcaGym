@@ -29,40 +29,6 @@ python scripts/convert_sb3_to_onnx.py --model_path models/ppo_model.zip --output
 pip install ray[rllib]==2.49.0
 ```
 
-## 安装与你的CUDA版本匹配的torch
-如果你使用的是conda环境，并且你的CUDA版本是12.8，请使用以下命令安装torch：
-```bash
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-```
-
-## 安装与你的cuda版本匹配的cuda-toolkit
-如果你使用的是conda环境，并且你的CUDA版本是12.8，请使用以下命令安装cuda-toolkit：
-
-```bash
-conda install -c conda-forge -c nvidia cuda-toolkit=12.8
-```
-
-## 验证环境配置
-
-安装完成后，建议运行测试脚本验证CUDA和PyTorch是否正确配置：
-
-```bash
-python scripts/test_cuda_torch.py
-```
-
-这个脚本会检查：
-- Python版本
-- CUDA驱动和工具包安装
-- PyTorch安装和CUDA支持
-- GPU可用性和性能测试
-
-如果所有检查都通过，你会看到：
-```
-🎉 所有检查都通过了！环境配置正确，可以继续后续步骤。
-```
-
-如果发现问题，脚本会提供具体的修复建议。
-
 ## 配置集群其他节点
 
 由于Ray要求集群节点的python版本必须与head节点一致。因此在完成head节点配置后，在head查询python具体版本号：
@@ -79,8 +45,6 @@ conda create -n orca_ray python=xxx
 ```
 
 然后按照orca环境的安装方式从新安装一次，直到完成所有worker的配置
-
-
 
 ## 启动Ray集群
 

@@ -60,7 +60,7 @@ conda install -c conda-forge -c nvidia cuda-toolkit=12.8
 安装完成后，建议运行测试脚本验证CUDA和PyTorch是否正确配置：
 
 ```bash
-python scripts/test_cuda_torch.py
+python orca_gym/scripts/test_cuda_torch.py
 ```
 
 ### 安装核心包

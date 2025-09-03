@@ -3,6 +3,10 @@ import os
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
+import fcntl
+import contextlib
+import tempfile
+import shutil
 
 proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
@@ -68,6 +72,26 @@ def get_eq_type(anchor_type: AnchorType):
         return mujoco.mjtEq.mjEQ_CONNECT
     else:
         return mujoco.mjtEq.mjEQ_CONNECT
+
+@contextlib.asynccontextmanager
+async def file_lock(file_path):
+    """
+    文件锁上下文管理器，防止多进程同时访问同一个文件
+    """
+    lock_path = file_path + '.lock'
+    async with aiofiles.open(lock_path, 'w') as lock_file:
+        await lock_file.write(str(os.getpid()))
+        # 在Linux上使用文件锁
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            # 清理锁文件
+            try:
+                os.unlink(lock_path)
+            except OSError:
+                pass
 
 class OrcaGymLocal(OrcaGymBase):
     """
@@ -167,8 +191,33 @@ class OrcaGymLocal(OrcaGymBase):
         else:
             content_file_path = os.path.join(local_file_dir, content_file_name)
 
-        async with aiofiles.open(content_file_path, 'wb') as f:
-            await f.write(content)
+        # 使用文件锁防止多进程重入
+        async with file_lock(content_file_path):
+            # 再次检查文件是否存在（可能在等待锁的过程中已被其他进程创建）
+            if not os.path.exists(content_file_path):
+                # 原子化保存：先写入临时文件，再移动到最终位置
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb', 
+                    dir=os.path.dirname(content_file_path), 
+                    delete=False,
+                    prefix=f"{content_file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(content)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    
+                    # 原子移动文件
+                    shutil.move(temp_file.name, content_file_path)
+                except Exception as e:
+                    # 清理临时文件
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
 
         return content_file_path
 
@@ -177,10 +226,12 @@ class OrcaGymLocal(OrcaGymBase):
             content_file_name = node.get('file')
             if content_file_name is not None:
                 content_file_path = os.path.join(self.xml_file_dir, content_file_name)
-                if not os.path.exists(content_file_path):
-                    # 下载文件
-                    print("Load content file: ", content_file_name)
-                    await self.load_content_file(content_file_name)
+                # 使用文件锁防止多进程重复下载
+                async with file_lock(content_file_path):
+                    if not os.path.exists(content_file_path):
+                        # 下载文件
+                        print("Load content file: ", content_file_name)
+                        await self.load_content_file(content_file_name)
         else:
             for child in node:
                 await self.process_xml_node(child)
@@ -233,22 +284,44 @@ class OrcaGymLocal(OrcaGymBase):
         file_name = response.file_name
         file_path = os.path.join(self.xml_file_dir, file_name)
         
-        # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
-        if not os.path.exists(file_path):
-            request = mjc_message_pb2.LoadLocalEnvRequest()
-            request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
-            response = await self.stub.LoadLocalEnv(request)
+        # 使用文件锁防止多进程重入
+        async with file_lock(file_path):
+            # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
+            if not os.path.exists(file_path):
+                request = mjc_message_pb2.LoadLocalEnvRequest()
+                request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
+                response = await self.stub.LoadLocalEnv(request)
 
-            if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
-                raise Exception("Load local env failed.")
-            
-            # print("Load xml from remote: ", file_name)
+                if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+                    raise Exception("Load local env failed.")
+                
+                # print("Load xml from remote: ", file_name)
 
-            xml_content = response.xml_content
-            
-            # 异步写入文件（使用aiofiles）
-            async with aiofiles.open(file_path, 'wb') as f:
-                await f.write(xml_content)
+                xml_content = response.xml_content
+                
+                # 原子化保存：先写入临时文件，再移动到最终位置
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb', 
+                    dir=self.xml_file_dir, 
+                    delete=False,
+                    prefix=f"{file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(xml_content)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    
+                    # 原子移动文件
+                    shutil.move(temp_file.name, file_path)
+                except Exception as e:
+                    # 清理临时文件
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
         
         # 返回绝对路径
         return os.path.abspath(file_path)

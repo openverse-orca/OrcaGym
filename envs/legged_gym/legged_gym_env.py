@@ -266,8 +266,8 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             try:
                 height_map_file_name = os.path.basename(height_map_file)
                 height_map_file_remote_dir = os.path.dirname(height_map_file)
-                height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orca_gym", "height_map")
-                # height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orca_gym", "height_map_tmp_test")
+                height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orcagym", "height_map")
+                # height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orcagym", "height_map_tmp_test")
                 
                 if not os.path.exists(height_map_file_local_dir):
                     os.makedirs(height_map_file_local_dir, exist_ok=True)
