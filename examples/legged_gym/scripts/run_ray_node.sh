@@ -195,7 +195,7 @@ mount_shared_storage_worker() {
         
         # 交互式提示用户输入sudo密码
         if sudo -n true 2>/dev/null; then
-            # 用户有sudo权限且不需要密码
+            # 用户有sudo权限且无需密码
             print_info "用户有sudo权限，无需输入密码"
             sudo mount "$head_ip:$SHARED_STORAGE_PATH" "$SHARED_STORAGE_PATH" 2>/dev/null
         else
@@ -218,38 +218,12 @@ mount_shared_storage_worker() {
             print_warning "挂载点写入测试失败，请检查NFS配置"
         fi
     else
-        print_warning "NFS挂载失败，尝试使用rsync同步..."
-        
-        # 如果NFS挂载失败，尝试使用rsync同步（作为备选方案）
-        if command -v rsync &> /dev/null; then
-            print_info "使用rsync同步共享目录..."
-            if [[ $EUID -eq 0 ]]; then
-                rsync -av --delete "$head_ip:$SHARED_STORAGE_PATH/" "$SHARED_STORAGE_PATH/" 2>/dev/null
-            else
-                print_info "需要sudo权限来执行rsync同步"
-                
-                # 交互式提示用户输入sudo密码
-                if sudo -n true 2>/dev/null; then
-                    # 用户有sudo权限且不需要密码
-                    print_info "用户有sudo权限，无需输入密码"
-                    sudo rsync -av --delete "$head_ip:$SHARED_STORAGE_PATH/" "$SHARED_STORAGE_PATH/" 2>/dev/null
-                else
-                    # 需要输入sudo密码
-                    print_info "请输入您的sudo密码:"
-                    sudo rsync -av --delete "$head_ip:$SHARED_STORAGE_PATH/" "$SHARED_STORAGE_PATH/" 2>/dev/null
-                fi
-            fi
-            
-            if [[ $? -eq 0 ]]; then
-                print_success "rsync同步成功"
-            else
-                print_error "rsync同步失败，请检查网络连接和权限"
-                return 1
-            fi
-        else
-            print_error "无法挂载共享存储，且rsync不可用"
-            return 1
-        fi
+        print_error "NFS挂载失败，请检查以下配置："
+        print_error "1. 目标机器是否运行NFS服务"
+        print_error "2. 防火墙是否允许NFS端口(2049)"
+        print_error "3. /etc/exports配置是否正确"
+        print_error "4. 网络连接是否正常"
+        return 1
     fi
 }
 
@@ -350,10 +324,10 @@ start_worker_node() {
     print_info "启动Ray worker节点..."
     print_info "连接到head节点: $head_ip:$RAY_PORT"
     
-    # 挂载共享存储
+    # 挂载共享存储（可选，失败时不阻止启动）
     if ! mount_shared_storage_worker "$head_ip"; then
-        print_error "共享存储挂载失败，无法启动Ray worker节点"
-        exit 1
+        print_warning "共享存储挂载失败，但将继续启动Ray worker节点"
+        print_warning "注意：某些需要共享存储的功能可能不可用"
     fi
     
     # 检测可用的GPU数量
@@ -368,7 +342,7 @@ start_worker_node() {
     # 检测可用的CPU数量，并分配为8的倍数
     local num_cpus=$(nproc)
     local allocated_cpus=$((num_cpus / 8 * 8))
-    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
+    print_info "检测到 $num_cpus 个CPU核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
     
     # 启动Ray worker节点
     ray start \

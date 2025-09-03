@@ -48,6 +48,10 @@ conda create -n orca_ray python=xxx
 
 ## 启动Ray集群
 
+### 安装NFS服务
+
+首先需要在Head节点上安装 NFS 服务，并正确配置，具体参考其他教程。
+
 ### 启动Head节点
 
 在head节点机器上运行：
