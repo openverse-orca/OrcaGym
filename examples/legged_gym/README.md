@@ -48,25 +48,16 @@ conda create -n orca_ray python=xxx
 
 ## 启动Ray集群
 
-### 安装NFS服务
-
-首先需要在Head节点上安装 NFS 服务，并正确配置，具体参考其他教程。
-
 ### 启动Head节点
 
 在head节点机器上运行：
 
 ```bash
-# 1. 设置共享存储
-bash ./scripts/run_ray_node.sh storage setup
-
-# 2. 启动Ray head节点
 bash ./scripts/run_ray_node.sh head
 ```
 
 这将：
 - 从配置文件读取IP地址（当前为192.168.1.100）
-- 设置共享存储
 - 启动Ray head节点
 - 显示Ray集群地址
 
@@ -75,10 +66,6 @@ bash ./scripts/run_ray_node.sh head
 在worker节点机器上运行：
 
 ```bash
-# 1. 挂载共享存储
-bash ./scripts/run_ray_node.sh storage mount
-
-# 2. 启动Ray worker节点
 bash ./scripts/run_ray_node.sh worker
 ```
 

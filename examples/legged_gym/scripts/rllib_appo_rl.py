@@ -359,7 +359,6 @@ def config_appo_tuner(
         param_space=config.to_dict(),
         run_config=RunConfig(
             name="APPO_OrcaGym_Training",
-            storage_path="/mnt/nfs/ray_results",  # 使用共享存储路径
             stop={"training_iteration": iter},
             checkpoint_config=CheckpointConfig(
                 num_to_keep=3,

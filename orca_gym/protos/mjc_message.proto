@@ -21,6 +21,7 @@ service GrpcService {
   rpc BeginSaveMp4File(BeginSaveMp4FileRequest) returns (BeginSaveMp4FileResponse);
   rpc StopSaveMp4File(StopSaveMp4FileRequest) returns (StopSaveMp4FileResponse);
   rpc GetCurrentFrameIndex(GetCurrentFrameIndexRequest) returns (GetCurrentFrameIndexResponse);
+  rpc GetTimeStamp(GetTimeStampRequest) returns (GetTimeStampResponse);
 
   // 键鼠操作
   rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
@@ -1074,7 +1075,11 @@ message SetCameraSensorInfoResponse {
 
 message BeginSaveMp4FileRequest {
   string file_path = 1; // 保存 MP4 文件的路径
-
+  enum CaptureMode { //捕获相机帧的方式
+    ASYNC = 0;
+    SYNC = 1;
+  }
+  CaptureMode capture_mode = 2;
 }
 
 message BeginSaveMp4FileResponse {
@@ -1106,6 +1111,21 @@ message GetCurrentFrameIndexRequest
 message GetCurrentFrameIndexResponse {
   int64 current_frame = 1;
   string error_message = 2;
+}
+
+message GetTimeStampRequest
+{
+  // 该请求不需要任何参数
+  uint64 last_frame_index = 1; // 截止到哪个帧的时间戳
+}
+
+message TimeStampList {
+  repeated uint64 time_stamps = 1; // 时间戳列表
+}
+
+message GetTimeStampResponse {
+  map<string, TimeStampList> time_stamp_map = 1; // 时间戳，键为 Actor 名字，值为时间戳列表
+  string error_message = 2; // 错误详情（可选）
 }
 
 message MakeCameraViewportActiveRequest {

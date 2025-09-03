@@ -24,10 +24,6 @@ CONFIG_FILE="$SCRIPT_DIR/../configs/rllib_appo_cluster_config.yaml"
 RAY_PORT=6379
 RAY_DASHBOARD_PORT=8265
 
-# 共享存储配置
-SHARED_STORAGE_PATH="/mnt/nfs/ray_results"
-SHARED_STORAGE_OWNER="orca"  # 可以根据实际情况修改
-
 # 函数：打印带颜色的消息
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -70,163 +66,6 @@ check_conda_env() {
     print_success "使用conda环境: $CONDA_DEFAULT_ENV"
 }
 
-# 函数：设置共享存储（head节点）
-setup_shared_storage_head() {
-    print_info "设置共享存储目录..."
-    
-    # 检查是否为root用户
-    if [[ $EUID -eq 0 ]]; then
-        print_info "以root用户运行，直接创建共享目录..."
-        mkdir -p "$SHARED_STORAGE_PATH"
-        chmod 777 "$SHARED_STORAGE_PATH"
-        
-        # 尝试设置所有者（如果用户存在）
-        if id "$SHARED_STORAGE_OWNER" &>/dev/null; then
-            chown "$SHARED_STORAGE_OWNER:$SHARED_STORAGE_OWNER" "$SHARED_STORAGE_PATH"
-            print_info "设置目录所有者为: $SHARED_STORAGE_OWNER"
-        fi
-    else
-        print_info "以普通用户运行，尝试创建共享目录..."
-        
-        # 尝试创建目录
-        if mkdir -p "$SHARED_STORAGE_PATH" 2>/dev/null; then
-            print_success "成功创建共享目录: $SHARED_STORAGE_PATH"
-        else
-            print_warning "无法创建共享目录，需要sudo权限"
-            print_info "尝试使用sudo创建共享目录..."
-            
-            # 交互式提示用户输入sudo密码
-            if sudo -n true 2>/dev/null; then
-                # 用户有sudo权限且不需要密码
-                print_info "用户有sudo权限，无需输入密码"
-                if sudo mkdir -p "$SHARED_STORAGE_PATH" && sudo chmod 777 "$SHARED_STORAGE_PATH"; then
-                    print_success "使用sudo成功创建共享目录: $SHARED_STORAGE_PATH"
-                    
-                    # 尝试设置所有者（如果用户存在）
-                    if id "$SHARED_STORAGE_OWNER" &>/dev/null; then
-                        sudo chown "$SHARED_STORAGE_OWNER:$SHARED_STORAGE_OWNER" "$SHARED_STORAGE_PATH"
-                        print_info "设置目录所有者为: $SHARED_STORAGE_OWNER"
-                    fi
-                else
-                    print_error "sudo创建目录失败"
-                    return 1
-                fi
-            else
-                # 需要输入sudo密码
-                print_info "需要sudo权限来创建共享目录"
-                print_info "请输入您的sudo密码:"
-                
-                # 使用sudo创建目录
-                if sudo mkdir -p "$SHARED_STORAGE_PATH" && sudo chmod 777 "$SHARED_STORAGE_PATH"; then
-                    print_success "使用sudo成功创建共享目录: $SHARED_STORAGE_PATH"
-                    
-                    # 尝试设置所有者（如果用户存在）
-                    if id "$SHARED_STORAGE_OWNER" &>/dev/null; then
-                        sudo chown "$SHARED_STORAGE_OWNER:$SHARED_STORAGE_OWNER" "$SHARED_STORAGE_PATH"
-                        print_info "设置目录所有者为: $SHARED_STORAGE_OWNER"
-                    fi
-                else
-                    print_error "sudo创建目录失败，请检查密码或权限"
-                    return 1
-                fi
-            fi
-        fi
-    fi
-    
-    # 验证目录权限
-    if [[ -d "$SHARED_STORAGE_PATH" ]] && [[ -w "$SHARED_STORAGE_PATH" ]]; then
-        print_success "共享存储目录设置成功: $SHARED_STORAGE_PATH"
-        
-        # 测试写入权限
-        local test_file="$SHARED_STORAGE_PATH/.test_write"
-        if echo "test" > "$test_file" 2>/dev/null; then
-            rm -f "$test_file"
-            print_success "共享存储目录写入测试通过"
-        else
-            print_warning "共享存储目录写入测试失败，请检查权限"
-        fi
-    else
-        print_error "共享存储目录设置失败"
-        return 1
-    fi
-}
-
-# 函数：挂载共享存储（worker节点）
-mount_shared_storage_worker() {
-    local head_ip=$1
-    print_info "挂载共享存储目录..."
-    
-    # 检查目录是否已挂载
-    if mount | grep -q "$SHARED_STORAGE_PATH"; then
-        print_info "共享存储已挂载: $SHARED_STORAGE_PATH"
-        return 0
-    fi
-    
-    # 检查目录是否存在
-    if [[ ! -d "$SHARED_STORAGE_PATH" ]]; then
-        print_info "创建挂载点目录..."
-        if ! mkdir -p "$SHARED_STORAGE_PATH" 2>/dev/null; then
-            print_warning "无法创建挂载点，需要sudo权限"
-            print_info "尝试使用sudo创建挂载点目录..."
-            
-            # 交互式提示用户输入sudo密码
-            if sudo -n true 2>/dev/null; then
-                # 用户有sudo权限且不需要密码
-                print_info "用户有sudo权限，无需输入密码"
-                sudo mkdir -p "$SHARED_STORAGE_PATH"
-            else
-                # 需要输入sudo密码
-                print_info "需要sudo权限来创建挂载点目录"
-                print_info "请输入您的sudo密码:"
-                sudo mkdir -p "$SHARED_STORAGE_PATH"
-            fi
-        fi
-    fi
-    
-    # 尝试挂载NFS
-    print_info "尝试挂载NFS共享: $head_ip:$SHARED_STORAGE_PATH"
-    
-    if [[ $EUID -eq 0 ]]; then
-        # 以root用户运行
-        mount "$head_ip:$SHARED_STORAGE_PATH" "$SHARED_STORAGE_PATH" 2>/dev/null
-    else
-        # 以普通用户运行，尝试sudo
-        print_info "需要sudo权限来挂载NFS共享"
-        
-        # 交互式提示用户输入sudo密码
-        if sudo -n true 2>/dev/null; then
-            # 用户有sudo权限且无需密码
-            print_info "用户有sudo权限，无需输入密码"
-            sudo mount "$head_ip:$SHARED_STORAGE_PATH" "$SHARED_STORAGE_PATH" 2>/dev/null
-        else
-            # 需要输入sudo密码
-            print_info "请输入您的sudo密码:"
-            sudo mount "$head_ip:$SHARED_STORAGE_PATH" "$SHARED_STORAGE_PATH" 2>/dev/null
-        fi
-    fi
-    
-    # 检查挂载结果
-    if mount | grep -q "$SHARED_STORAGE_PATH"; then
-        print_success "共享存储挂载成功: $SHARED_STORAGE_PATH"
-        
-        # 测试读写权限
-        local test_file="$SHARED_STORAGE_PATH/.test_mount"
-        if echo "test" > "$test_file" 2>/dev/null; then
-            rm -f "$test_file"
-            print_success "挂载点写入测试通过"
-        else
-            print_warning "挂载点写入测试失败，请检查NFS配置"
-        fi
-    else
-        print_error "NFS挂载失败，请检查以下配置："
-        print_error "1. 目标机器是否运行NFS服务"
-        print_error "2. 防火墙是否允许NFS端口(2049)"
-        print_error "3. /etc/exports配置是否正确"
-        print_error "4. 网络连接是否正常"
-        return 1
-    fi
-}
-
 # 函数：从配置文件读取head节点IP
 get_head_node_ip() {
     if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -263,12 +102,6 @@ start_head_node() {
     print_info "Head节点IP: $head_ip"
     print_info "Ray端口: $RAY_PORT"
     print_info "Dashboard端口: $RAY_DASHBOARD_PORT"
-    
-    # 设置共享存储
-    if ! setup_shared_storage_head; then
-        print_error "共享存储设置失败，无法启动Ray head节点"
-        exit 1
-    fi
     
     # 检查端口是否被占用
     if check_port $RAY_PORT; then
@@ -324,12 +157,6 @@ start_worker_node() {
     print_info "启动Ray worker节点..."
     print_info "连接到head节点: $head_ip:$RAY_PORT"
     
-    # 挂载共享存储（可选，失败时不阻止启动）
-    if ! mount_shared_storage_worker "$head_ip"; then
-        print_warning "共享存储挂载失败，但将继续启动Ray worker节点"
-        print_warning "注意：某些需要共享存储的功能可能不可用"
-    fi
-    
     # 检测可用的GPU数量
     local num_gpus=0
     if command -v nvidia-smi &> /dev/null; then
@@ -342,7 +169,7 @@ start_worker_node() {
     # 检测可用的CPU数量，并分配为8的倍数
     local num_cpus=$(nproc)
     local allocated_cpus=$((num_cpus / 8 * 8))
-    print_info "检测到 $num_cpus 个CPU核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
+    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
     
     # 启动Ray worker节点
     ray start \
@@ -381,39 +208,6 @@ show_ray_status() {
     ray status
 }
 
-# 函数：测试共享存储
-test_shared_storage() {
-    print_info "测试共享存储访问..."
-    
-    if [[ ! -d "$SHARED_STORAGE_PATH" ]]; then
-        print_error "共享存储目录不存在: $SHARED_STORAGE_PATH"
-        return 1
-    fi
-    
-    # 测试写入
-    local test_file="$SHARED_STORAGE_PATH/.test_$(date +%s)"
-    if echo "test_content" > "$test_file" 2>/dev/null; then
-        print_success "写入测试通过"
-        
-        # 测试读取
-        if [[ -f "$test_file" ]] && [[ "$(cat "$test_file")" == "test_content" ]]; then
-            print_success "读取测试通过"
-        else
-            print_error "读取测试失败"
-            rm -f "$test_file" 2>/dev/null
-            return 1
-        fi
-        
-        # 清理测试文件
-        rm -f "$test_file"
-        print_success "共享存储测试完成"
-        return 0
-    else
-        print_error "写入测试失败，请检查权限"
-        return 1
-    fi
-}
-
 # 函数：显示帮助信息
 show_help() {
     echo "Ray集群管理脚本"
@@ -425,23 +219,16 @@ show_help() {
     echo "  worker [HEAD_IP]    启动Ray worker节点（可选指定head节点IP）"
     echo "  stop                停止Ray节点"
     echo "  status              显示Ray集群状态"
-    echo "  storage setup       设置共享存储目录（head节点）"
-    echo "  storage mount [IP]  挂载共享存储（worker节点）"
-    echo "  storage test        测试共享存储访问"
     echo "  help                显示此帮助信息"
     echo ""
     echo "示例:"
     echo "  $0 head              # 启动head节点"
     echo "  $0 worker            # 启动worker节点（使用配置文件中的IP）"
     echo "  $0 worker 192.168.1.100  # 启动worker节点（指定IP）"
-    echo "  $0 storage setup     # 设置共享存储"
-    echo "  $0 storage mount     # 挂载共享存储"
-    echo "  $0 storage test      # 测试共享存储"
     echo "  $0 stop              # 停止Ray节点"
     echo "  $0 status            # 显示状态"
     echo ""
     echo "配置文件: $CONFIG_FILE"
-    echo "共享存储路径: $SHARED_STORAGE_PATH"
 }
 
 # 主函数
@@ -470,30 +257,6 @@ main() {
                 head_ip=$(get_head_node_ip)
                 start_worker_node "$head_ip"
             fi
-            ;;
-        "storage")
-            case "${2:-}" in
-                "setup")
-                    setup_shared_storage_head
-                    ;;
-                "mount")
-                    if [[ $# -eq 3 ]]; then
-                        mount_shared_storage_worker "$3"
-                    else
-                        head_ip=$(get_head_node_ip)
-                        mount_shared_storage_worker "$head_ip"
-                    fi
-                    ;;
-                "test")
-                    test_shared_storage
-                    ;;
-                *)
-                    print_info "存储管理命令:"
-                    print_info "  storage setup        - 设置共享存储目录（head节点）"
-                    print_info "  storage mount [IP]   - 挂载共享存储（worker节点）"
-                    print_info "  storage test         - 测试共享存储访问"
-                    ;;
-            esac
             ;;
         "stop")
             stop_ray

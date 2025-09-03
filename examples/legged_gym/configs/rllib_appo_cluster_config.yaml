@@ -9,7 +9,7 @@ env_name: "LeggedGym"
 # 集群训练专用配置
 training:
   max_episode_steps: 1000
-  num_env_runners: 96             # 根据集群可用CPU核数来配置，每个worker节点的可用数已经按照8的倍数来分配，因此这里也应该是8的倍数
+  num_env_runners: 56             # 根据集群可用CPU核数来配置，每个worker节点的可用数已经按照8的倍数来分配，因此这里也应该是8的倍数
   num_envs_per_env_runner: 32    # 必须是 32 的倍数，一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
   async_env_runner: True
   iter: 2000
