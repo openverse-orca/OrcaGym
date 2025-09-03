@@ -144,7 +144,7 @@ class OrcaGymLocal(OrcaGymBase):
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
-    async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir=""):
+    async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
         request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name, file_dir=remote_file_dir)
         response = await self.stub.LoadContentFile(request)
 
@@ -155,6 +155,13 @@ class OrcaGymLocal(OrcaGymBase):
         if content is None or len(content) == 0:
             raise Exception("Content is empty.")
         
+        # 如果指定了临时文件路径，先写入临时文件
+        if temp_file_path is not None:
+            async with aiofiles.open(temp_file_path, 'wb') as f:
+                await f.write(content)
+            return temp_file_path
+        
+        # 否则按原来的逻辑写入最终路径
         if local_file_dir is None or len(local_file_dir) == 0:
             content_file_path = os.path.join(self.xml_file_dir, content_file_name)
         else:
