@@ -212,7 +212,7 @@ def get_config(
                     # ====================================================
                     # MLP 编码器 (核心部分)
                     # ====================================================
-                    "fcnet_hiddens": agent_config["pi"],
+                    "fcnet_hiddens": [256, 256],        # pi encoder 使用一个扁平的小网络
                     "fcnet_activation": "silu",
                     "fcnet_kernel_initializer": "orthogonal_",
                     "fcnet_kernel_initializer_kwargs": {"gain": 1.0},
@@ -239,10 +239,10 @@ def get_config(
                     # ====================================================
                     # 【强烈推荐启用】为高斯分布设置独立的、可训练的log(std)参数。
                     # 这能极大地稳定训练，因为网络只需要学习均值，方差由一个单独的参数控制。
-                    "free_log_std": True,
+                    # "free_log_std": True,
                     # 严格裁剪log(std)，防止方差过大或过小，保证探索在合理范围内。
                     # 对于动作范围被压缩到[-1,1]的任务，标准差不需要太大，因此裁剪范围可以更紧一些。
-                    "log_std_clip_param": 5.0,
+                    # "log_std_clip_param": 5.0,
 
                     # 共享编码器层，提升学习效率和泛化能力。
                     # 如果训练后期发现策略和价值函数性能冲突，可以尝试设为False。
@@ -297,6 +297,11 @@ def get_config(
             # which entropy coeff depends on, is updated after each worker rollout.
             min_time_s_per_iteration=0,
         )
+        # .evaluation(
+        #     evaluation_interval=10,
+        #     evaluation_parallel_to_training=True,
+        #     evaluation_num_env_runners=1,
+        # )
     )
     return config
 

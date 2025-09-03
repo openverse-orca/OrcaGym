@@ -542,3 +542,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_actuator_trnid(self, actuator_id, trnid):
         self.gym.set_actuator_trnid(actuator_id, trnid)
         return
+
+    async def _load_content_file(self, content_file_name, remote_file_dir="", local_file_dir=""):
+        content_file_path = await self.gym.load_content_file(content_file_name, remote_file_dir, local_file_dir)
+        return content_file_path
+
+    def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir=""):
+        return self.loop.run_until_complete(self._load_content_file(content_file_name, remote_file_dir, local_file_dir))

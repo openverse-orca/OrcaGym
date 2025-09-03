@@ -144,8 +144,8 @@ class OrcaGymLocal(OrcaGymBase):
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
-    async def load_content_file(self, content_file_name):
-        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
+    async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir=""):
+        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name, file_dir=remote_file_dir)
         response = await self.stub.LoadContentFile(request)
 
         if response.status != mjc_message_pb2.LoadContentFileResponse.SUCCESS:
@@ -155,11 +155,15 @@ class OrcaGymLocal(OrcaGymBase):
         if content is None or len(content) == 0:
             raise Exception("Content is empty.")
         
-        content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        if local_file_dir is None or len(local_file_dir) == 0:
+            content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        else:
+            content_file_path = os.path.join(local_file_dir, content_file_name)
+
         async with aiofiles.open(content_file_path, 'wb') as f:
             await f.write(content)
 
-        return
+        return content_file_path
 
     async def process_xml_node(self, node : ET.Element):
         if node.tag == 'mesh' or node.tag == 'hfield':

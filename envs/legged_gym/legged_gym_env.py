@@ -13,6 +13,7 @@ import requests
 from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
 from .legged_config import LeggedEnvConfig, LeggedRobotConfig
+import os
 
 class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -256,7 +257,21 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
     def _init_height_map(self, height_map_file: str) -> None:
         if height_map_file is not None:
             try:
-                self._height_map = np.load(height_map_file)
+                height_map_file_name = os.path.basename(height_map_file)
+                height_map_file_remote_dir = os.path.dirname(height_map_file)
+                height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orca_gym", "height_map")
+                
+                if not os.path.exists(height_map_file_local_dir):
+                    os.makedirs(height_map_file_local_dir, exist_ok=True)
+
+                height_map_file_local_path = os.path.join(height_map_file_local_dir, height_map_file_name)
+                if not os.path.exists(height_map_file_local_path):
+                    self.load_content_file(height_map_file_name, height_map_file_remote_dir, height_map_file_local_dir)
+                    print("Load height map file: ", height_map_file_local_path)
+                else:
+                    print("Height map file already exists: ", height_map_file_local_path)
+
+                self._height_map = np.load(height_map_file_local_path)
             except:
                 gym.logger.warn("Height map file loading failed!, use default height map 200m x 200m")
                 self._height_map = np.zeros((2000, 2000))  # default height map, 200m x 200m

@@ -175,7 +175,7 @@ Lite3Config = {
         "n_steps" : 64,  # 每个环境采样步数
         "rollout_fragment_length" : 64,  # 每个rollout的片段长度(rllib)
         "batch_size" : 4096,  # 批次大小            
-        "train_batch_size_per_learner" : 8192,  # 每个learner的批次大小(rllib)
+        "train_batch_size_per_learner" : 4096,  # 每个learner的批次大小(rllib)
         "minibatch_size" : 128,  # 每个learner的批次大小(rllib)
         "learning_rate": {
             "initial_value": 3e-4,    # 初始学习率

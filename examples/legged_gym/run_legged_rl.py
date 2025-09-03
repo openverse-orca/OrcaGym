@@ -40,7 +40,6 @@ def process_scene(
     agent_spawnable_name: str,
     agent_num: int,
     terrain_spawnable_names: list[str],
-    model_dir: str,
 ):
     # 清空场景
     clear_scene(
@@ -56,7 +55,6 @@ def process_scene(
     # 空场景生成高度图
     height_map_file = generate_height_map_file(
         orcagym_addresses=orcagym_addresses,
-        height_map_dir=model_dir,
     )
 
     # 放置机器人
@@ -147,7 +145,6 @@ def run_sb3_ppo_rl(
         agent_spawnable_name=agent_spawnable_name,
         agent_num=agent_num,
         terrain_spawnable_names=terrain_spawnable_names,
-        model_dir=model_dir,
     )
 
     import examples.legged_gym.scripts.sb3_ppo_vecenv_rl as sb3_rl
@@ -284,7 +281,6 @@ def run_rllib_appo_rl(
         agent_spawnable_name=agent_spawnable_name,
         agent_num=32,   # 一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
         terrain_spawnable_names=terrain_spawnable_names,
-        model_dir=model_dir,
     )
 
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl

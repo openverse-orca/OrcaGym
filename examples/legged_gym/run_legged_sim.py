@@ -261,7 +261,6 @@ def main(
         # 空场景生成高度图
         height_map_file = generate_height_map_file(
             orcagym_addresses=orcagym_addresses,
-            height_map_dir=height_map_dir,
         )
 
         # 放置机器人
