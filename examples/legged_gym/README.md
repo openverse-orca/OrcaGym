@@ -53,12 +53,16 @@ conda create -n orca_ray python=xxx
 在head节点机器上运行：
 
 ```bash
+# 1. 设置共享存储
+bash ./scripts/run_ray_node.sh storage setup
+
+# 2. 启动Ray head节点
 bash ./scripts/run_ray_node.sh head
 ```
 
 这将：
-- 自动激活orca conda环境
 - 从配置文件读取IP地址（当前为192.168.1.100）
+- 设置共享存储
 - 启动Ray head节点
 - 显示Ray集群地址
 
@@ -67,6 +71,10 @@ bash ./scripts/run_ray_node.sh head
 在worker节点机器上运行：
 
 ```bash
+# 1. 挂载共享存储
+bash ./scripts/run_ray_node.sh storage mount
+
+# 2. 启动Ray worker节点
 bash ./scripts/run_ray_node.sh worker
 ```
 
@@ -81,19 +89,13 @@ bash ./scripts/run_ray_node.sh worker 192.168.xxx.xxx
 #### 查看集群状态
 
 ```bash
-bash ./scripts/run_ray_node.sh status
+ray status
 ```
 
-#### 停止集群
+#### 停止集群（head节点运行，则停止整个集群，worker节点运行则当前节点退出集群）
 
 ```bash
-bash ./scripts/run_ray_node.sh stop
-```
-
-#### 查看帮助
-
-```bash
-bash ./scripts/run_ray_node.sh help
+ray stop
 ```
 
 ### 配置文件
