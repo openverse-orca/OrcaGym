@@ -32,6 +32,9 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         is_subenv: bool,
         env_id: str,
         task: str,            
+        robot_config: dict,
+        legged_obs_config: dict,
+        curriculum_config: dict,
         **kwargs        
     ):
 
@@ -40,6 +43,9 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self._env_id = env_id
         self._task = task
         self._action_skip = action_skip
+        self._robot_config = robot_config
+        self._legged_obs_config = legged_obs_config
+        self._curriculum_config = curriculum_config
         
         super().__init__(
             frame_skip = frame_skip,
@@ -51,10 +57,15 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
 
         self._agents : list[OrcaGymAsyncAgent] = []
 
-        self.initialize_agents(entry=agent_engry, 
-                               task=task, 
-                               max_episode_steps=max_episode_steps,
-                               dt=self.dt * self._action_skip)
+        self.initialize_agents(
+            entry=agent_engry, 
+            task=task, 
+            max_episode_steps=max_episode_steps,
+            dt=self.dt * self._action_skip,
+            robot_config=self._robot_config,
+            legged_obs_config=self._legged_obs_config,
+            curriculum_config=self._curriculum_config
+        )
 
         self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]
         self._agent_actuator_names = [actuator_name for agent in self._agents for actuator_name in agent.actuator_names]

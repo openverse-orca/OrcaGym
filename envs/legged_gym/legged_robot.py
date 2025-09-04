@@ -13,7 +13,6 @@ import numpy as np
 
 from .legged_utils import local2global, global2local, quat_angular_velocity, smooth_sqr_wave_np, quat_to_euler
 
-from .legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig
 from orca_gym.utils.joint_controller import pd_control
 from numpy.linalg import norm, lstsq
 
@@ -38,11 +37,16 @@ class LeggedRobot(OrcaGymAsyncAgent):
                  task: str,
                  max_episode_steps: int,
                  dt: float,
+                 robot_config: dict,
+                 legged_obs_config: dict,
+                 curriculum_config: dict,
                  **kwargs):
         
         super().__init__(env_id, agent_name, task, max_episode_steps, dt, **kwargs)
 
-        robot_config = LeggedRobotConfig[get_legged_robot_name(agent_name)]
+        self._robot_config = robot_config
+        self._legged_obs_config = legged_obs_config
+        self._curriculum_config = curriculum_config
 
         self._base_joint_name = self.name_space(robot_config["base_joint_name"])
         self._leg_joint_names = self.name_space_list(robot_config["leg_joint_names"])
@@ -103,7 +107,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
 
         self._sensor_names = self._imu_sensor_names + self._foot_touch_sensor_names
 
-        self._ground_contact_body_names = CurriculumConfig["ground_contact_body_names"]  # gound body is not included in the agent's namespace
+        self._ground_contact_body_names = self._curriculum_config["ground_contact_body_names"]  # gound body is not included in the agent's namespace
         self._base_contact_body_names = self.name_space_list(robot_config["base_contact_body_names"])
         self._leg_contact_body_names = self.name_space_list(robot_config["leg_contact_body_names"])
         self._all_contact_body_names = self._base_contact_body_names + self._leg_contact_body_names + self._foot_body_names
@@ -137,7 +141,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         self._pos_random_range = robot_config["pos_random_range"]
         
         # Curriculum learning
-        self.setup_curriculum(list(CurriculumConfig["curriculum_levels"].keys())[0])
+        self.setup_curriculum(list(self._curriculum_config["curriculum_levels"].keys())[0])
         
         self._init_commands_config()
    
@@ -1179,16 +1183,16 @@ class LeggedRobot(OrcaGymAsyncAgent):
         Returns:
             [torch.Tensor]: Vector of scales used to normalize the observations
         """
-        scale_lin_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["lin_vel"]
-        scale_ang_vel = np.array([1, 1, 1]) * LeggedObsConfig["scale"]["ang_vel"]
+        scale_lin_vel = np.array([1, 1, 1]) * self._legged_obs_config["scale"]["lin_vel"]
+        scale_ang_vel = np.array([1, 1, 1]) * self._legged_obs_config["scale"]["ang_vel"]
         scale_orientation = np.array([1, 1, 1])  # No scaling on the orientation
-        scale_command = np.array([LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["lin_vel"], LeggedObsConfig["scale"]["ang_vel"]])
+        scale_command = np.array([self._legged_obs_config["scale"]["lin_vel"], self._legged_obs_config["scale"]["lin_vel"], self._legged_obs_config["scale"]["lin_vel"], self._legged_obs_config["scale"]["ang_vel"]])
         scale_square_wave = np.ones(1)  # No scaling on the square wave
         scale_leg_phase = np.ones(2)  # No scaling on the leg phase
-        scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qpos"]
-        scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * LeggedObsConfig["scale"]["qvel"]
+        scale_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * self._legged_obs_config["scale"]["qpos"]
+        scale_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * self._legged_obs_config["scale"]["qvel"]
         scale_action = np.array([1] * len(self._actuator_names)) # No scaling on the action
-        scale_height = np.ones(16) * LeggedObsConfig["scale"]["height"]
+        scale_height = np.ones(16) * self._legged_obs_config["scale"]["height"]
 
         scale_vec = np.concatenate([
             scale_lin_vel, 
@@ -1215,17 +1219,17 @@ class LeggedRobot(OrcaGymAsyncAgent):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_level = LeggedObsConfig["noise"]["noise_level"]
-        noise_lin_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["lin_vel"] * LeggedObsConfig["scale"]["lin_vel"]
-        noise_ang_vel = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["ang_vel"] * LeggedObsConfig["scale"]["ang_vel"]
-        noise_orientation = np.array([1, 1, 1]) * noise_level * LeggedObsConfig["noise"]["orientation"]
+        noise_level = self._legged_obs_config["noise"]["noise_level"]
+        noise_lin_vel = np.array([1, 1, 1]) * noise_level * self._legged_obs_config["noise"]["lin_vel"] * self._legged_obs_config["scale"]["lin_vel"]
+        noise_ang_vel = np.array([1, 1, 1]) * noise_level * self._legged_obs_config["noise"]["ang_vel"] * self._legged_obs_config["scale"]["ang_vel"]
+        noise_orientation = np.array([1, 1, 1]) * noise_level * self._legged_obs_config["noise"]["orientation"]
         noise_command = np.zeros(4)  # No noise on the command
         noise_square_wave = np.zeros(1)  # No noise on the square wave
         scale_leg_phase = np.zeros(2)  # No noise on the leg phase
-        noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qpos"] * LeggedObsConfig["scale"]["qpos"]
-        noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * LeggedObsConfig["noise"]["qvel"] * LeggedObsConfig["scale"]["qvel"]
+        noise_leg_joint_qpos = np.array([1] * len(self._leg_joint_names)) * noise_level * self._legged_obs_config["noise"]["qpos"] * self._legged_obs_config["scale"]["qpos"]
+        noise_leg_joint_qvel = np.array([1] * len(self._leg_joint_names)) * noise_level * self._legged_obs_config["noise"]["qvel"] * self._legged_obs_config["scale"]["qvel"]
         noise_action = np.zeros(len(self._actuator_names))  # No noise on the action
-        noise_height = np.ones(16) * noise_level * LeggedObsConfig["noise"]["height"] * LeggedObsConfig["scale"]["height"]
+        noise_height = np.ones(16) * noise_level * self._legged_obs_config["noise"]["height"] * self._legged_obs_config["scale"]["height"]
 
         noise_vec = np.concatenate([
             noise_lin_vel, 
@@ -1271,6 +1275,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
     
     def _setup_reward_functions(self, robot_config : dict) -> None:
         reward_coeff = robot_config["reward_coeff"][self._task]
+        print("Reward coeff: ", reward_coeff)
         self._reward_functions = [
             {"function": self._compute_reward_alive, "coeff": reward_coeff["alive"] if "alive" in reward_coeff else 0},
             {"function": self._compute_reward_success, "coeff": reward_coeff["success"] if "success" in reward_coeff else 0},
@@ -1475,11 +1480,11 @@ class LeggedRobot(OrcaGymAsyncAgent):
     def setup_curriculum(self, curriculum : str) -> None:
         print("Agent: ", self._env_id + self.name, "Setup curriculum: ", curriculum)
 
-        robot_config = LeggedRobotConfig[get_legged_robot_name(self.name)]
-        self._terrain = CurriculumConfig["terrain"]
-        self._curriculum_levels =  CurriculumConfig["curriculum_levels"][curriculum]
+        robot_config = self._robot_config
+        self._terrain = self._curriculum_config["terrain"]
+        self._curriculum_levels =  self._curriculum_config["curriculum_levels"][curriculum]
         self._curriculum_learning = robot_config["curriculum_learning"]
-        self._curriculum_commands = CurriculumConfig["curriculum_commands"]
+        self._curriculum_commands = self._curriculum_config["curriculum_commands"]
         if self._curriculum_learning:
             buffer_size = min(self._max_episode_steps, 1000)
             self._curriculum_reward_buffer = {

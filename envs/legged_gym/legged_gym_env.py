@@ -1,24 +1,16 @@
 import numpy as np
-from gymnasium.core import ObsType
 from orca_gym.environment.async_env import OrcaGymAsyncEnv
-from orca_gym.utils import rotations
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-import datetime
+from typing import SupportsFloat
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
 import requests
-from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
-from .legged_config import LeggedEnvConfig, LeggedRobotConfig
+from .legged_config import LeggedEnvConfig
 import os
 import fcntl
-import tempfile
 import shutil
-import hashlib
-from pathlib import Path
 
 class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -36,6 +28,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         run_mode: str,
         env_id: str,
         task: str,
+        robot_config: dict,
+        legged_obs_config: dict,
+        curriculum_config: dict,
         **kwargs,
     ):
 
@@ -53,6 +48,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             is_subenv = is_subenv,
             env_id = env_id,
             task = task,
+            robot_config = robot_config,
+            legged_obs_config = legged_obs_config,
+            curriculum_config = curriculum_config,
             **kwargs,
         )
 
@@ -414,20 +412,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                 agent.init_playable()
                 agent.player_control = True
                 break
-
-        if "go2" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["go2"]
-        elif "A01B" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["A01B"]
-        elif "AzureLoong" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["AzureLoong"]
-        elif "Lite3" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["Lite3"]
-        elif "g1" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["g1"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
+        self._player_agent_lin_vel_x = np.array(self._robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(self._robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":

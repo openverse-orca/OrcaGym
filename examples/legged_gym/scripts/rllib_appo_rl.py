@@ -27,6 +27,7 @@ from ray.rllib.env.single_agent_env_runner import (
 from orca_gym.environment.async_env.single_agent_env_runner import (
     OrcaGymAsyncSingleAgentEnvRunner
 )
+from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
@@ -87,6 +88,9 @@ def get_orca_gym_register_info(
             'is_subenv': True,
             'run_mode': 'training',
             'task': task,
+            'robot_config': LeggedRobotConfig[agent_name],
+            'legged_obs_config': LeggedObsConfig,
+            'curriculum_config': CurriculumConfig,
         },
     }
 

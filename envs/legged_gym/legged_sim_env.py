@@ -1,18 +1,10 @@
-from datetime import datetime
-import sys
 import numpy as np
-from gymnasium.core import ObsType
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment import OrcaGymLocalEnv
-from scipy.spatial.transform import Rotation as R
 from collections import defaultdict
 
 from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
-from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 
 class ControlDevice:
     """

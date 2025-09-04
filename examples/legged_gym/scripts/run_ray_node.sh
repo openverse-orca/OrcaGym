@@ -143,7 +143,6 @@ start_head_node() {
         local actual_ip=$(hostname -I | awk '{print $1}')
         print_info "Ray地址: ray://$actual_ip:$RAY_PORT"
         print_info "GPU资源: $num_gpus"
-        print_warning "注意：当前Ray安装为minimal版本，不支持Dashboard"
     else
         print_error "Ray head节点启动失败"
         exit 1
@@ -175,8 +174,7 @@ start_worker_node() {
     ray start \
         --address=$head_ip:$RAY_PORT \
         --num-cpus=$allocated_cpus \
-        --num-gpus=$num_gpus \
-        --temp-dir=/tmp/ray
+        --num-gpus=$num_gpus
     
     if [[ $? -eq 0 ]]; then
         print_success "Ray worker节点启动成功"
