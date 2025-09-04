@@ -31,10 +31,9 @@ class BasicUnitChecker:
 
 
     def truncate_video_frames(self, mp4_path, frames_counts:int, max_frames: int, isColor: bool):
-        min_frames = max_frames - 3
-        if frames_counts < min_frames:
+        if frames_counts < max_frames:
             return ErrorType.MP4FrameCountError
-        elif frames_counts <= max_frames:
+        elif frames_counts == max_frames:
             return ErrorType.Qualified
         elif frames_counts > max_frames:
             tmp_name = mp4_path.replace('.mp4', '_tmp.mp4')
@@ -109,7 +108,7 @@ class BasicUnitChecker:
 
         duration = video_track.duration / 1000.0
         frame_count = int(video_track.frame_count)
-        if duration < 8 or duration > 40:
+        if duration < 10 or duration > 40:
            return ErrorType.MP4DurationError, frame_count
         fps = frame_count / duration
         if 29 < float(fps) < 31:

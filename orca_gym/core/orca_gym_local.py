@@ -52,6 +52,17 @@ class AnchorType:
     WELD = 1
     BALL = 2
 
+class CaptureMode:
+    '''
+    Enum for mujoco capture camera mode
+    When using synchronous mode,
+    each camera frame is aligned,
+    but performance will be affected.
+    Asynchronous mode, the opposite
+    '''
+    ASYNC = 0
+    SYNC = 1
+
 def get_eq_type(anchor_type: AnchorType):
     """
     Get the equality constraint type based on the anchor type.
@@ -175,8 +186,8 @@ class OrcaGymLocal(OrcaGymBase):
                 await self.process_xml_node(child)
         return
     
-    async def begin_save_video(self, file_path):
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
+    async def begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC):
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
         response = await self.stub.BeginSaveMp4File(request)
         if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
             print(f"Video saving started at {file_path}")

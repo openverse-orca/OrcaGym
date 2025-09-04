@@ -1074,7 +1074,11 @@ message SetCameraSensorInfoResponse {
 
 message BeginSaveMp4FileRequest {
   string file_path = 1; // 保存 MP4 文件的路径
-
+  enum CaptureMode { //捕获相机帧的方式
+    ASYNC = 0;
+    SYNC = 1;
+  }
+  CaptureMode capture_mode = 2;
 }
 
 message BeginSaveMp4FileResponse {
@@ -1110,8 +1114,8 @@ message GetCurrentFrameIndexResponse {
 
 message GetTimeStampRequest
 {
+  // 该请求不需要任何参数
   uint64 last_frame_index = 1; // 截止到哪个帧的时间戳
-
 }
 
 message TimeStampList {

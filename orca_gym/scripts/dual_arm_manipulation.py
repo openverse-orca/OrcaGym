@@ -103,7 +103,7 @@ OBJ_CN = {
     "intelcore_i5":"英特尔i5",
     "wifi_box":"路由器",
     "cpu_fan":"cpu风扇",
-    "fridge":"冰箱", 
+    "fridge":"冰箱",
     "housekeeping":"家政",
     "Guizi": "柜子",
     "guizi": "柜子",
@@ -365,7 +365,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
 
         env.render()
         task_status = info['task_status']
-        
+
         action_step_taken += 1
         is_success = False
         if action_step_taken >= action_step:        
@@ -376,7 +376,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         dataset_writer.set_UUIDPATH()
                         mp4_save_path = dataset_writer.get_mp4_save_path()
 
-                        env.begin_save_video(mp4_save_path)
+                        env.begin_save_video(mp4_save_path, 0)
 
                         saving_mp4 = True
                         camera_frame_index.append(env.get_current_frame())
@@ -1057,7 +1057,7 @@ def augment_episode(env : DualArmEnv,
 
     if output_video:
         print(f"video save path: {output_video_path}")
-        env.begin_save_video(output_video_path)
+        env.begin_save_video(output_video_path, int(sync_codec))
     for i in action_index_list:
         action = action_list[i]
         last_action = action_list[i - 1] if i > 0 else action
@@ -1086,12 +1086,12 @@ def augment_episode(env : DualArmEnv,
                 elapsed_time = datetime.now() - start_time
                 if elapsed_time.total_seconds() < REALTIME_STEP:
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+            else:
+                env.render()
 
         is_success = False
         if original_dones[i] :
             is_success = env._task.is_success(env)
-                    
-        env.render()
 
         global g_skip_frame
         if sync_codec and g_skip_frame < 1:
@@ -1123,7 +1123,6 @@ def augment_episode(env : DualArmEnv,
         return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, {}
 
 def do_augmentation(
-        # json_path,
         env : DualArmEnv, 
         cameras : list[CameraWrapper], 
         rgb_size : tuple,                    
@@ -1156,22 +1155,22 @@ def do_augmentation(
     # 1) 获取 level_name
     level_name = env._task.level_name
     lvl = level_name.decode() if isinstance(level_name, (bytes, bytearray)) else level_name
-    
+
     # 2) 映射出 scene_name / sub_scene_name
     scene_name, sub_scene_name = SCENE_SUBSCENE_MAPPING.get(
         lvl, (lvl.title(), lvl.title()+"_Operation")
     )
-    
+
     # 3) 构造 JSON 目录
     scene_dir = os.path.join(
         dataset_writer.basedir  # parent of HDF5 filename
     )
     os.makedirs(scene_dir, exist_ok=True)
-    
+
     # 4) JSON 路径
     json_fname = f"{scene_name}-{sub_scene_name}.json"
     json_path = os.path.join(scene_dir, json_fname)
-   
+
     for camera in cameras:
         camera.start()
     
