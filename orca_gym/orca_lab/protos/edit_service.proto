@@ -176,6 +176,15 @@ message ReParentActorResponse {
     string error_message = 2;
 }
 
+message GetWindowIdRequest {
+    
+}
+message GetWindowIdResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    uint64 window_id = 3;
+}
+
 service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
@@ -202,4 +211,5 @@ service GrpcService {
     rpc RenameActor(RenameActorRequest) returns (RenameActorResponse);
     rpc ReParentActor(ReParentActorRequest) returns (ReParentActorResponse);
 
+    rpc GetWindowId(GetWindowIdRequest) returns (GetWindowIdResponse);
 }

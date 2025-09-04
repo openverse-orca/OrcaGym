@@ -119,6 +119,11 @@ class GrpcServiceStub(object):
                 request_serializer=edit__service__pb2.ReParentActorRequest.SerializeToString,
                 response_deserializer=edit__service__pb2.ReParentActorResponse.FromString,
                 _registered_method=True)
+        self.GetWindowId = channel.unary_unary(
+                '/SceneEdit.GrpcService/GetWindowId',
+                request_serializer=edit__service__pb2.GetWindowIdRequest.SerializeToString,
+                response_deserializer=edit__service__pb2.GetWindowIdResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -226,6 +231,12 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetWindowId(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -313,6 +324,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.ReParentActor,
                     request_deserializer=edit__service__pb2.ReParentActorRequest.FromString,
                     response_serializer=edit__service__pb2.ReParentActorResponse.SerializeToString,
+            ),
+            'GetWindowId': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetWindowId,
+                    request_deserializer=edit__service__pb2.GetWindowIdRequest.FromString,
+                    response_serializer=edit__service__pb2.GetWindowIdResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -774,6 +790,33 @@ class GrpcService(object):
             '/SceneEdit.GrpcService/ReParentActor',
             edit__service__pb2.ReParentActorRequest.SerializeToString,
             edit__service__pb2.ReParentActorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetWindowId(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/SceneEdit.GrpcService/GetWindowId',
+            edit__service__pb2.GetWindowIdRequest.SerializeToString,
+            edit__service__pb2.GetWindowIdResponse.FromString,
             options,
             channel_credentials,
             insecure,
