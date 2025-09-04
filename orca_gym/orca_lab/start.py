@@ -10,6 +10,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import subprocess
 
+from orca_gym.orca_lab.ui.actor_editor import ActorEditor
 from orca_gym.orca_lab.ui.actor_outline import ActorOutline
 from orca_gym.orca_lab.ui.rename_dialog import RenameDialog
 from orca_gym.orca_lab.ui.actor_outline_model import ActorOutlineModel
@@ -46,7 +47,7 @@ class MainWindow(QtWidgets.QWidget):
 
         await self._init_ui()
 
-        self.resize(400, 200)
+        self.resize(800, 400)
         self.show()
 
         # For testing ...
@@ -87,7 +88,7 @@ class MainWindow(QtWidgets.QWidget):
         self.actor_outline = ActorOutline()
         self.actor_outline.set_actor_model(self.actor_outline_model)
         self.actor_outline.actor_selection_changed.connect(
-            lambda actors: asyncio.ensure_future(self.set_scene_selection(actors))
+            lambda actors: asyncio.ensure_future(self.set_selection_from_scene(actors))
         )
         self.actor_outline.request_add_group.connect(
             lambda parent: asyncio.ensure_future(self.add_group(parent))
@@ -96,6 +97,12 @@ class MainWindow(QtWidgets.QWidget):
             lambda actor: asyncio.ensure_future(self.delete_actor(actor))
         )
         self.actor_outline.request_rename.connect(self.open_rename_dialog)
+
+        self.actor_editor = ActorEditor()
+        # self.actor_editor.setMinimumWidth(80)
+        self.actor_editor.transform_changed.connect(
+            lambda: asyncio.ensure_future(self.on_transform_edit())
+        )
 
         self.asset_browser = AssetBrowser()
         assets = await self.remote_scene.get_actor_assets()
@@ -107,9 +114,9 @@ class MainWindow(QtWidgets.QWidget):
         self.menu_bar = QtWidgets.QMenuBar()
 
         layout1 = QtWidgets.QHBoxLayout()
-        layout1.addWidget(self.actor_outline)
-        layout1.addWidget(self.asset_browser)
-        layout1.addWidget(self.tool_bar)
+        layout1.addWidget(self.actor_outline, 1)
+        layout1.addWidget(self.actor_editor, 1)
+        layout1.addWidget(self.asset_browser, 1)
 
         layout2 = QtWidgets.QVBoxLayout()
         layout2.addWidget(self.menu_bar)
@@ -162,7 +169,7 @@ class MainWindow(QtWidgets.QWidget):
         world_transform_change = "world_transform_change:"
         if op.startswith(world_transform_change):
             actor_path = Path(op[len(world_transform_change) :])
-            print(actor_path)
+
             if not actor_path in self.local_scene:
                 raise Exception(f"actor not exist")
 
@@ -183,7 +190,7 @@ class MainWindow(QtWidgets.QWidget):
             for p in actor_paths:
                 paths.append(Path(p))
 
-            await self.set_actor_outline_selection(paths)
+            await self.set_selection_from_outline(paths)
 
     async def run_sim(self):
         if self.sim_process_running:
@@ -246,7 +253,7 @@ class MainWindow(QtWidgets.QWidget):
         self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
 
-    async def set_actor_outline_selection(self, actor_paths: list[Path]):
+    async def set_selection_from_outline(self, actor_paths: list[Path]):
         actors = []
         for path in actor_paths:
             actor = self.local_scene.find_actor_by_path(path)
@@ -257,7 +264,12 @@ class MainWindow(QtWidgets.QWidget):
 
         self.actor_outline.set_actor_selection(actors)
 
-    async def set_scene_selection(self, actors: list[AssetActor]):
+        if len(actors) == 0:
+            self.actor_editor.actor = None
+        else:
+            self.actor_editor.actor = actors[0]
+
+    async def set_selection_from_scene(self, actors: list[AssetActor]):
         actor_paths = []
         for actor in actors:
             path = self.local_scene.get_actor_path(actor)
@@ -265,7 +277,13 @@ class MainWindow(QtWidgets.QWidget):
                 raise Exception(f"Invalid actor: {actor}")
 
             actor_paths.append(path)
+
         await self.remote_scene.set_selection(actor_paths)
+
+        if len(actors) == 0:
+            self.actor_editor.actor = None
+        else:
+            self.actor_editor.actor = actors[0]
 
     def make_unique_name(self, base_name: str, parent: BaseActor) -> str:
         existing_names = {child.name for child in parent.children}
@@ -365,6 +383,23 @@ class MainWindow(QtWidgets.QWidget):
         model.endResetModel()
 
         await self.remote_scene.reparent_actor(actor_path, new_parent_path)
+
+    async def on_transform_edit(self):
+        actor = self.actor_editor.actor
+        if actor is None:
+            return
+
+        transform = self.actor_editor.transform
+        if transform is None:
+            return
+
+        actor.transform = transform
+
+        actor_path = self.local_scene.get_actor_path(actor)
+        if actor_path is None:
+            raise Exception("Invalid actor.")
+
+        await self.remote_scene.set_actor_transform(actor_path, transform, True)
 
 
 if __name__ == "__main__":

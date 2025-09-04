@@ -63,7 +63,6 @@ class RemoteScene:
             quat=transform.rotation,
             scale=transform.scale,
         )
-        print(transform)
         return msg
 
     def _get_transform_from_message(self, msg) -> Transform:

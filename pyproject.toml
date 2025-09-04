@@ -12,6 +12,7 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy>=2.0.0",
     "scipy",
+    "scipy-stubs", # for type hints
     "matplotlib",
     "grpcio==1.66.1",
     "grpcio-tools==1.66.1",
