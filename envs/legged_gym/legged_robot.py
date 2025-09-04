@@ -16,20 +16,6 @@ from .legged_utils import local2global, global2local, quat_angular_velocity, smo
 from orca_gym.utils.joint_controller import pd_control
 from numpy.linalg import norm, lstsq
 
-def get_legged_robot_name(agent_name: str) -> str:
-    if agent_name.startswith("go2"):
-        return "go2"
-    elif agent_name.startswith("A01B"):
-        return "A01B"
-    elif agent_name.startswith("AzureLoong"):
-        return "AzureLoong"
-    elif agent_name.startswith("Lite3"):
-        return "Lite3"
-    elif agent_name.startswith("g1"):
-        return "g1"
-    else:
-        raise ValueError(f"Unsupported agent name: {agent_name}")
-
 class LeggedRobot(OrcaGymAsyncAgent):
     def __init__(self, 
                  env_id: str,                 
@@ -40,6 +26,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
                  robot_config: dict,
                  legged_obs_config: dict,
                  curriculum_config: dict,
+                 is_subenv: bool,
                  **kwargs):
         
         super().__init__(env_id, agent_name, task, max_episode_steps, dt, **kwargs)
@@ -145,10 +132,9 @@ class LeggedRobot(OrcaGymAsyncAgent):
         
         self._init_commands_config()
    
-        env_idx = int(self._env_id.split("-")[-1])
-        # print("agent env_id: ", env_idx, "log_env_ids: ", robot_config["log_env_ids"])
         self._reward_printer = None
-        if env_idx in robot_config["log_env_ids"] and self.name in robot_config["log_agent_names"]:
+        if not is_subenv and self.name in robot_config["log_agent_names"]:
+            # subenv 用来控制训练时的渲染输出，有且只有一个是 false，这个就是要渲染的。奖励打印也以这个为准，所见即所得
             self._reward_printer = RewardPrinter()
 
         if self.name in robot_config["visualize_command_agent_names"]:
@@ -156,7 +142,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         else:
             self._visualize_command = False
             
-        if self.name == robot_config["playable_agent_name"] and env_idx in robot_config["log_env_ids"]:
+        if self.name == robot_config["playable_agent_name"] and not is_subenv:
             self._is_playable = True
         else:
             self._is_playable = False
@@ -1275,7 +1261,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
     
     def _setup_reward_functions(self, robot_config : dict) -> None:
         reward_coeff = robot_config["reward_coeff"][self._task]
-        print("Reward coeff: ", reward_coeff)
+        # print("Reward coeff: ", reward_coeff)
         self._reward_functions = [
             {"function": self._compute_reward_alive, "coeff": reward_coeff["alive"] if "alive" in reward_coeff else 0},
             {"function": self._compute_reward_success, "coeff": reward_coeff["success"] if "success" in reward_coeff else 0},

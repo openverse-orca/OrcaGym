@@ -64,7 +64,8 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
             dt=self.dt * self._action_skip,
             robot_config=self._robot_config,
             legged_obs_config=self._legged_obs_config,
-            curriculum_config=self._curriculum_config
+            curriculum_config=self._curriculum_config,
+            is_subenv=is_subenv,
         )
 
         self._agent_joint_names = [joint_name for agent in self._agents for joint_name in agent.joint_names ]

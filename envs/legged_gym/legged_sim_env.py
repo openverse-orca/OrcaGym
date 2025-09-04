@@ -4,7 +4,7 @@ from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment import OrcaGymLocalEnv
 from collections import defaultdict
 
-from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
+from envs.legged_gym.legged_robot import LeggedRobot
 
 class ControlDevice:
     """
@@ -286,7 +286,6 @@ class AgentBase:
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         self._id = id
         self._name = name
-        self._config_name = get_legged_robot_name(name)
 
     @property
     def id(self) -> int:
@@ -295,10 +294,7 @@ class AgentBase:
     @property
     def name(self) -> str:
         return self._name
-    
-    @property
-    def config_name(self) -> str:
-        return self._config_name
+
 
     @property
     def action_range(self) -> np.ndarray:

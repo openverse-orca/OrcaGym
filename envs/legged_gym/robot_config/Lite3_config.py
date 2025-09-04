@@ -159,7 +159,6 @@ Lite3Config = {
         "curriculum_learning" :     True,
 
         # Config for logging
-        "log_env_ids" :     [0],
         "log_agent_names" : ["Lite3_000"],
         
         # Config for visualization
