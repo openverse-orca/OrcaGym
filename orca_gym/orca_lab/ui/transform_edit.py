@@ -2,8 +2,10 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 from enum import Enum, auto
 
+import numpy as np
+
 from orca_gym.orca_lab.ui.float_edit import FloatEdit
-from orca_gym.orca_lab.math import Transform, Vec3
+from orca_gym.orca_lab.math import Transform
 
 from scipy.spatial.transform import Rotation
 
@@ -76,11 +78,12 @@ class TransformEdit(QtWidgets.QWidget):
     @property
     def transform(self):
         transform = Transform()
-        
-        transform.position = Vec3( self._pos_x.value, self._pos_y.value, self._pos_z.value)
+
+        transform.position = np.array(
+            [self._pos_x.value, self._pos_y.value, self._pos_z.value], dtype=np.float64
+        )
 
         angles = [self._rot_x.value, self._rot_y.value, self._rot_z.value]
-        print("angles", angles)
         r = Rotation.from_euler(
             "xyz",
             angles,

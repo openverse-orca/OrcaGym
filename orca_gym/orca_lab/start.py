@@ -16,9 +16,53 @@ from orca_gym.orca_lab.ui.rename_dialog import RenameDialog
 from orca_gym.orca_lab.ui.actor_outline_model import ActorOutlineModel
 from orca_gym.orca_lab.ui.asset_browser import AssetBrowser
 from orca_gym.orca_lab.ui.tool_bar import ToolBar
-from orca_gym.orca_lab.math import Transform, Vec3
+from orca_gym.orca_lab.math import Transform
 
 import PySide6.QtAsyncio as QtAsyncio
+
+
+class SelectionCommand:
+    def __init__(self):
+        self.old_selection = []
+        self.new_selection = []
+
+
+class CreteActorCommand:
+    def __init__(self):
+        self.actor_class = None
+        self.params = {}
+        self.parent = None
+        self.row = -1
+
+
+class DeleteActorCommand:
+    def __init__(self):
+        self.actor = None
+        self.parent = None
+        self.row = -1
+
+
+class RenameActorCommand:
+    def __init__(self):
+        self.actor = None
+        self.old_name = ""
+        self.new_name = ""
+
+
+class ReparentActorCommand:
+    def __init__(self):
+        self.actor = None
+        self.old_parent = None
+        self.old_row = -1
+        self.new_parent = None
+        self.new_row = -1
+
+
+class TransformCommand:
+    def __init__(self):
+        self.actor = None
+        self.old_transform = None
+        self.new_transform = None
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -28,6 +72,8 @@ class MainWindow(QtWidgets.QWidget):
 
     async def init(self):
         self.local_scene = LocalScene()
+        self.command_history = []
+        self.command_history_index = -1
 
         self.edit_grpc_addr = "localhost:50151"
         self.sim_grpc_addr = "localhost:50051"
@@ -57,7 +103,7 @@ class MainWindow(QtWidgets.QWidget):
         # q = rot.as_quat()  # x,y,z,w
 
         transform = Transform()
-        transform.position = Vec3(0, 0, 2)
+        transform.position = np.array([0, 0, 2], dtype=np.float64)
 
         actor = AssetActor(name=f"box1", spawnable_name="box")
         actor.transform = transform
@@ -161,6 +207,8 @@ class MainWindow(QtWidgets.QWidget):
                 actor_path, True
             )
 
+            self.set_transform_from_scene(actor_path, transform, True)
+
             await self.remote_scene.set_actor_transform(actor_path, transform, True)
 
             actor = self.local_scene[actor_path]
@@ -176,6 +224,8 @@ class MainWindow(QtWidgets.QWidget):
             transform = await self.remote_scene.get_pending_actor_transform(
                 actor_path, False
             )
+
+            self.set_transform_from_scene(actor_path, transform, False)
 
             await self.remote_scene.set_actor_transform(actor_path, transform, False)
 
@@ -243,7 +293,7 @@ class MainWindow(QtWidgets.QWidget):
 
         index = self.asset_map_counter[item_name]
         transform = Transform()
-        transform.position = Vec3(1 * index, 0, 2)
+        transform.position = np.array([1 * index, 0, 2], dtype=np.float64)
         new_item_name = item_name + str(index)
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
         actor.transform = transform
@@ -297,6 +347,7 @@ class MainWindow(QtWidgets.QWidget):
         return new_name
 
     async def add_group(self, parent_actor: GroupActor | Path):
+        # TODO add group on asset actor crash!!!
         new_group_name = self.make_unique_name("group", parent_actor)
         actor = GroupActor(name=new_group_name)
         await self.add_actor(actor, parent_actor)
@@ -400,6 +451,42 @@ class MainWindow(QtWidgets.QWidget):
             raise Exception("Invalid actor.")
 
         await self.remote_scene.set_actor_transform(actor_path, transform, True)
+
+    def set_transform_from_scene(
+        self, actor_path: Path, transform: Transform, local: bool
+    ):
+        actor = self.local_scene[actor_path]
+
+        if local == True:
+            actor.transform = transform
+        else:
+            actor.world_transform = transform
+
+        if self.actor_editor.actor == actor:
+            self.actor_editor.update_ui()
+
+    def add_command(self, command):
+        # Remove commands after the current index
+        self.command_history = self.command_history[: self.command_history_index + 1]
+
+        self.command_history.append(command)
+        self.command_history_index += 1
+
+    def undo(self):
+        if self.command_history_index < 0:
+            return
+
+        command = self.command_history[self.command_history_index]
+
+        self.command_history_index -= 1
+
+    def redo(self):
+        if self.command_history_index + 1 >= len(self.command_history):
+            return
+
+        command = self.command_history[self.command_history_index + 1]
+
+        self.command_history_index += 1
 
 
 if __name__ == "__main__":

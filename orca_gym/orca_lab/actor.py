@@ -11,6 +11,7 @@ class BaseActor:
         self._name = ""
         self._parent = None
         self._transform = Transform()
+        self._world_transform = None
         self.name = name
         self.parent = parent
 
@@ -46,6 +47,7 @@ class BaseActor:
             parent_actor._children.append(self)
 
         self._parent = parent_actor
+        self._world_transform = None  # Invalidate world transform cache
 
     @property
     def transform(self):
@@ -56,6 +58,32 @@ class BaseActor:
         if not isinstance(value, Transform):
             raise TypeError("transform must be an instance of Transform.")
         self._transform = value
+
+        self._world_transform = None  # Invalidate world transform cache
+
+    @property
+    def world_transform(self) -> Transform:
+        if self._world_transform is not None:
+            return self._world_transform
+
+        if self.parent is None:
+            self._world_transform = self.transform
+        else:
+            self._world_transform = self.parent.world_transform * self.transform
+
+        return self._world_transform
+
+    @world_transform.setter
+    def world_transform(self, value: Transform):
+        if not isinstance(value, Transform):
+            raise TypeError("world_transform must be an instance of Transform.")
+
+        if self.parent is None:
+            self.transform = value
+        else:
+            self.transform = self.parent.world_transform.inverse() * value
+
+        self._world_transform = value
 
 
 class GroupActor(BaseActor):

@@ -1,4 +1,5 @@
 import grpc
+import numpy as np
 from orca_gym.orca_lab.math import Transform
 import orca_gym.orca_lab.protos.edit_service_pb2_grpc as edit_service_pb2_grpc
 import orca_gym.orca_lab.protos.edit_service_pb2 as edit_service_pb2
@@ -9,7 +10,8 @@ from orca_gym.orca_lab.path import Path
 from orca_gym.orca_lab.actor import BaseActor, GroupActor, AssetActor
 
 from typing import List
-
+import subprocess
+import time
 
 Success = edit_service_pb2.StatusCode.Success
 Error = edit_service_pb2.StatusCode.Error
@@ -23,7 +25,7 @@ class RemoteScene:
         self.edit_grpc_addr = edit_grpc_addr
         self.sim_grpc_addr = sim_grpc_addr
 
-    async def init_grpc(self):
+    async def init_grpc(self, /, launch: str = ""):
         options = [
             ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
             ("grpc.max_send_message_length", 1024 * 1024 * 1024),
@@ -41,8 +43,44 @@ class RemoteScene:
 
         self.timeout = 3
 
-        if not await self.aloha():
-            raise Exception("Failed to connect to server.")
+        if isinstance(launch, str) and launch != "":
+            print(f"launching server: {self.edit_grpc_addr}")
+
+            cmds = [
+                launch,
+                "--datalink_host ",
+                "54.223.63.47",
+                "--datalink_port",
+                "7000",
+            ]
+
+            server_process = subprocess.Popen(cmds)
+            if server_process is None:
+                raise Exception("Failed to launch server process.")
+
+            # We can 'block' here.
+            max_wait_time = 10
+            while True:
+                if await self.aloha():
+                    break
+                time.sleep(1)
+                print("waiting for server to be ready...")
+                if server_process.poll() is not None:
+                    raise Exception("Server process exited unexpectedly.")
+                max_wait_time -= 1
+                if max_wait_time <= 0:
+                    server_process.terminate()
+                    raise Exception("Timeout waiting for server to be ready.")
+
+            self.server_process = server_process
+
+        else:
+            print(f"connecting to existing server: {self.edit_grpc_addr}")
+            if not await self.aloha():
+                raise Exception("Failed to connect to server.")
+            self.server_process = None
+
+        print("connected to server.")
 
     async def destroy_grpc(self):
         await self._stop_query_pending_operation_loop()
@@ -67,8 +105,10 @@ class RemoteScene:
 
     def _get_transform_from_message(self, msg) -> Transform:
         transform = Transform()
-        transform.position = msg.pos
-        transform.rotation = msg.quat
+        transform.position = np.array(msg.pos, dtype=np.float64)
+        quat = np.array(msg.quat, dtype=np.float64)
+        quat = quat /  np.linalg.norm(quat)
+        transform.rotation = quat
         transform.scale = msg.scale
         return transform
 
@@ -77,10 +117,15 @@ class RemoteScene:
             raise Exception(f"Request failed. {response.error_message}")
 
     async def aloha(self) -> bool:
-        request = edit_service_pb2.AlohaRequest(value=1)
-        response = await self.edit_stub.Aloha(request)
-        self._check_response(response)
-        return response.value == 2
+        try:
+            request = edit_service_pb2.AlohaRequest(value=1)
+            response = await self.edit_stub.Aloha(request)
+            self._check_response(response)
+            if response.value != 2:
+                raise Exception("Invalid response value.")
+            return True
+        except Exception as e:
+            return False
 
     async def query_pending_operation_loop(self) -> List[str]:
         request = edit_service_pb2.GetPendingOperationsRequest()
@@ -226,3 +271,9 @@ class RemoteScene:
         )
         response = await self.edit_stub.ReParentActor(request)
         self._check_response(response)
+
+    async def get_window_id(self) -> int:
+        request = edit_service_pb2.GetWindowIdRequest()
+        response = await self.edit_stub.GetWindowId(request)
+        self._check_response(response)
+        return response.window_id
