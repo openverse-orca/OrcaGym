@@ -17,6 +17,9 @@ import time
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import get_schedule_fn, get_linear_fn
+
+from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
+
 class SnapshotCallback(BaseCallback):
     def __init__(self, 
                  save_interval : int, 
@@ -116,7 +119,11 @@ def register_env(
             'is_subenv': is_subenv,
             'height_map_file': height_map_file,
             'run_mode': run_mode,
-            'env_id': env_id
+            'env_id': env_id,
+            'robot_config': LeggedRobotConfig[agent_name],
+            'legged_obs_config': LeggedObsConfig,
+            'curriculum_config': CurriculumConfig,
+            'legged_env_config': LeggedEnvConfig,
         },
         max_episode_steps=sys.maxsize,  # 环境永不停止，agent有最大步数
         reward_threshold=0.0,

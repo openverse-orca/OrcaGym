@@ -15,7 +15,7 @@ import yaml
 from scripts.scene_util import clear_scene, publish_terrain, generate_height_map_file, publish_scene
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 from envs.legged_gym.legged_sim_env import LeggedSimEnv
-from envs.legged_gym.legged_config import LeggedRobotConfig
+from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
 
 from scripts.grpc_client import GrpcInferenceClient, create_grpc_client
 
@@ -27,8 +27,6 @@ project_root = os.path.dirname(os.path.dirname(current_file_path))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-
-from envs.legged_gym.legged_config import LeggedEnvConfig
 
 EPISODE_TIME_VERY_SHORT = LeggedEnvConfig["EPISODE_TIME_VERY_SHORT"]
 EPISODE_TIME_SHORT = LeggedEnvConfig["EPISODE_TIME_SHORT"]
@@ -113,25 +111,29 @@ class KeyboardControl:
 def register_env(orcagym_addr : str, 
                  env_name : str, 
                  env_index : int, 
-                 agent_names : str,
+                 agent_name : str,
                  ctrl_device : str,
                  max_episode_steps : int,
                  height_map : str,
                  ) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
-    agent_names_list = agent_names.split(" ")
-    print("Agent names: ", agent_names_list)
+    agent_names = [f"{agent_name}_000"]
+    print("Agent names: ", agent_names)
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'orcagym_addr': orcagym_addr, 
                 'env_id': env_id,
-                'agent_names': agent_names_list,
+                'agent_names': agent_names,
                 'time_step': TIME_STEP,
                 'action_skip': ACTION_SKIP,
                 'max_episode_steps': max_episode_steps,
                 'ctrl_device': ctrl_device,
                 'control_freq': CONTROL_FREQ,
                 'height_map': height_map,
+                'robot_config': LeggedRobotConfig[agent_name],
+                'legged_obs_config': LeggedObsConfig,
+                'curriculum_config': CurriculumConfig,
+                'legged_env_config': LeggedEnvConfig,
                 }
     gym.register(
         id=env_id,
@@ -272,15 +274,13 @@ def main(
             terrain_spawnable_names=terrain_spawnable_names,
         )
 
-        agent_names = f"{agent_name}_000"
-
         print("simulation running... , orcagym_addr: ", orcagym_addresses)
         env_name = "LeggedSim-v0"
         env_id, kwargs = register_env(
             orcagym_addr=orcagym_addresses[0], 
             env_name=env_name, 
             env_index=0, 
-            agent_names=agent_names, 
+            agent_name=agent_name, 
             ctrl_device=ctrl_device, 
             max_episode_steps=MAX_EPISODE_STEPS,
             height_map=height_map_file,

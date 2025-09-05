@@ -36,6 +36,10 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         max_episode_steps: int,
         ctrl_device: ControlDevice,
         control_freq: int,
+        robot_config: dict,
+        legged_obs_config: dict,
+        curriculum_config: dict,
+        legged_env_config: dict,
         **kwargs,
     ):
 
@@ -46,6 +50,11 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq     
         self._keyboard_addr = orcagym_addr
+
+        self._robot_config = robot_config
+        self._legged_obs_config = legged_obs_config
+        self._curriculum_config = curriculum_config
+        self._legged_env_config = legged_env_config
 
         super().__init__(
             frame_skip = frame_skip,
@@ -307,6 +316,10 @@ class AgentBase:
             task="flat_terrain",
             max_episode_steps=env.max_episode_steps,
             dt=env.dt,
+            robot_config=env._robot_config,
+            legged_obs_config=env._legged_obs_config,
+            curriculum_config=env._curriculum_config,
+            is_subenv=False,
         )
         
         self.dt = env.dt

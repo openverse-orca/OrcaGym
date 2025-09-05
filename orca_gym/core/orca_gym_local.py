@@ -3,8 +3,6 @@ import os
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
-import fcntl
-import contextlib
 import tempfile
 import shutil
 
@@ -23,6 +21,7 @@ from orca_gym.core.orca_gym_model import OrcaGymModel
 from orca_gym.core.orca_gym_data import OrcaGymData
 from orca_gym.core.orca_gym_opt_config import OrcaGymOptConfig
 from orca_gym.core.orca_gym import OrcaGymBase
+from orca_gym.utils.dir_utils import cleanup_zombie_locks, file_lock
 
 import mujoco
 from scipy.spatial.transform import Rotation as R
@@ -73,25 +72,6 @@ def get_eq_type(anchor_type: AnchorType):
     else:
         return mujoco.mjtEq.mjEQ_CONNECT
 
-@contextlib.asynccontextmanager
-async def file_lock(file_path):
-    """
-    文件锁上下文管理器，防止多进程同时访问同一个文件
-    """
-    lock_path = file_path + '.lock'
-    async with aiofiles.open(lock_path, 'w') as lock_file:
-        await lock_file.write(str(os.getpid()))
-        # 在Linux上使用文件锁
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-            # 清理锁文件
-            try:
-                os.unlink(lock_path)
-            except OSError:
-                pass
 
 class OrcaGymLocal(OrcaGymBase):
     """
@@ -104,6 +84,11 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
         self._override_ctrls : dict[int, float] = {}
+        
+        # 清理可能的僵尸锁文件
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        cleanup_zombie_locks(temp_dir)
 
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
@@ -191,33 +176,44 @@ class OrcaGymLocal(OrcaGymBase):
         else:
             content_file_path = os.path.join(local_file_dir, content_file_name)
 
-        # 使用文件锁防止多进程重入
-        async with file_lock(content_file_path):
-            # 再次检查文件是否存在（可能在等待锁的过程中已被其他进程创建）
-            if not os.path.exists(content_file_path):
-                # 原子化保存：先写入临时文件，再移动到最终位置
-                temp_file = tempfile.NamedTemporaryFile(
-                    mode='wb', 
-                    dir=os.path.dirname(content_file_path), 
-                    delete=False,
-                    prefix=f"{content_file_name}_",
-                    suffix=".tmp"
-                )
-                try:
-                    temp_file.write(content)
-                    temp_file.flush()
-                    os.fsync(temp_file.fileno())
-                    temp_file.close()
-                    
-                    # 原子移动文件
-                    shutil.move(temp_file.name, content_file_path)
-                except Exception as e:
-                    # 清理临时文件
+        print("Content file path: ", content_file_path)
+
+        # 使用文件锁防止多进程重入，设置30秒超时
+        try:
+            async with file_lock(content_file_path, timeout=30):
+                # 再次检查文件是否存在（可能在等待锁的过程中已被其他进程创建）
+                if not os.path.exists(content_file_path):
+                    # 原子化保存：先写入临时文件，再移动到最终位置
+                    temp_file = tempfile.NamedTemporaryFile(
+                        mode='wb', 
+                        dir=os.path.dirname(content_file_path), 
+                        delete=False,
+                        prefix=f"{content_file_name}_",
+                        suffix=".tmp"
+                    )
                     try:
-                        os.unlink(temp_file.name)
-                    except OSError:
-                        pass
-                    raise e
+                        temp_file.write(content)
+                        temp_file.flush()
+                        os.fsync(temp_file.fileno())
+                        temp_file.close()
+                        
+                        # 原子移动文件
+                        shutil.move(temp_file.name, content_file_path)
+                    except Exception as e:
+                        # 清理临时文件
+                        try:
+                            os.unlink(temp_file.name)
+                        except OSError:
+                            pass
+                        raise e
+        except TimeoutError as e:
+            print(f"警告: {e}")
+            # 如果获取锁超时，检查文件是否已经存在
+            if os.path.exists(content_file_path):
+                print(f"文件 {content_file_path} 已存在，跳过下载")
+                return content_file_path
+            else:
+                raise Exception(f"无法获取文件锁，且文件不存在: {content_file_path}")
 
         return content_file_path
 

@@ -29,7 +29,7 @@ LeggedEnvConfig = {
         "sdf_iterations" : 10,  
         "filterparent" : "disable"
     },
-    "phy_config" : "phy_low",
+    "phy_config" : "phy_high",
 }
 
 LeggedObsConfig = {
