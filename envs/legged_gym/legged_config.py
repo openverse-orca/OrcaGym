@@ -6,8 +6,8 @@ from envs.legged_gym.robot_config.AzureLoong_config import AzureLoongConfig
 from envs.legged_gym.robot_config.g1_config import g1Config
 
 LeggedEnvConfig = {
-    "TIME_STEP" : 0.0025,                 # 仿真步长1000Hz ~ 200Hz
-    "FRAME_SKIP" : 2,                    # PD函数计算步长200Hz
+    "TIME_STEP" : 0.005,                 # 仿真步长1000Hz ~ 200Hz
+    "FRAME_SKIP" : 1,                    # PD函数计算步长200Hz
     "ACTION_SKIP" : 4,                  # 训练和推理步长50Hz
 
     "EPISODE_TIME_VERY_SHORT" : 2,       # 每个episode的时间长度
@@ -29,7 +29,7 @@ LeggedEnvConfig = {
         "sdf_iterations" : 10,  
         "filterparent" : "disable"
     },
-    "phy_config" : "phy_high",
+    "phy_config" : "phy_low",
 }
 
 LeggedObsConfig = {

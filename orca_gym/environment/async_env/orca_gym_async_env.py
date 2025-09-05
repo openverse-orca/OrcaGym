@@ -35,6 +35,7 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         robot_config: dict,
         legged_obs_config: dict,
         curriculum_config: dict,
+        legged_env_config: dict,
         **kwargs        
     ):
 
@@ -46,7 +47,8 @@ class OrcaGymAsyncEnv(OrcaGymLocalEnv):
         self._robot_config = robot_config
         self._legged_obs_config = legged_obs_config
         self._curriculum_config = curriculum_config
-        
+        self._legged_env_config = legged_env_config
+                
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,

@@ -7,7 +7,6 @@ import time
 from collections import defaultdict
 import requests
 from .legged_robot import LeggedRobot
-from .legged_config import LeggedEnvConfig
 import os
 import fcntl
 import shutil
@@ -31,6 +30,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         robot_config: dict,
         legged_obs_config: dict,
         curriculum_config: dict,
+        legged_env_config: dict,
         **kwargs,
     ):
 
@@ -51,6 +51,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             robot_config = robot_config,
             legged_obs_config = legged_obs_config,
             curriculum_config = curriculum_config,
+            legged_env_config = legged_env_config,
             **kwargs,
         )
 
@@ -490,12 +491,12 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         return lin_vel, turn_angel, reborn
 
     def _reset_phy_config(self) -> None:
-        phy_config = LeggedEnvConfig["phy_config"]
-        self.gym.opt.iterations = LeggedEnvConfig[phy_config]["iterations"]
-        self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
-        self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
-        self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
-        self.gym.opt.filterparent = LeggedEnvConfig[phy_config]["filterparent"]
+        phy_config = self._legged_env_config["phy_config"]
+        self.gym.opt.iterations = self._legged_env_config[phy_config]["iterations"]
+        self.gym.opt.noslip_iterations = self._legged_env_config[phy_config]["noslip_iterations"]
+        self.gym.opt.ccd_iterations = self._legged_env_config[phy_config]["ccd_iterations"]
+        self.gym.opt.sdf_iterations = self._legged_env_config[phy_config]["sdf_iterations"]
+        self.gym.opt.filterparent = self._legged_env_config[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)

@@ -126,8 +126,8 @@ start_head_node() {
     # 检测可用的CPU数量并分配为8的倍数，且不超过50%
     local num_cpus=$(nproc)
     local max_cpus=$((num_cpus * 50 / 100))
-    local allocated_cpus=$((max_cpus / 8 * 8 + 2))
-    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
+    local allocated_cpus=$((max_cpus / 8 * 8 + 2))  # 1 for ray scheduler, 1 for leaner
+    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray"
     
     # 启动Ray head节点
     ray start --head \

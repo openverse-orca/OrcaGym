@@ -34,6 +34,7 @@ class RewardPrinter:
                 self._reward_data[message][self._buffer_index[message]] = reward
                 self._buffer_index[message] += 1
             elif self._all_buffer_full(): 
+                print("============= print reward =============")
                 for key, value in self._reward_data.items():
                     if self.PRINT_DETAIL:
                         print(key, f"{value.mean():.10f}\t\t\t|{value.max():.4e}|{value.min():.4e}|{value.std():.4e}|{self._reward_coeff[key]:.4e}")
@@ -48,7 +49,7 @@ class RewardPrinter:
                     else:
                         mean_value = value.mean()
                         print(key, f"{mean_value:.10f} | {(mean_value / self._reward_coeff[key]):.10f}")
-                print("-----------------------------------")
+                print("========================================")
                 self._buffer_index = {key: 0 for key in self._buffer_index.keys()}
                 
     def _all_buffer_full(self):

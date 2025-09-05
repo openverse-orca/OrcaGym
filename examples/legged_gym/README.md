@@ -26,7 +26,11 @@ python scripts/convert_sb3_to_onnx.py --model_path models/ppo_model.zip --output
 要安装Ray RLlib，请使用以下命令：
 
 ```bash
-pip install ray[rllib]==2.49.0 ray[default]==2.49.0
+# head和worker节点都需要
+pip install ray[rllib]==2.49.0 
+
+# 仅head节点需要
+pip install ray[default]==2.49.0
 ```
 
 ## 配置集群其他节点

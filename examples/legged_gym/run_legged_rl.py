@@ -259,7 +259,7 @@ def run_rllib_appo_rl(
     num_envs_per_env_runner = run_mode_config['num_envs_per_env_runner']
 
     if num_env_runners == 0:
-        num_env_runners = int(ray.available_resources()['CPU'] - 2) // 8 * 8
+        num_env_runners = int(ray.available_resources()['CPU'] - 2) // 8 * 8    # 1 for ray scheduler, 1 for leaner
 
     if visualize:
         render_mode = "human"

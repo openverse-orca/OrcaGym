@@ -27,7 +27,7 @@ from ray.rllib.env.single_agent_env_runner import (
 from orca_gym.environment.async_env.single_agent_env_runner import (
     OrcaGymAsyncSingleAgentEnvRunner
 )
-from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig
+from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
@@ -91,6 +91,7 @@ def get_orca_gym_register_info(
             'robot_config': LeggedRobotConfig[agent_name],
             'legged_obs_config': LeggedObsConfig,
             'curriculum_config': CurriculumConfig,
+            'legged_env_config': LeggedEnvConfig,
         },
     }
 
@@ -174,8 +175,19 @@ def get_config(
         [total_steps * rl_end_fraction, rl_final_value],
     ]
 
+    ent_coef_initial_value = agent_config["ent_coef_schedule"]["initial_value"]
+    ent_coef_final_value = agent_config["ent_coef_schedule"]["final_value"]
+    ent_coef_end_fraction = agent_config["ent_coef_schedule"]["end_fraction"]
+    ent_coef_schedule = [
+        [0, ent_coef_initial_value],
+        [total_steps * ent_coef_end_fraction, ent_coef_final_value],
+    ]
+
     timesteps_per_iteration = num_env_runners * num_envs_per_env_runner * agent_config.get("rollout_fragment_length", 32)
     print("timesteps_per_iteration: ", timesteps_per_iteration)
+
+    # 每4096个机器人分配一个learner
+    num_learners = (num_env_runners * num_envs_per_env_runner) // 4096 + 1
 
     config = (
         APPOConfig()
@@ -201,7 +213,7 @@ def get_config(
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
-            num_gpus_per_env_runner=0.025,
+            num_gpus_per_env_runner=0.01,
             rollout_fragment_length=agent_config.get("rollout_fragment_length", 32),
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
             observation_filter="MeanStdFilter",
@@ -214,26 +226,19 @@ def get_config(
                 model_config={
 
                     # ====================================================
-                    # MLP 编码器 (核心部分)
+                    # MLP 编码器 
                     # ====================================================
-                    "fcnet_hiddens": [256, 256],        # pi encoder 使用一个扁平的小网络
+                    "fcnet_hiddens": [256, 256],       
                     "fcnet_activation": "silu",
                     "fcnet_kernel_initializer": "orthogonal_",
                     "fcnet_kernel_initializer_kwargs": {"gain": 1.0},
                     "fcnet_bias_initializer": "zeros_",
 
-                    "vf_net_hiddens": agent_config["vf"],
-                    "vf_net_activation": "silu",
-                    "vf_net_kernel_initializer": "orthogonal_",
-                    "vf_net_kernel_initializer_kwargs": {"gain": 1.0},
-                    "vf_net_bias_initializer": "zeros_",
-                    
                     # ====================================================
-                    # 头部网络 (策略头)
+                    # 头部网络 (策略头, pi, vf 都用这个配置)
                     # ====================================================
                     "head_fcnet_hiddens": agent_config["pi"], 
                     "head_fcnet_activation": "silu",
-                    # 保持头部初始化与编码器一致
                     "head_fcnet_kernel_initializer": "orthogonal_",
                     "head_fcnet_kernel_initializer_kwargs": {"gain": 1.0},
                     "head_fcnet_bias_initializer": "zeros_",
@@ -250,7 +255,7 @@ def get_config(
 
                     # 共享编码器层，提升学习效率和泛化能力。
                     # 如果训练后期发现策略和价值函数性能冲突，可以尝试设为False。
-                    "vf_share_layers": False,
+                    "vf_share_layers": True,
 
                     # ====================================================
                     # 明确禁用 LSTM
@@ -268,22 +273,27 @@ def get_config(
             )
         )
         .learners(
-            num_learners=1,
-            num_gpus_per_learner=0.6,
+            num_learners=1, #num_learners,
+            num_gpus_per_learner=0.5,  # learner 的显存要求高，尽量不要分到一个节点
         )
         .training(
-            train_batch_size_per_learner=agent_config.get("train_batch_size_per_learner", 8192),
-            minibatch_size=agent_config.get("minibatch_size", 128), # 新增
+            train_batch_size_per_learner=num_env_runners * num_envs_per_env_runner * agent_config.get("rollout_fragment_length", 32),
+            minibatch_size=agent_config.get("minibatch_size", 4096),
             lr=rl_lr_schedule,
-            grad_clip=agent_config["max_grad_norm"],
+            grad_clip=agent_config.get("grad_clip", 1),
             grad_clip_by="norm",
             gamma=agent_config["gamma"],
-            lambda_=agent_config.get("gae_lambda", 0.95), # 新增
-            clip_param=agent_config.get("clip_range", 0.3), # 新增
-            vf_loss_coeff=agent_config.get("vf_coef", 1.0), # 新增
-            entropy_coeff=agent_config.get("ent_coef", 0.01), # 新增，强烈推荐
+            lambda_=agent_config.get("gae_lambda", 0.95),
+            clip_param=agent_config.get("clip_range", 0.2),
+            vf_loss_coeff=agent_config.get("vf_loss_coeff", 0.5), 
+            entropy_coeff=ent_coef_schedule, 
             # adam_epsilon=1e-7, # 可选新增
         )
+        # .evaluation(
+        #     evaluation_interval=10,
+        #     evaluation_parallel_to_training=True,
+        #     evaluation_num_env_runners=8,
+        # )
         .resources(
             num_cpus_for_main_process=1,
             num_gpus=num_gpus_available,
@@ -301,11 +311,6 @@ def get_config(
             # which entropy coeff depends on, is updated after each worker rollout.
             min_time_s_per_iteration=0,
         )
-        # .evaluation(
-        #     evaluation_interval=10,
-        #     evaluation_parallel_to_training=True,
-        #     evaluation_num_env_runners=1,
-        # )
     )
     return config
 
