@@ -57,11 +57,11 @@ conda create -n orca_ray python=xxx
 在head节点机器上运行：
 
 ```bash
-bash ./scripts/run_ray_node.sh head
+bash ./scripts/run_ray_node.sh head 192.168.xxx.xxx
 ```
 
 这将：
-- 从配置文件读取IP地址（当前为192.168.1.100）
+- 从你的小网ip启动head节点。为了连接稳定性，推荐使用有线网口，尽量不要用无线网口
 - 启动Ray head节点
 - 显示Ray集群地址
 
@@ -70,14 +70,9 @@ bash ./scripts/run_ray_node.sh head
 在worker节点机器上运行：
 
 ```bash
-bash ./scripts/run_ray_node.sh worker
-```
-
-或者指定head节点IP：
-
-```bash
 bash ./scripts/run_ray_node.sh worker 192.168.xxx.xxx
 ```
+
 
 ###  管理集群
 

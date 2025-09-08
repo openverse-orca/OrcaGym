@@ -316,6 +316,7 @@ def run_rllib_appo_rl(
             frame_skip=FRAME_SKIP,
             action_skip=ACTION_SKIP,
             time_step=TIME_STEP,
+            model_dir=model_dir,
         )
     elif run_mode == 'testing':
         if not ckpt:

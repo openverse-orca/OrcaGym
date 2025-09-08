@@ -325,7 +325,8 @@ def config_appo_tuner(
         async_env_runner: bool,
         env_name: str,
         env_kwargs: dict,
-        num_gpus_available: float
+        num_gpus_available: float,
+        model_dir: str = None
     ) -> tune.Tuner:
 
     
@@ -363,12 +364,16 @@ def config_appo_tuner(
     # trainer = TorchTrainer(train_func, scaling_config=scaling_config)
     # result = trainer.fit()
 
+    # 设置存储路径
+    storage_path = os.path.abspath(model_dir if model_dir else os.getcwd())
+    
     return tune.Tuner(
         "APPO",
         param_space=config.to_dict(),
         run_config=RunConfig(
             name="APPO_OrcaGym_Training",
             stop={"training_iteration": iter},
+            storage_path=storage_path,
             checkpoint_config=CheckpointConfig(
                 num_to_keep=3,
                 checkpoint_frequency=100,
@@ -650,7 +655,8 @@ def run_training(
         height_map_file: str,
         frame_skip: int,
         action_skip: int,
-        time_step: float
+        time_step: float,
+        model_dir: str = None
     ):
 
 
@@ -730,7 +736,8 @@ def run_training(
         num_gpus_available=num_gpus_available,
         async_env_runner=async_env_runner,
         env_name=env_name,
-        env_kwargs=demo_env_kwargs
+        env_kwargs=demo_env_kwargs,
+        model_dir=model_dir
     )
     results = tuner.fit()
 

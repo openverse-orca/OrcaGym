@@ -23,6 +23,10 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 RAY_PORT=6379
 RAY_DASHBOARD_PORT=8265
 
+# NFS配置 - 使用动态路径
+NFS_EXPORT_PATH="$(dirname "$SCRIPT_DIR")/trained_models_tmp"
+NFS_MOUNT_PATH="/tmp/trained_models_tmp"
+
 # 函数：打印带颜色的消息
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -85,6 +89,99 @@ check_port() {
     fi
 }
 
+# 函数：检查NFS服务是否运行
+check_nfs_service() {
+    if systemctl is-active --quiet nfs-kernel-server; then
+        return 0  # NFS服务运行中
+    else
+        return 1  # NFS服务未运行
+    fi
+}
+
+# 函数：启动NFS服务
+start_nfs_service() {
+    print_info "启动NFS服务..."
+    sudo systemctl start nfs-kernel-server
+    sudo systemctl enable nfs-kernel-server
+    if [[ $? -eq 0 ]]; then
+        print_success "NFS服务启动成功"
+    else
+        print_error "NFS服务启动失败"
+        exit 1
+    fi
+}
+
+# 函数：配置NFS共享目录（head节点）
+setup_nfs_export() {
+    local head_ip=$1
+    
+    print_info "配置NFS共享目录..."
+    print_info "共享路径: $NFS_EXPORT_PATH"
+    print_info "实际路径: $(realpath "$NFS_EXPORT_PATH")"
+    
+    # 检查NFS服务
+    if ! check_nfs_service; then
+        print_warning "NFS服务未运行，正在启动..."
+        start_nfs_service
+    fi
+    
+    # 确保共享目录存在
+    if [[ ! -d "$NFS_EXPORT_PATH" ]]; then
+        print_info "创建共享目录: $NFS_EXPORT_PATH"
+        mkdir -p "$NFS_EXPORT_PATH"
+    fi
+    
+    # 配置NFS导出
+    local export_line="$NFS_EXPORT_PATH *(rw,sync,no_subtree_check,no_root_squash)"
+    
+    # 检查是否已经配置过
+    if ! grep -q "$NFS_EXPORT_PATH" /etc/exports 2>/dev/null; then
+        print_info "添加NFS导出配置..."
+        echo "$export_line" | sudo tee -a /etc/exports
+        sudo exportfs -ra
+        print_success "NFS导出配置完成"
+    else
+        print_info "NFS导出配置已存在"
+    fi
+    
+    # 显示导出状态
+    print_info "当前NFS导出状态:"
+    sudo exportfs -v
+}
+
+# 函数：挂载NFS共享目录（worker节点）
+mount_nfs_share() {
+    local head_ip=$1
+    
+    print_info "挂载NFS共享目录..."
+    print_info "从 $head_ip:$NFS_EXPORT_PATH 挂载到 $NFS_MOUNT_PATH"
+    print_info "实际路径: $(realpath "$NFS_EXPORT_PATH")"
+    
+    # 创建挂载点
+    if [[ ! -d "$NFS_MOUNT_PATH" ]]; then
+        print_info "创建挂载点: $NFS_MOUNT_PATH"
+        sudo mkdir -p "$NFS_MOUNT_PATH"
+    fi
+    
+    # 检查是否已经挂载
+    if mountpoint -q "$NFS_MOUNT_PATH"; then
+        print_warning "目录已挂载，先卸载..."
+        sudo umount "$NFS_MOUNT_PATH"
+    fi
+    
+    # 挂载NFS共享
+    sudo mount -t nfs "$head_ip:$NFS_EXPORT_PATH" "$NFS_MOUNT_PATH"
+    
+    if [[ $? -eq 0 ]]; then
+        print_success "NFS共享挂载成功"
+        print_info "挂载点: $NFS_MOUNT_PATH"
+        print_info "注意: 此挂载仅在当前会话中有效，重启后需要重新运行脚本"
+    else
+        print_error "NFS共享挂载失败"
+        exit 1
+    fi
+}
+
 # 函数：启动Ray head节点
 start_head_node() {
     local head_ip=$1
@@ -93,6 +190,9 @@ start_head_node() {
     print_info "Head节点IP: $head_ip"
     print_info "Ray端口: $RAY_PORT"
     print_info "Dashboard端口: $RAY_DASHBOARD_PORT"
+    
+    # 配置NFS共享目录
+    setup_nfs_export "$head_ip"
     
     # 检查端口是否被占用
     if check_port $RAY_PORT; then
@@ -146,6 +246,9 @@ start_worker_node() {
     
     print_info "启动Ray worker节点..."
     print_info "连接到head节点: $head_ip:$RAY_PORT"
+    
+    # 挂载NFS共享目录
+    mount_nfs_share "$head_ip"
     
     # 检测可用的GPU数量
     local num_gpus=0
@@ -215,6 +318,12 @@ show_help() {
     echo "  $0 worker 192.168.1.100      # 连接到192.168.1.100的head节点"
     echo "  $0 stop                       # 停止Ray节点"
     echo "  $0 status                     # 显示状态"
+    echo ""
+    echo "NFS共享功能:"
+    echo "  - head节点会自动配置NFS共享，将trained_models_tmp目录共享给worker节点"
+    echo "  - worker节点会自动挂载head节点的trained_models_tmp目录到/tmp/trained_models_tmp"
+    echo "  - 挂载仅在当前会话中有效，重启后需要重新运行脚本"
+    echo "  - 需要sudo权限来配置NFS服务和挂载点"
     echo ""
     echo "注意: head节点IP地址必须作为参数传入，不再从配置文件读取"
 }

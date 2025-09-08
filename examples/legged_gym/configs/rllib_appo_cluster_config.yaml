@@ -1,5 +1,6 @@
 framework: "rllib"
 orcagym_addresses: ["192.168.110.100:50051"]    # 因为worker节点要远程访问OrcaLab，所以要配置你运行OrcaLab的节点ip地址，推荐使用有线网口，尽量不要用无线网口
+ray_cluster_address: "ray://192.168.110.100:6379"  # Ray集群地址，是你启动head节点的ip地址，推荐使用有线网口，尽量不要用无线网口
 agent_name: "Lite3"
 agent_spawnable_name: "lite3_usda"
 task: "flat_terrain"
