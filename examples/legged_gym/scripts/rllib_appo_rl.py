@@ -11,6 +11,7 @@ import gymnasium as gym
 import torch
 from ray.rllib.algorithms.appo.torch.default_appo_torch_rl_module import DefaultAPPOTorchRLModule
 import os
+from datetime import datetime
 from ray.rllib.core.rl_module.rl_module import RLModule
 from ray.rllib.core import DEFAULT_MODULE_ID
 from ray.rllib.core.columns import Columns
@@ -364,8 +365,57 @@ def config_appo_tuner(
     # trainer = TorchTrainer(train_func, scaling_config=scaling_config)
     # result = trainer.fit()
 
-    # 设置存储路径
-    storage_path = os.path.abspath(model_dir if model_dir else os.getcwd())
+    # 设置存储路径 - 使用NFS共享目录，确保head和worker节点都可以访问
+    # 支持通过软链接方式共享 ./trained_models_tmp 目录
+    nfs_base_path = os.environ.get('ORCA_NFS_BASE_PATH', '/mnt/nfs')
+    
+    if model_dir:
+        # 如果提供了model_dir，检查是否为NFS路径
+        if model_dir.startswith('/mnt/nfs') or model_dir.startswith('/shared'):
+            # 已经是NFS路径，直接使用
+            storage_path = os.path.abspath(model_dir)
+        elif model_dir.startswith('./trained_models_tmp') or 'trained_models_tmp' in model_dir:
+            # 如果是trained_models_tmp相关路径，转换为NFS路径
+            # 获取相对于trained_models_tmp的路径部分
+            if model_dir.startswith('./trained_models_tmp/'):
+                relative_path = model_dir[len('./trained_models_tmp/'):]
+            elif 'trained_models_tmp/' in model_dir:
+                relative_path = model_dir.split('trained_models_tmp/')[-1]
+            else:
+                relative_path = os.path.basename(model_dir)
+            
+            # 构建NFS路径
+            storage_path = os.path.join(nfs_base_path, 'trained_models_tmp', relative_path)
+        else:
+            # 其他情况，将model_dir名称放到NFS的trained_models_tmp下
+            model_name = os.path.basename(model_dir)
+            storage_path = os.path.join(nfs_base_path, 'trained_models_tmp', model_name)
+    else:
+        # 如果没有提供model_dir，使用NFS共享目录作为默认路径
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        default_model_name = f"appo_training_{timestamp}"
+        storage_path = os.path.join(nfs_base_path, 'trained_models_tmp', default_model_name)
+    
+    # 确保NFS目录存在
+    try:
+        os.makedirs(storage_path, exist_ok=True)
+        print(f"使用NFS共享存储路径: {storage_path}")
+        # 验证软链接是否正常工作
+        if os.path.islink(os.path.join(nfs_base_path, 'trained_models_tmp')):
+            link_target = os.readlink(os.path.join(nfs_base_path, 'trained_models_tmp'))
+            print(f"检测到软链接: {nfs_base_path}/trained_models_tmp -> {link_target}")
+    except PermissionError:
+        print(f"警告: 无法创建NFS目录 {storage_path}，请检查权限和NFS挂载状态")
+        # 回退到本地目录
+        storage_path = os.path.abspath(model_dir if model_dir else os.getcwd())
+        os.makedirs(storage_path, exist_ok=True)
+        print(f"回退到本地存储路径: {storage_path}")
+    except Exception as e:
+        print(f"警告: NFS路径设置失败: {e}")
+        # 回退到本地目录
+        storage_path = os.path.abspath(model_dir if model_dir else os.getcwd())
+        os.makedirs(storage_path, exist_ok=True)
+        print(f"回退到本地存储路径: {storage_path}")
     
     return tune.Tuner(
         "APPO",

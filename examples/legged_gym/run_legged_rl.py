@@ -84,7 +84,7 @@ def process_model_dir(
         model_dir = os.path.dirname(model_file)
     elif run_mode == "training":
         formatted_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        model_dir = f"./trained_models_tmp/{agent_name}_{subenv_num * agent_num}_{formatted_now}"
+        model_dir = f"./trained_models_tmp/{agent_name}_{task}_{formatted_now}"
         os.makedirs(model_dir, exist_ok=True)
         model_file = os.path.join(model_dir, f"{agent_name}_{task}.zip")
         export_config(config, model_dir)
