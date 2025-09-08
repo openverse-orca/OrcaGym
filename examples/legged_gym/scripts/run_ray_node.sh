@@ -23,9 +23,13 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 RAY_PORT=6379
 RAY_DASHBOARD_PORT=8265
 
-# NFS配置 - 使用动态路径
-NFS_EXPORT_PATH="$(dirname "$SCRIPT_DIR")/trained_models_tmp"
-NFS_MOUNT_PATH="/tmp/trained_models_tmp"
+# NFS配置 - 使用统一的挂载方案
+# Head节点：将./trained_models_tmp挂载到/mnt/nfs/下并共享
+# Worker节点：挂载head节点的/mnt/nfs/trained_models_tmp并创建软链接
+LOCAL_TRAINED_MODELS_PATH="$(dirname "$SCRIPT_DIR")/trained_models_tmp"
+NFS_BASE_PATH="/mnt/nfs"
+NFS_EXPORT_PATH="$NFS_BASE_PATH/trained_models_tmp"
+NFS_MOUNT_PATH="/mnt/nfs/trained_models_tmp"
 
 # 函数：打印带颜色的消息
 print_info() {
@@ -98,6 +102,35 @@ check_nfs_service() {
     fi
 }
 
+# 函数：验证路径和权限
+validate_paths_and_permissions() {
+    print_info "验证路径和权限..."
+    
+    # 检查脚本目录是否可写
+    if [[ ! -w "$(dirname "$SCRIPT_DIR")" ]]; then
+        print_error "脚本目录不可写: $(dirname "$SCRIPT_DIR")"
+        exit 1
+    fi
+    
+    # 检查是否有sudo权限
+    if ! sudo -n true 2>/dev/null; then
+        print_warning "需要sudo权限来配置NFS，请确保当前用户有sudo权限"
+    fi
+    
+    # 检查NFS相关工具是否可用
+    if ! command -v exportfs &> /dev/null; then
+        print_error "exportfs命令不可用，请安装nfs-kernel-server"
+        exit 1
+    fi
+    
+    if ! command -v mount &> /dev/null; then
+        print_error "mount命令不可用"
+        exit 1
+    fi
+    
+    print_success "路径和权限验证通过"
+}
+
 # 函数：启动NFS服务
 start_nfs_service() {
     print_info "启动NFS服务..."
@@ -116,8 +149,9 @@ setup_nfs_export() {
     local head_ip=$1
     
     print_info "配置NFS共享目录..."
-    print_info "共享路径: $NFS_EXPORT_PATH"
-    print_info "实际路径: $(realpath "$NFS_EXPORT_PATH")"
+    print_info "本地路径: $LOCAL_TRAINED_MODELS_PATH"
+    print_info "NFS挂载路径: $NFS_EXPORT_PATH"
+    print_info "实际本地路径: $(realpath "$LOCAL_TRAINED_MODELS_PATH")"
     
     # 检查NFS服务
     if ! check_nfs_service; then
@@ -125,10 +159,37 @@ setup_nfs_export() {
         start_nfs_service
     fi
     
-    # 确保共享目录存在
+    # 创建NFS基础目录
+    if [[ ! -d "$NFS_BASE_PATH" ]]; then
+        print_info "创建NFS基础目录: $NFS_BASE_PATH"
+        sudo mkdir -p "$NFS_BASE_PATH"
+    fi
+    
+    # 确保本地trained_models_tmp目录存在
+    if [[ ! -d "$LOCAL_TRAINED_MODELS_PATH" ]]; then
+        print_info "创建本地trained_models_tmp目录: $LOCAL_TRAINED_MODELS_PATH"
+        mkdir -p "$LOCAL_TRAINED_MODELS_PATH"
+    fi
+    
+    # 将本地trained_models_tmp目录挂载到/mnt/nfs/下
     if [[ ! -d "$NFS_EXPORT_PATH" ]]; then
-        print_info "创建共享目录: $NFS_EXPORT_PATH"
-        mkdir -p "$NFS_EXPORT_PATH"
+        print_info "创建NFS导出目录: $NFS_EXPORT_PATH"
+        sudo mkdir -p "$NFS_EXPORT_PATH"
+    fi
+    
+    # 检查是否已经挂载
+    if ! mountpoint -q "$NFS_EXPORT_PATH"; then
+        print_info "将本地目录挂载到NFS路径..."
+        # 使用bind mount将本地目录挂载到NFS路径
+        sudo mount --bind "$LOCAL_TRAINED_MODELS_PATH" "$NFS_EXPORT_PATH"
+        if [[ $? -eq 0 ]]; then
+            print_success "本地目录挂载成功"
+        else
+            print_error "本地目录挂载失败"
+            exit 1
+        fi
+    else
+        print_info "NFS导出目录已挂载"
     fi
     
     # 配置NFS导出
@@ -155,7 +216,13 @@ mount_nfs_share() {
     
     print_info "挂载NFS共享目录..."
     print_info "从 $head_ip:$NFS_EXPORT_PATH 挂载到 $NFS_MOUNT_PATH"
-    print_info "实际路径: $(realpath "$NFS_EXPORT_PATH")"
+    print_info "本地trained_models_tmp路径: $LOCAL_TRAINED_MODELS_PATH"
+    
+    # 创建NFS基础目录
+    if [[ ! -d "$NFS_BASE_PATH" ]]; then
+        print_info "创建NFS基础目录: $NFS_BASE_PATH"
+        sudo mkdir -p "$NFS_BASE_PATH"
+    fi
     
     # 创建挂载点
     if [[ ! -d "$NFS_MOUNT_PATH" ]]; then
@@ -175,6 +242,28 @@ mount_nfs_share() {
     if [[ $? -eq 0 ]]; then
         print_success "NFS共享挂载成功"
         print_info "挂载点: $NFS_MOUNT_PATH"
+        
+        # 创建软链接：将本地的./trained_models_tmp指向挂载的NFS路径
+        if [[ -L "$LOCAL_TRAINED_MODELS_PATH" ]]; then
+            print_info "软链接已存在，先删除..."
+            rm "$LOCAL_TRAINED_MODELS_PATH"
+        elif [[ -d "$LOCAL_TRAINED_MODELS_PATH" ]]; then
+            print_warning "本地目录已存在，先备份为trained_models_tmp_backup..."
+            mv "$LOCAL_TRAINED_MODELS_PATH" "${LOCAL_TRAINED_MODELS_PATH}_backup"
+        fi
+        
+        # 创建软链接
+        print_info "创建软链接: $LOCAL_TRAINED_MODELS_PATH -> $NFS_MOUNT_PATH"
+        ln -s "$NFS_MOUNT_PATH" "$LOCAL_TRAINED_MODELS_PATH"
+        
+        if [[ $? -eq 0 ]]; then
+            print_success "软链接创建成功"
+            print_info "本地路径 $LOCAL_TRAINED_MODELS_PATH 现在指向共享的NFS目录"
+        else
+            print_error "软链接创建失败"
+            exit 1
+        fi
+        
         print_info "注意: 此挂载仅在当前会话中有效，重启后需要重新运行脚本"
     else
         print_error "NFS共享挂载失败"
@@ -190,6 +279,9 @@ start_head_node() {
     print_info "Head节点IP: $head_ip"
     print_info "Ray端口: $RAY_PORT"
     print_info "Dashboard端口: $RAY_DASHBOARD_PORT"
+    
+    # 验证路径和权限
+    validate_paths_and_permissions
     
     # 配置NFS共享目录
     setup_nfs_export "$head_ip"
@@ -247,6 +339,9 @@ start_worker_node() {
     print_info "启动Ray worker节点..."
     print_info "连接到head节点: $head_ip:$RAY_PORT"
     
+    # 验证路径和权限
+    validate_paths_and_permissions
+    
     # 挂载NFS共享目录
     mount_nfs_share "$head_ip"
     
@@ -283,6 +378,37 @@ start_worker_node() {
     fi
 }
 
+# 函数：清理NFS挂载和软链接
+cleanup_nfs() {
+    print_info "清理NFS挂载和软链接..."
+    
+    # 清理软链接
+    if [[ -L "$LOCAL_TRAINED_MODELS_PATH" ]]; then
+        print_info "删除软链接: $LOCAL_TRAINED_MODELS_PATH"
+        rm "$LOCAL_TRAINED_MODELS_PATH"
+        
+        # 如果存在备份目录，恢复它
+        if [[ -d "${LOCAL_TRAINED_MODELS_PATH}_backup" ]]; then
+            print_info "恢复备份目录: ${LOCAL_TRAINED_MODELS_PATH}_backup -> $LOCAL_TRAINED_MODELS_PATH"
+            mv "${LOCAL_TRAINED_MODELS_PATH}_backup" "$LOCAL_TRAINED_MODELS_PATH"
+        fi
+    fi
+    
+    # 清理NFS挂载
+    if mountpoint -q "$NFS_MOUNT_PATH"; then
+        print_info "卸载NFS挂载: $NFS_MOUNT_PATH"
+        sudo umount "$NFS_MOUNT_PATH"
+    fi
+    
+    # 清理head节点的bind mount
+    if mountpoint -q "$NFS_EXPORT_PATH"; then
+        print_info "卸载bind mount: $NFS_EXPORT_PATH"
+        sudo umount "$NFS_EXPORT_PATH"
+    fi
+    
+    print_success "NFS清理完成"
+}
+
 # 函数：停止Ray节点
 stop_ray() {
     print_info "停止Ray节点..."
@@ -291,6 +417,13 @@ stop_ray() {
         print_success "Ray节点已停止"
     else
         print_warning "停止Ray节点时出现警告"
+    fi
+    
+    # 询问是否清理NFS
+    echo -n "是否清理NFS挂载和软链接？(y/N): "
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        cleanup_nfs
     fi
 }
 
@@ -310,6 +443,7 @@ show_help() {
     echo "  head <HEAD_IP>       启动Ray head节点（指定IP地址）"
     echo "  worker <HEAD_IP>     启动Ray worker节点（指定head节点IP）"
     echo "  stop                 停止Ray节点"
+    echo "  cleanup              清理NFS挂载和软链接"
     echo "  status               显示Ray集群状态"
     echo "  help                 显示此帮助信息"
     echo ""
@@ -317,11 +451,14 @@ show_help() {
     echo "  $0 head 192.168.1.100        # 在192.168.1.100启动head节点"
     echo "  $0 worker 192.168.1.100      # 连接到192.168.1.100的head节点"
     echo "  $0 stop                       # 停止Ray节点"
+    echo "  $0 cleanup                    # 清理NFS挂载和软链接"
     echo "  $0 status                     # 显示状态"
     echo ""
     echo "NFS共享功能:"
-    echo "  - head节点会自动配置NFS共享，将trained_models_tmp目录共享给worker节点"
-    echo "  - worker节点会自动挂载head节点的trained_models_tmp目录到/tmp/trained_models_tmp"
+    echo "  - head节点会将./trained_models_tmp挂载到/mnt/nfs/trained_models_tmp并共享"
+    echo "  - worker节点会挂载head节点的/mnt/nfs/trained_models_tmp到本地/mnt/nfs/trained_models_tmp"
+    echo "  - worker节点会创建软链接：./trained_models_tmp -> /mnt/nfs/trained_models_tmp"
+    echo "  - 这样所有节点都可以通过./trained_models_tmp访问共享的模型文件"
     echo "  - 挂载仅在当前会话中有效，重启后需要重新运行脚本"
     echo "  - 需要sudo权限来配置NFS服务和挂载点"
     echo ""
@@ -367,6 +504,9 @@ main() {
             ;;
         "stop")
             stop_ray
+            ;;
+        "cleanup")
+            cleanup_nfs
             ;;
         "status")
             show_ray_status
