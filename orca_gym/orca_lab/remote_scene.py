@@ -272,8 +272,17 @@ class RemoteScene:
         response = await self.edit_stub.ReParentActor(request)
         self._check_response(response)
 
-    async def get_window_id(self) -> int:
+    async def get_window_id(self):
         request = edit_service_pb2.GetWindowIdRequest()
         response = await self.edit_stub.GetWindowId(request)
         self._check_response(response)
-        return response.window_id
+        return response
+    
+    async def get_generate_pos(self, posX, posY):
+        request = edit_service_pb2.GetGeneratePosRequest(
+            posX=posX,
+            posY=posY,
+        )
+        response = await self.edit_stub.GetGeneratePos(request)
+        self._check_response(response)
+        return response

@@ -21,6 +21,7 @@ class ReparentData:
 class ActorOutlineModel(QAbstractItemModel):
     # actor path, new parent path, index to insert at (-1 means append to the end)
     request_reparent = Signal(Path, Path, int)
+    add_item = Signal(str, BaseActor)
 
     def __init__(self, local_scene: LocalScene, parent=None):
         super().__init__(parent)
@@ -162,24 +163,47 @@ class ActorOutlineModel(QAbstractItemModel):
         return Qt.CopyAction
 
     def dropMimeData(self, data, action, row, column, parent):
+        if data.hasFormat(self.reparent_mime):
+            reparent_data = ReparentData()
+            if not self.prepare_reparent_data(
+                reparent_data, data, action, row, column, parent
+            ):
+                return False
+            self.request_reparent.emit(
+                reparent_data.actor_path, reparent_data.parent_path, row
+            )
+            return True
 
-        reparent_data = ReparentData()
-        if not self.prepare_reparent_data(
-            reparent_data, data, action, row, column, parent
-        ):
-            return False
+        if data.hasFormat("application/x-orca-asset"):
+            # decode asset name robustly
+            ba = data.data("application/x-orca-asset")
+            try:
+                asset_name = bytes(ba).decode("utf-8")
+            except Exception:
+                try:
+                    asset_name = ba.data().decode("utf-8")
+                except Exception:
+                    asset_name = str(ba)
 
-        self.request_reparent.emit(
-            reparent_data.actor_path, reparent_data.parent_path, row
-        )
+            parent_actor = self.get_actor(parent)
+            if parent_actor is None:
+                return False
 
-        return True
+            self.add_item.emit(asset_name, parent_actor)
+            return True
+        
+        return False
 
     def canDropMimeData(self, data, action, row, column, parent):
-        reparent_data = ReparentData()
-        return self.prepare_reparent_data(
-            reparent_data, data, action, row, column, parent
-        )
+        if data.hasFormat("application/x-orca-asset"):
+            parent_actor = self.get_actor(parent)
+            return parent_actor is not None
+        if data.hasFormat(self.reparent_mime):
+            reparent_data = ReparentData()
+            return self.prepare_reparent_data(
+                reparent_data, data, action, row, column, parent
+            )
+        return False
 
     def mimeData(self, indexes):
         if len(indexes) == 0:
@@ -198,7 +222,7 @@ class ActorOutlineModel(QAbstractItemModel):
         return mime_data
 
     def mimeTypes(self):
-        return [self.reparent_mime]
+        return [self.reparent_mime,  "application/x-orca-asset"]
 
     def prepare_reparent_data(
         self,
@@ -212,7 +236,7 @@ class ActorOutlineModel(QAbstractItemModel):
         if not mime_data.hasFormat(self.reparent_mime):
             return False
 
-        if action != Qt.CopyAction:
+        if action not in [Qt.CopyAction, Qt.MoveAction]:
             return False
 
         if column > 0:

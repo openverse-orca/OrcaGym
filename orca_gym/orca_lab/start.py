@@ -19,7 +19,7 @@ from orca_gym.orca_lab.ui.tool_bar import ToolBar
 from orca_gym.orca_lab.math import Transform
 
 import PySide6.QtAsyncio as QtAsyncio
-
+import ctypes
 
 class SelectionCommand:
     def __init__(self):
@@ -91,6 +91,9 @@ class MainWindow(QtWidgets.QWidget):
         self._query_pending_operation_running = False
         await self._start_query_pending_operation_loop()
 
+        respone = await self.remote_scene.get_window_id()
+        self.hwnd = respone.window_id
+        
         await self._init_ui()
 
         self.resize(800, 400)
@@ -130,6 +133,9 @@ class MainWindow(QtWidgets.QWidget):
                 self.reparent_actor(actor, new_parent, row)
             )
         )
+        self.actor_outline_model.add_item.connect(
+            lambda item_name, parent_actor: asyncio.ensure_future(self.add_item_to_scene(item_name, parent_actor))
+        )
 
         self.actor_outline = ActorOutline()
         self.actor_outline.set_actor_model(self.actor_outline_model)
@@ -150,11 +156,14 @@ class MainWindow(QtWidgets.QWidget):
             lambda: asyncio.ensure_future(self.on_transform_edit())
         )
 
-        self.asset_browser = AssetBrowser()
+        self.asset_browser = AssetBrowser(hwnd_target=self.hwnd)
         assets = await self.remote_scene.get_actor_assets()
         self.asset_browser.set_assets(assets)
         self.asset_browser.add_item.connect(
             lambda item_name: asyncio.ensure_future(self.add_item_to_scene(item_name))
+        )
+        self.asset_browser.add_item_by_drag.connect(
+            lambda item_name, posX, posY: asyncio.ensure_future(self.add_item_by_drag(item_name, posX, posY))
         )
 
         self.menu_bar = QtWidgets.QMenuBar()
@@ -288,9 +297,13 @@ class MainWindow(QtWidgets.QWidget):
         await asyncio.sleep(1 / frequency)
         asyncio.create_task(self._sim_process_check_loop())
 
-    async def add_item_to_scene(self, item_name):
+    async def add_item_to_scene(self, item_name, parent_actor=None):
         print(f"Adding {item_name} to the scene...")
-
+        if parent_actor is None:
+            parent_path = Path.root_path()
+        else:
+            parent_path = self.local_scene.get_actor_path(parent_actor)
+    
         index = self.asset_map_counter[item_name]
         transform = Transform()
         transform.position = np.array([1 * index, 0, 2], dtype=np.float64)
@@ -298,6 +311,23 @@ class MainWindow(QtWidgets.QWidget):
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
         actor.transform = transform
 
+        await self.add_actor(actor, parent_path)
+
+        self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
+        print(f"{item_name} added to the scene!")
+
+    async def add_item_by_drag(self, item_name, posX, posY):
+        print(f"Adding {item_name} to the scene...")
+        index = self.asset_map_counter[item_name]
+        respone = await self.remote_scene.get_generate_pos(posX, posY)
+        transform = respone.transform
+        new_item_name = item_name + str(index)
+        actor = AssetActor(name=new_item_name, spawnable_name=item_name)
+
+        pos = np.array([transform.pos[0], transform.pos[1], transform.pos[2]])
+        quat = np.array([transform.quat[0], transform.quat[1], transform.quat[2], transform.quat[3]])
+        scale = transform.scale
+        actor.transform = Transform(pos, quat, scale)
         await self.add_actor(actor, Path.root_path())
 
         self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
@@ -490,7 +520,7 @@ class MainWindow(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
     q_app = QtWidgets.QApplication([])
 
     main_window = MainWindow()

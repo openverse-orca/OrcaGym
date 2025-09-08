@@ -185,6 +185,16 @@ message GetWindowIdResponse {
     uint64 window_id = 3;
 }
 
+message GetGeneratePosRequest {
+    int32 posX = 1;
+    int32 posY = 2;
+}
+message GetGeneratePosResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    Transform transform = 3;
+}
+
 service GrpcService {
     rpc Aloha(AlohaRequest) returns (AlohaResponse);
     
@@ -212,4 +222,5 @@ service GrpcService {
     rpc ReParentActor(ReParentActorRequest) returns (ReParentActorResponse);
 
     rpc GetWindowId(GetWindowIdRequest) returns (GetWindowIdResponse);
+    rpc GetGeneratePos(GetGeneratePosRequest) returns (GetGeneratePosResponse);
 }
