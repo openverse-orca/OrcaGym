@@ -17,8 +17,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-# 配置文件路径
-CONFIG_FILE="$SCRIPT_DIR/../configs/rllib_appo_cluster_config.yaml"
+# 注意：不再使用配置文件读取head节点IP，改为通过参数传入
 
 # 默认端口
 RAY_PORT=6379
@@ -66,22 +65,14 @@ check_conda_env() {
     print_success "使用conda环境: $CONDA_DEFAULT_ENV"
 }
 
-# 函数：从配置文件读取head节点IP
-get_head_node_ip() {
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        print_error "配置文件不存在: $CONFIG_FILE"
-        exit 1
+# 函数：验证IP地址格式
+validate_ip() {
+    local ip=$1
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        return 0
+    else
+        return 1
     fi
-    
-    # 使用grep和awk提取IP地址
-    HEAD_IP=$(grep "ray_cluster_address:" "$CONFIG_FILE" | awk -F'"' '{print $2}' | awk -F'ray://' '{print $2}' | awk -F':' '{print $1}')
-    
-    if [[ -z "$HEAD_IP" ]]; then
-        print_error "无法从配置文件中提取head节点IP地址"
-        exit 1
-    fi
-    
-    echo "$HEAD_IP"
 }
 
 # 函数：检查端口是否被占用
@@ -213,20 +204,19 @@ show_help() {
     echo "用法: $0 [选项]"
     echo ""
     echo "选项:"
-    echo "  head                启动Ray head节点"
-    echo "  worker [HEAD_IP]    启动Ray worker节点（可选指定head节点IP）"
-    echo "  stop                停止Ray节点"
-    echo "  status              显示Ray集群状态"
-    echo "  help                显示此帮助信息"
+    echo "  head <HEAD_IP>       启动Ray head节点（指定IP地址）"
+    echo "  worker <HEAD_IP>     启动Ray worker节点（指定head节点IP）"
+    echo "  stop                 停止Ray节点"
+    echo "  status               显示Ray集群状态"
+    echo "  help                 显示此帮助信息"
     echo ""
     echo "示例:"
-    echo "  $0 head              # 启动head节点"
-    echo "  $0 worker            # 启动worker节点（使用配置文件中的IP）"
-    echo "  $0 worker 192.168.1.100  # 启动worker节点（指定IP）"
-    echo "  $0 stop              # 停止Ray节点"
-    echo "  $0 status            # 显示状态"
+    echo "  $0 head 192.168.1.100        # 在192.168.1.100启动head节点"
+    echo "  $0 worker 192.168.1.100      # 连接到192.168.1.100的head节点"
+    echo "  $0 stop                       # 停止Ray节点"
+    echo "  $0 status                     # 显示状态"
     echo ""
-    echo "配置文件: $CONFIG_FILE"
+    echo "注意: head节点IP地址必须作为参数传入，不再从配置文件读取"
 }
 
 # 主函数
@@ -243,18 +233,28 @@ main() {
     # 解析命令
     case "$1" in
         "head")
-            head_ip=$(get_head_node_ip)
-            start_head_node "$head_ip"
+            if [[ $# -ne 2 ]]; then
+                print_error "head命令需要指定IP地址"
+                echo "用法: $0 head <HEAD_IP>"
+                exit 1
+            fi
+            if ! validate_ip "$2"; then
+                print_error "无效的IP地址格式: $2"
+                exit 1
+            fi
+            start_head_node "$2"
             ;;
         "worker")
-            if [[ $# -eq 2 ]]; then
-                # 使用指定的IP
-                start_worker_node "$2"
-            else
-                # 从配置文件读取IP
-                head_ip=$(get_head_node_ip)
-                start_worker_node "$head_ip"
+            if [[ $# -ne 2 ]]; then
+                print_error "worker命令需要指定head节点IP地址"
+                echo "用法: $0 worker <HEAD_IP>"
+                exit 1
             fi
+            if ! validate_ip "$2"; then
+                print_error "无效的IP地址格式: $2"
+                exit 1
+            fi
+            start_worker_node "$2"
             ;;
         "stop")
             stop_ray
