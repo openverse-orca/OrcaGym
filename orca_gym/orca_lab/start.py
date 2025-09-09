@@ -19,7 +19,7 @@ from orca_gym.orca_lab.ui.tool_bar import ToolBar
 from orca_gym.orca_lab.math import Transform
 
 import PySide6.QtAsyncio as QtAsyncio
-import ctypes
+import sys
 
 class SelectionCommand:
     def __init__(self):
@@ -151,6 +151,7 @@ class MainWindow(QtWidgets.QWidget):
         self.actor_outline.request_rename.connect(self.open_rename_dialog)
 
         self.actor_editor = ActorEditor()
+        print(self.actor_editor.actor)
         # self.actor_editor.setMinimumWidth(80)
         self.actor_editor.transform_changed.connect(
             lambda: asyncio.ensure_future(self.on_transform_edit())
@@ -343,8 +344,8 @@ class MainWindow(QtWidgets.QWidget):
             actors.append(actor)
 
         self.actor_outline.set_actor_selection(actors)
-
-        if len(actors) == 0:
+        
+        if actors == None:
             self.actor_editor.actor = None
         else:
             self.actor_editor.actor = actors[0]
@@ -359,11 +360,12 @@ class MainWindow(QtWidgets.QWidget):
             actor_paths.append(path)
 
         await self.remote_scene.set_selection(actor_paths)
-
-        if len(actors) == 0:
+        
+        if actors == None:
             self.actor_editor.actor = None
         else:
             self.actor_editor.actor = actors[0]
+        
 
     def make_unique_name(self, base_name: str, parent: BaseActor) -> str:
         existing_names = {child.name for child in parent.children}
@@ -520,7 +522,7 @@ class MainWindow(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    
     q_app = QtWidgets.QApplication([])
 
     main_window = MainWindow()

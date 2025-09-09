@@ -163,6 +163,7 @@ class ActorOutlineModel(QAbstractItemModel):
         return Qt.CopyAction
 
     def dropMimeData(self, data, action, row, column, parent):
+        print("drop")
         if data.hasFormat(self.reparent_mime):
             reparent_data = ReparentData()
             if not self.prepare_reparent_data(
@@ -188,7 +189,7 @@ class ActorOutlineModel(QAbstractItemModel):
             parent_actor = self.get_actor(parent)
             if parent_actor is None:
                 return False
-
+            print(asset_name, parent_actor)
             self.add_item.emit(asset_name, parent_actor)
             return True
         

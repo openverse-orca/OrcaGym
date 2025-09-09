@@ -1,21 +1,8 @@
 import asyncio
 from typing import List
-import ctypes
-from ctypes import wintypes, windll
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
-
-from orca_gym.orca_lab.remote_scene import RemoteScene
-
-user32 = ctypes.windll.user32
-WM_COPYDATA = 0x004A
-
-class COPYDATASTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("dwData", wintypes.LPARAM),
-        ("cbData", wintypes.DWORD),
-        ("lpData", wintypes.LPVOID)
-    ]
+from orca_gym.orca_lab.ui.platform import Platform
 
 
 class AssetListModel(QtCore.QStringListModel):
@@ -45,11 +32,13 @@ class AssetBrowser(QtWidgets.QListView):
         self.hwnd_target = hwnd_target
         self.dragging = False
         self.selected_item_name = None
+        self._drag_start_pos = None
         self.setDragEnabled(True)
         
         self.setModel(self._model)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+        self.platform = Platform()
 
     def set_assets(self, assets: List[str]):
         assets = [str(asset) for asset in assets]
@@ -73,41 +62,31 @@ class AssetBrowser(QtWidgets.QListView):
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
             index = self.indexAt(event.pos())
-            
             if index.isValid():
                 self.selected_item_name = index.data(QtCore.Qt.DisplayRole)
-                print(self.selected_item_name)
+                self._drag_start_pos = event.pos()
             else:
                 self.selected_item_name = None
+                self._drag_start_pos = None
             self.dragging = True
+            super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event):
-        if self.dragging and event.button() == QtCore.Qt.LeftButton:
-            self.dragging = False
+    def mouseMoveEvent(self, event):
+        if event.buttons() & QtCore.Qt.LeftButton and self._drag_start_pos:
+            distance = (event.pos() - self._drag_start_pos).manhattanLength()
+            if distance >= QtWidgets.QApplication.startDragDistance():
+                drag = QtGui.QDrag(self)
+                mime_data = self._model.mimeData([self.currentIndex()])
+                drag.setMimeData(mime_data)
+                QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
+                QtWidgets.QApplication.restoreOverrideCursor()
 
-            if not self.selected_item_name:
-                print("未选择资产，取消发送")
-                return
+                drop_action = drag.exec(Qt.CopyAction | Qt.MoveAction)
+
+                if drop_action != Qt.IgnoreAction:
+                    self._drag_start_pos = None
+                    point = self.platform.get_current_window_pos(QtGui.QCursor.pos(), self.hwnd_target)
+                    if point:
+                        self.add_item_by_drag.emit(self.selected_item_name, point[0], point[1])
+                super().mouseMoveEvent(event)
             
-            # 获取全局鼠标坐标
-            pos = QtGui.QCursor.pos()
-            point = wintypes.POINT(pos.x(), pos.y())
-
-            dpiX = wintypes.UINT()
-            dpiY = wintypes.UINT()
-            monitor = windll.user32.MonitorFromWindow(self.hwnd_target, 2)
-            windll.shcore.GetDpiForMonitor(monitor, 0, ctypes.byref(dpiX), ctypes.byref(dpiY))
-            scale_x = dpiX.value / 96.0
-            scale_y = dpiY.value / 96.0
-
-            point.x = int(point.x * scale_x)
-            point.y = int(point.y * scale_y)
-
-            # 鼠标下的窗口
-            hwnd_under = user32.WindowFromPoint(point)
-            if hwnd_under == self.hwnd_target:
-                # 转换为客户区坐标
-                user32.ScreenToClient(hwnd_under, ctypes.byref(point))
-                self.add_item_by_drag.emit(self.selected_item_name, point.x, point.y)
-            else:
-                print("释放在非目标窗口")
