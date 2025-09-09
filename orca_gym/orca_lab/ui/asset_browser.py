@@ -3,7 +3,7 @@ from typing import List
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 from orca_gym.orca_lab.ui.platform import Platform
-
+import time
 
 class AssetListModel(QtCore.QStringListModel):
     asset_mime = "application/x-orca-asset"
@@ -33,7 +33,8 @@ class AssetBrowser(QtWidgets.QListView):
         self.dragging = False
         self.selected_item_name = None
         self._drag_start_pos = None
-        self.setDragEnabled(True)
+        self.setDragEnabled(False)
+        self.actor_outline_hwnd = None
         
         self.setModel(self._model)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -58,8 +59,9 @@ class AssetBrowser(QtWidgets.QListView):
 
     def on_add_item(self, item_name):
         self.add_item.emit(item_name)
-
+    
     def mousePressEvent(self, event):
+        print("in preser")
         if event.button() == QtCore.Qt.LeftButton:
             index = self.indexAt(event.pos())
             if index.isValid():
@@ -70,23 +72,43 @@ class AssetBrowser(QtWidgets.QListView):
                 self._drag_start_pos = None
             self.dragging = True
             super().mousePressEvent(event)
-
+    '''
     def mouseMoveEvent(self, event):
         if event.buttons() & QtCore.Qt.LeftButton and self._drag_start_pos:
             distance = (event.pos() - self._drag_start_pos).manhattanLength()
+            
             if distance >= QtWidgets.QApplication.startDragDistance():
+                
                 drag = QtGui.QDrag(self)
-                mime_data = self._model.mimeData([self.currentIndex()])
+                
+                mime_data = QtCore.QMimeData()
+                mime_data.setData("text/plain", self.selected_item_name.encode("utf-16le"))
                 drag.setMimeData(mime_data)
-                QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-                QtWidgets.QApplication.restoreOverrideCursor()
-
+                
+                mime_data = self._model.mimeData([self.currentIndex()])
+                mime_data.setText(self.selected_item_name)
+                drag.setMimeData(mime_data)
+                
                 drop_action = drag.exec(Qt.CopyAction | Qt.MoveAction)
-
-                if drop_action != Qt.IgnoreAction:
+                
+                if drop_action == Qt.IgnoreAction:
                     self._drag_start_pos = None
                     point = self.platform.get_current_window_pos(QtGui.QCursor.pos(), self.hwnd_target)
                     if point:
                         self.add_item_by_drag.emit(self.selected_item_name, point[0], point[1])
-                super().mouseMoveEvent(event)
-            
+                
+            super().mouseMoveEvent(event)
+    ''' 
+
+    def mouseReleaseEvent(self, event):
+        print("release")
+        self._drag_start_pos = None
+
+        if self.platform.is_in_actor_outline(self.actor_outline_hwnd, QtGui.QCursor.pos()):
+            self.on_add_item(self.selected_item_name)
+
+        point = self.platform.get_current_window_pos(QtGui.QCursor.pos(), self.hwnd_target)
+        if point:
+            self.add_item_by_drag.emit(self.selected_item_name, point[0], point[1])
+        
+        super().mouseReleaseEvent(event)

@@ -157,7 +157,7 @@ class ActorOutlineModel(QAbstractItemModel):
         self.endResetModel()
 
     def supportedDropActions(self):
-        return Qt.CopyAction
+        return Qt.CopyAction | Qt.MoveAction
 
     def supportedDragActions(self):
         return Qt.CopyAction

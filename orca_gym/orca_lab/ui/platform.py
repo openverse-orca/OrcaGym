@@ -14,21 +14,21 @@ class Platform:
     def get_current_window_pos(self, pos, hwnd_target):
         if sys.platform == "win32":
             point = self.platform.win_pos(pos)
-            
-            self.platform.get_dpi(self.hwnd_target)
+            self.platform.get_dpi(hwnd_target)
             scale_x = self.platform.dpiX.value / 96.0
             scale_y = self.platform.dpiY.value / 96.0
             point.x = int(point.x * scale_x)
             point.y = int(point.y * scale_y)
 
             hwnd_under = self.platform.user32.WindowFromPoint(point)
-            if hwnd_under == self.hwnd_target:
+            if hwnd_under == hwnd_target:
                 point = self.platform.screen_to_client(point, hwnd_under)
                 relative_pos = (point.x, point.y)
                 return relative_pos
             else:
                 print("释放在非目标窗口")
                 return None
+
 
         elif sys.platform == "linux":
             display = self.platform.display
@@ -52,3 +52,12 @@ class Platform:
             else:
                 print("释放在非目标窗口")
                 return None
+            
+    def is_in_actor_outline(self, actor_outline_hwnd, pos):
+        point = self.platform.win_pos(pos)
+        self.platform.get_dpi(actor_outline_hwnd)
+        scale_x = self.platform.dpiX.value / 96.0
+        scale_y = self.platform.dpiY.value / 96.0
+        point.x = int(point.x * scale_x)
+        point.y = int(point.y * scale_y)
+        return self.platform.is_in(actor_outline_hwnd, point)

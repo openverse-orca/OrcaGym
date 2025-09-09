@@ -19,7 +19,7 @@ from orca_gym.orca_lab.ui.tool_bar import ToolBar
 from orca_gym.orca_lab.math import Transform
 
 import PySide6.QtAsyncio as QtAsyncio
-import sys
+
 
 class SelectionCommand:
     def __init__(self):
@@ -98,7 +98,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.resize(800, 400)
         self.show()
-
+        self.asset_browser.actor_outline_hwnd = self.actor_outline.winId()
         # For testing ...
 
         # # Add a actor, for testing.
@@ -345,7 +345,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.actor_outline.set_actor_selection(actors)
         
-        if actors == None:
+        if len(actors) == 0:
             self.actor_editor.actor = None
         else:
             self.actor_editor.actor = actors[0]
@@ -361,7 +361,7 @@ class MainWindow(QtWidgets.QWidget):
 
         await self.remote_scene.set_selection(actor_paths)
         
-        if actors == None:
+        if len(actors) == 0:
             self.actor_editor.actor = None
         else:
             self.actor_editor.actor = actors[0]

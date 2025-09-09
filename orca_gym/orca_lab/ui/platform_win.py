@@ -17,7 +17,7 @@ class PlatformHandlerWin:
         self.dpiX = wintypes.UINT()
         self.dpiY = wintypes.UINT()
     
-    def win_pos(pos):
+    def win_pos(self, pos):
         return wintypes.POINT(pos.x(), pos.y())
 
     def get_dpi(self, hwnd_target):
@@ -27,3 +27,9 @@ class PlatformHandlerWin:
     def screen_to_client(self, point, hwnd_under):
         self.user32.ScreenToClient(hwnd_under, ctypes.byref(point))
         return point
+    
+    def is_in(self, actor_outline_hwnd, pos):
+        rect = wintypes.RECT()
+        if not self.user32.GetWindowRect(actor_outline_hwnd, ctypes.byref(rect)):
+            return False
+        return rect.left <= pos.x <= rect.right and rect.top <= pos.y <= rect.bottom
