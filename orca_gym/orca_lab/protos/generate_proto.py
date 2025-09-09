@@ -20,3 +20,13 @@ protoc.main((
     f'--grpc_python_out={output_dir}',
     proto_file,
 ))
+
+
+proto_file = os.path.join(current_dir, "./asset_service.proto")
+protoc.main((
+    '',
+    f'-I{os.path.dirname(proto_file)}',
+    f'--python_out={output_dir}',
+    f'--grpc_python_out={output_dir}',
+    proto_file,
+))

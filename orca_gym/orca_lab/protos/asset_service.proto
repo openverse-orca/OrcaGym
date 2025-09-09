@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package Asset;
+
+enum StatusCode {
+    Success = 0;
+    Error = 1;
+}
+
+message AlohaRequest {
+    int32 value = 1;
+}
+message AlohaResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    int32 value = 3;
+}
+
+
+message DownloadAssetRequest {
+    string url = 1;
+}
+
+message DownloadAssetResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+}
+
+service GrpcService {
+    rpc Aloha(AlohaRequest) returns (AlohaResponse);
+
+    rpc DownloadAsset(DownloadAssetRequest) returns (DownloadAssetResponse);
+}
