@@ -83,7 +83,7 @@ class ActorOutline(QtWidgets.QTreeView):
         selection_model = self.selectionModel()
         selection_model.clearSelection()
 
-        model = self.model()
+        model: ActorOutlineModel = self.model()
         for actor in actors:
             index = model.get_index_from_actor(actor)
             if not index.isValid():
@@ -95,6 +95,21 @@ class ActorOutline(QtWidgets.QTreeView):
             self.scrollTo(index)
 
         self._change_from_outside = False
+
+    def get_actor_selection(self) -> list[BaseActor]:
+        model: ActorOutlineModel = self.model()
+        selection_model = self.selectionModel()
+        indexes = selection_model.selectedIndexes()
+
+        actors = []
+        for index in indexes:
+            actor = model.get_actor(index)
+            if actor is None:
+                raise Exception("Invalid actor.")
+
+            actors.append(actor)
+
+        return actors
 
     @QtCore.Slot()
     def show_context_menu(self, position):

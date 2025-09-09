@@ -10,6 +10,7 @@ class LocalScene:
         self.root_actor = GroupActor(name="root", parent=None)
         self._actors: Dict[Path, BaseActor] = {}
         self._actors[Path.root_path()] = self.root_actor
+        self._selection: list[Path] = []
 
     def __contains__(self, path: Path) -> bool:
         return path in self._actors
@@ -22,6 +23,18 @@ class LocalScene:
     @property
     def pseudo_root_actor(self):
         return self.root_actor
+
+    @property
+    def selection(self) -> list[Path]:
+        return self._selection.copy()
+
+    @selection.setter
+    def selection(self, actors: list[Path]):
+        paths = []
+        for actor in actors:
+            actor, path = self.get_actor_and_path(actor)
+            paths.append(path)
+        self._selection = paths
 
     def find_actor_by_path(self, path: Path) -> BaseActor | None:
         if path in self._actors:
@@ -49,6 +62,17 @@ class LocalScene:
             raise Exception("Invalid actor.")
 
         return actor, actor_path
+
+    def get_actor_and_path_list(
+        self, actors: list[BaseActor | Path]
+    ) -> Tuple[list[BaseActor], list[Path]]:
+        actor_list = []
+        path_list = []
+        for actor in actors:
+            a, p = self.get_actor_and_path(actor)
+            actor_list.append(a)
+            path_list.append(p)
+        return actor_list, path_list
 
     def _replace_path(self, old_prefix: Path, new_prefix: Path):
         paths_to_update = [old_prefix]
@@ -103,17 +127,7 @@ class LocalScene:
         self._actors[actor_path] = actor
 
     def can_delete_actor(self, actor: BaseActor | Path) -> Tuple[bool, str]:
-        if isinstance(actor, BaseActor):
-            actor_path = self.get_actor_path(actor)
-            if actor_path is None:
-                return False, "Invalid actor."
-
-        elif isinstance(actor, Path):
-            actor = self.find_actor_by_path(actor)
-            if actor is None:
-                return False, "Actor does not exist."
-
-            actor_path = actor
+        actor, actor_path = self.get_actor_and_path(actor)
 
         if actor_path == actor_path.root_path():
             return False, "Cannot delete pseudo root actor."
