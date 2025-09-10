@@ -1,3 +1,4 @@
+from typing import Tuple
 from PySide6 import QtCore, QtWidgets, QtGui
 
 from orca_gym.orca_lab.actor import BaseActor
@@ -27,6 +28,8 @@ class ActorOutlineDelegate(QtWidgets.QStyledItemDelegate):
     #     print(editor.text())
 
 
+# QTreeView的默认行为是按下鼠标左键时选中，我们希望在鼠标左键抬起的时候选中。
+# 这样可以避免在拖拽时选中。
 class ActorOutline(QtWidgets.QTreeView):
     actor_selection_changed = QtCore.Signal(list)
     request_add_group = QtCore.Signal(BaseActor)
@@ -40,7 +43,7 @@ class ActorOutline(QtWidgets.QTreeView):
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.setItemDelegate(ActorOutlineDelegate(self))
 
-        self.setDragEnabled(True)
+        # self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.DragDrop)
@@ -50,6 +53,11 @@ class ActorOutline(QtWidgets.QTreeView):
         self._change_from_outside = False
         self._current_index = QtCore.QModelIndex()
         self._current_actor: BaseActor | None = None
+
+        self._brach_areas = {}
+        self._left_mouse_pressed = False
+
+        self.reparent_mime = "application/x-orca-actor-reparent"
 
     def set_actor_model(self, model):
         self.setModel(model)
@@ -156,6 +164,69 @@ class ActorOutline(QtWidgets.QTreeView):
     @QtCore.Slot()
     def _rename_actor(self):
         self.request_rename.emit(self._current_actor)
+
+    def _get_actor_at_pos(self, pos) -> Tuple[BaseActor, Path]:
+        index = self.indexAt(pos)
+        actor_outline_model: ActorOutlineModel = self.model()
+        actor = actor_outline_model.get_actor(index)
+        if actor is None:
+            raise Exception("Invalid actor.")
+
+        return actor_outline_model.local_scene.get_actor_and_path(actor)
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent):
+        if event.button() == QtCore.Qt.LeftButton:
+            self._left_mouse_pressed = True
+            actor, actor_path = self._get_actor_at_pos(event.pos())
+            self._current_actor = actor
+            self._current_actor_path = actor_path
+
+            self.startDrag(QtCore.Qt.DropActions(QtCore.Qt.DropAction.CopyAction))
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
+        if event.button() == QtCore.Qt.LeftButton:
+            if not self._left_mouse_pressed:
+                return
+
+            self._left_mouse_pressed = False
+
+            pos = event.position().toPoint()
+            index = self.indexAt(pos)
+            actor, actor_path = self._get_actor_at_pos(pos)
+
+            if actor_path == Path.root_path():
+                self.set_actor_selection([])
+                self.actor_selection_changed.emit([])
+
+            else:
+                rect = self._brach_areas.get(index)
+
+                if rect and rect.contains(pos):
+                    self.setExpanded(index, not self.isExpanded(index))
+                else:
+                    self.set_actor_selection([actor])
+                    self.actor_selection_changed.emit([actor])
+
+    def mouseMoveEvent(self, event):
+        if self._left_mouse_pressed:
+            self._left_mouse_pressed = False
+
+            data = self._current_actor_path.string().encode("utf-8")
+
+            mime_data = QtCore.QMimeData()
+            mime_data.setData("application/x-orca-actor-reparent", data)
+
+            drag = QtGui.QDrag(self)
+            drag.setMimeData(mime_data)
+            drag.exec(QtCore.Qt.DropAction.CopyAction)
+
+    def paintEvent(self, event):
+        self._brach_areas = {}
+        return super().paintEvent(event)
+
+    def drawBranches(self, painter, rect, index):
+        self._brach_areas[index] = rect
+        return super().drawBranches(painter, rect, index)
 
 
 if __name__ == "__main__":

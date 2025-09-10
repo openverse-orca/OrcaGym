@@ -206,25 +206,6 @@ class MainWindow(QtWidgets.QWidget):
         await asyncio.sleep(1 / frequency)
         asyncio.create_task(self._sim_process_check_loop())
 
-    async def add_item_to_scene(self, item_name, parent_actor=None):
-        print(f"Adding {item_name} to the scene...")
-        if parent_actor is None:
-            parent_path = Path.root_path()
-        else:
-            parent_path = self.local_scene.get_actor_path(parent_actor)
-
-        index = self.asset_map_counter[item_name]
-        transform = Transform()
-        transform.position = np.array([1 * index, 0, 2], dtype=np.float64)
-        new_item_name = item_name + str(index)
-        actor = AssetActor(name=new_item_name, spawnable_name=item_name)
-        actor.transform = transform
-
-        await self.add_actor(actor, parent_path)
-
-        self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
-        print(f"{item_name} added to the scene!")
-
     async def add_item_by_drag(self, item_name, posX, posY):
         print(f"Adding {item_name} to the scene...")
         index = self.asset_map_counter[item_name]
@@ -391,17 +372,26 @@ class SelectionCommand:
         self.old_selection = []
         self.new_selection = []
 
+    def __repr__(self):
+        return f"SelectionCommand(old_selection={self.old_selection}, new_selection={self.new_selection})"
+
 
 class CreateGroupCommand:
     def __init__(self):
         self.path: Path | None = None
 
+    def __repr__(self):
+        return f"CreateGroupCommand(path={self.path})"
+
 
 class CreteActorCommand:
     def __init__(self):
         self.actor = None
-        self.parent = None
+        self.path: Path = None
         self.row = -1
+
+    def __repr__(self):
+        return f"CreteActorCommand(path={self.path})"
 
 
 class DeleteActorCommand:
@@ -410,11 +400,17 @@ class DeleteActorCommand:
         self.path: Path = None
         self.row = -1
 
+    def __repr__(self):
+        return f"DeleteActorCommand(path={self.path})"
+
 
 class RenameActorCommand:
     def __init__(self):
         self.old_path: Path = None
         self.new_path: Path = None
+
+    def __repr__(self):
+        return f"RenameActorCommand(old_path={self.old_path}, new_path={self.new_path})"
 
 
 class ReparentActorCommand:
@@ -424,12 +420,18 @@ class ReparentActorCommand:
         self.new_path = None
         self.new_row = -1
 
+    def __repr__(self):
+        return f"ReparentActorCommand(old_path={self.old_path}, old_row={self.old_row}, new_path={self.new_path}, new_row={self.new_row})"
+
 
 class TransformCommand:
     def __init__(self):
         self.actor_path = None
         self.old_transform = None
         self.new_transform = None
+
+    def __repr__(self):
+        return f"TransformCommand(actor_path={self.actor_path})"
 
 
 # Add undo/redo functionality
@@ -468,10 +470,12 @@ class MainWindow1(MainWindow):
 
         action_undo = QtGui.QAction("Undo")
         action_undo.setShortcut(QtGui.QKeySequence("Ctrl+Z"))
+        action_undo.setShortcutContext(QtCore.Qt.ShortcutContext.ApplicationShortcut)
         connect(action_undo.triggered, self.undo)
 
         action_redo = QtGui.QAction("Redo")
         action_redo.setShortcut(QtGui.QKeySequence("Ctrl+Shift+Z"))
+        action_redo.setShortcutContext(QtCore.Qt.ShortcutContext.ApplicationShortcut)
         connect(action_redo.triggered, self.redo)
 
         self.addActions([action_undo, action_redo])
@@ -511,6 +515,8 @@ class MainWindow1(MainWindow):
 
         self.command_history_index = self.command_history_index + 1
 
+        print(f"Added command: {command}")
+
     async def undo(self):
         if self.command_history_index < 0:
             return
@@ -524,7 +530,7 @@ class MainWindow1(MainWindow):
             case CreateGroupCommand():
                 await self.delete_actor(command.path)
             case CreteActorCommand():
-                pass
+                await self.delete_actor(command.path)
             case DeleteActorCommand():
                 actor = command.actor
                 parent_path = command.path.parent()
@@ -557,7 +563,9 @@ class MainWindow1(MainWindow):
                 actor = GroupActor(name=name)
                 await self.add_actor(actor, parent)
             case CreteActorCommand():
-                pass
+                parent = command.path.parent()
+                actor = deepcopy(command.actor)
+                await self.add_actor(actor, parent)
             case DeleteActorCommand():
                 await self.delete_actor(command.path)
             case RenameActorCommand():
@@ -643,7 +651,7 @@ class MainWindow1(MainWindow):
         self, actor: BaseActor | Path, new_parent: BaseActor | Path, row: int
     ):
         actor, actor_path = self.local_scene.get_actor_and_path(actor)
-        new_parent, _ = self.local_scene.get_actor_and_path(new_parent)
+        new_parent, new_parent_path = self.local_scene.get_actor_and_path(new_parent)
         old_parent = actor.parent
         old_index = old_parent.children.index(actor)
         assert old_index != -1
@@ -651,7 +659,7 @@ class MainWindow1(MainWindow):
         command = ReparentActorCommand()
         command.old_path = actor_path
         command.old_row = old_index
-        command.new_path = new_parent
+        command.new_path = new_parent_path / actor.name
         command.new_row = row
 
         await self.reparent_actor(actor, new_parent, row)
@@ -674,6 +682,18 @@ class MainWindow1(MainWindow):
         command.new_path = actor_path.parent() / new_name
 
         await self.rename_actor(actor, new_name)
+
+        self.add_command(command)
+
+    async def add_item_to_scene(self, item_name):
+        name = self.make_unique_name(item_name, self.local_scene.root_actor)
+        actor = AssetActor(name=name, spawnable_name=item_name)
+
+        await self.add_actor(actor, Path.root_path())
+
+        command = CreteActorCommand()
+        command.actor = deepcopy(actor)
+        command.path = Path.root_path() / name
 
         self.add_command(command)
 

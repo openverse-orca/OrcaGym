@@ -30,18 +30,18 @@ class ActorOutlineModel(QAbstractItemModel):
         self.reparent_mime = "application/x-orca-actor-reparent"
         self.local_scene = local_scene
 
-    def get_actor(self, index: QModelIndex) -> BaseActor | None:
+    def get_actor(self, index: QModelIndex) -> BaseActor:
         if not index.isValid():
             return self.m_root_group
 
         if index.model() != self:
-            return None
+            raise ValueError("Index does not belong to this model.")
 
         actor = index.internalPointer()
-        if isinstance(actor, BaseActor):
-            return actor
+        if not isinstance(actor, BaseActor):
+            raise ValueError("Invalid actor.")
 
-        return None
+        return actor
 
     def get_index_from_actor(self, actor: BaseActor) -> QModelIndex:
         if not isinstance(actor, BaseActor):
@@ -91,8 +91,6 @@ class ActorOutlineModel(QAbstractItemModel):
             return QModelIndex()
 
         actor = self.get_actor(child)
-        if actor is None:
-            return QModelIndex()
 
         parent_actor = actor.parent
         if parent_actor == self.m_root_group:
@@ -122,8 +120,6 @@ class ActorOutlineModel(QAbstractItemModel):
             return None
 
         actor = self.get_actor(index)
-        if actor is None:
-            return None
 
         if index.column() == 0:
             if role == Qt.DisplayRole:
@@ -141,7 +137,7 @@ class ActorOutlineModel(QAbstractItemModel):
         f = (
             ItemFlag.ItemIsEnabled
             | ItemFlag.ItemIsSelectable
-            | ItemFlag.ItemIsDragEnabled
+            # | ItemFlag.ItemIsDragEnabled
             | ItemFlag.ItemIsDropEnabled
             # | ItemFlag.ItemIsEditable
         )
@@ -186,12 +182,10 @@ class ActorOutlineModel(QAbstractItemModel):
                     asset_name = str(ba)
 
             parent_actor = self.get_actor(parent)
-            if parent_actor is None:
-                return False
 
             self.add_item.emit(asset_name, parent_actor)
             return True
-        
+
         return False
 
     def canDropMimeData(self, data, action, row, column, parent):
@@ -210,8 +204,6 @@ class ActorOutlineModel(QAbstractItemModel):
             return None
 
         actor = self.get_actor(indexes[0])
-        if actor is None:
-            return None
 
         actor_path = self.local_scene.get_actor_path(actor)
         if actor_path is None:
@@ -222,7 +214,7 @@ class ActorOutlineModel(QAbstractItemModel):
         return mime_data
 
     def mimeTypes(self):
-        return [self.reparent_mime,  "application/x-orca-asset"]
+        return [self.reparent_mime, "application/x-orca-asset"]
 
     def prepare_reparent_data(
         self,
@@ -243,8 +235,6 @@ class ActorOutlineModel(QAbstractItemModel):
             return False
 
         parent_actor = self.get_actor(parent)
-        if parent_actor is None:
-            return False
 
         parent_actor_path = self.local_scene.get_actor_path(parent_actor)
         if parent_actor_path is None:
@@ -256,7 +246,7 @@ class ActorOutlineModel(QAbstractItemModel):
         actor_path = Path(actor_path_str)
         actor = self.local_scene.find_actor_by_path(actor_path)
 
-        print(f"drop {parent_actor_path}, row: {row}, col:{column}")
+        # print(f"drop {parent_actor_path}, row: {row}, col:{column}")
 
         ok, err = self.local_scene.can_reparent_actor(actor, parent_actor)
         if not ok:
