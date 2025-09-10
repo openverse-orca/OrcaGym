@@ -173,9 +173,10 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
         # 创建新的状态字典，修复键名
         new_state_dict = {}
         for key, value in policy_state.items():
-            # 将numpy数组转换为torch张量
+            # 将numpy数组转换为torch张量，创建可写副本避免内存共享警告
             if isinstance(value, np.ndarray):
-                value = torch.from_numpy(value)
+                # 创建可写的副本，避免内存共享警告
+                value = torch.from_numpy(value.copy())
             
             # 修复键名映射
             new_key = key
@@ -195,9 +196,23 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
             # 如果还是失败，尝试只加载匹配的键
             model_state_dict = rllib_module.state_dict()
             compatible_state_dict = {}
+            incompatible_keys = []
+            
             for key, value in new_state_dict.items():
-                if key in model_state_dict and value.shape == model_state_dict[key].shape:
-                    compatible_state_dict[key] = value
+                if key in model_state_dict:
+                    if value.shape == model_state_dict[key].shape:
+                        compatible_state_dict[key] = value
+                    else:
+                        incompatible_keys.append(f"{key}: checkpoint shape {value.shape} vs model shape {model_state_dict[key].shape}")
+                else:
+                    incompatible_keys.append(f"{key}: key not found in model")
+            
+            if incompatible_keys:
+                print(f"发现 {len(incompatible_keys)} 个不兼容的参数:")
+                for key_info in incompatible_keys[:5]:  # 只显示前5个
+                    print(f"  - {key_info}")
+                if len(incompatible_keys) > 5:
+                    print(f"  ... 还有 {len(incompatible_keys) - 5} 个不兼容参数")
             
             rllib_module.load_state_dict(compatible_state_dict, strict=False)
             print(f"成功加载 {len(compatible_state_dict)} 个兼容的参数")

@@ -34,6 +34,8 @@ class OrcaMetricsCallback(DefaultCallbacks):
             "total_envs": total_envs,
         })
 
+        # print(f"result: {result}")
+
         episode_return_mean = result.get('env_runners', {}).get('episode_return_mean', 0)
         episode_len_mean = result.get('env_runners', {}).get('episode_len_mean', 0)
         total_loss = result.get('learners', {}).get('default_policy', {}).get('total_loss', 0)

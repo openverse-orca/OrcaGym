@@ -241,9 +241,17 @@ def run_rllib_appo_rl(
         for i in range(torch.cuda.device_count()):
             print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     
+    # 检测Ray集群中的CPU资源
+    num_cpus_available = int(ray.available_resources()['CPU'])
+    print(f"Ray集群检测到的CPU数量: {num_cpus_available}")
+
     # 检测Ray集群中的GPU资源
     num_gpus_available = rllib_appo_rl.detect_ray_gpu_resources()
     print(f"Ray集群检测到的GPU数量: {num_gpus_available}")
+
+    # leaner 的数量和节点数保持一致，每个节点分配一个learner
+    num_learners = len(ray.nodes())
+    print(f"Ray集群设置的learner数量: {num_learners}")
 
     if remote is not None:
         orcagym_addresses = [remote]
@@ -259,7 +267,7 @@ def run_rllib_appo_rl(
     num_envs_per_env_runner = run_mode_config['num_envs_per_env_runner']
 
     if num_env_runners == 0:
-        num_env_runners = int(ray.available_resources()['CPU'] - 2) // 8 * 8    # 1 for ray scheduler, 1 for leaner
+        num_env_runners =  num_cpus_available - (num_learners * 4) - 1  # 1 for ray scheduler, 4 for leaner
 
     if visualize:
         render_mode = "human"
@@ -290,7 +298,7 @@ def run_rllib_appo_rl(
 
     max_episode_steps = run_mode_config['max_episode_steps']
     total_steps = run_mode_config['iter'] * num_env_runners * num_envs_per_env_runner * max_episode_steps
-    agent_num = 32
+    agent_num = 32  # NOTE: 这里是 AsyncEnv 里面用的 agent_num，不是 num_envs_per_env_runner。并且 num_envs_per_env_runner 必须是 32 的倍数
     subenv_num = (num_env_runners * num_envs_per_env_runner) // agent_num
 
     if run_mode == 'training':
@@ -305,6 +313,7 @@ def run_rllib_appo_rl(
             agent_config=LeggedRobotConfig[agent_name],
             task=task,
             max_episode_steps=run_mode_config['max_episode_steps'],
+            num_learners=num_learners,
             num_env_runners=num_env_runners,
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_gpus_available=num_gpus_available,

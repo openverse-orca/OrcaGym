@@ -246,6 +246,16 @@ setup_nfs_export() {
     else
         print_info "NFS导出配置已存在"
     fi
+
+    # 重启NFS服务
+    print_info "重启NFS服务..."
+    sudo systemctl restart nfs-kernel-server
+    if [[ $? -eq 0 ]]; then
+        print_success "NFS服务重启成功"
+    else
+        print_error "NFS服务重启失败"
+        exit 1
+    fi
     
     # 显示导出状态
     print_info "当前NFS导出状态:"
@@ -352,10 +362,8 @@ start_head_node() {
         print_warning "未检测到nvidia-smi，GPU数量设为0"
     fi
     
-    # 检测可用的CPU数量并分配为8的倍数，且不超过50%
     local num_cpus=$(nproc)
-    local max_cpus=$((num_cpus * 50 / 100))
-    local allocated_cpus=$((max_cpus / 8 * 8 + 2))  # 1 for ray scheduler, 1 for leaner
+    local allocated_cpus=$((num_cpus - 8))  # 预留8个核心给OrcaLab软件
     print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray"
     
     # 启动Ray head节点
@@ -402,8 +410,8 @@ start_worker_node() {
     
     # 检测可用的CPU数量，并分配为8的倍数
     local num_cpus=$(nproc)
-    local allocated_cpus=$((num_cpus / 8 * 8))
-    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray（8的倍数）"
+    local allocated_cpus=$((num_cpus))
+    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray"
     
     # 启动Ray worker节点
     ray start \

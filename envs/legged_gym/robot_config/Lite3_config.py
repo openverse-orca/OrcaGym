@@ -172,9 +172,7 @@ Lite3Config = {
         "pi" : [512, 256, 128],  # 策略网络结构
         "vf" : [512, 256, 128],   # 值函数网络结构
         "n_steps" : 64,  # 每个环境采样步数
-        "rollout_fragment_length" : 64,  # 每个rollout的片段长度(rllib)
         "batch_size" : 4096,  # 批次大小            
-        "minibatch_size" : 4096,  # 批次大小  (rllib)
         "learning_rate": {
             "initial_value": 3e-4,    # 初始学习率
             "end_fraction": 0.8,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
@@ -183,12 +181,22 @@ Lite3Config = {
         "gamma" : 0.99,  # 折扣因子
         "clip_range": 0.2,  # 裁剪范围
         "ent_coef" : 0.01,  # 固定熵系数
-        "ent_coef_schedule" : {   # 线性衰减熵系数
-            "initial_value": 0.01,
-            "end_fraction": 0.6,
-            "final_value": 0.001,
-        },
-        "vf_loss_coeff" : 0.5, # 值函数损失系数(rllib)
         "max_grad_norm" : 1,  # 最大梯度范数
-        "grad_clip" : 1, # 梯度裁剪(rllib)
+
+        # Config for rllib
+        "rollout_fragment_length" : 64,  # 每个rollout的片段长度(rllib)
+        "minibatch_size" : 4096,  # 批次大小  (rllib)
+        "lr_schedule": {
+            "initial_value": 1e-4,    # 初始学习率
+            "end_fraction": 0.8,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
+            "final_value": 1e-5       # 最终学习率
+        },
+        "ent_coef_schedule" : {   # 线性衰减熵系数(rllib)
+            "initial_value": 0.01,
+            "end_fraction": 0.4,
+            "final_value": 0.005,
+        },
+        "clip_param": 0.4, # 裁剪参数(rllib)
+        "grad_clip" : 40.0, # 梯度裁剪(rllib)
+        "grad_clip_by" : "global_norm", # 梯度裁剪方式(rllib)
     }

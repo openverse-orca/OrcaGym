@@ -54,6 +54,14 @@ conda create -n orca_ray python=xxx
 
 ### 启动Head节点
 
+首先安装nfs服务端，并启动nfs服务
+
+```bash
+sudo apt-get install nfs-kernel-server
+sudo systemctl start nfs-kernel-server
+```
+
+
 在head节点机器上运行：
 
 ```bash
@@ -67,12 +75,17 @@ bash ./scripts/run_ray_node.sh head 192.168.xxx.xxx
 
 ### 启动Worker节点
 
+首先安装nfs客户端，支持mount.nfs命令。
+
+```bash
+sudo apt-get install nfs-common
+```
+
 在worker节点机器上运行：
 
 ```bash
 bash ./scripts/run_ray_node.sh worker 192.168.xxx.xxx
 ```
-
 
 ###  管理集群
 
@@ -90,7 +103,7 @@ ray stop
 
 ### 配置文件
 
-脚本会自动读取 `examples/legged_gym/configs/rllib_appo_config.yaml` 文件中的配置：
+脚本会自动读取 `configs/rllib_appo_config.yaml` 文件中的配置：
 
 ```yaml
 orcagym_addresses: ["192.168.1.100:50051"]    # 配置成你的头结点ip地址
@@ -122,3 +135,74 @@ sudo firewall-cmd --permanent --add-port=8265/tcp
 sudo firewall-cmd --permanent --add-port=50051/tcp
 sudo firewall-cmd --reload
 ```
+
+# 模型提取和查看
+
+## 功能特性
+
+- 支持从SB3 PPO模型提取PyTorch模型
+- 支持从RLLib APPO checkpoint提取PyTorch模型
+- 详细的模型结构分析
+- 参数统计和可视化
+- 模型推理测试
+- 保存为独立的PyTorch模型
+
+## 使用方法
+
+### 1. 基本用法（自动检测模型类型）
+
+```bash
+# 激活conda环境
+conda activate orca
+
+# 自动检测并分析最新的模型
+python scripts/extract_pytorch_model.py
+```
+
+### 2. 指定模型类型和路径
+
+```bash
+# 分析RLLib APPO模型
+python scripts/extract_pytorch_model.py \
+    --type rllib \
+    --checkpoint path/to/checkpoint_xxxxxx \
+    --analyze-only
+
+# 分析SB3模型
+python scripts/extract_pytorch_model.py \
+    --type sb3 \
+    --checkpoint path/to/model.zip \
+    --analyze-only
+```
+
+### 3. 保存提取的模型
+
+```bash
+# 提取并保存RLLib模型
+python scripts/extract_pytorch_model.py \
+    --type rllib \
+    --checkpoint path/to/checkpoint_000000 \
+    --output my_rllib_model.pth
+
+# 提取并保存SB3模型
+python scripts/extract_pytorch_model.py \
+    --type sb3 \
+    --checkpoint path/to/model.zip \
+    --output my_sb3_model.pth
+```
+
+## 命令行参数
+
+- `--checkpoint`: 模型checkpoint路径
+- `--type`: 模型类型 (`sb3` 或 `rllib`)
+- `--output`: 输出PyTorch模型路径
+- `--analyze-only`: 只分析模型结构，不保存模型
+
+## 输出信息
+
+脚本会输出以下信息：
+
+1. **模型组件结构**：显示编码器、策略网络、价值网络的结构
+2. **参数统计**：每个组件的参数数量和可训练参数数量
+3. **参数详情**：权重和偏置的统计信息（最小值、最大值、均值、标准差）
+4. **推理测试**：使用示例输入测试模型推理能力

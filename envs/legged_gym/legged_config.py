@@ -106,10 +106,10 @@ CurriculumConfig = {
     },
 
     "curriculum_levels" : {
-        "basic_moving" : [
-            {"terrain" : "default" ,          "command_type": "move_slowly",},
-            {"terrain" : "default" ,          "command_type": "move_medium",},
-        ],
+        # "basic_moving" : [
+        #     {"terrain" : "default" ,          "command_type": "move_slowly",},
+        #     {"terrain" : "default" ,          "command_type": "move_medium",},
+        # ],
         "flat_terrain" : [
             {"terrain" : "default" ,          "command_type": "move_medium",},
             {"terrain" : "default" ,          "command_type": "move_fast",},

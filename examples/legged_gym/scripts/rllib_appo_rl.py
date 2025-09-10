@@ -2,6 +2,7 @@ import ray
 from ray import tune
 from ray.tune import RunConfig, CheckpointConfig
 from ray.rllib.algorithms.appo import APPOConfig
+from ray.rllib.algorithms.ppo import PPOConfig
 from ray.tune.registry import register_env
 
 import torch.version
@@ -29,6 +30,7 @@ from orca_gym.environment.async_env.single_agent_env_runner import (
     OrcaGymAsyncSingleAgentEnvRunner
 )
 from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
+from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
 
 ENV_ENTRY_POINT = {
     "Ant_OrcaGymEnv": "envs.mujoco.ant_orcagym:AntOrcaGymEnv",
@@ -152,6 +154,7 @@ def create_demo_env_instance(
 def get_config(
     agent_config: dict,
     task: str,
+    num_learners: int,
     num_env_runners: int, 
     num_envs_per_env_runner: int,
     env: gym.Env,
@@ -168,9 +171,9 @@ def get_config(
 
     # 将SB3的学习率缩放一个因子
     lr_scale_factor = 1
-    rl_initial_value = agent_config["learning_rate"]["initial_value"] / lr_scale_factor
-    rl_final_value = agent_config["learning_rate"]["final_value"] / lr_scale_factor
-    rl_end_fraction = agent_config["learning_rate"]["end_fraction"]
+    rl_initial_value = agent_config["lr_schedule"]["initial_value"] / lr_scale_factor
+    rl_final_value = agent_config["lr_schedule"]["final_value"] / lr_scale_factor
+    rl_end_fraction = agent_config["lr_schedule"]["end_fraction"]
     rl_lr_schedule = [
         [0, rl_initial_value],
         [total_steps * rl_end_fraction, rl_final_value],
@@ -184,11 +187,14 @@ def get_config(
         [total_steps * ent_coef_end_fraction, ent_coef_final_value],
     ]
 
-    timesteps_per_iteration = num_env_runners * num_envs_per_env_runner * agent_config.get("rollout_fragment_length", 32)
-    print("timesteps_per_iteration: ", timesteps_per_iteration)
-
-    # 每4096个机器人分配一个learner
-    num_learners = (num_env_runners * num_envs_per_env_runner) // 4096 + 1
+    rollout_fragment_length = agent_config.get("rollout_fragment_length", 64)
+    minibatch_size = agent_config.get("minibatch_size", 4096)
+    train_batch_size_per_learner = (num_env_runners * num_envs_per_env_runner * rollout_fragment_length) / num_learners
+    train_batch_size_per_learner = train_batch_size_per_learner // minibatch_size * minibatch_size
+    timesteps_per_iteration = train_batch_size_per_learner * num_learners
+    print(f"num_learners: {num_learners}, rollout_fragment_length: {rollout_fragment_length}, \
+            minibatch_size: {minibatch_size}, train_batch_size_per_learner: {train_batch_size_per_learner}, \
+            timesteps_per_iteration: {timesteps_per_iteration}")
 
     config = (
         APPOConfig()
@@ -214,81 +220,72 @@ def get_config(
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_cpus_per_env_runner=1.0,
-            num_gpus_per_env_runner=0.01,
-            rollout_fragment_length=agent_config.get("rollout_fragment_length", 32),
+            num_gpus_per_env_runner=0.025,
+            rollout_fragment_length=rollout_fragment_length,
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
-            observation_filter="MeanStdFilter",
+            # observation_filter="MeanStdFilter",
+            compress_observations=True,
         )
         .rl_module(
-            rl_module_spec=RLModuleSpec(
-                observation_space=env.observation_space["observation"],
-                action_space=env.action_space,
-                module_class=DefaultAPPOTorchRLModule,
-                model_config={
+            model_config=DefaultModelConfig(
+                # ====================================================
+                # MLP 编码器 
+                # ====================================================
+                fcnet_hiddens=agent_config["pi"],       
+                fcnet_activation="silu",
+                fcnet_kernel_initializer="orthogonal_",
+                fcnet_kernel_initializer_kwargs={"gain": 1.0},
+                fcnet_bias_initializer= "zeros_",
 
-                    # ====================================================
-                    # MLP 编码器 
-                    # ====================================================
-                    "fcnet_hiddens": [256, 256],       
-                    "fcnet_activation": "silu",
-                    "fcnet_kernel_initializer": "orthogonal_",
-                    "fcnet_kernel_initializer_kwargs": {"gain": 1.0},
-                    "fcnet_bias_initializer": "zeros_",
+                # 输出层使用线性激活函数，确保输出范围正确
+                head_fcnet_activation="linear",
 
-                    # ====================================================
-                    # 头部网络 (策略头, pi, vf 都用这个配置)
-                    # ====================================================
-                    "head_fcnet_hiddens": agent_config["pi"], 
-                    "head_fcnet_activation": "silu",
-                    "head_fcnet_kernel_initializer": "orthogonal_",
-                    "head_fcnet_kernel_initializer_kwargs": {"gain": 1.0},
-                    "head_fcnet_bias_initializer": "zeros_",
+                # 尝试共享编码器提高训练效率
+                # 不共享编码器，是 SB3 PPO的默认方式
+                vf_share_layers=True,
 
-                    # ====================================================
-                    # 连续动作设置 (最关键的部分!)
-                    # ====================================================
-                    # 【强烈推荐启用】为高斯分布设置独立的、可训练的log(std)参数。
-                    # 这能极大地稳定训练，因为网络只需要学习均值，方差由一个单独的参数控制。
-                    # "free_log_std": True,
-                    # 严格裁剪log(std)，防止方差过大或过小，保证探索在合理范围内。
-                    # 对于动作范围被压缩到[-1,1]的任务，标准差不需要太大，因此裁剪范围可以更紧一些。
-                    # "log_std_clip_param": 5.0,
+                # 使用更稳定的训练策略
+                free_log_std=True,
 
-                    # 共享编码器层，提升学习效率和泛化能力。
-                    # 如果训练后期发现策略和价值函数性能冲突，可以尝试设为False。
-                    "vf_share_layers": True,
+                # ====================================================
+                # 明确禁用 LSTM
+                # ====================================================
+                use_lstm=False, # 明确设置为False，确保不使用LSTM
 
-                    # ====================================================
-                    # 明确禁用 LSTM
-                    # ====================================================
-                    "use_lstm": False, # 明确设置为False，确保不使用LSTM
+                # 卷积网络无关，保持None
+                conv_filters=None,
 
-                    # 卷积网络无关，保持None
-                    "conv_filters": None,
-
-                    # ====================================================
-                    # 使用GPU加速
-                    # ====================================================
-                    "use_gpu": num_gpus_available > 0,
-                },
-            )
+                # ====================================================
+                # 使用GPU加速
+                # ====================================================
+                # use_gpu=True if num_gpus_available > 0 else False,
+            ),
+            # rl_module_spec=RLModuleSpec(
+            #     observation_space=env.observation_space["observation"],
+            #     action_space=env.action_space,
+            #     module_class=DefaultAPPOTorchRLModule,
+            #     model_config=model_config,
+            # )
         )
         .learners(
-            num_learners=1, #num_learners,
+            num_learners=num_learners,
+            num_cpus_per_learner=4.0,  # 为learner分配多一些CPU辅助训练
             num_gpus_per_learner=0.5,  # learner 的显存要求高，尽量不要分到一个节点
         )
         .training(
-            train_batch_size_per_learner=num_env_runners * num_envs_per_env_runner * agent_config.get("rollout_fragment_length", 32),
-            minibatch_size=agent_config.get("minibatch_size", 4096),
+            train_batch_size_per_learner=train_batch_size_per_learner,
+            minibatch_size=minibatch_size,
             lr=rl_lr_schedule,
-            grad_clip=agent_config.get("grad_clip", 1),
-            grad_clip_by="norm",
+            grad_clip=agent_config.get("grad_clip", 40.0),
+            grad_clip_by=agent_config.get("grad_clip_by", "global_norm"),
             gamma=agent_config["gamma"],
-            lambda_=agent_config.get("gae_lambda", 0.95),
-            clip_param=agent_config.get("clip_range", 0.2),
+            # lambda_=agent_config.get("gae_lambda", 0.95),
+            clip_param=agent_config.get("clip_param", 0.4),
             vf_loss_coeff=agent_config.get("vf_loss_coeff", 0.5), 
             entropy_coeff=ent_coef_schedule, 
-            # adam_epsilon=1e-7, # 可选新增
+            # use_kl_loss=True,
+            circular_buffer_num_batches=16,
+            circular_buffer_iterations_per_batch=20
         )
         # .evaluation(
         #     evaluation_interval=10,
@@ -318,6 +315,7 @@ def get_config(
 def config_appo_tuner(
         agent_config: dict,
         task: str,
+        num_learners: int,
         num_env_runners: int, 
         num_envs_per_env_runner: int,
         iter: int,
@@ -343,6 +341,7 @@ def config_appo_tuner(
     config = get_config(
         agent_config=agent_config,
         task=task,
+        num_learners=num_learners,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         env=env,
@@ -358,7 +357,7 @@ def config_appo_tuner(
     # 重要：添加GPU资源报告
     print(f"总GPU需求: {num_gpus_available} (实际检测到 {num_gpus_available} 个GPU)")
     print(f"Learner GPU配置: {config.num_gpus_per_learner}")
-    print(f"模型是否使用GPU: {config.rl_module_spec.model_config['use_gpu']}")
+    # print(f"模型是否使用GPU: {config.rl_module_spec.model_config['use_gpu']}")
     
 
     # scaling_config = ScalingConfig(num_workers=2, use_gpu=True)
@@ -695,6 +694,7 @@ def run_training(
         agent_config: dict,
         task: str,
         max_episode_steps: int,
+        num_learners: int,
         num_env_runners: int,
         num_envs_per_env_runner: int,
         num_gpus_available: float,
@@ -778,6 +778,7 @@ def run_training(
     tuner = config_appo_tuner(
         agent_config=agent_config,
         task=task,
+        num_learners=num_learners,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
         iter=iter,
