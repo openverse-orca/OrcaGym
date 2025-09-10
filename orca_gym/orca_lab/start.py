@@ -22,8 +22,6 @@ from orca_gym.orca_lab.ui.tool_bar import ToolBar
 from orca_gym.orca_lab.math import Transform
 
 import PySide6.QtAsyncio as QtAsyncio
-import ctypes
-
 
 class MainWindow(QtWidgets.QWidget):
 
@@ -699,7 +697,7 @@ class MainWindow1(MainWindow):
 
 
 if __name__ == "__main__":
-    # ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    
     q_app = QtWidgets.QApplication([])
 
     main_window = MainWindow1()

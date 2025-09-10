@@ -41,7 +41,7 @@ class ActorEditor(QtWidgets.QWidget):
             item = layout.itemAt(i)
             if item.widget():
                 item.widget().setParent(None)
-            layout.removeItem(item)
+            # layout.removeItem(item)
 
     def _refresh(self):
         self._clear_layout()

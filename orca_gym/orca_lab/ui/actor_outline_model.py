@@ -153,12 +153,13 @@ class ActorOutlineModel(QAbstractItemModel):
         self.endResetModel()
 
     def supportedDropActions(self):
-        return Qt.CopyAction
+        return Qt.CopyAction | Qt.MoveAction
 
     def supportedDragActions(self):
         return Qt.CopyAction
 
     def dropMimeData(self, data, action, row, column, parent):
+        print("drop")
         if data.hasFormat(self.reparent_mime):
             reparent_data = ReparentData()
             if not self.prepare_reparent_data(
