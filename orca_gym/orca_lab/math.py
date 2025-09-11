@@ -1,3 +1,4 @@
+import re
 import numpy as np
 from scipy.spatial.transform import Rotation
 import math
@@ -12,8 +13,8 @@ class Transform:
     This is consistent with our Renderer convention.
 
     Attributes:
-        position (np.array): 3D position as a numpy array of shape (3,).
-        rotation (np.array): Rotation is a uint quaternion as a numpy array of shape (4,) in (w, x, y, z) format.
+        position (np.ndarray): 3D position as a numpy array of shape (3,).
+        rotation (np.ndarray): Rotation is a uint quaternion as a numpy array of shape (4,) in (w, x, y, z) format.
         scale (float): Uniform scale factor.
 
     Raises:
@@ -28,21 +29,21 @@ class Transform:
         self.scale = scale
 
     @property
-    def position(self) -> np.array:
+    def position(self) -> np.ndarray:
         return self._position
 
     @position.setter
-    def position(self, value: np.array):
+    def position(self, value: np.ndarray):
         if not isinstance(value, np.ndarray) or value.shape != (3,):
             raise TypeError("position must be a numpy array of shape (3,).")
         self._position = value
 
     @property
-    def rotation(self) -> np.array:
+    def rotation(self) -> np.ndarray:
         return self._rotation
 
     @rotation.setter
-    def rotation(self, value: np.array):
+    def rotation(self, value: np.ndarray):
         if not isinstance(value, np.ndarray) or value.shape != (4,):
             raise TypeError("rotation must be a numpy array of shape (4,).")
 
@@ -87,7 +88,7 @@ class Transform:
     def __mul__(self, other: "Transform") -> "Transform":
         return self.multiply(other)
 
-    def transform_point(self, point: np.array) -> np.array:
+    def transform_point(self, point: np.ndarray) -> np.ndarray:
         """Apply the transform to a point."""
 
         if not isinstance(point, np.ndarray) or point.shape != (3,):
@@ -105,7 +106,7 @@ class Transform:
 
         return translated_point
 
-    def transform_vector(self, vector: np.array) -> np.array:
+    def transform_vector(self, vector: np.ndarray) -> np.ndarray:
         """Apply the transform to a vector (ignoring translation)."""
 
         if not isinstance(vector, np.ndarray) or vector.shape != (3,):
@@ -120,7 +121,7 @@ class Transform:
 
         return rotated_vector
 
-    def transform_direction(self, direction: np.array) -> np.array:
+    def transform_direction(self, direction: np.ndarray) -> np.ndarray:
         """Apply the transform to a direction (ignoring translation and scale)."""
 
         if not isinstance(direction, np.ndarray) or direction.shape != (3,):
@@ -168,3 +169,164 @@ class Transform:
         inv_position = -inv_scale * inv_r.apply(self.position)
 
         return Transform(position=inv_position, rotation=inv_rotation, scale=inv_scale)
+
+
+# TODO
+# as_euler 迁移自 scipy\spatial\transform\_rotation_cy.pyx
+# 有BUG， Rotation.as_euler会卡主Qt的Undo。
+# 是正则表达式re.match的问题。
+
+
+def _elementary_basis_index(axis):
+    if axis == "x":
+        return 0
+    elif axis == "y":
+        return 1
+    elif axis == "z":
+        return 2
+
+
+def _get_angles(angles, extrinsic, symmetric, sign, lamb, a, b, c, d):
+    # Returns 1 if a gimbal warning is detected and 0 otherwise (so that
+    # warnings can be handled at a higher level)
+
+    # intrinsic/extrinsic conversion helpers
+    if extrinsic:
+        angle_first = 0
+        angle_third = 2
+    else:
+        angle_first = 2
+        angle_third = 0
+
+    # Step 2
+    # Compute second angle...
+    angles[1] = 2 * math.atan2(math.hypot(c, d), math.hypot(a, b))
+
+    # ... and check if equal to is 0 or pi, causing a singularity
+    if abs(angles[1]) <= 1e-7:
+        case = 1
+    elif abs(angles[1] - np.pi) <= 1e-7:
+        case = 2
+    else:
+        case = 0  # normal case
+
+    # Step 3
+    # compute first and third angles, according to case
+    half_sum = math.atan2(b, a)
+    half_diff = math.atan2(d, c)
+
+    if case == 0:  # no singularities
+        angles[angle_first] = half_sum - half_diff
+        angles[angle_third] = half_sum + half_diff
+
+    else:  # any degenerate case
+        angles[2] = 0
+        if case == 1:
+            angles[0] = 2 * half_sum
+        else:
+            angles[0] = 2 * half_diff * (-1 if extrinsic else 1)
+
+    # for Tait-Bryan/asymmetric sequences
+    if not symmetric:
+        angles[angle_third] *= sign
+        angles[1] = angles[1] - lamb
+
+    for idx in range(3):
+        if angles[idx] < -np.pi:
+            angles[idx] = angles[idx] + 2 * np.pi
+        elif angles[idx] > np.pi:
+            angles[idx] = angles[idx] - 2 * np.pi
+
+    if case != 0:
+        return 1
+    return 0
+
+
+def as_euler(quat, seq, degrees=False, scalar_first=True) -> np.ndarray:
+
+    if scalar_first:
+        quat = np.array([quat[1], quat[2], quat[3], quat[0]])
+
+    # Prepare axis sequence to call Euler angles conversion algorithm.
+    if len(seq) != 3:
+        raise ValueError("Expected 3 axes, got {}.".format(seq))
+
+    intrinsic = False
+    extrinsic = True
+    # intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
+    # extrinsic = re.match(r"^[xyz]{1,3}$", seq) is not None
+    if not (intrinsic or extrinsic):
+        raise ValueError(
+            "Expected axes from `seq` to be from "
+            "['x', 'y', 'z'] or ['X', 'Y', 'Z'], "
+            "got {}".format(seq)
+        )
+
+    if any(seq[i] == seq[i + 1] for i in range(2)):
+        raise ValueError(
+            "Expected consecutive axes to be different, " "got {}".format(seq)
+        )
+
+    seq = seq.lower()
+    if not extrinsic:
+        seq = seq[::-1]
+
+    # The algorithm assumes extrinsic frame transformations. The algorithm
+    # in the paper is formulated for rotation quaternions, which are stored
+    # directly by Rotation. See:
+    # Bernardes E, Viollet S (2022) Quaternion to Euler angles conversion: A
+    # direct, general and computationally efficient method.
+    # PLoS ONE 17(11): e0276302. https://doi.org/10.1371/journal.pone.0276302
+    i = _elementary_basis_index(seq[0])
+    j = _elementary_basis_index(seq[1])
+    k = _elementary_basis_index(seq[2])
+
+    symmetric = i == k
+    if symmetric:
+        k = 3 - i - j  # get third axis
+
+    # Step 0
+    # Check if permutation is even (+1) or odd (-1)
+    sign = (i - j) * (j - k) * (k - i) // 2
+
+    # some forward definitions
+
+    angles = np.array([0, 0, 0], dtype=np.float64)
+
+    # Step 1
+    # Permutate quaternion elements
+    if symmetric:
+        a = quat[3]
+        b = quat[i]
+        c = quat[j]
+        d = quat[k] * sign
+    else:
+        a = quat[3] - quat[j]
+        b = quat[i] + quat[k] * sign
+        c = quat[j] + quat[3]
+        d = quat[k] * sign - quat[i]
+
+    n_gimbal_warnings = _get_angles(
+        angles, extrinsic, symmetric, sign, np.pi / 2, a, b, c, d
+    )
+
+    if n_gimbal_warnings > 0:
+        print(
+            "Gimbal lock detected. Setting third angle to zero "
+            "since it is not possible to uniquely determine "
+            "all angles.",
+            stacklevel=2,
+        )
+
+    if degrees:
+        angles = np.rad2deg(angles)
+    return angles
+
+
+if __name__ == "__main__":
+    q = np.array([1, 0, 0, 0], dtype=np.float64)
+    r = Rotation.from_quat(q, scalar_first=True)
+    angles = r.as_euler("xyz", degrees=True)
+    print(angles)
+    angles = as_euler(q, "xyz", degrees=True, scalar_first=True)
+    print(angles)

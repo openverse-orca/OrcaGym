@@ -3,6 +3,8 @@ from typing import List, override
 from orca_gym.orca_lab.path import Path
 from orca_gym.orca_lab.math import Transform
 
+import copy
+
 type ParentActor = GroupActor | None
 
 
@@ -51,13 +53,13 @@ class BaseActor:
 
     @property
     def transform(self):
-        return self._transform
+        return copy.deepcopy(self._transform)
 
     @transform.setter
     def transform(self, value):
         if not isinstance(value, Transform):
             raise TypeError("transform must be an instance of Transform.")
-        self._transform = value
+        self._transform = copy.deepcopy(value)
 
         self._world_transform = None  # Invalidate world transform cache
 

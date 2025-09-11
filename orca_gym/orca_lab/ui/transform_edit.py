@@ -5,7 +5,7 @@ from enum import Enum, auto
 import numpy as np
 
 from orca_gym.orca_lab.ui.float_edit import FloatEdit
-from orca_gym.orca_lab.math import Transform
+from orca_gym.orca_lab.math import Transform, as_euler
 
 from scipy.spatial.transform import Rotation
 
@@ -75,15 +75,15 @@ class TransformEdit(QtWidgets.QWidget):
     def _on_value_changed(self):
         self.value_changed.emit()
 
-    @property
     def transform(self):
         transform = Transform()
 
         transform.position = np.array(
-            [self._pos_x.value, self._pos_y.value, self._pos_z.value], dtype=np.float64
+            [self._pos_x.value(), self._pos_y.value(), self._pos_z.value()],
+            dtype=np.float64,
         )
 
-        angles = [self._rot_x.value, self._rot_y.value, self._rot_z.value]
+        angles = [self._rot_x.value(), self._rot_y.value(), self._rot_z.value()]
         r = Rotation.from_euler(
             "xyz",
             angles,
@@ -92,27 +92,24 @@ class TransformEdit(QtWidgets.QWidget):
         quat = r.as_quat(scalar_first=True)
         transform.rotation = quat
 
-        transform.scale = self._scale_uniform.value
+        transform.scale = self._scale_uniform.value()
         return transform
 
-    @transform.setter
-    def transform(self, transform: Transform):
-        self._set_from_outside = True
+    def set_transform(self, transform: Transform):
 
-        self._pos_x.value = transform.position[0]
-        self._pos_y.value = transform.position[1]
-        self._pos_z.value = transform.position[2]
+        self._pos_x.set_value(transform.position[0])
+        self._pos_y.set_value(transform.position[1])
+        self._pos_z.set_value(transform.position[2])
 
-        r = Rotation.from_quat(transform.rotation, scalar_first=True)
-        angles = r.as_euler("xyz", degrees=True)
+        # r = Rotation.from_quat(transform.rotation.tolist(), scalar_first=True)
+        # angles = r.as_euler("xyz", degrees=True)
+        angles = as_euler(transform.rotation, "xyz", degrees=True)
 
-        self._rot_x.value = angles[0]
-        self._rot_y.value = angles[1]
-        self._rot_z.value = angles[2]
+        self._rot_x.set_value(angles[0])
+        self._rot_y.set_value(angles[1])
+        self._rot_z.set_value(angles[2])
 
-        self._scale_uniform.value = transform.scale
-
-        self._set_from_outside = False
+        self._scale_uniform.set_value(transform.scale)
 
 
 if __name__ == "__main__":
@@ -124,7 +121,7 @@ if __name__ == "__main__":
     input.resize(400, 50)
 
     def on_value_changed():
-        print("value changed", input.transform)
+        print("value changed", input.transform())
 
     input.value_changed.connect(on_value_changed)
 

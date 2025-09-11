@@ -98,7 +98,7 @@ class FloatEdit(QtWidgets.QLineEdit):
                 event: QtGui.QMouseEvent = event
                 delta = event.globalPosition().x() - self.last_mouse_pos.x()
                 value = self._value + delta * 0.01
-                self.value = value
+                self.set_value(value, True)
                 self.last_mouse_pos = event.globalPosition()
 
         return super().eventFilter(watched, event)
@@ -114,16 +114,15 @@ class FloatEdit(QtWidgets.QLineEdit):
         except ValueError:
             pass
 
-    @property
     def value(self) -> float:
         return self._value
 
-    @value.setter
-    def value(self, value: float):
+    def set_value(self, value: float, emit_signal: bool = False):
         if not is_close(value, self._value):
             self._value = value
             self.setText(f"{self._value:.2f}")
-            self.value_changed.emit(self._value)
+            if emit_signal:
+                self.value_changed.emit(self._value)
 
 
 if __name__ == "__main__":

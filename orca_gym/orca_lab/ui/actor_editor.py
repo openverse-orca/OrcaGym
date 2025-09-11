@@ -41,7 +41,10 @@ class ActorEditor(QtWidgets.QWidget):
             item = layout.itemAt(i)
             if item.widget():
                 item.widget().setParent(None)
-            # layout.removeItem(item)
+            elif item.layout():
+                self._clear_layout(item.layout())
+            layout.removeItem(item)
+            del item
 
     def _refresh(self):
         self._clear_layout()
@@ -67,7 +70,10 @@ class ActorEditor(QtWidgets.QWidget):
         transform_edit.value_changed.connect(self._on_transform_changed)
         transform_edit.start_drag.connect(self._on_start_drag)
         transform_edit.stop_drag.connect(self._on_stop_drag)
-        transform_edit.transform = self._actor.transform
+
+        transform_edit.set_transform(self._actor.transform)
+
+        # transform_edit.set_transform(self._actor.transform)
         self._transform_edit = transform_edit
         self._layout.addWidget(transform_edit)
 
