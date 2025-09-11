@@ -184,19 +184,28 @@ Lite3Config = {
         "max_grad_norm" : 1,  # 最大梯度范数
 
         # Config for rllib
+        "fcnet_hiddens": [256, 256],
         "rollout_fragment_length" : 64,  # 每个rollout的片段长度(rllib)
-        "minibatch_size" : 4096,  # 批次大小  (rllib)
+        "train_batch_size" : 4096,  # 训练批次大小  (rllib)
+        "minibatch_size" : 1024,    # 批次大小  (rllib)
         "lr_schedule": {
-            "initial_value": 1e-4,    # 初始学习率
-            "end_fraction": 0.8,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
-            "final_value": 1e-5       # 最终学习率
+            "initial_value": 5e-4,    # 初始学习率
+            "end_fraction": 0.2,      # 线性衰减，0.1表示在训练结束前10%时达到最终学习率
+            "final_value": 5e-5       # 最终学习率
         },
         "ent_coef_schedule" : {   # 线性衰减熵系数(rllib)
             "initial_value": 0.01,
-            "end_fraction": 0.4,
-            "final_value": 0.005,
+            "end_fraction": 0.2,
+            "final_value": 0.001,
         },
         "clip_param": 0.4, # 裁剪参数(rllib)
-        "grad_clip" : 40.0, # 梯度裁剪(rllib)
+        "grad_clip" : 1.0, # 梯度裁剪(rllib)
         "grad_clip_by" : "global_norm", # 梯度裁剪方式(rllib)
+        "vf_loss_coeff" : 0.5,
+        "vf_share_layers" : False,
+        "use_lstm" : True,
+        "lstm_cell_size" : 256,
+        "max_seq_len" : 20,
+        "conv_filters" : None,
+        "free_log_std" : False,
     }

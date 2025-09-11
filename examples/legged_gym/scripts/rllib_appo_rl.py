@@ -4,6 +4,9 @@ from ray.tune import RunConfig, CheckpointConfig
 from ray.rllib.algorithms.appo import APPOConfig
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.tune.registry import register_env
+import ray
+from ray.util.placement_group import placement_group, remove_placement_group
+from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 import torch.version
 from orca_gym.adapters.rllib.metrics_callback import OrcaMetricsCallback
@@ -20,7 +23,6 @@ import numpy as np
 from ray.rllib.utils.numpy import convert_to_numpy
 import tree
 import time
-import os
 import gymnasium as gym
 import json
 from ray.rllib.env.single_agent_env_runner import (
@@ -150,19 +152,22 @@ def create_demo_env_instance(
     
     return env, kwargs[env_name]
 
-
 def get_config(
     agent_config: dict,
     task: str,
     num_learners: int,
     num_env_runners: int, 
     num_envs_per_env_runner: int,
+    num_cpus_per_learner: int,
+    num_gpus_per_learner: int,
+    num_cpus_per_env_runner: int,
+    num_gpus_per_env_runner: int,
     env: gym.Env,
     num_gpus_available: float,
     async_env_runner: bool,
     env_name: str,
     env_kwargs: dict,
-    total_steps: int
+    total_steps: int,
 ):
     # env_name 是用 - 分隔的字符串，去掉最后一段，保留前面的
     env_name_prefix = "-".join(env.spec.id.split("-")[:-1])
@@ -187,14 +192,14 @@ def get_config(
         [total_steps * ent_coef_end_fraction, ent_coef_final_value],
     ]
 
+    # evaluation_num_env_runners = num_env_runners // 8
+    # num_env_runners = num_env_runners - evaluation_num_env_runners
+
     rollout_fragment_length = agent_config.get("rollout_fragment_length", 64)
-    minibatch_size = agent_config.get("minibatch_size", 4096)
-    train_batch_size_per_learner = (num_env_runners * num_envs_per_env_runner * rollout_fragment_length) / num_learners
-    train_batch_size_per_learner = train_batch_size_per_learner // minibatch_size * minibatch_size
-    timesteps_per_iteration = train_batch_size_per_learner * num_learners
+    minibatch_size = agent_config.get("minibatch_size", 1024)
+    train_batch_size_per_learner = agent_config.get("train_batch_size", 4096)
     print(f"num_learners: {num_learners}, rollout_fragment_length: {rollout_fragment_length}, \
-            minibatch_size: {minibatch_size}, train_batch_size_per_learner: {train_batch_size_per_learner}, \
-            timesteps_per_iteration: {timesteps_per_iteration}")
+            minibatch_size: {minibatch_size}, train_batch_size_per_learner: {train_batch_size_per_learner}")
 
     config = (
         APPOConfig()
@@ -219,8 +224,8 @@ def get_config(
             env_runner_cls=ENV_RUNNER_CLS[env_name],
             num_env_runners=num_env_runners,          
             num_envs_per_env_runner=num_envs_per_env_runner,
-            num_cpus_per_env_runner=1.0,
-            num_gpus_per_env_runner=0.025,
+            num_cpus_per_env_runner=num_cpus_per_env_runner,  
+            num_gpus_per_env_runner=num_gpus_per_env_runner,
             rollout_fragment_length=rollout_fragment_length,
             gym_env_vectorize_mode=gym.envs.registration.VectorizeMode.ASYNC if async_env_runner else gym.envs.registration.VectorizeMode.SYNC,  # default is `SYNC`
             # observation_filter="MeanStdFilter",
@@ -231,7 +236,7 @@ def get_config(
                 # ====================================================
                 # MLP 编码器 
                 # ====================================================
-                fcnet_hiddens=agent_config["pi"],       
+                fcnet_hiddens=agent_config["fcnet_hiddens"],       
                 fcnet_activation="silu",
                 fcnet_kernel_initializer="orthogonal_",
                 fcnet_kernel_initializer_kwargs={"gain": 1.0},
@@ -242,18 +247,20 @@ def get_config(
 
                 # 尝试共享编码器提高训练效率
                 # 不共享编码器，是 SB3 PPO的默认方式
-                vf_share_layers=True,
+                vf_share_layers=agent_config.get("vf_share_layers", True),
 
                 # 使用更稳定的训练策略
-                free_log_std=True,
+                free_log_std=agent_config.get("free_log_std", True),
 
                 # ====================================================
-                # 明确禁用 LSTM
+                # LSTM 层配置
                 # ====================================================
-                use_lstm=False, # 明确设置为False，确保不使用LSTM
+                use_lstm=agent_config.get("use_lstm", False), 
+                lstm_cell_size=agent_config.get("lstm_cell_size", 256),
+                max_seq_len=agent_config.get("max_seq_len", 10),
 
                 # 卷积网络无关，保持None
-                conv_filters=None,
+                conv_filters=agent_config.get("conv_filters", None),
 
                 # ====================================================
                 # 使用GPU加速
@@ -269,8 +276,10 @@ def get_config(
         )
         .learners(
             num_learners=num_learners,
-            num_cpus_per_learner=4.0,  # 为learner分配多一些CPU辅助训练
-            num_gpus_per_learner=0.5,  # learner 的显存要求高，尽量不要分到一个节点
+            num_cpus_per_learner=num_cpus_per_learner, 
+            num_gpus_per_learner=num_gpus_per_learner, 
+            # 禁用 DDP 以避免 NCCL 冲突
+            # _enable_learner_api=True,
         )
         .training(
             train_batch_size_per_learner=train_batch_size_per_learner,
@@ -283,18 +292,19 @@ def get_config(
             clip_param=agent_config.get("clip_param", 0.4),
             vf_loss_coeff=agent_config.get("vf_loss_coeff", 0.5), 
             entropy_coeff=ent_coef_schedule, 
-            # use_kl_loss=True,
+            use_kl_loss=True,
             circular_buffer_num_batches=16,
             circular_buffer_iterations_per_batch=20
         )
         # .evaluation(
         #     evaluation_interval=10,
         #     evaluation_parallel_to_training=True,
-        #     evaluation_num_env_runners=8,
+        #     evaluation_num_env_runners=evaluation_num_env_runners,
         # )
         .resources(
             num_cpus_for_main_process=1,
-            num_gpus=num_gpus_available,
+            # num_gpus=num_gpus_available,
+            # placement_strategy="SPREAD",
         )
         .api_stack(
             enable_rl_module_and_learner=True,
@@ -304,10 +314,10 @@ def get_config(
             OrcaMetricsCallback
         )
         .reporting(
-            min_sample_timesteps_per_iteration=timesteps_per_iteration,
+            # min_sample_timesteps_per_iteration=timesteps_per_iteration,
             # 0 metrics reporting delay, this makes sure timestep,
             # which entropy coeff depends on, is updated after each worker rollout.
-            min_time_s_per_iteration=0,
+            min_time_s_per_iteration=5,
         )
     )
     return config
@@ -318,6 +328,10 @@ def config_appo_tuner(
         num_learners: int,
         num_env_runners: int, 
         num_envs_per_env_runner: int,
+        num_cpus_per_learner: int,
+        num_gpus_per_learner: int,
+        num_cpus_per_env_runner: int,
+        num_gpus_per_env_runner: int,
         iter: int,
         total_steps: int,
         env: gym.Env,
@@ -325,18 +339,14 @@ def config_appo_tuner(
         env_name: str,
         env_kwargs: dict,
         num_gpus_available: float,
-        model_dir: str = None
+        model_dir: str = None,
     ) -> tune.Tuner:
-
-    
-    # 设置CUDA可见设备
-    # if num_gpus_available > 0:
-    #     gpu_devices = ','.join([str(i) for i in range(num_gpus_available)])
-    #     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_devices
-    #     print(f"设置CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
-    # else:
-    #     print("警告: 未检测到GPU，将使用CPU训练")
-    #     os.environ['CUDA_VISIBLE_DEVICES'] = ""
+        
+    # 设置 NCCL 环境变量来避免 GPU 冲突
+    os.environ["NCCL_DEBUG"] = "WARN"
+    os.environ["NCCL_IB_DISABLE"] = "1"
+    os.environ["NCCL_P2P_DISABLE"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # 只使用第一个GPU
     
     config = get_config(
         agent_config=agent_config,
@@ -344,12 +354,16 @@ def config_appo_tuner(
         num_learners=num_learners,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
+        num_cpus_per_learner=num_cpus_per_learner,
+        num_gpus_per_learner=num_gpus_per_learner,
+        num_cpus_per_env_runner=num_cpus_per_env_runner,
+        num_gpus_per_env_runner=num_gpus_per_env_runner,
         env=env,
         num_gpus_available=num_gpus_available,
         async_env_runner=async_env_runner,
         env_name=env_name,
         env_kwargs=env_kwargs,
-        total_steps=total_steps
+        total_steps=total_steps,
     )
     
     print(f"总环境数: {config.num_env_runners * config.num_envs_per_env_runner}")
@@ -358,11 +372,6 @@ def config_appo_tuner(
     print(f"总GPU需求: {num_gpus_available} (实际检测到 {num_gpus_available} 个GPU)")
     print(f"Learner GPU配置: {config.num_gpus_per_learner}")
     # print(f"模型是否使用GPU: {config.rl_module_spec.model_config['use_gpu']}")
-    
-
-    # scaling_config = ScalingConfig(num_workers=2, use_gpu=True)
-    # trainer = TorchTrainer(train_func, scaling_config=scaling_config)
-    # result = trainer.fit()
 
     # 设置存储路径 - 使用NFS共享目录，确保head和worker节点都可以访问
     # 支持通过软链接方式共享 ./trained_models_tmp 目录
@@ -416,7 +425,8 @@ def config_appo_tuner(
         os.makedirs(storage_path, exist_ok=True)
         print(f"回退到本地存储路径: {storage_path}")
     
-    return tune.Tuner(
+    # 创建 Tuner
+    tuner = tune.Tuner(
         "APPO",
         param_space=config.to_dict(),
         run_config=RunConfig(
@@ -432,11 +442,9 @@ def config_appo_tuner(
             ),
             verbose=2,
         ),
-        # scaling_config=ScalingConfig(
-        #     num_workers=num_env_runners,
-        #     use_gpu=True
-        # )
     )
+    
+    return tuner
 
 
 
@@ -698,6 +706,11 @@ def run_training(
         num_env_runners: int,
         num_envs_per_env_runner: int,
         num_gpus_available: float,
+        num_node_cpus: dict,
+        num_cpus_per_learner: int,
+        num_gpus_per_learner: int,
+        num_cpus_per_env_runner: int,
+        num_gpus_per_env_runner: int,
         async_env_runner: bool,
         iter: int,
         total_steps: int,
@@ -781,6 +794,10 @@ def run_training(
         num_learners=num_learners,
         num_env_runners=num_env_runners,
         num_envs_per_env_runner=num_envs_per_env_runner,
+        num_cpus_per_learner=num_cpus_per_learner,
+        num_gpus_per_learner=num_gpus_per_learner,
+        num_cpus_per_env_runner=num_cpus_per_env_runner,
+        num_gpus_per_env_runner=num_gpus_per_env_runner,
         iter=iter,
         total_steps=total_steps,
         env=demo_env,
@@ -788,11 +805,9 @@ def run_training(
         async_env_runner=async_env_runner,
         env_name=env_name,
         env_kwargs=demo_env_kwargs,
-        model_dir=model_dir
+        model_dir=model_dir,
     )
     results = tuner.fit()
-
-    
 
     # 训练运行后清理
     if torch.distributed.is_initialized():

@@ -9,8 +9,14 @@ env_name: "LeggedGym"
 # 集群训练专用配置
 training:
   max_episode_steps: 1000
-  num_env_runners: 0             # 为0时，自动使用集群最大可用CPU运行（集群可用CPU数-2，因为要预留2个给leaner和调度器）。如果手工指定，也可以手工指定。考虑到每个worker节点的可用数已经按照8的倍数来分配，因此这里也应该是8的倍数
-  num_envs_per_env_runner: 64    # 必须是 32 的倍数，一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
+  num_env_runners: 0             # 为0时，自动根据集群可用CPU进行分配。对于单节点环境，必须设置为非0，否则learner独占此节点，就没有运行 env runner 的节点了
+                                 # 非0的分配方式：预留8个CPU给OrcaLab，预留num_cpus_per_learner个CPU给learner，预留1个CPU给调度器，剩余的CPU为env_runners可分分配最大数量
+  num_envs_per_env_runner: 32    # 必须是 32 的倍数，一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
+  num_cpus_per_env_runner: 1     # 每个env_runner配套1个CPU
+  num_gpus_per_env_runner: 0.01   # 每个env_runner配套0.01个GPU
+  num_learners: 8                # 多Learner需要优化显存占用，避免爆显存
+  num_cpus_per_learner: 2        # 每个learner配套多少个CPU，如果num_env_runners != 0，则使用这个值来分配learner的CPU
+  num_gpus_per_learner: 0.125    # 在单卡机中，一个节点允许分配8个learner
   async_env_runner: True
   iter: 2000
   render_mode: none

@@ -363,8 +363,8 @@ start_head_node() {
     fi
     
     local num_cpus=$(nproc)
-    local allocated_cpus=$((num_cpus - 8))  # 预留8个核心给OrcaLab软件
-    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray"
+    local allocated_cpus=$((num_cpus - 8))  # 分配少一些worker, 给OrcaLab预留CPU和GPU资源
+    print_info "检测到 $num_cpus 个CPU核心，实际分配 $allocated_cpus 个核心给Ray"
     
     # 启动Ray head节点
     ray start --head \
@@ -411,7 +411,7 @@ start_worker_node() {
     # 检测可用的CPU数量，并分配为8的倍数
     local num_cpus=$(nproc)
     local allocated_cpus=$((num_cpus))
-    print_info "检测到 $num_cpus 个CPU核心，最大分配 $max_cpus 个核心，实际分配 $allocated_cpus 个核心给Ray"
+    print_info "检测到 $num_cpus 个CPU核心，实际分配 $allocated_cpus 个核心给Ray"
     
     # 启动Ray worker节点
     ray start \

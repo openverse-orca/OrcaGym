@@ -245,13 +245,17 @@ def run_rllib_appo_rl(
     num_cpus_available = int(ray.available_resources()['CPU'])
     print(f"Ray集群检测到的CPU数量: {num_cpus_available}")
 
+    # 检测每个节点的CPU资源
+    num_node_cpus = {}
+    num_node_cpus_max = 0
+    for node in ray.nodes():
+        num_node_cpus[node['NodeID']] = node['Resources']['CPU']
+        num_node_cpus_max = max(num_node_cpus_max, node['Resources']['CPU'])
+    print(f"Ray集群检测到的每个节点的CPU数量: {num_node_cpus}")
+
     # 检测Ray集群中的GPU资源
     num_gpus_available = rllib_appo_rl.detect_ray_gpu_resources()
     print(f"Ray集群检测到的GPU数量: {num_gpus_available}")
-
-    # leaner 的数量和节点数保持一致，每个节点分配一个learner
-    num_learners = len(ray.nodes())
-    print(f"Ray集群设置的learner数量: {num_learners}")
 
     if remote is not None:
         orcagym_addresses = [remote]
@@ -263,11 +267,32 @@ def run_rllib_appo_rl(
     task = config['task']
 
     run_mode_config = config[run_mode]
-    num_env_runners = run_mode_config['num_env_runners']
-    num_envs_per_env_runner = run_mode_config['num_envs_per_env_runner']
+    num_env_runners = int(run_mode_config['num_env_runners'])
+    num_envs_per_env_runner = int(run_mode_config['num_envs_per_env_runner'])
+
+    num_learners = int(run_mode_config['num_learners'])
+    num_cpus_per_learner = run_mode_config['num_cpus_per_learner']
+    num_gpus_per_learner = run_mode_config['num_gpus_per_learner']
+
+    num_cpus_per_env_runner = run_mode_config['num_cpus_per_env_runner']
+    num_gpus_per_env_runner = run_mode_config['num_gpus_per_env_runner']
 
     if num_env_runners == 0:
-        num_env_runners =  num_cpus_available - (num_learners * 4) - 1  # 1 for ray scheduler, 4 for leaner
+        # 自动分配时，将learner分配到一个独立的节点。为保障该节点不运行env_runners，所以需要减去一个节点的CPU数量
+        # 此时相当于指定将learner分配到CPU核最多的节点上（TODO: 后续优化让用户指定分配在哪个节点）
+        num_env_runners = int((num_cpus_available - num_node_cpus_max - 1) // 4 * 4)
+
+    assert num_env_runners * num_cpus_per_env_runner + num_learners * num_cpus_per_learner <= num_cpus_available - 1, \
+        f"Ray集群设置的env_runners数量和learner数量之和不能超过Ray集群的CPU数量-1，当前设置的env_runners数量: {num_env_runners}, \
+          learner数量: {num_learners}, Ray集群的CPU数量: {num_cpus_available}, Ray集群的每个节点的CPU数量: {num_node_cpus}"
+    
+    assert num_env_runners * num_gpus_per_env_runner + num_learners * num_gpus_per_learner <= num_gpus_available, \
+        f"Ray集群设置的env_runners数量和learner数量之和不能超过Ray集群的GPU数量，当前设置的env_runners数量: {num_env_runners}, \
+          learner数量: {num_learners}, Ray集群的GPU数量: {num_gpus_available}"
+
+
+    print(f"Ray集群设置的env_runners数量: {num_env_runners}")
+    print(f"Ray集群设置的learner数量: {num_learners}")
 
     if visualize:
         render_mode = "human"
@@ -317,6 +342,11 @@ def run_rllib_appo_rl(
             num_env_runners=num_env_runners,
             num_envs_per_env_runner=num_envs_per_env_runner,
             num_gpus_available=num_gpus_available,
+            num_node_cpus=num_node_cpus,
+            num_cpus_per_learner=num_cpus_per_learner,
+            num_gpus_per_learner=num_gpus_per_learner,
+            num_cpus_per_env_runner=num_cpus_per_env_runner,
+            num_gpus_per_env_runner=num_gpus_per_env_runner,
             async_env_runner=run_mode_config['async_env_runner'],
             iter=run_mode_config['iter'],
             total_steps=total_steps,
