@@ -69,9 +69,6 @@ class MainWindow(QtWidgets.QWidget):
         self.asset_browser = AssetBrowser(hwnd_target=self.hwnd)
         assets = await self.remote_scene.get_actor_assets()
         self.asset_browser.set_assets(assets)
-        self.asset_browser.add_item.connect(
-            lambda item_name: asyncio.ensure_future(self.add_item_to_scene(item_name))
-        )
 
         self.menu_bar = QtWidgets.QMenuBar()
 
@@ -161,13 +158,6 @@ class MainWindow(QtWidgets.QWidget):
                 paths.append(Path(p))
 
             await self.set_selection_from_remote_scene(paths)
-
-        add_item = "add_item"
-        if op.startswith(add_item):
-            
-            [transform, name] = await self.remote_scene.get_pending_add_item()
-            print("add info", name, transform)
-            await self.add_item_drag(name, transform)
 
         add_item = "add_item"
         if op.startswith(add_item):
@@ -495,7 +485,6 @@ class MainWindow1(MainWindow):
         connect(self.actor_editor.transform_changed, self.on_transform_edit)
 
         connect(self.asset_browser.add_item, self.add_item_to_scene)
-        connect(self.asset_browser.add_item_by_drag, self.add_item_by_drag)
 
         connect(self.menu_file.aboutToShow, self.prepare_file_menu)
         connect(self.menu_edit.aboutToShow, self.prepare_edit_menu)
@@ -716,18 +705,6 @@ class MainWindow1(MainWindow):
         command.new_path = actor_path.parent() / new_name
 
         await self.rename_actor(actor, new_name)
-
-        self.add_command(command)
-
-    async def add_item_to_scene(self, item_name):
-        name = self.make_unique_name(item_name, self.local_scene.root_actor)
-        actor = AssetActor(name=name, spawnable_name=item_name)
-
-        await self.add_actor(actor, Path.root_path())
-
-        command = CreteActorCommand()
-        command.actor = deepcopy(actor)
-        command.path = Path.root_path() / name
 
         self.add_command(command)
 
