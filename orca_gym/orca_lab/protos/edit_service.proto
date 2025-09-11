@@ -125,6 +125,14 @@ message GetPendingSelectionChangeResponse {
     repeated string actor_paths = 3;
 }
 
+message GetPendingAddItemRequest {
+}
+message GetPendingAddItemResponse {
+    StatusCode status_code = 1;
+    string error_message = 2;
+    Transform transform = 3;
+    string actor_name = 4;
+}
 
 message SetSelectionRequest {
     repeated string actor_paths = 1;
@@ -212,6 +220,7 @@ service GrpcService {
     rpc GetActorAssets(GetActorAssetsRequest) returns (GetActorAssetsResponse);
 
     rpc GetPendingSelectionChange(GetPendingSelectionChangeRequest) returns (GetPendingSelectionChangeResponse);
+    rpc GetPendingAddItem(GetPendingAddItemRequest) returns (GetPendingAddItemResponse);
     rpc SetSelection(SetSelectionRequest) returns (SetSelectionResponse);
 
     rpc SaveBodyTransform(SaveBodyTransformRequest) returns (SaveBodyTransformResponse);

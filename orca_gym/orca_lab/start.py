@@ -163,9 +163,6 @@ class MainWindow(QtWidgets.QWidget):
         self.asset_browser.add_item.connect(
             lambda item_name: asyncio.ensure_future(self.add_item_to_scene(item_name))
         )
-        self.asset_browser.add_item_by_drag.connect(
-            lambda item_name, posX, posY: asyncio.ensure_future(self.add_item_by_drag(item_name, posX, posY))
-        )
 
         self.menu_bar = QtWidgets.QMenuBar()
 
@@ -206,6 +203,7 @@ class MainWindow(QtWidgets.QWidget):
         asyncio.create_task(self._query_pending_operation_loop())
 
     async def _process_pending_operation(self, op: str):
+        print("op:", op)
         local_transform_change = "local_transform_change:"
         if op.startswith(local_transform_change):
             actor_path = Path(op[len(local_transform_change) :])
@@ -251,6 +249,13 @@ class MainWindow(QtWidgets.QWidget):
                 paths.append(Path(p))
 
             await self.set_selection_from_outline(paths)
+
+        add_item = "add_item"
+        if op.startswith(add_item):
+            
+            [transform, name] = await self.remote_scene.get_pending_add_item()
+            print("add info", name, transform)
+            await self.add_item_drag(name, transform)
 
     async def run_sim(self):
         if self.sim_process_running:
@@ -317,11 +322,10 @@ class MainWindow(QtWidgets.QWidget):
         self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
 
-    async def add_item_by_drag(self, item_name, posX, posY):
+    async def add_item_drag(self, item_name, transform):
         print(f"Adding {item_name} to the scene...")
         index = self.asset_map_counter[item_name]
-        respone = await self.remote_scene.get_generate_pos(posX, posY)
-        transform = respone.transform
+        transform = transform
         new_item_name = item_name + str(index)
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
 

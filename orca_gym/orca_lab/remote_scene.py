@@ -223,6 +223,12 @@ class RemoteScene:
         response = await self.edit_stub.GetPendingSelectionChange(request)
         self._check_response(response)
         return response.actor_paths
+    
+    async def get_pending_add_item(self) -> Transform:
+        request = edit_service_pb2.GetPendingAddItemRequest()
+        response = await self.edit_stub.GetPendingAddItem(request)
+        self._check_response(response)
+        return [response.transform, response.actor_name]
 
     async def set_selection(self, actor_paths: list[Path]):
         paths = []
