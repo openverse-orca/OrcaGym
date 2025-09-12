@@ -280,7 +280,10 @@ def run_rllib_appo_rl(
     if num_env_runners == 0:
         # 自动分配时，将learner分配到一个独立的节点。为保障该节点不运行env_runners，所以需要减去一个节点的CPU数量
         # 此时相当于指定将learner分配到CPU核最多的节点上（TODO: 后续优化让用户指定分配在哪个节点）
-        num_env_runners = int((num_cpus_available - num_node_cpus_max - 1) // 4 * 4)
+        # num_env_runners = int((num_cpus_available - num_node_cpus_max - 1) // 4 * 4)
+
+        # learner 可以和 env_runners 共享一个节点，所以需要减去learner的CPU数量
+        num_env_runners = int((num_cpus_available - num_learners * num_cpus_per_learner - 1) // 4 * 4)
 
     assert num_env_runners * num_cpus_per_env_runner + num_learners * num_cpus_per_learner <= num_cpus_available - 1, \
         f"Ray集群设置的env_runners数量和learner数量之和不能超过Ray集群的CPU数量-1，当前设置的env_runners数量: {num_env_runners}, \

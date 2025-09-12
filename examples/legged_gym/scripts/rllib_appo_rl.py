@@ -292,9 +292,9 @@ def get_config(
             clip_param=agent_config.get("clip_param", 0.4),
             vf_loss_coeff=agent_config.get("vf_loss_coeff", 0.5), 
             entropy_coeff=ent_coef_schedule, 
-            use_kl_loss=True,
-            circular_buffer_num_batches=16,
-            circular_buffer_iterations_per_batch=20
+            use_kl_loss=agent_config.get("use_kl_loss", False),
+            circular_buffer_num_batches=agent_config.get("circular_buffer_num_batches", 16),
+            circular_buffer_iterations_per_batch=agent_config.get("circular_buffer_iterations_per_batch", 20)
         )
         # .evaluation(
         #     evaluation_interval=10,

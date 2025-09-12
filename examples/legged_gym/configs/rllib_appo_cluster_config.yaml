@@ -14,9 +14,9 @@ training:
   num_envs_per_env_runner: 32    # 必须是 32 的倍数，一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
   num_cpus_per_env_runner: 1     # 每个env_runner配套1个CPU
   num_gpus_per_env_runner: 0.01   # 每个env_runner配套0.01个GPU
-  num_learners: 8                # 多Learner需要优化显存占用，避免爆显存
-  num_cpus_per_learner: 2        # 每个learner配套多少个CPU，如果num_env_runners != 0，则使用这个值来分配learner的CPU
-  num_gpus_per_learner: 0.125    # 在单卡机中，一个节点允许分配8个learner
+  num_learners: 1                # 每个learner要占用一张卡
+  num_cpus_per_learner: 8        # 每个learner配套多少个CPU，如果num_env_runners != 0，则使用这个值来分配learner的CPU
+  num_gpus_per_learner: 0.6      # 大于0.5，避免多个learner共享一张卡
   async_env_runner: True
   iter: 2000
   render_mode: none
