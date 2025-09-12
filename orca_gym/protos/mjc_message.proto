@@ -22,6 +22,7 @@ service GrpcService {
   rpc StopSaveMp4File(StopSaveMp4FileRequest) returns (StopSaveMp4FileResponse);
   rpc GetCurrentFrameIndex(GetCurrentFrameIndexRequest) returns (GetCurrentFrameIndexResponse);
   rpc GetTimeStamp(GetTimeStampRequest) returns (GetTimeStampResponse);
+  rpc GetCameraFramePNG(GetCameraFramePNGRequest) returns (GetCameraFramePNGResponse);
 
   // 键鼠操作
   rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
@@ -1126,6 +1127,22 @@ message TimeStampList {
 message GetTimeStampResponse {
   map<string, TimeStampList> time_stamp_map = 1; // 时间戳，键为 Actor 名字，值为时间戳列表
   string error_message = 2; // 错误详情（可选）
+}
+
+message GetCameraFramePNGRequest
+{
+  string image_path = 1;
+}
+
+message NameAndTransform {
+  string name = 1;
+  repeated double pos = 2;
+  repeated double quat = 3;
+}
+
+message GetCameraFramePNGResponse
+{
+  repeated NameAndTransform name_transform = 1;
 }
 
 message MakeCameraViewportActiveRequest {

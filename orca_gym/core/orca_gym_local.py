@@ -55,6 +55,17 @@ class AnchorType:
     WELD = 1
     BALL = 2
 
+class CaptureMode:
+    '''
+    Enum for mujoco capture camera mode
+    When using synchronous mode,
+    each camera frame is aligned,
+    but performance will be affected.
+    Asynchronous mode, the opposite
+    '''
+    ASYNC = 0
+    SYNC = 1
+
 def get_eq_type(anchor_type: AnchorType):
     """
     Get the equality constraint type based on the anchor type.
@@ -233,8 +244,8 @@ class OrcaGymLocal(OrcaGymBase):
                 await self.process_xml_node(child)
         return
     
-    async def begin_save_video(self, file_path):
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
+    async def begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC):
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
         response = await self.stub.BeginSaveMp4File(request)
         if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
             print(f"Video saving started at {file_path}")
@@ -249,6 +260,26 @@ class OrcaGymLocal(OrcaGymBase):
         request = mjc_message_pb2.GetCurrentFrameIndexRequest()
         response = await self.stub.GetCurrentFrameIndex(request)
         return response.current_frame
+
+    async def get_camera_time_stamp(self, last_frame) -> dict:
+        request = mjc_message_pb2.GetTimeStampRequest()
+        request.last_frame_index = last_frame
+        response = await self.stub.GetTimeStamp(request)
+        if response.error_message != "":
+            print(f"Get time stamp failed. error message: {response.error_message}")
+        return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
+
+    async def get_frame_png(self, image_path):
+        request = mjc_message_pb2.GetCameraFramePNGRequest()
+        request.image_path = image_path
+        response = await self.stub.GetCameraFramePNG(request)
+        result = {}
+        for name_transform in response.name_transform:
+            result[name_transform.name] = {
+                'pos': list(name_transform.pos),
+                'quat': list(name_transform.quat)
+            }
+        return result
 
     @property
     def xml_file_dir(self):

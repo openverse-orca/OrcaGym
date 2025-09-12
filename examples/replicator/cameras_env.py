@@ -38,17 +38,17 @@ class CamerasEnv(OrcaGymLocalEnv):
 
         self._camera_config = [
             {"name" : "default_camera","duration" : 5, "body_name" : "default_camera_CameraViewport"}, 
-            {"name" : "top_camera", "duration" : 5, "body_name" : "top_camera_CameraViewport"}, 
-            {"name" : "side_camera", "duration" : 5, "body_name" : "side_camera_CameraViewport"},
+            # {"name" : "top_camera", "duration" : 5, "body_name" : "top_camera_CameraViewport"},
+            # {"name" : "side_camera", "duration" : 5, "body_name" : "side_camera_CameraViewport"},
         ]
         self._current_camera = 0
         self._camera_switch_time = 0.0
 
         self._default_camera_body_name = self._camera_config[0]["body_name"]
-        self._top_camera_body_name = self._camera_config[1]["body_name"]
-        self._side_camera_body_name = self._camera_config[2]["body_name"]
-        self._side_camera_init_pos, _, self._side_camera_init_quat = self.get_body_xpos_xmat_xquat([self._side_camera_body_name])
-        self._side_camera_rotate_angle = 0.0
+        # self._top_camera_body_name = self._camera_config[1]["body_name"]
+        # self._side_camera_body_name = self._camera_config[2]["body_name"]
+        # self._side_camera_init_pos, _, self._side_camera_init_quat = self.get_body_xpos_xmat_xquat([self._side_camera_body_name])
+        # self._side_camera_rotate_angle = 0.0
         self._camera_move_phrase = 0
 
 
@@ -60,7 +60,7 @@ class CamerasEnv(OrcaGymLocalEnv):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
 
     def _set_action_space(self):
-        self.action_space = self.generate_action_space(np.ones(self.nu, dtype=np.float32))
+        self.action_space = self.generate_action_space(np.array([self.nu, self.nu], dtype=np.float32))
 
     
     def render_callback(self, mode='human') -> None:
@@ -86,8 +86,8 @@ class CamerasEnv(OrcaGymLocalEnv):
 
 
         self._move_default_camera()
-        self._rotate_top_camera()
-        self._slide_side_camera()
+        # self._rotate_top_camera()
+        # self._slide_side_camera()
         self._switch_camera()
 
         return obs, reward, terminated, truncated, info
@@ -112,7 +112,6 @@ class CamerasEnv(OrcaGymLocalEnv):
 
         obs = self._get_obs().copy()
         return obs, {}
-    
 
 
     def get_observation(self, obs=None) -> dict:
