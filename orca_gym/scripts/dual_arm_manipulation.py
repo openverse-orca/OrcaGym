@@ -557,7 +557,7 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         data_gen_mode="simulation",
     )
     uuid_dir   = dataset_writer.get_UUIDPath()
-    dump_static_camera_params(uuid_dir, lvl)
+    # dump_static_camera_params(uuid_dir, lvl)
 
 
 

@@ -109,6 +109,16 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
                 _registered_method=True)
+        self.GetTimeStamp = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetTimeStamp',
+                request_serializer=mjc__message__pb2.GetTimeStampRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetTimeStampResponse.FromString,
+                _registered_method=True)
+        self.GetCameraFramePNG = channel.unary_unary(
+                '/MujocoMessage.GrpcService/GetCameraFramePNG',
+                request_serializer=mjc__message__pb2.GetCameraFramePNGRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.GetCameraFramePNGResponse.FromString,
+                _registered_method=True)
         self.GetKeyPressedEvents = channel.unary_unary(
                 '/MujocoMessage.GrpcService/GetKeyPressedEvents',
                 request_serializer=mjc__message__pb2.GetKeyPressedEventsRequest.SerializeToString,
@@ -551,6 +561,18 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetCurrentFrameIndex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTimeStamp(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCameraFramePNG(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1064,6 +1086,16 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.GetCurrentFrameIndex,
                     request_deserializer=mjc__message__pb2.GetCurrentFrameIndexRequest.FromString,
                     response_serializer=mjc__message__pb2.GetCurrentFrameIndexResponse.SerializeToString,
+            ),
+            'GetTimeStamp': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTimeStamp,
+                    request_deserializer=mjc__message__pb2.GetTimeStampRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetTimeStampResponse.SerializeToString,
+            ),
+            'GetCameraFramePNG': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCameraFramePNG,
+                    request_deserializer=mjc__message__pb2.GetCameraFramePNGRequest.FromString,
+                    response_serializer=mjc__message__pb2.GetCameraFramePNGResponse.SerializeToString,
             ),
             'GetKeyPressedEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.GetKeyPressedEvents,
@@ -1821,6 +1853,60 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/GetCurrentFrameIndex',
             mjc__message__pb2.GetCurrentFrameIndexRequest.SerializeToString,
             mjc__message__pb2.GetCurrentFrameIndexResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTimeStamp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetTimeStamp',
+            mjc__message__pb2.GetTimeStampRequest.SerializeToString,
+            mjc__message__pb2.GetTimeStampResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetCameraFramePNG(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/GetCameraFramePNG',
+            mjc__message__pb2.GetCameraFramePNGRequest.SerializeToString,
+            mjc__message__pb2.GetCameraFramePNGResponse.FromString,
             options,
             channel_credentials,
             insecure,

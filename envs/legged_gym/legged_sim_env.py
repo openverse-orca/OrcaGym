@@ -1,18 +1,10 @@
-from datetime import datetime
-import sys
 import numpy as np
-from gymnasium.core import ObsType
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-from orca_gym.devices.xbox_joystick import XboxJoystickManager
+from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment import OrcaGymLocalEnv
-from scipy.spatial.transform import Rotation as R
 from collections import defaultdict
 
-from envs.legged_gym.legged_robot import LeggedRobot, get_legged_robot_name
-from envs.legged_gym.legged_config import LeggedEnvConfig, LeggedRobotConfig
-from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
+from envs.legged_gym.legged_robot import LeggedRobot
 
 class ControlDevice:
     """
@@ -44,6 +36,10 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         max_episode_steps: int,
         ctrl_device: ControlDevice,
         control_freq: int,
+        robot_config: dict,
+        legged_obs_config: dict,
+        curriculum_config: dict,
+        legged_env_config: dict,
         **kwargs,
     ):
 
@@ -54,6 +50,11 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq     
         self._keyboard_addr = orcagym_addr
+
+        self._robot_config = robot_config
+        self._legged_obs_config = legged_obs_config
+        self._curriculum_config = curriculum_config
+        self._legged_env_config = legged_env_config
 
         super().__init__(
             frame_skip = frame_skip,
@@ -101,11 +102,11 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         env_action_range = np.concatenate([agent.action_range for agent in self._agents.values()], axis=0)
         self.env_action_range_min = env_action_range[:, 0]
         self.env_action_range_max = env_action_range[:, 1]
-        # print("env action range: ", action_range)
+        print("env action range: ", env_action_range)
         # 归一化到 [-1, 1]区间
-        scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
+        # scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
         # print("Scaled action range: ", scaled_action_range)
-        self.action_space = self.generate_action_space(scaled_action_range)
+        self.action_space = self.generate_action_space(env_action_range)
 
 
     def get_env_version(self):
@@ -278,6 +279,13 @@ class LeggedSimEnv(OrcaGymLocalEnv):
     def setup_command(self, command_dict : dict) -> None:
         [agent.agent.setup_command(command_dict) for agent in self._agents.values()]
 
+    def setup_base_friction(self, base_friction: float) -> None:
+        geom_dict = self.model.get_geom_dict()
+        geom_friction_dict = self._agents[self._agent_names[0]].agent.scale_foot_friction(geom_dict, base_friction)
+        self.set_geom_friction(geom_friction_dict)
+
+        print("Setup base friction: ", geom_friction_dict)
+
 
 
 ## --------------------------------            
@@ -287,7 +295,6 @@ class AgentBase:
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         self._id = id
         self._name = name
-        self._config_name = get_legged_robot_name(name)
 
     @property
     def id(self) -> int:
@@ -296,10 +303,7 @@ class AgentBase:
     @property
     def name(self) -> str:
         return self._name
-    
-    @property
-    def config_name(self) -> str:
-        return self._config_name
+
 
     @property
     def action_range(self) -> np.ndarray:
@@ -309,9 +313,13 @@ class AgentBase:
         self._legged_agent = LeggedRobot(
             env_id = env.env_id,
             agent_name=self.name,
-            task="follow_command",
+            task="flat_terrain",
             max_episode_steps=env.max_episode_steps,
             dt=env.dt,
+            robot_config=env._robot_config,
+            legged_obs_config=env._legged_obs_config,
+            curriculum_config=env._curriculum_config,
+            is_subenv=False,
         )
         
         self.dt = env.dt
@@ -329,6 +337,7 @@ class AgentBase:
         self.agent.set_action_space() 
         self.generate_action_scale_array(self._query_ctrl_info())
         self._init_playable(env)
+
 
     @property
     def agent(self) -> LeggedRobot:
@@ -411,6 +420,7 @@ class AgentBase:
     def _init_playable(self, env: LeggedSimEnv) -> None:
         self.agent.init_playable()
         self.agent.player_control = True
+
 class Lite3Agent(AgentBase):
     def __init__(self, env: LeggedSimEnv, id: int, name: str) -> None:
         super().__init__(env, id, name)

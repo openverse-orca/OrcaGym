@@ -1,6 +1,9 @@
 # shop1任务配置文件
 
 level_name: "shop"
+type: "pick_and_place"
+range: {x: [0.2, 0.612], y: [-0.4, 0.4], z: -0.4, r: 0.3}
+
 # body, site, joint 的顺序需要保持一致
 object_bodys: [ "bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite", "salt_site", "can_site"]

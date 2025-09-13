@@ -124,11 +124,16 @@ class OrcaGymAsyncAgent:
 
         self._ctrl_start = actuator_dict[self._actuator_names[0]]['ActuatorId']
 
-        self._ctrl_range = np.array(ctrl_range_list)
         self._torques_range = np.array(torques_range_list)
+        self._torques_limit = np.array([abs(self._torques_range[i][1]) * self._soft_torque_limit for i in range(len(self._torques_range))])
+
+        self._ctrl_range = np.array(ctrl_range_list)
         self._joint_qpos_limit = np.array([[self._ctrl_range[i][0] * self._soft_joint_qpos_limit, 
                                            self._ctrl_range[i][1] * self._soft_joint_qpos_limit] 
                                            for i in range(len(self._ctrl_range))])
+
+        self._joint_qvel_limit = np.array([self._joint_qvel_range[i] * self._soft_joint_qvel_limit for i in range(len(self._joint_qvel_range))])
+
         # print("ctrl_range: ", self._ctrl_range)
         # print("soft_joint_qpos_limit: ", self._soft_joint_qpos_limit)
         # print("joint_qpos_limit: ", self._joint_qpos_limit)
@@ -189,7 +194,6 @@ class OrcaGymAsyncAgent:
         self._np_random = np_random
         reset_info = self.on_reset(**kwargs)
         return reset_info
-
 
     def is_success(self, achieved_goal, desired_goal) -> np.float32:
         raise NotImplementedError

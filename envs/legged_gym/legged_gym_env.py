@@ -1,18 +1,15 @@
 import numpy as np
-from gymnasium.core import ObsType
 from orca_gym.environment.async_env import OrcaGymAsyncEnv
-from orca_gym.utils import rotations
-from typing import Optional, Any, SupportsFloat
-from gymnasium import spaces
-import datetime
+from typing import SupportsFloat
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import gymnasium as gym
 import time
 from collections import defaultdict
 import requests
-from examples.vln.imgrec import RecAction
 from .legged_robot import LeggedRobot
-from .legged_config import LeggedEnvConfig, LeggedRobotConfig
+import os
+import fcntl
+import shutil
 
 class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
@@ -30,10 +27,15 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         run_mode: str,
         env_id: str,
         task: str,
+        robot_config: dict,
+        legged_obs_config: dict,
+        curriculum_config: dict,
+        legged_env_config: dict,
         **kwargs,
     ):
-        self._init_height_map(height_map_file)
-        self._run_mode = run_mode       
+
+        self._run_mode = run_mode      
+        self._height_map = np.zeros((2000, 2000))  # Set default height map before load from file, 200m x 200m 
         
         super().__init__(
             frame_skip = frame_skip,
@@ -46,9 +48,14 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             is_subenv = is_subenv,
             env_id = env_id,
             task = task,
+            robot_config = robot_config,
+            legged_obs_config = legged_obs_config,
+            curriculum_config = curriculum_config,
+            legged_env_config = legged_env_config,
             **kwargs,
         )
 
+        self._init_height_map(height_map_file)
         self._randomize_agent_foot_friction()
         self._add_randomized_weight()
         self._init_playable(orcagym_addr)
@@ -221,11 +228,10 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             print("Skip randomize foot friction in testing or play mode")
             return
 
-        random_friction = self.np_random.uniform(0, 1.0)
         geom_friction_dict = {}
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
-            agent_geom_friction_dict = agent.randomize_foot_friction(random_friction, self.model.get_geom_dict())
+            agent_geom_friction_dict = agent.randomize_foot_friction(self.model.get_geom_dict())
             geom_friction_dict.update(agent_geom_friction_dict)
 
         # print("Set geom friction: ", geom_friction_dict)
@@ -237,13 +243,15 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
             print("Skip randomized weight load in testing or play mode")
             return   
 
-        pos_scale = 0.01
         weight_load_dict = {}
         all_joint_dict = self.model.get_joint_dict()        
         for i in range(len(self.agents)):
             agent : LeggedRobot = self.agents[i]
             random_weight = self.np_random.uniform(agent.added_mass_range[0], agent.added_mass_range[1])
-            random_weight_pos = [self.np_random.uniform(-pos_scale, pos_scale), self.np_random.uniform(-pos_scale, pos_scale), 0]
+            random_weight_pos = [
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1]),
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1]), 
+                self.np_random.uniform(agent.added_mass_pos_range[0], agent.added_mass_pos_range[1])]
 
             base_body_id = all_joint_dict[agent.base_joint_name]["BodyID"]
             weight_load_tmp = {base_body_id : {"weight": random_weight, "pos": random_weight_pos}}
@@ -255,12 +263,115 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
     def _init_height_map(self, height_map_file: str) -> None:
         if height_map_file is not None:
             try:
-                self._height_map = np.load(height_map_file)
-            except:
+                height_map_file_name = os.path.basename(height_map_file)
+                height_map_file_remote_dir = os.path.dirname(height_map_file)
+                height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orcagym", "height_map")
+                # height_map_file_local_dir = os.path.join(os.path.expanduser("~"), ".orcagym", "height_map_tmp_test")
+                
+                if not os.path.exists(height_map_file_local_dir):
+                    os.makedirs(height_map_file_local_dir, exist_ok=True)
+
+                height_map_file_local_path = os.path.join(height_map_file_local_dir, height_map_file_name)
+                
+                # 使用文件锁防止多进程重入
+                lock_file_path = height_map_file_local_path + ".lock"
+                
+                # 清理可能存在的过期锁文件（超过5分钟）
+                if os.path.exists(lock_file_path):
+                    lock_age = time.time() - os.path.getmtime(lock_file_path)
+                    if lock_age > 300:  # 5分钟
+                        try:
+                            os.remove(lock_file_path)
+                        except:
+                            pass
+                    else:
+                        # 检查锁文件中的进程ID是否仍然有效
+                        try:
+                            with open(lock_file_path, 'r') as f:
+                                pid_str = f.read().strip()
+                                if pid_str.isdigit():
+                                    pid = int(pid_str)
+                                    # 检查进程是否还在运行
+                                    try:
+                                        os.kill(pid, 0)  # 发送信号0检查进程是否存在
+                                    except OSError:
+                                        # 进程不存在，清理锁文件
+                                        try:
+                                            os.remove(lock_file_path)
+                                        except:
+                                            pass
+                        except:
+                            # 读取失败，清理锁文件
+                            try:
+                                os.remove(lock_file_path)
+                            except:
+                                pass
+                
+                # 创建锁文件并写入当前进程ID
+                with open(lock_file_path, 'w') as lock_file:
+                    lock_file.write(str(os.getpid()))
+                    lock_file.flush()
+                    os.fsync(lock_file.fileno())
+                    
+                    try:
+                        # 获取独占锁
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                        
+                        # 再次检查文件是否存在（在锁保护下）
+                        if not os.path.exists(height_map_file_local_path):
+                            # 使用临时文件下载，避免文件损坏
+                            temp_file_path = height_map_file_local_path + ".tmp"
+                            
+                            try:
+                                self.load_content_file(height_map_file_name, height_map_file_remote_dir, height_map_file_local_dir, temp_file_path)
+                                
+                                # 验证下载的文件完整性
+                                if self._verify_file_integrity(temp_file_path):
+                                    # 原子性地移动到最终位置
+                                    shutil.move(temp_file_path, height_map_file_local_path)
+                                    print("Load height map file: ", height_map_file_local_path)
+                                else:
+                                    raise Exception("Downloaded file integrity check failed")
+                                    
+                            except Exception as e:
+                                # 清理临时文件
+                                if os.path.exists(temp_file_path):
+                                    os.remove(temp_file_path)
+                                raise e
+                        else:
+                            print("Height map file already exists: ", height_map_file_local_path)
+                            
+                    finally:
+                        # 释放锁
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                        # 清理锁文件
+                        try:
+                            os.remove(lock_file_path)
+                        except:
+                            pass
+                
+                # 加载高度图文件
+                self._height_map = None
+                self._height_map = np.load(height_map_file_local_path)
+                
+            except Exception as e:
+                print("Load height map file failed: ", e)
                 gym.logger.warn("Height map file loading failed!, use default height map 200m x 200m")
                 self._height_map = np.zeros((2000, 2000))  # default height map, 200m x 200m
         else:
             raise ValueError("Height map file is not provided")
+    
+    def _verify_file_integrity(self, file_path: str) -> bool:
+        """验证文件完整性"""
+        try:
+            # 尝试加载文件，如果损坏会抛出异常
+            test_data = np.load(file_path)
+            # 检查数据是否为空或异常
+            if test_data is None or test_data.size == 0:
+                return False
+            return True
+        except Exception:
+            return False
 
     def _reset_agent_joint_qpos(self, agents: list[LeggedRobot]) -> None:
         joint_qpos = {}
@@ -302,20 +413,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                 agent.init_playable()
                 agent.player_control = True
                 break
-
-        if "go2" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["go2"]
-        elif "A01B" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["A01B"]
-        elif "AzureLoong" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["AzureLoong"]
-        elif "Lite3" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["Lite3"]
-        elif "g1" in self._player_agent.name:
-            robot_config = LeggedRobotConfig["g1"]
             
-        self._player_agent_lin_vel_x = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
-        self._player_agent_lin_vel_y = np.array(robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
+        self._player_agent_lin_vel_x = np.array(self._robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_x"]) / 2
+        self._player_agent_lin_vel_y = np.array(self._robot_config["curriculum_commands"]["move_medium"]["command_lin_vel_range_y"]) / 2
     
     def _update_playable(self) -> None:
         if self._run_mode != "play" and self._run_mode != "nav":
@@ -391,12 +491,12 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         return lin_vel, turn_angel, reborn
 
     def _reset_phy_config(self) -> None:
-        phy_config = LeggedEnvConfig["phy_config"]
-        self.gym.opt.iterations = LeggedEnvConfig[phy_config]["iterations"]
-        self.gym.opt.noslip_iterations = LeggedEnvConfig[phy_config]["noslip_iterations"]
-        self.gym.opt.ccd_iterations = LeggedEnvConfig[phy_config]["ccd_iterations"]
-        self.gym.opt.sdf_iterations = LeggedEnvConfig[phy_config]["sdf_iterations"]
-        self.gym.opt.filterparent = LeggedEnvConfig[phy_config]["filterparent"]
+        phy_config = self._legged_env_config["phy_config"]
+        self.gym.opt.iterations = self._legged_env_config[phy_config]["iterations"]
+        self.gym.opt.noslip_iterations = self._legged_env_config[phy_config]["noslip_iterations"]
+        self.gym.opt.ccd_iterations = self._legged_env_config[phy_config]["ccd_iterations"]
+        self.gym.opt.sdf_iterations = self._legged_env_config[phy_config]["sdf_iterations"]
+        self.gym.opt.filterparent = self._legged_env_config[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
         print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)

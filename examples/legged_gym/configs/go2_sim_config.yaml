@@ -5,20 +5,11 @@ agent_spawnable_name: "go2_usda"
 model_file: 
   "flat_terrain": "/home/superfhwl/download/go2_follow_command_flat_terrain_iteration_300.zip"
   "rough_terrain": "/home/superfhwl/download/go2_follow_command_rough_terrain_iteration_1000.zip"
-  "stand_still": "/home/superfhwl/download/go2_stand_still_iteration_500.zip"
 
 ctrl_device: "keyboard"
 
 command_model:
   "flat_terrain":
-    "forward": "flat_terrain"
-    "backward": "flat_terrain"
-    "stand_still": "stand_still"
-    "trun": "stand_still"
   "rough_terrain":
-    "forward": "rough_terrain"
-    "backward": "rough_terrain"
-    "stand_still": "rough_terrain"
-    "trun": "rough_terrain"
   
 terrain_spawnable_names: ["terrain_test_usda"]

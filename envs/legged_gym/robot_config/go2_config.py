@@ -1,7 +1,7 @@
 import numpy as np
 
 RewardConfig = {
-    "follow_command": {
+    "flat_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
@@ -33,7 +33,7 @@ RewardConfig = {
         # "soft_torque_limit" : 1.0,       # 避免关节力矩过大
         "contact_no_vel" : 0,            # 接触时，足底线速度越小越好
     },
-    "stand_still": {
+    "rough_terrain": {
         "alive" : 0,                     # 存活奖励
         "success" : 0,                   # 成功奖励
         "failure" : 0,                   # 失败惩罚
@@ -136,15 +136,6 @@ Go2Config = {
         "sensor_foot_touch_names" : ["FL_touch", "FR_touch", "RL_touch", "RR_touch"],   # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",                                     
-                                        ],
         
         "base_contact_body_names" : ["base", "FL_hip", "FR_hip", "RL_hip", "RR_hip"],
         "leg_contact_body_names" : ["FL_thigh", "FL_calf", 
@@ -177,7 +168,7 @@ Go2Config = {
         "randomize_base_mass" :     True,
         "added_mass_range" :        [-0.5, 1.5],
         "push_robots" :             True,
-        "push_interval_s" :         5,
+        "push_interval_s" :         15,
         "max_push_vel_xy" :         1.0,
         "pos_random_range" :        0.5,    # randomize the x,y position of the robot in each episode
         

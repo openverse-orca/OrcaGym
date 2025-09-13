@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package inference;
+
+// 推理服务定义
+service InferenceService {
+  // 单次推理
+  rpc Predict (InferenceRequest) returns (InferenceResponse);
+  
+  // 批量推理
+  rpc BatchPredict (BatchInferenceRequest) returns (BatchInferenceResponse);
+}
+
+// 推理请求
+message InferenceRequest {
+  // 观察数据
+  repeated float observation = 1;
+  
+  // 可选：目标数据
+  repeated float desired_goal = 2;
+  
+  // 可选：已达成目标
+  repeated float achieved_goal = 3;
+  
+  // 模型类型标识
+  string model_type = 4;
+  
+  // 是否确定性推理
+  bool deterministic = 5;
+}
+
+// 推理响应
+message InferenceResponse {
+  // 动作数据
+  repeated float action = 1;
+  
+  // 可选：状态信息
+  repeated float states = 2;
+  
+  // 推理状态
+  bool success = 3;
+  
+  // 错误信息
+  string error_message = 4;
+}
+
+// 批量推理请求
+message BatchInferenceRequest {
+  repeated InferenceRequest requests = 1;
+}
+
+// 批量推理响应
+message BatchInferenceResponse {
+  repeated InferenceResponse responses = 1;
+} 

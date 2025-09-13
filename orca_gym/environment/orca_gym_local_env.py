@@ -14,7 +14,7 @@ import sys
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.core.orca_gym_local import AnchorType, get_eq_type
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -46,8 +46,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         )
 
         render_fps = self.metadata.get("render_fps")
-        self._render_interval = 1.0 / render_fps
-        self._render_time_step = time.perf_counter()
+        self._render_interval = self.realtime_step * render_fps
+        print(f"render_interval: {self._render_interval}" )
+        self.render_count = 0
         self._last_frame_index = -1
         self.mj_forward()
 
@@ -114,11 +115,11 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     async def _get_body_manipulation_movement(self):
         return await self.gym.get_body_manipulation_movement()
     
-    def begin_save_video(self, file_path: str):
-        return self.loop.run_until_complete(self._begin_save_video(file_path))
+    def begin_save_video(self, file_path: str, capture_mode: CaptureMode = CaptureMode.ASYNC ):
+        return self.loop.run_until_complete(self._begin_save_video(file_path, capture_mode=capture_mode))
 
-    async def _begin_save_video(self, file_path):
-        return await self.gym.begin_save_video(file_path)
+    async def _begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC ):
+        return await self.gym.begin_save_video(file_path, capture_mode=capture_mode)
 
     def stop_save_video(self):
         return self.loop.run_until_complete(self._stop_save_video())
@@ -128,8 +129,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def get_next_frame(self) -> int:
         current_frame = self.loop.run_until_complete(self._get_current_frame())
-        if current_frame == 0:
-            # 如果摄像头没有使能，会一直返回0
+        if current_frame < 0:
+            # 如果摄像头没有使能，会一直返回-1
             return current_frame
         
         for _ in range(10):
@@ -147,6 +148,18 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     async def _get_current_frame(self):
         return await self.gym.get_current_frame()
+
+    def get_camera_time_stamp(self, last_frame_index) -> dict:
+        return self.loop.run_until_complete(self._get_camera_time_stamp(last_frame_index))
+
+    async def _get_camera_time_stamp(self, last_frame_index):
+        return await self.gym.get_camera_time_stamp(last_frame_index)
+
+    def get_frame_png(self, image_path):
+        return self.loop.run_until_complete(self._get_frame_png(image_path))
+
+    async def _get_frame_png(self, image_path):
+        return await self.gym.get_frame_png(image_path)
 
     def get_body_manipulation_movement(self):
         actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
@@ -184,12 +197,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def render(self):
         if self.render_mode not in ["human", "force"]:
             return
-        
-        time_diff = time.perf_counter() - self._render_time_step
-        if (time_diff > self._render_interval):
-            self._render_time_step = time.perf_counter()
+
+        self.render_count += self._render_interval
+        if (self.render_count >= 1.0):
             self.loop.run_until_complete(self.gym.render())
             self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+            self.render_count -= 1
 
     def do_body_manipulation(self):
         if self._anchor_body_id is None:
@@ -542,3 +555,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def set_actuator_trnid(self, actuator_id, trnid):
         self.gym.set_actuator_trnid(actuator_id, trnid)
         return
+
+    async def _load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
+        content_file_path = await self.gym.load_content_file(content_file_name, remote_file_dir, local_file_dir, temp_file_path)
+        return content_file_path
+
+    def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
+        return self.loop.run_until_complete(self._load_content_file(content_file_name, remote_file_dir, local_file_dir, temp_file_path))
