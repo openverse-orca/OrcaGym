@@ -131,7 +131,7 @@ class GroupActor(BaseActor):
 class AssetActor(BaseActor):
     def __init__(self, name: str, spawnable_name: str, parent: GroupActor = None):
         super().__init__(name, parent)
-        self.spawnable_name = spawnable_name
+        self._spawnable_name = spawnable_name
 
     def __repr__(self):
         return f"AssetActor(name={self.name})"

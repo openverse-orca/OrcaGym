@@ -107,7 +107,7 @@ class ActorEditor(QtWidgets.QWidget):
 
     def update_ui(self):
         if self._transform_edit is not None and self._actor is not None:
-            self._transform_edit.transform = self._actor.transform
+            self._transform_edit.set_transform(self._actor.transform)
 
 
 if __name__ == "__main__":

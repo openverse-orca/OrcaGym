@@ -40,9 +40,9 @@ class TransformEdit(QtWidgets.QWidget):
 
         self._layout.addSpacing(10)
 
-        self._rot_x = self._add_line("Rotation X", FloatEdit())
-        self._rot_y = self._add_line("Y", FloatEdit())
-        self._rot_z = self._add_line("Z", FloatEdit())
+        self._rot_x = self._add_line("Rotation X", FloatEdit(step =1.0))
+        self._rot_y = self._add_line("Y", FloatEdit(step =1.0))
+        self._rot_z = self._add_line("Z", FloatEdit(step =1.0))
 
         self._layout.addSpacing(10)
 
@@ -75,6 +75,7 @@ class TransformEdit(QtWidgets.QWidget):
     def _on_value_changed(self):
         self.value_changed.emit()
 
+    @property
     def transform(self):
         transform = Transform()
 

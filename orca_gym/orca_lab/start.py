@@ -50,9 +50,6 @@ class MainWindow(QtWidgets.QWidget):
         respone = await self.remote_scene.get_window_id()
         self.hwnd = respone.window_id
 
-        self.asset_map_counter = {}
-        self.asset_map_counter["box"] = 2
-
     async def _init_ui(self):
         self.tool_bar = ToolBar()
         connect(self.tool_bar.action_start.triggered, self.run_sim)
@@ -219,23 +216,18 @@ class MainWindow(QtWidgets.QWidget):
         else:
             parent_path = self.local_scene.get_actor_path(parent_actor)
     
-        index = self.asset_map_counter[item_name]
         transform = Transform()
-        transform.position = np.array([1 * index, 0, 2], dtype=np.float64)
-        new_item_name = item_name + str(index)
+        transform.position = np.array([0, 0, 1], dtype=np.float64)
+        new_item_name = self.make_unique_name(item_name, parent_path)
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
         actor.transform = transform
 
         await self.add_actor(actor, parent_path)
-
-        self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
 
     async def add_item_drag(self, item_name, transform):
         print(f"Adding {item_name} to the scene...")
-        index = self.asset_map_counter[item_name]
-        transform = transform
-        new_item_name = item_name + str(index)
+        new_item_name = self.make_unique_name(item_name, Path.root_path())
         actor = AssetActor(name=new_item_name, spawnable_name=item_name)
 
         pos = np.array([transform.pos[0], transform.pos[1], transform.pos[2]])
@@ -245,8 +237,6 @@ class MainWindow(QtWidgets.QWidget):
         scale = transform.scale
         actor.transform = Transform(pos, quat, scale)
         await self.add_actor(actor, Path.root_path())
-
-        self.asset_map_counter[item_name] = self.asset_map_counter[item_name] + 1
         print(f"{item_name} added to the scene!")
 
     async def set_selection(self, actors: list[BaseActor | Path], source: str = ""):

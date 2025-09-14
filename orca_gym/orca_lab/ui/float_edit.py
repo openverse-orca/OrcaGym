@@ -19,9 +19,9 @@ class FloatEdit(QtWidgets.QLineEdit):
     start_drag = QtCore.Signal()
     stop_drag = QtCore.Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, step:float=0.01):
         super().__init__(parent)
-
+        self._step = step
         self.setValidator(QtGui.QDoubleValidator())
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.setCursor(QtCore.Qt.CursorShape.SizeHorCursor)
@@ -97,7 +97,7 @@ class FloatEdit(QtWidgets.QLineEdit):
             if self._state == FloatInputState.Dragging:
                 event: QtGui.QMouseEvent = event
                 delta = event.globalPosition().x() - self.last_mouse_pos.x()
-                value = self._value + delta * 0.01
+                value = self._value + delta * self._step
                 self.set_value(value, True)
                 self.last_mouse_pos = event.globalPosition()
 
