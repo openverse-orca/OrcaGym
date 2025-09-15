@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 from pathlib import Path
-from pxr import Usd, UsdGeom, Gf, Sdf
+from pxr import Usd, UsdGeom, Gf, Sdf, UsdLux
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
@@ -117,6 +117,35 @@ def get_all_prim(stage):
     all_prim = []
     _traverse_prims(prim=stage.Load("/"), all_prim=all_prim)  # 遍历 Stage 的根 Prim
     return all_prim
+
+def remove_dome_lights_from_stage(stage):
+    """
+    从 USD stage 中检测并删除所有 dome light 组件
+    """
+    dome_lights_removed = []
+    
+    # 先收集所有 dome light 的路径，避免在遍历过程中修改 stage
+    dome_light_paths = []
+    for prim in stage.Traverse():
+        if prim.GetTypeName() == 'DomeLight':
+            dome_light_paths.append(prim.GetPath())
+            print(f"Found dome light at path: {prim.GetPath()}")
+    
+    # 删除收集到的 dome lights
+    for prim_path in dome_light_paths:
+        stage.RemovePrim(prim_path)
+        dome_lights_removed.append(prim_path)
+        print(f"Removed dome light: {prim_path}")
+    
+    if dome_lights_removed:
+        print(f"Total dome lights removed: {len(dome_lights_removed)}")
+        # 保存修改后的 stage
+        stage.GetRootLayer().Save()
+        print("Stage saved with dome lights removed")
+    else:
+        print("No dome lights found in the stage")
+    
+    return dome_lights_removed
 
 def get_bounding_box(all_prim, params, bbox_cache):
     for prim in all_prim:
@@ -401,6 +430,10 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     
     # 打开 USD 文件
     stage = Usd.Stage.Open(usd_file)
+    
+    # 检测并删除 dome light 组件
+    remove_dome_lights_from_stage(stage)
+    
     meters_per_unit = stage.GetMetadata('metersPerUnit')
     print(f"metersPerUnit: {meters_per_unit}")
     config_scale = params["transform_options"]["scale"]
