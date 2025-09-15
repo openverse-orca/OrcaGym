@@ -48,6 +48,7 @@ robot_entries = {
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
+ANIM_SPEED = 0.1
 def get_robot_entry(name: str):
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
@@ -101,6 +102,7 @@ class DualArmEnv(RobomimicEnv):
             for i in range(len(agent_names)):
                 # 当agent数量大于pico数量时，使用最后一个pico
                 self._joystick[agent_names[i]] = pico_joystick[min(i, len(pico_joystick) - 1)]
+                print("Pico Joystick",agent_names[i])
         
         self._sample_range = sample_range
         self._reward_type = reward_type
@@ -158,6 +160,27 @@ class DualArmEnv(RobomimicEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
+        #add animation joint for vr teleoperation
+        self.animjoint_names = []
+        self.animjoint = []
+        self.animjointorigpos = []
+        self.lastanimtime = 0
+        self.animspeed = 0
+        self.havestate = False
+        if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION:
+            #add scene animation joint for vr teleoperation
+          
+            jointtv = self.model.get_joint_byname("openloong_gripper_2f85_fix_base_usda_J_TV_joint")
+            if jointtv:
+                print("Found animation joint for teleoperation: J_TV_joint")
+                
+                self.animjoint_names.append("openloong_gripper_2f85_fix_base_usda_J_TV_joint")    
+                self.animjointorigpos = self.gym.query_joint_qpos(self.animjoint_names)         
+                self.animjoint.append(jointtv)
+                print("Animation jointpos: ",  self.animjointorigpos )
+
+           
 
 
     def init_env(self):
@@ -268,6 +291,56 @@ class DualArmEnv(RobomimicEnv):
     
     def _is_truncated(self) -> bool:
         return self._task_status == TaskStatus.FAILURE
+    
+    def  step_modelanim(self, animation_time: float) -> None:
+        """
+        Step the simulation for a certain amount of time, without changing the control inputs.
+        This is used to animate the model in the GUI.
+        """
+        tt = np.array([animation_time])
+        passtime = animation_time -  self.lastanimtime
+        self.lastanimtime =  animation_time
+        animjointpos = self.gym.query_joint_qpos(self.animjoint_names)['openloong_gripper_2f85_fix_base_usda_J_TV_joint']
+        #add pos change wtih passtime and speed
+        if len(self._joystick) > 0:
+            picotemp = self._joystick['openloong_gripper_2f85_fix_base_usda']
+            keystate = picotemp.get_key_state()
+            if keystate:
+                if self.havestate == False:
+                    self.animspeed = ANIM_SPEED
+                    self.havestate = True
+
+
+                if keystate["leftHand"]["primaryButtonPressed"] and keystate["leftHand"]["secondaryButtonPressed"]:
+                    self.animspeed = 0
+                if keystate["rightHand"]["primaryButtonPressed"] and keystate["rightHand"]["secondaryButtonPressed"]:
+                    self.animspeed = ANIM_SPEED
+            else:
+                if self.havestate == True:
+                    self.havestate = False
+                    self.animspeed = 0
+
+
+               
+
+            """
+            if picotemp.running == False or picotemp.get_left_gripButton():
+                print("get_left_gripButton true......................")
+                animspeed = 0
+            if picotemp.get_right_gripButton():
+                print("get_right_gripButton true......................")
+                animspeed = 0.1
+            """ 
+        animjointpos[0] += passtime * self.animspeed
+
+       # print("step_modelanim time: ", animjointpos  )
+        if self.animjoint:
+            for animjoint in self.animjoint_names:
+                
+                self.set_joint_qpos({animjoint: animjointpos})
+        self.mj_forward()
+
+
 
     def step(self, action) -> tuple:
         if self._run_mode == RunMode.TELEOPERATION:
@@ -280,6 +353,7 @@ class DualArmEnv(RobomimicEnv):
         
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
         
+        self.step_modelanim(self.data.time)
         
         if self._run_mode == RunMode.TELEOPERATION:
             [agent.update_force_feedback() for agent in self._agents.values()]
@@ -439,6 +513,7 @@ class DualArmEnv(RobomimicEnv):
             ag.on_reset_model()
 
         self._task.get_task(self)
+        
 
         self.mj_forward()
         obs = self._get_obs().copy()
