@@ -34,7 +34,7 @@ class ActorEditor(QtWidgets.QWidget):
 
         self._actor = actor
         self._refresh()
-    '''
+
     def _clear_layout(self):
         layout = self._layout
         for i in reversed(range(layout.count())):
@@ -45,20 +45,6 @@ class ActorEditor(QtWidgets.QWidget):
                 self._clear_layout(item.layout())
             layout.removeItem(item)
             del item
-    '''
-    def _clear_layout(self, layout=None):
-        if layout is None:
-            layout = self._layout
-        while layout.count():
-            item = layout.takeAt(0)  # 更安全，直接取出而不是 itemAt()
-            if item.widget():
-                w = item.widget()
-                layout.removeWidget(w)
-                w.setParent(None)
-            elif item.layout():
-                self._clear_layout(item.layout())
-                layout.removeItem(item)
-
 
     def _refresh(self):
         # self._clear_layout()
