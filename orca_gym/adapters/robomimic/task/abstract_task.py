@@ -3,7 +3,7 @@ import re
 
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
-from orca_gym.task.scene_manage import SceneManager
+from orca_gym.adapters.robomimic.task.scene_manage import SceneManager
 
 from orca_gym.scene.orca_gym_scene import Actor, MaterialInfo, LightInfo, OrcaGymScene
 import numpy as np

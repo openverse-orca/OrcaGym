@@ -8,7 +8,7 @@ from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.task.pick_place_task import PickPlaceTask, TaskStatus
+from orca_gym.adapters.robomimic.task.scene_manage.pick_place_task import PickPlaceTask, TaskStatus
 import importlib
 
 class RunMode:
@@ -148,7 +148,7 @@ class DualArmEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
-        from orca_gym.task.abstract_task import AbstractTask
+        from orca_gym.adapters.robomimic.task.scene_manage.abstract_task import AbstractTask
         from orca_gym.scene.orca_gym_scene import OrcaGymScene
         # self._task = AbstractTask()
         # self._task.grpc_addr = "192.168.1.164:50051"

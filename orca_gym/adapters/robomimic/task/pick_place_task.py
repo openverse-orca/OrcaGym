@@ -1,6 +1,6 @@
 from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.task.abstract_task import AbstractTask
+from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
 import random
 
 
@@ -10,7 +10,7 @@ import re
 import numpy as np
 from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.task.abstract_task import AbstractTask
+from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
 import random
 
 class PickPlaceTask(AbstractTask):

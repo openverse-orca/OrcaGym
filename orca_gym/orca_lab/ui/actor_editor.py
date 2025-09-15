@@ -47,7 +47,7 @@ class ActorEditor(QtWidgets.QWidget):
             del item
 
     def _refresh(self):
-        self._clear_layout()
+        # self._clear_layout()
 
         if self._actor is None:
             label = QtWidgets.QLabel("No actor selected")
