@@ -162,9 +162,9 @@ class DualArmEnv(RobomimicEnv):
         self._set_action_space()
 
         #add animation joint for vr teleoperation
-        animjointdic = self.gym.query_joint_qpos(["openloong_gripper_2f85_fix_base_usda_J_TV_joint"])
+        animjointdic = self.gym.query_all_joints()
         self._has_anim_joint = False
-        if animjointdic:
+        if animjointdic.get("openloong_gripper_2f85_fix_base_usda_J_TV_joint", None) is not None:
             self._has_anim_joint = True
             print(Fore.GREEN + "[Info] Found animation joint for teleoperation: J_TV_joint" + Style.RESET_ALL)
         self.animjoint_names = []
