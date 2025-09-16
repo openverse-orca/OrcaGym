@@ -162,6 +162,11 @@ class DualArmEnv(RobomimicEnv):
         self._set_action_space()
 
         #add animation joint for vr teleoperation
+        animjointdic = self.gym.query_joint_qpos(["openloong_gripper_2f85_fix_base_usda_J_TV_joint"])
+        self._has_anim_joint = False
+        if animjointdic:
+            self._has_anim_joint = True
+            print(Fore.GREEN + "[Info] Found animation joint for teleoperation: J_TV_joint" + Style.RESET_ALL)
         self.animjoint_names = []
         self.animjoint = []
         self.animjointorigpos = []
@@ -352,8 +357,8 @@ class DualArmEnv(RobomimicEnv):
             raise ValueError("Invalid run mode : ", self._run_mode)
         
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
-        
-        self.step_modelanim(self.data.time)
+        if self._has_anim_joint:
+            self.step_modelanim(self.data.time)
         
         if self._run_mode == RunMode.TELEOPERATION:
             [agent.update_force_feedback() for agent in self._agents.values()]
