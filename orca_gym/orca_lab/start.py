@@ -4,6 +4,7 @@ import random
 
 from typing import Dict, Tuple
 from PySide6 import QtCore, QtWidgets, QtGui
+from orca_gym.orca_lab import sim_process
 from orca_gym.orca_lab.actor import AssetActor, BaseActor, GroupActor
 from orca_gym.orca_lab.local_scene import LocalScene
 from orca_gym.orca_lab.path import Path
@@ -656,7 +657,7 @@ class MainWindow1(MainWindow):
 
     async def set_selection_from_outline(self, actors):
         _, actor_paths = self.local_scene.get_actor_and_path_list(actors)
-        if actor_paths:
+        if self.local_scene.selection != actor_paths:
             command = SelectionCommand()
             command.new_selection = actor_paths
             command.old_selection = self.local_scene.selection  
@@ -664,12 +665,12 @@ class MainWindow1(MainWindow):
             await self.set_selection(actor_paths, "outline")
 
     async def set_selection_from_remote_scene(self, actor_paths: list[Path]):
-        command = SelectionCommand()
-        command.new_selection = actor_paths
-        command.old_selection = self.local_scene.selection
-
-        self.add_command(command)
-        await self.set_selection(actor_paths, "remote")
+        if self.local_scene.selection != actor_paths:
+            command = SelectionCommand()
+            command.new_selection = actor_paths
+            command.old_selection = self.local_scene.selection
+            self.add_command(command)
+            await self.set_selection(actor_paths, "remote")
 
     async def reparent_from_outline(
         self, actor: BaseActor | Path, new_parent: BaseActor | Path, row: int
