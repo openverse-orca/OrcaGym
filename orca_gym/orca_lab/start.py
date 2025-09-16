@@ -49,6 +49,8 @@ class MainWindow(QtWidgets.QWidget):
 
         respone = await self.remote_scene.get_window_id()
         self.hwnd = respone.window_id
+        self.start_transform = None
+        self.end_transform = None
 
     async def _init_ui(self):
         self.tool_bar = ToolBar()
@@ -109,7 +111,48 @@ class MainWindow(QtWidgets.QWidget):
         asyncio.create_task(self._query_pending_operation_loop())
 
     async def _process_pending_operation(self, op: str):
-        print("op:", op)
+        sltc = "start_local_transform_change:"
+        if op.startswith(sltc):
+            actor_path = Path(op[len(sltc) :])
+
+            if actor_path not in self.local_scene:
+                raise Exception(f"actor not exist")
+            
+            actor = self.local_scene[actor_path]
+            self.start_transform = actor.transform
+        
+        eltc = "end_local_transform_change:"
+        if op.startswith(eltc):
+            actor_path = Path(op[len(eltc) :])
+
+            if actor_path not in self.local_scene:
+                raise Exception(f"actor not exist")
+            
+            actor = self.local_scene[actor_path]
+            self.end_transform = actor.transform
+            self.transform_change.emit(actor_path, True)
+
+        swtc = "start_world_transform_change:"
+        if op.startswith(swtc):
+            actor_path = Path(op[len(swtc) :])
+
+            if actor_path not in self.local_scene:
+                raise Exception(f"actor not exist")
+            
+            actor = self.local_scene[actor_path]
+            self.start_transform = actor.world_transform
+        
+        ewtc = "end_world_transform_change:"
+        if op.startswith(ewtc):
+            actor_path = Path(op[len(ewtc) :])
+
+            if actor_path not in self.local_scene:
+                raise Exception(f"actor not exist")
+            
+            actor = self.local_scene[actor_path]
+            self.end_transform = actor.world_transform
+            self.transform_change.emit(actor_path, False)
+
         local_transform_change = "local_transform_change:"
         if op.startswith(local_transform_change):
             actor_path = Path(op[len(local_transform_change) :])
@@ -120,13 +163,8 @@ class MainWindow(QtWidgets.QWidget):
             transform = await self.remote_scene.get_pending_actor_transform(
                 actor_path, True
             )
-
             self.set_transform_from_scene(actor_path, transform, True)
-
             await self.remote_scene.set_actor_transform(actor_path, transform, True)
-
-            actor = self.local_scene[actor_path]
-            actor.transform = transform
 
         world_transform_change = "world_transform_change:"
         if op.startswith(world_transform_change):
@@ -140,11 +178,7 @@ class MainWindow(QtWidgets.QWidget):
             )
 
             self.set_transform_from_scene(actor_path, transform, False)
-
             await self.remote_scene.set_actor_transform(actor_path, transform, False)
-
-            actor = self.local_scene[actor_path]
-            actor.transform = transform
 
         selection_change = "selection_change"
         if op.startswith(selection_change):
@@ -158,10 +192,8 @@ class MainWindow(QtWidgets.QWidget):
 
         add_item = "add_item"
         if op.startswith(add_item):
-            
             [transform, name] = await self.remote_scene.get_pending_add_item()
-            print("add info", name, transform)
-            await self.add_item_drag(name, transform)
+            self.add_item_by_drag.emit(name, transform)
 
     async def run_sim(self):
         if self.sim_process_running:
@@ -208,36 +240,6 @@ class MainWindow(QtWidgets.QWidget):
         frequency = 0.5  # Hz
         await asyncio.sleep(1 / frequency)
         asyncio.create_task(self._sim_process_check_loop())
-
-    async def add_item_to_scene(self, item_name, parent_actor=None):
-        print(f"Adding {item_name} to the scene...")
-        if parent_actor is None:
-            parent_path = Path.root_path()
-        else:
-            parent_path = self.local_scene.get_actor_path(parent_actor)
-    
-        transform = Transform()
-        transform.position = np.array([0, 0, 1], dtype=np.float64)
-        new_item_name = self.make_unique_name(item_name, parent_path)
-        actor = AssetActor(name=new_item_name, spawnable_name=item_name)
-        actor.transform = transform
-
-        await self.add_actor(actor, parent_path)
-        print(f"{item_name} added to the scene!")
-
-    async def add_item_drag(self, item_name, transform):
-        print(f"Adding {item_name} to the scene...")
-        new_item_name = self.make_unique_name(item_name, Path.root_path())
-        actor = AssetActor(name=new_item_name, spawnable_name=item_name)
-
-        pos = np.array([transform.pos[0], transform.pos[1], transform.pos[2]])
-        quat = np.array(
-            [transform.quat[0], transform.quat[1], transform.quat[2], transform.quat[3]]
-        )
-        scale = transform.scale
-        actor.transform = Transform(pos, quat, scale)
-        await self.add_actor(actor, Path.root_path())
-        print(f"{item_name} added to the scene!")
 
     async def set_selection(self, actors: list[BaseActor | Path], source: str = ""):
         actors, actor_paths = self.local_scene.get_actor_and_path_list(actors)
@@ -398,7 +400,7 @@ class CreateGroupCommand:
         return f"CreateGroupCommand(path={self.path})"
 
 
-class CreteActorCommand:
+class CreateActorCommand:
     def __init__(self):
         self.actor = None
         self.path: Path = None
@@ -443,6 +445,7 @@ class TransformCommand:
         self.actor_path = None
         self.old_transform = None
         self.new_transform = None
+        self.local = None
 
     def __repr__(self):
         return f"TransformCommand(actor_path={self.actor_path})"
@@ -450,6 +453,10 @@ class TransformCommand:
 
 # Add undo/redo functionality
 class MainWindow1(MainWindow):
+
+    add_item_by_drag = QtCore.Signal(str, Transform)
+    transform_change = QtCore.Signal(Path, bool)
+
     def __init__(self):
         super().__init__()
 
@@ -478,6 +485,9 @@ class MainWindow1(MainWindow):
 
         connect(self.menu_file.aboutToShow, self.prepare_file_menu)
         connect(self.menu_edit.aboutToShow, self.prepare_edit_menu)
+
+        connect(self.add_item_by_drag, self.add_item_drag)
+        connect(self.transform_change, self.transform_change_command)
 
         # Window actions.
 
@@ -542,7 +552,7 @@ class MainWindow1(MainWindow):
                 await self.set_selection(command.old_selection)
             case CreateGroupCommand():
                 await self.delete_actor(command.path)
-            case CreteActorCommand():
+            case CreateActorCommand():
                 await self.delete_actor(command.path)
             case DeleteActorCommand():
                 actor = command.actor
@@ -556,7 +566,8 @@ class MainWindow1(MainWindow):
                 old_parent_path = command.old_path.parent()
                 await self.reparent_actor(actor, old_parent_path, command.old_row)
             case TransformCommand():
-                pass
+                self.set_transform_from_scene(command.actor_path, command.old_transform, command.local)
+                await self.remote_scene.set_actor_transform(command.actor_path, command.old_transform, command.local)
             case _:
                 raise Exception("Unknown command type.")
 
@@ -575,7 +586,7 @@ class MainWindow1(MainWindow):
                 name = command.path.name()
                 actor = GroupActor(name=name)
                 await self.add_actor(actor, parent)
-            case CreteActorCommand():
+            case CreateActorCommand():
                 parent = command.path.parent()
                 actor = deepcopy(command.actor)
                 await self.add_actor(actor, parent)
@@ -589,7 +600,8 @@ class MainWindow1(MainWindow):
                 new_parent_path = command.new_path.parent()
                 await self.reparent_actor(actor, new_parent_path, command.new_row)
             case TransformCommand():
-                pass
+                self.set_transform_from_scene(command.actor_path, command.new_transform, command.local)
+                await self.remote_scene.set_actor_transform(command.actor_path, command.new_transform, command.local)
             case _:
                 raise Exception("Unknown command type.")
 
@@ -644,13 +656,12 @@ class MainWindow1(MainWindow):
 
     async def set_selection_from_outline(self, actors):
         _, actor_paths = self.local_scene.get_actor_and_path_list(actors)
-
-        command = SelectionCommand()
-        command.new_selection = actor_paths
-        command.old_selection = self.local_scene.selection
-
-        self.add_command(command)
-        await self.set_selection(actor_paths, "outline")
+        if actor_paths:
+            command = SelectionCommand()
+            command.new_selection = actor_paths
+            command.old_selection = self.local_scene.selection  
+            self.add_command(command)
+            await self.set_selection(actor_paths, "outline")
 
     async def set_selection_from_remote_scene(self, actor_paths: list[Path]):
         command = SelectionCommand()
@@ -698,6 +709,46 @@ class MainWindow1(MainWindow):
 
         self.add_command(command)
 
+    async def add_item_to_scene(self, item_name, parent_actor=None):
+        if parent_actor is None:
+            parent_path = Path.root_path()
+        else:
+            parent_path = self.local_scene.get_actor_path(parent_actor)
+        name = self.make_unique_name(item_name, parent_path)
+        actor = AssetActor(name=name, spawnable_name=item_name)
+
+        await self.add_actor(actor, parent_path)
+
+        command = CreateActorCommand()
+        command.actor = deepcopy(actor)
+        command.path = parent_path / name
+        self.add_command(command)
+
+    async def add_item_drag(self, item_name, transform):
+        name = self.make_unique_name(item_name, Path.root_path())
+        actor = AssetActor(name=name, spawnable_name=item_name)
+
+        pos = np.array([transform.pos[0], transform.pos[1], transform.pos[2]])
+        quat = np.array(
+            [transform.quat[0], transform.quat[1], transform.quat[2], transform.quat[3]]
+        )
+        scale = transform.scale
+        actor.transform = Transform(pos, quat, scale)
+
+        await self.add_actor(actor, Path.root_path())
+
+        command = CreateActorCommand()
+        command.actor = deepcopy(actor)
+        command.path = Path.root_path() / name
+        self.add_command(command)
+
+    async def transform_change_command(self, actor_path, local):
+        command = TransformCommand()
+        command.actor_path = actor_path
+        command.old_transform = self.start_transform
+        command.new_transform = self.end_transform
+        command.local = local
+        self.add_command(command)
 
 if __name__ == "__main__":
     

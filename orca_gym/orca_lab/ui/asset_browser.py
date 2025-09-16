@@ -3,6 +3,7 @@ from typing import List
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import Qt
 import time
+from orca_gym.orca_lab.actor import BaseActor, GroupActor
 
 class AssetListModel(QtCore.QStringListModel):
     asset_mime = "application/x-orca-asset"
@@ -21,7 +22,7 @@ class AssetListModel(QtCore.QStringListModel):
 
 class AssetBrowser(QtWidgets.QListView):
 
-    add_item = QtCore.Signal(str)
+    add_item = QtCore.Signal(str, BaseActor)
 
     def __init__(self, hwnd_target=None):
         super().__init__()
@@ -55,7 +56,7 @@ class AssetBrowser(QtWidgets.QListView):
         context_menu.exec(self.mapToGlobal(pos))
 
     def on_add_item(self, item_name):
-        self.add_item.emit(item_name)
+        self.add_item.emit(item_name, None)
     
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
