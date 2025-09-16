@@ -48,7 +48,7 @@ robot_entries = {
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
-ANIM_SPEED = 0.1
+ANIM_SPEED = 0.
 def get_robot_entry(name: str):
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
