@@ -346,7 +346,7 @@ def register_env(orcagym_addr, env_name, env_index, height_map_border, height_ra
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
         id=env_id,
-        entry_point="orca_gym.tools.height_map_generater:HeightMapGenerater",
+        entry_point="orca_gym.tools.terrains.height_map_generater:HeightMapGenerater",
         kwargs={
             'frame_skip': 1,   # 1 action per frame
             'orcagym_addr': orcagym_addr,

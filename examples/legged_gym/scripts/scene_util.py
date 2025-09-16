@@ -12,7 +12,7 @@ def generate_height_map_file(
     print("=============> Generate height map file ...")
 
     # 调用 ../../orca_gym/tools/generate_height_map.py
-    os.system(f"python ../../orca_gym/tools/height_map_generater.py --orcagym_addresses {orcagym_addresses[0]}")
+    os.system(f"python ../../orca_gym/tools/terrains/height_map_generater.py --orcagym_addresses {orcagym_addresses[0]}")
 
     height_map_dir = os.path.join(os.path.expanduser("~"), ".orcagym", "height_map")
 
