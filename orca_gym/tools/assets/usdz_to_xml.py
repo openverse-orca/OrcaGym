@@ -214,7 +214,10 @@ def split_mesh(obj_name, output_dir, max_split_mesh_number):
     # 获取当前脚本的绝对路径所在的目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
     # 构建 TestVHACD 的绝对路径
-    testvhacd_path = os.path.join(script_dir, "TestVHACD")
+    if os.name == "nt":
+        testvhacd_path = os.path.join(script_dir, "TestVHACD.exe")
+    else:
+        testvhacd_path = os.path.join(script_dir, "TestVHACD")
     
     # 调用 cpp 程序 TestVHACD 执行分割
     obj_path = os.path.join(output_dir, obj_name)

@@ -1,9 +1,16 @@
 import os
 import sys
 import time
-import fcntl
 import contextlib
 import signal
+
+# 平台检测和条件导入
+if sys.platform == 'win32':
+    import msvcrt
+    HAS_FCNTL = False
+else:
+    import fcntl
+    HAS_FCNTL = True
 
 def create_tmp_dir(dir_name):
     # 获取当前工作目录
@@ -66,6 +73,51 @@ def cleanup_zombie_locks(directory_path):
         print(f"共清理了 {cleaned_count} 个僵尸锁文件")
 
 
+def _windows_file_lock(lock_file, non_blocking=False, timeout=30):
+    """
+    Windows平台的文件锁实现
+    
+    Args:
+        lock_file: 文件对象
+        non_blocking: 是否使用非阻塞模式
+        timeout: 超时时间（秒）
+    
+    Returns:
+        bool: 是否成功获取锁
+    """
+    if non_blocking:
+        # 非阻塞模式
+        try:
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    else:
+        # 阻塞模式，使用轮询实现超时
+        import time
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                return True
+            except OSError:
+                time.sleep(0.1)  # 等待100ms后重试
+        return False
+
+
+def _windows_file_unlock(lock_file):
+    """
+    Windows平台的文件锁释放
+    
+    Args:
+        lock_file: 文件对象
+    """
+    try:
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+    except OSError:
+        pass
+
+
 @contextlib.asynccontextmanager
 async def file_lock(file_path, timeout=30, non_blocking=False):
     """
@@ -117,27 +169,33 @@ async def file_lock(file_path, timeout=30, non_blocking=False):
         lock_file.flush()
         
         # 获取文件锁
-        if non_blocking:
-            # 非阻塞模式
-            try:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise TimeoutError(f"无法获取文件锁 {file_path}，文件可能被其他进程占用")
+        if HAS_FCNTL:
+            # Linux/Unix平台使用fcntl
+            if non_blocking:
+                # 非阻塞模式
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise TimeoutError(f"无法获取文件锁 {file_path}，文件可能被其他进程占用")
+            else:
+                # 阻塞模式，但使用信号处理超时
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"获取文件锁超时 {file_path}")
+                
+                # 设置超时信号
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(timeout)
+                
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                finally:
+                    # 取消超时信号
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
         else:
-            # 阻塞模式，但使用信号处理超时
-            def timeout_handler(signum, frame):
-                raise TimeoutError(f"获取文件锁超时 {file_path}")
-            
-            # 设置超时信号
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout)
-            
-            try:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            finally:
-                # 取消超时信号
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+            # Windows平台使用msvcrt
+            if not _windows_file_lock(lock_file, non_blocking, timeout):
+                raise TimeoutError(f"无法获取文件锁 {file_path}，文件可能被其他进程占用")
         
         # 记录当前进程持有此锁
         _lock_tracking[file_path] = current_pid
@@ -146,7 +204,10 @@ async def file_lock(file_path, timeout=30, non_blocking=False):
             yield
         finally:
             # 释放锁
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            if HAS_FCNTL:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            else:
+                _windows_file_unlock(lock_file)
             lock_file.close()
             lock_file = None
             
