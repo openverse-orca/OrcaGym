@@ -85,7 +85,7 @@ class DualArmEnv(RobomimicEnv):
 
         self._run_mode = run_mode
         self._action_type = action_type
-
+        self._sync_render = True        # 数采需要严格同步渲染，保证生成的视频与仿真数据一致
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq

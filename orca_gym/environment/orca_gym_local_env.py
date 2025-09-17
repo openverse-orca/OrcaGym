@@ -46,10 +46,16 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         )
 
         render_fps = self.metadata.get("render_fps")
-        self._render_interval = self.realtime_step * render_fps
-        print(f"render_interval: {self._render_interval}" )
+
+        # 用于异步渲染
+        self._render_interval = 1.0 / render_fps
+        self._render_time_step = time.perf_counter()
+
+        # 用于同步渲染
+        self._render_count_interval = self.realtime_step * render_fps
         self.render_count = 0
         self._last_frame_index = -1
+
         self.mj_forward()
 
         self._body_anchored = None
@@ -194,15 +200,29 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             return False
 
+    @property
+    def sync_render(self) -> bool:
+        if hasattr(self, "_sync_render"):
+            return self._sync_render
+        else:
+            return False
+
     def render(self):
         if self.render_mode not in ["human", "force"]:
             return
 
-        self.render_count += self._render_interval
-        if (self.render_count >= 1.0):
-            self.loop.run_until_complete(self.gym.render())
-            self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
-            self.render_count -= 1
+        if self.sync_render:
+            self.render_count += self._render_count_interval
+            if (self.render_count >= 1.0):
+                self.loop.run_until_complete(self.gym.render())
+                self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+                self.render_count -= 1
+        else:
+            time_diff = time.perf_counter() - self._render_time_step
+            if (time_diff > self._render_interval):
+                self._render_time_step = time.perf_counter()
+                self.loop.run_until_complete(self.gym.render())
+                self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
 
     def do_body_manipulation(self):
         if self._anchor_body_id is None:
