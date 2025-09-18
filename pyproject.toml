@@ -34,8 +34,7 @@ dependencies = [
     "grpcio",
     "flask",
     "tensorboard",
-    "trimesh",
-    "pyside6",
+    "trimesh"
 ]
 
 # 可选依赖，可用于开发调试、测试、格式化代码等用途
