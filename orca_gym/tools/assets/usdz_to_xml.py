@@ -95,17 +95,42 @@ def convert_usdz2usdc(usdz_path, converted_dir):
     with zipfile.ZipFile(usdz_path, 'r') as zip_ref:
         zip_ref.extractall(temp_dir)
 
-    # Rename the unzipped usdc file to the same name as the usdz file
-    usdc_file_name = usdz_file_name_without_ext + ".usdc"
-    usdc_file_path = os.path.join(temp_dir, usdc_file_name)
-    default_usdc_file_path = os.path.join(temp_dir, "scene.usdc")
-    if os.path.exists(default_usdc_file_path):
-        os.rename(default_usdc_file_path, usdc_file_path)
-        # print(f"Renamed {default_usdc_file_path} to {usdc_file_path}")
-    else:
-        print(f"Default usdc file not found: {default_usdc_file_path}")
+    # Find all usdc and usda files in the temp directory
+    usdc_files = []
+    usda_files = []
     
-    return usdc_file_path
+    for file in os.listdir(temp_dir):
+        if file.endswith('.usdc'):
+            usdc_files.append(file)
+        elif file.endswith('.usda'):
+            usda_files.append(file)
+    
+    # Check if there's exactly one usdc or usda file
+    total_files = len(usdc_files) + len(usda_files)
+    
+    if total_files == 0:
+        raise FileNotFoundError(f"No usdc or usda files found in path: {temp_dir}")
+    elif total_files > 1:
+        raise ValueError(f"Multiple usdc/usda files found in path: {temp_dir}. Found {len(usdc_files)} usdc files and {len(usda_files)} usda files.")
+    
+    # There's exactly one file, rename it to match the usdz file name
+    if usdc_files:
+        # There's one usdc file
+        original_file = usdc_files[0]
+        new_file_name = usdz_file_name_without_ext + ".usdc"
+    else:
+        # There's one usda file
+        original_file = usda_files[0]
+        new_file_name = usdz_file_name_without_ext + ".usda"
+    
+    original_file_path = os.path.join(temp_dir, original_file)
+    new_file_path = os.path.join(temp_dir, new_file_name)
+    
+    # Rename the file
+    os.rename(original_file_path, new_file_path)
+    print(f"Renamed {original_file} to {new_file_name}")
+    
+    return new_file_path
 
 def get_all_prim(stage):
     # 遍历所有 Prim
@@ -142,8 +167,6 @@ def remove_dome_lights_from_stage(stage):
         # 保存修改后的 stage
         stage.GetRootLayer().Save()
         print("Stage saved with dome lights removed")
-    else:
-        print("No dome lights found in the stage")
     
     return dome_lights_removed
 
@@ -498,9 +521,13 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         f.write(xml_str)
 
 
-def main(config_path):
+def main(config_path, skip_exist_xml=False):
     """
     Main function to process the USDZ file and add mujoco physics geometry.
+    
+    Args:
+        config_path: Path to the configuration file
+        skip_exist_xml: If True, skip processing files that already have corresponding XML files
     """
     file_params = load_file_params(config_path)
 
@@ -509,17 +536,44 @@ def main(config_path):
     #     print(params)
 
     converted_dir = create_converted_dir(config_path)
-    for params in file_params:
+    
+    total_files = len(file_params)
+    processed_count = 0
+    skipped_count = 0
+    
+    for i, params in enumerate(file_params, 1):
         usdz_path = params["filename"]
         usdc_path = convert_usdz2usdc(usdz_path, converted_dir)
         usdc_dir = os.path.dirname(usdc_path)
         xml_path = os.path.join(usdc_dir, os.path.basename(usdz_path).replace(".usdz", ".xml"))
-        build_mjcf_xml(usd_file=usdc_path, mjcf_file=xml_path, output_dir=usdc_dir, params=params)
+        
+        # 检查是否跳过已存在的XML文件
+        if skip_exist_xml and os.path.exists(xml_path):
+            print(f"[{i}/{total_files}] Skipping {os.path.basename(usdz_path)} - XML already exists: {xml_path}")
+            skipped_count += 1
+            continue
+        
+        print(f"[{i}/{total_files}] Processing {os.path.basename(usdz_path)}")
+        try:
+            build_mjcf_xml(usd_file=usdc_path, mjcf_file=xml_path, output_dir=usdc_dir, params=params)
+            processed_count += 1
+            print(f"[{i}/{total_files}] Successfully processed {os.path.basename(usdz_path)}")
+        except Exception as e:
+            print(f"[{i}/{total_files}] Error processing {os.path.basename(usdz_path)}: {str(e)}")
+            continue
+    
+    # 打印处理结果统计
+    print(f"\n=== Processing Summary ===")
+    print(f"Total files: {total_files}")
+    print(f"Processed: {processed_count}")
+    print(f"Skipped: {skipped_count}")
+    print(f"Failed: {total_files - processed_count - skipped_count}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Porcess USDZ file and add mujoco physics geometry')
-    parser.add_argument('--config', type=str, help='The config file to use')
+    parser = argparse.ArgumentParser(description='Process USDZ file and add mujoco physics geometry')
+    parser.add_argument('--config', type=str, required=True, help='The config file to use')
+    parser.add_argument('--skip_exist_xml', action='store_true', help='Skip the existing XML file') # 对批处理的支持，有时候处理到一半，需要跳过已经处理过的文件，减少导入的负担
     args = parser.parse_args()
 
-    main(args.config)
+    main(args.config, args.skip_exist_xml)
 
