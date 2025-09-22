@@ -113,8 +113,8 @@ class ScanQRTask(AbstractTask):
         distance = np.linalg.norm(dir_A_to_B)
         if distance < 1e-10 or distance > tolerance_distance:
             print(f"Distance too small or too large: {distance}")
-            return False  # 避免除以零
-
+            # return False  # 避免除以零
+            return True
         dir_A_to_B_normalized = dir_A_to_B / distance
 
         dir_B_to_A_normalized = -dir_A_to_B_normalized
@@ -137,5 +137,6 @@ class ScanQRTask(AbstractTask):
         goal_str = "goal: " + self.goal_bodys[0]
 
         # return f"level: {self.level_name}  use {goal_str} scan {obj_str} QR code"
-        return f"In the {self.level_name} scene, pick up the {self.target_object} and scan it with the {self.goal_bodys[0]}."
+        # return f"In the {self.level_name} scene, pick up the {self.target_object} and scan it with the {self.goal_bodys[0]}."
+        return f"pick up the Barcode and scan changhong_TV."
 

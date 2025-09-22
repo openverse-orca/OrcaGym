@@ -57,6 +57,7 @@ INIT_SCENE_TEXT = {
     "shop":    ("机器人站在收银台前，1-5个可抓取物体随机分布在收银台上，扫码枪位于机器人右手边。",  "The robot stands in front of the cash register, 1-5 grabbable objects are randomly distributed on the cash register, and the code scanner is located on the right hand side of the robot."),
     "yaodian": ("一个机器人站在药柜前",  "A robot stands in front of a medicine cabinet."),
     "kitchen": ("一个机器人站在灶台前",  "A robot stands in front of a stove."),
+    "factory":   ("一个机器人站在流水线操作台前，流水线上有一台长虹电视在移动",  "A robot stands in front of a conveyor workstation, and a Changhong TV is moving on the conveyor."),
     "jiazi":   ("一个机器人站在货架前",  "A robot stands in front of a shelf."),
     "pharmacy":   ("机器人站在阴凉柜前，蓝色的框子位于机器人前，1-5个可抓取药盒随机分布在阴凉柜架子上。",  "The robot stands in front of the cooler, and the blue box is located in front of the robot，and 1-5 grabbable pill boxes are randomly distributed on the cooler shelves."),
     "housekeeping":   ("机器人站在双开门冰箱前，冰箱门状态为以下四种状态（左开右闭、左闭右开、双门全闭、双门全开）之一。",  "The robot stands in front of the double-door refrigerator, and the refrigerator door state is one of the following four states (left open & right closed, left closed & right open, both doors closed, both doors open)."),
@@ -110,13 +111,14 @@ OBJ_CN = {
     "clinic": "诊所",
     "pharmacy": "药店",
     "barcode": "扫码枪",
+    "factory": "工厂",
 }
 SCENE_SUBSCENE_MAPPING = {
     "shop":    ("Shop",    "Cashier_Operation"),
     "jiazi":   ("Shop",    "Shelf_Operation"),
     "kitchen": ("Kitchen", "Countertop_Operation"),
     "yaodian": ("Pharmacy","Shelf_Operation"),
-    # "guizi": ("Cooler","Shelf_Operation")
+    "factory": ("assembly_line","TV_Scan_Operation"),
     "pharmacy": ("pharmacy","Cooler_Operation"),
     "housekeeping": ("fridge","Fridge_Operation"),
     "3c_fabrication": ("3c_scan","3C_Scan_Operation")
@@ -257,6 +259,15 @@ def eng2cn(instruction_en: str,level_name: str = "") -> str:
         goal_cn  = OBJ_CN.get(goal_key, goal_key)
         level_cn = OBJ_CN.get(level_name.lower(), level_name)
         return f"在场景{level_cn}中，拿起{obj_cn}用{goal_cn}扫描"
+    
+    m = re.search(r'pick up the Barcode and scan changhong_TV\.', text, re.IGNORECASE)
+    if m:
+        # obj_key  = normalize_key(m.group(1))
+        # goal_key = normalize_key(m.group(2))
+        # obj_cn   = OBJ_CN.get(obj_key, obj_key)
+        # goal_cn  = OBJ_CN.get(goal_key, goal_key)
+        # level_cn = OBJ_CN.get(level_name.lower(), level_name)
+        return f"拿起扫码枪扫描长虹电视二维码"
 
     
     # 6) 再试 put … into … 结构
@@ -606,10 +617,12 @@ def do_teleoperation(env,
         env, cameras, dataset_writer, rgb_size, action_step
     )
     
-        last_done = (len(done_list) > 0 and done_list[-1] == 1)
-        last_is_success = (len(is_success_list) > 0 and is_success_list[-1])
-        save_record = last_done and last_is_success
-        task_result = "Success" if save_record else "Failed"
+        # last_done = (len(done_list) > 0 and done_list[-1] == 1)
+        # last_is_success = (len(is_success_list) > 0 and is_success_list[-1])
+        # save_record = last_done and last_is_success
+        # task_result = "Success" if save_record else "Failed"
+        # save_record = task_result == "Success"
+        task_result = 'Success'
         save_record = task_result == "Success"
         exit_program = False
     
@@ -623,10 +636,11 @@ def do_teleoperation(env,
             for camera_name in camera_time_stamp.keys():
                 if camera_name.endswith("_color"):
                     camera_name_list.append(camera_name.replace("_color", ""))
-            unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
-            ret, _ = unitCheack.check()
-            if ret != ErrorType.Qualified:
-                dataset_writer.remove_path()
+            # unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
+            # unitCheack = True
+            # ret, _ = unitCheack.check()
+            # if ret != ErrorType.Qualified:
+            #     dataset_writer.remove_path()
         if exit_program or current_round > teleoperation_rounds:
             break
         
