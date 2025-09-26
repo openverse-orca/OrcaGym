@@ -191,7 +191,7 @@ def get_bounding_box(all_prim, params, bbox_cache):
         print(f"    Center: {center}")
         print(f"    Size: {size}")
 
-def export_mesh_to_obj(prim, output_dir):
+def export_mesh_to_obj(prim, output_dir, axis='Y'):
     """将 USD Mesh 导出为 OBJ 文件"""
     mesh = UsdGeom.Mesh(prim)
     
@@ -203,7 +203,13 @@ def export_mesh_to_obj(prim, output_dir):
     # 生成 OBJ 内容
     obj_content = "# OBJ File\n"
     for p in points:
-        obj_content += f"v {-p[0]} {p[2]} {p[1]}\n"
+        if axis == 'Y':
+            # 按照最初的逻辑处理Y-up
+            obj_content += f"v {-p[0]} {p[2]} {p[1]}\n"
+        elif axis == 'Z':
+            # USD坐标系(Z-up): X右, Y前, Z上 -> MuJoCo坐标系: X前, Y左, Z上
+            # 转换: USD(x,y,z) -> MuJoCo(x,-y,z)
+            obj_content += f"v {p[0]} {-p[1]} {p[2]}\n"
     
     start_idx = 0
     for count in face_vertex_counts:
@@ -260,7 +266,7 @@ def split_mesh(obj_name, output_dir, max_split_mesh_number):
     
     return obj_name_list
 
-def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
+def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray, axis : str = 'Y'):
     """将 USD 变换矩阵转换为 MJCF 的 pos 和 quat"""
 
 
@@ -273,10 +279,16 @@ def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray):
     matrix.Orthonormalize()
     quat = matrix.ExtractRotationQuat()
     
-    # TODO: Orca 处理USD导入的时候做了转换，这里要做适配
-    pos = [-translation[0], translation[2], translation[1]]
-    quat = [quat.real, -quat.imaginary[0], -quat.imaginary[1], -quat.imaginary[2]]
-
+    if axis == 'Y':
+        # 按照最初的逻辑处理Y-up
+        pos = [-translation[0], translation[2], translation[1]]
+        quat = [quat.real, -quat.imaginary[0], -quat.imaginary[1], -quat.imaginary[2]]
+    elif axis == 'Z':
+        # USD坐标系(Z-up): X右, Y前, Z上 -> MuJoCo坐标系: X前, Y左, Z上
+        # 转换: USD(x,y,z) -> MuJoCo(x,-y,z)
+        pos = [translation[0], -translation[1], translation[2]]
+        w, x, y, z = quat.real, quat.imaginary[0], quat.imaginary[1], quat.imaginary[2]
+        quat = [w, x, -y, z]  # 对应坐标轴转换
     return pos, quat, scale
 
 
@@ -313,18 +325,27 @@ def _add_visualize_geom(body, mesh_file_name):
     visual_geom.set("contype", "0")
     visual_geom.set("conaffinity", "0")
     
-def process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos):
+def process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos, axis='Y'):
     # 如果需要用到obj文件，则添加 mesh 到 asset
     if params["collision_options"]["collider_type"] == "convex_hull" or params["debug_options"]["visualize_obj"]:
-        _add_mesh_assets(asset, obj_name, output_dir, scale)
+        _add_mesh_assets(asset, obj_name, scale)
 
     # 添加 collision geom
     if params["collision_options"]["collider_type"] == "bounding_box":
         bbox_range = bbox.GetRange()
         collision_size = bbox_range.GetSize() * scale / 2.0
-        collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
         collision_pos = bbox_range.GetMidpoint() * scale - pos
-        collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
+        
+        if axis == 'Y':
+            # 按照最初的逻辑处理Y-up
+            collision_size = [abs(collision_size[0]), abs(collision_size[2]), abs(collision_size[1])]
+            collision_pos = [-collision_pos[0], collision_pos[2], collision_pos[1]]
+        elif axis == 'Z':
+            # USD坐标系(Z-up): X右, Y前, Z上 -> MuJoCo坐标系: X前, Y左, Z上
+            # 转换: USD(x,y,z) -> MuJoCo(x,-y,z)
+            collision_size = [abs(collision_size[0]), abs(collision_size[1]), abs(collision_size[2])]
+            collision_pos = [collision_pos[0], -collision_pos[1], collision_pos[2]]
+        
         _add_box_geom(body, params, collision_pos, collision_size)
 
     elif params["collision_options"]["collider_type"] == "convex_hull":
@@ -336,7 +357,7 @@ def process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos
     if params["debug_options"]["visualize_obj"]:
         _add_visualize_geom(body, obj_name)
 
-def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos):
+def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos, axis='Y'):
     aabb_list = []
     for obj_name in obj_name_list:
         # 如果需要用到obj文件，则添加 mesh 到 asset
@@ -432,6 +453,13 @@ def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, para
 
         collision_pos = center * scale - pos
         collision_size = size * scale / 2.0
+        
+        if axis == 'Z':
+            # USD坐标系(Z-up): X右, Y前, Z上 -> MuJoCo坐标系: X前, Y左, Z上
+            # 转换: USD(x,y,z) -> MuJoCo(x,-y,z)
+            collision_pos = [collision_pos[0], -collision_pos[1], collision_pos[2]]
+            collision_size = [abs(collision_size[0]), abs(collision_size[1]), abs(collision_size[2])]
+
         _add_box_geom(body, params, collision_pos, collision_size)
 
 
@@ -457,6 +485,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     # 打开 USD 文件
     stage = Usd.Stage.Open(usd_file)
     
+    axis = stage.GetMetadata('upAxis')
     # 检测并删除 dome light 组件
     remove_dome_lights_from_stage(stage)
     
@@ -487,7 +516,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         # 获取当前节点的局部变换矩阵（相对于父节点）
         xform = UsdGeom.Xformable(prim)
         local_matrix = xform.GetLocalTransformation()
-        pos, quat, scale = matrix_to_pos_quat_scale(local_matrix, scale.copy())
+        pos, quat, scale = matrix_to_pos_quat_scale(local_matrix, scale.copy(), axis=axis)
 
         body_hash = hash(prim.GetPath())
 
@@ -499,13 +528,13 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
         
         # 处理 Mesh
         if prim.IsA(UsdGeom.Mesh):
-            obj_name = export_mesh_to_obj(prim, output_dir)
+            obj_name = export_mesh_to_obj(prim, output_dir, axis)
             
             if params["collision_options"]["split_mesh"]:
                 obj_name_list = split_mesh(obj_name, output_dir, params["collision_options"]["max_split_mesh_number"])
-                process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos)
+                process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, params, pos, axis)
             else:
-                process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos)
+                process_ori_mesh(obj_name, asset, body, output_dir, scale, bbox, params, pos, axis)
         
         # 递归处理子节点
         for child in prim.GetChildren():
