@@ -5,6 +5,7 @@ import sys
 from datetime import datetime
 from typing import Optional
 from orca_gym.scene.orca_gym_scene import OrcaGymScene
+import argparse
 
 ENV_ENTRY_POINT = {
     "Character": "envs.character.character_env:CharacterEnv",
@@ -92,9 +93,14 @@ def run_simulation(orcagym_addr : str,
 
 
 if __name__ == "__main__":
-    orcagym_addr = "localhost:50051"
-    agent_name = "Remy"
-    env_name = "Character"
+    parser = argparse.ArgumentParser("Run character simulation")
+    parser.add_argument("--orcagym_addr", type=str, default="localhost:50051")
+    parser.add_argument("--agent_name", type=str, default="Remy")
+    parser.add_argument("--env_name", type=str, default="Character")
+    args = parser.parse_args()
+    orcagym_addr = args.orcagym_addr
+    agent_name = args.agent_name
+    env_name = args.env_name
 
     scene = OrcaGymScene(orcagym_addr)
     scene_runtime = OrcaGymSceneRuntime(scene)

@@ -119,3 +119,5 @@ decomp.stl
 
 *.hdf5
 *.h5
+
+MUJOCO_LOG.TXT
