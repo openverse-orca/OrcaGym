@@ -231,8 +231,8 @@ def main(
         model_file = config['model_file']
         model_type = config['model_type']
         ctrl_device = config['ctrl_device']
-        terrain_spawnable_names = config['terrain_spawnable_names']
-        agent_spawnable_name = config['agent_spawnable_name']
+        terrain_asset_paths = config['terrain_asset_paths']
+        agent_asset_path = config['agent_asset_path']
 
         height_map_dir = "./height_map"
         command_model = config['command_model']
@@ -257,7 +257,7 @@ def main(
         # 发布地形
         publish_terrain(
             orcagym_addresses=orcagym_addresses,
-            terrain_spawnable_names=terrain_spawnable_names,
+            terrain_asset_paths=terrain_asset_paths,
         )
 
         # 空场景生成高度图
@@ -269,9 +269,9 @@ def main(
         publish_scene(
             orcagym_addresses=orcagym_addresses,
             agent_name=agent_name,
-            agent_spawnable_name=agent_spawnable_name,
+            agent_asset_path=agent_asset_path,
             agent_num=1,
-            terrain_spawnable_names=terrain_spawnable_names,
+            terrain_asset_paths=terrain_asset_paths,
         )
 
         print("simulation running... , orcagym_addr: ", orcagym_addresses)

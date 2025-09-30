@@ -28,7 +28,7 @@ class Character():
             self._config = yaml.load(f, Loader=yaml.FullLoader)
             
     def _init_character(self):
-        self._spawnable_name = self._config['spawnable_name']
+        self._asset_path = self._config['asset_path']
         self._body_name = self._env.body(self._config['body_name'], self._agent_id)
         self._body_id = self._model.body_name2id(self._body_name)
         joint_name_dict = self._config['joint_names']

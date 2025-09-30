@@ -323,7 +323,7 @@ class AbstractTask:
         将所有的 actors 添加到场景中, 初始化到infinity位置
         '''
         for i in range(len(self.actors)):
-            self.scene.add_actor(actor_name=self.actors[i], spawnable_name=self.actors_spawnable[i],
+            self.scene.add_actor(actor_name=self.actors[i], asset_path=self.actors_spawnable[i],
                                  position=np.array(self.infinity), rotation = rotations.euler2quat([0, 0, 0]))
     
     def generate_lights(self):
@@ -351,7 +351,7 @@ class AbstractTask:
         for i in range(actors):
             self.add_actor_with_pose(actors[i], actors_spawnable[i], position[i], rotation[i])
 
-    def add_actor(self, actor_name, spawnable_name):
+    def add_actor(self, actor_name, asset_path):
         random_pos, random_xquat = self._random_position_and_rotation(self.center, self.bound)
 
         if self.random_actor_position:
@@ -364,10 +364,10 @@ class AbstractTask:
         else:
             rotation = rotations.euler2quat([0, 0, 0])
 
-        self.scene.add_actor(actor_name, spawnable_name, position, rotation, scale=1.0)
+        self.scene.add_actor(actor_name, asset_path, position, rotation, scale=1.0)
 
 
-    def add_light(self, light_name, spawnable_name):
+    def add_light(self, light_name, asset_path):
         # 1) 位置：要么随机，要么固定在 center
         rand_pos, rand_quat = self._random_position_and_rotation(self.light_center, self.light_bound)
         position = rand_pos   if self.random_light_position else np.array(self.light_center)
@@ -379,7 +379,7 @@ class AbstractTask:
             # 绕 X 轴 -90° → 光照沿 −Z 方向（竖直向下）
             rotation = rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
 
-        self.scene.add_light(light_name, spawnable_name, position, rotation, scale=1.0)
+        self.scene.add_light(light_name, asset_path, position, rotation, scale=1.0)
 
     def set_light_info(self, light_name, color=None, intensity=None):
         """
@@ -412,8 +412,8 @@ class AbstractTask:
         print(f"[Debug-Actor] set_actor_material → {actor_name}, base_color={base_color}")
         self.scene.set_material_info(actor_name, base_color)
 
-    def add_actor_with_pose(self, actor_name, spawnable_name, position, rotation):
-        self.scene.add_actor(actor_name, spawnable_name, position=position, rotation=rotation, scale=1.0)
+    def add_actor_with_pose(self, actor_name, asset_path, position, rotation):
+        self.scene.add_actor(actor_name, asset_path, position=position, rotation=rotation, scale=1.0)
 
     def publish_scene(self):
         self.scene.publish_scene()

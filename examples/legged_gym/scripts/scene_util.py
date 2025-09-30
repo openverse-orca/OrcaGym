@@ -41,20 +41,20 @@ def clear_scene(
 
 def publish_terrain(
     orcagym_addresses: list[str],
-    terrain_spawnable_names: list[str],
+    terrain_asset_paths: list[str],
 ):
     print("=============> Publish terrain ...")
     scene = OrcaGymScene(orcagym_addresses[0])
-    for terrain_spawnable_name in terrain_spawnable_names:
+    for terrain_asset_path in terrain_asset_paths:
         terrain = Actor(
-            name=f"{terrain_spawnable_name}",
-            spawnable_name=terrain_spawnable_name,
+            name=f"{terrain_asset_path}",
+            asset_path=terrain_asset_path,
             position=[0, 0, 0],
             rotation=euler2quat([0, 0, 0]),
             scale=1.0,
         )
         scene.add_actor(terrain)
-        print(f"    =============> Add terrain {terrain_spawnable_name} ...")
+        print(f"    =============> Add terrain {terrain_asset_path} ...")
         time.sleep(0.01)
 
     scene.publish_scene()
@@ -67,9 +67,9 @@ def publish_terrain(
 def publish_scene(
     orcagym_addresses: list[str],
     agent_name: str,
-    agent_spawnable_name: str,
+    agent_asset_path: str,
     agent_num: int,
-    terrain_spawnable_names: list[str],
+    terrain_asset_paths: list[str],
 ):
     print("=============> Publish scene ...")
     scene = OrcaGymScene(orcagym_addresses[0])
@@ -82,7 +82,7 @@ def publish_scene(
         y_pos = (i // sqrt_width) * 0.5 + base_offset_y
         actor = Actor(
             name=f"{agent_name}_{i:03d}",
-            spawnable_name=agent_spawnable_name,
+            asset_path=agent_asset_path,
             position=[x_pos, y_pos, 0],
             rotation=euler2quat([0, 0, 0]),
             scale=1.0,
@@ -93,16 +93,16 @@ def publish_scene(
 
     print("=============> Publish terrain ...")
     scene = OrcaGymScene(orcagym_addresses[0])
-    for terrain_spawnable_name in terrain_spawnable_names:
+    for terrain_asset_path in terrain_asset_paths:
         terrain = Actor(
-            name=f"{terrain_spawnable_name}",
-            spawnable_name=terrain_spawnable_name,
+            name=f"{terrain_asset_path}",
+            asset_path=terrain_asset_path,
             position=[0, 0, 0],
             rotation=euler2quat([0, 0, 0]),
             scale=1.0,
         )
         scene.add_actor(terrain)
-        print(f"    =============> Add terrain {terrain_spawnable_name} ...")
+        print(f"    =============> Add terrain {terrain_asset_path} ...")
         time.sleep(0.01)
 
 

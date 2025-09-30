@@ -1,6 +1,6 @@
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
-agent_spawnable_name: "lite3_usda"
+agent_asset_path: "lite3_usda"
 model_type: "sb3"
 
 model_file: 
@@ -31,6 +31,6 @@ command_model:
     "turn_speed" : 0.7853975   # pi / 4
     "turbo_scale" : 2.0        # turbo mode scale
 
-terrain_spawnable_names: ["terrain_test_usda"]
+terrain_asset_paths: ["terrain_test_usda"]
 
 friction_scale: 1.0

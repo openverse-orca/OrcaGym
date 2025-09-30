@@ -37,9 +37,9 @@ def export_config(config: dict, model_dir: str):
 def process_scene(
     orcagym_addresses: list[str],
     agent_name: str,
-    agent_spawnable_name: str,
+    agent_asset_path: str,
     agent_num: int,
-    terrain_spawnable_names: list[str],
+    terrain_asset_paths: list[str],
 ):
     # 清空场景
     clear_scene(
@@ -49,7 +49,7 @@ def process_scene(
     # 发布地形
     publish_terrain(
         orcagym_addresses=orcagym_addresses,
-        terrain_spawnable_names=terrain_spawnable_names,
+        terrain_asset_paths=terrain_asset_paths,
     )
 
     # 空场景生成高度图
@@ -61,9 +61,9 @@ def process_scene(
     publish_scene(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
-        agent_spawnable_name=agent_spawnable_name,
+        agent_asset_path=agent_asset_path,
         agent_num=agent_num,
-        terrain_spawnable_names=terrain_spawnable_names,
+        terrain_asset_paths=terrain_asset_paths,
     )
 
     return height_map_file
@@ -106,7 +106,7 @@ def run_sb3_ppo_rl(
         orcagym_addresses = config['orcagym_addresses']
 
     agent_name = config['agent_name']
-    agent_spawnable_name = config['agent_spawnable_name']
+    agent_asset_path = config['agent_asset_path']
     training_episode = config['training_episode']
     task = config['task']
 
@@ -119,7 +119,7 @@ def run_sb3_ppo_rl(
     else:
         render_mode = run_mode_config['render_mode']
 
-    terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
+    terrain_asset_paths = run_mode_config['terrain_asset_paths'][task]
     entry_point = 'envs.legged_gym.legged_gym_env:LeggedGymEnv'
 
     if task == 'rough_terrain' or task == 'no_action' or task == 'flat_terrain':
@@ -142,9 +142,9 @@ def run_sb3_ppo_rl(
     height_map_file = process_scene(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
-        agent_spawnable_name=agent_spawnable_name,
+        agent_asset_path=agent_asset_path,
         agent_num=agent_num,
-        terrain_spawnable_names=terrain_spawnable_names,
+        terrain_asset_paths=terrain_asset_paths,
     )
 
     import examples.legged_gym.scripts.sb3_ppo_vecenv_rl as sb3_rl
@@ -263,7 +263,7 @@ def run_rllib_appo_rl(
         orcagym_addresses = config['orcagym_addresses']
 
     agent_name = config['agent_name']
-    agent_spawnable_name = config['agent_spawnable_name']
+    agent_asset_path = config['agent_asset_path']
     task = config['task']
 
     run_mode_config = config[run_mode]
@@ -302,7 +302,7 @@ def run_rllib_appo_rl(
     else:
         render_mode = run_mode_config['render_mode']
 
-    terrain_spawnable_names = run_mode_config['terrain_spawnable_names'][task]
+    terrain_asset_paths = run_mode_config['terrain_asset_paths'][task]
 
     model_dir, model_file = process_model_dir(
         config=config, 
@@ -317,9 +317,9 @@ def run_rllib_appo_rl(
     height_map_file = process_scene(
         orcagym_addresses=orcagym_addresses,
         agent_name=agent_name,
-        agent_spawnable_name=agent_spawnable_name,
+        agent_asset_path=agent_asset_path,
         agent_num=32,   # 一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
-        terrain_spawnable_names=terrain_spawnable_names,
+        terrain_asset_paths=terrain_asset_paths,
     )
 
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl

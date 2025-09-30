@@ -11,12 +11,12 @@ class Actor:
 
     def __init__(self,
                  name: str,
-                 spawnable_name: str,
+                 asset_path: str,
                  position: np.ndarray,
                  rotation: np.ndarray,
                  scale: float,):
         self.name = name
-        self.spawnable_name = spawnable_name
+        self.asset_path = asset_path
         self.position = position
         self.rotation = rotation
         self.scale = float(scale)
@@ -25,7 +25,7 @@ class Actor:
     def _check_actor(self):
         if self.name is None or self.name == "":
             raise ValueError("Actor name cannot be None or empty.")
-        if self.spawnable_name is None or self.spawnable_name == "":
+        if self.asset_path is None or self.asset_path == "":
             raise ValueError("Actor spawnable name cannot be None or empty.")
         if self.position is None or len(self.position) != 3:
             raise ValueError("Actor position must be a 3D vector.")
@@ -144,7 +144,7 @@ class OrcaGymScene:
         async with self.lock:  # 加锁保证串行
             request = mjc_message_pb2.AddActorRequest(
                 name = actor.name,
-                spawnable_name = actor.spawnable_name,
+                spawnable_name = actor.asset_path,
                 pos = actor.position,
                 quat = actor.rotation,
                 scale = actor.scale,)

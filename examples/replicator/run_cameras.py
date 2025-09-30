@@ -20,7 +20,7 @@ def create_scene() -> OrcaGymScene:
 
     # actor = Actor(
     #     name=f"original_red_cup",
-    #     spawnable_name="cup_of_coffee_usda",
+    #     asset_path="cup_of_coffee_usda",
     #     position=np.array([np.random.uniform(0.0, 0.5),
     #                        np.random.uniform(0.0, 0.5),
     #                        np.random.uniform(1.0, 2.0)]),
@@ -33,7 +33,7 @@ def create_scene() -> OrcaGymScene:
     #
     # actor = Actor(
     #     name="office_desk",
-    #     spawnable_name="office_desk_7_mb_usda",
+    #     asset_path="office_desk_7_mb_usda",
     #     position=np.array([0, 0, 0.0]),
     #     rotation=rotations.euler2quat(np.array([0.0, 0.0, 0])),
     #     scale=1.0,
@@ -42,7 +42,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name="default_camera",
-        spawnable_name="cameraviewport_mujoco",
+        asset_path="cameraviewport_mujoco",
         position=np.array([-1, -1, 1.2]),
         rotation=rotations.euler2quat(np.array([0, 0, -np.pi / 4])),
         scale=1.0,
@@ -51,7 +51,7 @@ def create_scene() -> OrcaGymScene:
 
     # actor = Actor(
     #     name="top_camera",
-    #     spawnable_name="cameraviewport_mujoco",
+    #     asset_path="cameraviewport_mujoco",
     #     position=np.array([0, 0, 5]),
     #     rotation=rotations.euler2quat(np.array([ -np.pi / 2, 0, 0])),
     #     scale=1.0,
@@ -60,7 +60,7 @@ def create_scene() -> OrcaGymScene:
     #
     # actor = Actor(
     #     name="side_camera",
-    #     spawnable_name="cameraviewport_mujoco",
+    #     asset_path="cameraviewport_mujoco",
     #     position=np.array([-3, -3, 1.5]),
     #     rotation=rotations.euler2quat(np.array([0, 0, -np.pi / 4])),
     #     scale=1.0,

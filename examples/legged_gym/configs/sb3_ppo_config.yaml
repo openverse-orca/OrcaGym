@@ -1,7 +1,7 @@
 framework: "sb3"
 orcagym_addresses: ["localhost:50051"]
 agent_name: "Lite3"
-agent_spawnable_name: "lite3_usda"
+agent_asset_path: "assets/prefabs/lite3_usda"
 training_episode: 100
 task: "flat_terrain"
 
@@ -9,9 +9,9 @@ training:
   subenv_num: 32
   agent_num: 32
   render_mode: "none"
-  terrain_spawnable_names: 
-    flat_terrain: ["terrain_ellipsoid_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda"]
-    rough_terrain: ["terrain_stair_low_usda", "terrain_stair_low_flat_usda", "terrain_brics_low_usda", "terrain_slope_5_usda", "terrain_stair_high_usda", "terrain_brics_high_usda", "terrain_slope_10_usda"]
+  terrain_asset_paths: 
+    flat_terrain: ["assets/prefabs/terrain_ellipsoid_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda"]
+    rough_terrain: ["assets/prefabs/terrain_stair_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda", "assets/prefabs/terrain_slope_5_usda", "assets/prefabs/terrain_stair_high_usda", "assets/prefabs/terrain_brics_high_usda", "assets/prefabs/terrain_slope_10_usda"]
   curriculum_list:
     flat_terrain:
       - name: "flat_terrain"
@@ -26,7 +26,7 @@ testing:
   subenv_num: 1
   agent_num: 8
   render_mode: "human"
-  terrain_spawnable_names: 
+  terrain_asset_paths: 
     flat_terrain: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
   curriculum_list:
     flat_terrain:
@@ -37,7 +37,7 @@ play:
   subenv_num: 1
   agent_num: 1
   render_mode: "human"
-  terrain_spawnable_names: 
+  terrain_asset_paths: 
     flat_terrain: ["terrain_test_usda"]
   curriculum_list:
     flat_terrain:

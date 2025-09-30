@@ -13,12 +13,12 @@ class SceneManager:
     def register_init_env_callback(self, callback):
         self._init_env_callback = callback
 
-    def add_actor(self, actor_name: str, spawnable_name: str, position: np.ndarray, rotation: np.ndarray, scale: float = 1.0):
-        actor = Actor(actor_name, spawnable_name, position, rotation, scale)
+    def add_actor(self, actor_name: str, asset_path: str, position: np.ndarray, rotation: np.ndarray, scale: float = 1.0):
+        actor = Actor(actor_name, asset_path, position, rotation, scale)
         self._scene.add_actor(actor)
 
-    def add_light(self, light_name: str, spawnable_name: str, position: np.ndarray, rotation: np.ndarray, scale: float = 1.0):
-        actor= Actor(light_name, spawnable_name, position, rotation, 1.0)
+    def add_light(self, light_name: str, asset_path: str, position: np.ndarray, rotation: np.ndarray, scale: float = 1.0):
+        actor= Actor(light_name, asset_path, position, rotation, 1.0)
         self._scene.add_actor(actor)
 
     def set_light_info(self, light_name: str, color = None, intensity = None):
