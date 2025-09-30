@@ -1,4 +1,4 @@
-asset_path: "Remy"
+asset_path: "assets/prefabs/Remy"
 body_name: "Animation"
 joint_names: {"Move_X" : "Slide_X", "Move_Y" : "Slide_Y", "Move_Z" : "Slide_Z", "Rotate_Z" : "Rotate_Z"}
 speed: 

@@ -42,7 +42,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name="default_camera",
-        asset_path="cameraviewport_mujoco",
+        asset_path="assets/prefabs/cameraviewport_mujoco",
         position=np.array([-1, -1, 1.2]),
         rotation=rotations.euler2quat(np.array([0, 0, -np.pi / 4])),
         scale=1.0,

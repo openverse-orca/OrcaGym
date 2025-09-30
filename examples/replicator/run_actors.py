@@ -18,7 +18,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name=f"original_red_cup",
-        asset_path="cup_of_coffee_usda",
+        asset_path="assets/prefabs/cup_of_coffee_usda",
         position=np.array([np.random.uniform(0.0, 0.5), 
                            np.random.uniform(0.0, 0.5), 
                            np.random.uniform(1.0, 2.0)]),
@@ -32,7 +32,7 @@ def create_scene() -> OrcaGymScene:
     for i in range(10):
         actor = Actor(
             name=f"cup_with_random_color_and_scale_{i}",
-            asset_path="cup_of_coffee_usda",
+            asset_path="assets/prefabs/cup_of_coffee_usda",
             position=np.array([np.random.uniform(-1.2, 1.2), 
                             np.random.uniform(-1.2, 1.2), 
                             np.random.uniform(1.0, 2.0)]),
@@ -46,7 +46,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name="cart_basket",
-        asset_path="cart_basket_usda",
+        asset_path="assets/prefabs/cart_basket_usda",
         position=np.array([0, 0, 0.0]),
         rotation=rotations.euler2quat(np.array([0.0, 0.0, 0.0])),
         scale=1.0,
@@ -55,7 +55,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name="office_desk",
-        asset_path="office_desk_7_mb_usda",
+        asset_path="assets/prefabs/office_desk_7_mb_usda",
         position=np.array([0, 0, 0.0]),
         rotation=rotations.euler2quat(np.array([0.0, 0.0, 0])),
         scale=1.0,
@@ -64,7 +64,7 @@ def create_scene() -> OrcaGymScene:
 
     actor = Actor(
         name="default_camera",
-        asset_path="cameraviewport",
+        asset_path="assets/prefabs/cameraviewport",
         position=np.array([-1, -1, 1.2]),
         rotation=rotations.euler2quat(np.array([0, 0, -np.pi / 4])),
         scale=1.0,

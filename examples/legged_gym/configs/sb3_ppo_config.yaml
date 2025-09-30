@@ -27,7 +27,7 @@ testing:
   agent_num: 8
   render_mode: "human"
   terrain_asset_paths: 
-    flat_terrain: ["terrain_perlin_rough_slope_usda", "terrain_perlin_smooth_slope_usda", "terrain_perlin_rough_usda", "terrain_perlin_smooth_usda", "terrain_stair_high_usda", "terrain_stair_low_usda"]
+    flat_terrain: ["assets/prefabs/terrain_perlin_rough_slope_usda", "assets/prefabs/terrain_perlin_smooth_slope_usda", "assets/prefabs/terrain_perlin_rough_usda", "assets/prefabs/terrain_perlin_smooth_usda", "assets/prefabs/terrain_stair_high_usda", "assets/prefabs/terrain_stair_low_usda"]
   curriculum_list:
     flat_terrain:
       - name: "flat_terrain"
@@ -38,7 +38,7 @@ play:
   agent_num: 1
   render_mode: "human"
   terrain_asset_paths: 
-    flat_terrain: ["terrain_test_usda"]
+    flat_terrain: ["assets/prefabs/terrain_test_usda"]
   curriculum_list:
     flat_terrain:
       - name: "flat_terrain"
