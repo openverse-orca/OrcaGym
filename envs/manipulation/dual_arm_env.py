@@ -1,6 +1,8 @@
 import random
 import re
+from sre_compile import dis
 import time
+from tkinter import N, NO
 from colorama import Fore, Style
 import numpy as np
 from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
@@ -12,7 +14,9 @@ from orca_gym.task.close_open_task import CloseOpenTask
 from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.task.abstract_task import TaskStatus
 from orca_gym.task.pick_place_task import PickPlaceTask
+import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 import importlib
+from bezierdata import BezierPath
 
 class RunMode:
     """
@@ -48,7 +52,7 @@ robot_entries = {
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
-ANIM_SPEED = 0.3
+ANIM_SPEED = 0.25
 def get_robot_entry(name: str):
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
@@ -164,26 +168,40 @@ class DualArmEnv(RobomimicEnv):
         #add animation joint for vr teleoperation
         animjointdic = self.gym.query_all_joints()
         self._has_anim_joint = False
-        if animjointdic.get("openloong_gripper_2f85_fix_base_usda_J_TV_joint", None) is not None:
+        if animjointdic.get("openloong_gripper_2f85_fix_base_usda_J_box", None) is not None:
             self._has_anim_joint = True
-            print(Fore.GREEN + "[Info] Found animation joint for teleoperation: J_TV_joint" + Style.RESET_ALL)
+            print(Fore.GREEN + "[Info] Found animation joint for teleoperation: J_box" + Style.RESET_ALL)
         self.animjoint_names = []
         self.animjoint = []
         self.animjointorigpos = []
         self.lastanimtime = 0
         self.animspeed = 0
         self.havestate = False
-        if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION:
+        self.bezierpath = BezierPath("path.json")
+        self.curbesdist = 0
+        self.targetpos = None
+        self.lastpos = None
+        self.breset = False
+        self.last_curdir = None
+      #  pos = self.bezierpath.get_position(0)
+      #  animjointpos = np.concatenate([pos, direction], axis=0)
+        if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION and self._has_anim_joint:
             #add scene animation joint for vr teleoperation
-          
-            jointtv = self.model.get_joint_byname("openloong_gripper_2f85_fix_base_usda_J_TV_joint")
-            if jointtv:
-                print("Found animation joint for teleoperation: J_TV_joint")
-                
-                self.animjoint_names.append("openloong_gripper_2f85_fix_base_usda_J_TV_joint")    
-                self.animjointorigpos = self.gym.query_joint_qpos(self.animjoint_names)         
-                self.animjoint.append(jointtv)
+
+            jointbox = self.model.get_joint_byname("openloong_gripper_2f85_fix_base_usda_J_box")
+            if jointbox:
+                print("Found animation joint for teleoperation: J_box_joint")
+                self.animjoint_names.append("openloong_gripper_2f85_fix_base_usda_J_box")
+                self.animjointorigpos = self.gym.query_joint_qpos(self.animjoint_names)
+                self.lastpos = self.animjointorigpos["openloong_gripper_2f85_fix_base_usda_J_box"][0:3].copy()
+                print("lastpos3333: ", self.lastpos)
+                self.animjoint.append(jointbox)
                 print("Animation jointpos: ",  self.animjointorigpos )
+               # direction = [1,1,0,0]
+              #  animjointpos = np.concatenate([pos, direction], axis=0)
+              #  print("animjointpos: ", animjointpos)
+             #   self.set_joint_qpos({"openloong_gripper_2f85_fix_base_usda_J_box": animjointpos})
+               # self.mj_forward()
 
            
 
@@ -296,16 +314,138 @@ class DualArmEnv(RobomimicEnv):
     
     def _is_truncated(self) -> bool:
         return self._task_status == TaskStatus.FAILURE
+
+    def normalize(self, v, eps=1e-9):
+        v = np.asarray(v, dtype=float)
+        n = np.linalg.norm(v)
+        return v if n < eps else v / n
     
+    test = 0
+
+
+    def quat_multiply(self, q1, q2):
+     #   """四元数乘法"""
+        w = q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3]
+        x = q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2]
+        y = q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1]
+        z = q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+        return np.array([w, x, y, z])   
+
+    def quat_conjugate(self, q):
+        #"""四元数共轭"""
+        return np.array([q[0], -q[1], -q[2], -q[3]])
+
+    def quat_to_axis_angle(self, q):
+        #"""四元数转轴角"""
+        if q[0] > 1.0:
+            q[0] = 1.0
+        elif q[0] < -1.0:
+            q[0] = -1.0
+        
+        den = np.sqrt(1.0 - q[0] * q[0])
+        if abs(den) < 1e-6:
+            return np.array([0, 0, 1]), 0.0
+        
+        angle = 2.0 * np.arccos(q[0])
+        axis = q[1:4] / den
+        return axis, angle
+
+    def  reset_modelanim(self) -> None:
+        self.curbesdist = 0.001
+        self.targetpos = None
+        self.lastpos = None
+        self.bezierpath.reset()
+        self.breset = False
+        self.last_curdir = None
+        pos = self.bezierpath.get_position(0)
+        direction = [1,0,0,0]
+        animjointpos = np.concatenate([pos, direction], axis=0)
+        self.set_joint_qpos({"openloong_gripper_2f85_fix_base_usda_J_box": animjointpos})
+        self.lastpos = pos
+       # self.mj_forward()
+        self.test = 1
+
     def  step_modelanim(self, animation_time: float) -> None:
+
         """
         Step the simulation for a certain amount of time, without changing the control inputs.
         This is used to animate the model in the GUI.
         """
+
+        if self.test == 0:
+            self.reset_modelanim()
+            return
+
         tt = np.array([animation_time])
-        passtime = animation_time -  self.lastanimtime
+        passtime = animation_time   #-  self.lastanimtime
+     #   print("passtime: ", passtime,"test:",self.test)
+     #   print("lastpos: ", self.lastpos,"test:",self.test)
+
+
         self.lastanimtime =  animation_time
-        animjointpos = self.gym.query_joint_qpos(self.animjoint_names)['openloong_gripper_2f85_fix_base_usda_J_TV_joint']
+        animjointpos = self.gym.query_joint_qpos(self.animjoint_names)['openloong_gripper_2f85_fix_base_usda_J_box']
+        tt = np.array([animjointpos[4],animjointpos[5],animjointpos[6],animjointpos[3]])
+        curdir = transform_utils.quat2axisangle(tt).copy()
+
+        # 角度解包处理
+        if self.last_curdir is None :
+            self.last_curdir = curdir.copy()
+            self.cumulative_angle = curdir.copy()
+        
+        # 检测角度跳跃并转换到连续角度空间
+        curdir_unwrapped = curdir.copy()
+      #  for i in range(len(curdir)):
+            # 检测是否发生跳跃（角度差大于π）
+        angle_diff = curdir - self.last_curdir
+        bsetspeed = True
+        
+        if angle_diff[2] > np.pi:
+            # 发生正向跳跃，转换到连续角度空间
+            curdir_unwrapped[2] = -2 * np.pi - (2 * np.pi - curdir[2])
+            bsetspeed = False
+            #   self.test = 4098
+        elif angle_diff[2] < -np.pi:
+            # 发生负向跳跃，转换到连续角度空间
+            curdir_unwrapped[2] = 2 * np.pi + (2 * np.pi + curdir[2])
+            bsetspeed = False
+              #  self.test = 4098
+        
+
+        print("test:",self.test)
+        
+        print(f"原始角度: {curdir}")
+        print(f"转换后角度: {curdir_unwrapped}")
+        
+        # 计算角度差
+        angle_diff = curdir_unwrapped - self.cumulative_angle
+        
+        # 更新累积角度
+        self.cumulative_angle = curdir_unwrapped.copy()
+        self.last_curdir = curdir_unwrapped.copy()
+        
+        print(f"角度差: {angle_diff}")
+        print(f"累积角度: {self.cumulative_angle}")
+
+        movedist = np.linalg.norm(animjointpos[0:3] - self.lastpos)
+        print("movedist: ", movedist, "test:",self.test)
+        
+        
+        self.lastpos = animjointpos[0:3].copy()
+     
+        self.curbesdist += movedist
+
+        if self.curbesdist > self.bezierpath.total_length:
+            self.breset = True
+            self.curbesdist = 0
+
+     #   print("movedist: ", movedist, " curbesdist: ", self.curbesdist)
+        #如果targetpos不为空，
+        if self.targetpos is not None:
+            calcposdiff = animjointpos[0:3] - self.targetpos
+            calcposdiff_length = np.linalg.norm(calcposdiff)
+         #   print("calcposdiff_length: ", calcposdiff_length)
+
+      
         #add pos change wtih passtime and speed
         if len(self._joystick) > 0:
             picotemp = self._joystick['openloong_gripper_2f85_fix_base_usda']
@@ -336,15 +476,90 @@ class DualArmEnv(RobomimicEnv):
                 print("get_right_gripButton true......................")
                 animspeed = 0.1
             """ 
-        animjointpos[0] += passtime * self.animspeed
+        self.animspeed  = ANIM_SPEED
+        pos,distance,direction = self.bezierpath.update_position(self.curbesdist, self.animspeed, passtime)
+        print("output direction:",direction,"test:",self.test)
+        self.targetpos = pos[0:3]
+    #    print("Target direction: ", direction)
+      #  calcposdiff = animjointpos[0:3] - pos[0:3]
+        #计算calcposdiff向量的长
+     #   calcposdiff_length = np.linalg.norm(calcposdiff)
+
+      #  print("calcposdiff_length: ", calcposdiff_length)
+
+             
+        
+
+
+        eps = 1e-6  # 小偏移量
+        pos1 =  self.targetpos #self.bezierpath.get_position(self.curbesdist - eps)
+        pos2 = animjointpos[0:3]  #bezierpath.get_position(self.curbesdist + eps)
+        direction2 = pos1 - pos2
+        print("targetpos:",pos1, "curpos:", pos2 , "direction1111111: ", direction2, 'Length:', np.linalg.norm(direction2))
+        #direction2[0] = -direction2[0]
+        direction2 = self.normalize(direction2)
+        #direction 归一化
+       # direction2 = direction2 / np.linalg.norm(direction2)
+
+        posvel = direction2 * self.animspeed
+       # print("direction22222222: ", posvel,'Length:', np.linalg.norm(posvel))
+        
+       # direction = transform_utils.quat2axisangle(direction)
+        #direction 归一化,并转换为四元数
+       # print("direction1111111: ", direction)
+      #  direction = transform_utils.axisangle2quat(direction)
+  
+     #   dir = np.array([direction[3], direction[0], direction[1], direction[2]])
+
+      #  self.curbesdist = distance
+        #print("step_modelanim time: ", animation_time, " passtime: ", passtime, " animspeed: ", self.animspeed, " curbesdist: ", self.curbesdist, " pos: ", pos  )
+      #  print("pos: ", pos, " [1,0,0,0]: ", [1,0,0,0])  , axis=0    , axis=0)               
+      #  animjointpos = np.concatenate([pos, dir], axis=0)
+      #  print("animjointpos: ", animjointpos)
+       # posvel = [0.0, 0.5, 0.0]
+       # posvel = [-0.66384125, 0.74787283, 0.00101892]
+
+
+        dirdiff = direction - curdir_unwrapped
+        #print("direction: ", direction)
+        print("curdir: ", curdir,"curdir_unwrapped: ", curdir_unwrapped)
+        print("dirdiff: ", dirdiff)
+        #限制dirdiff[2]的范围在-6.28到6.28之间
+        
+      #  dirdiff[2] = np.clip(dirdiff[2], -6.28, 6.28)
+
+        #   dirdiff[2] = 0
+    #    print("dirdiff22: ", dirdiff)
+
+        dirspeed = (dirdiff[2]/passtime)*70/50
+   #     print("dirspeed: ", dirspeed)
+        if bsetspeed == False:
+            dirspeed = 0
+        dirvel = [0.0, 0.0, dirspeed] #[0.0, 0.0, 3.1415926/2.0]
+       # dirvel = [0.0, 0.0, 0.0] #[0.0, 0.0, 3.1415926/2.0]
+        print("dirvel: ", dirspeed)
+     
+        animjointqvel = np.concatenate([posvel, dirvel], axis=0)
+
+
+        # pos = self.bezierpath.get_position(0)
+        # dir = [1,0,0,0]
+        # animjointpos = np.concatenate([pos, dir], axis=0)
 
        # print("step_modelanim time: ", animjointpos  )
-        if self.animjoint:
-            for animjoint in self.animjoint_names:
-                
-                self.set_joint_qpos({animjoint: animjointpos})
-        self.mj_forward()
+        if self.animjoint :
+            for animjoint in self.animjoint_names:  
+               #self.set_joint_qpos({animjoint: animjointpos})
+               self.set_joint_qvel({animjoint: animjointqvel})
 
+        dist = np.linalg.norm(self.lastpos - self.bezierpath.get_position(0))
+        print("lastpos: ", self.lastpos,"bezierpath 0: ", self.bezierpath.get_position(0),"dist:",dist,"test:",self.test)
+
+        print("distance: ", self.curbesdist, "total_length: ", self.bezierpath.total_length,"test:",self.test)
+
+        if  dist< 0.02 and self.breset == True:  #self.curbesdist >= self.bezierpath.total_length  and
+            self.reset_modelanim()
+       # self.mj_forward()
 
 
     def step(self, action) -> tuple:
@@ -355,15 +570,21 @@ class DualArmEnv(RobomimicEnv):
             ctrl, noscaled_action = self._playback_action(noscaled_action)
         else:
             raise ValueError("Invalid run mode : ", self._run_mode)
-        
+
         # print("runmode: ", self._run_mode, "no_scaled_action: ", noscaled_action, "scaled_action: ", scaled_action, "ctrl: ", ctrl)
-        if self._has_anim_joint:
-            self.step_modelanim(self.data.time)
+        if self._has_anim_joint:# and self.test <  5000:
+            self.step_modelanim(self.dt)
+            self.test += 1
         
         if self._run_mode == RunMode.TELEOPERATION:
             [agent.update_force_feedback() for agent in self._agents.values()]
 
         scaled_action = self.normalize_action(noscaled_action, self.env_action_range_min, self.env_action_range_max)
+
+        current_qvel = self.gym.query_joint_qvel(['openloong_gripper_2f85_fix_base_usda_J_box'])['openloong_gripper_2f85_fix_base_usda_J_box']
+
+      #  print(f"实际角速度: {current_qvel}")
+    #    print(f"时间: {animation_time}")
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)

@@ -1,6 +1,6 @@
 # shop1任务配置文件
 
-level_name: "shop"
+level_name: "factory"
 type: "scan"
 range: {x: [12.101, 12.5], y: [-0.4, 0.4], z: -0.4, r: 0.3}
 
