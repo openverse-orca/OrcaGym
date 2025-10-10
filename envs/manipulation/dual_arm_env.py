@@ -18,6 +18,52 @@ import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 import importlib
 from bezierdata import BezierPath
 
+class AnimatedObject:
+    """单个动画对象的状态管理类"""
+    def __init__(self, joint_name: str, bezier_path: BezierPath, start_from_current_position: bool = True):
+        self.joint_name = joint_name
+        self.bezier_path = bezier_path
+        self.curbesdist = 0
+        self.targetpos = None
+        self.lastpos = None
+        self.breset = False
+        self.last_curdir = None
+        self.cumulative_angle = None
+        self.start_from_current_position = start_from_current_position
+        self.is_active = False
+        
+        # 为每个对象创建独立的 AngleSmoother
+        from bezierdata import AngleSmoother
+        self.angle_smoother = AngleSmoother()
+        
+    def reset(self, current_pos=None):
+        """重置动画对象状态"""
+        self.targetpos = None
+        self.breset = False
+        self.last_curdir = None
+        self.cumulative_angle = None
+        
+        # 重置独立的 AngleSmoother
+        self.angle_smoother.reset()
+        
+        if self.start_from_current_position and current_pos is not None:
+            # 从当前位置开始
+            closest_distance, closest_pos = self.bezier_path.find_closest_point_on_curve(current_pos)
+            self.curbesdist = closest_distance
+            self.lastpos = current_pos
+            print(f"对象 {self.joint_name} 从当前位置开始: {current_pos}, 最近曲线点距离: {closest_distance}")
+        else:
+            # 从曲线起点开始
+            self.curbesdist = 0.001
+            pos = self.bezier_path.get_position(0)
+
+           
+            self.lastpos = pos
+            print(f"对象 {self.joint_name} 从曲线起点开始: {pos}")
+        
+        self.angle_smoother.reset()
+        self.is_active = True
+
 class RunMode:
     """
     Enum class for control type
@@ -52,7 +98,7 @@ robot_entries = {
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
-ANIM_SPEED = 0.25
+ANIM_SPEED = 0.5
 def get_robot_entry(name: str):
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
@@ -104,7 +150,7 @@ class DualArmEnv(RobomimicEnv):
             for i in range(len(pico_ports)):
                 pico_joystick.append(PicoJoystick(int(pico_ports[i])))
             for i in range(len(agent_names)):
-                # 当agent数量大于pico数量时，使用最后一个pico
+                # 当agent数量大于pico数量时，使用最后一个pico pos = self.bezierpath.get_position(0)
                 self._joystick[agent_names[i]] = pico_joystick[min(i, len(pico_joystick) - 1)]
                 print("Pico Joystick",agent_names[i])
         
@@ -177,26 +223,30 @@ class DualArmEnv(RobomimicEnv):
         self.lastanimtime = 0
         self.animspeed = 0
         self.havestate = False
+        
+        # 多对象动画支持
+        self.animated_objects = {}  # 存储所有动画对象的信息
         self.bezierpath = BezierPath("path.json")
-        self.curbesdist = 0
-        self.targetpos = None
-        self.lastpos = None
-        self.breset = False
-        self.last_curdir = None
+        self.start_from_current_position = True  # 默认从当前位置开始
       #  pos = self.bezierpath.get_position(0)
       #  animjointpos = np.concatenate([pos, direction], axis=0)
         if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION and self._has_anim_joint:
             #add scene animation joint for vr teleoperation
 
-            jointbox = self.model.get_joint_byname("openloong_gripper_2f85_fix_base_usda_J_box")
-            if jointbox:
-                print("Found animation joint for teleoperation: J_box_joint")
-                self.animjoint_names.append("openloong_gripper_2f85_fix_base_usda_J_box")
-                self.animjointorigpos = self.gym.query_joint_qpos(self.animjoint_names)
-                self.lastpos = self.animjointorigpos["openloong_gripper_2f85_fix_base_usda_J_box"][0:3].copy()
-                print("lastpos3333: ", self.lastpos)
-                self.animjoint.append(jointbox)
-                print("Animation jointpos: ",  self.animjointorigpos )
+            # jointbox = self.model.get_joint_byname("openloong_gripper_2f85_fix_base_usda_J_box")
+            # if jointbox:
+            #     print("Found animation joint for teleoperation: J_box_joint")
+            #     self.animjoint_names.append("openloong_gripper_2f85_fix_base_usda_J_box")
+            #     self.animjointorigpos = self.gym.query_joint_qpos(self.animjoint_names)
+            #     self.lastpos = self.animjointorigpos["openloong_gripper_2f85_fix_base_usda_J_box"][0:3].copy()
+            #     print("lastpos3333: ", self.lastpos)
+            #     self.animjoint.append(jointbox)
+            #     print("Animation jointpos: ",  self.animjointorigpos )
+                
+                # 添加默认动画对象
+            self.add_animated_object("openloong_gripper_2f85_fix_base_usda_J1_box")
+            self.add_animated_object("openloong_gripper_2f85_fix_base_usda_J_box")
+     
                # direction = [1,1,0,0]
               #  animjointpos = np.concatenate([pos, direction], axis=0)
               #  print("animjointpos: ", animjointpos)
@@ -349,217 +399,144 @@ class DualArmEnv(RobomimicEnv):
         angle = 2.0 * np.arccos(q[0])
         axis = q[1:4] / den
         return axis, angle
-
-    def  reset_modelanim(self) -> None:
-        self.curbesdist = 0.001
-        self.targetpos = None
-        self.lastpos = None
+    def reset_modelanim(self, start_from_current_position=True) -> None:
+        """
+        重置模型动画 - 支持多对象
+        
+        参数:
+        start_from_current_position: 如果为True，从物体当前位置开始；如果为False，从曲线起点开始
+        """
         self.bezierpath.reset()
-        self.breset = False
-        self.last_curdir = None
-        pos = self.bezierpath.get_position(0)
-        direction = [1,0,0,0]
-        animjointpos = np.concatenate([pos, direction], axis=0)
-        self.set_joint_qpos({"openloong_gripper_2f85_fix_base_usda_J_box": animjointpos})
-        self.lastpos = pos
-       # self.mj_forward()
+        
+        # 重置所有动画对象
+        for joint_name, obj in self.animated_objects.items():
+            #if obj.is_active:
+                # 获取当前关节位置
+            try:
+                animjointpos = self.gym.query_joint_qpos([joint_name])[joint_name]
+                current_pos = animjointpos[0:3]
+                obj.reset(current_pos)
+            except Exception as e:
+                print(f"警告: 无法获取关节 {joint_name} 的位置: {e}")
+                obj.reset()
+        
         self.test = 1
+        return
 
-    def  step_modelanim(self, animation_time: float) -> None:
 
+    def step_modelanim(self, animation_time: float) -> None:
         """
-        Step the simulation for a certain amount of time, without changing the control inputs.
-        This is used to animate the model in the GUI.
+        多对象动画步进函数
+        
+        参数:
+        animation_time: 动画时间
         """
-
         if self.test == 0:
             self.reset_modelanim()
             return
 
-        tt = np.array([animation_time])
-        passtime = animation_time   #-  self.lastanimtime
-     #   print("passtime: ", passtime,"test:",self.test)
-     #   print("lastpos: ", self.lastpos,"test:",self.test)
-
-
-        self.lastanimtime =  animation_time
-        animjointpos = self.gym.query_joint_qpos(self.animjoint_names)['openloong_gripper_2f85_fix_base_usda_J_box']
-        tt = np.array([animjointpos[4],animjointpos[5],animjointpos[6],animjointpos[3]])
-        curdir = transform_utils.quat2axisangle(tt).copy()
-
-        # 角度解包处理
-        if self.last_curdir is None :
-            self.last_curdir = curdir.copy()
-            self.cumulative_angle = curdir.copy()
+        passtime = animation_time
+        self.lastanimtime = animation_time
+       
         
-        # 检测角度跳跃并转换到连续角度空间
-        curdir_unwrapped = curdir.copy()
-      #  for i in range(len(curdir)):
-            # 检测是否发生跳跃（角度差大于π）
-        angle_diff = curdir - self.last_curdir
-        bsetspeed = True
-        
-        if angle_diff[2] > np.pi:
-            # 发生正向跳跃，转换到连续角度空间
-            curdir_unwrapped[2] = -2 * np.pi - (2 * np.pi - curdir[2])
-            bsetspeed = False
-            #   self.test = 4098
-        elif angle_diff[2] < -np.pi:
-            # 发生负向跳跃，转换到连续角度空间
-            curdir_unwrapped[2] = 2 * np.pi + (2 * np.pi + curdir[2])
-            bsetspeed = False
-              #  self.test = 4098
-        
+        # 处理所有动画对象
+        for joint_name, obj in self.animated_objects.items():
+            #print("aaaaaa: ", self.animated_objects)
+            if not obj.is_active:
+                continue
+                
+            try:
+                # 获取当前关节位置
+               # print("joint_name: ", joint_name)
+                animjointpos = self.gym.query_joint_qpos([joint_name])[joint_name]
+                current_pos = animjointpos[0:3]
+                
+                # 角度处理
+                tt = np.array([animjointpos[4], animjointpos[5], animjointpos[6], animjointpos[3]])
+                curdir = transform_utils.quat2axisangle(tt).copy()
+                
+                # 角度解包处理
+                if obj.last_curdir is None:
+                    obj.last_curdir = curdir.copy()
+                    obj.cumulative_angle = curdir.copy()
+                
+                # 检测角度跳跃并转换到连续角度空间
+                curdir_unwrapped = curdir.copy()
+                angle_diff = curdir - obj.last_curdir
+                bsetspeed = True
+                
+                if angle_diff[2] > np.pi:
+                    curdir_unwrapped[2] =  -2 * np.pi - (2 * np.pi - curdir[2])
+                    bsetspeed = False
+                    print("angle_diff[2] :", angle_diff[2])
+                elif angle_diff[2] < -np.pi:
+                    curdir_unwrapped[2] = 2 * np.pi + (2 * np.pi + curdir[2])
+                    bsetspeed = False
+                    print("angle_diff[2] :", angle_diff[2])
+                
+                # 计算角度差
+                angle_diff = curdir_unwrapped - obj.cumulative_angle
+                obj.cumulative_angle = curdir_unwrapped.copy()
+                obj.last_curdir = curdir_unwrapped.copy()
+                
+                # 计算移动距离
+                movedist = np.linalg.norm(current_pos - obj.lastpos)
+                
+                obj.lastpos = current_pos.copy()
+                obj.curbesdist += movedist
 
-        print("test:",self.test)
-        
-        print(f"原始角度: {curdir}")
-        print(f"转换后角度: {curdir_unwrapped}")
-        
-        # 计算角度差
-        angle_diff = curdir_unwrapped - self.cumulative_angle
-        
-        # 更新累积角度
-        self.cumulative_angle = curdir_unwrapped.copy()
-        self.last_curdir = curdir_unwrapped.copy()
-        
-        print(f"角度差: {angle_diff}")
-        print(f"累积角度: {self.cumulative_angle}")
+                print("joint_name: ", joint_name, "movedist: ", movedist,"curbesdist: ", obj.curbesdist,"test: ", self.test)
+                
+                # 检查是否到达曲线终点
+                if obj.bezier_path.total_length - obj.curbesdist < 0.001:
+                    obj.breset = True
+                  #  obj.curbesdist = 0
+                
+                # 更新位置（禁用内置的 AngleSmoother）
+                self.animspeed = ANIM_SPEED
+                pos, distance, direction = obj.bezier_path.update_position(obj.curbesdist, self.animspeed, passtime, use_angle_smoother=False)
+                
+                # 使用对象独立的 AngleSmoother 处理角度
+                smoothed_direction = [0, 0, obj.angle_smoother.smooth_angle(direction[2])]
+                obj.targetpos = pos[0:3]
+                
+                # 计算速度
+                eps = 1e-6
+                pos1 = obj.targetpos
+                pos2 = current_pos
+                direction2 = pos1 - pos2
+                direction2 = self.normalize(direction2)
+                posvel = direction2 * self.animspeed
+                
+                # 计算角速度（使用平滑后的角度）
+                dirdiff = smoothed_direction - curdir_unwrapped
 
-        movedist = np.linalg.norm(animjointpos[0:3] - self.lastpos)
-        print("movedist: ", movedist, "test:",self.test)
-        
-        
-        self.lastpos = animjointpos[0:3].copy()
-     
-        self.curbesdist += movedist
+                print("dirdiff: ", dirdiff, "curdir_unwrapped: ", curdir_unwrapped,"smoothed_direction: ", smoothed_direction)
+                dirspeed = (dirdiff[2] / passtime) * 70 / 50
+                if not bsetspeed:
+                    dirspeed = 0
+                dirvel = [0.0, 0.0, dirspeed]
+                
+                # 设置关节速度
+                animjointqvel = np.concatenate([posvel, dirvel], axis=0)
 
-        if self.curbesdist > self.bezierpath.total_length:
-            self.breset = True
-            self.curbesdist = 0
-
-     #   print("movedist: ", movedist, " curbesdist: ", self.curbesdist)
-        #如果targetpos不为空，
-        if self.targetpos is not None:
-            calcposdiff = animjointpos[0:3] - self.targetpos
-            calcposdiff_length = np.linalg.norm(calcposdiff)
-         #   print("calcposdiff_length: ", calcposdiff_length)
-
-      
-        #add pos change wtih passtime and speed
-        if len(self._joystick) > 0:
-            picotemp = self._joystick['openloong_gripper_2f85_fix_base_usda']
-            keystate = picotemp.get_key_state()
-            if keystate:
-                if self.havestate == False:
-                    self.animspeed = ANIM_SPEED
-                    self.havestate = True
-
-
-                if keystate["leftHand"]["primaryButtonPressed"] and keystate["leftHand"]["secondaryButtonPressed"]:
-                    self.animspeed = 0
-                if keystate["rightHand"]["primaryButtonPressed"] and keystate["rightHand"]["secondaryButtonPressed"]:
-                    self.animspeed = ANIM_SPEED
-            else:
-                if self.havestate == True:
-                    self.havestate = False
-                    self.animspeed = 0
-
-
-               
-
-            """
-            if picotemp.running == False or picotemp.get_left_gripButton():
-                print("get_left_gripButton true......................")
-                animspeed = 0
-            if picotemp.get_right_gripButton():
-                print("get_right_gripButton true......................")
-                animspeed = 0.1
-            """ 
-        self.animspeed  = ANIM_SPEED
-        pos,distance,direction = self.bezierpath.update_position(self.curbesdist, self.animspeed, passtime)
-        print("output direction:",direction,"test:",self.test)
-        self.targetpos = pos[0:3]
-    #    print("Target direction: ", direction)
-      #  calcposdiff = animjointpos[0:3] - pos[0:3]
-        #计算calcposdiff向量的长
-     #   calcposdiff_length = np.linalg.norm(calcposdiff)
-
-      #  print("calcposdiff_length: ", calcposdiff_length)
-
-             
-        
-
-
-        eps = 1e-6  # 小偏移量
-        pos1 =  self.targetpos #self.bezierpath.get_position(self.curbesdist - eps)
-        pos2 = animjointpos[0:3]  #bezierpath.get_position(self.curbesdist + eps)
-        direction2 = pos1 - pos2
-        print("targetpos:",pos1, "curpos:", pos2 , "direction1111111: ", direction2, 'Length:', np.linalg.norm(direction2))
-        #direction2[0] = -direction2[0]
-        direction2 = self.normalize(direction2)
-        #direction 归一化
-       # direction2 = direction2 / np.linalg.norm(direction2)
-
-        posvel = direction2 * self.animspeed
-       # print("direction22222222: ", posvel,'Length:', np.linalg.norm(posvel))
-        
-       # direction = transform_utils.quat2axisangle(direction)
-        #direction 归一化,并转换为四元数
-       # print("direction1111111: ", direction)
-      #  direction = transform_utils.axisangle2quat(direction)
-  
-     #   dir = np.array([direction[3], direction[0], direction[1], direction[2]])
-
-      #  self.curbesdist = distance
-        #print("step_modelanim time: ", animation_time, " passtime: ", passtime, " animspeed: ", self.animspeed, " curbesdist: ", self.curbesdist, " pos: ", pos  )
-      #  print("pos: ", pos, " [1,0,0,0]: ", [1,0,0,0])  , axis=0    , axis=0)               
-      #  animjointpos = np.concatenate([pos, dir], axis=0)
-      #  print("animjointpos: ", animjointpos)
-       # posvel = [0.0, 0.5, 0.0]
-       # posvel = [-0.66384125, 0.74787283, 0.00101892]
-
-
-        dirdiff = direction - curdir_unwrapped
-        #print("direction: ", direction)
-        print("curdir: ", curdir,"curdir_unwrapped: ", curdir_unwrapped)
-        print("dirdiff: ", dirdiff)
-        #限制dirdiff[2]的范围在-6.28到6.28之间
-        
-      #  dirdiff[2] = np.clip(dirdiff[2], -6.28, 6.28)
-
-        #   dirdiff[2] = 0
-    #    print("dirdiff22: ", dirdiff)
-
-        dirspeed = (dirdiff[2]/passtime)*70/50
-   #     print("dirspeed: ", dirspeed)
-        if bsetspeed == False:
-            dirspeed = 0
-        dirvel = [0.0, 0.0, dirspeed] #[0.0, 0.0, 3.1415926/2.0]
-       # dirvel = [0.0, 0.0, 0.0] #[0.0, 0.0, 3.1415926/2.0]
-        print("dirvel: ", dirspeed)
-     
-        animjointqvel = np.concatenate([posvel, dirvel], axis=0)
-
-
-        # pos = self.bezierpath.get_position(0)
-        # dir = [1,0,0,0]
-        # animjointpos = np.concatenate([pos, dir], axis=0)
-
-       # print("step_modelanim time: ", animjointpos  )
-        if self.animjoint :
-            for animjoint in self.animjoint_names:  
-               #self.set_joint_qpos({animjoint: animjointpos})
-               self.set_joint_qvel({animjoint: animjointqvel})
-
-        dist = np.linalg.norm(self.lastpos - self.bezierpath.get_position(0))
-        print("lastpos: ", self.lastpos,"bezierpath 0: ", self.bezierpath.get_position(0),"dist:",dist,"test:",self.test)
-
-        print("distance: ", self.curbesdist, "total_length: ", self.bezierpath.total_length,"test:",self.test)
-
-        if  dist< 0.02 and self.breset == True:  #self.curbesdist >= self.bezierpath.total_length  and
-            self.reset_modelanim()
-       # self.mj_forward()
+                self.set_joint_qvel({joint_name: animjointqvel})
+                
+                # 检查是否需要重置
+                dist_to_end = np.linalg.norm(obj.lastpos - obj.bezier_path.get_position(obj.bezier_path.total_length))
+                if  obj.breset and dist_to_end < 0.02:
+                    print("重置对象: ", joint_name,"dist_to_end: ", dist_to_end)
+                    pos = obj.bezier_path.get_position(0)
+                    direction = [1,0,0,0]
+                    animjointpos = np.concatenate([pos, direction], axis=0)
+                    self.set_joint_qpos({joint_name: animjointpos})
+                    obj.reset()
+                
+                print(f"对象 {joint_name}: 距离={obj.curbesdist:.3f}/{obj.bezier_path.total_length:.3f}")
+                
+            except Exception as e:
+                print(f"警告: 处理对象 {joint_name} 时出错: {e}")
+                continue
 
 
     def step(self, action) -> tuple:
@@ -948,6 +925,41 @@ class DualArmEnv(RobomimicEnv):
             return False
         else:
             raise ValueError("Invalid action type: ", self._action_type)
+
+    def add_animated_object(self, joint_name: str, start_from_current_position: bool = None):
+        """
+        添加一个动画对象
+        
+        参数:
+        joint_name: 关节名称
+        start_from_current_position: 是否从当前位置开始，如果为None则使用默认设置
+        """
+        if start_from_current_position is None:
+            start_from_current_position = self.start_from_current_position
+            
+        self.animated_objects[joint_name] = AnimatedObject(
+            joint_name, self.bezierpath, start_from_current_position
+        )
+        print(f"添加动画对象: {joint_name}")
+    
+    def remove_animated_object(self, joint_name: str):
+        """移除一个动画对象"""
+        if joint_name in self.animated_objects:
+            del self.animated_objects[joint_name]
+            print(f"移除动画对象: {joint_name}")
+    
+    def set_animation_start_mode(self, start_from_current_position=True):
+        """
+        设置动画起始模式
+        
+        参数:
+        start_from_current_position: 如果为True，从物体当前位置开始；如果为False，从曲线起点开始
+        """
+        self.start_from_current_position = start_from_current_position
+        # 更新所有现有对象
+        for obj in self.animated_objects.values():
+            obj.start_from_current_position = start_from_current_position
+        print(f"动画起始模式设置为: {'从当前位置开始' if start_from_current_position else '从曲线起点开始'}")
 
     def disable_actuators(self, actuator_names, trnid):
         for actuator_name in actuator_names:

@@ -168,8 +168,33 @@ class BezierPath:
       #  euler_angles[2] = euler_angles[2] - pi/2 
        # print(f"Roll: {euler_angles[0]:.2f}°, Pitch: {euler_angles[1]:.2f}°, Yaw: {euler_angles[2]:.2f}°")
         return euler_angles 
+
+    def find_closest_point_on_curve(self, position):
+        """
+        找到曲线上距离给定位置最近的点
+        
+        参数:
+        position: 目标位置 [x, y, z]
+        
+        返回:
+        closest_distance: 最近点在曲线上的距离
+        closest_position: 最近点的位置 [x, y, z]
+        """
+        position = np.array(position)
+        min_distance = float('inf')
+        closest_distance = 0
+        
+        # 遍历所有曲线点，找到距离最小的点
+        for i, curve_point in enumerate(self.curve_points):
+            distance = np.linalg.norm(curve_point - position)
+            if distance < min_distance:
+                min_distance = distance
+                closest_distance = self.cumulative_lengths[i]
+        
+        closest_position = self.get_position(closest_distance)
+        return closest_distance, closest_position
     
-    def update_position(self, current_distance, speed, dt):
+    def update_position(self, current_distance, speed, dt, use_angle_smoother=True):
         """
         更新位置
         
@@ -177,16 +202,25 @@ class BezierPath:
         current_distance: 当前距离
         speed: 当前速度
         dt: 时间步长
+        use_angle_smoother: 是否使用内置的AngleSmoother，默认为True以保持向后兼容
         
         返回:
         new_position: 新位置 [x, y, z]
         new_distance: 新距离
+        direction: 方向 [x, y, z] 或 [0, 0, smoothed_angle]
         """
         new_distance = current_distance + speed * dt
         new_distance = min(max(0, new_distance), self.total_length)
         #添加返回该位置的切线方向
         direction = self.get_direction(new_distance)
-        direction = [0,0, self.smoother.smooth_angle(direction[2])]
+        
+        if use_angle_smoother:
+            # 使用内置的 AngleSmoother（向后兼容）
+            direction = [0,0, self.smoother.smooth_angle(direction[2])]
+        else:
+            # 返回原始方向，让调用者自己处理角度平滑
+            direction = [0, 0, direction[2]]
+            
        # print("output direction: ", direction)
         return self.get_position(new_distance), new_distance, direction
     
