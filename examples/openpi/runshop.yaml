@@ -1,0 +1,35 @@
+# config.yaml
+basic:
+  parallelism_num: 1
+  datalink_auth_config: "/home/orca/GameLauncher/orcasim.json"
+  orcasim_path: "/home/orca/GameLauncher/OrcaProject.GameLauncher"
+  level: "shop"
+  levelorca: "shop0722test"
+
+connection:
+  orcagym_address: "localhost:50051"
+  agent_names: "openloong_gripper_2f85_fix_base_usda"
+  pico_ports: "8001"
+
+mode:
+  run_mode: "augmentation"
+  action_type: "joint_pos"
+
+task:
+  task_config: "ashop_task.yaml"
+  dataset: "/home/orca/OrcaWorkStation/OrcaGym/examples/openpi/processed_datasets_tmp/combined_DualArmEnv_1_0_0_shop0705_1_guiji_task_2025-07-10_10-48-15.hdf5"
+
+advanced:
+  record_length: 1200
+ 
+  playback_mode: "random"
+  rollout_times: 10
+  augmented_noise: 0.01
+  augmented_rounds: 3
+  teleoperation_rounds: 100
+  sample_range: 0.0
+  realtime_playback: 'True'
+  withvideo: 'True'
+  index: 0
+  sync_codec: 'False'
+  useNvenc: 1
