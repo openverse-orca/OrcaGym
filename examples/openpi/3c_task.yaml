@@ -17,7 +17,7 @@ random_actor : true
 random_actor_position: false
 random_actor_rotation: false
 actors: ["battery_01", "wifi_box", "intel_box","intelcore_i5", "cpu_fan"]
-actors_spawnable: ["battery_01", "wifi_box", "intel_box","intelcore_i5", "cpu_fan"]
+actors_spawnable: ["assets/prefabs/battery_01", "assets/prefabs/wifi_box", "assets/prefabs/intel_box","assets/prefabs/intelcore_i5", "assets/prefabs/cpu_fan"]
 center: [-6.35, 2.56, 2.32]
 infinity: [1000, 1000, 1]
 bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
