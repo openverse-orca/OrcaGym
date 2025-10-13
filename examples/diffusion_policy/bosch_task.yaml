@@ -1,0 +1,21 @@
+# shop1任务配置文件
+
+level_name: "jiazi"
+type: "pick_and_place"
+range: {x: [0.4, 0.45],y: [0, 0.1],z: -0.15,r: 0.3}
+
+object_bodys: ["block"]
+object_sites: ["blocksite"]
+object_joints: ["block_joint"]
+
+goal_bodys: ["target"]
+goal_sites: ["target_site"]
+goal_joints: ["target_joint"]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["block"]
+actors_spawnable: ["block"]
+center: [-6.35, 2.56, 2.32]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

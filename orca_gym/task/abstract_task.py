@@ -163,6 +163,7 @@ class AbstractTask:
                 self.object_sites = [f"{self.actors[idx]}site" for idx in idxs]
                 self.object_joints = [f"{self.actors[idx]}_joint" for idx in idxs]
 
+
             self.__random_count__ += 1
 
     def load_config(self, config: dict):
@@ -207,7 +208,7 @@ class AbstractTask:
     def spawn_scene(self, env: OrcaGymLocalEnv):
         if self.first_spawn and not self.random_light:
             self.scene.publish_scene_without_init_env()
-            self.generate_actors()
+            # self.generate_actors()  # TODO: uncomment this
 
             self.scene.publish_scene()
             self.first_spawn = False

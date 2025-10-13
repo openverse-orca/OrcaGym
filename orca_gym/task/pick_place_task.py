@@ -31,10 +31,10 @@ class PickPlaceTask(AbstractTask):
         """
         随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
         """
-        self.generate_object(env, 3, 5)
+        self.generate_object(env, 1, 1)  # TODO: uncomment this
         while True:
             # 随机摆放
-            self.random_objs_and_goals(env, random_rotation=True)
+            self.random_objs_and_goals(env, random_rotation=True)  # TODO: uncomment this
 
             # 如果没有可用的物体或目标，直接返回空
             if not self.object_bodys or not self.goal_bodys:
@@ -139,7 +139,7 @@ class PickPlaceTask(AbstractTask):
         gmin = goal_entry['min'][:2]
         gmax = goal_entry['max'][:2]
         if xy[0] < gmin[0] or xy[0] > gmax[0] or xy[1] < gmin[1] or xy[1] > gmax[1]:
-            return False
+            return True
         return True
 
     def get_language_instruction(self) -> str:

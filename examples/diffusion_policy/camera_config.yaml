@@ -1,0 +1,85 @@
+# camera_config.yaml
+
+# 通用相机配置，不随场景变化，包括原始外参（机器人坐标系）与内参、端口
+default:
+  camera_head:
+    fovy: 75
+    width: 1080
+    height: 720
+    near: 0.2
+    far: 4.0
+    ports:
+      rgb: 7070
+      depth: 7071
+    translation: [0.02, 0.0, 0.15]
+    rotation:    [0.0, 40.0, -90.0]
+
+  camera_wrist_l:
+    fovy: 50
+    width: 1080
+    height: 720
+    near: 0.2
+    far: 4.0
+    ports:
+      rgb: 7090
+      depth: 7091
+    translation: [0.0, 0.0, -0.15]
+    rotation:    [-150.0, 0.0, -180.0]
+
+  camera_wrist_r:
+    fovy: 50
+    width: 1080
+    height: 720
+    near: 0.2
+    far: 4.0
+    ports:
+      rgb: 7080
+      depth: 7081
+    translation: [0.0, 0.0, -0.15]
+    rotation:    [150.0, 0.0,   0.0]
+
+# 各场景下的相机在世界坐标系下的 extrinsics
+scenes:
+  jiazi:
+    camera_head:
+      translation: [-2.26, 6.18, 1.66]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [-2.71, 5.23, 1.48]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [-2.71, 7.126, 1.48]
+      rotation:    [48.1, 0.0, 0.0]
+
+  kitchen:
+    camera_head:
+      translation: [-4.43, -4.15, 1.72]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [-4.5, -5.0, 1.42]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [-4.43, -3.21, 1.46]
+      rotation:    [48.1, 0.0, 0.0]
+
+  yaodian:
+    camera_head:
+      translation: [2.83, -2.83, 1.61]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [3.0, -3.75, 1.47]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [3.0, -1.94, 1.47]
+      rotation:    [48.1, 0.0, 0.0]
+
+  shop:
+    camera_head:
+      translation: [-6.40, 2.40, 1.79]
+      rotation:    [0.0, -25.0, 0.0]
+    camera_wrist_l:
+      translation: [-7.29, 2.29, 1.60]
+      rotation:    [-48.0, 0.0, 0.0]
+    camera_wrist_r:
+      translation: [-5.405, 2.31, 1.59]
+      rotation:    [48.1, 0.0, 0.0]

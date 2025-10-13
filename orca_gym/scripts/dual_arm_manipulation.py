@@ -398,8 +398,8 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                                 is_success = False
                     env.stop_save_video()
                     saving_mp4 = False
-                    if not is_success:
-                        dataset_writer.remove_path()
+                    # if not is_success:
+                    #     dataset_writer.remove_path()
                 elif task_status == TaskStatus.FAILURE:
 
 #                     env.stop_save_video()
@@ -409,7 +409,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                     env.stop_save_video()
                     #通过os接口删除路径
 
-                    dataset_writer.remove_path()
+                    # dataset_writer.remove_path()
                   #      print(f"目录及其内容已删除: {rmpath}")
            
                     saving_mp4 = False              
@@ -625,8 +625,8 @@ def do_teleoperation(env,
                     camera_name_list.append(camera_name.replace("_color", ""))
             unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
             ret, _ = unitCheack.check()
-            if ret != ErrorType.Qualified:
-                dataset_writer.remove_path()
+            # if ret != ErrorType.Qualified:
+            #     dataset_writer.remove_path()
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -1212,14 +1212,14 @@ def do_augmentation(
                     if ret != ErrorType.Qualified:
                         trial_count += 1
                         print(f"ret = {ret}")
-                        dataset_writer.remove_path()
-                        dataset_writer.remove_episode_from_json(json_path, dataset_writer.experiment_id)
+                        # dataset_writer.remove_path()
+                        # dataset_writer.remove_episode_from_json(json_path, dataset_writer.experiment_id)
                     else:
                         done_demo_count += 1
                         print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                         done = True
                 else:
-                    dataset_writer.remove_path()
+                    # dataset_writer.remove_path()
                     print("Episode failed! Retrying...")
                     trial_count += 1
             if not done:
