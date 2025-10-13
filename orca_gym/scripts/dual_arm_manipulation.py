@@ -617,13 +617,13 @@ def do_teleoperation(env,
         env, cameras, dataset_writer, rgb_size, action_step
     )
     
-        # last_done = (len(done_list) > 0 and done_list[-1] == 1)
-        # last_is_success = (len(is_success_list) > 0 and is_success_list[-1])
-        # save_record = last_done and last_is_success
-        # task_result = "Success" if save_record else "Failed"
-        # save_record = task_result == "Success"
-        task_result = 'Success'
+        last_done = (len(done_list) > 0 and done_list[-1] == 1)
+        last_is_success = True
+        save_record = last_done and last_is_success
+        task_result = "Success" if save_record else "Failed"
         save_record = task_result == "Success"
+        # task_result = 'Success'
+        # save_record = task_result == "Success"
         exit_program = False
     
         if save_record:
