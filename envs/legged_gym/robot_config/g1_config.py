@@ -203,15 +203,6 @@ g1Config = {
         "sensor_foot_touch_names" : ["lf-touch-front", "lf-touch-back", "rf-touch-front", "rf-touch-back"],  # Maintain the same order as contact_site_names
         "use_imu_sensor" : False,
 
-        "ground_contact_body_names" : ["Floor_Floor", 
-                                        "terrain_perlin_smooth_usda_terrain",
-                                        "terrain_perlin_rough_usda_terrain",
-                                        "terrain_perlin_smooth_slope_usda_terrain",
-                                        "terrain_perlin_rough_slope_usda_terrain",
-                                        "terrain_stair_low_usda_terrain", 
-                                        "terrain_stair_high_usda_terrain",    
-                                        "terrain_brics_usda_terrain",                                    
-                                        ],
         
         "base_contact_body_names" : ["pelvis", "waist_yaw_link", "waist_roll_link", "torso_link",
                                      ],

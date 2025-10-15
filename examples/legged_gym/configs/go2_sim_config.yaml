@@ -1,0 +1,15 @@
+orcagym_addresses: ["localhost:50051"]
+agent_name: "go2"
+agent_asset_path: "assets/prefabs/go2_usda"
+
+model_file: 
+  "flat_terrain": "/home/superfhwl/download/go2_follow_command_flat_terrain_iteration_300.zip"
+  "rough_terrain": "/home/superfhwl/download/go2_follow_command_rough_terrain_iteration_1000.zip"
+
+ctrl_device: "keyboard"
+
+command_model:
+  "flat_terrain":
+  "rough_terrain":
+  
+terrain_asset_paths: ["assets/prefabs/terrain_test_usda"]

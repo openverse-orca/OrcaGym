@@ -3,6 +3,8 @@ import os
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
+import tempfile
+import shutil
 
 proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
@@ -19,6 +21,7 @@ from orca_gym.core.orca_gym_model import OrcaGymModel
 from orca_gym.core.orca_gym_data import OrcaGymData
 from orca_gym.core.orca_gym_opt_config import OrcaGymOptConfig
 from orca_gym.core.orca_gym import OrcaGymBase
+from orca_gym.utils.dir_utils import cleanup_zombie_locks, file_lock
 
 import mujoco
 from scipy.spatial.transform import Rotation as R
@@ -52,6 +55,17 @@ class AnchorType:
     WELD = 1
     BALL = 2
 
+class CaptureMode:
+    '''
+    Enum for mujoco capture camera mode
+    When using synchronous mode,
+    each camera frame is aligned,
+    but performance will be affected.
+    Asynchronous mode, the opposite
+    '''
+    ASYNC = 0
+    SYNC = 1
+
 def get_eq_type(anchor_type: AnchorType):
     """
     Get the equality constraint type based on the anchor type.
@@ -69,6 +83,7 @@ def get_eq_type(anchor_type: AnchorType):
     else:
         return mujoco.mjtEq.mjEQ_CONNECT
 
+
 class OrcaGymLocal(OrcaGymBase):
     """
     OrcaGymLocal class
@@ -80,6 +95,11 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
         self._override_ctrls : dict[int, float] = {}
+        
+        # 清理可能的僵尸锁文件
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        cleanup_zombie_locks(temp_dir)
 
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
@@ -144,8 +164,8 @@ class OrcaGymLocal(OrcaGymBase):
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
-    async def load_content_file(self, content_file_name):
-        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name)
+    async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
+        request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name, file_dir=remote_file_dir)
         response = await self.stub.LoadContentFile(request)
 
         if response.status != mjc_message_pb2.LoadContentFileResponse.SUCCESS:
@@ -155,28 +175,77 @@ class OrcaGymLocal(OrcaGymBase):
         if content is None or len(content) == 0:
             raise Exception("Content is empty.")
         
-        content_file_path = os.path.join(self.xml_file_dir, content_file_name)
-        async with aiofiles.open(content_file_path, 'wb') as f:
-            await f.write(content)
+        # 如果指定了临时文件路径，先写入临时文件
+        if temp_file_path is not None:
+            async with aiofiles.open(temp_file_path, 'wb') as f:
+                await f.write(content)
+            return temp_file_path
+        
+        # 否则按原来的逻辑写入最终路径
+        if local_file_dir is None or len(local_file_dir) == 0:
+            content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        else:
+            content_file_path = os.path.join(local_file_dir, content_file_name)
 
-        return
+        print("Content file path: ", content_file_path)
+
+        # 使用文件锁防止多进程重入，设置30秒超时
+        try:
+            async with file_lock(content_file_path, timeout=30):
+                # 再次检查文件是否存在（可能在等待锁的过程中已被其他进程创建）
+                if not os.path.exists(content_file_path):
+                    # 原子化保存：先写入临时文件，再移动到最终位置
+                    temp_file = tempfile.NamedTemporaryFile(
+                        mode='wb', 
+                        dir=os.path.dirname(content_file_path), 
+                        delete=False,
+                        prefix=f"{content_file_name}_",
+                        suffix=".tmp"
+                    )
+                    try:
+                        temp_file.write(content)
+                        temp_file.flush()
+                        os.fsync(temp_file.fileno())
+                        temp_file.close()
+                        
+                        # 原子移动文件
+                        shutil.move(temp_file.name, content_file_path)
+                    except Exception as e:
+                        # 清理临时文件
+                        try:
+                            os.unlink(temp_file.name)
+                        except OSError:
+                            pass
+                        raise e
+        except TimeoutError as e:
+            print(f"警告: {e}")
+            # 如果获取锁超时，检查文件是否已经存在
+            if os.path.exists(content_file_path):
+                print(f"文件 {content_file_path} 已存在，跳过下载")
+                return content_file_path
+            else:
+                raise Exception(f"无法获取文件锁，且文件不存在: {content_file_path}")
+
+        return content_file_path
 
     async def process_xml_node(self, node : ET.Element):
         if node.tag == 'mesh' or node.tag == 'hfield':
             content_file_name = node.get('file')
             if content_file_name is not None:
                 content_file_path = os.path.join(self.xml_file_dir, content_file_name)
-                if not os.path.exists(content_file_path):
-                    # 下载文件
-                    print("Load content file: ", content_file_name)
-                    await self.load_content_file(content_file_name)
+                # 使用文件锁防止多进程重复下载
+                async with file_lock(content_file_path):
+                    if not os.path.exists(content_file_path):
+                        # 下载文件
+                        print("Load content file: ", content_file_name)
+                        await self.load_content_file(content_file_name)
         else:
             for child in node:
                 await self.process_xml_node(child)
         return
     
-    async def begin_save_video(self, file_path):
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
+    async def begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC):
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
         response = await self.stub.BeginSaveMp4File(request)
         if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
             print(f"Video saving started at {file_path}")
@@ -191,6 +260,26 @@ class OrcaGymLocal(OrcaGymBase):
         request = mjc_message_pb2.GetCurrentFrameIndexRequest()
         response = await self.stub.GetCurrentFrameIndex(request)
         return response.current_frame
+
+    async def get_camera_time_stamp(self, last_frame) -> dict:
+        request = mjc_message_pb2.GetTimeStampRequest()
+        request.last_frame_index = last_frame
+        response = await self.stub.GetTimeStamp(request)
+        if response.error_message != "":
+            print(f"Get time stamp failed. error message: {response.error_message}")
+        return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
+
+    async def get_frame_png(self, image_path):
+        request = mjc_message_pb2.GetCameraFramePNGRequest()
+        request.image_path = image_path
+        response = await self.stub.GetCameraFramePNG(request)
+        result = {}
+        for name_transform in response.name_transform:
+            result[name_transform.name] = {
+                'pos': list(name_transform.pos),
+                'quat': list(name_transform.quat)
+            }
+        return result
 
     @property
     def xml_file_dir(self):
@@ -222,22 +311,44 @@ class OrcaGymLocal(OrcaGymBase):
         file_name = response.file_name
         file_path = os.path.join(self.xml_file_dir, file_name)
         
-        # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
-        if not os.path.exists(file_path):
-            request = mjc_message_pb2.LoadLocalEnvRequest()
-            request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
-            response = await self.stub.LoadLocalEnv(request)
+        # 使用文件锁防止多进程重入
+        async with file_lock(file_path):
+            # 检查返回的文件是否已经存在,如果文件不存在，则获取文件内容
+            if not os.path.exists(file_path):
+                request = mjc_message_pb2.LoadLocalEnvRequest()
+                request.req_type = mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_CONTENT
+                response = await self.stub.LoadLocalEnv(request)
 
-            if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
-                raise Exception("Load local env failed.")
-            
-            # print("Load xml from remote: ", file_name)
+                if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
+                    raise Exception("Load local env failed.")
+                
+                # print("Load xml from remote: ", file_name)
 
-            xml_content = response.xml_content
-            
-            # 异步写入文件（使用aiofiles）
-            async with aiofiles.open(file_path, 'wb') as f:
-                await f.write(xml_content)
+                xml_content = response.xml_content
+                
+                # 原子化保存：先写入临时文件，再移动到最终位置
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb', 
+                    dir=self.xml_file_dir, 
+                    delete=False,
+                    prefix=f"{file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(xml_content)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    
+                    # 原子移动文件
+                    shutil.move(temp_file.name, file_path)
+                except Exception as e:
+                    # 清理临时文件
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
         
         # 返回绝对路径
         return os.path.abspath(file_path)
@@ -306,6 +417,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.disableactuator = self.opt.disableactuator
         self._mjModel.opt.sdf_initpoints = self.opt.sdf_initpoints
         self._mjModel.opt.sdf_iterations = self.opt.sdf_iterations
+        self._mjModel.opt.disableflags = self._mjModel.opt.disableflags | mujoco.mjtDisableBit.mjDSBL_FILTERPARENT if not self.opt.filterparent else self._mjModel.opt.disableflags & ~mujoco.mjtDisableBit.mjDSBL_FILTERPARENT.value
         
 
     def query_opt_config(self):
@@ -338,7 +450,8 @@ class OrcaGymLocal(OrcaGymBase):
             "enableflags": self._mjModel.opt.enableflags,
             "disableactuator": self._mjModel.opt.disableactuator,
             "sdf_initpoints": self._mjModel.opt.sdf_initpoints,
-            "sdf_iterations": self._mjModel.opt.sdf_iterations
+            "sdf_iterations": self._mjModel.opt.sdf_iterations,
+            "filterparent": False if self._mjModel.opt.disableflags & mujoco.mjtDisableBit.mjDSBL_FILTERPARENT else True
         }
         return opt_config
 
@@ -445,54 +558,7 @@ class OrcaGymLocal(OrcaGymBase):
                 "LengthRange": actuator.lengthrange,
             }
         return actuator_dict
-    def get_goal_bounding_box(self, goal_body_name):
-        """
-        计算目标物体（goal_body_name）在世界坐标系下的轴对齐包围盒。
-        支持 BOX、SPHERE 类型，BOX 会考虑 geom 的旋转。
-        """
-        inf = float('inf')
-        min_corner = np.array([ inf,  inf,  inf])
-        max_corner = np.array([-inf, -inf, -inf])
-        for geom_id in range(self._mjModel.ngeom):
-            body_id = self._mjModel.geom(geom_id).bodyid
-            body_name = self._mjModel.body(body_id).name
-            if goal_body_name not in body_name:
-                continue
-
-            geom = self._mjModel.geom(geom_id)
-            geom_type = geom.type
-            # 世界坐标下的几何中心
-            center = self._mjData.geom_xpos[geom_id]
-
-            if geom_type == mujoco.mjtGeom.mjGEOM_BOX:
-                # MuJoCo 中 size 已经是 half-extents (local frame)
-                half_local = np.array(geom.size)
-                # 获取世界坐标下的旋转矩阵
-                xmat = self._mjData.geom_xmat[geom_id].reshape(3, 3)
-                # 计算旋转后沿世界轴的半尺寸
-                half_world = np.abs(xmat) @ half_local
-                box_min = center - half_world
-                box_max = center + half_world
-
-            elif geom_type == mujoco.mjtGeom.mjGEOM_SPHERE:
-                # 球体只需考虑半径
-                r = geom.size[0]
-                box_min = center - r
-                box_max = center + r
-
-            else:
-                # 其他类型暂不处理
-                continue
-
-            min_corner = np.minimum(min_corner, box_min)
-            max_corner = np.maximum(max_corner, box_max)
-
-        bounding_box = {
-            'min': min_corner,
-            'max': max_corner,
-            'size': max_corner - min_corner
-        }
-        return bounding_box
+    
     def set_actuator_trnid(self, actuator_id, trnid):
         model = self._mjModel
         actuator = model.actuator(actuator_id)

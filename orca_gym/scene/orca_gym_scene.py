@@ -11,12 +11,12 @@ class Actor:
 
     def __init__(self,
                  name: str,
-                 spawnable_name: str,
+                 asset_path: str,
                  position: np.ndarray,
                  rotation: np.ndarray,
                  scale: float,):
         self.name = name
-        self.spawnable_name = spawnable_name
+        self.asset_path = asset_path
         self.position = position
         self.rotation = rotation
         self.scale = float(scale)
@@ -25,7 +25,7 @@ class Actor:
     def _check_actor(self):
         if self.name is None or self.name == "":
             raise ValueError("Actor name cannot be None or empty.")
-        if self.spawnable_name is None or self.spawnable_name == "":
+        if self.asset_path is None or self.asset_path == "":
             raise ValueError("Actor spawnable name cannot be None or empty.")
         if self.position is None or len(self.position) != 3:
             raise ValueError("Actor position must be a 3D vector.")
@@ -144,7 +144,7 @@ class OrcaGymScene:
         async with self.lock:  # 加锁保证串行
             request = mjc_message_pb2.AddActorRequest(
                 name = actor.name,
-                spawnable_name = actor.spawnable_name,
+                spawnable_name = actor.asset_path,
                 pos = actor.position,
                 quat = actor.rotation,
                 scale = actor.scale,)
@@ -217,3 +217,49 @@ class OrcaGymScene:
             
     def set_material_info(self, actor_name: str, material_info: MaterialInfo):
         self.loop.run_until_complete(self._set_material_info(actor_name, material_info))
+
+
+    async def _set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamNumberRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamNumber(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamNumberResponse.SUCCESS:
+                print("Set actor anim param number failed: ", response.error_message)
+                raise Exception("Set actor anim param number failed.")
+            
+    def set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
+        self.loop.run_until_complete(self._set_actor_anim_param_number(actor_name, param_name, value))
+
+    async def _set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamBoolRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamBool(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamBoolResponse.SUCCESS:
+                print("Set actor anim param bool failed: ", response.error_message)
+                raise Exception("Set actor anim param bool failed.")
+            
+    def set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
+        self.loop.run_until_complete(self._set_actor_anim_param_bool(actor_name, param_name, value))
+
+    async def _set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorAnimParamStringRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorAnimParamString(request)
+            if response.status != mjc_message_pb2.SetActorAnimParamStringResponse.SUCCESS:
+                print("Set actor anim param string failed: ", response.error_message)
+                raise Exception("Set actor anim param string failed.")
+            
+    def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
+        self.loop.run_until_complete(self._set_actor_anim_param_string(actor_name, param_name, value))

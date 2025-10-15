@@ -49,6 +49,8 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
 
         self._base_name = self.body("torso")
         self._base_joint_name = self.joint("root")
+        self._init_body_geom_id()
+
         self._leg_joint_names = [
             self.joint("hip_1"), self.joint("ankle_1"), self.joint("hip_2"), self.joint("ankle_2"), self.joint("hip_3"), self.joint("ankle_3"), self.joint("hip_4"), self.joint("ankle_4")
         ]
@@ -62,6 +64,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         self._contact_cost_weight: float = 5e-4
 
         self._healthy_reward: float = 1e-3
+        self._terminated_reward: float = -10.0
         self._terminate_when_unhealthy: bool = True
         self._healthy_z_range: Tuple[float, float] = (0.2, 1.0)
         self._reset_noise_scale: float = 0.1
@@ -105,6 +108,33 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
     @property
     def healthy_reward(self):
         return self.is_healthy * self._healthy_reward
+
+
+    def _init_body_geom_id(self):
+        self._body_geom_id = []
+        geom_dict = self.model.get_geom_dict()
+        for geom_name, geom in geom_dict.items():
+            body_name = self.model.get_geom_body_name(geom["GeomId"])
+            if body_name == self._base_name:
+                self._body_geom_id.append(geom["GeomId"])
+
+        print("body_geom_id: ", self._body_geom_id)
+
+    @property
+    def is_terminated(self):
+        if not self._terminate_when_unhealthy:
+            return False
+        
+        simple_contact = self.query_contact_simple()
+        for contact in simple_contact:
+            if contact["Geom1"] in self._body_geom_id or contact["Geom2"] in self._body_geom_id:
+                return True
+        return False
+
+    @property
+    def terminated_reward(self):
+        return self.is_terminated * self._terminated_reward
+
     
     def render_callback(self, mode='human') -> None:
         if mode == "human":
@@ -119,6 +149,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
     def step(self, action) -> tuple:
         action_dict = {self._actuator_names[i]: action[i] for i in range(len(self._actuator_names))}
         ctrl = self._action2ctrl(action_dict)
+        # print("ctrl: ", ctrl)
 
         # step the simulation with original action space
         xy_position_before = self.get_body_xpos_xmat_xquat([self._base_name])[0][:2].copy()
@@ -130,7 +161,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
 
         obs = self._get_obs().copy()
         reward, reward_info = self._get_rew(x_velocity, action)
-        terminated = (not self.is_healthy) and self._terminate_when_unhealthy
+        terminated = self.is_terminated
         qpos = self.query_joint_qpos([self._base_joint_name])[self._base_joint_name]
         info = {
             "x_position": qpos[0],
@@ -184,6 +215,14 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
         """
         Reset the environment, return observation
         """
+        
+        body_qpos = self.query_joint_qpos([self._base_joint_name])[self._base_joint_name]
+        body_xyz = body_qpos[:2]
+        random_xyz = self._reset_noise_scale * self.np_random.uniform(-1, 1, (2))
+        body_xyz += random_xyz
+
+        self.set_joint_qpos({self._base_joint_name: body_qpos})
+        self.mj_forward()
 
         self.ctrl = np.zeros(self.nu, dtype=np.float32)
 
@@ -240,7 +279,8 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
     def _get_rew(self, x_velocity: float, action):
         forward_reward = x_velocity * self._forward_reward_weight
         healthy_reward = self.healthy_reward
-        rewards = forward_reward + healthy_reward
+        terminated_reward = self.terminated_reward
+        rewards = forward_reward + healthy_reward + terminated_reward
 
         ctrl_cost = self.control_cost(action)
         # contact_cost = self.contact_cost

@@ -1,0 +1,56 @@
+framework: "rllib"
+orcagym_addresses: ["192.168.110.100:50051"]    # 因为worker节点要远程访问OrcaLab，所以要配置你运行OrcaLab的节点ip地址，推荐使用有线网口，尽量不要用无线网口
+ray_cluster_address: "ray://192.168.110.100:6379"  # Ray集群地址，是你启动head节点的ip地址，推荐使用有线网口，尽量不要用无线网口
+agent_name: "Lite3"
+agent_asset_path: "assets/prefabs/lite3_usda"
+task: "flat_terrain"
+env_name: "LeggedGym"
+
+# 集群训练专用配置
+training:
+  max_episode_steps: 1000
+  num_env_runners: 0             # 为0时，自动根据集群可用CPU进行分配。对于单节点环境，必须设置为非0，否则learner独占此节点，就没有运行 env runner 的节点了
+                                 # 非0的分配方式：预留8个CPU给OrcaLab，预留num_cpus_per_learner个CPU给learner，预留1个CPU给调度器，剩余的CPU为env_runners可分分配最大数量
+  num_envs_per_env_runner: 32    # 必须是 32 的倍数，一个Mujoco Instance支持 32 个agent是最合理的，这是默认配置
+  num_cpus_per_env_runner: 1     # 每个env_runner配套1个CPU
+  num_gpus_per_env_runner: 0.01   # 每个env_runner配套0.01个GPU
+  num_learners: 1                # 每个learner要占用一张卡
+  num_cpus_per_learner: 8        # 每个learner配套多少个CPU，如果num_env_runners != 0，则使用这个值来分配learner的CPU
+  num_gpus_per_learner: 0.6      # 大于0.5，避免多个learner共享一张卡
+  async_env_runner: True
+  iter: 2000
+  render_mode: none
+  terrain_asset_paths: 
+    flat_terrain: ["assets/prefabs/terrain_ellipsoid_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda"]
+    rough_terrain: ["assets/prefabs/terrain_stair_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda", "assets/prefabs/terrain_slope_5_usda", "assets/prefabs/terrain_stair_high_usda", "assets/prefabs/terrain_brics_high_usda", "assets/prefabs/terrain_slope_10_usda"]
+  curriculum_list:
+    flat_terrain:
+      - name: "flat_terrain"
+        milestone: 2000
+    rough_terrain:
+      - name: "rough_terrain"
+        milestone: 2000
+
+testing:
+  agent_name: "Lite3_000"
+  max_episode_steps: 1000
+  render_mode: human
+  num_env_runners: 1         
+  num_envs_per_env_runner: 1    
+  async_env_runner: True
+  iter: 2000
+  terrain_asset_paths: 
+    flat_terrain: ["assets/prefabs/terrain_ellipsoid_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda"]
+    rough_terrain: ["assets/prefabs/terrain_stair_low_usda", "assets/prefabs/terrain_stair_low_flat_usda", "assets/prefabs/terrain_brics_low_usda", "assets/prefabs/terrain_slope_5_usda", "assets/prefabs/terrain_stair_high_usda", "assets/prefabs/terrain_brics_high_usda", "assets/prefabs/terrain_slope_10_usda"]
+  curriculum_list:
+    flat_terrain:
+      - name: "flat_terrain"
+        milestone: 2000
+    rough_terrain:
+      - name: "rough_terrain"
+        milestone: 2000
+
+playing:
+  agent_name: "Lite3_000"
+  max_episode_steps: 1000
+  render_mode: human 

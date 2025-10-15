@@ -1,0 +1,36 @@
+orcagym_addresses: ["localhost:50051"]
+agent_name: "Lite3"
+agent_asset_path: "assets/prefabs/lite3_usda"
+model_type: "sb3"
+
+model_file: 
+  "sb3":
+    "flat_terrain": "test/Lite3_flat_terrain.zip"
+    "rough_terrain": "test/Lite3_rough_terrain.zip"
+  "onnx":
+    "flat_terrain": "test/Lite3_flat_terrain.onnx"
+    "rough_terrain": "test/Lite3_rough_terrain.onnx"
+  "grpc":
+    "flat_terrain": "localhost:50151"  # 远程服务器地址
+    "rough_terrain": "localhost:50151"
+  "rllib":
+    "flat_terrain": "test/checkpoint_Lite3_flat_terrain"
+    "rough_terrain": "test/checkpoint_Lite3_rough_terrain"
+
+ctrl_device: "keyboard"
+
+command_model:
+  "flat_terrain":
+    "forward_speed" : [-0.5, 0.5]      # move forward or backward
+    "left_speed" : [-0.3, 0.3]         # move left or right
+    "turn_speed" : 0.7853975   # pi / 4
+    "turbo_scale" : 3.0        # turbo mode scale
+  "rough_terrain":
+    "forward_speed" : [-0.5, 0.5]      # move forward or backward
+    "left_speed" : [-0.3, 0.3]         # move left or right
+    "turn_speed" : 0.7853975   # pi / 4
+    "turbo_scale" : 2.0        # turbo mode scale
+
+terrain_asset_paths: ["assets/prefabs/terrain_test_usda"]
+
+friction_scale: 1.0

@@ -17,7 +17,7 @@ ENV_ENTRY_POINT = {
 }
 
 TIME_STEP = 0.005
-FRAME_SKIP = 1
+FRAME_SKIP = 4
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
 CONTROL_FREQ = 1 / REALTIME_STEP
 
@@ -80,7 +80,7 @@ def run_simulation(orcagym_addr : str,
             obs, reward, terminated, truncated, info = env.step(action)
 
             env.render()
-
+            # env.unwrapped.get_frame_png("/home/orca/OrcaLabPNG")
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < REALTIME_STEP:
                 time.sleep(REALTIME_STEP - elapsed_time.total_seconds())

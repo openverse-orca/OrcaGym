@@ -8,7 +8,7 @@ from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.task.pick_place_task import PickPlaceTask, TaskStatus
+from orca_gym.adapters.robomimic.task.scene_manage.pick_place_task import PickPlaceTask, TaskStatus
 import importlib
 
 class RunMode:
@@ -85,7 +85,7 @@ class DualArmEnv(RobomimicEnv):
 
         self._run_mode = run_mode
         self._action_type = action_type
-
+        self._sync_render = True        # 数采需要严格同步渲染，保证生成的视频与仿真数据一致
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
@@ -147,6 +147,20 @@ class DualArmEnv(RobomimicEnv):
         # Run generate_observation_space after initialization to ensure that the observation object's name is defined.
         self._set_obs_space()
         self._set_action_space()
+
+        from orca_gym.adapters.robomimic.task.scene_manage.abstract_task import AbstractTask
+        from orca_gym.scene.orca_gym_scene import OrcaGymScene
+        # self._task = AbstractTask()
+        # self._task.grpc_addr = "192.168.1.164:50051"
+        # self._task.scene = OrcaGymScene(self._task.grpc_addr)
+        # self._task.actors = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
+        # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
+        # self._task.register_init_env_callback(self.init_env)
+        self._config = task_config_dict
+        self._config["grpc_addr"] = "192.168.1.220:50051"
+        self._task = PickPlaceTask(self._config)
+        
+        self._task.register_init_env_callback(self.init_env)
 
 
     def init_env(self):
@@ -282,8 +296,8 @@ class DualArmEnv(RobomimicEnv):
 
         info = {"state": self.get_state(),
                 "action": scaled_action,
-                "object": self.objects,  # 提取第一个对象的位置
-                "goal": self.goals,
+                # "object": self.objects,  # 提取第一个对象的位置
+                # "goal": self.goals,
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
                 "time_step": self.data.time}
@@ -431,10 +445,9 @@ class DualArmEnv(RobomimicEnv):
                 full      = self._config["actors"]
                 spawn     = self._config["actors_spawnable"]
                 total     = len(spawn)
-                n_select  = random.randint(3, 5)               # 比如想抽 3~5 个
-                idxs      = random.sample(range(total), k=n_select)
+                idxs      = 1
                 # 根据索引分别取 actor_name 与 spawn_name
-                short_names = [full[i]  for i in idxs]
+                short_names = [full[i]  for i in range(idxs)]
                 # 只改 object_bodys/sites/joints 三项，保持 actors 原样
                 self._config["object_bodys"]  = list(short_names)
                 self._config["object_sites"]  = [f"{n}site"   for n in short_names]
@@ -477,6 +490,9 @@ class DualArmEnv(RobomimicEnv):
         }
     
     def reset_model(self) -> tuple[dict, dict]:
+        self._task.spawn_scene(self)
+        self._task.get_task(self)
+        
         if self._run_mode == RunMode.TELEOPERATION:
             return self.reset_teleoperation()
         elif self._run_mode == RunMode.POLICY_NORMALIZED:

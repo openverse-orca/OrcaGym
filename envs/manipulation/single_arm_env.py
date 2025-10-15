@@ -78,6 +78,7 @@ class SingleArmEnv(RobomimicEnv):
         self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
+        self._sync_render = True        # 数采需要严格同步渲染，保证生成的视频与仿真数据一致
         
         super().__init__(
             frame_skip = frame_skip,

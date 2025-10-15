@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OrcaGym"         # 修改为你的项目名称
-version = "25.7.2"                  # 修改为项目版本
+version = "25.10.0"                  # 修改为项目版本
 description = "OrcaGym"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -12,6 +12,7 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy>=2.0.0",
     "scipy",
+    "scipy-stubs", # for type hints
     "matplotlib",
     "grpcio==1.66.1",
     "grpcio-tools==1.66.1",
@@ -30,9 +31,10 @@ dependencies = [
     "opencv-python",
     "aiofiles",
     "requests",
+    "grpcio",
     "flask",
     "tensorboard",
-    "trimesh",
+    "trimesh"
 ]
 
 # 可选依赖，可用于开发调试、测试、格式化代码等用途

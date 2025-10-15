@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.task.abstract_task import AbstractTask
+from orca_gym.adapters.robomimic.task.scene_manage.abstract_task import AbstractTask
 import robomimic.envs.env_base as EB
 import robomimic.utils.obs_utils as ObsUtils
 

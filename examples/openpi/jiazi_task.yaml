@@ -1,6 +1,9 @@
 # shop1任务配置文件
 
 level_name: "jiazi"
+type: "pick_and_place"
+range: {x: [0.55, 0.65],y: [-0.4, 0.4],z: -0.15,r: 0.3}
+
 object_bodys: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite", "salt_site", "can_site"]
 object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint", "salt_joint", "can_joint"]

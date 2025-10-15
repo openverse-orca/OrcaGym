@@ -1,4 +1,4 @@
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+import argparse
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import numpy as np
 import orca_gym.utils.rotations as rotations
@@ -83,7 +83,13 @@ def run_simulation(orcagym_addr : str,
 
 
 if __name__ == "__main__":
-    orcagym_addr = "localhost:50051"
-    agent_name = "openloong_gripper_2f85_mobile_base_usda"
-    env_name = "WheeledChassis"
+    parser = argparse.ArgumentParser("Run wheeled chassis simulation")
+    parser.add_argument("--orcagym_addr", type=str, default="localhost:50051")
+    parser.add_argument("--agent_name", type=str, default="openloong_gripper_2f85_mobile_base_usda")
+    parser.add_argument("--env_name", type=str, default="WheeledChassis")
+    args = parser.parse_args()
+    orcagym_addr = args.orcagym_addr
+    agent_name = args.agent_name
+    env_name = args.env_name
+
     run_simulation(orcagym_addr, agent_name, env_name)
