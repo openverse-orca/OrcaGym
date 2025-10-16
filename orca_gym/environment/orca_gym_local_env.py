@@ -452,6 +452,11 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             }
         return site_dict
     
+    def query_site_size(self, site_names):
+        site_size_dict = self.gym.query_site_size(site_names)
+        return site_size_dict
+
+
     def query_site_pos_and_quat_B(self, site_names, base_body_list) -> Dict[str, Dict[str, Union[NDArray[np.float32], NDArray[np.float32]]]]:
         site_dict = self.gym.query_site_pos_and_mat(site_names)
         base_pos, _, base_quat = self.get_body_xpos_xmat_xquat(base_body_list)
@@ -544,6 +549,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def query_joint_dofadrs(self, joint_names):
         joint_dofadrs = self.gym.query_joint_dofadrs(joint_names)
         return joint_dofadrs
+        
     def get_goal_bounding_box(self, geom_name):
         geom_size = self.gym.get_goal_bounding_box(geom_name)
         return geom_size

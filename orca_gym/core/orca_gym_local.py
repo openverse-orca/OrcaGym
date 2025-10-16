@@ -887,7 +887,15 @@ class OrcaGymLocal(OrcaGymBase):
             xmat = self._mjData.site(site_name).xmat
             site_pos_and_mat[site_name] = {"xpos": xpos, "xmat": xmat}
         return site_pos_and_mat
-    
+
+    def query_site_size(self, site_names: list[str]):
+        site_size_dict = {}
+        for site_name in site_names:
+            site_id = self._mjModel.site(site_name).id
+            site_size = self._mjModel.site_size[site_id]
+            site_size_dict[site_name] = site_size.copy()
+        return site_size_dict
+
     def set_joint_qpos(self, joint_qpos):
         for joint_name, qpos in joint_qpos.items():
             joint_id = self._mjModel.joint(joint_name).id
