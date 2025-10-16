@@ -674,7 +674,7 @@ class LeggedRobot(OrcaGymAsyncAgent):
         return reward
 
     def _compute_reward_feet_self_contact(self, coeff) -> SupportsFloat:
-        reward = (-np.sum(self._feet_self_contact)) * coeff * self.dtcompute_reward_symmetry
+        reward = (-np.sum(self._feet_self_contact)) * coeff * self.dt
         self._print_reward("Foot self contact reward: ", reward, coeff * self.dt)
         return reward
     

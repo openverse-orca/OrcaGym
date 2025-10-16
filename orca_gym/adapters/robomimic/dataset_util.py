@@ -7,7 +7,7 @@ import os
 import uuid  # 新增导入uuid模块
 import time  # 新增导入time模块
 import shutil
-
+import hashlib
 class DatasetWriter:
     # def __init__(self, base_dir, env_name, env_version, env_kwargs=None):  # 修改1: 参数名改为base_dir
     #     """
@@ -64,14 +64,23 @@ class DatasetWriter:
             self.create_hdf5_file()  # 新增: 创建HDF5文件
         else:
             self.basedir = base_dir
-            self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-            self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+            # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
+            # self.uuid_dir = os.path.join(base_dir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+
+            # uuid1 = str(uuid.uuid4())[:8]
+            # uuid2 = str(uuid.uuid4())[:8]
+            raw_uuid = str(uuid.uuid4())
+            hash_digest = hashlib.sha256(raw_uuid.encode('utf-8')).hexdigest()
+            short_id = hash_digest[:16]
+            self.experiment_id = short_id
+            # self.experiment_id = f"{uuid1}_{uuid2}"
+            self.uuid_dir = os.path.join(base_dir, self.experiment_id)
             self.camera_dir = os.path.join(self.uuid_dir, "camera")
             self.parameters_dir = os.path.join(self.uuid_dir, "parameters")
             self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
             self.depth_dir = os.path.join(self.camera_dir, "depth")
             self.video_dir = os.path.join(self.camera_dir, "video")
-        # print("self.uuid_dir..............:",self.uuid_dir)
+            print("self.uuid_dir..............:",self.uuid_dir)
             self.hdf5_path = os.path.join(self.proprio_stats_dir, "proprio_stats.hdf5") 
             self.mp4_save_path : str = None
             
@@ -88,8 +97,16 @@ class DatasetWriter:
             f.create_group('mask')  # 创建掩码组用于过滤器键（可选）
 
     def set_UUIDPATH(self):
-        self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
-        self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+        # self.experiment_id = str(uuid.uuid4())[:8]  # 修改2: 使用8位UUID简化路径
+        # self.uuid_dir = os.path.join(self.basedir, f"{self.experiment_id}_{int(time.time())}")  # 修改3: 结合时间戳
+        # uuid1 = str(uuid.uuid4())[:8]
+        # uuid2 = str(uuid.uuid4())[:8]
+        # self.experiment_id = f"{uuid1}_{uuid2}"
+        raw_uuid = str(uuid.uuid4())
+        hash_digest = hashlib.sha256(raw_uuid.encode('utf-8')).hexdigest()
+        short_id = hash_digest[:16]
+        self.experiment_id = short_id
+        self.uuid_dir = os.path.join(self.basedir, self.experiment_id)
         self.camera_dir = os.path.join(self.uuid_dir, "camera")
         self.proprio_stats_dir = os.path.join(self.uuid_dir, "proprio_stats")
         self.depth_dir = os.path.join(self.camera_dir, "depth")
@@ -118,6 +135,25 @@ class DatasetWriter:
         if os.path.exists(rmpath) and os.path.isdir(rmpath):
             shutil.rmtree(rmpath)
         self.pathremoved = True
+
+
+    @staticmethod
+    def remove_episode_from_json(json_path, episode_id):
+    # 删除 JSON 文件中指定 episode_id 的记录
+        if not os.path.exists(json_path):
+            print(f"JSON file {json_path} not found!")
+            return
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 保留不是这个 episode_id 的条目
+        new_data = [item for item in data if item["episode_id"] != episode_id]
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(new_data, f, ensure_ascii=False, indent=4)
+        
+        print(f"Removed episode {episode_id} from {json_path}")
 
 
         
@@ -177,8 +213,8 @@ class DatasetWriter:
             {
                 'states': np.ndarray (N, D),    # 机器人关节、夹爪、物体 的位姿、速度
                 'actions': np.ndarray (N, A),   # 机械臂末端的位姿、夹爪的开合程度
-                'objects': np.ndarray (N, O),   # 物体的位姿
-                'goals': np.ndarray (N, G)      # 目标位姿（可选）
+                'objects': str,   # 物体的相关信息 json格式
+                'goals': str     # 目标的相关信息 json格式
                 'rewards': np.ndarray (N,),     # 奖励
                 'dones': np.ndarray (N,),       # 完成标志
                 'obs': dict of np.ndarrays      # 观测数据字典
@@ -186,6 +222,7 @@ class DatasetWriter:
                 'language_instruction': str     # 语言指令（可选）
                 'next_obs'                      # 如果未提供，将自动生成
                 'camera_frames'                 # 可选，用于存储相机帧，格式为字典，键为相机名称，值为帧列表
+                'camera_time_stamp': dict       # 相机时间戳，键为相机名称，值为时间戳列表
             }
         - model_file: MJCF MuJoCo 模型的 XML 字符串（可选，仅用于 robosuite 数据集）。
         """
@@ -207,7 +244,7 @@ class DatasetWriter:
             if model_file:
                 demo_group.attrs['model_file'] = model_file
 
-            for key in ['states', 'actions', 'camera_frames', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps']:
+            for key in ['states', 'actions', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps', 'timestamps']:
                 if key in demo_data:
                     demo_group.create_dataset(key, data=demo_data[key])
 
@@ -216,13 +253,14 @@ class DatasetWriter:
             for obs_key, obs_data in demo_data['obs'].items():
                 obs_group.create_dataset(obs_key, data=obs_data, compression="gzip", compression_opts=4)
  
-            # # 处理 camera_frames
-            # if 'camera_frames' in demo_data:  # 修改10: 添加条件判断
-            #     fps = demo_data['timesteps'].shape[0] // (demo_data['timesteps'][-1] - demo_data['timesteps'][0])
-            #     for camera_name, frames in demo_data['camera_frames'].items():  # 修改11: 遍历所有相机
-            #         # video_path = self.get_mp4_save_path(demo_name_h5, camera_name)  # 使用新方法获取路径
-            #         video_path = self.get_mp4_save_path(demo_name, camera_name)
-            #         self.save_single_camera_video(frames, video_path, fps)  # 修改12: 使用新的保存方法
+            camera_group = demo_group.create_group('camera')
+            for key in ['camera_frames', 'camera_time_stamp']:
+                if key == 'camera_frames' and 'camera_frames' in demo_data:
+                    # 如果存在 camera_frames，则创建相机帧数据集
+                    demo_group.create_dataset('camera_frames', data=demo_data['camera_frames'], compression="gzip", compression_opts=4)
+                if key == 'camera_time_stamp' and 'camera_time_stamp' in demo_data:
+                    for camera_name, time_stamps in demo_data['camera_time_stamp'].items():
+                        camera_group.create_dataset(camera_name, data=time_stamps, compression="gzip", compression_opts=4)
 
             # 自动生成 next_obs
             if 'next_obs' in demo_data:
@@ -470,4 +508,9 @@ class DatasetReader:
                 'next_obs': {key: np.array(demo_group['next_obs'][key]) for key in demo_group['next_obs'].keys()},
                 'camera_frames': np.array(demo_group['camera_frames'])
             }
+
+            if 'timestamps' in demo_group:
+                demo_data['timestamps'] = np.array(demo_group['timestamps'])
+            if 'camera' in demo_group:
+                demo_data['camera'] = {key: np.array(demo_group['camera'][key]) for key in demo_group['camera'].keys()}
         return demo_data

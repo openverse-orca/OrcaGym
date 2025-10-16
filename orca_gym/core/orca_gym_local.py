@@ -418,7 +418,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel.opt.sdf_initpoints = self.opt.sdf_initpoints
         self._mjModel.opt.sdf_iterations = self.opt.sdf_iterations
         self._mjModel.opt.disableflags = self._mjModel.opt.disableflags | mujoco.mjtDisableBit.mjDSBL_FILTERPARENT if not self.opt.filterparent else self._mjModel.opt.disableflags & ~mujoco.mjtDisableBit.mjDSBL_FILTERPARENT.value
-        
+
 
     def query_opt_config(self):
         opt_config = {
@@ -558,7 +558,54 @@ class OrcaGymLocal(OrcaGymBase):
                 "LengthRange": actuator.lengthrange,
             }
         return actuator_dict
-    
+    def get_goal_bounding_box(self, goal_body_name):
+        """
+        计算目标物体（goal_body_name）在世界坐标系下的轴对齐包围盒。
+        支持 BOX、SPHERE 类型，BOX 会考虑 geom 的旋转。
+        """
+        inf = float('inf')
+        min_corner = np.array([ inf,  inf,  inf])
+        max_corner = np.array([-inf, -inf, -inf])
+        for geom_id in range(self._mjModel.ngeom):
+            body_id = self._mjModel.geom(geom_id).bodyid
+            body_name = self._mjModel.body(body_id).name
+            if goal_body_name not in body_name:
+                continue
+
+            geom = self._mjModel.geom(geom_id)
+            geom_type = geom.type
+            # 世界坐标下的几何中心
+            center = self._mjData.geom_xpos[geom_id]
+
+            if geom_type == mujoco.mjtGeom.mjGEOM_BOX:
+                # MuJoCo 中 size 已经是 half-extents (local frame)
+                half_local = np.array(geom.size)
+                # 获取世界坐标下的旋转矩阵
+                xmat = self._mjData.geom_xmat[geom_id].reshape(3, 3)
+                # 计算旋转后沿世界轴的半尺寸
+                half_world = np.abs(xmat) @ half_local
+                box_min = center - half_world
+                box_max = center + half_world
+
+            elif geom_type == mujoco.mjtGeom.mjGEOM_SPHERE:
+                # 球体只需考虑半径
+                r = geom.size[0]
+                box_min = center - r
+                box_max = center + r
+
+            else:
+                # 其他类型暂不处理
+                continue
+
+            min_corner = np.minimum(min_corner, box_min)
+            max_corner = np.maximum(max_corner, box_max)
+
+        bounding_box = {
+            'min': min_corner,
+            'max': max_corner,
+            'size': max_corner - min_corner
+        }
+        return bounding_box
     def set_actuator_trnid(self, actuator_id, trnid):
         model = self._mjModel
         actuator = model.actuator(actuator_id)
