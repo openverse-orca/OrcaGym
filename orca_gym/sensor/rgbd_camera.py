@@ -45,7 +45,7 @@ class CameraWrapper:
         return self.received_first_frame
 
     async def do_stuff(self):
-        uri = f"ws://192.168.1.220:{self.port}"
+        uri = f"ws://localhost:{self.port}"
         # print(f"start connecting to {uri}")
         async with websockets.connect(uri) as websocket:
             cur_pos = 0

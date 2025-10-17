@@ -520,6 +520,7 @@ class AbstractTask:
                 "orientation": xquat[i * 4:(i + 1)*4].tolist(),
                 "target_body": self.target_object == self.object_bodys[i]
             }
+        print(f"info: {info}")
 
         json_str = json.dumps(info)
         return json_str

@@ -1,0 +1,23 @@
+# 3c任务配置文件
+
+level_name: "3c_fabrication"
+type: "scan"
+range: {x: [0.30, 0.62], y: [0.15, 0.78], z: -0.3, r: 0.3}
+
+# body, site, joint 的顺序需要保持一致
+object_bodys: [ "battery_01", "wifi_box","intel_box","intelcore_i5", "cpu_fan"]
+object_sites: ["battery_01site", "wifi_boxsite","intel_box_site","intelcore_i5_site", "cpu_fan_site"]
+object_joints: ["battery_01_joint", "wifi_box_joint", "intel_box_joint","intelcore_i5_joint", "cpu_fan_joint"]
+
+goal_bodys: ["Barcode"]
+goal_sites: ["Barcode_site"]
+goal_joints: ["Barcode_joint"]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["battery_01", "wifi_box", "intel_box","intelcore_i5", "cpu_fan"]
+actors_spawnable: ["assets/prefabs/battery_01", "assets/prefabs/wifi_box", "assets/prefabs/intel_box","assets/prefabs/intelcore_i5", "assets/prefabs/cpu_fan"]
+center: [-6.35, 2.56, 2.32]
+infinity: [1000, 1000, 1]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

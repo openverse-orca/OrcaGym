@@ -247,6 +247,17 @@ class DatasetWriter:
             for key in ['states', 'actions', 'language_instruction', 'objects', 'goals', 'rewards', 'dones', 'timesteps', 'timestamps']:
                 if key in demo_data:
                     demo_group.create_dataset(key, data=demo_data[key])
+            
+            # 处理task_info（任务信息）
+            if 'task_info' in demo_data:
+                task_info_group = demo_group.create_group('task_info')
+                for task_key, task_value in demo_data['task_info'].items():
+                    if isinstance(task_value, str):
+                        # 字符串类型，转换为字节存储
+                        task_info_group.create_dataset(task_key, data=task_value.encode('utf-8'))
+                    else:
+                        # 其他类型，直接存储
+                        task_info_group.create_dataset(task_key, data=task_value)
 
             # 处理 obs
             obs_group = demo_group.create_group('obs')

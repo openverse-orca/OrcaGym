@@ -144,6 +144,7 @@ class PickPlaceTask(AbstractTask):
         # 获取目标区域边界
         gmin = goal_entry['min'][:2]
         gmax = goal_entry['max'][:2]
+        
         if xy[0] < gmin[0] or xy[0] > gmax[0] or xy[1] < gmin[1] or xy[1] > gmax[1]:
             return False
         return True

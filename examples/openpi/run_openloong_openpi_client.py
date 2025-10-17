@@ -28,7 +28,7 @@ RGB_SIZE = dual_arm_manipulation.RGB_SIZE
 
 @dataclasses.dataclass
 class Args:
-    orca_gym_address: str = '192.168.1.220:50051'
+    orca_gym_address: str = 'localhost:50051'
     env_name: str = "DualArmEnv"
     seed: int = 0
     agent_names: str = "openloong_gripper_2f85_fix_base_usda"

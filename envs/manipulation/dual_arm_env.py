@@ -8,7 +8,7 @@ from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.adapters.robomimic.task.scene_manage.pick_place_task import PickPlaceTask, TaskStatus
+from orca_gym.adapters.robomimic.task.pick_place_task import PickPlaceTask, TaskStatus
 import importlib
 
 class RunMode:
@@ -148,7 +148,7 @@ class DualArmEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
-        from orca_gym.adapters.robomimic.task.scene_manage.abstract_task import AbstractTask
+        from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
         from orca_gym.scene.orca_gym_scene import OrcaGymScene
         # self._task = AbstractTask()
         # self._task.grpc_addr = "192.168.1.164:50051"
@@ -157,7 +157,7 @@ class DualArmEnv(RobomimicEnv):
         # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.register_init_env_callback(self.init_env)
         self._config = task_config_dict
-        self._config["grpc_addr"] = "192.168.1.220:50051"
+        self._config["grpc_addr"] = "localhost:50051"
         self._task = PickPlaceTask(self._config)
         
         self._task.register_init_env_callback(self.init_env)
@@ -291,16 +291,19 @@ class DualArmEnv(RobomimicEnv):
 
         # step the simulation with original action space
         self.do_simulation(ctrl, self.frame_skip)
+        time_stamp = time.time_ns()
 
         obs = self._get_obs().copy()
 
         info = {"state": self.get_state(),
                 "action": scaled_action,
-                # "object": self.objects,  # 提取第一个对象的位置
-                # "goal": self.goals,
+                "object": self.objects,  # 提取第一个对象的位置
+                "goal": self.goals,
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
-                "time_step": self.data.time}
+                "time_step": self.data.time,
+                "time_stamp": time_stamp
+                }
         terminated = self._is_success()
         truncated = self._is_truncated()
         reward = self._compute_reward(info)
