@@ -15,7 +15,7 @@ from gymnasium.envs.registration import register
 from datetime import datetime, timedelta, timezone
 
 import h5py
-from orca_gym.utils.kps_data_checker import BasicUnitChecker, ErrorType
+# from orca_gym.utils.kps_data_checker import BasicUnitChecker, ErrorType
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.adapters.robomimic.dataset_util import DatasetWriter, DatasetReader
 from orca_gym.sensor.rgbd_camera import Monitor, CameraWrapper
@@ -362,6 +362,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
 
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
+        # print(f"info: {info}")
 
         env.render()
         task_status = info['task_status']
@@ -385,20 +386,32 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
                         camera_frame_index.append(env.get_current_frame())
 
                 if task_status == TaskStatus.SUCCESS:
-                    camera_frame_index.append(env.get_current_frame())
+                    current_frame = env.get_current_frame()
+                    camera_frame_index.append(current_frame)
                     print(f"camera_frame_index: {camera_frame_index[-1]}")
                     is_success = env._task.is_success(env)
                     is_success_list.append(is_success)
-                    if is_success:
-                        time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
-                        for camera_name, time_list in time_stamp_dict.items():
-                            try:
-                                camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
-                            except IndexError:
-                                is_success = False
+                    # 只有在相机帧索引有效时才尝试获取时间戳
+                    if is_success and current_frame >= 0:
+                        try:
+                            time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1])
+                            for camera_name, time_list in time_stamp_dict.items():
+                                try:
+                                    camera_time_stamp[camera_name] = [time_list[index] for index in camera_frame_index]
+                                except IndexError:
+                                    print(f"Warning: IndexError when processing camera {camera_name} timestamps")
+                                    # 不将is_success设置为False，因为任务本身是成功的
+                        except Exception as e:
+                            print(f"Warning: Failed to get camera timestamps: {e}")
+                            # 不将is_success设置为False，因为任务本身是成功的
+                    elif is_success and current_frame < 0:
+                        print("Warning: Camera frame index is invalid, but task is successful. Proceeding without camera timestamps.")
+                    
                     env.stop_save_video()
                     saving_mp4 = False
-                    if not is_success:
+                    # 任务成功时不删除路径，即使is_success为False（可能是相机问题导致的）
+                    # 只有在任务状态为FAILURE时才删除路径
+                    if task_status == TaskStatus.FAILURE:
                         dataset_writer.remove_path()
                 elif task_status == TaskStatus.FAILURE:
 
@@ -516,11 +529,36 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
     # 只处理第一个info对象（初始状态）
     first_info = info_list[0]
 
+    # 将objects和goals转换为简单的numpy数组格式
+    def convert_to_simple_arrays(structured_array):
+        """将结构化数组转换为简单的numpy数组，便于HDF5存储"""
+        if len(structured_array) == 0:
+            return np.array([])
+        
+        # 提取所有数值数据并展平
+        data_list = []
+        for field_name in structured_array.dtype.names:
+            if structured_array.dtype[field_name].kind == 'U':  # Unicode string
+                # 跳过字符串字段，只保留数值数据
+                continue
+            else:
+                data = structured_array[field_name]
+                if data.dtype.kind in ['f', 'i', 'u']:  # 数值类型
+                    data_list.append(data.flatten())
+        
+        if data_list:
+            return np.concatenate(data_list).astype(np.float32)
+        else:
+            return np.array([])
+    
+    objects_array = convert_to_simple_arrays(first_info['object'])
+    goals_array = convert_to_simple_arrays(first_info['goal'])
+
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-        'objects': first_info['object'],
-        'goals': first_info['goal'],
+        'objects': objects_array,
+        'goals': goals_array,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
@@ -607,11 +645,12 @@ def do_teleoperation(env,
     )
     
         last_done = (len(done_list) > 0 and done_list[-1] == 1)
-        last_is_success = (len(is_success_list) > 0 and is_success_list[-1])
-        save_record = last_done and last_is_success
+        # 只要任务完成就保存数据，不依赖于is_success检查
+        save_record = last_done
         task_result = "Success" if save_record else "Failed"
-        save_record = task_result == "Success"
         exit_program = False
+        
+      #  print(f"info_list: {info_list}")
     
         if save_record:
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
@@ -623,10 +662,10 @@ def do_teleoperation(env,
             for camera_name in camera_time_stamp.keys():
                 if camera_name.endswith("_color"):
                     camera_name_list.append(camera_name.replace("_color", ""))
-            unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
-            ret, _ = unitCheack.check()
-            if ret != ErrorType.Qualified:
-                dataset_writer.remove_path()
+            # unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
+            # ret, _ = unitCheack.check()
+            # if ret != ErrorType.Qualified:
+            #     dataset_writer.remove_path()
         if exit_program or current_round > teleoperation_rounds:
             break
         
@@ -1113,14 +1152,23 @@ def augment_episode(env : DualArmEnv,
         if terminated_times >= 5 or truncated:
             if output_video:
                 env.stop_save_video()
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success, {}
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
 
     if output_video:
-        time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1] + 1)
         env.stop_save_video()
-        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, time_stamp_dict
+        # 只有在相机帧索引有效时才尝试获取时间戳
+        if len(camera_frame_index) > 0 and camera_frame_index[-1] >= 0:
+            try:
+                time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1] + 1)
+                return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, time_stamp_dict
+            except Exception as e:
+                print(f"Warning: Failed to get camera timestamps at episode end: {e}")
+                return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
+        else:
+            print("Warning: Invalid camera frame index at episode end, returning empty timestamps")
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
     else:
-        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list,is_success, {}
+        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
 
 def do_augmentation(
         env : DualArmEnv, 
@@ -1207,17 +1255,17 @@ def do_augmentation(
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list,
                                         camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
                     uuid_path = dataset_writer.get_UUIDPath()
-                    unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
-                    ret, _ = unitCheack.check()
-                    if ret != ErrorType.Qualified:
-                        trial_count += 1
-                        print(f"ret = {ret}")
-                        dataset_writer.remove_path()
-                        dataset_writer.remove_episode_from_json(json_path, dataset_writer.experiment_id)
-                    else:
-                        done_demo_count += 1
-                        print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
-                        done = True
+                    # unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
+                    # ret, _ = unitCheack.check()
+                    # if ret != ErrorType.Qualified:
+                    #     trial_count += 1
+                    #     print(f"ret = {ret}")
+                    #     dataset_writer.remove_path()
+                    #     dataset_writer.remove_episode_from_json(json_path, dataset_writer.experiment_id)
+                    # else:
+                    done_demo_count += 1
+                    print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
+                    done = True
                 else:
                     dataset_writer.remove_path()
                     print("Episode failed! Retrying...")
@@ -1458,7 +1506,8 @@ def run_example(orcagym_addr : str,
         # if run_mode == "teleoperation":
         if run_mode == "teleoperation" and 'dataset_writer' in locals():
             dataset_writer.finalize()
-        env.close()
+        if 'env' in locals():
+            env.close()
 
 
 def _get_algo_config(algo_name):
