@@ -121,3 +121,6 @@ decomp.stl
 *.h5
 
 MUJOCO_LOG.TXT
+
+.pypirc
+dist-test/

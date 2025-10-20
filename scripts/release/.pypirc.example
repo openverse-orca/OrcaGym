@@ -1,0 +1,25 @@
+# PyPI Configuration Example
+# 
+# Copy this file to ~/.pypirc and update with your tokens
+# 
+# Get your tokens at:
+#   - TestPyPI: https://test.pypi.org/manage/account/token/
+#   - PyPI: https://pypi.org/manage/account/token/
+#
+# After creating this file, set proper permissions:
+#   chmod 600 ~/.pypirc
+
+[distutils]
+index-servers =
+    pypi
+    testpypi
+
+[pypi]
+username = __token__
+password = pypi-YOUR-PRODUCTION-TOKEN-HERE
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = pypi-YOUR-TEST-TOKEN-HERE
+
