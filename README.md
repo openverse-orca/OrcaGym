@@ -61,8 +61,17 @@ conda activate orca
 # 安装核心包
 pip install -e .
 
+# 全量安装
+pip install -e ".[all]"
+
 # 或者安装开发依赖
 pip install -e ".[dev]"
+
+# 安装可选依赖
+pip install -e ".[rl]"
+pip install -e ".[imitation]"
+pip install -e ".[devices]"
+pip install -e ".[sensors]"
 ```
 
 ### 特定示例的额外依赖
