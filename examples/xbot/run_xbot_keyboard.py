@@ -152,8 +152,9 @@ def main():
     print("\n📦 创建环境...")
     env = XBotSimpleEnv(**config)
     
-    # 加载策略
-    policy_path = "/home/orca/OrcaWorkStation/humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt"
+    # 加载策略 - 使用相对路径
+    # 目录结构: OrcaWorkStation/OrcaGym/examples/xbot/ 和 OrcaWorkStation/humanoid-gym/
+    policy_path = "../../../humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt"
     
     print(f"\n📦 加载策略: {policy_path}")
     try:

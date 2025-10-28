@@ -122,13 +122,15 @@ def main():
     print(f"  - 动作空间: {env.action_space.shape}")
     print(f"  - 命令速度已设置: vx={env.cmd_vx}, vy={env.cmd_vy}, dyaw={env.cmd_dyaw}")
     
-    # 加载策略
-    policy_path = "/home/orca/OrcaWorkStation/humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt"
+    # 加载策略 - 使用相对路径
+    # 目录结构: OrcaWorkStation/OrcaGym/examples/xbot/ 和 OrcaWorkStation/humanoid-gym/
+    policy_path = "../../../humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt"
     
+    print(f"\n📦 加载策略: {policy_path}")
     try:
         policy = torch.jit.load(policy_path)
         policy.eval()
-        print(f"\n✓ 策略加载成功")
+        print(f"✓ 策略加载成功")
         use_policy = True
     except Exception as e:
         print(f"\n⚠️  无法加载策略: {e}")
