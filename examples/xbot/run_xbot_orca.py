@@ -122,9 +122,9 @@ def main():
     print(f"  - 动作空间: {env.action_space.shape}")
     print(f"  - 命令速度已设置: vx={env.cmd_vx}, vy={env.cmd_vy}, dyaw={env.cmd_dyaw}")
     
-    # 加载策略 - 使用相对路径
-    # 目录结构: OrcaWorkStation/OrcaGym/examples/xbot/ 和 OrcaWorkStation/humanoid-gym/
-    policy_path = "../../../humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt"
+    # 加载策略 - 使用项目内的config目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    policy_path = os.path.join(script_dir, "config", "policy_example.pt")
     
     print(f"\n📦 加载策略: {policy_path}")
     try:

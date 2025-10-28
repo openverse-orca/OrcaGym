@@ -8,7 +8,7 @@
 - ✅ 稳定站立
 - ✅ 平稳行走
 - ✅ 使用humanoid-gym预训练模型
-- ✅ 使用相对路径（便携性更好）
+- ✅ 策略文件集成在项目内（config目录）
 
 ## 🚀 使用方法
 
@@ -65,6 +65,14 @@ python examples/xbot/run_xbot_keyboard.py
   - 基于`OrcaGymLocalEnv`
   - 实现PD控制、观察空间、decimation
 
+### 配置和策略
+- **`config/policy_example.pt`** - 预训练策略模型 ⭐
+  - 来自humanoid-gym项目
+  - 已集成在项目内
+  - 无需外部依赖
+
+- **`config/xbot_train_config.yaml`** - 训练配置文件
+
 ### 运行脚本
 - **`run_xbot_orca.py`** - 自动运行脚本（固定速度）
   - 加载预训练策略
@@ -76,10 +84,6 @@ python examples/xbot/run_xbot_keyboard.py
   - 实时调整速度
   - 支持Turbo加速模式
 
-### 预训练模型
-- **路径**: `/home/orca/OrcaWorkStation/humanoid-gym/logs/XBot_ppo/exported/policies/policy_example.pt`
-- **来源**: humanoid-gym项目
-- **格式**: TorchScript JIT模型
 
 ## 📝 关键配置
 
