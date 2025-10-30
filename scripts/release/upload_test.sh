@@ -37,8 +37,8 @@ twine upload --repository testpypi dist-test/*
 echo ""
 echo "✅ Upload to TestPyPI completed!"
 echo ""
-echo "🔗 View your package at: https://test.pypi.org/project/orca-gym-test/"
+echo "🔗 View your package at: https://test.pypi.org/project/orca-gym/"
 echo ""
 echo "📦 Test installation:"
-echo "   pip install --index-url https://test.pypi.org/simple/ orca-gym-test"
+echo "   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ orca-gym"
 

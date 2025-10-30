@@ -71,8 +71,8 @@
 ```
 
 生成两种格式的分发包：
-- `orcagym_core-{version}-py3-none-any.whl` - wheel 格式（推荐）
-- `orcagym_core-{version}.tar.gz` - 源码包
+- `orca_gym-{version}-py3-none-any.whl` - wheel 格式（推荐）
+- `orca_gym-{version}.tar.gz` - 源码包
 
 构建后的文件在 `dist/` 目录。
 

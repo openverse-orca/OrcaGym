@@ -21,7 +21,7 @@ fi
 python -m build
 
 echo ""
-echo "📦 Building TestPyPI package (orca-gym-test)..."
+echo "📦 Building TestPyPI package (orca-gym)..."
 
 # Prepare temp workspace for test package build
 TEST_OUTDIR="$PROJECT_ROOT/dist-test"
@@ -37,14 +37,10 @@ rsync -a \
     --exclude '*.egg-info' \
     "$PROJECT_ROOT/" "$TMP_DIR/"
 
-# Modify package name in pyproject.toml to orca-gym-test for TestPyPI build
-if grep -q 'name = "orca-gym"' "$TMP_DIR/pyproject.toml"; then
-    sed -i 's/name = "orca-gym"/name = "orca-gym-test"/' "$TMP_DIR/pyproject.toml"
-else
-    echo "⚠️  Unable to find package name in pyproject.toml for test build; leaving as-is."
-fi
+# Keep the same package name (orca-gym) for TestPyPI build
+# This allows for complete installation testing with the same package name
 
-# Build the test package with modified name
+# Build the test package with same name
 mkdir -p "$TEST_OUTDIR"
 (cd "$TMP_DIR" && python -m build --outdir "$TEST_OUTDIR")
 
