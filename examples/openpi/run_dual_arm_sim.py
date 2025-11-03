@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument('--teleoperation_rounds', type=int, default=100, help='The rounds to do teleoperation')
     parser.add_argument('--sample_range', type=float, default=0.0, help='The area range to sample the object and goal position')
     parser.add_argument('--realtime_playback', type=str, default='True', help='The flag to enable the real-time playback or rollout')
-    parser.add_argument('--level', type=str, default='shop',  help='The storage level or scenario for file storage (e.g., default, experiment, debug)')
+    parser.add_argument('--level', type=str, help='The storage level or scenario for file storage (e.g., default, experiment, debug)')
     parser.add_argument('--withvideo', type=str, default='True',  help='Set Output Video data (e.g., default, experiment, debug)')
     parser.add_argument('--sync_codec', type=str, default='False',  help='Wait for the next frame to be ready before sending the next command (e.g., True, False)')
 

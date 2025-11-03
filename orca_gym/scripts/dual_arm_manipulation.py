@@ -524,41 +524,92 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         camera_time_stamp,
                         timestep_list, 
                         language_instruction,
-                        level_name):
+                        level_name,
+                        env=None):
         
     # 只处理第一个info对象（初始状态）
     first_info = info_list[0]
 
-    # 将objects和goals转换为简单的numpy数组格式
-    def convert_to_simple_arrays(structured_array):
-        """将结构化数组转换为简单的numpy数组，便于HDF5存储"""
-        if len(structured_array) == 0:
-            return np.array([])
+    # 将objects和goals转换为JSON字符串格式（与PriOrcaGym保持一致）
+    def convert_to_json_string(data, target_object=None, env=None):
+        """将结构化数组或JSON字符串转换为JSON字符串格式，便于HDF5存储"""
+        # 如果输入是字符串（JSON格式），直接返回
+        if isinstance(data, str):
+            return data
         
-        # 提取所有数值数据并展平
-        data_list = []
-        for field_name in structured_array.dtype.names:
-            if structured_array.dtype[field_name].kind == 'U':  # Unicode string
-                # 跳过字符串字段，只保留数值数据
-                continue
-            else:
-                data = structured_array[field_name]
-                if data.dtype.kind in ['f', 'i', 'u']:  # 数值类型
-                    data_list.append(data.flatten())
+        # 如果输入是空数组，返回空JSON对象
+        if len(data) == 0:
+            return "{}"
         
-        if data_list:
-            return np.concatenate(data_list).astype(np.float32)
-        else:
-            return np.array([])
+        # 获取agent名称列表，用于去除前缀
+        agent_names = []
+        if env is not None and hasattr(env, '_agent_names'):
+            agent_names = env._agent_names
+        
+        def remove_agent_prefix(name, agent_names):
+            """根据agent名称去除前缀"""
+            for agent_name in agent_names:
+                # 尝试不同的前缀模式
+                prefixes = [
+                    f"{agent_name}_",
+                    f"{agent_name.lower()}_",
+                    f"{agent_name.upper()}_",
+                ]
+                for prefix in prefixes:
+                    if name.startswith(prefix):
+                        return name[len(prefix):]
+            return name
+        
+        # 构建JSON格式的数据结构
+        info = {}
+        for entry in data:
+            # 获取关节名称
+            joint_name = str(entry['joint_name'], encoding='utf-8') if isinstance(entry['joint_name'], bytes) else entry['joint_name']
+            
+            # 获取物体名称（从关节名称推断）
+            body_name = joint_name.replace('_joint', '')
+            
+            # 去除agent前缀
+            clean_body_name = remove_agent_prefix(body_name, agent_names)
+            clean_joint_name = remove_agent_prefix(joint_name, agent_names)
+            
+            # 构建位置和方向信息
+            position = entry['position'].tolist() if hasattr(entry['position'], 'tolist') else list(entry['position'])
+            orientation = entry['orientation'].tolist() if hasattr(entry['orientation'], 'tolist') else list(entry['orientation'])
+            
+            # 判断是否是目标物体 - 使用清理后的物体名称进行匹配
+            is_target = False
+            if target_object is not None:
+                # 使用清理后的物体名称进行匹配
+                is_target = (target_object == clean_body_name)
+            
+            info[clean_body_name] = {
+                "joint_name": clean_joint_name,
+                "position": position,
+                "orientation": orientation,
+                "target_body": is_target
+            }
+        
+        return json.dumps(info)
     
-    objects_array = convert_to_simple_arrays(first_info['object'])
-    goals_array = convert_to_simple_arrays(first_info['goal'])
+    # 获取目标物体信息
+    target_object = None
+    if 'language_instruction' in first_info:
+        lang_instr = first_info['language_instruction']
+        if isinstance(lang_instr, (bytes, bytearray)):
+            lang_instr = lang_instr.decode("utf-8")
+        import re
+        obj_match = re.search(r'object:\s*(\S+)\s+to', lang_instr)
+        target_object = obj_match.group(1) if obj_match else None
+    
+    objects_json = convert_to_json_string(first_info['object'], target_object, env)
+    goals_json = convert_to_json_string(first_info['goal'], None, env)
 
     dataset_writer.add_demo_data({
         'states': np.array([np.concatenate([info["state"]["qpos"], info["state"]["qvel"]]) for info in info_list], dtype=np.float32),
         'actions': np.array([info["action"] for info in info_list], dtype=np.float32),
-        'objects': objects_array,
-        'goals': goals_array,
+        'objects': objects_json,
+        'goals': goals_json,
         'rewards': np.array(reward_list, dtype=np.float32),
         'dones': np.array(done_list, dtype=np.int32),
         'obs': obs_list,
@@ -656,7 +707,7 @@ def do_teleoperation(env,
             print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
             current_round += 1
 
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"],level_name = env._task.level_name)
+            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"], level_name=env._task.level_name, env=env)
             uuid_path = dataset_writer.get_UUIDPath()
             camera_name_list = []
             for camera_name in camera_time_stamp.keys():
@@ -806,12 +857,31 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
         target_obj_joint_name = ""
         target_obj_position = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         demo_objects = demo.get("objects", [])
-        for obj in demo_objects:
-            joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else obj["joint_name"]
-            if target_obj in joint_name:
-                target_obj_joint_name = joint_name
-                target_obj_position = np.array(obj["position"], dtype=np.float32)
-                break
+        
+        # 处理JSON格式或结构化数组格式
+        if isinstance(demo_objects, str) or (isinstance(demo_objects, np.ndarray) and demo_objects.shape == () and demo_objects.dtype == "object"):
+            # JSON字符串格式
+            import json
+            if isinstance(demo_objects, np.ndarray):
+                json_str = demo_objects[()]
+            else:
+                json_str = demo_objects
+            json_data = json.loads(json_str)
+            
+            for object_name, object_info in json_data.items():
+                joint_name = object_info['joint_name']
+                if target_obj in joint_name or target_obj in object_name:
+                    target_obj_joint_name = joint_name
+                    target_obj_position = np.array(object_info['position'], dtype=np.float32)
+                    break
+        else:
+            # 结构化数组格式（旧格式）
+            for obj in demo_objects:
+                joint_name = obj["joint_name"].decode('utf-8') if isinstance(obj["joint_name"], (bytes, bytearray)) else obj["joint_name"]
+                if target_obj in joint_name:
+                    target_obj_joint_name = joint_name
+                    target_obj_position = np.array(obj["position"], dtype=np.float32)
+                    break
 
         resample_success = False
         target_obj_position_delta = 0
@@ -825,9 +895,12 @@ def resample_objects(env: DualArmEnv, demo: dict, sample_range: float) -> None:
                 break
 
         if not resample_success:
-            print(f"Warning: Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
+            # 静默处理，移除警告打印
+            # print(f"Warning: Failed to resample target object {target_obj} within range {sample_range}. Using original position.")
+            pass
 
-        print("[Info] Resampling target object", target_obj, "to delta:", target_obj_position_delta)
+        # 移除调试打印以减少输出
+        # print("[Info] Resampling target object", target_obj, "to delta:", target_obj_position_delta)
 
 def calculate_transform_matrix(a, b, a1, b1):
     """
@@ -964,7 +1037,8 @@ def _transform_xy_list(source_xy_list: np.ndarray, source_xy: np.ndarray, target
     transform_matrix = calculate_transform_matrix(
         source_xy[0], source_xy[1], target_xy[0], target_xy[1]
     )
-    print("Transform Matrix: ", transform_matrix)
+    # 移除打印以减少输出
+    # print("Transform Matrix: ", transform_matrix)
 
     target_xy_list = np.zeros_like(source_xy_list)
     for i, xy in enumerate(source_xy_list):
@@ -997,7 +1071,8 @@ def resample_actions(
     target_obj = env._task.target_object
 
     if target_obj is None:
-        print("Warning: No target object found in the demo data.")
+        # 移除警告打印，静默处理
+        # print("Warning: No target object found in the demo data.")
         return demo_action_list
     
     noscale_action_list = _get_noscale_action_list(env, demo_action_list)
@@ -1007,21 +1082,22 @@ def resample_actions(
 
     demo_xy, env_xy = _get_target_xy(env, demo_data, target_obj)
     final_demo_xy = demo_xy_list[-1]
-    print("Demo XY: ", demo_xy, "Env XY: ", env_xy, "Final Demo XY: ", final_demo_xy)
+    # 移除调试打印以减少输出
+    # print("Demo XY: ", demo_xy, "Env XY: ", env_xy, "Final Demo XY: ", final_demo_xy)
 
     closest_demo_step_id = _find_closest_step(demo_xy_list, demo_xy)
-    print("Closest Demo Step ID: ", closest_demo_step_id)
+    # print("Closest Demo Step ID: ", closest_demo_step_id)
 
     env_xy_list = _transform_xy_list(demo_xy_list, demo_xy, env_xy, 0)
     final_env_xy = env_xy_list[-1]
-    print("Final Env XY: ", final_env_xy)
+    # print("Final Env XY: ", final_env_xy)
 
     closest_env_step_id = _find_closest_step(env_xy_list, env_xy)
-    print("Closest Env Step ID: ", closest_env_step_id)
+    # print("Closest Env Step ID: ", closest_env_step_id)
 
     env_xy_list = _transform_xy_list(env_xy_list, final_env_xy, final_demo_xy, closest_demo_step_id)
     new_final_env_xy = env_xy_list[-1]
-    print("New Final Env XY: ", new_final_env_xy, "Demo XY: ", final_demo_xy, "distance: ", np.linalg.norm(new_final_env_xy - final_demo_xy))
+    # print("New Final Env XY: ", new_final_env_xy, "Demo XY: ", final_demo_xy, "distance: ", np.linalg.norm(new_final_env_xy - final_demo_xy))
     
 
     noscale_action_list = _set_eef_xy_to_action(env, noscale_action_list, env_xy_list)
@@ -1067,10 +1143,14 @@ def augment_episode(env : DualArmEnv,
                     sync_codec: bool = False,
                     output_video: bool = True,
                     output_video_path: str = "") -> tuple:
+    print("🔄 [Augment] 开始增广 episode...")
     env._task.data = demo_data
+    print("🔄 [Augment] 正在 spawn_scene...")
     env._task.spawn_scene(env)
     env._task.sample_range = sample_range
+    print("🔄 [Augment] 正在 reset 环境...")
     obs, _ = env.reset(seed=42)
+    print("🔄 [Augment] 环境 reset 完成")
     obs_list    = {obs_key: [] for obs_key, obs_data in obs.items()}
     reward_list = []
     done_list = []
@@ -1084,9 +1164,12 @@ def augment_episode(env : DualArmEnv,
 
     # 轨迹增广需要重新采样动作
     if sample_range > 0.0:
+        print(f"🔄 [Augment] 正在重采样动作 (sample_range={sample_range})...")
         action_list = resample_actions(env, demo_data)
+        print(f"🔄 [Augment] 重采样完成，共 {len(action_list)} 个动作")
     else:
         action_list = demo_data['actions']
+        print(f"🔄 [Augment] 使用原始动作，共 {len(action_list)} 个")
 
     action_index_list = list(range(len(action_list)))
     holdon_action_index_list = action_index_list[-1] * np.ones(20, dtype=int)
@@ -1095,9 +1178,18 @@ def augment_episode(env : DualArmEnv,
     T = len(original_dones)
 
     if output_video:
-        print(f"video save path: {output_video_path}")
+        print(f"🔄 [Augment] 正在开始录制视频...")
         env.begin_save_video(output_video_path, int(sync_codec))
+        print(f"🔄 [Augment] 视频录制已开始")
+    
+    print(f"🔄 [Augment] 开始执行动作循环，总共 {len(action_index_list)} 步...")
+    step_counter = 0
     for i in action_index_list:
+        # 每10%进度打印一次
+        if step_counter % max(1, len(action_index_list) // 10) == 0:
+            progress = (step_counter / len(action_index_list)) * 100
+            print(f"🔄 [Augment] 执行进度: {progress:.1f}% ({step_counter}/{len(action_index_list)})")
+        step_counter += 1
         action = action_list[i]
         last_action = action_list[i - 1] if i > 0 else action
     
@@ -1109,7 +1201,17 @@ def augment_episode(env : DualArmEnv,
         if noise_scale > 0.0:
             noise = np.random.normal(0, noise_scale, action_chunk.shape)
             action_chunk += noise * np.abs(action_chunk)
-    
+            
+            # 对腰部数据使用较小的角度单位噪声处理（兼容d12_waist_config）
+            # 腰部数据在action数组的第28个位置（索引28）
+            # 检查是否有腰部关节（通过action数组的长度判断）
+            if action_chunk.shape[1] > 28:
+                # 使用较小的噪声强度（原噪声的10%）
+                waist_noise_scale = noise_scale * 0.1
+                waist_noise = np.random.normal(0, waist_noise_scale, action_chunk[:, 28:29].shape)
+                # 角度单位的噪声（弧度），直接添加到归一化的action值
+                action_chunk[:, 28:29] += waist_noise
+        
         action_chunk = np.clip(action_chunk, -1.0, 1.0)
     
         for j in range(action_step):
@@ -1129,8 +1231,10 @@ def augment_episode(env : DualArmEnv,
                 env.render()
 
         is_success = False
-        if original_dones[i] :
+        if original_dones[i]:
             is_success = env._task.is_success(env)
+            if is_success:
+                print(f"✅ [Augment] 任务成功！(步骤 {step_counter}/{len(action_index_list)})")
 
         global g_skip_frame
         if sync_codec and g_skip_frame < 1:
@@ -1152,23 +1256,22 @@ def augment_episode(env : DualArmEnv,
         if terminated_times >= 5 or truncated:
             if output_video:
                 env.stop_save_video()
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
+            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success, {}
 
+    # 修复：参考 PriOrcaGym 的实现，先获取时间戳再停止视频（顺序很重要！）
     if output_video:
+        print(f"🔄 [Augment] Episode 执行完成，正在获取相机时间戳...")
+        print(f"🔄 [Augment] camera_frame_index 长度: {len(camera_frame_index)}, 最后一帧: {camera_frame_index[-1] if len(camera_frame_index) > 0 else 'N/A'}")
+        # ⚠️ 关键修复：必须先获取时间戳，再停止视频
+        # 如果先停止视频，get_camera_time_stamp 可能会阻塞或失败
+        time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1] + 1)
+        print(f"🔄 [Augment] 时间戳获取完成，正在停止视频录制...")
         env.stop_save_video()
-        # 只有在相机帧索引有效时才尝试获取时间戳
-        if len(camera_frame_index) > 0 and camera_frame_index[-1] >= 0:
-            try:
-                time_stamp_dict = env.get_camera_time_stamp(camera_frame_index[-1] + 1)
-                return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, time_stamp_dict
-            except Exception as e:
-                print(f"Warning: Failed to get camera timestamps at episode end: {e}")
-                return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
-        else:
-            print("Warning: Invalid camera frame index at episode end, returning empty timestamps")
-            return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
+        print(f"🔄 [Augment] 视频录制已停止，返回结果")
+        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success, time_stamp_dict
     else:
-        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success_list, {}
+        print(f"🔄 [Augment] Episode 执行完成（无视频录制）")
+        return obs_list, reward_list, done_list, info_list, camera_frame_index, timestep_list, is_success, {}
 
 def do_augmentation(
         env : DualArmEnv, 
@@ -1186,7 +1289,8 @@ def do_augmentation(
         sync_codec : bool = False
     ):
     
-    print("=================>sync codec: ", sync_codec)
+    # 移除调试打印
+    # print("=================>sync codec: ", sync_codec)
    # realtime = False
     
     # Copy the original dataset to the augmented dataset
@@ -1253,7 +1357,7 @@ def do_augmentation(
                             if camera_name.endswith("_color"):
                                 camera_name_list.append(camera_name.replace("_color", ""))
                     add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list,
-                                        camera_frames, camera_time_stamp, timestep_list, language_instruction,level_name)
+                                        camera_frames, camera_time_stamp, timestep_list, language_instruction, level_name, env=env)
                     uuid_path = dataset_writer.get_UUIDPath()
                     # unitCheack = BasicUnitChecker(uuid_path, camera_name_list, "proprio_stats.hdf5")
                     # ret, _ = unitCheack.check()
@@ -1563,6 +1667,28 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
 
     algo_config = _get_algo_config(algo) if run_mode == "imitation" else ["none_algorithm"]
 
+    # 如果 level 未提供，尝试从 task_config 文件中获取 level_name
+    if level is None:
+        if task_config is not None:
+            try:
+                with open(task_config, 'r') as f:
+                    task_config_dict = yaml.safe_load(f)
+                    if task_config_dict and 'level_name' in task_config_dict:
+                        level = task_config_dict['level_name']
+                        print(f"Using level_name '{level}' from task config file: {task_config}")
+            except Exception as e:
+                print(f"Warning: Failed to read level_name from task config: {e}")
+        
+        # 如果仍然为 None，给出友好的错误提示
+        if level is None:
+            raise ValueError(
+                "Missing required '--level' parameter. "
+                "Please provide it either by:\n"
+                "  1. Using --level argument: --level <level_name>\n"
+                "  2. Or ensure your task config file contains 'level_name' field.\n"
+                f"Current task_config: {task_config}"
+            )
+
     if run_mode == "teleoperation":
         if record_path is None:
             now = datetime.now()
@@ -1577,6 +1703,7 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
         if record_path is None:
             raise ValueError("Please input the record file path.")
         else:
+            # level 应该已经在上面的检查中设置好了
             augmented_path = os.path.join(current_file_path, "augmented_datasets_tmp", level)
 
     if run_mode == "rollout":

@@ -1,5 +1,8 @@
 # shop1灯光配置文件
 level_name: "shop"
+type: "pick_and_place"
+range: {x: [0.2, 0.612], y: [-0.4, 0.4], z: -0.4, r: 0.3}
+
 random_light : true
 num_lights: 3
 random_light_position: true
@@ -23,7 +26,7 @@ random_actor_position: false
 random_actor_rotation: false
 random_actor_color: true
 actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
-actors_spawnable: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+actors_spawnable: ["assets/prefabs/bottle_red", "assets/prefabs/jar_01", "assets/prefabs/bottle_blue", "assets/prefabs/salt", "assets/prefabs/can"]
 center: [-6.35, 2.56, 2.32]
 infinity: [1000, 1000, 1]
 bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
