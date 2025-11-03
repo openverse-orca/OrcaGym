@@ -128,3 +128,6 @@ exclude = ["examples*", "envs*", "doc*", "3rd_party*", "tests*"]
 
 [tool.setuptools.package-data]
 orca_gym = ["*.proto", "py.typed"]
+
+[project.scripts]
+orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
