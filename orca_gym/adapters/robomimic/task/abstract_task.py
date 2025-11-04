@@ -132,12 +132,37 @@ class AbstractTask:
     def set_goal_sites(self, goal_sites: list[str]):
         self.goal_sites = goal_sites
 
+    def _find_joint_name(self, env: OrcaGymLocalEnv, joint_name: str) -> str:
+        """
+        查找joint名称，支持不同机器人名称前缀。
+        首先尝试使用当前agent名称前缀，如果失败则从环境中查找匹配的joint。
+        """
+        try:
+            # 首先尝试使用env.joint()（会自动添加当前agent前缀）
+            full_name = env.joint(joint_name)
+            # 验证joint是否存在
+            env.model.joint(full_name).id
+            return full_name
+        except (KeyError, AttributeError):
+            # 如果失败，从环境中查找所有joint，找到以该名称结尾的
+            try:
+                all_joint_names = env.model.get_joint_dict().keys()
+                # 查找以joint_name结尾的joint
+                for jname in all_joint_names:
+                    if jname.endswith(f"_{joint_name}") or jname == joint_name:
+                        return jname
+                # 如果还是找不到，返回原始名称（让调用者处理错误）
+                return env.joint(joint_name)
+            except Exception:
+                # 如果都失败了，返回使用当前agent前缀的版本
+                return env.joint(joint_name)
+
     def get_object_joints_xpos(self, env: OrcaGymLocalEnv):
-        env_object_joints = [env.joint(joint_name) for joint_name in self.object_joints]
+        env_object_joints = [self._find_joint_name(env, joint_name) for joint_name in self.object_joints]
         return env.query_joint_qpos(env_object_joints)
 
     def get_goal_joints_xpos(self, env: OrcaGymLocalEnv):
-        env_goal_joints = [env.joint(joint_name) for joint_name in self.goal_joints]
+        env_goal_joints = [self._find_joint_name(env, joint_name) for joint_name in self.goal_joints]
         return env.query_joint_qpos(env_goal_joints)
 
     def get_object_xpos_xmat_xquat(self, env: OrcaGymLocalEnv):
@@ -156,7 +181,7 @@ class AbstractTask:
             if self.__random_count__ % self.random_cycle == 0:
                 # 将object_bodys放回到无限远处
                 pos = self.infinity + [1, 0, 0, 0]
-                qpos_dict = {env.joint(joint_name): pos for joint_name in self.object_joints}
+                qpos_dict = {self._find_joint_name(env, joint_name): pos for joint_name in self.object_joints}
                 env.set_joint_qpos(qpos_dict)
 
                 n_select  = random.randint(pick_min, pick_max)
@@ -274,8 +299,8 @@ class AbstractTask:
     #todo: 需要重写这部分代码， 这里应该只需要做随机位置，位置是否合理应该由具体任务决定
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, random_rotation=True, target_obj_joint_name=None):
         object_bodys = [env.body(bn) for bn in self.object_bodys]
-        obj_joints  = [env.joint(jn) for jn in self.object_joints]
-        goal_joints = [env.joint(jn) for jn in self.goal_joints]
+        obj_joints  = [self._find_joint_name(env, jn) for jn in self.object_joints]
+        goal_joints = [self._find_joint_name(env, jn) for jn in self.goal_joints]
 
         dummy = env.site("dummy_site")
         info  = env.query_site_pos_and_quat([dummy])[dummy]

@@ -43,10 +43,39 @@ class DualArmRobot(AgentBase):
         ######## Base body and joint setup ########
         self._base_body_name = [self._env.body(config["base"]["base_body_name"], id)]
 
-        dummy_joint_id = self._env.model.joint_name2id(self._env.joint(config["base"]["dummy_joint_name"], id))
+        # Try to find dummy_joint with agent prefix, if not found, try without prefix
+        try:
+            dummy_joint_name = self._env.joint(config["base"]["dummy_joint_name"], id)
+            dummy_joint_id = self._env.model.joint_name2id(dummy_joint_name)
+        except KeyError:
+            # If joint not found with prefix, try to find it directly
+            all_joint_names = self._env.model.get_joint_dict().keys()
+            dummy_joint_name = None
+            for jname in all_joint_names:
+                if jname.endswith(f"_{config['base']['dummy_joint_name']}") or jname == config["base"]["dummy_joint_name"]:
+                    dummy_joint_name = jname
+                    break
+            if dummy_joint_name is None:
+                raise KeyError(f"Could not find dummy_joint in model. Available joints: {list(all_joint_names)[:10]}")
+            dummy_joint_id = self._env.model.joint_name2id(dummy_joint_name)
 
         # ######## Right Arm ########
-        self._r_arm_joint_names = [self._env.joint(config["right_arm"]["joint_names"][i], id) for i in range(len(config["right_arm"]["joint_names"]))]
+        # Helper function to find joint with fallback
+        def find_joint_name(joint_name_base):
+            try:
+                joint_name = self._env.joint(joint_name_base, id)
+                self._env.model.joint_name2id(joint_name)  # Verify it exists
+                return joint_name
+            except KeyError:
+                # If not found with prefix, search all joints
+                all_joint_names = self._env.model.get_joint_dict().keys()
+                for jname in all_joint_names:
+                    if jname.endswith(f"_{joint_name_base}") or jname == joint_name_base:
+                        return jname
+                # If still not found, raise error with available joints
+                raise KeyError(f"Could not find joint '{joint_name_base}'. Available joints: {list(all_joint_names)[:20]}")
+        
+        self._r_arm_joint_names = [find_joint_name(config["right_arm"]["joint_names"][i]) for i in range(len(config["right_arm"]["joint_names"]))]
         self._r_arm_joint_id = [self._env.model.joint_name2id(joint_name) for joint_name in self._r_arm_joint_names]
         self._r_jnt_address = [self._env.jnt_qposadr(joint_name) for joint_name in self._r_arm_joint_names]
         self._r_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._r_arm_joint_names]
@@ -63,7 +92,7 @@ class DualArmRobot(AgentBase):
         self._ee_site_r  = self._env.site(config["right_arm"]["ee_center_site_name"], id)
 
         # ######## Left Arm ########
-        self._l_arm_joint_names = [self._env.joint(config["left_arm"]["joint_names"][i], id) for i in range(len(config["left_arm"]["joint_names"]))]
+        self._l_arm_joint_names = [find_joint_name(config["left_arm"]["joint_names"][i]) for i in range(len(config["left_arm"]["joint_names"]))]
         self._l_arm_joint_id = [self._env.model.joint_name2id(joint_name) for joint_name in self._l_arm_joint_names]
         self._l_jnt_address = [self._env.jnt_qposadr(joint_name) for joint_name in self._l_arm_joint_names]
         self._l_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._l_arm_joint_names]
