@@ -90,8 +90,13 @@ def run_simulation(orcagym_addr : str,
             env.close()
 
 
-if __name__ == "__main__":
+def main():
+    """命令行入口函数"""
     orcagym_addr = "localhost:50051"
     agent_name = "NoRobot"
     env_name = "SimulationLoop"
     run_simulation(orcagym_addr, agent_name, env_name)
+
+
+if __name__ == "__main__":
+    main()

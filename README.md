@@ -87,6 +87,29 @@ pip install -e ".[sensors]"
 
 从[官方门户](http://orca3d.cn/)下载并安装 OrcaStudio、OrcaLab
 
+### 使用 orcagym-loop 命令启动仿真循环
+
+`orcagym-loop` 是一个用于测试的常用脚本，用于启动基本的仿真循环。安装 `orca-gym` 后，可以直接使用该命令。
+
+**使用 OrcaStudio 的情况**：
+1. 在 OrcaStudio 中，点击"运行"按钮（或按快捷键 `Ctrl+G`）启动仿真服务器
+2. 在控制台执行 `orcagym-loop` 命令，启动仿真循环
+3. 仿真将在本地 `localhost:50051` 地址上运行
+
+**使用 OrcaLab 的情况**：
+1. 在 OrcaLab 中点击"运行"按钮启动仿真服务器
+2. 选择"无仿真程序"选项
+3. 在控制台执行 `orcagym-loop` 命令，启动仿真循环
+4. 仿真将在本地 `localhost:50051` 地址上运行
+
+**命令示例**：
+```bash
+# 安装 orca-gym 后，直接运行
+orcagym-loop
+```
+
+该命令会启动一个基本的仿真循环，按 `Ctrl+C` 可以停止仿真。
+
 ## 核心包说明
 
 `orca-gym` 包含以下核心模块：
