@@ -43,6 +43,7 @@ robot_entries = {
     "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
     "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
+    "dexforce_w1_gripper": "envs.manipulation.robots.dexforce_w1_gripper:DexforceW1Gripper",
 }
 
 def get_robot_entry(name: str):

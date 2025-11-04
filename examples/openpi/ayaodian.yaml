@@ -1,16 +1,16 @@
 # shop1灯光配置文件
 level_name: "yaodian"
 type: "pick_and_place"
-range: {x: [0.2, 0.6], y: [-0.4, 0.4], z: -0.4, r: 0.3}
+range: {x: [0.44, 0.54], y: [-0.4, 0.4], z: 0.15, r: 0.1}
 
 random_light : true
 num_lights: 3
 random_light_position: true
 random_light_rotation: true
 lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
-lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
-light_center: [2.59, -2.78, 1.298]
-light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+lights_spawnable: ["assets/prefabs/spotlight","assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight"]
+light_center: [2.518, -2.956, 2.017]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0.19, 0.2]]
 
 object_bodys: [ "niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
 object_sites: ["niuhuangwansite", "qinghuopiansite", "orangeboxsite", "pipalusite", "xiaokepiansite"]

@@ -9,10 +9,12 @@ from envs.manipulation.dual_arm_env import DualArmEnv, AgentBase, RunMode, Contr
 from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
 from envs.manipulation.robots.configs.openloong_config import openloong_config
+from envs.manipulation.robots.configs.dexforce_w1_config import dexforce_w1_config
 robot_config = {
     "openloong_hand_fix_base" : openloong_config,
     "openloong_gripper_2f85_fix_base" : openloong_config,
     "openloong_gripper_2f85_mobile_base" : openloong_config,
+    "dexforce_w1_gripper" : dexforce_w1_config,
 }
 def get_robot_config(robot_name: str):
     for key in robot_config.keys():

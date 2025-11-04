@@ -8,9 +8,9 @@ num_lights: 3
 random_light_position: true
 random_light_rotation: true
 lights: ["spotlight1", "spotlight2", "spotlight3", "spotlight4", "spotlight5", "spotlight6"]
-lights_spawnable: ["spotlight","spotlight", "spotlight", "spotlight", "spotlight", "spotlight"]
+lights_spawnable: ["assets/prefabs/spotlight","assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight", "assets/prefabs/spotlight"]
 light_center: [-2.26, 6.18, 1.66]
-light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0.19, 0.2]]
 
 object_bodys: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
 object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite", "salt_site", "can_site"]

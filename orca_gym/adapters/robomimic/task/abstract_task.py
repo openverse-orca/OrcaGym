@@ -104,6 +104,8 @@ class AbstractTask:
         self.data = {} #来着增广的数据
         self.sample_range = 0.0 #增广采样范围
         self.target_object = None
+        self.current_light_configs = []  # 保存当前使用的灯光完整配置（位置、旋转、颜色、强度）
+        self.augmentation_scene_initialized = False  # 增广场景是否已初始化
 
 
     def get_object_sites(self):
@@ -218,19 +220,44 @@ class AbstractTask:
             self.scene.publish_scene()
             self.first_spawn = False
         elif is_augmentation_mode:
-            # 增广模式下需要生成 actors（优化：减少 publish_scene 调用次数）
-            self.scene.publish_scene_without_init_env()
-            self.generate_actors()
-            self.scene.publish_scene()
-            if self.random_light and self.__random_count__ % self.random_cycle == 0:
-                light_idxs = self.generate_lights()
-                # 移除额外的 publish_scene_without_init_env() 调用，避免频繁发布导致崩溃
-                # self.scene.publish_scene_without_init_env()  # ❌ 删除这一行
-
-                for idx in light_idxs:
-                    self.set_light_info(self.lights[idx])
-                for actor in self.actors:
-                    self.set_actor_material(actor)
+            # 增广模式：优化场景发布逻辑，避免每次都重建场景
+            
+            # 只在第一次或周期到达时才重新发布场景
+            need_publish_scene = (not self.augmentation_scene_initialized or 
+                                (self.random_light and self.__random_count__ % self.random_cycle == 0))
+            
+            if need_publish_scene:
+                print(f"🔄 [Scene] 重建场景 (首次: {not self.augmentation_scene_initialized}, 周期: {self.__random_count__ % self.random_cycle if self.random_light else 'N/A'})")
+                
+                # 清空并重建场景
+                self.scene.publish_scene_without_init_env()
+                self.generate_actors()
+                
+                # 灯光处理：只在周期到达时重新生成配置
+                if self.random_light and self.__random_count__ % self.random_cycle == 0:
+                    print(f"🔦 [Light] 周期到达 ({self.__random_count__}), 重新生成灯光配置...")
+                    self.current_light_configs = self._generate_light_configs()
+                
+                # 添加灯光到场景
+                if self.random_light and len(self.current_light_configs) > 0:
+                    print(f"🔦 [Light] 添加 {len(self.current_light_configs)} 个灯光")
+                    for light_cfg in self.current_light_configs:
+                        self.scene.add_light(light_cfg['name'], light_cfg['asset_path'], 
+                                           light_cfg['position'], light_cfg['rotation'], scale=1.0)
+                
+                # 统一发布一次场景（包含 actors 和 lights）
+                self.scene.publish_scene()
+                
+                # 场景发布后，设置灯光和材质属性
+                if self.random_light and len(self.current_light_configs) > 0:
+                    for light_cfg in self.current_light_configs:
+                        self.scene.set_light_info(light_cfg['name'], light_cfg['color'], light_cfg['intensity'])
+                    for actor in self.actors:
+                        self.set_actor_material(actor)
+                
+                self.augmentation_scene_initialized = True
+            else:
+                print(f"⚡ [Scene] 跳过场景重建 (周期: {self.__random_count__ % self.random_cycle}/{self.random_cycle})")
         elif self.random_light:
         # 周期性随机添加灯光
             if self.random_light and self.__random_count__ % self.random_cycle == 0:
@@ -346,27 +373,59 @@ class AbstractTask:
             self.scene.add_actor(actor_name=self.actors[i], asset_path=self.actors_spawnable[i],
                                  position=np.array(self.infinity), rotation = rotations.euler2quat([0, 0, 0]))
     
-    def generate_lights(self):
+    def _generate_light_configs(self):
         """
-        只在 random_light=True 时运行，
-        并且固定选 self.num_lights 盏，生成朝下的灯。
+        生成灯光配置（包含位置、旋转、颜色、强度）
+        这些配置会被保存，在多次增广中重用
         """
-        idxs = []
+        configs = []
         if not self.random_light:
-            return idxs
+            return configs
 
         total = len(self.lights)
-        # 限制不超过总数
         n = min(self.num_lights, total)
         idxs = random.sample(range(total), n)
 
         for i in idxs:
             name      = self.lights[i]
             spawnable = self.lights_spawnable[i]
-            # 移除调试打印，减少输出
-            # print(f"[Debug-Light] add_light → {name} at spawnable {spawnable}")
-            self.add_light(name, spawnable)
-        return idxs
+            
+            # 添加 assets/prefabs/ 前缀（如果没有的话）
+            if not spawnable.startswith("assets/prefabs/"):
+                spawnable = f"assets/prefabs/{spawnable}"
+            
+            # 生成位置和旋转（这些会被保存）
+            rand_pos, rand_quat = self._random_position_and_rotation(self.light_center, self.light_bound)
+            position = rand_pos if self.random_light_position else np.array(self.light_center)
+            rotation = rand_quat if self.random_light_rotation else rotations.euler2quat(np.array([-np.pi/2, 0.0, 0.0]))
+            
+            # 生成颜色和强度（这些会被保存）
+            color = np.array([np.random.uniform(0.0, 1.0), 
+                            np.random.uniform(0.0, 1.0), 
+                            np.random.uniform(0.0, 1.0)])
+            intensity = np.random.uniform(1000, 2000.0)
+            
+            configs.append({
+                'name': name,
+                'asset_path': spawnable,
+                'position': position,
+                'rotation': rotation,
+                'color': color,
+                'intensity': intensity
+            })
+            print(f"  - {name}: pos={position[:2]}, color={color}, intensity={intensity:.0f}")
+        
+        return configs
+    
+    def generate_lights(self):
+        """
+        向后兼容的方法，调用 _generate_light_configs 并添加到场景
+        """
+        configs = self._generate_light_configs()
+        for cfg in configs:
+            self.scene.add_light(cfg['name'], cfg['asset_path'], 
+                               cfg['position'], cfg['rotation'], scale=1.0)
+        return [i for i in range(len(configs))]
 
     def set_actors(self, actors, actors_spawnable, position, rotation):
         for i in range(actors):
