@@ -16,19 +16,51 @@ class DexforceW1Gripper(DualArmRobot):
 
         super().init_agent(id)
 
-        self._l_hand_actuator_names = [self._env.actuator(config["left_hand"]["actuator_names"][0], id)]
+        # Helper function to find actuator with fallback (same as in dual_arm_robot.py)
+        def find_actuator_name(actuator_name_base):
+            try:
+                actuator_name = self._env.actuator(actuator_name_base, id)
+                self._env.model.actuator_name2id(actuator_name)  # Verify it exists
+                return actuator_name
+            except KeyError:
+                # If not found with prefix, search all actuators
+                all_actuator_names = self._env.model.get_actuator_dict().keys()
+                for aname in all_actuator_names:
+                    if aname.endswith(f"_{actuator_name_base}") or aname == actuator_name_base:
+                        return aname
+                # If still not found, raise error with available actuators
+                raise KeyError(f"Could not find actuator '{actuator_name_base}'. Available actuators: {list(all_actuator_names)[:20]}")
+        
+        # Helper function to find body with fallback (same as in dual_arm_robot.py)
+        def find_body_name(body_name_base):
+            try:
+                body_name = self._env.body(body_name_base, id)
+                body_dict = self._env.model.get_body_dict()
+                if body_name not in body_dict:
+                    raise KeyError(f"Body '{body_name}' not found in model")
+                return body_name
+            except KeyError:
+                # If not found with prefix, search all bodies
+                all_body_names = self._env.model.get_body_dict().keys()
+                for bname in all_body_names:
+                    if bname.endswith(f"_{body_name_base}") or bname == body_name_base:
+                        return bname
+                # If still not found, raise error with available bodies
+                raise KeyError(f"Could not find body '{body_name_base}'. Available bodies: {list(all_body_names)[:20]}")
+
+        self._l_hand_actuator_names = [find_actuator_name(config["left_hand"]["actuator_names"][0])]
         
         self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
-        self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][0], id), self._env.body(config["left_hand"]["body_names"][1], id)]
+        self._l_hand_body_names = [find_body_name(config["left_hand"]["body_names"][0]), find_body_name(config["left_hand"]["body_names"][1])]
         self._l_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._l_hand_body_names:
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
-        self._r_hand_actuator_names = [self._env.actuator(config["right_hand"]["actuator_names"][0], id)]
+        self._r_hand_actuator_names = [find_actuator_name(config["right_hand"]["actuator_names"][0])]
 
         self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
-        self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][0], id), self._env.body(config["right_hand"]["body_names"][1], id)]
+        self._r_hand_body_names = [find_body_name(config["right_hand"]["body_names"][0]), find_body_name(config["right_hand"]["body_names"][1])]
         self._r_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._r_hand_body_names:

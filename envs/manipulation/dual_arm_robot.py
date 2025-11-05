@@ -41,7 +41,25 @@ class DualArmRobot(AgentBase):
         注意：xpos, xquat 不能在这里读取，因为还没有执行 mj_forward，读到的是不正确的
         """
         ######## Base body and joint setup ########
-        self._base_body_name = [self._env.body(config["base"]["base_body_name"], id)]
+        # Helper function to find body with fallback
+        def find_body_name(body_name_base):
+            try:
+                body_name = self._env.body(body_name_base, id)
+                # Verify it exists by checking in the model
+                body_dict = self._env.model.get_body_dict()
+                if body_name not in body_dict:
+                    raise KeyError(f"Body '{body_name}' not found in model")
+                return body_name
+            except KeyError:
+                # If not found with prefix, search all bodies
+                all_body_names = self._env.model.get_body_dict().keys()
+                for bname in all_body_names:
+                    if bname.endswith(f"_{body_name_base}") or bname == body_name_base:
+                        return bname
+                # If still not found, raise error with available bodies
+                raise KeyError(f"Could not find body '{body_name_base}'. Available bodies: {list(all_body_names)[:20]}")
+        
+        self._base_body_name = [find_body_name(config["base"]["base_body_name"])]
 
         # Try to find dummy_joint with agent prefix, if not found, try without prefix
         try:
@@ -75,13 +93,68 @@ class DualArmRobot(AgentBase):
                 # If still not found, raise error with available joints
                 raise KeyError(f"Could not find joint '{joint_name_base}'. Available joints: {list(all_joint_names)[:20]}")
         
+        # Helper function to find actuator with fallback
+        def find_actuator_name(actuator_name_base):
+            try:
+                actuator_name = self._env.actuator(actuator_name_base, id)
+                self._env.model.actuator_name2id(actuator_name)  # Verify it exists
+                return actuator_name
+            except KeyError:
+                # If not found with prefix, search all actuators
+                all_actuator_names = self._env.model.get_actuator_dict().keys()
+                for aname in all_actuator_names:
+                    if aname.endswith(f"_{actuator_name_base}") or aname == actuator_name_base:
+                        return aname
+                # If still not found, raise error with available actuators
+                raise KeyError(f"Could not find actuator '{actuator_name_base}'. Available actuators: {list(all_actuator_names)[:20]}")
+        
+        # Helper function to find site with fallback
+        def find_site_name(site_name_base):
+            try:
+                site_name = self._env.site(site_name_base, id)
+                # Verify it exists by checking in the model
+                site_dict = self._env.model.get_site_dict()
+                if site_name not in site_dict:
+                    raise KeyError(f"Site '{site_name}' not found in model")
+                return site_name
+            except KeyError:
+                # If not found with prefix, search all sites
+                all_site_names = self._env.model.get_site_dict().keys()
+                for sname in all_site_names:
+                    if sname.endswith(f"_{site_name_base}") or sname == site_name_base:
+                        return sname
+                # If still not found, raise error with available sites
+                raise KeyError(f"Could not find site '{site_name_base}'. Available sites: {list(all_site_names)[:20]}")
+        
+        # Helper function to find mocap body with fallback
+        def find_mocap_name(mocap_name_base):
+            try:
+                mocap_name = self._env.mocap(mocap_name_base, id)
+                # Verify it exists by checking in the model (mocap bodies are regular bodies with mocap="true")
+                body_dict = self._env.model.get_body_dict()
+                if mocap_name not in body_dict:
+                    raise KeyError(f"Mocap body '{mocap_name}' not found in model")
+                return mocap_name
+            except KeyError:
+                # If not found with prefix, search all bodies for mocap bodies
+                all_body_names = self._env.model.get_body_dict().keys()
+                for bname in all_body_names:
+                    if bname.endswith(f"_{mocap_name_base}") or bname == mocap_name_base:
+                        # If the name matches, return it (mocap bodies are identified by naming convention)
+                        return bname
+                # If still not found, raise error with available bodies
+                raise KeyError(f"Could not find mocap body '{mocap_name_base}'. Available bodies: {list(all_body_names)[:20]}")
+        
+        # Store find_mocap_name for use in other methods
+        self._find_mocap_name = find_mocap_name
+        
         self._r_arm_joint_names = [find_joint_name(config["right_arm"]["joint_names"][i]) for i in range(len(config["right_arm"]["joint_names"]))]
         self._r_arm_joint_id = [self._env.model.joint_name2id(joint_name) for joint_name in self._r_arm_joint_names]
         self._r_jnt_address = [self._env.jnt_qposadr(joint_name) for joint_name in self._r_arm_joint_names]
         self._r_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._r_arm_joint_names]
 
-        self._r_arm_motor_names = [self._env.actuator(config["right_arm"]["motor_names"][i], id) for i in range(len(config["right_arm"]["motor_names"]))]
-        self._r_arm_position_names = [self._env.actuator(config["right_arm"]["position_names"][i], id) for i in range(len(config["right_arm"]["position_names"]))]
+        self._r_arm_motor_names = [find_actuator_name(config["right_arm"]["motor_names"][i]) for i in range(len(config["right_arm"]["motor_names"]))]
+        self._r_arm_position_names = [find_actuator_name(config["right_arm"]["position_names"][i]) for i in range(len(config["right_arm"]["position_names"]))]
         if self._env.action_use_motor():
             self._env.disable_actuators(self._r_arm_position_names, dummy_joint_id)
             self._r_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
@@ -89,7 +162,7 @@ class DualArmRobot(AgentBase):
             self._env.disable_actuators(self._r_arm_motor_names, dummy_joint_id)
             self._r_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
         self._r_neutral_joint_values = np.array(config["right_arm"]["neutral_joint_values"])
-        self._ee_site_r  = self._env.site(config["right_arm"]["ee_center_site_name"], id)
+        self._ee_site_r  = find_site_name(config["right_arm"]["ee_center_site_name"])
 
         # ######## Left Arm ########
         self._l_arm_joint_names = [find_joint_name(config["left_arm"]["joint_names"][i]) for i in range(len(config["left_arm"]["joint_names"]))]
@@ -97,8 +170,8 @@ class DualArmRobot(AgentBase):
         self._l_jnt_address = [self._env.jnt_qposadr(joint_name) for joint_name in self._l_arm_joint_names]
         self._l_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._l_arm_joint_names]
 
-        self._l_arm_motor_names = [self._env.actuator(config["left_arm"]["motor_names"][i], id) for i in range(len(config["left_arm"]["motor_names"]))]
-        self._l_arm_position_names = [self._env.actuator(config["left_arm"]["position_names"][i], id) for i in range(len(config["left_arm"]["position_names"]))]
+        self._l_arm_motor_names = [find_actuator_name(config["left_arm"]["motor_names"][i]) for i in range(len(config["left_arm"]["motor_names"]))]
+        self._l_arm_position_names = [find_actuator_name(config["left_arm"]["position_names"][i]) for i in range(len(config["left_arm"]["position_names"]))]
         if self._env.action_use_motor():
             self._env.disable_actuators(self._l_arm_position_names, dummy_joint_id)
             self._l_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_motor_names]
@@ -106,7 +179,7 @@ class DualArmRobot(AgentBase):
             self._env.disable_actuators(self._l_arm_motor_names, dummy_joint_id)
             self._l_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array(config["left_arm"]["neutral_joint_values"])
-        self._ee_site_l  = self._env.site(config["left_arm"]["ee_center_site_name"], id)
+        self._ee_site_l  = find_site_name(config["left_arm"]["ee_center_site_name"])
 
     def _setup_initial_info(self):
         """
@@ -247,11 +320,21 @@ class DualArmRobot(AgentBase):
         self._reset_gripper()
 
     def set_grasp_mocap(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self._env.mocap("leftHandMocap", self.id): {'pos': position, 'quat': orientation}}
+        # Use find_mocap_name if available, otherwise fallback to env.mocap
+        if hasattr(self, '_find_mocap_name'):
+            left_mocap_name = self._find_mocap_name("leftHandMocap")
+        else:
+            left_mocap_name = self._env.mocap("leftHandMocap", self.id)
+        mocap_pos_and_quat_dict = {left_mocap_name: {'pos': position, 'quat': orientation}}
         self._env.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
     def set_grasp_mocap_r(self, position, orientation) -> None:
-        mocap_pos_and_quat_dict = {self._env.mocap("rightHandMocap", self.id): {'pos': position, 'quat': orientation}}
+        # Use find_mocap_name if available, otherwise fallback to env.mocap
+        if hasattr(self, '_find_mocap_name'):
+            right_mocap_name = self._find_mocap_name("rightHandMocap")
+        else:
+            right_mocap_name = self._env.mocap("rightHandMocap", self.id)
+        mocap_pos_and_quat_dict = {right_mocap_name: {'pos': position, 'quat': orientation}}
         # print("Set grasp mocap: ", position, orientation)
         self._env.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
 
