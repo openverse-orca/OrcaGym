@@ -121,6 +121,9 @@ all = [
     "flask",
 ]
 
+[tool.setuptools]
+license-files = []
+
 [tool.setuptools.packages.find]
 # Only include orca_gym package, exclude examples, envs, doc, 3rd_party
 include = ["orca_gym*"]
