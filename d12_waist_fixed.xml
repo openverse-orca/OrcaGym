@@ -1,0 +1,119 @@
+<mujoco model="d12_waist">
+  <compiler angle="radian" meshdir="../meshes/"/>
+
+    <option timestep="0.001"  tolerance="1e-10" solver="Newton" jacobian="dense" cone="pyramidal" gravity="0 0 -9.81">  <!--integrator="RK4"  iteration="50"-->
+        <flag contact="enable" energy="enable"/>
+  </option>
+  <size njmax="500" nconmax="1000" />
+
+  <default>
+      <light castshadow="false" />
+      <geom rgba="0.784 0.784 0.784 1"/>
+      <default class="visual">
+          <geom contype="0" conaffinity="0" group="1" type="mesh" euler="1.57 0 0" />
+      </default>
+
+      <default class="2f85">
+      <mesh scale="0.001 0.001 0.001"/>
+      <general biastype="affine"/>
+
+      <joint axis="0 0 1"/>
+      <default class="driver">
+        <joint range="0 0.9" armature="0.005" damping="0.1" solimplimit="0.95 0.99 0.001" solreflimit="0.005 1"/>
+      </default>
+      <default class="follower">
+        <joint range="-0.872664 0.9" armature="0.001" solimplimit="0.95 0.99 0.001" solreflimit="0.005 1"/>
+      </default>
+      <default class="spring_link">
+        <joint range="-0.29670597283 0.9" armature="0.001" stiffness="0.05" springref="2.62" damping="0.00125"/>
+      </default>
+      <default class="coupler">
+        <joint range="-1.57 0" armature="0.001" solimplimit="0.95 0.99 0.001" solreflimit="0.005 1"/>
+      </default>
+      
+      <!-- 修改腰部关节参数，降低阻尼和摩擦 -->
+      <default class="waist_joint">
+         <joint damping="0.1" frictionloss="0.01" armature="0.01"/>
+      </default>
+
+      <default class="visual_2f85">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" material="pbr_plastic_black"/>
+      </default>
+      <default class="collision_2f85">
+        <geom type="mesh" group="3"/>
+        <default class="pad_box1">
+          <geom mass="1e-6" type="box" pos="0.043258  0 0.12" size="0.002 0.011 0.009375" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.55 0.55 0.55 1" group="3"/>
+        </default>
+        <default class="pad_box2">
+          <geom mass="1e-6" type="box" pos="0.043258 0 0.13875" size="0.002 0.011 0.009375" friction="0.6" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.45 0.45 0.45 1" group="3"/>
+        </default>
+      </default>
+    </default>
+
+      <default class="collision">
+
+          <geom contype="1" conaffinity="1" friction="0.02 0.01 0.001"
+              margin="0.0005" condim="1" group="0" euler="1.57 0 0" />
+      </default>
+      <joint damping="0.1" frictionloss="0.02" armature="0.01"/>
+    </default>
+
+  <asset>
+      <!-- 保持原有的asset内容不变 -->
+      <texture type="2d" name="Metal009_color"      file="../textures/Metal009_2K-PNG/Metal009_2K-PNG_Color.png"/>
+    <texture type="2d" name="Metal009_roughness"  file="../textures/Metal009_2K-PNG/Metal009_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Metal009_metalic"  file="../textures/Metal009_2K-PNG/Metal009_2K-PNG_Metalness.png"/>
+    <texture type="2d" name="Metal009_normal"     file="../textures/Metal009_2K-PNG/Metal009_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_metal_gray" metallic="0.0" roughness="1.0" rgba="1 0 0 1.0">
+          <layer role="rgb" texture="Metal009_color"/>
+          <layer role="normal" texture="Metal009_normal"/>
+          <layer role="roughness" texture="Metal009_roughness"/>
+          <layer role="metallic" texture="Metal009_metalic"/>
+    </material>
+
+    <texture type="2d" name="Plastic006_color"      file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Color.png"/>
+    <texture type="2d" name="Plastic006_roughness"  file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_Roughness.png"/>
+    <texture type="2d" name="Plastic006_normal"     file="../textures/Plastic006_2K-PNG/Plastic006_2K-PNG_NormalDX.png"/>
+
+    <material name="pbr_plastic_black" metallic="0.05" roughness="1.0" rgba="1 0 0 1.0">
+	  <layer role="rgb" texture="Plastic006_color"/>
+	  <layer role="normal" texture="Plastic006_normal"/>
+	  <layer role="roughness" texture="Plastic006_roughness"/>
+    </material>
+
+    <!-- 保持所有mesh定义不变 -->
+    <mesh name="base_link" file="base_link.STL"/>
+    <mesh name="waist_yaw_link" file="waist_yaw_link.STL"/>
+    <!-- ... 其他mesh定义保持不变 ... -->
+  </asset>
+
+  <worldbody>
+      <!-- 保持原有的worldbody内容不变，但修改waist_yaw_joint的参数 -->
+      <body name="base_link" pos="0 0 0.95">
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" mesh="base_link" material="pbr_metal_gray"/>
+        <geom type="mesh" group="3" mesh="base_link"/>
+        
+        <!-- 修改waist_yaw_joint的参数 -->
+        <body name="waist_yaw_link" pos="0 0 0.1355">
+          <inertial pos="-0.0042435 -0.00178668 0.235581" quat="0.999764 -0.0197829 0.00162414 0.00881085" mass="18.6975" diaginertia="0.48966 0.385465 0.19736"/>
+          <!-- 关键修改：降低关节的阻尼和摩擦，使用更温和的参数 -->
+          <joint name="waist_yaw_joint" pos="0 0 0" axis="0 0 1" range="-1.57 1.57" actuatorfrcrange="-95 95" damping="0.1" frictionloss="0.01" armature="0.01" solimplimit="0.9 0.95 0.001" solreflimit="0.01 1"/>
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.79216 0.81961 0.93333 1" mesh="waist_yaw_link"/>
+          <geom type="mesh" rgba="0.79216 0.81961 0.93333 1" mesh="waist_yaw_link"/>
+          <!-- ... 其他body内容保持不变 ... -->
+        </body>
+      </body>
+  </worldbody>
+
+  <actuator>
+    <!-- 关键修改：大幅降低Position控制器的增益，避免过度响应 -->
+    <position name="P_waist" joint="waist_yaw_joint" kp="10" kv="5" ctrllimited="true" ctrlrange="-3.14 3.14" forcelimited="true" forcerange="-50 50"/>
+    <motor name="M_waist" joint="waist_yaw_joint" gear="1" ctrllimited="true" ctrlrange="-50 50"/>
+    
+    <!-- 保持其他actuator定义不变 -->
+    <!-- ... 其他actuator定义 ... -->
+  </actuator>
+
+  <!-- 保持其他部分不变 -->
+</mujoco>

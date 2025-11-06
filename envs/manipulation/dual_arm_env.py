@@ -98,7 +98,7 @@ robot_entries = {
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
 }
 
-ANIM_SPEED = 0.5
+ANIM_SPEED = 0.2
 def get_robot_entry(name: str):
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
@@ -437,12 +437,35 @@ class DualArmEnv(RobomimicEnv):
 
         passtime = animation_time
         self.lastanimtime = animation_time
+
+        if len(self._joystick) > 0:
+            picotemp = self._joystick['openloong_gripper_2f85_fix_base_usda']
+            keystate = picotemp.get_key_state()
+           # print("keystate: ", keystate)
+            if keystate:
+                if self.havestate == False:
+                    self.animspeed = ANIM_SPEED
+                    self.havestate = True
+                    print("animspeed: ", self.animspeed)
+
+
+                if keystate["leftHand"]["primaryButtonPressed"] and keystate["leftHand"]["secondaryButtonPressed"]:
+                    self.animspeed = 0
+                if keystate["rightHand"]["primaryButtonPressed"] and keystate["rightHand"]["secondaryButtonPressed"]:
+                    self.animspeed = ANIM_SPEED
+            else:
+                if self.havestate == True:
+                    self.havestate = False
+                    self.animspeed = 0
+
+
+        
        
         
         # 处理所有动画对象
         for joint_name, obj in self.animated_objects.items():
             #print("aaaaaa: ", self.animated_objects)
-            if not obj.is_active:
+            if not obj.is_active or self.animspeed == 0:
                 continue
                 
             try:
@@ -485,7 +508,7 @@ class DualArmEnv(RobomimicEnv):
                 obj.lastpos = current_pos.copy()
                 obj.curbesdist += movedist
 
-                print("joint_name: ", joint_name, "movedist: ", movedist,"curbesdist: ", obj.curbesdist,"test: ", self.test)
+             #   print("joint_name: ", joint_name, "movedist: ", movedist,"curbesdist: ", obj.curbesdist,"test: ", self.test)
                 
                 # 检查是否到达曲线终点
                 if obj.bezier_path.total_length - obj.curbesdist < 0.001:
@@ -493,7 +516,7 @@ class DualArmEnv(RobomimicEnv):
                   #  obj.curbesdist = 0
                 
                 # 更新位置（禁用内置的 AngleSmoother）
-                self.animspeed = ANIM_SPEED
+                #self.animspeed = ANIM_SPEED
                 pos, distance, direction = obj.bezier_path.update_position(obj.curbesdist, self.animspeed, passtime, use_angle_smoother=False)
                 
                 # 使用对象独立的 AngleSmoother 处理角度
@@ -511,7 +534,7 @@ class DualArmEnv(RobomimicEnv):
                 # 计算角速度（使用平滑后的角度）
                 dirdiff = smoothed_direction - curdir_unwrapped
 
-                print("dirdiff: ", dirdiff, "curdir_unwrapped: ", curdir_unwrapped,"smoothed_direction: ", smoothed_direction)
+               # print("dirdiff: ", dirdiff, "curdir_unwrapped: ", curdir_unwrapped,"smoothed_direction: ", smoothed_direction)
                 dirspeed = (dirdiff[2] / passtime) * 70 / 50
                 if not bsetspeed:
                     dirspeed = 0
@@ -525,14 +548,14 @@ class DualArmEnv(RobomimicEnv):
                 # 检查是否需要重置
                 dist_to_end = np.linalg.norm(obj.lastpos - obj.bezier_path.get_position(obj.bezier_path.total_length))
                 if  obj.breset and dist_to_end < 0.02:
-                    print("重置对象: ", joint_name,"dist_to_end: ", dist_to_end)
+                   # print("重置对象: ", joint_name,"dist_to_end: ", dist_to_end)
                     pos = obj.bezier_path.get_position(0)
                     direction = [1,0,0,0]
                     animjointpos = np.concatenate([pos, direction], axis=0)
                     self.set_joint_qpos({joint_name: animjointpos})
                     obj.reset()
                 
-                print(f"对象 {joint_name}: 距离={obj.curbesdist:.3f}/{obj.bezier_path.total_length:.3f}")
+             #   print(f"对象 {joint_name}: 距离={obj.curbesdist:.3f}/{obj.bezier_path.total_length:.3f}")
                 
             except Exception as e:
                 print(f"警告: 处理对象 {joint_name} 时出错: {e}")
