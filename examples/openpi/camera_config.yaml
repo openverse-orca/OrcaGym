@@ -12,7 +12,7 @@ default:
       rgb: 7070
       depth: 7071
     translation: [0.02, 0.0, 0.15]
-    rotation:    [0.0, 40.0, -90.0]
+    rotation:    [-90.0, -15.0, 90.0]  # 修复上下颠倒：Z轴 -90→90
 
   camera_wrist_l:
     fovy: 50

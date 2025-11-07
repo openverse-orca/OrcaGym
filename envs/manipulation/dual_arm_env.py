@@ -1,3 +1,4 @@
+import copy
 import random
 import re
 import time
@@ -8,7 +9,7 @@ from typing import Optional
 from orca_gym.devices.pico_joytsick import PicoJoystick
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
-from orca_gym.adapters.robomimic.task.pick_place_task import PickPlaceTask, TaskStatus
+from orca_gym.adapters.robomimic.task.pick_place_task import EmptyTask, PickPlaceTask, TaskStatus
 import importlib
 
 class RunMode:
@@ -105,11 +106,16 @@ class DualArmEnv(RobomimicEnv):
         self._setup_reward_functions(reward_type)
 
         self._reward_printer = RewardPrinter()
-        self._config = task_config_dict
+        has_task_config = bool(task_config_dict)
+        self._config = copy.deepcopy(task_config_dict) if task_config_dict else {}
         self._config['grpc_addr'] = orcagym_addr
-        self._task = PickPlaceTask(self._config)
+        if has_task_config:
+            self._task = PickPlaceTask(self._config)
+        else:
+            self._task = EmptyTask(grpc_addr=orcagym_addr)
         self._task.register_init_env_callback(self.init_env)
         kwargs["task"] = self._task
+        self._has_task_config = has_task_config
         self._teleop_counter = 0
         self._got_task = False
         super().__init__(
@@ -157,9 +163,12 @@ class DualArmEnv(RobomimicEnv):
         # self._task.actors = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.register_init_env_callback(self.init_env)
-        self._config = task_config_dict
+        self._config = copy.deepcopy(task_config_dict) if task_config_dict else {}
         self._config["grpc_addr"] = "localhost:50051"
-        self._task = PickPlaceTask(self._config)
+        if self._has_task_config:
+            self._task = PickPlaceTask(self._config)
+        else:
+            self._task = EmptyTask(grpc_addr="localhost:50051")
         
         self._task.register_init_env_callback(self.init_env)
 
@@ -190,6 +199,9 @@ class DualArmEnv(RobomimicEnv):
 
         self.ctrl = np.zeros(self.nu)
         self.mj_forward() 
+
+    def _is_empty_task(self) -> bool:
+        return getattr(self._task, "is_empty", False)
 
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
@@ -442,6 +454,9 @@ class DualArmEnv(RobomimicEnv):
     
 
     def reset_teleoperation(self) -> tuple[dict, dict]:
+        if self._is_empty_task():
+            return self.reset_empty()
+
         if self._config.get("random_actor", False):
             self._teleop_counter += 1
             if self._teleop_counter == 1 or (self._teleop_counter - 1) % 20 == 0:
@@ -478,6 +493,13 @@ class DualArmEnv(RobomimicEnv):
 
         self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
         self.mj_forward()
+        
+        # 修复：在spawn物体后重新设置手臂到neutral位置，防止物理碰撞改变手臂姿态
+        print("\n[DEBUG] Re-setting arm to neutral after spawn...")
+        [agent.set_joint_neutral() for agent in self._agents.values()]
+        self.mj_forward()
+        print("[DEBUG] Neutral position set complete.")
+        
         obs = self._get_obs().copy()
         return obs, {"objects": self.objects, "goals": self.goals}
     
@@ -493,9 +515,40 @@ class DualArmEnv(RobomimicEnv):
             "goals":   getattr(self, "goals",   None),
         }
     
+    def reset_empty(self) -> tuple[dict, dict]:
+        self._set_init_state()
+        for ag in self._agents.values():
+            ag.on_reset_model()
+        [agent.set_joint_neutral() for agent in self._agents.values()]
+        self._set_gripper_open_pose()
+        self.mj_forward()
+
+        instruction = self._task.get_language_instruction()
+        if instruction:
+            print(instruction)
+
+        self.objects = None
+        self.goals = None
+        obs = self._get_obs().copy()
+        return obs, {"objects": None, "goals": None}
+
+    def _set_gripper_open_pose(self):
+        open_qpos = 0.025
+        joint_names = [
+            "LEFT_FINGER1", "LEFT_FINGER2",
+            "RIGHT_FINGER1", "RIGHT_FINGER2",
+        ]
+        qpos_dict = {self.joint(name): open_qpos for name in joint_names}
+        try:
+            self.set_joint_qpos(qpos_dict)
+        except Exception as exc:
+            print(f"[RESET] Failed to set gripper open pose: {exc}")
+
     def reset_model(self) -> tuple[dict, dict]:
         self._task.spawn_scene(self)
         self._task.get_task(self)
+        if self._is_empty_task():
+            return self.reset_empty()
         
         if self._run_mode == RunMode.TELEOPERATION:
             return self.reset_teleoperation()

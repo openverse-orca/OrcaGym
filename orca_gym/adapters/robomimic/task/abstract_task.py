@@ -183,6 +183,33 @@ class AbstractTask:
             except Exception:
                 # 如果都失败了，返回使用当前agent前缀的版本
                 return env.site(site_name)
+    
+    def _find_body_name(self, env: OrcaGymLocalEnv, body_name: str) -> str:
+        """
+        查找body名称，支持不同机器人名称前缀。
+        首先尝试使用当前agent名称前缀，如果失败则从环境中查找匹配的body。
+        """
+        try:
+            # 首先尝试使用env.body()（会自动添加当前agent前缀）
+            full_name = env.body(body_name)
+            # 验证body是否存在
+            body_dict = env.model.get_body_dict()
+            if full_name not in body_dict:
+                raise KeyError(f"Body '{full_name}' not found in model")
+            return full_name
+        except (KeyError, AttributeError):
+            # 如果失败，从环境中查找所有body，找到以该名称结尾的
+            try:
+                all_body_names = env.model.get_body_dict().keys()
+                # 查找以body_name结尾的body
+                for bname in all_body_names:
+                    if bname.endswith(f"_{body_name}") or bname == body_name:
+                        return bname
+                # 如果还是找不到，返回原始名称（让调用者处理错误）
+                return env.body(body_name)
+            except Exception:
+                # 如果都失败了，返回使用当前agent前缀的版本
+                return env.body(body_name)
 
     def get_object_joints_xpos(self, env: OrcaGymLocalEnv):
         env_object_joints = [self._find_joint_name(env, joint_name) for joint_name in self.object_joints]
@@ -193,11 +220,11 @@ class AbstractTask:
         return env.query_joint_qpos(env_goal_joints)
 
     def get_object_xpos_xmat_xquat(self, env: OrcaGymLocalEnv):
-        env_objects_body = [env.body(body_name) for body_name in self.object_bodys]
+        env_objects_body = [self._find_body_name(env, body_name) for body_name in self.object_bodys]
         return env.get_body_xpos_xmat_xquat(env_objects_body)
 
     def get_goal_xpos_xmat_xquat(self, env: OrcaGymLocalEnv):
-        env_goals_body = [env.body(body_name) for body_name in self.goal_bodys]
+        env_goals_body = [self._find_body_name(env, body_name) for body_name in self.goal_bodys]
         return env.get_body_xpos_xmat_xquat(env_goals_body)
 
     def generate_object(self, env:OrcaGymLocalEnv, pick_min, pick_max):
@@ -325,13 +352,17 @@ class AbstractTask:
 
     #todo: 需要重写这部分代码， 这里应该只需要做随机位置，位置是否合理应该由具体任务决定
     def random_objs_and_goals(self, env: OrcaGymLocalEnv, random_rotation=True, target_obj_joint_name=None):
-        object_bodys = [env.body(bn) for bn in self.object_bodys]
+        object_bodys = [self._find_body_name(env, bn) for bn in self.object_bodys]
         obj_joints  = [self._find_joint_name(env, jn) for jn in self.object_joints]
         goal_joints = [self._find_joint_name(env, jn) for jn in self.goal_joints]
 
         dummy = self._find_site_name(env, "dummy_site")
         info  = env.query_site_pos_and_quat([dummy])[dummy]
         base_pos, base_quat = info["xpos"], info["xquat"]
+        
+        # 打印调试信息：dummy_site位置和spawn range配置
+        print(f"[SPAWN DEBUG] dummy_site position: [{base_pos[0]:.3f}, {base_pos[1]:.3f}, {base_pos[2]:.3f}]")
+        print(f"[SPAWN DEBUG] spawn range config: x={self.range['x']}, y={self.range['y']}, z={self.range['z']}, r={self.range['r']}")
 
         def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint):
             if target_obj_joint_name is not None:
@@ -370,7 +401,9 @@ class AbstractTask:
 
                 # 跳过落进目标的
                 obj_qpos = _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint)
-                # print("[Debug] Placing object on joint:", joint, "at position:", obj_qpos)
+                # 打印每个物体的spawn位置
+                obj_name = joint.split('_joint')[0].split('_')[-1] if '_joint' in joint else joint
+                print(f"[SPAWN] {obj_name}: pos=[{obj_qpos[0]:.3f}, {obj_qpos[1]:.3f}, {obj_qpos[2]:.3f}]")
                 if not random_rotation:
                     org_qpos = env.query_joint_qpos([joint])[joint]
                     obj_qpos[3:] = org_qpos[3:]

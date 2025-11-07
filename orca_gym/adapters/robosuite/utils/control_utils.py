@@ -5,7 +5,7 @@ from orca_gym.adapters.robosuite.utils.numba import jit_decorator
 
 
 @jit_decorator
-def nullspace_torques(mass_matrix, nullspace_matrix, initial_joint, joint_pos, joint_vel, joint_kp=10):
+def nullspace_torques(mass_matrix, nullspace_matrix, initial_joint, joint_pos, joint_vel, joint_kp=5):
     """
     For a robot with redundant DOF(s), a nullspace exists which is orthogonal to the remainder of the controllable
     subspace of the robot's joints. Therefore, an additional secondary objective that does not impact the original
@@ -23,7 +23,7 @@ def nullspace_torques(mass_matrix, nullspace_matrix, initial_joint, joint_pos, j
         initial_joint (np.array): Joint configuration to be used for calculating nullspace torques
         joint_pos (np.array): Current joint positions
         joint_vel (np.array): Current joint velocities
-        joint_kp (float): Proportional control gain when calculating nullspace torques
+        joint_kp (float): Proportional control gain when calculating nullspace torques (默认从10降低到3以改善手腕灵活性)
 
     Returns:
           np.array: nullspace torques

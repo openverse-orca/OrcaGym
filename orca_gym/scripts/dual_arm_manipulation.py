@@ -696,15 +696,18 @@ def do_teleoperation(env,
     )
     
         last_done = (len(done_list) > 0 and done_list[-1] == 1)
-        # 只要任务完成就保存数据，不依赖于is_success检查
-        save_record = last_done
-        task_result = "Success" if save_record else "Failed"
+        # 检查任务是否真正成功（物体是否真的放入目标区域）
+        actual_success = (len(is_success_list) > 0 and is_success_list[-1])
+        save_record = last_done and actual_success  # 必须既done又success才保存
+        task_result = "Success" if actual_success else "Failed"
         exit_program = False
         
-      #  print(f"info_list: {info_list}")
+        # 打印调试信息
+        if last_done:
+            print(f"[INFO] Episode done. Actual success: {actual_success}")
     
         if save_record:
-            print(f"Round {current_round} / {teleoperation_rounds}, Task is {task_result}!")
+            print(f"✅ Round {current_round} / {teleoperation_rounds}, Task is {task_result}! (Saved)")
             current_round += 1
 
             add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"], level_name=env._task.level_name, env=env)
@@ -717,6 +720,12 @@ def do_teleoperation(env,
             # ret, _ = unitCheack.check()
             # if ret != ErrorType.Qualified:
             #     dataset_writer.remove_path()
+        elif last_done and not actual_success:
+            # 任务done但没有成功，删除录制数据
+            print(f"❌ Round {current_round} / {teleoperation_rounds}, Task is {task_result}! (Not saved - object not in goal)")
+            dataset_writer.remove_path()
+            current_round += 1
+            
         if exit_program or current_round > teleoperation_rounds:
             break
         

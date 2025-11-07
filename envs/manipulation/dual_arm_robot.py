@@ -298,13 +298,58 @@ class DualArmRobot(AgentBase):
             self._pico_joystick.close()        
 
     def set_joint_neutral(self) -> None:
+        # 强制打印（确保能看到）
+        import sys
+        sys.stdout.flush()
+        print("\n" + "="*80, flush=True)
+        print(f"[SET_NEUTRAL CALLED] Robot: {self._name}", flush=True)
+        print(f"  Right neutral: {self._r_neutral_joint_values}", flush=True)
+        print(f"  Left neutral:  {self._l_neutral_joint_values}", flush=True)
+        print("="*80 + "\n", flush=True)
+        
         # assign value to arm joints
         arm_joint_qpos = {}
         for name, value in zip(self._r_arm_joint_names, self._r_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])
         for name, value in zip(self._l_arm_joint_names, self._l_neutral_joint_values):
             arm_joint_qpos[name] = np.array([value])     
-        self._env.set_joint_qpos(arm_joint_qpos)        
+        self._env.set_joint_qpos(arm_joint_qpos)
+        
+        # 修复：清零手臂关节速度，确保完全静止
+        arm_joint_qvel = {}
+        for name in self._r_arm_joint_names + self._l_arm_joint_names:
+            arm_joint_qvel[name] = np.array([0.0])
+        self._env.set_joint_qvel(arm_joint_qvel)
+        
+        # 调试：打印设置的neutral值
+        print(f"\n[DEBUG] Setting neutral joint positions for {self._name}:")
+        print(f"  Right arm neutral: {self._r_neutral_joint_values}")
+        print(f"  Left arm neutral:  {self._l_neutral_joint_values}")
+        
+        # 执行mj_forward后打印实际关节位置
+        self._env.mj_forward()
+        actual_qpos = self._env.query_joint_qpos(self._r_arm_joint_names + self._l_arm_joint_names)
+        print(f"[DEBUG] Actual joint positions after set_neutral:")
+        print(f"  Right arm actual: {[actual_qpos[name][0] for name in self._r_arm_joint_names]}")
+        print(f"  Left arm actual:  {[actual_qpos[name][0] for name in self._l_arm_joint_names]}")
+        
+        # 额外打印：与neutral的差异
+        r_diff = [abs(actual_qpos[name][0] - self._r_neutral_joint_values[i]) for i, name in enumerate(self._r_arm_joint_names)]
+        l_diff = [abs(actual_qpos[name][0] - self._l_neutral_joint_values[i]) for i, name in enumerate(self._l_arm_joint_names)]
+        max_r_diff = max(r_diff) if r_diff else 0
+        max_l_diff = max(l_diff) if l_diff else 0
+        if max_r_diff > 0.01 or max_l_diff > 0.01:
+            print(f"  ⚠️  WARNING: Joint position mismatch detected!")
+            print(f"      Max right arm diff: {max_r_diff:.4f}")
+            print(f"      Max left arm diff:  {max_l_diff:.4f}")
+        
+        # 检查差异
+        r_diff = sum(abs(actual_qpos[name][0] - val) for name, val in zip(self._r_arm_joint_names, self._r_neutral_joint_values))
+        l_diff = sum(abs(actual_qpos[name][0] - val) for name, val in zip(self._l_arm_joint_names, self._l_neutral_joint_values))
+        if r_diff > 0.1 or l_diff > 0.1:
+            print(f"  ⚠️  WARNING: Joint positions differ from neutral! R_diff={r_diff:.3f}, L_diff={l_diff:.3f}")
+        else:
+            print(f"  ✅ Joint positions match neutral values")        
 
     def set_init_ctrl(self) -> None:
         if self._env.action_use_motor():
@@ -316,8 +361,36 @@ class DualArmRobot(AgentBase):
             self._env.ctrl[self._l_arm_actuator_id[i]] = self._l_neutral_joint_values[i]
 
     def on_reset_model(self) -> None:
+        # 修复：先重新计算mocap初始位置（基于当前neutral姿态）
+        # 确保手臂设置到neutral位置
+        self.set_joint_neutral()
+        self._env.mj_forward()
+        
+        # 重新计算mocap初始位置（基于neutral姿态的ee位置）
+        site_dict = self._env.query_site_pos_and_quat([self._ee_site_l])
+        self._initial_grasp_site_xpos, self._initial_grasp_site_xquat = self._global_to_local(
+            site_dict[self._ee_site_l]['xpos'], 
+            site_dict[self._ee_site_l]['xquat']
+        )
+        
+        site_dict = self._env.query_site_pos_and_quat([self._ee_site_r])
+        self._initial_grasp_site_xpos_r, self._initial_grasp_site_xquat_r = self._global_to_local(
+            site_dict[self._ee_site_r]['xpos'], 
+            site_dict[self._ee_site_r]['xquat']
+        )
+        
+        # 然后重置mocap和gripper
         self._reset_grasp_mocap()
         self._reset_gripper()
+        
+        # 修复：每次reset时完全重置控制器状态
+        if self._env.action_use_motor():
+            if hasattr(self, '_l_controller'):
+                self._l_controller.update_initial_joints(self._l_neutral_joint_values)
+                self._l_controller.reset_goal()  # 重置控制器目标
+            if hasattr(self, '_r_controller'):
+                self._r_controller.update_initial_joints(self._r_neutral_joint_values)
+                self._r_controller.reset_goal()  # 重置控制器目标
 
     def set_grasp_mocap(self, position, orientation) -> None:
         # Use find_mocap_name if available, otherwise fallback to env.mocap
@@ -352,6 +425,44 @@ class DualArmRobot(AgentBase):
 
         arm_joint_values_l = self._get_arm_joint_values(self._l_arm_joint_names)
         arm_joint_values_r = self._get_arm_joint_values(self._r_arm_joint_names)
+        
+        # 调试：打印实际运行时的关节值和末端位置
+        if not hasattr(self, '_debug_counter'):
+            self._debug_counter = 0
+        self._debug_counter += 1
+        if self._debug_counter <= 3 or self._debug_counter % 20 == 0:  # 前3帧 + 每20帧
+            print(f"\n{'='*80}")
+            print(f"[RUNTIME DEBUG] Frame {self._debug_counter}")
+            print(f"{'='*80}")
+            print(f"[JOINTS] Right arm: {[f'{v:.3f}' for v in arm_joint_values_r]}")
+            print(f"[JOINTS] Left arm:  {[f'{v:.3f}' for v in arm_joint_values_l]}")
+            
+            # 打印末端位置（相对于base）
+            print(f"[EE_POS] Right EE position: [{ee_sites[self._ee_site_r]['xpos'][0]:.3f}, "
+                  f"{ee_sites[self._ee_site_r]['xpos'][1]:.3f}, "
+                  f"{ee_sites[self._ee_site_r]['xpos'][2]:.3f}]")
+            print(f"[EE_POS] Left EE position:  [{ee_sites[self._ee_site_l]['xpos'][0]:.3f}, "
+                  f"{ee_sites[self._ee_site_l]['xpos'][1]:.3f}, "
+                  f"{ee_sites[self._ee_site_l]['xpos'][2]:.3f}]")
+            
+            # 打印waist位置作为参考
+            try:
+                waist_body = self._env.body("waist", self._id)
+                waist_pos = self._env.model.get_body_dict()[waist_body]["xpos"]
+                print(f"[WAIST] Position: [{waist_pos[0]:.3f}, {waist_pos[1]:.3f}, {waist_pos[2]:.3f}]")
+                
+                # 计算末端与waist的距离
+                r_dist = ((ee_sites[self._ee_site_r]['xpos'][0] - waist_pos[0])**2 + 
+                         (ee_sites[self._ee_site_r]['xpos'][1] - waist_pos[1])**2 + 
+                         (ee_sites[self._ee_site_r]['xpos'][2] - waist_pos[2])**2)**0.5
+                l_dist = ((ee_sites[self._ee_site_l]['xpos'][0] - waist_pos[0])**2 + 
+                         (ee_sites[self._ee_site_l]['xpos'][1] - waist_pos[1])**2 + 
+                         (ee_sites[self._ee_site_l]['xpos'][2] - waist_pos[2])**2)**0.5
+                print(f"[DIST] Right EE to waist: {r_dist:.3f}m")
+                print(f"[DIST] Left EE to waist:  {l_dist:.3f}m")
+            except:
+                pass
+            print(f"{'='*80}\n")
         arm_joint_velocities_l = self._get_arm_joint_velocities(self._l_arm_joint_names)
         arm_joint_velocities_r = self._get_arm_joint_velocities(self._r_arm_joint_names)
 

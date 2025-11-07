@@ -1,7 +1,7 @@
 import numpy as np
 from envs.manipulation.dual_arm_env import DualArmEnv
 from envs.manipulation.dual_arm_robot import DualArmRobot
-from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as config
+from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config
 
 
 class OpenLoongGripperFixBase(DualArmRobot):
@@ -16,19 +16,26 @@ class OpenLoongGripperFixBase(DualArmRobot):
 
         super().init_agent(id)
 
-        self._l_hand_actuator_names = [self._env.actuator(config["left_hand"]["actuator_names"][0], id)]
-        
+        profile = self._resolve_gripper_profile()
+        self._l_hand_profile = profile["left_hand"]
+        self._r_hand_profile = profile["right_hand"]
+
+        self._l_gripper_offset_dir = self._l_hand_profile.get("offset_dir", -1)
+        self._r_gripper_offset_dir = self._r_hand_profile.get("offset_dir", -1)
+
+        self._l_hand_actuator_names = [self._env.actuator(self._l_hand_profile["actuator_names"][0], id)]
+
         self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
-        self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][0], id), self._env.body(config["left_hand"]["body_names"][1], id)]
+        self._l_hand_body_names = [self._env.body(self._l_hand_profile["body_names"][0], id), self._env.body(self._l_hand_profile["body_names"][1], id)]
         self._l_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._l_hand_body_names:
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
-        self._r_hand_actuator_names = [self._env.actuator(config["right_hand"]["actuator_names"][0], id)]
+        self._r_hand_actuator_names = [self._env.actuator(self._r_hand_profile["actuator_names"][0], id)]
 
         self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
-        self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][0], id), self._env.body(config["right_hand"]["body_names"][1], id)]
+        self._r_hand_body_names = [self._env.body(self._r_hand_profile["body_names"][0], id), self._env.body(self._r_hand_profile["body_names"][1], id)]
         self._r_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._r_hand_body_names:
@@ -37,10 +44,8 @@ class OpenLoongGripperFixBase(DualArmRobot):
 
     def set_l_hand_actuator_ctrl(self, offset_rate) -> None:
         for actuator_id in self._l_hand_actuator_id:
-            offset_dir = -1
-
             abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = offset_rate * self._l_gripper_offset_dir * abs_ctrlrange
             self._env.ctrl[actuator_id] = np.clip(
                 self._env.ctrl[actuator_id],
                 self._all_ctrlrange[actuator_id][0],
@@ -67,10 +72,8 @@ class OpenLoongGripperFixBase(DualArmRobot):
             
     def set_r_hand_actuator_ctrl(self, offset_rate) -> None:
         for actuator_id in self._r_hand_actuator_id:
-            offset_dir = -1
-
             abs_ctrlrange = self._all_ctrlrange[actuator_id][1] - self._all_ctrlrange[actuator_id][0]
-            self._env.ctrl[actuator_id] = offset_rate * offset_dir * abs_ctrlrange
+            self._env.ctrl[actuator_id] = offset_rate * self._r_gripper_offset_dir * abs_ctrlrange
             self._env.ctrl[actuator_id] = np.clip(
                 self._env.ctrl[actuator_id],
                 self._all_ctrlrange[actuator_id][0],
@@ -118,3 +121,9 @@ class OpenLoongGripperFixBase(DualArmRobot):
     
     def set_wheel_ctrl(self, joystick_state) -> None:
         return
+
+    def _resolve_gripper_profile(self):
+        for key, profile in gripper_2f85_config.items():
+            if key in self._name:
+                return profile
+        return gripper_2f85_config["openloong"]
