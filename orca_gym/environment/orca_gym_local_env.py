@@ -239,12 +239,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             self.anchor_actor(actor_anchored, anchor_type)
         
         
-        delta_pos, delta_quat = self.get_body_manipulation_movement()
-        # print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
-        delta_pos *= self._render_interval
-        delta_euler = quat2euler(delta_quat)
-        delta_euler *= self._render_interval
-        delta_quat = euler2quat(delta_euler)
+        pos, quat = self.get_body_manipulation_movement()
 
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
@@ -252,13 +247,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
             return
 
-        # 更新锚点位置
-        anchor_xpos = anchor_xpos + delta_pos
-        # 更新锚点四元数
-        anchor_xquat = quat_mul(
-            anchor_xquat,
-            delta_quat
-        )
+        # 同步锚点位置
+        anchor_xpos = pos
+        # 同步锚点四元数
+        anchor_xquat = quat
 
         # 更新锚点的位置和四元数
         self.set_mocap_pos_and_quat({
