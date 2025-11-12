@@ -239,7 +239,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             self.anchor_actor(actor_anchored, anchor_type)
         
         
-        pos, quat = self.get_body_manipulation_movement()
+        delta_pos, delta_quat = self.get_body_manipulation_movement()
 
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
@@ -248,9 +248,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return
 
         # 同步锚点位置
-        anchor_xpos = pos
+        anchor_xpos = delta_pos
         # 同步锚点四元数
-        anchor_xquat = quat
+        anchor_xquat = delta_quat
 
         # 更新锚点的位置和四元数
         self.set_mocap_pos_and_quat({
