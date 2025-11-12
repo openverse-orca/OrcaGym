@@ -301,11 +301,9 @@ class DualArmRobot(AgentBase):
         # 强制打印（确保能看到）
         import sys
         sys.stdout.flush()
-        print("\n" + "="*80, flush=True)
-        print(f"[SET_NEUTRAL CALLED] Robot: {self._name}", flush=True)
+        print(f"\n[SET_NEUTRAL CALLED] Robot: {self._name}", flush=True)
         print(f"  Right neutral: {self._r_neutral_joint_values}", flush=True)
-        print(f"  Left neutral:  {self._l_neutral_joint_values}", flush=True)
-        print("="*80 + "\n", flush=True)
+        print(f"  Left neutral:  {self._l_neutral_joint_values}\n", flush=True)
         
         # assign value to arm joints
         arm_joint_qpos = {}
@@ -431,19 +429,19 @@ class DualArmRobot(AgentBase):
             self._debug_counter = 0
         self._debug_counter += 1
         if self._debug_counter <= 3 or self._debug_counter % 20 == 0:  # 前3帧 + 每20帧
-            print(f"\n{'='*80}")
-            print(f"[RUNTIME DEBUG] Frame {self._debug_counter}")
-            print(f"{'='*80}")
-            print(f"[JOINTS] Right arm: {[f'{v:.3f}' for v in arm_joint_values_r]}")
-            print(f"[JOINTS] Left arm:  {[f'{v:.3f}' for v in arm_joint_values_l]}")
+            # print(f"\n{'='*80}")
+            # print(f"[RUNTIME DEBUG] Frame {self._debug_counter}")
+            # print(f"{'='*80}")
+            # print(f"[JOINTS] Right arm: {[f'{v:.3f}' for v in arm_joint_values_r]}")
+            # print(f"[JOINTS] Left arm:  {[f'{v:.3f}' for v in arm_joint_values_l]}")
             
-            # 打印末端位置（相对于base）
-            print(f"[EE_POS] Right EE position: [{ee_sites[self._ee_site_r]['xpos'][0]:.3f}, "
-                  f"{ee_sites[self._ee_site_r]['xpos'][1]:.3f}, "
-                  f"{ee_sites[self._ee_site_r]['xpos'][2]:.3f}]")
-            print(f"[EE_POS] Left EE position:  [{ee_sites[self._ee_site_l]['xpos'][0]:.3f}, "
-                  f"{ee_sites[self._ee_site_l]['xpos'][1]:.3f}, "
-                  f"{ee_sites[self._ee_site_l]['xpos'][2]:.3f}]")
+            # # 打印末端位置（相对于base）
+            # print(f"[EE_POS] Right EE position: [{ee_sites[self._ee_site_r]['xpos'][0]:.3f}, "
+            #       f"{ee_sites[self._ee_site_r]['xpos'][1]:.3f}, "
+            #       f"{ee_sites[self._ee_site_r]['xpos'][2]:.3f}]")
+            # print(f"[EE_POS] Left EE position:  [{ee_sites[self._ee_site_l]['xpos'][0]:.3f}, "
+            #       f"{ee_sites[self._ee_site_l]['xpos'][1]:.3f}, "
+            #       f"{ee_sites[self._ee_site_l]['xpos'][2]:.3f}]")
             
             # 打印waist位置作为参考
             try:
@@ -462,7 +460,6 @@ class DualArmRobot(AgentBase):
                 print(f"[DIST] Left EE to waist:  {l_dist:.3f}m")
             except:
                 pass
-            print(f"{'='*80}\n")
         arm_joint_velocities_l = self._get_arm_joint_velocities(self._l_arm_joint_names)
         arm_joint_velocities_r = self._get_arm_joint_velocities(self._r_arm_joint_names)
 

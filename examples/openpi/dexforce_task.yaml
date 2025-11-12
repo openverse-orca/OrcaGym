@@ -1,0 +1,37 @@
+level_name: "dexforce_w1"
+type: "pick_and_place"
+
+# 直接使用场景中预放置的光声物件，跳过随机生成
+use_existing_object_pose: true
+success_tolerance: 0.15
+success_use_joint_center: true
+success_center_offset: [-0.35, 0.0, -0.30]
+success_local_bounds:
+  half: [0.35, 0.35]
+  above: 0.25
+  below: 0.45
+success_debug: false
+object_spawn_reference_joints: []
+spawn_goal_index: 0
+success_goal_index: 1
+
+# Item_GuangshengX 与 Basket 的命名遵循场景中已有节点
+object_bodys: ["Item_Guangsheng1", "Item_Guangsheng2", "Item_Guangsheng3"]
+object_sites: ["Item_Guangsheng1site", "Item_Guangsheng2site", "Item_Guangsheng3site"]
+object_joints: ["Item_Guangsheng1_joint", "Item_Guangsheng2_joint", "Item_Guangsheng3_joint"]
+success_objects: ["Item_Guangsheng1", "Item_Guangsheng2", "Item_Guangsheng3"]
+
+goal_bodys: ["Basket1", "Basket2"]
+goal_sites: ["Basket1site", "Basket2site"]
+goal_joints: ["Basket1_joint", "Basket2_joint"]
+
+range: {x: [0.0, 0.0], y: [0.0, 0.0], z: 0.0, r: 0.0}
+
+random_actor : false
+random_actor_position: false
+random_actor_rotation: false
+actors: []
+actors_spawnable: []
+center: [0.0, 0.0, 0.0]
+bound: [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
+

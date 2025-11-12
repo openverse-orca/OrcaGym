@@ -1,6 +1,7 @@
 from colorama import Fore, Style
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
+from orca_gym.utils import rotations
 import random
 from typing import Optional
 
@@ -9,10 +10,6 @@ import json
 import re
 
 import numpy as np
-from colorama import Fore, Style
-from orca_gym.environment import OrcaGymLocalEnv
-from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
-import random
 
 class PickPlaceTask(AbstractTask):
     def __init__(self, config: dict):
@@ -46,8 +43,15 @@ class PickPlaceTask(AbstractTask):
             if not self.object_bodys or not self.goal_bodys:
                 return None
 
-            # 从 object_bodys 随机选一个
-            self.target_object = random.choice(self.object_bodys)
+            if getattr(self, "success_objects", None):
+                candidates = [obj for obj in self.success_objects if obj in self.object_bodys]
+            else:
+                candidates = list(self.object_bodys)
+            if not candidates:
+                return None
+
+            # 默认使用列表中的第一个作为语言提示用的目标
+            self.target_object = candidates[0]
 
             # 只取第一个 goal
             goal_name = self.goal_bodys[0]
@@ -100,21 +104,45 @@ class PickPlaceTask(AbstractTask):
 
         goal_entries = []
         goal_positions_list = []
-        goal_bounding_boxes = {}  # 用于存储目标的bounding box信息
+        spawn_idx = int(np.clip(self.spawn_goal_index, 0, max(len(goal_joints) - 1, 0))) if goal_joints else 0
+        success_idx = int(np.clip(self.success_goal_index, 0, max(len(goal_joints) - 1, 0))) if goal_joints else 0
 
-        for goal_joint_name, qpos in goal_positions.items():
+        for idx, goal_joint_name in enumerate(goal_joints):
+            qpos = goal_positions[goal_joint_name]
             # 获取目标的尺寸
             goal_name = goal_joint_name.replace("_joint", "")
             info = env.get_goal_bounding_box(goal_name)
 
-            # 如果没有尺寸信息，跳过目标
-            if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
-                continue
+            bbox_valid = (
+                info is not None
+                and "min" in info
+                and "max" in info
+                and np.all(np.isfinite(info["min"]))
+                and np.all(np.isfinite(info["max"]))
+            )
 
-            mn = np.array(info["min"]).flatten()
-            mx = np.array(info["max"]).flatten()
-            sz = mx - mn
+            tol = float(getattr(self, "success_tolerance", 0.05))
+            use_joint_center = bool(getattr(self, "success_use_joint_center", False)) and idx == success_idx
+
+            if use_joint_center or not bbox_valid:
+                center = qpos[:3].flatten()
+                mn = center - tol
+                mx = center + tol
+                info = {"min": mn.copy(), "max": mx.copy(), "size": (mx - mn).copy()}
+            else:
+                mn = np.array(info["min"], dtype=np.float32).flatten()
+                mx = np.array(info["max"], dtype=np.float32).flatten()
+                mn = mn - tol
+                mx = mx + tol
+
+            sz = np.array(mx - mn, dtype=np.float32)
+
+            if idx == success_idx:
+                role = "success"
+            elif idx == spawn_idx:
+                role = "spawn"
+            else:
+                role = "aux"
 
             # 添加目标位置信息
             goal_entries.append({
@@ -123,7 +151,8 @@ class PickPlaceTask(AbstractTask):
                 "orientation": qpos[3:].tolist(),
                 "min": mn.tolist(),
                 "max": mx.tolist(),
-                "size": sz.tolist()
+                "size": sz.tolist(),
+                "role": role,
             })
 
             goal_positions_list.append(qpos[:3])  # 仅记录目标位置
@@ -134,36 +163,91 @@ class PickPlaceTask(AbstractTask):
         return goal_entries, goal_positions_array
 
     def is_success(self, env: OrcaGymLocalEnv):
-        target_body_name = self._find_body_name(env, self.target_object)
-        target_pos, _, _ = env.get_body_xpos_xmat_xquat([target_body_name])
-        pos_vec = target_pos[0] if hasattr(target_pos, 'ndim') and target_pos.ndim > 1 else target_pos
-        
         goal_entries, goal_positions = self.process_goals(env)
-        #只有一个goal, 只取第一个
-        goal_entry, goal_position = goal_entries[0], goal_positions[0]
-        # 获取目标区域边界（包括z轴）
-        gmin = goal_entry['min']  # [x_min, y_min, z_min]
-        gmax = goal_entry['max']  # [x_max, y_max, z_max]
-        
-        # 检查xyz三个维度是否都在目标区域内
-        success = not (pos_vec[0] < gmin[0] or pos_vec[0] > gmax[0] or 
-                       pos_vec[1] < gmin[1] or pos_vec[1] > gmax[1] or
-                       pos_vec[2] < gmin[2] or pos_vec[2] > gmax[2])
-        
-        # 打印调试信息
-        print(f"[SUCCESS CHECK] Object: {self.target_object}")
-        print(f"  Position: [{pos_vec[0]:.3f}, {pos_vec[1]:.3f}, {pos_vec[2]:.3f}]")
-        print(f"  Goal min: [{gmin[0]:.3f}, {gmin[1]:.3f}, {gmin[2]:.3f}]")
-        print(f"  Goal max: [{gmax[0]:.3f}, {gmax[1]:.3f}, {gmax[2]:.3f}]")
-        print(f"  Result: {'✅ SUCCESS' if success else '❌ FAILED'}")
-        
-        return success
+        if not goal_entries or not len(goal_positions):
+            return False
+
+        success_idx = int(np.clip(self.success_goal_index, 0, len(goal_entries) - 1))
+        goal_entry = goal_entries[success_idx]
+        center = np.array(goal_entry["position"], dtype=np.float32)
+        orientation = np.array(goal_entry["orientation"], dtype=np.float32)
+        rot_mat = rotations.quat2mat(orientation)
+        offset_local = getattr(self, "success_center_offset", np.zeros(3, dtype=np.float32))
+        if offset_local is None:
+            offset_local = np.zeros(3, dtype=np.float32)
+        offset_local = np.asarray(offset_local, dtype=np.float32).flatten()
+        center_adjusted = center + rot_mat @ offset_local
+
+        bounds_cfg = getattr(self, "success_local_bounds", None) or {}
+        tol = float(getattr(self, "success_tolerance", 0.05))
+
+        size = np.array(goal_entry.get("size", [tol * 2, tol * 2, tol * 2]), dtype=np.float32)
+        half_default = np.maximum(size * 0.5, tol)
+
+        half_xy = bounds_cfg.get("half")
+        if half_xy is None:
+            half_x, half_y = float(half_default[0]), float(half_default[1])
+        else:
+            if isinstance(half_xy, (int, float)):
+                half_x = half_y = float(half_xy)
+            else:
+                half_x = float(half_xy[0])
+                half_y = float(half_xy[1] if len(half_xy) > 1 else half_xy[0])
+        above = float(bounds_cfg.get("above", max(half_default[2], tol)))
+        below = float(bounds_cfg.get("below", max(half_default[2], tol)))
+        debug_enabled = bool(getattr(self, "success_debug", False))
+
+        candidate_objects = []
+        if getattr(self, "success_objects", None):
+            candidate_objects = list(self.success_objects)
+        elif self.object_bodys:
+            candidate_objects = list(self.object_bodys)
+        elif self.target_object:
+            candidate_objects = [self.target_object]
+
+        any_success = False
+        for obj_name in candidate_objects:
+            try:
+                target_body_name = self._find_body_name(env, obj_name)
+            except Exception:
+                continue
+            target_pos, _, _ = env.get_body_xpos_xmat_xquat([target_body_name])
+            pos_vec = target_pos[0] if hasattr(target_pos, 'ndim') and target_pos.ndim > 1 else target_pos
+
+            rel_world = pos_vec - center_adjusted
+            local_coord = rot_mat.T @ rel_world
+
+            within_x = -half_x <= local_coord[0] <= half_x
+            within_y = -half_y <= local_coord[1] <= half_y
+            within_z = -below <= local_coord[2] <= above
+            success = within_x and within_y and within_z
+
+            if debug_enabled:
+                print(f"[SUCCESS CHECK] Object: {obj_name}")
+                print(f"  World position: [{pos_vec[0]:.3f}, {pos_vec[1]:.3f}, {pos_vec[2]:.3f}]")
+                print(f"  Local position: [{local_coord[0]:.3f}, {local_coord[1]:.3f}, {local_coord[2]:.3f}]")
+                print(f"  Local bounds: x±{half_x:.3f}, y±{half_y:.3f}, z∈[-{below:.3f}, {above:.3f}]")
+                print(f"  Result: {'✅ SUCCESS' if success else '❌ FAILED'}")
+
+            if success:
+                any_success = True
+                break
+
+        return any_success
 
     def get_language_instruction(self) -> str:
-        if not self.target_object:
+        if getattr(self, "success_objects", None):
+            if len(self.success_objects) == 1:
+                obj_str = "object: " + self.success_objects[0]
+            else:
+                joined = ", ".join(self.success_objects)
+                obj_str = f"object: any of ({joined})"
+        elif self.target_object:
+            obj_str = "object: " + self.target_object
+        else:
             return "Do something."
-        obj_str = "object: " + self.target_object
-        goal_str = "goal: " + self.goal_bodys[0]
+        success_idx = int(np.clip(self.success_goal_index, 0, max(len(self.goal_bodys) - 1, 0))) if self.goal_bodys else 0
+        goal_str = "goal: " + self.goal_bodys[success_idx] if self.goal_bodys else "goal: unknown"
 
         return f"level: {self.level_name}  {obj_str} to {goal_str}"
         # return f"In the level {self.level_name} put the {self.target_object} into the {self.goal_bodys[0]}."

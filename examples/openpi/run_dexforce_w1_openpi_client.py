@@ -50,7 +50,7 @@ class Args:
 
     display: bool = False
     
-    task_config: str = "jiazi_task.yaml"
+    task_config: str = "dexforce_task.yaml"
 
 def main(args: Args) -> None:
     max_episode_steps = int(args.record_time * CONTROL_FREQ)    

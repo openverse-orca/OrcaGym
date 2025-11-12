@@ -119,7 +119,8 @@ SCENE_SUBSCENE_MAPPING = {
     # "guizi": ("Cooler","Shelf_Operation")
     "pharmacy": ("pharmacy","Cooler_Operation"),
     "housekeeping": ("fridge","Fridge_Operation"),
-    "3c_fabrication": ("3c_scan","3C_Scan_Operation")
+    "3c_fabrication": ("3c_scan","3C_Scan_Operation"),
+    "dexforce_w1": ("Dexforce", "Dexforce_Operation"),
 }
 
 with open("camera_config.yaml", "r") as f:
@@ -525,7 +526,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         timestep_list, 
                         language_instruction,
                         level_name,
-                        env=None):
+                        env=None,
+                        task_success: bool | None = None):
         
     # 只处理第一个info对象（初始状态）
     first_info = info_list[0]
@@ -617,7 +619,8 @@ def add_demo_to_dataset(dataset_writer : DatasetWriter,
         'camera_time_stamp': camera_time_stamp,
         'timesteps': np.array(timestep_list, dtype=np.float32),
         'timestamps': np.array([info["time_stamp"] for info in info_list], dtype=np.uint64),
-        'language_instruction': language_instruction
+        'language_instruction': language_instruction,
+        'task_success': bool(task_success) if task_success is not None else None,
     })
     # 1) 拿到 level_name
     lvl = level_name.decode() if isinstance(level_name, (bytes, bytearray)) else level_name
@@ -698,19 +701,29 @@ def do_teleoperation(env,
         last_done = (len(done_list) > 0 and done_list[-1] == 1)
         # 检查任务是否真正成功（物体是否真的放入目标区域）
         actual_success = (len(is_success_list) > 0 and is_success_list[-1])
-        save_record = last_done and actual_success  # 必须既done又success才保存
         task_result = "Success" if actual_success else "Failed"
         exit_program = False
         
-        # 打印调试信息
         if last_done:
             print(f"[INFO] Episode done. Actual success: {actual_success}")
-    
-        if save_record:
-            print(f"✅ Round {current_round} / {teleoperation_rounds}, Task is {task_result}! (Saved)")
+            status_icon = "✅" if actual_success else "❌"
+            print(f"{status_icon} Round {current_round} / {teleoperation_rounds}, Task is {task_result}! (Saved)")
             current_round += 1
 
-            add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frame_index, camera_time_stamp, timestep_list, info_list[0]["language_instruction"], level_name=env._task.level_name, env=env)
+            add_demo_to_dataset(
+                dataset_writer,
+                obs_list,
+                reward_list,
+                done_list,
+                info_list,
+                camera_frame_index,
+                camera_time_stamp,
+                timestep_list,
+                info_list[0]["language_instruction"],
+                level_name=env._task.level_name,
+                env=env,
+                task_success=actual_success,
+            )
             uuid_path = dataset_writer.get_UUIDPath()
             camera_name_list = []
             for camera_name in camera_time_stamp.keys():
@@ -720,11 +733,6 @@ def do_teleoperation(env,
             # ret, _ = unitCheack.check()
             # if ret != ErrorType.Qualified:
             #     dataset_writer.remove_path()
-        elif last_done and not actual_success:
-            # 任务done但没有成功，删除录制数据
-            print(f"❌ Round {current_round} / {teleoperation_rounds}, Task is {task_result}! (Not saved - object not in goal)")
-            dataset_writer.remove_path()
-            current_round += 1
             
         if exit_program or current_round > teleoperation_rounds:
             break

@@ -92,7 +92,7 @@ class DexforceW1Gripper(DualArmRobot):
             ctrl_value = np.clip(ctrl_min + mapped_rate * (ctrl_max - ctrl_min), ctrl_min, ctrl_max)
             self._env.ctrl[actuator_id] = ctrl_value
             actuator_name = self._env.model.actuator_id2name(actuator_id)
-            print(f"[GRIPPER][L] actuator={actuator_name} offset={offset_rate:.3f} mapped={mapped_rate:.3f} ctrl={ctrl_value:.3f} range=[{ctrl_min:.3f}, {ctrl_max:.3f}]")
+            #print(f"[GRIPPER][L] actuator={actuator_name} offset={offset_rate:.3f} mapped={mapped_rate:.3f} ctrl={ctrl_value:.3f} range=[{ctrl_min:.3f}, {ctrl_max:.3f}]")
         sys.stdout.flush()
             
     def set_gripper_ctrl_l(self, joystick_state) -> None:
@@ -117,7 +117,7 @@ class DexforceW1Gripper(DualArmRobot):
         try:
             qpos_dict = self._env.query_joint_qpos(self._l_finger_joint_names)
             qpos_values = [float(qpos_dict[name][0]) for name in self._l_finger_joint_names]
-            print(f"[GRIPPER][L] joints={qpos_values}")
+            #print(f"[GRIPPER][L] joints={qpos_values}")
         except Exception as exc:
             print(f"[GRIPPER][L] joints query failed: {exc}")
         sys.stdout.flush()
@@ -129,7 +129,7 @@ class DexforceW1Gripper(DualArmRobot):
             ctrl_value = np.clip(ctrl_min + mapped_rate * (ctrl_max - ctrl_min), ctrl_min, ctrl_max)
             self._env.ctrl[actuator_id] = ctrl_value
             actuator_name = self._env.model.actuator_id2name(actuator_id)
-            print(f"[GRIPPER][R] actuator={actuator_name} offset={offset_rate:.3f} mapped={mapped_rate:.3f} ctrl={ctrl_value:.3f} range=[{ctrl_min:.3f}, {ctrl_max:.3f}]")
+            #print(f"[GRIPPER][R] actuator={actuator_name} offset={offset_rate:.3f} mapped={mapped_rate:.3f} ctrl={ctrl_value:.3f} range=[{ctrl_min:.3f}, {ctrl_max:.3f}]")
         sys.stdout.flush()
 
     def set_gripper_ctrl_r(self, joystick_state) -> None:
@@ -153,7 +153,7 @@ class DexforceW1Gripper(DualArmRobot):
         try:
             qpos_dict = self._env.query_joint_qpos(self._r_finger_joint_names)
             qpos_values = [float(qpos_dict[name][0]) for name in self._r_finger_joint_names]
-            print(f"[GRIPPER][R] joints={qpos_values}")
+            #print(f"[GRIPPER][R] joints={qpos_values}")
         except Exception as exc:
             print(f"[GRIPPER][R] joints query failed: {exc}")
         sys.stdout.flush()

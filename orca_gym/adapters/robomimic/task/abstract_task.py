@@ -1,6 +1,8 @@
 import json
 import re
 
+from typing import List, Optional
+
 from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.utils import rotations
 from orca_gym.adapters.robomimic.task.scene_manage import SceneManager
@@ -21,6 +23,7 @@ DEFAULT_CONFIG = {
     "goal_bodys": [],
     "goal_sites": [],
     "goal_joints": [],
+    "object_spawn_reference_joints": [],
 
     "level_name": None,
     "random_cycle": 20,
@@ -45,7 +48,16 @@ DEFAULT_CONFIG = {
     "light_bound": [[-1, 1], [-1, 1], [0, 2]], # 以center点为中心，距离中心的边界位置
     "light_description": [],
     "num_lights": 1,
-    "grpc_addr": "localhost:50051"
+    "grpc_addr": "localhost:50051",
+    "spawn_goal_index": 0,
+    "success_goal_index": 0,
+    "success_objects": [],
+    "success_center_offset": [0.0, 0.0, 0.0],
+    "success_local_bounds": None,
+    "success_tolerance": 0.05,
+    "success_use_joint_center": False,
+    "success_debug": False,
+    "use_existing_object_pose": False,
 }
 
 class TaskStatus:
@@ -76,6 +88,10 @@ class AbstractTask:
         self.level_name = None
         self.type = "pick_and_place"  # 任务类型，默认是pick_and_place
         self.range = {}
+        self.object_spawn_reference_joints = []
+        self.use_existing_object_pose = False
+        self.spawn_goal_index = 0
+        self.success_goal_index = 0
         self.random_actor = False
         self.__random_count__ = 0 # 用于随机Actor的计数， 每次随机摆放Actor和灯光都要+1
         self.random_cycle = 20
@@ -87,6 +103,12 @@ class AbstractTask:
         self.bound = []
         self.description = []
         self.grpc_addr = None
+        self.success_objects = []
+        self.success_tolerance = 0.05
+        self.success_center_offset = np.zeros(3, dtype=np.float32)
+        self.success_local_bounds = None
+        self.success_use_joint_center = False
+        self.success_debug = False
 
         self.random_light = False
         self.random_light_position = False
@@ -258,6 +280,7 @@ class AbstractTask:
         self.goal_bodys = self.__get_config_setting__("goal_bodys", config)
         self.goal_sites = self.__get_config_setting__("goal_sites", config)
         self.goal_joints = self.__get_config_setting__("goal_joints", config)
+        self.object_spawn_reference_joints = self.__get_config_setting__("object_spawn_reference_joints", config)
 
         self.level_name = self.__get_config_setting__("level_name", config)
         self.range = self.__get_config_setting__("range", config)
@@ -284,6 +307,15 @@ class AbstractTask:
         self.light_description = self.__get_config_setting__("light_description", config)
         self.num_lights = self.__get_config_setting__("num_lights", config)
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
+        self.spawn_goal_index = self.__get_config_setting__("spawn_goal_index", config)
+        self.success_goal_index = self.__get_config_setting__("success_goal_index", config)
+        self.success_objects = self.__get_config_setting__("success_objects", config)
+        self.success_center_offset = np.array(self.__get_config_setting__("success_center_offset", config), dtype=np.float32)
+        self.success_local_bounds = self.__get_config_setting__("success_local_bounds", config)
+        self.success_tolerance = self.__get_config_setting__("success_tolerance", config)
+        self.success_use_joint_center = self.__get_config_setting__("success_use_joint_center", config)
+        self.success_debug = bool(self.__get_config_setting__("success_debug", config))
+        self.use_existing_object_pose = self.__get_config_setting__("use_existing_object_pose", config)
 
     def spawn_scene(self, env: OrcaGymLocalEnv):
         # 使用 run_mode 判断是否为增广任务
@@ -355,6 +387,48 @@ class AbstractTask:
         object_bodys = [self._find_body_name(env, bn) for bn in self.object_bodys]
         obj_joints  = [self._find_joint_name(env, jn) for jn in self.object_joints]
         goal_joints = [self._find_joint_name(env, jn) for jn in self.goal_joints]
+        goal_anchor_index = int(np.clip(self.spawn_goal_index, 0, max(len(goal_joints) - 1, 0))) if goal_joints else 0
+
+        if self.use_existing_object_pose:
+            if obj_joints:
+                self.randomized_object_positions = env.query_joint_qpos(obj_joints)
+            else:
+                self.randomized_object_positions = {}
+            if goal_joints:
+                self.randomized_goal_positions = env.query_joint_qpos(goal_joints)
+            else:
+                self.randomized_goal_positions = {}
+            return
+
+        if self.object_spawn_reference_joints:
+            spawn_joints = [self._find_joint_name(env, jn) for jn in self.object_spawn_reference_joints]
+            spawn_qpos_dict = env.query_joint_qpos(spawn_joints)
+            spawn_bbox_dict = {}
+            for sj in spawn_joints:
+                spawn_body = sj.replace("_joint", "")
+                spawn_bbox_dict[sj] = env.get_goal_bounding_box(spawn_body)
+
+            qpos_dict = {}
+            placed_positions: List[np.ndarray] = []
+            for idx, joint in enumerate(obj_joints):
+                spawn_joint = spawn_joints[min(idx, len(spawn_joints) - 1)]
+                spawn_qpos = spawn_qpos_dict[spawn_joint]
+                spawn_bbox = spawn_bbox_dict.get(spawn_joint)
+                sampled_pos = self._sample_position_from_spawn_area(spawn_qpos[:3], spawn_bbox, placed_positions)
+
+                original_qpos = env.query_joint_qpos([joint])[joint]
+                orientation = original_qpos[3:]
+                if orientation.shape[0] < 4:
+                    orientation = spawn_qpos[3:]
+                qpos_dict[joint] = np.concatenate([sampled_pos, orientation], axis=0)
+                placed_positions.append(sampled_pos.copy())
+
+            if qpos_dict:
+                env.set_joint_qpos(qpos_dict)
+                env.mj_forward()
+                self.randomized_object_positions = env.query_joint_qpos(obj_joints)
+                self.randomized_goal_positions = env.query_joint_qpos(goal_joints)
+            return
 
         dummy = self._find_site_name(env, "dummy_site")
         info  = env.query_site_pos_and_quat([dummy])[dummy]
@@ -362,7 +436,8 @@ class AbstractTask:
         
         # 打印调试信息：dummy_site位置和spawn range配置
         print(f"[SPAWN DEBUG] dummy_site position: [{base_pos[0]:.3f}, {base_pos[1]:.3f}, {base_pos[2]:.3f}]")
-        print(f"[SPAWN DEBUG] spawn range config: x={self.range['x']}, y={self.range['y']}, z={self.range['z']}, r={self.range['r']}")
+        if isinstance(self.range, dict):
+            print(f"[SPAWN DEBUG] spawn range config: x={self.range.get('x')}, y={self.range.get('y')}, z={self.range.get('z')}, r={self.range.get('r')}")
 
         def _get_qpos_not_in_goal_range(goal0_pos, base_pos, base_quat, joint):
             if target_obj_joint_name is not None:
@@ -393,7 +468,10 @@ class AbstractTask:
 
         def _find_obj_place_no_contact(find_target_obj=False):
             placed = []
-            goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[0]][:3]
+            if goal_joints:
+                goal0_pos = env.query_joint_qpos(goal_joints)[goal_joints[goal_anchor_index]][:3]
+            else:
+                goal0_pos = np.zeros(3, dtype=np.float32)
             placed_body = []
             for joint, body in zip(obj_joints, object_bodys):
                 if find_target_obj and joint != target_obj_joint_name:
@@ -448,6 +526,41 @@ class AbstractTask:
 
         self.randomized_object_positions = env.query_joint_qpos(obj_joints)
         self.randomized_goal_positions   = env.query_joint_qpos(goal_joints)
+
+    def _sample_position_from_spawn_area(
+        self,
+        base_pos: np.ndarray,
+        bbox: Optional[dict],
+        placed_positions: List[np.ndarray],
+        min_distance: float = 0.05,
+    ) -> np.ndarray:
+        """
+        根据给定的参考位置（通常为篮子1的joint位置）和其几何包围盒，
+        采样一个新的物体摆放位置，保证与已放置物体之间有一定间距。
+        """
+        base_pos = np.asarray(base_pos, dtype=np.float32)
+        candidate = base_pos.copy()
+        if bbox:
+            mn = np.array(bbox["min"], dtype=np.float32).flatten()
+            mx = np.array(bbox["max"], dtype=np.float32).flatten()
+            # 若 bounding box 计算失败（出现 inf / nan 或区间反常），退化为默认策略
+            finite_mask = np.isfinite(mn) & np.isfinite(mx)
+            valid_interval = np.all(mx - mn >= 1e-6)
+            if finite_mask.all() and valid_interval:
+                candidate[2] = float(np.clip(base_pos[2], mn[2], mx[2]))
+                for _ in range(50):
+                    candidate[0] = np.random.uniform(mn[0], mx[0])
+                    candidate[1] = np.random.uniform(mn[1], mx[1])
+                    if all(np.linalg.norm(candidate[:2] - p[:2]) >= min_distance for p in placed_positions):
+                        return candidate.copy()
+                return candidate.copy()
+
+        for _ in range(50):
+            offset = np.random.uniform(-0.03, 0.03, size=2)
+            candidate[:2] = base_pos[:2] + offset
+            if all(np.linalg.norm(candidate[:2] - p[:2]) >= min_distance for p in placed_positions):
+                return candidate.copy()
+        return candidate.copy()
 
 
     def generate_actors(self):
@@ -701,6 +814,8 @@ class AbstractTask:
         info = {}
         jpos_dict = self.get_goal_joints_xpos(env)
         xpos, xmat, xquat = self.get_goal_xpos_xmat_xquat(env)
+        spawn_index = int(np.clip(self.spawn_goal_index, 0, max(len(self.goal_bodys) - 1, 0))) if self.goal_bodys else 0
+        success_index = int(np.clip(self.success_goal_index, 0, max(len(self.goal_bodys) - 1, 0))) if self.goal_bodys else 0
         for i in range(len(self.goal_bodys)):
             geom_size = env.get_goal_bounding_box(env.body(self.goal_bodys[i]))
             if not geom_size:
@@ -708,13 +823,20 @@ class AbstractTask:
             mn = np.array(geom_size["min"]).flatten()
             mx = np.array(geom_size["max"]).flatten()
             sz = mx - mn
+            if i == success_index:
+                role = "success"
+            elif i == spawn_index:
+                role = "spawn"
+            else:
+                role = "aux"
             info[self.goal_bodys[i]] = {
                 "joint_name": self.goal_joints[i],
                 "position": jpos_dict[env.joint(self.goal_joints[i])].tolist(),
                 "orientation": xquat[i * 4:(i + 1)*4].tolist(),
                 "min": mn.tolist(),
                 "max": mx.tolist(),
-                "size": sz.tolist()
+                "size": sz.tolist(),
+                "role": role,
             }
 
         json_str = json.dumps(info)
