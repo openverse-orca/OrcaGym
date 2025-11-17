@@ -16,6 +16,7 @@ from scripts.scene_util import clear_scene, publish_terrain, generate_height_map
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 from envs.legged_gym.legged_sim_env import LeggedSimEnv
 from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
+from orca_gym.utils.device_utils import get_torch_device, get_gpu_info, print_gpu_info
 
 from scripts.grpc_client import GrpcInferenceClient, create_grpc_client
 
@@ -145,7 +146,9 @@ def register_env(orcagym_addr : str,
     return env_id, kwargs
 
 def load_sb3_model(model_file: dict):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    """加载 SB3 模型（支持 MUSA 和 CUDA）"""
+    device = get_torch_device(try_to_use_gpu=True)
+    print(f"加载 SB3 模型，使用设备: {device}")
     models = {}
     for key, value in model_file.items(): 
         models[key] = PPO.load(value, device=device)
@@ -188,15 +191,18 @@ def load_grpc_model(model_file: dict):
     return models
 
 def load_rllib_model(model_file: dict):
+    """加载 RLLib 模型（支持 MUSA 和 CUDA）"""
     from ray.rllib.core.rl_module.rl_module import RLModule
     from ray.rllib.core import DEFAULT_MODULE_ID
     import examples.legged_gym.scripts.rllib_appo_rl as rllib_appo_rl
 
-    # 在脚本开头调用
-    if rllib_appo_rl.setup_cuda_environment():
-        print("CUDA 环境验证通过")
+    # 验证 GPU 环境（支持 CUDA 和 MUSA）
+    gpu_info = get_gpu_info()
+    if gpu_info['available']:
+        print(f"GPU 环境验证通过: {gpu_info['device_type']}")
+        print_gpu_info()
     else:
-        print("CUDA 环境设置失败，GPU 加速可能不可用")
+        print("GPU 环境设置失败，将使用 CPU")
 
     models = {}
     for key, value in model_file.items():
@@ -222,6 +228,12 @@ def main(
     remote: str,
     ):
     try:
+        # 打印 GPU 信息
+        print("="*50)
+        print("推理环境 GPU 信息")
+        print_gpu_info()
+        print("="*50)
+        
         if remote is not None:
             orcagym_addresses = [remote]
         else:
@@ -493,7 +505,9 @@ def run_simulation(env: gym.Env,
                     from ray.rllib.core.columns import Columns
                     from torch import torch
                     from ray.rllib.utils.numpy import convert_to_numpy
-                    input_dict = {Columns.OBS: torch.from_numpy(agent_obs["observation"]).unsqueeze(0)}
+                    # 使用正确的设备（支持 MUSA 和 CUDA）
+                    device = get_torch_device(try_to_use_gpu=True)
+                    input_dict = {Columns.OBS: torch.from_numpy(agent_obs["observation"]).unsqueeze(0).to(device)}
                     rl_module_out = model.forward_inference(input_dict)
                     logits = convert_to_numpy(rl_module_out[Columns.ACTION_DIST_INPUTS])
                     mu = logits[:, :env.action_space.shape[0]]

@@ -205,16 +205,23 @@ def run_rllib_appo_rl(
     import ray
     import torch
 
-    # 在脚本开头调用
-    if rllib_appo_rl.setup_cuda_environment():
-        print("CUDA 环境验证通过")
-    else:
-        print("CUDA 环境设置失败，GPU 加速可能不可用")
+    # 导入 GPU 工具函数
+    from orca_gym.utils.device_utils import get_gpu_info, print_gpu_info
     
-    # 验证 PyTorch CUDA
-    rllib_appo_rl.verify_pytorch_cuda()
+    # 在脚本开头调用（支持 CUDA 和 MUSA）
+    if rllib_appo_rl.setup_gpu_environment():
+        gpu_info = get_gpu_info()
+        print(f"GPU 环境验证通过: {gpu_info['device_type']}")
+    else:
+        print("GPU 环境设置失败，将使用 CPU")
+    
+    # 验证 PyTorch GPU（支持 CUDA 和 MUSA）
+    rllib_appo_rl.verify_pytorch_gpu()
 
     # 初始化Ray集群
+    gpu_info = get_gpu_info()
+    num_gpus = gpu_info['device_count'] if gpu_info['available'] else 0
+    
     if 'ray_cluster_address' in config and config['ray_cluster_address']:
         print(f"连接到Ray集群: {config['ray_cluster_address']}")
         ray.init(
@@ -227,7 +234,7 @@ def run_rllib_appo_rl(
         ray.init(
             ignore_reinit_error=True,
             # 确保GPU资源被正确注册
-            num_gpus=torch.cuda.device_count() if torch.cuda.is_available() else 0
+            num_gpus=num_gpus
         )
 
     # 打印集群信息
@@ -235,11 +242,12 @@ def run_rllib_appo_rl(
     print(f"可用节点数量: {len(ray.nodes())}")
     print(f"可用资源: {ray.available_resources()}")
     
-    # 检查GPU资源
-    if torch.cuda.is_available():
-        print(f"PyTorch检测到GPU数量: {torch.cuda.device_count()}")
-        for i in range(torch.cuda.device_count()):
-            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+    # 检查GPU资源（支持 MUSA 和 CUDA）
+    if gpu_info['available']:
+        print_gpu_info()
+        print(f"PyTorch检测到GPU类型: {gpu_info['device_type']}")
+        print(f"GPU数量: {gpu_info['device_count']}")
+        print(f"GPU名称: {gpu_info['device_name']}")
     
     # 检测Ray集群中的CPU资源
     num_cpus_available = int(ray.available_resources()['CPU'])

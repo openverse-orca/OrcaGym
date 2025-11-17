@@ -8,6 +8,7 @@ from datetime import datetime
 import sys
 import os
 import time
+import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from envs.xbot_gym.xbot_simple_env import XBotSimpleEnv
@@ -71,6 +72,12 @@ def print_detailed_diagnostics(step, obs, action, env):
 
 
 def main():
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description="XBot运行脚本 - OrcaGym框架")
+    parser.add_argument("--orcagym_addr", type=str, default="localhost:50051",
+                        help="OrcaGym gRPC服务器地址 (默认: localhost:50051)")
+    args = parser.parse_args()
+    
     print("="*80)
     print("🚀 XBot运行测试 - OrcaGym框架（增强诊断版）")
     print("="*80)
@@ -78,12 +85,14 @@ def main():
     # 关键配置 - 匹配humanoid-gym
     config = {
         "frame_skip": 10,              # 单次物理步
-        "orcagym_addr": "localhost:50051",
+        "orcagym_addr": args.orcagym_addr,  # 使用命令行参数
         "agent_names": ["XBot-L"],
         "time_step": 0.001,           # ⚠️ 1ms物理步长
         "max_episode_steps": 10000,
         "render_mode": "human",       # 可视化
     }
+    
+    print(f"\n🔗 gRPC连接地址: {config['orcagym_addr']}")
 
     TIME_STEP = config['time_step']
     FRAME_SKIP = config['frame_skip']

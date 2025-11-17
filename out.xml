@@ -1,0 +1,26 @@
+<mujoco>
+    <option gravity="0.000000000 0.000000000 -9.810000420" timestep="0.0049999999" integrator="implicitfast" density="1.225" viscosity="1.8000001e-05" noslip_iterations="10" iterations="100" sdf_iterations="50">
+        <flag multiccd="disable" filterparent="enable"/>
+    </option>
+    <size memory="1000M"/>
+    <compiler coordinate="local"/>
+    <worldbody>
+        <light cutoff="30" pos="0 1 1" dir="0 -1 -2"/>
+        <light cutoff="30" pos="0 -1 1" dir="0 1 -2"/>
+        <body pos="0.000000000 0.000000000 -1000.000000000" euler="0.000000000 0.000000000 0.000000000" mocap="true" name="ActorManipulator_Anchor"/>
+        <body pos="0.000000000 0.000000000 -1000.000000000" euler="0.000000000 0.000000000 0.000000000" name="ActorManipulator_dummy">
+            <geom contype="1" conaffinity="1" density="1000" type="sphere" material="" rgba="0.500000000 0.500000000 0.500000000 1.000000000" solimp="0.899999976 0.949999988 0.001000000" friction="1.000000000 0.005000000 0.000100000" solref="0.020000000 1.000000000" priority="0" margin="0" condim="3" group="3" pos="0.000000000 0.000000000 0.000000000" quat="1.000000000 0.000000000 0.000000000 0.000000000" size="0.010000000 0.010000000 0.010000000" name="ActorManipulator_geom_87C8F6F4_4E35_4C49_A3A1_8E7183A76639"/>
+            <freejoint name="ActorManipulator_joint_DD84BFAB_ECEB_45A9_8A25_D6DD8363B4BE"/>
+        </body>
+        <body pos="0.000000000 0.000000000 0.000000000" euler="0.000000000 0.000000000 0.000000000" name="Floor_Floor">
+            <geom contype="1" conaffinity="1" density="1000" type="plane" material="" rgba="0.500000000 0.500000000 0.500000000 1.000000000" solimp="0.899999976 0.949999988 0.001000000" friction="1.000000000 0.005000000 0.000100000" solref="0.020000000 1.000000000" priority="0" margin="0" condim="3" group="0" pos="0.000000000 0.000000000 0.000000000" quat="1.000000000 0.000000000 0.000000000 0.000000000" size="512.000000000 512.000000000 0.005000000" name="Floor_Floor_042C5EE2_6986_40EE_A72F_44411C012226"/>
+        </body>
+    </worldbody>
+    <tendon/>
+    <actuator/>
+    <contact/>
+    <equality>
+        <weld body1="ActorManipulator_Anchor" body2="ActorManipulator_dummy" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+    </equality>
+    <asset/>
+</mujoco>

@@ -10,6 +10,7 @@ from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 import torch.version
 from orca_gym.adapters.rllib.metrics_callback import OrcaMetricsCallback
+from orca_gym.utils.device_utils import get_torch_device, get_gpu_info, print_gpu_info
 from ray.rllib.core.rl_module.rl_module import RLModuleSpec
 import gymnasium as gym
 import torch
@@ -532,76 +533,90 @@ def env_creator(
         raise
 
 
-def setup_cuda_environment():
-    """设置并验证 CUDA 环境"""
-    # 获取 Conda 环境路径
-    conda_prefix = os.environ.get("CONDA_PREFIX", "")
-    if not conda_prefix:
-        print("警告: 未检测到 Conda 环境")
-        return False
-    
-    # 设置环境变量
-    os.environ["CUDA_HOME"] = conda_prefix
-    os.environ["LD_LIBRARY_PATH"] = f"{conda_prefix}/lib:{os.environ.get('LD_LIBRARY_PATH', '')}"
-    
-    # 验证 CUDA 和 cuDNN
-    cuda_available = torch.cuda.is_available()
-    cudnn_version = torch.backends.cudnn.version() if cuda_available else 0
+def setup_gpu_environment():
+    """设置并验证 GPU 环境（支持 CUDA 和 MUSA）"""
+    gpu_info = get_gpu_info()
     
     print("="*50)
-    print("CUDA 环境验证")
-    print(f"CUDA_HOME: {conda_prefix}")
-    print(f"CUDA 可用: {cuda_available}")
-    if cuda_available:
-        print(f"GPU 设备数量: {torch.cuda.device_count()}")
-        for i in range(torch.cuda.device_count()):
-            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
-        print(f"CUDA 版本: {torch.version.cuda}")
-        print(f"cuDNN 版本: {cudnn_version}")
+    print("GPU 环境验证")
+    print(f"GPU 类型: {gpu_info['device_type']}")
+    print(f"GPU 可用: {gpu_info['available']}")
+    
+    if gpu_info['available']:
+        print_gpu_info()
         
-        # 检查nvidia-smi
-        try:
-            import subprocess
-            result = subprocess.run(['nvidia-smi', '--list-gpus'], 
-                                 capture_output=True, text=True)
-            if result.returncode == 0:
-                nvidia_gpu_count = len(result.stdout.strip().split('\n'))
-                print(f"nvidia-smi检测到GPU数量: {nvidia_gpu_count}")
-            else:
-                print("nvidia-smi执行失败")
-        except Exception as e:
-            print(f"nvidia-smi检查失败: {e}")
+        # 设置环境变量（如果需要）
+        if gpu_info['device_type'] == 'cuda':
+            conda_prefix = os.environ.get("CONDA_PREFIX", "")
+            if conda_prefix:
+                os.environ["CUDA_HOME"] = conda_prefix
+                os.environ["LD_LIBRARY_PATH"] = f"{conda_prefix}/lib:{os.environ.get('LD_LIBRARY_PATH', '')}"
+                print(f"CUDA_HOME: {conda_prefix}")
+            
+            # 打印 CUDA 版本信息
+            if torch.cuda.is_available():
+                print(f"CUDA 版本: {torch.version.cuda}")
+                print(f"cuDNN 版本: {torch.backends.cudnn.version()}")
+        elif gpu_info['device_type'] == 'musa':
+            # 设置 MUSA 环境变量
+            os.environ["LD_LIBRARY_PATH"] = f"/usr/local/musa/lib:/usr/lib/aarch64-linux-gnu/musa/:{os.environ.get('LD_LIBRARY_PATH', '')}"
+            print("MUSA 环境变量已设置")
+    else:
+        print("未检测到 GPU，将使用 CPU")
+    
     print("="*50)
     
-    return cuda_available
+    return gpu_info['available']
+
+
+def setup_cuda_environment():
+    """设置并验证 CUDA 环境（向后兼容函数）"""
+    return setup_gpu_environment()
+
+
+def verify_pytorch_gpu():
+    """验证 PyTorch 是否能正确使用 GPU（支持 CUDA 和 MUSA）"""
+    print("="*50)
+    print("PyTorch GPU 验证")
+    print(f"PyTorch 版本: {torch.__version__}")
+    
+    gpu_info = get_gpu_info()
+    print(f"GPU 类型: {gpu_info['device_type']}")
+    print(f"GPU 可用: {gpu_info['available']}")
+    
+    if gpu_info['available']:
+        print(f"GPU 设备数量: {gpu_info['device_count']}")
+        print(f"GPU 名称: {gpu_info['device_name']}")
+        
+        # 打印版本信息
+        if gpu_info['device_type'] == 'cuda':
+            print(f"CUDA 版本: {torch.version.cuda}")
+            print(f"cuDNN 版本: {torch.backends.cudnn.version()}")
+        elif gpu_info['device_type'] == 'musa':
+            try:
+                import torch_musa
+                print(f"torch_musa 版本: {torch_musa.__version__}")
+            except:
+                pass
+        
+        # 运行简单的 GPU 计算
+        try:
+            device = get_torch_device(try_to_use_gpu=True)
+            a = torch.tensor([1.0], device=device)
+            b = torch.tensor([2.0], device=device)
+            c = a + b
+            print(f"{gpu_info['device_type'].upper()} 计算测试成功: 1.0 + 2.0 = {c.item()}")
+        except Exception as e:
+            print(f"GPU 计算测试失败: {str(e)}")
+    else:
+        print("PyTorch 无法访问 GPU，将使用 CPU")
+    
+    print("="*50)
 
 
 def verify_pytorch_cuda():
-    """验证 PyTorch 是否能正确使用 CUDA"""
-    print("="*50)
-    print("PyTorch CUDA 验证")
-    print(f"PyTorch 版本: {torch.__version__}")
-    print(f"CUDA 可用: {torch.cuda.is_available()}")
-    
-    if torch.cuda.is_available():
-        print(f"GPU 设备数量: {torch.cuda.device_count()}")
-        for i in range(torch.cuda.device_count()):
-            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
-        print(f"CUDA 版本: {torch.version.cuda}")
-        print(f"cuDNN 版本: {torch.backends.cudnn.version()}")
-        
-        # 运行简单的 CUDA 计算
-        try:
-            a = torch.tensor([1.0], device="cuda")
-            b = torch.tensor([2.0], device="cuda")
-            c = a + b
-            print(f"CUDA 计算测试成功: 1.0 + 2.0 = {c.item()}")
-        except Exception as e:
-            print(f"CUDA 计算测试失败: {str(e)}")
-    else:
-        print("PyTorch 无法访问 CUDA")
-    
-    print("="*50)
+    """验证 PyTorch 是否能正确使用 CUDA（向后兼容函数）"""
+    return verify_pytorch_gpu()
 
 
 def detect_ray_gpu_resources() -> float:
@@ -625,15 +640,16 @@ def detect_ray_gpu_resources() -> float:
             print(f"获取Ray集群总资源失败: {e}")
             num_gpus_available = 0
     
-    # 方法3: 如果Ray方法都失败，使用PyTorch检测
+    # 方法3: 如果Ray方法都失败，使用PyTorch检测（支持 MUSA 和 CUDA）
     if num_gpus_available == 0:
-        if torch.cuda.is_available():
-            num_gpus_available = torch.cuda.device_count()
-            print(f"PyTorch检测到GPU数量: {num_gpus_available}")
+        gpu_info = get_gpu_info()
+        if gpu_info['available']:
+            num_gpus_available = gpu_info['device_count']
+            print(f"PyTorch检测到{gpu_info['device_type'].upper()} GPU数量: {num_gpus_available}")
         else:
             print("PyTorch无法检测到GPU")
     
-    # 方法4: 最后尝试使用nvidia-smi
+    # 方法4: 最后尝试使用nvidia-smi（仅 CUDA）
     if num_gpus_available == 0:
         try:
             import subprocess
@@ -652,6 +668,7 @@ def detect_ray_gpu_resources() -> float:
 
 
 def worker_env_check():
+    """检查 worker 环境的 GPU（支持 MUSA 和 CUDA）"""
     import os
     import torch
     import traceback
@@ -661,35 +678,42 @@ def worker_env_check():
     if conda_prefix:
         os.environ["LD_LIBRARY_PATH"] = f"{conda_prefix}/lib:{os.environ.get('LD_LIBRARY_PATH', '')}"
     
-    # 尝试初始化 CUDA
-    try:
-        torch.cuda.init()
-        available = torch.cuda.is_available()
-        device_name = torch.cuda.get_device_name(0) if available else "N/A"
-        cudnn_version = torch.backends.cudnn.version() if available else "N/A"
-        
-        # 运行简单的 CUDA 计算
-        if available:
-            a = torch.tensor([1.0], device="cuda")
-            b = torch.tensor([2.0], device="cuda")
+    # 检测 GPU（支持 MUSA 和 CUDA）
+    gpu_info = get_gpu_info()
+    available = gpu_info['available']
+    device_name = gpu_info['device_name'] if available else "N/A"
+    
+    # 运行简单的 GPU 计算
+    calc_test = "未测试"
+    cudnn_version = "N/A"
+    cuda_version = "N/A"
+    
+    if available:
+        try:
+            device = get_torch_device(try_to_use_gpu=True)
+            a = torch.tensor([1.0], device=device)
+            b = torch.tensor([2.0], device=device)
             c = a + b
             calc_test = f"计算成功: {c.item()}"
-        else:
-            calc_test = "未测试"
-    except Exception as e:
-        available = False
-        device_name = f"初始化失败: {str(e)}"
-        cudnn_version = "N/A"
-        calc_test = "未测试"
+            
+            # 获取版本信息
+            if gpu_info['device_type'] == 'cuda':
+                cudnn_version = str(torch.backends.cudnn.version()) if torch.cuda.is_available() else "N/A"
+                cuda_version = torch.version.cuda if torch.cuda.is_available() else "N/A"
+        except Exception as e:
+            available = False
+            device_name = f"初始化失败: {str(e)}"
+            calc_test = f"计算失败: {str(e)}"
     
     return {
         "pid": os.getpid(),
-        "cuda": available,
+        "cuda": available,  # 保持字段名兼容性
         "device_info": device_name,
+        "device_type": gpu_info['device_type'],
         "cudnn_version": cudnn_version,
         "calc_test": calc_test,
         "pytorch_version": torch.__version__,
-        "cuda_version": torch.version.cuda if hasattr(torch.version, "cuda") else "N/A",
+        "cuda_version": cuda_version,
         "ld_path": os.environ.get("LD_LIBRARY_PATH", ""),
         "cuda_home": os.environ.get("CUDA_HOME", ""),
     }
