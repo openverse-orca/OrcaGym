@@ -34,7 +34,13 @@ class PickPlaceTask(AbstractTask):
         """
         随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
         """
-        self.generate_object(env, 3, 5)
+        # 限制选择数量不超过可用的 actors 数量
+        if self.random_actor and self.actors:
+            pick_max = min(5, len(self.actors))
+            pick_min = min(3, len(self.actors))
+            self.generate_object(env, pick_min, pick_max)
+        else:
+            self.generate_object(env, 3, 5)
         while True:
             # 随机摆放
             self.random_objs_and_goals(env, random_rotation=True)

@@ -86,9 +86,21 @@ class DexforceW1Gripper(DualArmRobot):
 
 
     def set_l_hand_actuator_ctrl(self, offset_rate) -> None:
-        mapped_rate = np.clip(-offset_rate, 0.0, 1.0)
+        # Position control for sliding fingers: P_left_finger1, P_left_finger2
+        # offset_rate: [-1, 0] where -1=closed (when trigger pressed), 0=open (when trigger released)
+        # Position actuator range: [0, 0.05] meters where 0=open, 0.05=closed (increased for full closure)
+        # Fixed: User reports pressing trigger opens gripper, so invert mapping
+        # Mapping: offset_rate=-1 (pressed) -> ctrl=0 (open) - FIXED to ctrl=0.025 (closed)
+        #          offset_rate=0 (released) -> ctrl=0.025 (closed) - FIXED to ctrl=0 (open)
+        # Formula: Use 1.0 + offset_rate to map [-1,0] to [0,1], then invert
+        mapped_rate = np.clip(1.0 + offset_rate, 0.0, 1.0)  # Maps [-1,0] to [0,1]
+        mapped_rate = 1.0 - mapped_rate  # Invert: [0,1] -> [1,0]
+        
         for actuator_id in self._l_hand_actuator_id:
             ctrl_min, ctrl_max = self._all_ctrlrange[actuator_id]
+            # For position actuator: ctrl_min=0, ctrl_max=0.025
+            # mapped_rate=1 (when offset_rate=-1, pressed) -> ctrl=0.025 (closed)
+            # mapped_rate=0 (when offset_rate=0, released) -> ctrl=0 (open)
             ctrl_value = np.clip(ctrl_min + mapped_rate * (ctrl_max - ctrl_min), ctrl_min, ctrl_max)
             self._env.ctrl[actuator_id] = ctrl_value
             actuator_name = self._env.model.actuator_id2name(actuator_id)
@@ -123,9 +135,21 @@ class DexforceW1Gripper(DualArmRobot):
         sys.stdout.flush()
             
     def set_r_hand_actuator_ctrl(self, offset_rate) -> None:
-        mapped_rate = np.clip(-offset_rate, 0.0, 1.0)
+        # Position control for sliding fingers: P_right_finger1, P_right_finger2
+        # offset_rate: [-1, 0] where -1=closed (when trigger pressed), 0=open (when trigger released)
+        # Position actuator range: [0, 0.025] meters where 0=open, 0.025=closed
+        # Fixed: User reports pressing trigger opens gripper, so invert mapping
+        # Mapping: offset_rate=-1 (pressed) -> ctrl=0 (open) - FIXED to ctrl=0.025 (closed)
+        #          offset_rate=0 (released) -> ctrl=0.025 (closed) - FIXED to ctrl=0 (open)
+        # Formula: Use 1.0 + offset_rate to map [-1,0] to [0,1], then invert
+        mapped_rate = np.clip(1.0 + offset_rate, 0.0, 1.0)  # Maps [-1,0] to [0,1]
+        mapped_rate = 1.0 - mapped_rate  # Invert: [0,1] -> [1,0]
+        
         for actuator_id in self._r_hand_actuator_id:
             ctrl_min, ctrl_max = self._all_ctrlrange[actuator_id]
+            # For position actuator: ctrl_min=0, ctrl_max=0.025
+            # mapped_rate=1 (when offset_rate=-1, pressed) -> ctrl=0.025 (closed)
+            # mapped_rate=0 (when offset_rate=0, released) -> ctrl=0 (open)
             ctrl_value = np.clip(ctrl_min + mapped_rate * (ctrl_max - ctrl_min), ctrl_min, ctrl_max)
             self._env.ctrl[actuator_id] = ctrl_value
             actuator_name = self._env.model.actuator_id2name(actuator_id)

@@ -1,4 +1,6 @@
-# Configuration for Dexforce W1 gripper (simple finger gripper)
+# Configuration for Dexforce W1 gripper (position control for sliding fingers)
+# Position control: each finger has its own actuator, but equality constraint ensures synchronization
+# Control range: 0 (open) to 0.05 (closed) in meters - increased for full closure
 dexforce_w1_gripper_config = {
     "left_hand": {
         "actuator_names": ["P_left_finger1", "P_left_finger2"],

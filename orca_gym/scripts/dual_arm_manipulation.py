@@ -41,15 +41,15 @@ ENV_ENTRY_POINT = {
 }
 
 TIME_STEP = 0.001                       # 1000 Hz for physics simulation
-FRAME_SKIP = 20                         
-REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 50 Hz for python program loop
-CONTROL_FREQ = 1 / REALTIME_STEP        # 50 Hz for OSC controller computation
+FRAME_SKIP = 10                         
+REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 100 Hz for python program loop
+CONTROL_FREQ = 1 / REALTIME_STEP        # 100 Hz for OSC controller computation
 
-RGB_SIZE = (1280, 720)
+RGB_SIZE = (480, 480)
 CAMERA_CONFIG = {
     "camera_head": 7070,
-    # "camera_wrist_r": 7080,
-    # "camera_wrist_l": 7090,
+    "camera_wrist_r": 7080,
+    "camera_wrist_l": 7090,
 }
 _light_counter = 0
 _LIGHT_SWITCH_PERIOD = 20  # 每 20 次 reset 才切一次光
@@ -355,6 +355,7 @@ def teleoperation_episode(env : DualArmEnv, cameras : list[CameraWrapper], datas
     # camera_frames = {camera.name: [] for camera in cameras}
     camera_frame_index = []
     camera_time_stamp = {}
+    last_render_profile_time = time.perf_counter()
     timestep_list = []
     action_step_taken = 0
     saving_mp4 = False

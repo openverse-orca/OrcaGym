@@ -260,11 +260,16 @@ class AbstractTask:
                 qpos_dict = {self._find_joint_name(env, joint_name): pos for joint_name in self.object_joints}
                 env.set_joint_qpos(qpos_dict)
 
-                n_select  = random.randint(pick_min, pick_max)
-                idxs      = random.sample(range(len(self.actors)), k=n_select)
-                self.object_bodys = [self.actors[idx] for idx in idxs ]
-                self.object_sites = [f"{self.actors[idx]}site" for idx in idxs]
-                self.object_joints = [f"{self.actors[idx]}_joint" for idx in idxs]
+                # 确保选择数量不超过可用的 actors 数量
+                max_available = len(self.actors) if self.actors else 0
+                if max_available > 0:
+                    pick_min = min(pick_min, max_available)
+                    pick_max = min(pick_max, max_available)
+                    n_select  = random.randint(pick_min, pick_max)
+                    idxs      = random.sample(range(len(self.actors)), k=n_select)
+                    self.object_bodys = [self.actors[idx] for idx in idxs ]
+                    self.object_sites = [f"{self.actors[idx]}site" for idx in idxs]
+                    self.object_joints = [f"{self.actors[idx]}_joint" for idx in idxs]
 
             self.__random_count__ += 1
 

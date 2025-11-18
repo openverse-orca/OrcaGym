@@ -203,6 +203,56 @@ class DualArmEnv(RobomimicEnv):
     def _is_empty_task(self) -> bool:
         return getattr(self._task, "is_empty", False)
 
+    def _randomize_materials(self):
+        if not self._config.get("randomize_material_on_reset", False):
+            return
+        material_targets = self._config.get("material_actor_targets")
+        if not material_targets:
+            material_targets = self._config.get("reset_material_targets", [])
+        for actor_name in material_targets:
+            try:
+                self._task.set_actor_material(actor_name)
+            except Exception as exc:
+                print(f"[Randomize][Material] Failed for '{actor_name}': {exc}")
+
+    def _place_objects_in_goal(self):
+        if not self._config.get("spawn_objects_in_goal", False):
+            return
+        goal_index = int(self._config.get("spawn_goal_index", 0))
+        if goal_index >= len(self._task.goal_joints):
+            return
+
+        goal_joint_name = self._task.goal_joints[goal_index]
+        try:
+            goal_joint = self.joint(goal_joint_name)
+        except Exception as exc:
+            print(f"[Spawn][Placement] Failed to find goal joint '{goal_joint_name}': {exc}")
+            return
+
+        goal_qpos = self.query_joint_qpos([goal_joint])[goal_joint]
+        base_pos = np.array(goal_qpos[:3], dtype=np.float32)
+        base_pos[2] += 0.10
+        base_quat = np.array(goal_qpos[3:], dtype=np.float32)
+
+        offsets = self._config.get("spawn_object_offsets", [])
+        qpos_dict = {}
+
+        for idx, joint_name in enumerate(self._task.object_joints):
+            try:
+                joint_id = self.joint(joint_name)
+            except Exception as exc:
+                print(f"[Spawn][Placement] Failed to find object joint '{joint_name}': {exc}")
+                continue
+
+            offset = offsets[idx] if idx < len(offsets) else [0.0, 0.0, 0.05 * idx]
+            offset = np.array(offset, dtype=np.float32)
+            pos = base_pos + offset
+            qpos_dict[joint_id] = np.concatenate([pos, base_quat], axis=0)
+
+        if qpos_dict:
+            self.set_joint_qpos(qpos_dict)
+            self.mj_forward()
+
     def _set_obs_space(self):
         self.observation_space = self.generate_observation_space(self._get_obs().copy())
 
@@ -478,6 +528,8 @@ class DualArmEnv(RobomimicEnv):
             ag.on_reset_model()
 
         self.safe_get_task(self)
+        self._place_objects_in_goal()
+        self._randomize_materials()
         instr = self._task.get_language_instruction()
         m = re.match(r'level:\s*(\S+)\s+object:\s*(\S+)\s+to\s+goal:\s*(\S+)', instr)
         if m:
