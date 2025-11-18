@@ -1,6 +1,8 @@
 import asyncio
+import enum
 import json
 import threading
+from typing import Callable
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import copy
@@ -22,6 +24,24 @@ def transform_quaternion_to_mujoco(q_unity):
     v = R.from_matrix(R_mujoco).as_rotvec()
     return R.from_rotvec(v).as_quat()
 
+class PicoJoystickKey(enum.Enum):
+    X = 0
+    Y = 1
+    L_TRIGGER = 2
+    L_GRIPBUTTON = 3
+    L_JOYSTICK_POSITION = 4
+    L_JOYSTICK_PRESSED = 5
+    L_TRANSFORM = 6 
+    A = 7
+    B = 8
+    R_TRIGGER = 9
+    R_GRIPBUTTON = 10
+    R_JOYSTICK_POSITION = 11
+    R_JOYSTICK_PRESSED = 12
+    R_TRANSFORM = 13
+
+
+
 class PicoJoystick:
     def __init__(self, port=8001):
         self.mutex = threading.Lock()
@@ -30,6 +50,7 @@ class PicoJoystick:
         self.current_key_state = None
         self.suceess_AB = 0 #AB键长按次数
         self.suceess_XY = 0 #XY键长按次数
+        self.key_event = {}
         self.reset_pos = False
         self.loop = asyncio.new_event_loop()
         self.clients = set()  # 初始化 self.clients
@@ -95,9 +116,17 @@ class PicoJoystick:
                 self.clients.discard(writer)
                 writer.close()
 
+    def bind_key_event(self, key: str, event: Callable):
+        if key in self.key_event:
+            raise ValueError(f"Key {key} already bound")
+        self.key_event[key] = event
 
-    def update(self):
-        pass
+    def update(self, keys: list[PicoJoystickKey]):
+        transform = self.get_transform_list()
+        key_state = self.get_key_state()
+        for key in keys:
+            if key in self.key_event:
+                self.key_event[key](transform, key_state)
 
     def is_reset_pos(self):
         return self.reset_pos
@@ -147,6 +176,7 @@ class PicoJoystick:
         return [left_hand_transform, right_hand_transform, motion_trackers_transform]
 
     def extract_key_state(self, message) -> dict:
+        # unity里面是左手系， 这里的值是Unity里面的值
         left_hand_key_state = {
             "triggerValue": message["leftHand"]["triggerValue"],
             "primaryButtonPressed": message["leftHand"]["primaryButtonPressed"],
@@ -156,7 +186,9 @@ class PicoJoystick:
                 message["leftHand"]["joystickPosition"]["y"]
             ],
             "joystickPressed": message["leftHand"]["joystickPressed"],
-            "gripButtonPressed": message["leftHand"]["gripButtonPressed"]
+            "gripButtonPressed": message["leftHand"]["gripButtonPressed"],
+            "position": list(message["leftHand"]["position"].values()),
+            "rotation": list(message["leftHand"]["rotation"].values())
         }
 
         right_hand_key_state = {
@@ -168,7 +200,9 @@ class PicoJoystick:
                 message["rightHand"]["joystickPosition"]["y"]
             ],
             "joystickPressed": message["rightHand"]["joystickPressed"],
-            "gripButtonPressed": message["rightHand"]["gripButtonPressed"]
+            "gripButtonPressed": message["rightHand"]["gripButtonPressed"],
+            "position": list(message["rightHand"]["position"].values()),
+            "rotation": list(message["rightHand"]["rotation"].values())
         }
         return {"leftHand": left_hand_key_state, "rightHand": right_hand_key_state}
 

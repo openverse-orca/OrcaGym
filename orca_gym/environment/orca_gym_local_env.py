@@ -467,7 +467,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
             site_pos_quat_B[site_name] = {}
             site_pos_quat_B[site_name]["xpos"] = relative_pos_ee
-            site_pos_quat_B[site_name]["xquat"] = relative_rot_ee.as_quat().astype(np.float32)
+            site_pos_quat_B[site_name]["xquat"] = relative_rot_ee.as_quat()[[3, 0, 1, 2]].astype(np.float32)
 
         return site_pos_quat_B
 
@@ -575,6 +575,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     
     def set_actuator_trnid(self, actuator_id, trnid):
         self.gym.set_actuator_trnid(actuator_id, trnid)
+        return
+
+    def disable_actuator(self, actuator_groups: list[int]):
+        self.gym.disable_actuator(actuator_groups)
         return
 
     async def _load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
