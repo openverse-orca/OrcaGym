@@ -148,19 +148,20 @@ class DualArmEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
-        from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
-        from orca_gym.scene.orca_gym_scene import OrcaGymScene
+        # Note: _task was already created above (line 109), so we don't need to create it again
+        # The following code was redundant and has been removed to avoid duplicate initialization
+        # from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
+        # from orca_gym.scene.orca_gym_scene import OrcaGymScene
         # self._task = AbstractTask()
         # self._task.grpc_addr = "192.168.1.164:50051"
         # self._task.scene = OrcaGymScene(self._task.grpc_addr)
         # self._task.actors = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.register_init_env_callback(self.init_env)
-        self._config = task_config_dict
-        self._config["grpc_addr"] = "localhost:50051"
-        self._task = PickPlaceTask(self._config)
-        
-        self._task.register_init_env_callback(self.init_env)
+        # self._config = task_config_dict
+        # self._config["grpc_addr"] = "localhost:50051"
+        # self._task = PickPlaceTask(self._config)
+        # self._task.register_init_env_callback(self.init_env)
 
 
     def init_env(self):
@@ -415,17 +416,27 @@ class DualArmEnv(RobomimicEnv):
         #print("[Debug] after correction:", self._task.object_joints)
     
     def safe_get_task(self, env):
+        iteration = 0
+        max_iterations = 100  # 添加最大迭代次数限制，防止无限循环
         while True:
+            iteration += 1
+            if iteration > max_iterations:
+                break
             # 1) 生成一次 task（包括随机摆放）
             self._task.get_task(env)
     
             objs = self._task.randomized_object_positions
+            if not objs or not self._task.goal_bodys:
+                break
             goal_body = self._task.goal_bodys[0]
     
             # 2) 拿它的轴对齐包围盒
-            bbox = self.get_goal_bounding_box(goal_body)
-            min_xy = bbox['min'][:2]
-            max_xy = bbox['max'][:2]
+            try:
+                bbox = self.get_goal_bounding_box(goal_body)
+                min_xy = bbox['min'][:2]
+                max_xy = bbox['max'][:2]
+            except Exception:
+                break
     
             bad = False
             for joint_name, qpos in objs.items():

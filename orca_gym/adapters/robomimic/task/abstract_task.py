@@ -214,7 +214,6 @@ class AbstractTask:
         if self.first_spawn and not is_augmentation_mode:
             self.scene.publish_scene_without_init_env()
             self.generate_actors()
-
             self.scene.publish_scene()
             self.first_spawn = False
         elif is_augmentation_mode:
