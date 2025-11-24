@@ -13,6 +13,7 @@ from envs.xbot_gym.xbot_simple_env import XBotSimpleEnv
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
 import torch
 import numpy as np
+import argparse
 import time
 
 
@@ -123,7 +124,7 @@ class XBotKeyboardController:
         pass
 
 
-def main():
+def main(device: str = "cpu"):
     print("="*80)
     print("🎮 XBot键盘控制 - OrcaGym")
     print("="*80)
@@ -157,9 +158,23 @@ def main():
     policy_path = os.path.join(script_dir, "config", "policy_example.pt")
     
     print(f"\n📦 加载策略: {policy_path}")
+    
+    # 检查设备可用性
+    if device == "cuda":
+        if not torch.cuda.is_available():
+            print(f"[WARNING] CUDA not available. Falling back to CPU.")
+            device = "cpu"
+        else:
+            print(f"[INFO] Using GPU (CUDA)")
+            print(f"[INFO] CUDA device: {torch.cuda.get_device_name(0)}")
+    
+    torch_device = torch.device(device)
+    print(f"Device: {device.upper()}")
+    
     try:
-        policy = torch.jit.load(policy_path)
+        policy = torch.jit.load(policy_path, map_location=torch_device)
         policy.eval()
+        policy.to(torch_device)
         print("✅ 策略加载成功")
     except Exception as e:
         print(f"❌ 策略加载失败: {e}")
@@ -208,8 +223,9 @@ def main():
             
             # 获取策略动作
             with torch.no_grad():
-                obs_tensor = torch.from_numpy(obs).float()
-                action = policy(obs_tensor).numpy()
+                obs_tensor = torch.from_numpy(obs).float().to(torch_device)
+                action_tensor = policy(obs_tensor)
+                action = action_tensor.cpu().numpy()
             
             # Step
             obs, reward, terminated, truncated, info = env.step(action)
@@ -260,5 +276,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Run XBot with keyboard control')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cpu',
+                       help='Inference device: cpu or cuda (default: cpu)')
+    args = parser.parse_args()
+    
+    print(f"[INFO] Using device from command line: {args.device}")
+    main(device=args.device)
 

@@ -2,12 +2,14 @@
 """
 XBot运行脚本 - 完全基于OrcaGym框架
 使用envs/xbot_gym/xbot_simple_env.py环境
+支持CPU和GPU推理
 """
 
 from datetime import datetime
 import sys
 import os
 import time
+import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from envs.xbot_gym.xbot_simple_env import XBotSimpleEnv
@@ -70,7 +72,57 @@ def print_detailed_diagnostics(step, obs, action, env):
     print(f"{'='*80}")
 
 
-def main():
+def load_xbot_policy(policy_path: str, device: str = "cpu"):
+    """
+    加载XBot PyTorch JIT策略
+    
+    Args:
+        policy_path: 策略文件路径
+        device: 设备类型 ('cpu' 或 'cuda')
+    
+    Returns:
+        PyTorch JIT模型
+    """
+    # 检查设备可用性
+    if device == "cuda":
+        if not torch.cuda.is_available():
+            print(f"[WARNING] CUDA not available. Falling back to CPU.")
+            print(f"[WARNING] Install CUDA-enabled PyTorch to use GPU:")
+            print(f"         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118")
+            device = "cpu"
+        else:
+            print(f"[INFO] Using GPU (CUDA)")
+            print(f"[INFO] CUDA device: {torch.cuda.get_device_name(0)}")
+    
+    # 设置设备
+    torch_device = torch.device(device)
+    
+    # 加载模型
+    print(f"Loading XBot policy from: {policy_path}")
+    print(f"Device: {device.upper()}")
+    
+    try:
+        # 加载模型到指定设备
+        policy = torch.jit.load(policy_path, map_location=torch_device)
+        policy.eval()
+        policy.to(torch_device)
+        
+        # 验证设备
+        if hasattr(policy, 'parameters'):
+            # 对于 JIT 模型，检查第一个参数的位置
+            try:
+                sample_param = next(policy.parameters())
+                actual_device = sample_param.device
+                print(f"[INFO] Policy loaded on device: {actual_device}")
+            except:
+                print(f"[INFO] Policy loaded (device verification skipped)")
+        
+        return policy, torch_device
+    except Exception as e:
+        raise RuntimeError(f"Failed to load policy from {policy_path}: {e}")
+
+
+def main(device: str = "cpu"):
     print("="*80)
     print("🚀 XBot运行测试 - OrcaGym框架（增强诊断版）")
     print("="*80)
@@ -128,14 +180,14 @@ def main():
     
     print(f"\n📦 加载策略: {policy_path}")
     try:
-        policy = torch.jit.load(policy_path)
-        policy.eval()
+        policy, torch_device = load_xbot_policy(policy_path, device=device)
         print(f"✓ 策略加载成功")
         use_policy = True
     except Exception as e:
         print(f"\n⚠️  无法加载策略: {e}")
         print("   使用零动作测试")
         use_policy = False
+        torch_device = None
     
     # 运行
     print("\n" + "="*80)
@@ -161,8 +213,12 @@ def main():
             start_time = datetime.now()
             if use_policy:
                 with torch.no_grad():
-                    obs_tensor = torch.from_numpy(obs).float()
-                    action = policy(obs_tensor).numpy()
+                    # 将观测转换为tensor并移动到指定设备
+                    obs_tensor = torch.from_numpy(obs).float().to(torch_device)
+                    # 推理
+                    action_tensor = policy(obs_tensor)
+                    # 移回CPU并转换为numpy
+                    action = action_tensor.cpu().numpy()
             else:
                 # 零动作（站立测试）
                 action = np.zeros(12, dtype=np.float32)
@@ -213,5 +269,11 @@ def main():
         print("\n环境已关闭")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Run XBot policy in simulation')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda',
+                       help='Inference device: cpu or cuda (default: cpu)')
+    args = parser.parse_args()
+    
+    print(f"[INFO] Using device from command line: {args.device}")
+    main(device=args.device)
 
