@@ -1504,8 +1504,6 @@ def run_example(orcagym_addr : str,
                                     env_version=env.unwrapped.get_env_version(),
                                     env_kwargs=kwargs)
 
-
-
             do_teleoperation(env, dataset_writer, teleoperation_rounds,
                                                  cameras=cameras, rgb_size=RGB_SIZE, action_step=action_step,output_video = output_video)
             dataset_writer.shuffle_demos()
