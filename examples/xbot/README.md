@@ -130,7 +130,7 @@ frame_stack = 15   # 观察堆叠
 
 ### 性能测试脚本
 
-使用 `run_xbot_benchmark.py` 进行性能测试：
+使用 `run_xbot_benchmark.py` 进行性能测试（**已添加进度条显示**）：
 
 ```bash
 # 测试 MUSA GPU 性能
@@ -149,6 +149,11 @@ python run_xbot_benchmark.py --device musa --batch_sizes 1 4 8 16 32
 - 💾 内存使用情况
 - 📊 批量推理性能对比
 
+**新增功能：**
+- ✅ **进度条显示**：实时显示测试进度和平均延迟
+- ✅ **批量测试进度**：每个批量大小都有独立的进度条
+- ✅ **实时统计**：进度条中显示当前平均延迟
+
 **参数说明：**
 - `--device`: 测试设备 (cpu, cuda, musa, auto)
 - `--warmup`: 预热迭代次数（默认: 100）
@@ -156,6 +161,7 @@ python run_xbot_benchmark.py --device musa --batch_sizes 1 4 8 16 32
 - `--batch_sizes`: 批量推理测试的批量大小
 - `--compare_all`: 对比所有可用设备
 - `--no_batch`: 跳过批量推理测试
+- `--export_json`: 导出结果到 JSON 文件
 
 ## 🎯 下一步
 

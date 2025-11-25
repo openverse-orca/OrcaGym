@@ -41,6 +41,43 @@ python run_lite3_sim.py --config configs/lite3_onnx_sim_config.yaml --remote loc
 python run_lite3_sim.py --onnx_model_path policy.onnx --remote localhost:50051
 ```
 
+### 4. 性能测试
+
+使用 `run_lite3_benchmark.py` 进行性能测试（**支持进度条显示**）：
+
+```bash
+# 测试 MUSA GPU 性能
+python run_lite3_benchmark.py --device musa --warmup 100 --iterations 1000
+
+# 对比所有可用设备（MUSA GPU, CUDA GPU, CPU）
+python run_lite3_benchmark.py --compare_all --warmup 100 --iterations 1000
+
+# 测试批量推理性能
+python run_lite3_benchmark.py --device musa --batch_sizes 1 4 8 16 32
+```
+
+**测试指标：**
+- ⏱️ 推理时间（平均、中位数、P50/P95/P99）
+- 🚀 吞吐量（FPS、推理/秒）
+- 💾 内存使用情况
+- 📊 批量推理性能对比
+
+**功能特性：**
+- ✅ **进度条显示**：实时显示测试进度和平均延迟
+- ✅ **批量测试进度**：每个批量大小都有独立的进度条
+- ✅ **实时统计**：进度条中显示当前平均延迟
+- ✅ **设备对比**：自动对比所有可用设备的性能
+
+**参数说明：**
+- `--device`: 测试设备 (cpu, cuda, musa, auto)
+- `--policy_path`: 策略文件路径（默认: policy.onnx）
+- `--warmup`: 预热迭代次数（默认: 100）
+- `--iterations`: 测试迭代次数（默认: 1000）
+- `--batch_sizes`: 批量推理测试的批量大小
+- `--compare_all`: 对比所有可用设备
+- `--no_batch`: 跳过批量推理测试
+- `--export_json`: 导出结果到 JSON 文件
+
 **控制说明：**
 - `Z`: 进入默认状态（站立）
 - `C`: 进入RL控制状态

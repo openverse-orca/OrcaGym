@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-XBot 性能测试脚本
+Lite3 ONNX 策略性能测试脚本
 测试不同设备（MUSA GPU, CUDA GPU, CPU）的推理性能
 
 使用方法:
-    python run_xbot_benchmark.py --device musa --warmup 100 --iterations 1000
-    python run_xbot_benchmark.py --device auto --compare_all  # 对比所有可用设备
+    python run_lite3_benchmark.py --device musa --warmup 100 --iterations 1000
+    python run_lite3_benchmark.py --device auto --compare_all  # 对比所有可用设备
 """
 
 import sys
@@ -13,24 +13,20 @@ import os
 import time
 import argparse
 import numpy as np
-import torch
-from collections import deque
-import statistics
 from tqdm import tqdm
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from envs.xbot_gym.xbot_simple_env import XBotSimpleEnv
-from orca_gym.utils.device_utils import get_torch_device, get_gpu_info, print_gpu_info
+from envs.legged_gym.utils.onnx_policy import load_onnx_policy, ONNXPolicy
+from orca_gym.utils.device_utils import get_gpu_info, print_gpu_info
 import psutil
 import gc
 
 
-class PerformanceBenchmark:
-    """性能测试类"""
+class Lite3PerformanceBenchmark:
+    """Lite3 ONNX 性能测试类"""
     
-    def __init__(self, policy, torch_device, device_name: str):
+    def __init__(self, policy: ONNXPolicy, device_name: str):
         self.policy = policy
-        self.torch_device = torch_device
         self.device_name = device_name
         self.inference_times = []
         self.memory_usage = []
@@ -38,21 +34,12 @@ class PerformanceBenchmark:
     def warmup(self, num_warmup: int = 100):
         """预热：运行多次推理以稳定性能"""
         print(f"🔥 预热中... ({num_warmup} 次推理)")
-        dummy_obs = np.random.randn(705).astype(np.float32)
+        dummy_obs = np.random.randn(45).astype(np.float32)
         
         with tqdm(total=num_warmup, desc="  预热进度", unit="iter", ncols=80, leave=False) as pbar:
             for _ in range(num_warmup):
-                with torch.no_grad():
-                    obs_tensor = torch.from_numpy(dummy_obs).float().to(self.torch_device)
-                    _ = self.policy(obs_tensor)
+                _ = self.policy(dummy_obs)
                 pbar.update(1)
-        
-        # 同步 GPU（如果有）
-        if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-            if "musa" in str(self.torch_device):
-                torch.musa.synchronize()
-            else:
-                torch.cuda.synchronize()
         
         print("✓ 预热完成")
     
@@ -61,7 +48,7 @@ class PerformanceBenchmark:
         print(f"\n📊 单次推理性能测试 ({num_iterations} 次迭代)")
         print("=" * 80)
         
-        dummy_obs = np.random.randn(705).astype(np.float32)
+        dummy_obs = np.random.randn(45).astype(np.float32)
         self.inference_times = []
         
         # 记录初始内存
@@ -69,34 +56,17 @@ class PerformanceBenchmark:
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         
         # 测试循环（带进度条）
-        with tqdm(total=num_iterations, desc="  测试进度", unit="iter", ncols=80, 
+        with tqdm(total=num_iterations, desc="  测试进度", unit="iter", ncols=80,
                   bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]') as pbar:
             for i in range(num_iterations):
                 # 开始计时
-                if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-                    if "musa" in str(self.torch_device):
-                        torch.musa.synchronize()
-                    else:
-                        torch.cuda.synchronize()
-                    start_time = time.perf_counter()
-                else:
-                    start_time = time.perf_counter()
+                start_time = time.perf_counter()
                 
                 # 推理
-                with torch.no_grad():
-                    obs_tensor = torch.from_numpy(dummy_obs).float().to(self.torch_device)
-                    action_tensor = self.policy(obs_tensor)
-                    action = action_tensor.cpu().numpy()
+                _ = self.policy(dummy_obs)
                 
                 # 结束计时
-                if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-                    if "musa" in str(self.torch_device):
-                        torch.musa.synchronize()
-                    else:
-                        torch.cuda.synchronize()
-                    end_time = time.perf_counter()
-                else:
-                    end_time = time.perf_counter()
+                end_time = time.perf_counter()
                 
                 inference_time = (end_time - start_time) * 1000  # 转换为毫秒
                 self.inference_times.append(inference_time)
@@ -106,16 +76,16 @@ class PerformanceBenchmark:
                     current_memory = process.memory_info().rss / 1024 / 1024  # MB
                     self.memory_usage.append(current_memory - initial_memory)
                 
-                # 更新进度条（每10次更新一次，避免过于频繁）
+                # 更新进度条（每10次更新一次）
                 if (i + 1) % 10 == 0 or i == num_iterations - 1:
-                    # 显示当前平均时间
                     if len(self.inference_times) > 0:
                         avg_time = np.mean(self.inference_times[-min(100, len(self.inference_times)):])
                         pbar.set_postfix({'avg_ms': f'{avg_time:.3f}'})
-                    update_count = 10 if (i + 1) % 10 == 0 else ((i + 1) % 10)
-                    pbar.update(update_count)
+                    pbar.update(10 if (i + 1) % 10 == 0 else (i + 1) % 10)
         
-        # 确保进度条完成（pbar 在 with 块外已关闭，这里不需要）
+        # 确保进度条完成
+        if not pbar.n == num_iterations:
+            pbar.update(num_iterations - pbar.n)
         
         # 计算统计信息
         self._print_statistics()
@@ -129,62 +99,33 @@ class PerformanceBenchmark:
         
         for batch_size in batch_sizes:
             print(f"\n  测试批量大小: {batch_size}")
-            dummy_obs = np.random.randn(batch_size, 705).astype(np.float32)
+            dummy_obs = np.random.randn(batch_size, 45).astype(np.float32)
             batch_times = []
             
             # 预热
             with tqdm(total=10, desc="    预热", unit="iter", ncols=60, leave=False) as pbar:
                 for _ in range(10):
-                    with torch.no_grad():
-                        obs_tensor = torch.from_numpy(dummy_obs).float().to(self.torch_device)
-                        _ = self.policy(obs_tensor)
+                    _ = self.policy(dummy_obs)
                     pbar.update(1)
-            
-            # 同步
-            if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-                if "musa" in str(self.torch_device):
-                    torch.musa.synchronize()
-                else:
-                    torch.cuda.synchronize()
             
             # 测试（带进度条）
             num_iterations = 100
             with tqdm(total=num_iterations, desc="    测试", unit="iter", ncols=60, leave=False,
                       bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]') as pbar:
-                for iter_idx in range(num_iterations):
-                    if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-                        if "musa" in str(self.torch_device):
-                            torch.musa.synchronize()
-                        else:
-                            torch.cuda.synchronize()
-                        start_time = time.perf_counter()
-                    else:
-                        start_time = time.perf_counter()
-                    
-                    with torch.no_grad():
-                        obs_tensor = torch.from_numpy(dummy_obs).float().to(self.torch_device)
-                        action_tensor = self.policy(obs_tensor)
-                        _ = action_tensor.cpu().numpy()
-                    
-                    if "musa" in str(self.torch_device) or "cuda" in str(self.torch_device):
-                        if "musa" in str(self.torch_device):
-                            torch.musa.synchronize()
-                        else:
-                            torch.cuda.synchronize()
-                        end_time = time.perf_counter()
-                    else:
-                        end_time = time.perf_counter()
+                for _ in range(num_iterations):
+                    start_time = time.perf_counter()
+                    _ = self.policy(dummy_obs)
+                    end_time = time.perf_counter()
                     
                     batch_time = (end_time - start_time) * 1000  # 毫秒
                     batch_times.append(batch_time)
                     
                     # 更新进度条（每10次更新一次）
-                    if (iter_idx + 1) % 10 == 0 or iter_idx == num_iterations - 1:
+                    if len(batch_times) % 10 == 0 or len(batch_times) == num_iterations:
                         if len(batch_times) > 0:
                             avg_time = np.mean(batch_times[-min(20, len(batch_times)):])
                             pbar.set_postfix({'avg_ms': f'{avg_time:.3f}'})
-                        update_count = 10 if (iter_idx + 1) % 10 == 0 else ((iter_idx + 1) % 10)
-                        pbar.update(update_count)
+                        pbar.update(10 if len(batch_times) % 10 == 0 else len(batch_times) % 10)
             
             # 确保进度条完成
             if len(batch_times) < num_iterations:
@@ -273,42 +214,6 @@ class PerformanceBenchmark:
         }
 
 
-def load_xbot_policy(policy_path: str, device: str = "auto"):
-    """加载XBot策略"""
-    if device == "auto":
-        torch_device = get_torch_device(try_to_use_gpu=True)
-        device_str = str(torch_device)
-        if "musa" in device_str:
-            device = "musa"
-        elif "cuda" in device_str:
-            device = "cuda"
-        else:
-            device = "cpu"
-    else:
-        if device == "musa":
-            try:
-                import torch_musa
-                if torch.musa.is_available():
-                    torch_device = torch.device("musa:0")
-                else:
-                    raise RuntimeError("MUSA GPU not available")
-            except ImportError:
-                raise RuntimeError("torch_musa not installed")
-        elif device == "cuda":
-            if torch.cuda.is_available():
-                torch_device = torch.device("cuda:0")
-            else:
-                raise RuntimeError("CUDA not available")
-        else:
-            torch_device = torch.device("cpu")
-    
-    policy = torch.jit.load(policy_path, map_location=torch_device)
-    policy.eval()
-    policy.to(torch_device)
-    
-    return policy, torch_device, device
-
-
 def benchmark_device(device: str, policy_path: str, warmup: int, iterations: int, batch_sizes: list):
     """对单个设备进行性能测试"""
     print(f"\n{'='*80}")
@@ -317,11 +222,13 @@ def benchmark_device(device: str, policy_path: str, warmup: int, iterations: int
     
     try:
         # 加载策略
-        policy, torch_device, device_name = load_xbot_policy(policy_path, device)
-        print(f"✓ 策略已加载到设备: {torch_device}")
+        policy = load_onnx_policy(policy_path, device=device)
+        print(f"✓ 策略已加载")
+        print(f"  设备: {device.upper()}")
+        print(f"  Providers: {policy.session.get_providers()}")
         
         # 创建测试对象
-        benchmark = PerformanceBenchmark(policy, torch_device, device_name)
+        benchmark = Lite3PerformanceBenchmark(policy, device)
         
         # 预热
         benchmark.warmup(num_warmup=warmup)
@@ -336,16 +243,13 @@ def benchmark_device(device: str, policy_path: str, warmup: int, iterations: int
         # 清理
         del policy
         gc.collect()
-        if "musa" in str(torch_device) or "cuda" in str(torch_device):
-            if "musa" in str(torch_device):
-                torch.musa.empty_cache()
-            else:
-                torch.cuda.empty_cache()
         
         return benchmark.get_summary()
     
     except Exception as e:
         print(f"❌ 测试失败: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -367,8 +271,12 @@ def compare_all_devices(policy_path: str, warmup: int, iterations: int, export_j
         pass
     
     # 检查 CUDA
-    if torch.cuda.is_available():
-        available_devices.append("cuda")
+    try:
+        import torch
+        if torch.cuda.is_available():
+            available_devices.append("cuda")
+    except:
+        pass
     
     # CPU 总是可用
     available_devices.append("cpu")
@@ -447,11 +355,11 @@ def compare_all_devices(policy_path: str, warmup: int, iterations: int, export_j
 
 
 def main():
-    parser = argparse.ArgumentParser(description="XBot 性能测试脚本")
+    parser = argparse.ArgumentParser(description="Lite3 ONNX 性能测试脚本")
     parser.add_argument("--device", type=str, choices=['cpu', 'cuda', 'musa', 'auto'], 
                        default='auto', help="测试设备 (默认: auto)")
     parser.add_argument("--policy_path", type=str, 
-                       default=None, help="策略文件路径 (默认: config/policy_example.pt)")
+                       default=None, help="策略文件路径 (默认: policy.onnx)")
     parser.add_argument("--warmup", type=int, default=100, 
                        help="预热迭代次数 (默认: 100)")
     parser.add_argument("--iterations", type=int, default=1000, 
@@ -470,14 +378,14 @@ def main():
     # 默认策略路径
     if args.policy_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        args.policy_path = os.path.join(script_dir, "config", "policy_example.pt")
+        args.policy_path = os.path.join(script_dir, "policy.onnx")
     
     if not os.path.exists(args.policy_path):
         print(f"❌ 策略文件不存在: {args.policy_path}")
         return
     
     print("="*80)
-    print("🚀 XBot 性能测试")
+    print("🚀 Lite3 ONNX 性能测试")
     print("="*80)
     print(f"策略文件: {args.policy_path}")
     print(f"预热迭代: {args.warmup}")
