@@ -162,15 +162,18 @@ class PerformanceBenchmark:
             mean_time = np.mean(batch_times)
             std_time = np.std(batch_times)
             throughput = batch_size / (mean_time / 1000)  # 样本/秒
+            time_per_sample = mean_time / batch_size  # 单样本时间（毫秒）
             
             results[batch_size] = {
                 'mean_ms': mean_time,
                 'std_ms': std_time,
-                'throughput': throughput
+                'throughput': throughput,
+                'time_per_sample_ms': time_per_sample
             }
             
             print(f"    平均时间: {mean_time:.3f} ms ± {std_time:.3f} ms")
             print(f"    吞吐量: {throughput:.1f} 样本/秒")
+            print(f"    单样本时间: {time_per_sample:.6f} ms ({time_per_sample*1000:.3f} μs)")
         
         return results
     

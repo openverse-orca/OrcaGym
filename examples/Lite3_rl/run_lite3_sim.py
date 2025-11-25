@@ -270,21 +270,19 @@ def load_lite3_onnx_policy(model_path: str, device: str = "auto"):
             import onnxruntime as ort
             available_providers = ort.get_available_providers()
             
-            # MUSA GPU 通常通过 CUDAExecutionProvider 兼容
-            # 或者可能有专门的 MUSAExecutionProvider（如果已安装）
+            # MUSA GPU 支持检查
             if device == "musa":
-                # 检查是否有 MUSA 相关的 provider
-                musa_providers = [p for p in available_providers if 'MUSA' in p.upper() or 'MOORE' in p.upper()]
-                if musa_providers:
-                    print(f"[INFO] Using MUSA GPU with provider: {musa_providers[0]}")
+                # 检查是否有 MUSAExecutionProvider
+                if 'MUSAExecutionProvider' in available_providers:
+                    print(f"[INFO] ✅ Using MUSA GPU with MUSAExecutionProvider")
                 elif 'CUDAExecutionProvider' in available_providers:
                     print(f"[INFO] Using MUSA GPU (via CUDAExecutionProvider compatibility)")
                     print(f"[INFO] 注意: ONNX Runtime 将通过 CUDAExecutionProvider 使用 MUSA GPU")
                 else:
                     print(f"[WARNING] MUSA GPU requested but no compatible provider found.")
                     print(f"[WARNING] Available providers: {available_providers}")
-                    print(f"[WARNING] 要使用 MUSA GPU，需要安装支持 GPU 的 ONNX Runtime:")
-                    print(f"         对于 MUSA GPU，可能需要安装 onnxruntime-gpu 或专门的 MUSA 版本")
+                    print(f"[WARNING] 要使用 MUSA GPU，需要安装支持 MUSA 的 ONNX Runtime:")
+                    print(f"         安装: pip install onnxruntime-musa")
                     print(f"[WARNING] Falling back to CPU.")
                     device = "cpu"
             elif device == "cuda":
