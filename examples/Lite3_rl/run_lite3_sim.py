@@ -14,6 +14,7 @@ import numpy as np
 from datetime import datetime
 import gymnasium as gym
 import yaml
+import torch  # 用于版本检查和诊断
 
 # 添加项目根目录到Python路径
 current_file_path = os.path.abspath(__file__)
@@ -214,6 +215,54 @@ def load_lite3_onnx_policy(model_path: str, device: str = "auto"):
         else:
             device = "cpu"
             print(f"[INFO] No GPU available, using CPU")
+            # 打印调试信息
+            if 'debug_info' in gpu_info:
+                debug = gpu_info['debug_info']
+                if debug.get('torch_musa_imported', False):
+                    print(f"[DEBUG] torch_musa 已导入，但 GPU 不可用")
+                    if 'reason' in debug:
+                        print(f"[DEBUG] 原因: {debug['reason']}")
+    
+    # 如果用户明确指定了 MUSA，但检测不到，给出详细诊断
+    if device == "musa":
+        gpu_info = get_gpu_info()
+        if not gpu_info["available"] or gpu_info["device_type"] != "musa":
+            print(f"[WARNING] MUSA GPU 被请求，但检测不到可用的 MUSA GPU")
+            print(f"[WARNING] 当前检测到的设备类型: {gpu_info['device_type']}")
+            if 'debug_info' in gpu_info:
+                debug = gpu_info['debug_info']
+                print(f"[DEBUG] 诊断信息:")
+                print(f"  - torch_musa 导入状态: {debug.get('torch_musa_imported', 'unknown')}")
+                if 'torch_version' in debug:
+                    print(f"  - PyTorch 版本: {debug['torch_version']}")
+                if 'likely_cause' in debug:
+                    print(f"  - 可能原因: {debug['likely_cause']}")
+                if 'suggestion' in debug:
+                    print(f"  - 建议: {debug['suggestion']}")
+                if 'torch_musa_module_exists' in debug:
+                    print(f"  - torch.musa 模块存在: {debug['torch_musa_module_exists']}")
+                if 'torch_musa_is_available' in debug:
+                    print(f"  - torch.musa.is_available(): {debug['torch_musa_is_available']}")
+                if 'reason' in debug:
+                    print(f"  - 原因: {debug['reason']}")
+                if 'error' in debug:
+                    error_msg = debug['error']
+                    # 截断过长的错误信息
+                    if len(error_msg) > 300:
+                        error_msg = error_msg[:300] + "..."
+                    print(f"  - 导入错误: {error_msg}")
+            print(f"[WARNING] 建议:")
+            print(f"  1. 检查 PyTorch 版本: torch_musa 2.0.1 需要 PyTorch 2.2.0")
+            print(f"     当前版本: {torch.__version__}")
+            print(f"     解决方案: 从摩尔线程提供的本地 wheel 文件安装:")
+            print(f"       - torch-2.2.0-cp310-cp310-linux_aarch64.whl")
+            print(f"       - torch_musa-2.0.1-cp310-cp310-linux_aarch64.whl")
+            print(f"       - torchvision-0.17.2+c1d70fe-cp310-cp310-linux_aarch64.whl")
+            print(f"       - torchaudio-2.2.2+cefdb36-cp310-cp310-linux_aarch64.whl")
+            print(f"  2. 检查 MUSA 驱动是否正确安装（运行 'mthreads-smi' 确认）")
+            print(f"  3. 确保使用本地 wheel 文件安装，不要从 PyPI 安装 PyTorch")
+            print(f"  4. 如果系统能检测到 GPU 但 PyTorch 无法使用，可能需要完全卸载后重新安装")
+            print(f"[WARNING] 将继续尝试使用 MUSA，如果失败将回退到 CPU")
     
     # 检查设备可用性（对于 MUSA 和 CUDA）
     if device in ["cuda", "musa"]:
@@ -230,9 +279,12 @@ def load_lite3_onnx_policy(model_path: str, device: str = "auto"):
                     print(f"[INFO] Using MUSA GPU with provider: {musa_providers[0]}")
                 elif 'CUDAExecutionProvider' in available_providers:
                     print(f"[INFO] Using MUSA GPU (via CUDAExecutionProvider compatibility)")
+                    print(f"[INFO] 注意: ONNX Runtime 将通过 CUDAExecutionProvider 使用 MUSA GPU")
                 else:
                     print(f"[WARNING] MUSA GPU requested but no compatible provider found.")
                     print(f"[WARNING] Available providers: {available_providers}")
+                    print(f"[WARNING] 要使用 MUSA GPU，需要安装支持 GPU 的 ONNX Runtime:")
+                    print(f"         对于 MUSA GPU，可能需要安装 onnxruntime-gpu 或专门的 MUSA 版本")
                     print(f"[WARNING] Falling back to CPU.")
                     device = "cpu"
             elif device == "cuda":
