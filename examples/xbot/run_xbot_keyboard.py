@@ -7,10 +7,12 @@ XBot键盘控制 - 使用WASD控制机器人移动
 from datetime import datetime
 import sys
 import os
+import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from envs.xbot_gym.xbot_simple_env import XBotSimpleEnv
 from orca_gym.devices.keyboard import KeyboardInput, KeyboardInputSourceType
+from orca_gym.utils.device_utils import get_torch_device, get_gpu_info, print_gpu_info
 import torch
 import numpy as np
 import time
@@ -123,10 +125,13 @@ class XBotKeyboardController:
         pass
 
 
-def main():
+def main(device: str = "auto"):
     print("="*80)
     print("🎮 XBot键盘控制 - OrcaGym")
     print("="*80)
+    
+    # 打印GPU信息
+    print_gpu_info()
     
     # 环境配置
     orcagym_addr = "localhost:50051"
@@ -157,9 +162,52 @@ def main():
     policy_path = os.path.join(script_dir, "config", "policy_example.pt")
     
     print(f"\n📦 加载策略: {policy_path}")
+    
+    # 自动检测设备
+    if device == "auto":
+        torch_device = get_torch_device(try_to_use_gpu=True)
+        device_str = str(torch_device)
+        if "musa" in device_str:
+            device = "musa"
+        elif "cuda" in device_str:
+            device = "cuda"
+        else:
+            device = "cpu"
+        print(f"[INFO] Auto-detected device: {device_str}")
+    else:
+        # 手动指定设备
+        if device == "musa":
+            try:
+                import torch_musa
+                if torch.musa.is_available():
+                    torch_device = torch.device("musa:0")
+                    print(f"[INFO] Using MUSA GPU: {torch.musa.get_device_name(0)}")
+                else:
+                    print(f"[WARNING] MUSA GPU not available. Falling back to CPU.")
+                    torch_device = torch.device("cpu")
+                    device = "cpu"
+            except ImportError:
+                print(f"[WARNING] torch_musa not installed. Falling back to CPU.")
+                torch_device = torch.device("cpu")
+                device = "cpu"
+        elif device == "cuda":
+            if torch.cuda.is_available():
+                torch_device = torch.device("cuda:0")
+                print(f"[INFO] Using CUDA GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                print(f"[WARNING] CUDA not available. Falling back to CPU.")
+                torch_device = torch.device("cpu")
+                device = "cpu"
+        else:
+            torch_device = torch.device("cpu")
+            device = "cpu"
+    
+    print(f"Device: {device.upper()}")
+    
     try:
-        policy = torch.jit.load(policy_path)
+        policy = torch.jit.load(policy_path, map_location=torch_device)
         policy.eval()
+        policy.to(torch_device)
         print("✅ 策略加载成功")
     except Exception as e:
         print(f"❌ 策略加载失败: {e}")
@@ -208,8 +256,9 @@ def main():
             
             # 获取策略动作
             with torch.no_grad():
-                obs_tensor = torch.from_numpy(obs).float()
-                action = policy(obs_tensor).numpy()
+                obs_tensor = torch.from_numpy(obs).float().to(torch_device)
+                action_tensor = policy(obs_tensor)
+                action = action_tensor.cpu().numpy()
             
             # Step
             obs, reward, terminated, truncated, info = env.step(action)
@@ -260,5 +309,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Run XBot with keyboard control')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda', 'musa', 'auto'], default='auto',
+                       help='Inference device: cpu, cuda, musa, or auto (auto-detects GPU, default: auto)')
+    args = parser.parse_args()
+    
+    print(f"[INFO] Using device from command line: {args.device}")
+    main(device=args.device)
 

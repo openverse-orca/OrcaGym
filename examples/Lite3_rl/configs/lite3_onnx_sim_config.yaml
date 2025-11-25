@@ -13,6 +13,15 @@ onnx_model_path: "examples/Lite3_rl/policy.onnx"
 # 控制设备
 ctrl_device: "keyboard"
 
+# 推理设备: "cpu", "cuda", "musa", 或 "auto"
+# 注意: MuJoCo物理仿真本身不支持GPU，只有策略推理可以使用GPU
+# - "auto": 自动检测可用GPU（优先级：MUSA > CUDA > CPU）
+# - "musa": 使用MUSA GPU（摩尔线程显卡）
+# - "cuda": 使用CUDA GPU（NVIDIA显卡）
+# - "cpu": 使用CPU
+# 使用GPU需要安装: pip install onnxruntime-gpu
+inference_device: "auto"  # 可选: "cpu", "cuda", "musa", "auto"
+
 # 命令模型配置
 command_model:
   "flat_terrain":

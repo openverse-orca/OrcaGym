@@ -49,7 +49,11 @@ class ONNXPolicy:
         
         # 设置提供者
         if providers is None:
-            if device == "cuda":
+            if device == "musa":
+                # MUSA GPU 通常通过 CUDAExecutionProvider 兼容
+                # 或者可能有专门的 MUSAExecutionProvider
+                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            elif device == "cuda":
                 providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
             else:
                 providers = ['CPUExecutionProvider']

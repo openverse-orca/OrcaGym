@@ -33,6 +33,8 @@ from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, Cu
 from envs.legged_gym.utils.onnx_policy import load_onnx_policy
 from envs.legged_gym.utils.lite3_obs_helper import compute_lite3_obs, get_dof_pos_default_policy
 from envs.legged_gym.robot_config.Lite3_config import Lite3Config
+from orca_gym.utils.device_utils import get_gpu_info, print_gpu_info
+from orca_gym.utils.device_utils import get_gpu_info, print_gpu_info
 
 
 # 仿真参数
@@ -181,8 +183,70 @@ def register_env(orcagym_addr: str,
     return env_id, kwargs
 
 
-def load_lite3_onnx_policy(model_path: str):
-    """加载Lite3 ONNX策略"""
+def load_lite3_onnx_policy(model_path: str, device: str = "auto"):
+    """
+    加载Lite3 ONNX策略
+    
+    Args:
+        model_path: ONNX模型文件路径
+        device: 设备类型 ('cpu', 'cuda', 'musa', 或 'auto')
+                - 'auto': 自动检测可用GPU（优先级：MUSA > CUDA > CPU）
+                - 'musa': 使用MUSA GPU
+                - 'cuda': 使用CUDA GPU
+                - 'cpu': 使用CPU
+    
+    Returns:
+        ONNXPolicy实例
+    """
+    # 自动检测设备
+    if device == "auto":
+        gpu_info = get_gpu_info()
+        if gpu_info["available"]:
+            if gpu_info["device_type"] == "musa":
+                device = "musa"
+                print(f"[INFO] Auto-detected MUSA GPU: {gpu_info['device_name']}")
+            elif gpu_info["device_type"] == "cuda":
+                device = "cuda"
+                print(f"[INFO] Auto-detected CUDA GPU: {gpu_info['device_name']}")
+            else:
+                device = "cpu"
+                print(f"[INFO] Auto-detected device type: {gpu_info['device_type']}, falling back to CPU")
+        else:
+            device = "cpu"
+            print(f"[INFO] No GPU available, using CPU")
+    
+    # 检查设备可用性（对于 MUSA 和 CUDA）
+    if device in ["cuda", "musa"]:
+        try:
+            import onnxruntime as ort
+            available_providers = ort.get_available_providers()
+            
+            # MUSA GPU 通常通过 CUDAExecutionProvider 兼容
+            # 或者可能有专门的 MUSAExecutionProvider（如果已安装）
+            if device == "musa":
+                # 检查是否有 MUSA 相关的 provider
+                musa_providers = [p for p in available_providers if 'MUSA' in p.upper() or 'MOORE' in p.upper()]
+                if musa_providers:
+                    print(f"[INFO] Using MUSA GPU with provider: {musa_providers[0]}")
+                elif 'CUDAExecutionProvider' in available_providers:
+                    print(f"[INFO] Using MUSA GPU (via CUDAExecutionProvider compatibility)")
+                else:
+                    print(f"[WARNING] MUSA GPU requested but no compatible provider found.")
+                    print(f"[WARNING] Available providers: {available_providers}")
+                    print(f"[WARNING] Falling back to CPU.")
+                    device = "cpu"
+            elif device == "cuda":
+                if 'CUDAExecutionProvider' not in available_providers:
+                    print(f"[WARNING] CUDAExecutionProvider not available. Available providers: {available_providers}")
+                    print(f"[WARNING] Falling back to CPU. Install onnxruntime-gpu to use GPU:")
+                    print(f"         pip install onnxruntime-gpu")
+                    device = "cpu"
+                else:
+                    print(f"[INFO] Using CUDA GPU (CUDAExecutionProvider)")
+        except ImportError:
+            print(f"[WARNING] onnxruntime not installed. Falling back to CPU.")
+            device = "cpu"
+    
     # 如果是相对路径，转换为绝对路径
     if not os.path.isabs(model_path):
         # 获取项目根目录（从当前脚本位置向上3级：Lite3_rl -> examples -> OrcaGym-dev）
@@ -209,7 +273,8 @@ def load_lite3_onnx_policy(model_path: str):
                                f"Resolved path: {model_path}")
     
     print(f"Loading Lite3 ONNX policy from: {model_path}")
-    policy = load_onnx_policy(model_path, device="cpu")
+    print(f"Device: {device.upper()}")
+    policy = load_onnx_policy(model_path, device=device)
     return policy
 
 
@@ -497,8 +562,14 @@ def main(config: dict, remote: str = None):
         agent_asset_path = config['agent_asset_path']
         command_model = config['command_model']
         
+        # 获取推理设备（默认auto自动检测，可配置为cpu/cuda/musa/auto）
+        inference_device = config.get('inference_device', 'auto')
+        
+        # 打印GPU信息
+        print_gpu_info()
+        
         # 加载ONNX策略
-        policy = load_lite3_onnx_policy(onnx_model_path)
+        policy = load_lite3_onnx_policy(onnx_model_path, device=inference_device)
         
         # 清空场景
         clear_scene(orcagym_addresses=orcagym_addresses)
@@ -568,6 +639,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run Lite3 ONNX policy in simulation')
     parser.add_argument('--config', type=str, help='Path to config file')
     parser.add_argument('--remote', type=str, help='Remote address of OrcaStudio (e.g., localhost:50051)')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda', 'musa', 'auto'], default=None,
+                       help='Inference device: cpu, cuda, musa, or auto (auto-detects GPU, overrides config file)')
     args = parser.parse_args()
     
     if args.config is None:
@@ -578,6 +651,7 @@ if __name__ == "__main__":
             'agent_asset_path': 'assets/prefabs/lite3_usda',
             'onnx_model_path': 'policy.onnx',
             'ctrl_device': 'keyboard',
+            'inference_device': 'auto',  # 默认自动检测
             'terrain_asset_paths': ['assets/prefabs/terrain_test_usda'],
             'command_model': {
                 'flat_terrain': {
@@ -592,6 +666,11 @@ if __name__ == "__main__":
     else:
         with open(args.config, 'r') as f:
             config = yaml.load(f, Loader=yaml.FullLoader)
+    
+    # 命令行参数优先于配置文件
+    if args.device is not None:
+        config['inference_device'] = args.device
+        print(f"[INFO] Using device from command line: {args.device}")
     
     main(config=config, remote=args.remote)
 
