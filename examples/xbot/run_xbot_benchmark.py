@@ -314,7 +314,7 @@ def benchmark_device(device: str, policy_path: str, warmup: int, iterations: int
         return None
 
 
-def compare_all_devices(policy_path: str, warmup: int, iterations: int):
+def compare_all_devices(policy_path: str, warmup: int, iterations: int, export_json: str = None):
     """对比所有可用设备"""
     print(f"\n{'='*80}")
     print(f"📊 设备性能对比测试")
@@ -355,14 +355,14 @@ def compare_all_devices(policy_path: str, warmup: int, iterations: int):
         print(f"\n{'='*80}")
         print(f"📊 性能对比总结")
         print(f"{'='*80}")
-        print(f"{'设备':<10} {'平均时间(ms)':<15} {'FPS':<10} {'吞吐量(推理/秒)':<20} {'P95(ms)':<10}")
-        print(f"{'-'*80}")
+        print(f"{'设备':<10} {'平均时间(ms)':<15} {'FPS':<10} {'吞吐量(推理/秒)':<20} {'P95(ms)':<10} {'P99(ms)':<10}")
+        print(f"{'-'*90}")
         
         # 按平均时间排序
         sorted_results = sorted(results.items(), key=lambda x: x[1]['mean_ms'])
         
         for device, summary in sorted_results:
-            print(f"{device.upper():<10} {summary['mean_ms']:<15.3f} {summary['fps']:<10.1f} {summary['throughput']:<20.1f} {summary['p95_ms']:<10.3f}")
+            print(f"{device.upper():<10} {summary['mean_ms']:<15.3f} {summary['fps']:<10.1f} {summary['throughput']:<20.1f} {summary['p95_ms']:<10.3f} {summary['p99_ms']:<10.3f}")
         
         # 计算加速比
         if len(sorted_results) > 1:
@@ -371,6 +371,44 @@ def compare_all_devices(policy_path: str, warmup: int, iterations: int):
             for device, summary in sorted_results:
                 speedup = baseline / summary['mean_ms']
                 print(f"  {device.upper()}: {speedup:.2f}x")
+            
+            # 详细分析
+            print(f"\n📈 性能分析:")
+            fastest = sorted_results[0]
+            print(f"  - 最快设备: {fastest[0].upper()} ({fastest[1]['mean_ms']:.3f} ms)")
+            
+            if len(sorted_results) > 1:
+                second = sorted_results[1]
+                ratio = second[1]['mean_ms'] / fastest[1]['mean_ms']
+                print(f"  - 第二快设备: {second[0].upper()} ({second[1]['mean_ms']:.3f} ms, {ratio:.2f}x 慢)")
+            
+            # 延迟稳定性分析
+            print(f"\n⏱️  延迟稳定性 (P99/P50 比值，越小越稳定):")
+            for device, summary in sorted_results:
+                stability = summary['p99_ms'] / summary['p50_ms'] if summary['p50_ms'] > 0 else float('inf')
+                print(f"  - {device.upper()}: {stability:.2f}x")
+        
+        # 导出 JSON（如果指定）
+        if export_json:
+            import json
+            export_data = {
+                'test_config': {
+                    'warmup': warmup,
+                    'iterations': iterations,
+                    'policy_path': policy_path
+                },
+                'results': results,
+                'summary': {
+                    'fastest_device': sorted_results[0][0] if sorted_results else None,
+                    'speedup_ratios': {
+                        device: baseline / summary['mean_ms'] 
+                        for device, summary in sorted_results
+                    } if len(sorted_results) > 1 else {}
+                }
+            }
+            with open(export_json, 'w') as f:
+                json.dump(export_data, f, indent=2)
+            print(f"\n💾 结果已导出到: {export_json}")
 
 
 def main():
@@ -389,6 +427,8 @@ def main():
                        help="对比所有可用设备的性能")
     parser.add_argument("--no_batch", action='store_true',
                        help="跳过批量推理测试")
+    parser.add_argument("--export_json", type=str, default=None,
+                       help="导出结果到 JSON 文件")
     
     args = parser.parse_args()
     
@@ -413,7 +453,7 @@ def main():
     
     if args.compare_all:
         # 对比所有设备
-        compare_all_devices(args.policy_path, args.warmup, args.iterations)
+        compare_all_devices(args.policy_path, args.warmup, args.iterations, args.export_json)
     else:
         # 测试单个设备
         batch_sizes = [] if args.no_batch else args.batch_sizes
