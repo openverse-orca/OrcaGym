@@ -14,6 +14,10 @@ import os
 import json
 import traceback
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def train_policy(config : str, algo : str, dataset : str, name : str, output_dir : str, debug : bool = False):
 
     if config is not None:
@@ -66,4 +70,4 @@ def train_policy(config : str, algo : str, dataset : str, name : str, output_dir
         train(config, device=device)
     except Exception as e:
         res_str = "run failed with error:\n{}\n\n{}".format(e, traceback.format_exc())
-    print(res_str)
+    _logger.info(res_str)

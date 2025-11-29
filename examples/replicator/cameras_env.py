@@ -6,6 +6,10 @@ from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import orca_gym.utils.rotations as rotations
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class CamerasEnv(OrcaGymLocalEnv):
     """
@@ -122,7 +126,7 @@ class CamerasEnv(OrcaGymLocalEnv):
         
     def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
         self.scene_runtime = scene_runtime
-        print("Scene runtime is set.")
+        _logger.performance("Scene runtime is set.")
 
     def _timer_now(self) -> float:
         """
@@ -135,7 +139,7 @@ class CamerasEnv(OrcaGymLocalEnv):
         Switch the camera view.
         """
         if not hasattr(self, "scene_runtime") or self.scene_runtime is None:
-            print("Scene runtime is not set.")
+            _logger.performance("Scene runtime is not set.")
             return
         
         if self._timer_now() - self._camera_switch_time > self._camera_config[self._current_camera]["duration"]:
@@ -143,7 +147,7 @@ class CamerasEnv(OrcaGymLocalEnv):
             camera_name = self._camera_config[self._current_camera]["name"]
             entity_name = "CameraViewport"
             self.scene_runtime.make_camera_viewport_active(camera_name, entity_name)
-            print(f"Switched to camera: {camera_name}")
+            _logger.info(f"Switched to camera: {camera_name}")
             self._camera_switch_time = self._timer_now()
         else:
             # print(f"Current camera: {self._switch_camera_config[self._current_camera]['name']}, time left: {self._switch_camera_config[self._current_camera]['duration'] - (self._timer_now() - self._camera_switch_time)}")

@@ -10,6 +10,10 @@ import numpy as np
 import random
 import warnings, time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 DEFAULT_CONFIG = {
     "random_object": True, # 是否随机Object的位置，object应该在Agent下面
     "type": "pick_and_place", # 任务类型，默认是pick_and_place
@@ -325,7 +329,7 @@ class AbstractTask:
 
         # 容错处理
         if placed is None:
-            print(f"Warning: Failed to place objects! Falling back to default positions.")
+            _logger.error(f"Warning: Failed to place objects! Falling back to default positions.")
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回

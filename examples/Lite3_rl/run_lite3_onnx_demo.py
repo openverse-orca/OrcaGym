@@ -21,6 +21,10 @@ from envs.legged_gym.utils.onnx_policy import load_onnx_policy
 from envs.legged_gym.utils.lite3_obs_helper import compute_lite3_obs, get_dof_pos_default_policy
 from envs.legged_gym.robot_config.Lite3_config import Lite3Config
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Lite3 ONNX策略运行Demo")
@@ -37,36 +41,36 @@ def main():
     )
     args = parser.parse_args()
     
-    print("=" * 60)
-    print("Lite3 ONNX策略运行Demo")
-    print("=" * 60)
+    _logger.info("=" * 60)
+    _logger.info("Lite3 ONNX策略运行Demo")
+    _logger.info("=" * 60)
     
     # ========== 1. 加载配置 ==========
-    print("\n[1] 加载Lite3配置...")
+    _logger.info("\n[1] 加载Lite3配置...")
     config = Lite3Config
     
-    print(f"  - 关节数量: {len(config['leg_joint_names'])}")
-    print(f"  - PD参数: kp={config['kps'][0]}, kd={config['kds'][0]}")
+    _logger.info(f"  - 关节数量: {len(config['leg_joint_names'])}")
+    _logger.info(f"  - PD参数: kp={config['kps'][0]}, kd={config['kds'][0]}")
     print(f"  - 观测缩放: omega_scale={config.get('omega_scale', 'N/A')}, "
           f"dof_vel_scale={config.get('dof_vel_scale', 'N/A')}")
     
     # ========== 2. 加载ONNX策略 ==========
     if args.onnx_model_path:
-        print(f"\n[2] 加载ONNX策略: {args.onnx_model_path}")
+        _logger.info(f"\n[2] 加载ONNX策略: {args.onnx_model_path}")
         try:
             policy = load_onnx_policy(args.onnx_model_path, device="cpu")
-            print("  ✓ ONNX策略加载成功")
+            _logger.info("  ✓ ONNX策略加载成功")
         except Exception as e:
-            print(f"  ✗ ONNX策略加载失败: {e}")
+            _logger.info(f"  ✗ ONNX策略加载失败: {e}")
             policy = None
     else:
-        print("\n[2] 未指定ONNX模型路径，跳过策略加载")
-        print("    提示: 使用 --onnx_model_path 参数指定模型路径")
+        _logger.info("\n[2] 未指定ONNX模型路径，跳过策略加载")
+        _logger.info("    提示: 使用 --onnx_model_path 参数指定模型路径")
         policy = None
     
     # ========== 3. 测试观测计算 ==========
     if args.test_obs:
-        print("\n[3] 测试观测计算...")
+        _logger.info("\n[3] 测试观测计算...")
         
         # 创建模拟数据
         base_ang_vel = np.random.randn(3)
@@ -96,7 +100,7 @@ def main():
             dof_pos_default=dof_pos_default
         )
         
-        print(f"  ✓ 观测计算完成，维度: {obs.shape}")
+        _logger.info(f"  ✓ 观测计算完成，维度: {obs.shape}")
         assert obs.shape == (45,), f"观测维度应为(45,)，实际为{obs.shape}"
         
         # 测试批量观测
@@ -121,33 +125,33 @@ def main():
             dof_pos_default=dof_pos_default
         )
         
-        print(f"  ✓ 批量观测计算完成，维度: {obs_batch.shape}")
+        _logger.info(f"  ✓ 批量观测计算完成，维度: {obs_batch.shape}")
         assert obs_batch.shape == (num_envs, 45), f"批量观测维度应为({num_envs}, 45)，实际为{obs_batch.shape}"
         
         # 测试策略推理
         if policy is not None:
             try:
                 actions = policy(obs)
-                print(f"  ✓ 策略推理完成，动作维度: {actions.shape}")
+                _logger.info(f"  ✓ 策略推理完成，动作维度: {actions.shape}")
                 assert actions.shape == (12,), f"动作维度应为(12,)，实际为{actions.shape}"
                 
                 actions_batch = policy(obs_batch)
-                print(f"  ✓ 批量策略推理完成，动作维度: {actions_batch.shape}")
+                _logger.info(f"  ✓ 批量策略推理完成，动作维度: {actions_batch.shape}")
                 assert actions_batch.shape == (num_envs, 12), \
                     f"批量动作维度应为({num_envs}, 12)，实际为{actions_batch.shape}"
                 
-                print(f"\n  [示例输出]")
-                print(f"  - 观测前3维 (base_ang_vel): {obs[:3]}")
-                print(f"  - 动作前3维: {actions[:3]}")
+                _logger.info(f"\n  [示例输出]")
+                _logger.info(f"  - 观测前3维 (base_ang_vel): {obs[:3]}")
+                _logger.info(f"  - 动作前3维: {actions[:3]}")
             except Exception as e:
-                print(f"  ✗ 策略推理失败: {e}")
+                _logger.info(f"  ✗ 策略推理失败: {e}")
                 import traceback
                 traceback.print_exc()
     
     # ========== 4. 使用说明 ==========
-    print("\n" + "=" * 60)
-    print("使用说明:")
-    print("=" * 60)
+    _logger.info("\n" + "=" * 60)
+    _logger.info("使用说明:")
+    _logger.info("=" * 60)
     print("""
 1. 在OrcaGym-dev环境中使用Lite3配置:
    - 配置文件: envs/legged_gym/robot_config/Lite3_config.py
@@ -169,13 +173,13 @@ def main():
    - 在环境循环中计算观测并运行策略
     """)
     
-    print("=" * 60)
-    print("Demo完成！")
-    print("=" * 60)
-    print("\n下一步:")
-    print("1. 准备ONNX模型文件")
-    print("2. 运行: python run_lite3_onnx_demo.py --onnx_model_path /path/to/policy.onnx --test_obs")
-    print("3. 在仿真环境中集成ONNX策略")
+    _logger.info("=" * 60)
+    _logger.info("Demo完成！")
+    _logger.info("=" * 60)
+    _logger.info("\n下一步:")
+    _logger.info("1. 准备ONNX模型文件")
+    _logger.info("2. 运行: python run_lite3_onnx_demo.py --onnx_model_path /path/to/policy.onnx --test_obs")
+    _logger.info("3. 在仿真环境中集成ONNX策略")
 
 
 if __name__ == "__main__":

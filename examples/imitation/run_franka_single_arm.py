@@ -29,6 +29,10 @@ import orca_gym.scripts.franka_manipulation as franka_manipulation
 import numpy as np
 import argparse
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 
 
@@ -49,7 +53,7 @@ def run_example(orcagym_addr : str,
                 sample_range : float,
                 realtime_playback : bool):
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addr}")
         if run_mode == "playback":
             dataset_reader = DatasetReader(file_path=record_path)
             task = dataset_reader.get_env_kwargs()["task"]    
@@ -58,10 +62,10 @@ def run_example(orcagym_addr : str,
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
             env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
-            print("Registered environment: ", env_id)
+            _logger.info(f"Registered environment:  {env_id}")
 
             env = gym.make(env_id)
-            print("Starting simulation...")
+            _logger.info("Starting simulation...")
             franka_manipulation.do_playback(env, dataset_reader, playback_mode, ACTION_STEP, realtime_playback)
 
         elif run_mode == "teleoperation":
@@ -69,10 +73,10 @@ def run_example(orcagym_addr : str,
             env_index = 0
             camera_config = CAMERA_CONFIG
             env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.TELEOPERATION, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
-            print("Registered environment: ", env_id)
+            _logger.info(f"Registered environment:  {env_id}")
 
             env = gym.make(env_id)        
-            print("Starting simulation...")
+            _logger.info("Starting simulation...")
             kwargs["run_mode"] = RunMode.POLICY_NORMALIZED  # 此处用于训练的时候读取
             
             if RGB_SIZE is None:
@@ -100,7 +104,7 @@ def run_example(orcagym_addr : str,
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
             env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
-            print("Registered environment: ", env_id)
+            _logger.info(f"Registered environment:  {env_id}")
 
             # env = gym.make(env_id)
             # print("Starting simulation...")
@@ -125,7 +129,7 @@ def run_example(orcagym_addr : str,
             sample_range = env_kwargs["sample_range"]
             
             env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
-            print("Registered environment: ", env_id)
+            _logger.info(f"Registered environment:  {env_id}")
             
             env, policy = create_env(ckpt_path)
 
@@ -137,7 +141,7 @@ def run_example(orcagym_addr : str,
                     render=True, 
                     realtime_step=franka_manipulation.REALTIME_STEP
                 )
-                print(stats)
+                _logger.info(stats)
         elif run_mode == "augmentation":
             dataset_reader = DatasetReader(file_path=record_path)
             env_name = dataset_reader.get_env_name()
@@ -146,10 +150,10 @@ def run_example(orcagym_addr : str,
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
             env_id, kwargs = franka_manipulation.register_env(orcagym_addr, env_name, env_index, agent_name, RunMode.POLICY_NORMALIZED, task, ctrl_device, max_episode_steps, sample_range, ACTION_STEP, camera_config)
-            print("Registered environment: ", env_id)
+            _logger.info(f"Registered environment:  {env_id}")
 
             env = gym.make(env_id)
-            print("Starting simulation...")
+            _logger.info("Starting simulation...")
             
             now = datetime.now()
             formatted_now = now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -161,9 +165,9 @@ def run_example(orcagym_addr : str,
                 cameras = [CameraWrapper(name=camera_name, port=camera_port) for camera_name, camera_port in camera_config.items()]
             
             franka_manipulation.do_augmentation(env, cameras, True, RGB_SIZE, record_path, agumented_dataset_file_path, augmented_sacle, sample_range, augmented_rounds, ACTION_STEP)
-            print("Augmentation done! The augmented dataset is saved to: ", agumented_dataset_file_path)
+            _logger.info(f"Augmentation done! The augmented dataset is saved to:  {agumented_dataset_file_path}")
         else:
-            print("Invalid run mode! Please input 'teleoperation' or 'playback'.")
+            _logger.error("Invalid run mode! Please input 'teleoperation' or 'playback'.")
 
     except KeyboardInterrupt:
         print("Simulation stopped")        
@@ -270,14 +274,14 @@ if __name__ == "__main__":
             record_path = f"./records_tmp/Franka_{task}_{formatted_now}.hdf5"
     if run_mode == "imitation" or run_mode == "playback" or run_mode == "augmentation":
         if record_path is None:
-            print("Please input the record file path.")
+            _logger.info("Please input the record file path.")
             sys.exit(1)
     if run_mode == "rollout":
         if ckpt_path is None:
-            print("Please input the model file path.")
+            _logger.info("Please input the model file path.")
             sys.exit(1) 
     if run_mode not in ["teleoperation", "playback", "imitation", "rollout", "augmentation"]:
-        print("Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
+        _logger.error(f"Invalid run mode! Please input 'teleoperation', 'playback', 'imitation', 'rollout' or 'augmentation'.")
         sys.exit(1)
 
     if args.ctrl_device == 'xbox':
@@ -285,11 +289,11 @@ if __name__ == "__main__":
     elif args.ctrl_device == 'keyboard':
         ctrl_device = ControlDevice.KEYBOARD
     else:
-        print("Invalid control device! Please input 'xbox' or 'keyboard'.")
+        _logger.error("Invalid control device! Please input 'xbox' or 'keyboard'.")
         sys.exit(1)
 
     max_episode_steps = int(record_time / franka_manipulation.REALTIME_STEP)
-    print(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
+    _logger.performance(f"Run episode in {max_episode_steps} steps as {record_time} seconds.")
 
     # 启动 Monitor 子进程
     ports = [7070, 7090]

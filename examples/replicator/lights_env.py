@@ -6,6 +6,10 @@ from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import orca_gym.utils.rotations as rotations
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class LightsEnv(OrcaGymLocalEnv):
     """
@@ -50,7 +54,7 @@ class LightsEnv(OrcaGymLocalEnv):
             
         ]
         self._light_rotation_delta = np.zeros((len(self._light_config), 3), dtype=np.float32)
-        print("Light rotation delta: ", self._light_rotation_delta)
+        _logger.info(f"Light rotation delta:  {self._light_rotation_delta}")
         self._light_rotation_update_phrase = 0
 
 
@@ -121,7 +125,7 @@ class LightsEnv(OrcaGymLocalEnv):
         
     def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
         self.scene_runtime = scene_runtime
-        print("Scene runtime is set.")
+        _logger.performance("Scene runtime is set.")
 
     def _timer_now(self) -> float:
         """

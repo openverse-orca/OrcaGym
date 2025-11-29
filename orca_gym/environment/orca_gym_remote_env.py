@@ -10,6 +10,10 @@ from gymnasium.spaces import Space
 
 import asyncio
 import sys
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 from orca_gym.core import orca_gym
 from orca_gym import OrcaGymRemote
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
@@ -43,7 +47,7 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     def initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
-        print(f"Initializing simulation: Class: {self.__class__.__name__}")
+        _logger.info(f"Initializing simulation: Class: {self.__class__.__name__}")
         self.loop.run_until_complete(self._initialize_orca_sim())
         model = self.gym.model
         data = self.gym.data
@@ -135,8 +139,8 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
         # return self.data.body(body_name).xpos
         body_dict = self.loop.run_until_complete(self._get_body_xpos_xmat_xquat(body_name_list))
         if len(body_dict) != len(body_name_list):
-            print("Body Name List: ", body_name_list)
-            print("Body Dict: ", body_dict)
+            _logger.error(f"Body Name List: {body_name_list}")
+            _logger.error(f"Body Dict: {body_dict}")
             raise ValueError("Some body names are not found in the simulation.")
         xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
         xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()

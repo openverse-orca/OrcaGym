@@ -7,6 +7,10 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import copy
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def transform_position_to_mujoco(p_unity):
     x_mujoco = p_unity[2]
     y_mujoco = -p_unity[0]
@@ -95,7 +99,7 @@ class PicoJoystick:
                         self.current_transform = self.extract_all_transform(message)
                         self.current_key_state = self.extract_key_state(message)
         except Exception as e:
-            print("Client disconnected:", e)
+            _logger.info(f"Client disconnected: {e}")
         finally:
             self.clients.discard(writer)  # 移除客户端 writer
             writer.close()
@@ -112,7 +116,7 @@ class PicoJoystick:
                 writer.write((message + '\n').encode('utf-8'))
                 await writer.drain()
             except Exception as e:
-                print("send message error：", e)
+                _logger.error(f"send message error: {e}")
                 self.clients.discard(writer)
                 writer.close()
 

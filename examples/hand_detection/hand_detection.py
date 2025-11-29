@@ -4,7 +4,7 @@ import sys
 current_file_path = os.path.abspath('./')
 
 # 将项目根目录添加到 PYTHONPATH
-print(current_file_path)
+_logger.info(current_file_path)
 if current_file_path not in sys.path:
     sys.path.append(current_file_path)
 
@@ -14,6 +14,10 @@ import asyncio
 import nest_asyncio
 from gymnasium.envs.registration import register
 from datetime import datetime
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 
 
 nest_asyncio.apply()
@@ -55,15 +59,15 @@ async def continue_training(env):
 if __name__ == "__main__":
     try:
         orcagym_addr = "localhost:50051"
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addr}")
 
         env_name = "HandDetection-v0"
         env_index = 0
         env_id = register_env(orcagym_addr, env_name, env_index)
-        print("Registering environment with id: ", env_id)
+        _logger.info(f"Registering environment with id:  {env_id}")
 
         env = gym.make(env_id)        
-        print("启动仿真环境")
+        _logger.info("启动仿真环境")
 
         asyncio.run(continue_training(env))
     except KeyboardInterrupt:

@@ -8,6 +8,10 @@ from pynput.keyboard import Controller, Key, Listener
 from robosuite.devices import Device
 from robosuite.utils.transform_utils import rotation_matrix
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class Keyboard(Device):
     """
@@ -43,9 +47,9 @@ class Keyboard(Device):
 
         def print_command(char, info):
             char += " " * (10 - len(char))
-            print("{}\t{}".format(char, info))
+            _logger.info(f"{char}\t{info}")
 
-        print("")
+        _logger.info("")
         print_command("Keys", "Command")
         print_command("q", "reset simulation")
         print_command("spacebar", "toggle gripper (open/close)")
@@ -54,7 +58,7 @@ class Keyboard(Device):
         print_command("z-x", "rotate arm about x-axis")
         print_command("t-g", "rotate arm about y-axis")
         print_command("c-v", "rotate arm about z-axis")
-        print("")
+        _logger.info("")
 
     def _reset_internal_state(self):
         """

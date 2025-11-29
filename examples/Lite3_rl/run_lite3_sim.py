@@ -34,6 +34,10 @@ from envs.legged_gym.utils.onnx_policy import load_onnx_policy
 from envs.legged_gym.utils.lite3_obs_helper import compute_lite3_obs, get_dof_pos_default_policy
 from envs.legged_gym.robot_config.Lite3_config import Lite3Config
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 # 仿真参数
 TIME_STEP = 0.001                       # 1000 Hz for physics simulation
@@ -84,13 +88,13 @@ class KeyboardControl:
         if self._last_key_status["Z"] == 0 and key_status["Z"] == 1:
             enter_default_state = True
             self.rl_control_mode = False
-            print("进入默认状态（站立）")
+            _logger.info("进入默认状态（站立）")
         
         # c: 机器狗站立进入rl控制状态
         if self._last_key_status["C"] == 0 and key_status["C"] == 1:
             enter_rl_control = True
             self.rl_control_mode = True
-            print("进入RL控制状态")
+            _logger.info("进入RL控制状态")
         
         # 只有在RL控制状态下才响应移动命令
         if self.rl_control_mode:
@@ -132,7 +136,7 @@ class KeyboardControl:
             
             # 调试：打印命令（仅在按下S键时）
             if key_status["S"] == 1:
-                print(f"[DEBUG] 后退命令: lin_vel[0]={lin_vel[0]:.3f}, 归一化后={lin_vel[0]/0.5:.3f}, forward_speed配置={self.player_agent_lin_vel_x[self.terrain_type]}")
+                _logger.debug(f"[DEBUG] 后退命令: lin_vel[0]={lin_vel[0]:.3f}, 归一化后={lin_vel[0]/0.5:.3f}, forward_speed配置={self.player_agent_lin_vel_x[self.terrain_type]}")
         else:
             # 非RL控制状态下，重置命令平滑的历史值
             if self.command_smoothing:
@@ -155,7 +159,7 @@ def register_env(orcagym_addr: str,
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}_000"]
-    print("Agent names: ", agent_names)
+    _logger.info(f"Agent names:  {agent_names}")
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'orcagym_addr': orcagym_addr, 
                 'env_id': env_id,
@@ -198,14 +202,14 @@ def load_lite3_onnx_policy(model_path: str, device: str = "cpu"):
             import onnxruntime as ort
             available_providers = ort.get_available_providers()
             if 'CUDAExecutionProvider' not in available_providers:
-                print(f"[WARNING] CUDAExecutionProvider not available. Available providers: {available_providers}")
-                print(f"[WARNING] Falling back to CPU. Install onnxruntime-gpu to use GPU:")
-                print(f"         pip install onnxruntime-gpu")
+                _logger.warning(f"[WARNING] CUDAExecutionProvider not available. Available providers: {available_providers}")
+                _logger.warning(f"[WARNING] Falling back to CPU. Install onnxruntime-gpu to use GPU:")
+                _logger.performance(f"         pip install onnxruntime-gpu")
                 device = "cpu"
             else:
-                print(f"[INFO] Using GPU (CUDAExecutionProvider)")
+                _logger.info(f"[INFO] Using GPU (CUDAExecutionProvider)")
         except ImportError:
-            print(f"[WARNING] onnxruntime not installed. Falling back to CPU.")
+            _logger.warning(f"[WARNING] onnxruntime not installed. Falling back to CPU.")
             device = "cpu"
     
     # 如果是相对路径，转换为绝对路径
@@ -233,8 +237,8 @@ def load_lite3_onnx_policy(model_path: str, device: str = "cpu"):
                                f"Current working directory: {os.getcwd()}\n"
                                f"Resolved path: {model_path}")
     
-    print(f"Loading Lite3 ONNX policy from: {model_path}")
-    print(f"Device: {device.upper()}")
+    _logger.info(f"Loading Lite3 ONNX policy from: {model_path}")
+    _logger.info(f"Device: {device.upper()}")
     policy = load_onnx_policy(model_path, device=device)
     return policy
 
@@ -384,16 +388,16 @@ def run_simulation(env: gym.Env,
     if hasattr(agent, '_last_action'):
         agent._last_action = np.zeros(12)
     
-    print("=" * 60)
-    print("Lite3 ONNX策略仿真运行中...")
-    print("=" * 60)
-    print("控制说明:")
-    print("  Z: 机器狗站立进入默认状态")
-    print("  C: 机器狗站立进入RL控制状态")
-    print("  W/S: 前进/后退（仅在RL控制状态下有效）")
-    print("  A/D: 左移/右移（仅在RL控制状态下有效）")
-    print("  Q/E: 顺时针/逆时针旋转（仅在RL控制状态下有效）")
-    print("=" * 60)
+    _logger.info("=" * 60)
+    _logger.info("Lite3 ONNX策略仿真运行中...")
+    _logger.info("=" * 60)
+    _logger.info("控制说明:")
+    _logger.info("  Z: 机器狗站立进入默认状态")
+    _logger.info("  C: 机器狗站立进入RL控制状态")
+    _logger.info("  W/S: 前进/后退（仅在RL控制状态下有效）")
+    _logger.info("  A/D: 左移/右移（仅在RL控制状态下有效）")
+    _logger.info("  Q/E: 顺时针/逆时针旋转（仅在RL控制状态下有效）")
+    _logger.info("=" * 60)
     
     # 第一次循环前，先执行一步零动作来初始化环境状态
     action_init = np.zeros(env.action_space.shape[0])
@@ -452,7 +456,7 @@ def run_simulation(env: gym.Env,
             if hasattr(agent, '_command') and lin_vel[0] < 0:
                 actual_command = agent._command.get("lin_vel", None)
                 if actual_command is not None:
-                    print(f"[DEBUG] 后退命令检查: 设置={lin_vel[0]:.3f}, agent中={actual_command[0]:.3f}")
+                    _logger.debug(f"[DEBUG] 后退命令检查: 设置={lin_vel[0]:.3f}, agent中={actual_command[0]:.3f}")
             
             # 计算Lite3格式观测
             lite3_obs = compute_lite3_observation_from_env(env.unwrapped, agent_name_full)
@@ -503,7 +507,7 @@ def run_simulation(env: gym.Env,
                 time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
             
     except KeyboardInterrupt:
-        print("\n退出仿真环境")
+        _logger.info("\n退出仿真环境")
     finally:
         env.close()
 
@@ -552,7 +556,7 @@ def main(config: dict, remote: str = None):
             terrain_asset_paths=terrain_asset_paths
         )
         
-        print("simulation running... , orcagym_addr: ", orcagym_addresses)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addresses}")
         env_name = "Lite3Sim-v0"
         env_id, kwargs = register_env(
             orcagym_addr=orcagym_addresses[0], 
@@ -563,10 +567,10 @@ def main(config: dict, remote: str = None):
             max_episode_steps=MAX_EPISODE_STEPS,
             height_map=height_map_file,
         )
-        print("Registered environment: ", env_id)
+        _logger.info(f"Registered environment:  {env_id}")
         
         env = gym.make(env_id)
-        print("Starting simulation...")
+        _logger.info("Starting simulation...")
         
         # 设置摩擦系数
         friction_scale = config.get('friction_scale', None)
@@ -588,7 +592,7 @@ def main(config: dict, remote: str = None):
             command_model=command_model,
         )
     finally:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         if 'env' in locals():
             env.close()
 
@@ -628,7 +632,7 @@ if __name__ == "__main__":
     # 命令行参数优先于配置文件
     if args.device is not None:
         config['inference_device'] = args.device
-        print(f"[INFO] Using device from command line: {args.device}")
+        _logger.info(f"[INFO] Using device from command line: {args.device}")
     
     main(config=config, remote=args.remote)
 

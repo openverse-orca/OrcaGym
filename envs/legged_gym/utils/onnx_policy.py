@@ -11,6 +11,10 @@ import numpy as np
 from typing import Union, Optional
 import os
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class ONNXPolicy:
     """
@@ -71,10 +75,10 @@ class ONNXPolicy:
         input_shape = self.session.get_inputs()[0].shape
         output_shape = self.session.get_outputs()[0].shape
         
-        print(f"[ONNX Policy] Model loaded: {model_path}")
-        print(f"[ONNX Policy] Input: {self.input_name}, shape: {input_shape}")
-        print(f"[ONNX Policy] Output: {self.output_name}, shape: {output_shape}")
-        print(f"[ONNX Policy] Providers: {self.session.get_providers()}")
+        _logger.info(f"[ONNX Policy] Model loaded: {model_path}")
+        _logger.info(f"[ONNX Policy] Input: {self.input_name}, shape: {input_shape}")
+        _logger.info(f"[ONNX Policy] Output: {self.output_name}, shape: {output_shape}")
+        _logger.info(f"[ONNX Policy] Providers: {self.session.get_providers()}")
         
         # 检查是否支持动态batch
         # 如果第一个维度是None或字符串（如'batch'），则支持动态batch
@@ -94,15 +98,15 @@ class ONNXPolicy:
                 print(f"[ONNX Policy] Model has fixed batch_size={self.fixed_batch_size}, "
                       f"will process batch inputs sequentially")
             else:
-                print(f"[ONNX Policy] Model batch size unknown, will process batch inputs sequentially")
+                _logger.info(f"[ONNX Policy] Model batch size unknown, will process batch inputs sequentially")
         else:
-            print(f"[ONNX Policy] Model supports dynamic batch size")
+            _logger.info(f"[ONNX Policy] Model supports dynamic batch size")
         
         # 验证输入输出维度
         if len(input_shape) >= 2 and input_shape[1] != 45:
-            print(f"[WARNING] Expected input dimension 45, got {input_shape[1]}")
+            _logger.warning(f"[WARNING] Expected input dimension 45, got {input_shape[1]}")
         if len(output_shape) >= 2 and output_shape[1] != 12:
-            print(f"[WARNING] Expected output dimension 12, got {output_shape[1]}")
+            _logger.warning(f"[WARNING] Expected output dimension 12, got {output_shape[1]}")
     
     def __call__(self, obs: Union[np.ndarray, list]) -> np.ndarray:
         """

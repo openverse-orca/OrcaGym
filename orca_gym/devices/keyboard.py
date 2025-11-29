@@ -205,7 +205,7 @@ class KeyboardInput:
 
     def close(self):
         pygame.quit()
-        print("Keyboard controller closed")
+        _logger.info("Keyboard controller closed")
 
 
 class KeyboardServer:
@@ -217,7 +217,7 @@ class KeyboardServer:
         try:
             self.server_socket.bind((host, port))
         except OSError as e:
-            print(f"Port {port} is already in use!")
+            _logger.info(f"Port {port} is already in use!")
             raise e
         self.server_socket.listen(5)
 
@@ -231,9 +231,9 @@ class KeyboardServer:
             try:
                 client_socket, addr = self.server_socket.accept()
                 self.clients.append(client_socket)
-                print(f"Client connected: {addr}")
+                _logger.info(f"Client connected: {addr}")
             except Exception as e:
-                print(f"Error accepting clients: {e}")
+                _logger.error(f"Error accepting clients: {e}")
                 break
 
     def broadcast(self, message):
@@ -255,7 +255,7 @@ class KeyboardServer:
                     elif event.type == pygame.QUIT:
                         running = False
         except Exception as e:
-            print(f"An error occurred: {e}")
+            _logger.error(f"An error occurred: {e}")
         finally:
             self.close()
 
@@ -265,7 +265,7 @@ class KeyboardServer:
             client.close()
         self.server_socket.close()
         pygame.quit()
-        print("Keyboard server closed")
+        _logger.info("Keyboard server closed")
 
 
 
@@ -273,6 +273,10 @@ import socket
 import threading
 import pygame
 import os
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 
 class KeyboardClient:
     def __init__(self, host='localhost', port=55000):
@@ -296,7 +300,7 @@ class KeyboardClient:
         try:
             self.client_socket.connect((host, port))
         except socket.error as e:
-            print(f"无法连接到服务器 {host}:{port}")
+            _logger.info(f"无法连接到服务器 {host}:{port}")
             self.client_socket.close()
             raise e
 
@@ -319,10 +323,10 @@ class KeyboardClient:
                             self.keyboard_state[key_name] = 0
                 else:
                     # 服务器关闭了连接
-                    print("服务器关闭了连接")
+                    _logger.info("服务器关闭了连接")
                     self.running = False
         except Exception as e:
-            print(f"接收数据时发生错误: {e}")
+            _logger.info(f"接收数据时发生错误: {e}")
         finally:
             self.close()
 
@@ -338,8 +342,8 @@ class KeyboardClient:
             try:
                 self.client_socket.shutdown(socket.SHUT_RDWR)
             except Exception as e:
-                print(f"关闭套接字时发生错误: {e}")
+                _logger.info(f"关闭套接字时发生错误: {e}")
             finally:
                 self.client_socket.close()
-                print("键盘客户端已关闭")
+                _logger.info("键盘客户端已关闭")
 

@@ -6,6 +6,10 @@ from datetime import datetime
 import math
 import os
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def parse_rewards(file_path):
     """解析所有奖励项（支持不同长度数据）"""
     reward_data = {}
@@ -29,7 +33,7 @@ def parse_rewards(file_path):
                     reward_data[name] = []
                 reward_data[name].append(value)
             else:
-                print(f"Warning: Line {line_num} format invalid, skipped: {line}")
+                _logger.error(f"Warning: Line {line_num} format invalid, skipped: {line}")
     
     if not reward_data:
         raise ValueError("No valid reward data found. Check file format.")
@@ -105,7 +109,7 @@ def plot_all_rewards(reward_data, file_path):
     filename = os.path.join(file_dir, f"{file_prefix}.png")
     plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()
-    print(f"Saved all rewards plot to {filename}")
+    _logger.info(f"Saved all rewards plot to {filename}")
 
 def auto_y_range(values):
     """自动确定y轴范围"""
@@ -116,14 +120,14 @@ def auto_y_range(values):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Usage: python plot_all_rewards.py <reward_file>")
+        _logger.info("Usage: python plot_all_rewards.py <reward_file>")
         sys.exit(1)
     
     file_path = sys.argv[1]
     try:
         reward_data= parse_rewards(file_path)
-        print(f"Successfully parsed {len(reward_data)} reward types")
+        _logger.info(f"Successfully parsed {len(reward_data)} reward types")
         plot_all_rewards(reward_data, file_path)
     except Exception as e:
-        print(f"Error: {str(e)}")
+        _logger.error(f"Error: {str(e)}")
         sys.exit(1)

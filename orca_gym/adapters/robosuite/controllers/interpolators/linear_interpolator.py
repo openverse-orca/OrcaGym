@@ -3,6 +3,10 @@ import numpy as np
 import orca_gym.adapters.robosuite.utils.transform_utils as T
 from orca_gym.adapters.robosuite.controllers.interpolators.base_interpolator import Interpolator
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class LinearInterpolator(Interpolator):
     """
@@ -87,7 +91,7 @@ class LinearInterpolator(Interpolator):
         """
         # First, check to make sure requested goal shape is the same as self.dim
         if goal.shape[0] != self.dim:
-            print("Requested goal: {}".format(goal))
+            _logger.info("Requested goal: {}".format(goal))
             raise ValueError(
                 "LinearInterpolator: Input size wrong for goal; got {}, needs to be {}!".format(goal.shape[0], self.dim)
             )

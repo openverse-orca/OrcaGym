@@ -12,10 +12,12 @@ sys.path.append(proto_path)
 import mjc_message_pb2
 import mjc_message_pb2_grpc
 
-
 import numpy as np
 import scipy.linalg
 from datetime import datetime
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
 
 from orca_gym.core.orca_gym_model import OrcaGymModel
 from orca_gym.core.orca_gym_data import OrcaGymData
@@ -104,7 +106,7 @@ class OrcaGymLocal(OrcaGymBase):
     async def load_model_xml(self):
         model_xml_path = await self.load_local_env()
 
-        print("Model XML Path: ", model_xml_path)
+        _logger.info(f"Model XML Path: {model_xml_path}")
         await self.process_xml_file(model_xml_path)
         return model_xml_path
 
@@ -113,7 +115,7 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjData = mujoco.MjData(self._mjModel)
 
         size_model = mujoco.mj_sizeModel(self._mjModel)
-        print("size_model: ", size_model)
+        _logger.debug(f"size_model: {size_model}")
 
         # Update the timestep setting form the env parameter.
         self.set_opt_timestep(self._timestep)
@@ -160,7 +162,7 @@ class OrcaGymLocal(OrcaGymBase):
         if override_ctrls is not None and len(override_ctrls) > 0:
             for ctrl in override_ctrls:
                 if ctrl.index < 0 or ctrl.index >= self._mjModel.nu:
-                    print(f"Invalid control index: {ctrl.index}, skipping.")
+                    _logger.warning(f"Invalid control index: {ctrl.index}, skipping.")
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
@@ -187,7 +189,7 @@ class OrcaGymLocal(OrcaGymBase):
         else:
             content_file_path = os.path.join(local_file_dir, content_file_name)
 
-        print("Content file path: ", content_file_path)
+        _logger.debug(f"Content file path: {content_file_path}")
 
         # 使用文件锁防止多进程重入，设置30秒超时
         try:
@@ -218,10 +220,10 @@ class OrcaGymLocal(OrcaGymBase):
                             pass
                         raise e
         except TimeoutError as e:
-            print(f"警告: {e}")
+            _logger.warning(f"警告: {e}")
             # 如果获取锁超时，检查文件是否已经存在
             if os.path.exists(content_file_path):
-                print(f"文件 {content_file_path} 已存在，跳过下载")
+                _logger.info(f"文件 {content_file_path} 已存在，跳过下载")
                 return content_file_path
             else:
                 raise Exception(f"无法获取文件锁，且文件不存在: {content_file_path}")
@@ -237,7 +239,7 @@ class OrcaGymLocal(OrcaGymBase):
                 async with file_lock(content_file_path):
                     if not os.path.exists(content_file_path):
                         # 下载文件
-                        print("Load content file: ", content_file_name)
+                        _logger.debug(f"Load content file: {content_file_name}")
                         await self.load_content_file(content_file_name)
         else:
             for child in node:
@@ -248,9 +250,9 @@ class OrcaGymLocal(OrcaGymBase):
         request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
         response = await self.stub.BeginSaveMp4File(request)
         if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
-            print(f"Video saving started at {file_path}")
+            _logger.info(f"Video saving started at {file_path}")
         else:
-            print(f"Failed to start video saving: {response.error_message}")
+            _logger.error(f"Failed to start video saving: {response.error_message}")
 
     async def stop_save_video(self):
         request =  mjc_message_pb2.StopSaveMp4FileRequest()
@@ -266,7 +268,7 @@ class OrcaGymLocal(OrcaGymBase):
         request.last_frame_index = last_frame
         response = await self.stub.GetTimeStamp(request)
         if response.error_message != "":
-            print(f"Get time stamp failed. error message: {response.error_message}")
+            _logger.error(f"Get time stamp failed. error message: {response.error_message}")
         return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
 
     async def get_frame_png(self, image_path):

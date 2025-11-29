@@ -8,13 +8,17 @@ from pathlib import Path
 
 from orca_gym.sensor.rgbd_camera import Monitor
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def start_monitor(port=7070):
     """
     启动 monitor.py 作为子进程。
     """
     monitor_script = Path(__file__).resolve()
-    print("monitor_script: ", monitor_script)
+    _logger.info(f"monitor_script:  {monitor_script}")
 
     # 启动 monitor.py
     # 使用 sys.executable 确保使用相同的 Python 解释器
@@ -50,8 +54,8 @@ if __name__ == "__main__":
     
     monitor = Monitor(name="camera", port=port)
     try:
-        print("Start monitoring...")
+        _logger.info("Start monitoring...")
         monitor.start()
     except KeyboardInterrupt:
         monitor.stop()
-        print("Program terminated by user.")
+        _logger.info("Program terminated by user.")

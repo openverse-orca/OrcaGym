@@ -3,6 +3,10 @@ from numpy.typing import NDArray
 import numpy as np
 import time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 START_ARM_POSE = [
     0,
     -0.96,
@@ -143,7 +147,7 @@ class AlohaEnv(OrcaGymLocalEnv):
         self.set_joint_qpos(arm_joint_qpos)
         
     def reset_model(self) -> tuple[dict, dict]:
-        print("Aloha Env reset_model: ", START_ARM_POSE)
+        _logger.info(f"Aloha Env reset_model:  {START_ARM_POSE}")
         
         self._set_joint_neutral()
         self.ctrl = np.array(self._neutral_joint_values).flatten()

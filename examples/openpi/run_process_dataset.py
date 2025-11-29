@@ -19,6 +19,10 @@ from orca_gym.utils.dir_utils import create_tmp_dir
 from datetime import datetime
 import json
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", type=str, nargs='+', help="path to hdf5 dataset",)
@@ -44,11 +48,11 @@ if __name__ == "__main__":
         if output_file is None:
             formatted_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             output_file = f"./processed_datasets_tmp/combined_{process_dataset.get_dataset_prefix(dataset_files[0])}_{formatted_time}.hdf5"            
-            print("output file name: ", output_file)
+            _logger.info(f"output file name:  {output_file}")
         process_dataset.process_combine(dataset_files, output_file)
     elif proc == "update_kwargs":
         kwargs = eval(args.kwargs)
-        print("update kwargs: ", kwargs)
+        _logger.info(f"update kwargs:  {kwargs}")
         process_dataset.process_update_kwargs(dataset_files, kwargs)
     else:
-        print("Process not implemented: {}".format(proc))
+        _logger.info("Process not implemented: {}".format(proc))

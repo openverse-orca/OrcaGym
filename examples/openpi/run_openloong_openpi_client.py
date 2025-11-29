@@ -16,6 +16,10 @@ from orca_gym.scripts.dual_arm_manipulation import ActionType
 import logging
 import yaml
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 TIME_STEP = dual_arm_manipulation.TIME_STEP
 FRAME_SKIP = dual_arm_manipulation.FRAME_SKIP
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
@@ -77,7 +81,7 @@ def main(args: Args) -> None:
         task_config_dict=task_config_dict,
     )
         
-    print("Registered Simulation Environment: ", env_id, " with kwargs: ", kwargs)
+    _logger.info(f"Registered Simulation Environment: {env_id} with kwargs: {kwargs}")
 
     # 启动 Monitor 子进程
     ports = [7070]
@@ -128,8 +132,8 @@ def draw_action_csv(path: str) -> None:
     for col in df.columns[0:]:
         if "right" in col:
             continue
-        print(col)
-        print(df[col])
+        _logger.info(col)
+        _logger.info(df[col])
         plt.plot(df.index, df[col], marker='o', label=col)
     plt.legend()
     plt.show()

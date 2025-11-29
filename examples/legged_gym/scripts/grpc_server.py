@@ -22,13 +22,17 @@ from typing import Dict, Any, Optional
 from examples.legged_gym.scripts.proto import inference_pb2
 from examples.legged_gym.scripts.proto import inference_pb2_grpc
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 # 导入ONNX运行时
 try:
     import onnxruntime as ort
 except ImportError:
-    print("Error: onnxruntime not installed.")
-    print("Please install: pip install onnxruntime")
+    _logger.error("Error: onnxruntime not installed.")
+    _logger.performance("Please install: pip install onnxruntime")
     sys.exit(1)
 
 logger = logging.getLogger(__name__)
@@ -291,7 +295,7 @@ def test_server(config_path: str, port: int = 50051):
             "achieved_goal": np.random.normal(0, 1, 3).astype(np.float32)
         }
         
-        print("Testing gRPC server...")
+        _logger.info("Testing gRPC server...")
         
         # 获取可用的模型类型
         with open(config_path, 'r') as f:
@@ -299,16 +303,16 @@ def test_server(config_path: str, port: int = 50051):
         available_models = list(config['model_file']['onnx'].keys())
         
         for model_type in available_models:
-            print(f"Testing model: {model_type}")
+            _logger.info(f"Testing model: {model_type}")
             action, states = client.predict(test_obs, model_type=model_type, deterministic=True)
-            print(f"  Action shape: {action.shape}")
-            print(f"  States shape: {states.shape if states is not None else None}")
+            _logger.info(f"  Action shape: {action.shape}")
+            _logger.info(f"  States shape: {states.shape if states is not None else None}")
         
         client.close()
-        print("Test successful!")
+        _logger.info("Test successful!")
         
     except Exception as e:
-        print(f"Test failed: {e}")
+        _logger.error(f"Test failed: {e}")
 
 
 def main():

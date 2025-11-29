@@ -16,6 +16,10 @@ import robosuite
 import orca_gym.adapters.robosuite.utils.transform_utils as T
 from orca_gym.adapters.robosuite.wrappers import DomainRandomizationWrapper, VisualizationWrapper
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def get_camera_intrinsic_matrix(sim, camera_name, camera_height, camera_width):
     """
@@ -562,7 +566,7 @@ class DemoPlaybackCameraMover(CameraMover):
         self.current_ep = demo_num
 
         # Notify user of loaded episode
-        print(f"Loaded episode {demo_num}.")
+        _logger.info(f"Loaded episode {demo_num}.")
 
     def grab_next_frame(self):
         """

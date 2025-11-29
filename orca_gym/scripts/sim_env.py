@@ -5,6 +5,10 @@ from typing import Optional, Any, SupportsFloat
 from gymnasium import spaces
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class SimEnv(OrcaGymLocalEnv):
     """
@@ -55,7 +59,7 @@ class SimEnv(OrcaGymLocalEnv):
                 high=np.array([]),
                 dtype=np.float32
             )
-            print("No action space defined, nu is 0.")
+            _logger.info(f"No action space defined, nu is 0.")
 
     
     def render_callback(self, mode='human') -> None:

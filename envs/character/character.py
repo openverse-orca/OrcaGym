@@ -6,6 +6,10 @@ import numpy as np
 import time
 import orca_gym.utils.rotations as rotations
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class Character():
     def __init__(self, 
         env: OrcaGymLocalEnv, 
@@ -65,7 +69,7 @@ class Character():
 
         body_xpos, _, _ = self._env.get_body_xpos_xmat_xquat([self._body_name])
         self._original_coordinates = body_xpos[:2]
-        print("Original Coordinates: ", self._original_coordinates)
+        _logger.info(f"Original Coordinates:  {self._original_coordinates}")
 
         
     def on_step(self):
@@ -150,11 +154,11 @@ class Character():
         if self._control_type['active_type'] != 'waypoint' and keyboard_state[self._control_type['switch_key']['waypoint']] == 1:
             self._control_type['active_type'] = 'waypoint'
             self._reset_move_and_turn()
-            print("Switch to waypoint control")
+            _logger.info("Switch to waypoint control")
         elif self._control_type['active_type'] != 'keyboard' and keyboard_state[self._control_type['switch_key']['keyboard']] == 1:
             self._control_type['active_type'] = 'keyboard'
             self._reset_move_and_turn()
-            print("Switch to keyboard control")
+            _logger.info("Switch to keyboard control")
         
 
     def _process_keyboard_input(self, heading : float):
@@ -192,7 +196,7 @@ class Character():
                 self._waypoint_index = 0
             
             next_waypoint_coord = np.array(self._waypoint_control[self._waypoint_index]['Coordinates']) + self._original_coordinates
-            print("Next Waypoint Coordinates: ", next_waypoint_coord)
+            _logger.info(f"Next Waypoint Coordinates:  {next_waypoint_coord}")
             self._next_waypoint_coord = next_waypoint_coord
 
         if self._next_waypoint_coord is not None and self._moving_to_waypoint:

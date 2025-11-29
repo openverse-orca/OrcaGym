@@ -10,6 +10,10 @@ from enum import IntEnum
 import platform
 from typing import Tuple, List
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # 此处为了兼容绝对路径和相对路径写了多种导入方式，推荐用户根据包的结构选择一种清晰的导入方式
 if __package__ is None or __package__ == '':
     # 当作为脚本运行时，__package__ 为 None 或者空字符串
@@ -184,7 +188,7 @@ if os_name == 'Windows':
 elif os_name == 'Linux':
     dllPath = os.path.join(CUR_PATH, "libRM_Base.so")
 else:
-    print("当前操作系统：", os_name)
+    _logger.info(f"当前操作系统: {os_name}")
 
 
 class CallbackData(ctypes.Structure):

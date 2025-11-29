@@ -3,6 +3,10 @@ from envs.manipulation.dual_arm_env import DualArmEnv
 from envs.manipulation.dual_arm_robot import DualArmRobot
 from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as config
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class OpenLoongGripperFixBase(DualArmRobot):
     def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
@@ -12,7 +16,7 @@ class OpenLoongGripperFixBase(DualArmRobot):
 
         
     def init_agent(self, id: int):
-        print("OpenLoongGripperFixBase init_agent")
+        _logger.info("OpenLoongGripperFixBase init_agent")
 
         super().init_agent(id)
 

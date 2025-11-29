@@ -2,6 +2,10 @@ import numpy as np
 from orca_gym.scene.orca_gym_scene import OrcaGymScene
 from orca_gym.scene.orca_gym_scene import Actor, LightInfo, CameraSensorInfo, MaterialInfo
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class OrcaGymSceneRuntime():
     """
@@ -26,29 +30,29 @@ class OrcaGymSceneRuntime():
         try:
             self.scene.set_light_info(actor_name, light_info)
         except Exception as e:
-            print(f"Failed to set light info for {actor_name}: {e}")
+            _logger.error(f"Failed to set light info for {actor_name}: {e}")
 
 
     def make_camera_viewport_active(self, actor_name: str, entity_name: str):
         try:
             self.scene.make_camera_viewport_active(actor_name, entity_name)
         except Exception as e:
-            print(f"Failed to make camera viewport active for {actor_name}: {e}")
+            _logger.error(f"Failed to make camera viewport active for {actor_name}: {e}")
 
     def set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
         try:
             self.scene.set_actor_anim_param_number(actor_name, param_name, value)
         except Exception as e:
-            print(f"Failed to set actor anim param number for {actor_name}: {e}")
+            _logger.error(f"Failed to set actor anim param number for {actor_name}: {e}")
 
     def set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
         try:
             self.scene.set_actor_anim_param_bool(actor_name, param_name, value)
         except Exception as e:
-            print(f"Failed to set actor anim param bool for {actor_name}: {e}")
+            _logger.error(f"Failed to set actor anim param bool for {actor_name}: {e}")
 
     def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
         try:
             self.scene.set_actor_anim_param_string(actor_name, param_name, value)
         except Exception as e:
-            print(f"Failed to set actor anim param string for {actor_name}: {e}")
+            _logger.error(f"Failed to set actor anim param string for {actor_name}: {e}")

@@ -16,6 +16,10 @@ import numpy as np
 import argparse
 import time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class XBotKeyboardController:
     """
@@ -44,17 +48,17 @@ class XBotKeyboardController:
         # 上一次的按键状态
         self.last_key_state = {}
         
-        print("\n⌨️  键盘控制说明:")
-        print("  W - 前进")
-        print("  S - 后退")
-        print("  A - 左转")
-        print("  D - 右转")
-        print("  Q - 左平移")
-        print("  E - 右平移")
-        print("  LShift - 加速（Turbo）")
-        print("  Space - 停止")
-        print("  R - 重置环境")
-        print("  Esc - 退出")
+        _logger.info("\n⌨️  键盘控制说明:")
+        _logger.info("  W - 前进")
+        _logger.info("  S - 后退")
+        _logger.info("  A - 左转")
+        _logger.info("  D - 右转")
+        _logger.info("  Q - 左平移")
+        _logger.info("  E - 右平移")
+        _logger.info("  LShift - 加速（Turbo）")
+        _logger.info("  Space - 停止")
+        _logger.info("  R - 重置环境")
+        _logger.info("  Esc - 退出")
         print()
     
     def get_command(self):
@@ -125,9 +129,9 @@ class XBotKeyboardController:
 
 
 def main(device: str = "cpu"):
-    print("="*80)
-    print("🎮 XBot键盘控制 - OrcaGym")
-    print("="*80)
+    _logger.info("="*80)
+    _logger.info("🎮 XBot键盘控制 - OrcaGym")
+    _logger.info("="*80)
     
     # 环境配置
     orcagym_addr = "localhost:50051"
@@ -144,51 +148,51 @@ def main(device: str = "cpu"):
     FRAME_SKIP = config['frame_skip']
     REALTIME_STEP = TIME_STEP * FRAME_SKIP
     
-    print(f"\n⚙️  环境配置:")
-    print(f"  - OrcaGym地址: {orcagym_addr}")
-    print(f"  - 物理步长: {config['time_step']}s (1000Hz)")
-    print(f"  - 策略频率: 100Hz")
+    _logger.info(f"\n⚙️  环境配置:")
+    _logger.info(f"  - OrcaGym地址: {orcagym_addr}")
+    _logger.performance(f"  - 物理步长: {config['time_step']}s (1000Hz)")
+    _logger.info(f"  - 策略频率: 100Hz")
     
     # 创建环境
-    print("\n📦 创建环境...")
+    _logger.info("\n📦 创建环境...")
     env = XBotSimpleEnv(**config)
     
     # 加载策略 - 使用项目内的config目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
     policy_path = os.path.join(script_dir, "config", "policy_example.pt")
     
-    print(f"\n📦 加载策略: {policy_path}")
+    _logger.info(f"\n📦 加载策略: {policy_path}")
     
     # 检查设备可用性
     if device == "cuda":
         if not torch.cuda.is_available():
-            print(f"[WARNING] CUDA not available. Falling back to CPU.")
+            _logger.warning(f"[WARNING] CUDA not available. Falling back to CPU.")
             device = "cpu"
         else:
-            print(f"[INFO] Using GPU (CUDA)")
-            print(f"[INFO] CUDA device: {torch.cuda.get_device_name(0)}")
+            _logger.info(f"[INFO] Using GPU (CUDA)")
+            _logger.info(f"[INFO] CUDA device: {torch.cuda.get_device_name(0)}")
     
     torch_device = torch.device(device)
-    print(f"Device: {device.upper()}")
+    _logger.info(f"Device: {device.upper()}")
     
     try:
         policy = torch.jit.load(policy_path, map_location=torch_device)
         policy.eval()
         policy.to(torch_device)
-        print("✅ 策略加载成功")
+        _logger.info("✅ 策略加载成功")
     except Exception as e:
-        print(f"❌ 策略加载失败: {e}")
+        _logger.info(f"❌ 策略加载失败: {e}")
         env.close()
         return
     
     # 创建键盘控制器
-    print("\n🎮 初始化键盘控制器...")
+    _logger.info("\n🎮 初始化键盘控制器...")
     keyboard_controller = XBotKeyboardController(orcagym_addr)
     
-    print("\n" + "="*80)
-    print("🚀 开始运行...")
-    print("="*80)
-    print("\n提示: 按ESC退出，按R重置环境\n")
+    _logger.info("\n" + "="*80)
+    _logger.info("🚀 开始运行...")
+    _logger.info("="*80)
+    _logger.info("\n提示: 按ESC退出，按R重置环境\n")
     
     # Reset
     obs, info = env.reset()
@@ -209,12 +213,12 @@ def main(device: str = "cpu"):
             # 检查ESC退出
             key_state = keyboard_controller.keyboard.get_state()
             if key_state["Esc"] == 1:
-                print("\n⚠️  用户按下ESC，退出程序")
+                _logger.info("\n⚠️  用户按下ESC，退出程序")
                 break
             
             # 检查重置
             if reset_flag:
-                print(f"\n🔄 重置环境 (Episode {total_episodes}: {episode_steps}步, 奖励={episode_reward:.2f})")
+                _logger.info(f"\n🔄 重置环境 (Episode {total_episodes}: {episode_steps}步, 奖励={episode_reward:.2f})")
                 obs, info = env.reset()
                 episode_reward = 0.0
                 episode_steps = 0
@@ -237,16 +241,16 @@ def main(device: str = "cpu"):
             # 显示当前状态
             if episode_steps % 100 == 0:
                 status = "🛑 停止" if stop_flag else f"➡️  vx={vx:.2f}, vy={vy:.2f}, dyaw={dyaw:.2f}"
-                print(f"[Step {episode_steps:4d}] {status} | Reward: {episode_reward:.2f}")
+                _logger.info(f"[Step {episode_steps:4d}] {status} | Reward: {episode_reward:.2f}")
             
             # ⚠️ 禁用自动重置 - 只在检测到摔倒或超时时提示，不自动reset
             if terminated or truncated:
                 total_episodes += 1
-                print(f"\n⚠️  检测到异常状态 (Episode {total_episodes}):")
-                print(f"  - 步数: {episode_steps}")
-                print(f"  - 奖励: {episode_reward:.2f}")
-                print(f"  - 原因: {'摔倒' if terminated else '超时'}")
-                print(f"  ℹ️  机器人将继续运行，按R键手动重置")
+                _logger.info(f"\n⚠️  检测到异常状态 (Episode {total_episodes}):")
+                _logger.info(f"  - 步数: {episode_steps}")
+                _logger.info(f"  - 奖励: {episode_reward:.2f}")
+                _logger.info(f"  - 原因: {'摔倒' if terminated else '超时'}")
+                _logger.info(f"  ℹ️  机器人将继续运行，按R键手动重置")
                 print()
                 
                 # ⭐ 不自动重置，继续运行
@@ -258,9 +262,9 @@ def main(device: str = "cpu"):
                 time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
     
     except KeyboardInterrupt:
-        print("\n\n⚠️  程序被用户中断")
+        _logger.info("\n\n⚠️  程序被用户中断")
     except Exception as e:
-        print(f"\n❌ 运行出错: {e}")
+        _logger.info(f"\n❌ 运行出错: {e}")
         import traceback
         traceback.print_exc()
     
@@ -268,10 +272,10 @@ def main(device: str = "cpu"):
     keyboard_controller.close()
     env.close()
     
-    print("\n" + "="*80)
-    print("✅ 程序结束")
-    print("="*80)
-    print(f"总Episodes: {total_episodes}")
+    _logger.info("\n" + "="*80)
+    _logger.info("✅ 程序结束")
+    _logger.info("="*80)
+    _logger.info(f"总Episodes: {total_episodes}")
     print()
 
 
@@ -281,6 +285,6 @@ if __name__ == '__main__':
                        help='Inference device: cpu or cuda (default: cpu)')
     args = parser.parse_args()
     
-    print(f"[INFO] Using device from command line: {args.device}")
+    _logger.info(f"[INFO] Using device from command line: {args.device}")
     main(device=args.device)
 

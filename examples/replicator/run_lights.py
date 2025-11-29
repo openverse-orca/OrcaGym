@@ -11,6 +11,10 @@ import os
 import run_simulation as sim
 import time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def create_scene() -> OrcaGymScene:
     """
     Run the Replicator scene.
@@ -76,7 +80,7 @@ def create_scene() -> OrcaGymScene:
         )
         scene.set_light_info(f"light_with_random_color_scale_intensity_{i}", light_info)
 
-    print("Replicator scene published successfully.")
+    _logger.info("Replicator scene published successfully.")
 
     return scene
 
@@ -84,7 +88,7 @@ def create_scene() -> OrcaGymScene:
 def destroy_scene(scene: OrcaGymScene):
     scene.publish_scene()
     scene.close()
-    print("Replicator scene closed successfully.")
+    _logger.info("Replicator scene closed successfully.")
 
 
 if __name__ == "__main__":

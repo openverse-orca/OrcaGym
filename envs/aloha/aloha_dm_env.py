@@ -23,6 +23,10 @@ from envs.aloha.aloha_orcagym_task import TransferCubeTask_OrcaGym
 from dm_control.mujoco import wrapper
 import imageio
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class AlohaDMEnv(gym.Env):
     # TODO(aliberts): add "human" render_mode
     metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 30}
@@ -55,7 +59,7 @@ class AlohaDMEnv(gym.Env):
 
         self._aloha_env = self._make_orca_gym_local_env(frame_skip, orcagym_addr, agent_names, time_step, **kwargs)
         self._aloha_env.reset()
-        print("Init aloha orca gym env, reseted.")
+        _logger.info(f"Init aloha orca gym env, reseted.")
         
         self._dm_env = self._make_dm_env_task(
             task_name=self.task,
@@ -70,7 +74,7 @@ class AlohaDMEnv(gym.Env):
                 dtype=np.float64,
             )
         elif self.obs_type == "pixels":
-            print("obs_type: pixels")
+            _logger.info("obs_type: pixels")
             self.observation_space = spaces.Dict(
                 {
                     "top": spaces.Box(
@@ -82,7 +86,7 @@ class AlohaDMEnv(gym.Env):
                 }
             )
         elif self.obs_type == "pixels_agent_pos":
-            print("obs_type: pixels_agent_pos")
+            _logger.info("obs_type: pixels_agent_pos")
             self.observation_space = spaces.Dict(
                 {
                     "pixels": spaces.Dict(

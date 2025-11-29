@@ -4,6 +4,10 @@ import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
 import asyncio
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class Actor:
     """
     A class to represent an actor in the ORCA Gym environment.
@@ -134,7 +138,7 @@ class OrcaGymScene:
             request = mjc_message_pb2.PublishSceneRequest()
             response = await self.stub.PublishScene(request)
             if response.status != mjc_message_pb2.PublishSceneResponse.SUCCESS:
-                print("Publish scene failed: ", response.error_message)
+                _logger.error(f"Publish scene failed:  {response.error_message}")
                 raise Exception("Publish scene failed.")
 
     def publish_scene(self):
@@ -151,7 +155,7 @@ class OrcaGymScene:
         
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
-            print("Add actor failed: ", response.error_message)
+            _logger.error(f"Add actor failed:  {response.error_message}")
             raise Exception("Add actor failed.")
         
     def add_actor(self, actor: Actor):
@@ -166,7 +170,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetLightInfo(request)
             if response.status != mjc_message_pb2.SetLightInfoResponse.SUCCESS:
-                print("Set light info failed: ", response.error_message)
+                _logger.error(f"Set light info failed:  {response.error_message}")
                 raise Exception("Set light info failed.")
         
     def set_light_info(self, actor_name : str, light_info: LightInfo):
@@ -184,7 +188,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetCameraSensorInfo(request)
             if response.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
-                print("Set camera sensor info failed: ", response.error_message)
+                _logger.error(f"Set camera sensor info failed:  {response.error_message}")
                 raise Exception("Set camera sensor info failed.")
             
     def set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
@@ -198,7 +202,7 @@ class OrcaGymScene:
             
             response = await self.stub.MakeCameraViewportActive(request)
             if response.status != mjc_message_pb2.MakeCameraViewportActiveResponse.SUCCESS:
-                print("Make camera viewport activate failed: ", response.error_message)
+                _logger.error(f"Make camera viewport activate failed:  {response.error_message}")
                 raise Exception("Make camera viewport activate failed.")
             
     def make_camera_viewport_active(self, actor_name: str, entity_name: str):
@@ -212,7 +216,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetMaterialInfo(request)
             if response.status != mjc_message_pb2.SetMaterialInfoResponse.SUCCESS:
-                print("Set material info failed: ", response.error_message)
+                _logger.error(f"Set material info failed:  {response.error_message}")
                 raise Exception("Set material info failed.")
             
     def set_material_info(self, actor_name: str, material_info: MaterialInfo):
@@ -228,7 +232,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetActorAnimParamNumber(request)
             if response.status != mjc_message_pb2.SetActorAnimParamNumberResponse.SUCCESS:
-                print("Set actor anim param number failed: ", response.error_message)
+                _logger.error(f"Set actor anim param number failed:  {response.error_message}")
                 raise Exception("Set actor anim param number failed.")
             
     def set_actor_anim_param_number(self, actor_name: str, param_name: str, value: float):
@@ -243,7 +247,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetActorAnimParamBool(request)
             if response.status != mjc_message_pb2.SetActorAnimParamBoolResponse.SUCCESS:
-                print("Set actor anim param bool failed: ", response.error_message)
+                _logger.error(f"Set actor anim param bool failed:  {response.error_message}")
                 raise Exception("Set actor anim param bool failed.")
             
     def set_actor_anim_param_bool(self, actor_name: str, param_name: str, value: bool):
@@ -258,7 +262,7 @@ class OrcaGymScene:
             
             response = await self.stub.SetActorAnimParamString(request)
             if response.status != mjc_message_pb2.SetActorAnimParamStringResponse.SUCCESS:
-                print("Set actor anim param string failed: ", response.error_message)
+                _logger.error(f"Set actor anim param string failed:  {response.error_message}")
                 raise Exception("Set actor anim param string failed.")
             
     def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):

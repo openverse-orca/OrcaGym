@@ -13,6 +13,10 @@ if project_root not in sys.path:
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 #from envs.orca_gym_env import ActionSpaceType
 
 # 
@@ -20,7 +24,7 @@ from datetime import datetime
 TIME_STEP = 0.01
 
 def register_env(orcagym_addr, env_name, env_index, control_freq=20) -> str:
-    print("register_env: ", orcagym_addr)
+    _logger.info(f"register_env:  {orcagym_addr}")
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     gym.register(
@@ -59,7 +63,7 @@ def continue_training(env):
 if __name__ == "__main__":
     try:
         orcagym_addr = "localhost:50051"
-        print("simulation running... , grpc_address: ", orcagym_addr)
+        _logger.info(f"simulation running... , grpc_address:  {orcagym_addr}")
        # env_id = f"XboxControl-v0-OrcaGym-{grpc_address[-2:]}"
                 
         env_name = "RM75VRControl-v0"
@@ -68,7 +72,7 @@ if __name__ == "__main__":
        # register_env(grpc_address, 20)
 
         env = gym.make(env_id)        
-        print("Start Simulation!")
+        _logger.info("Start Simulation!")
 
         continue_training(env)
     except KeyboardInterrupt:

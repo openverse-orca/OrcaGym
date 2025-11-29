@@ -11,6 +11,10 @@ from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.adapters.robomimic.task.pick_place_task import PickPlaceTask, TaskStatus
 import importlib
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class RunMode:
     """
     Enum class for control type
@@ -232,9 +236,9 @@ class DualArmEnv(RobomimicEnv):
     
     def set_task_status(self, status):
         if status == TaskStatus.SUCCESS:
-            print("Task success!")
+            _logger.info("Task success!")
         elif status == TaskStatus.FAILURE:
-            print("Task failure!")
+            _logger.error("Task failure!")
         elif status == TaskStatus.BEGIN:
             print("Start to record task....... Press left hand grip if task failed, press right hand grip if task success.")            
         self._task_status = status
@@ -391,12 +395,12 @@ class DualArmEnv(RobomimicEnv):
     def _debug_list_loaded_objects(self):
         all_keys = list(self.model._joint_dict.keys())
 
-        print("=== ALL JOINT KEYS IN MODEL ===")
+        _logger.info("=== ALL JOINT KEYS IN MODEL ===")
         for k in all_keys:
-            print("   ", k)
-        print("================================")
+            _logger.info(f"    {k}")
+        _logger.info("================================")
 
-        print("[Debug] before correction:", self._task.object_joints)
+        _logger.debug(f"[Debug] before correction: {self._task.object_joints}")
         corrected = []
         for short_jn in self._task.object_joints:
             sn_tokens = short_jn.lower().split("_")
@@ -407,7 +411,7 @@ class DualArmEnv(RobomimicEnv):
                 if fn_tokens[-len(sn_tokens):] == sn_tokens:
                     matches.append(full)
             if not matches:
-                print(f"[Debug] joint '{short_jn}' not found → SKIP")
+                _logger.warning(f"[Debug] joint '{short_jn}' not found → SKIP")
                 continue
             full_jn = matches[0]
             
@@ -484,7 +488,7 @@ class DualArmEnv(RobomimicEnv):
             )
         else:
             # 万一格式不符，回退到无色输出
-            print(instr)
+            _logger.info(instr)
 
         self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
         self.mj_forward()
@@ -564,7 +568,7 @@ class DualArmEnv(RobomimicEnv):
 
             # 如果没有尺寸信息，跳过目标
             if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
+                _logger.error(f"Error: No geometry size information found for goal {goal_name}")
                 continue
 
             mn = np.array(info["min"]).flatten()

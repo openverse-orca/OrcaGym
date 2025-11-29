@@ -13,6 +13,10 @@ from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
 import random
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class PickPlaceTask(AbstractTask):
     def __init__(self, config: dict):
         
@@ -108,7 +112,7 @@ class PickPlaceTask(AbstractTask):
 
             # 如果没有尺寸信息，跳过目标
             if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
+                _logger.error(f"Error: No geometry size information found for goal {goal_name}")
                 continue
 
             mn = np.array(info["min"]).flatten()

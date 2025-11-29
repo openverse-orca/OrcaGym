@@ -6,6 +6,10 @@ from collections import defaultdict
 
 from envs.legged_gym.legged_robot import LeggedRobot
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class ControlDevice:
     """
     Enum class for control
@@ -102,7 +106,7 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         env_action_range = np.concatenate([agent.action_range for agent in self._agents.values()], axis=0)
         self.env_action_range_min = env_action_range[:, 0]
         self.env_action_range_max = env_action_range[:, 1]
-        print("env action range: ", env_action_range)
+        _logger.info(f"env action range:  {env_action_range}")
         # 归一化到 [-1, 1]区间
         # scaled_action_range = np.concatenate([[[-1.0, 1.0]] * len(env_action_range)], dtype=np.float32)
         # print("Scaled action range: ", scaled_action_range)
@@ -284,7 +288,7 @@ class LeggedSimEnv(OrcaGymLocalEnv):
         geom_friction_dict = self._agents[self._agent_names[0]].agent.scale_foot_friction(geom_dict, base_friction)
         self.set_geom_friction(geom_friction_dict)
 
-        print("Setup base friction: ", geom_friction_dict)
+        _logger.info(f"Setup base friction:  {geom_friction_dict}")
 
 
 

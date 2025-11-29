@@ -13,6 +13,10 @@ from gymnasium import spaces
 
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class XBotSimpleEnv(OrcaGymLocalEnv):
     """
@@ -43,7 +47,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         self.nu = int(self.model.nu)
         self.nq = int(self.model.nq)
         self.nv = int(self.model.nv)
-        print(f"[XBotSimpleEnv] Model: nq={self.nq}, nv={self.nv}, nu={self.nu}")
+        _logger.info(f"[XBotSimpleEnv] Model: nq={self.nq}, nv={self.nv}, nu={self.nu}")
 
         # 控制参数 - 恢复humanoid-gym的原始值
         # 因为我们会实现正确的decimation（10次内部循环）
@@ -58,9 +62,9 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         # 简单检查timestep
         if self.verbose:
             actual_timestep = self.gym._mjModel.opt.timestep
-            print(f"[XBotSimpleEnv] Physics timestep: {actual_timestep}s ({1.0/actual_timestep:.0f}Hz)")
+            _logger.performance(f"[XBotSimpleEnv] Physics timestep: {actual_timestep}s ({1.0/actual_timestep:.0f}Hz)")
         
-        print(f"[XBotSimpleEnv] Using humanoid-gym PD gains: kp_max={np.max(self.kps)}, kd={self.kds[0]}, tau_limit={self.tau_limit}, action_scale={self.action_scale}, decimation={self.decimation}")
+        _logger.info(f"[XBotSimpleEnv] Using humanoid-gym PD gains: kp_max={np.max(self.kps)}, kd={self.kds[0]}, tau_limit={self.tau_limit}, action_scale={self.action_scale}, decimation={self.decimation}")
 
         # 观察历史
         self.frame_stack = frame_stack
@@ -122,7 +126,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         except:
             self.base_body_name = "base_link"  # 默认值
         
-        print(f"[XBotSimpleEnv] Using base body name: {self.base_body_name}")
+        _logger.info(f"[XBotSimpleEnv] Using base body name: {self.base_body_name}")
         
         # 上一次的基座位置（用于检测位移和估算角速度）
         self.last_base_pos = None
@@ -138,16 +142,16 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
             low=-18.0, high=18.0, shape=(full_obs_dim,), dtype=np.float32
         )
 
-        print(f"[XBotSimpleEnv] Initialized with frame_stack={frame_stack}")
-        print(f"[XBotSimpleEnv] Action space: {self.action_space.shape}")
-        print(f"[XBotSimpleEnv] Observation space: {self.observation_space.shape}")
+        _logger.info(f"[XBotSimpleEnv] Initialized with frame_stack={frame_stack}")
+        _logger.info(f"[XBotSimpleEnv] Action space: {self.action_space.shape}")
+        _logger.info(f"[XBotSimpleEnv] Observation space: {self.observation_space.shape}")
 
     def set_command(self, vx: float = 0.0, vy: float = 0.0, dyaw: float = 0.0):
         """设置运动命令"""
         self.cmd_vx = vx
         self.cmd_vy = vy
         self.cmd_dyaw = dyaw
-        print(f"[Command] Set to vx={vx:.2f}, vy={vy:.2f}, dyaw={dyaw:.2f}")
+        _logger.info(f"[Command] Set to vx={vx:.2f}, vy={vy:.2f}, dyaw={dyaw:.2f}")
     
     def set_smoothness(self, alpha: float = 0.15):
         """
@@ -158,13 +162,13 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
           - 1.0: 无平滑，完全响应
         """
         self.action_filter_alpha = np.clip(alpha, 0.0, 1.0)
-        print(f"[Config] Action smoothness set to alpha={self.action_filter_alpha:.2f}")
+        _logger.info(f"[Config] Action smoothness set to alpha={self.action_filter_alpha:.2f}")
     
     def enable_warmup(self, enabled: bool = True, steps: int = 300):
         """启用/禁用warmup阶段"""
         self.use_warmup = enabled
         self.warmup_steps = steps
-        print(f"[Config] Warmup {'enabled' if enabled else 'disabled'} ({steps} steps)")
+        _logger.info(f"[Config] Warmup {'enabled' if enabled else 'disabled'} ({steps} steps)")
 
     def quaternion_to_euler(self, quat: np.ndarray) -> np.ndarray:
         """
@@ -216,7 +220,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
                 omega = np.array(sensor_dict[gyro_name], dtype=np.float64)
                 sensor_read_success = True
                 if self.step_count == 1:
-                    print(f"[Success] Using sensors: '{ori_name}', '{gyro_name}'")
+                    _logger.info(f"[Success] Using sensors: '{ori_name}', '{gyro_name}'")
                 break
             except:
                 continue
@@ -241,12 +245,12 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
                 
                 sensor_read_success = True
                 if self.step_count == 1:
-                    print(f"[Fallback] Using body quaternion from '{self.base_body_name}' (omega estimated from Δeuler)")
+                    _logger.info(f"[Fallback] Using body quaternion from '{self.base_body_name}' (omega estimated from Δeuler)")
             except:
                 pass
         
         if not sensor_read_success and self.step_count == 1:
-            print(f"[Error] Cannot read IMU sensors! Observation will have zero omega/euler.")
+            _logger.error(f"[Error] Cannot read IMU sensors! Observation will have zero omega/euler.")
 
         # 转换欧拉角
         eu_ang = self.quaternion_to_euler(quat)
@@ -293,7 +297,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         """
         重置环境
         """
-        print("[XBotSimpleEnv] Resetting environment...")
+        _logger.info("[XBotSimpleEnv] Resetting environment...")
 
         # 清空控制和历史
         self.ctrl = np.zeros(self.nu, dtype=np.float32)
@@ -320,7 +324,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
             CRAWL_HEIGHT = 0.05  # 5cm高度，接近地面
             current_qpos[2] = CRAWL_HEIGHT
             
-            print(f"[爬行模式] 设置初始高度: {CRAWL_HEIGHT}m (原始约0.88m)")
+            _logger.info(f"[爬行模式] 设置初始高度: {CRAWL_HEIGHT}m (原始约0.88m)")
             
             # 通过OrcaGym API设置qpos
             import asyncio
@@ -328,16 +332,16 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
                 self.loop.run_until_complete(self.gym.set_qpos(current_qpos))
                 self.gym.mj_forward()
                 self.gym.update_data()
-                print(f"[爬行模式] qpos已更新，新base高度: {current_qpos[2]:.3f}m")
+                _logger.info(f"[爬行模式] qpos已更新，新base高度: {current_qpos[2]:.3f}m")
             else:
-                print(f"[警告] 无法设置qpos（loop不可用）")
+                _logger.info(f"[警告] 无法设置qpos（loop不可用）")
         except Exception as e:
-            print(f"[警告] 设置爬行模式失败: {e}")
+            _logger.info(f"[警告] 设置爬行模式失败: {e}")
 
         # 获取初始观察
         obs = self.get_full_obs_vector()
 
-        print(f"[XBotSimpleEnv] Reset complete. Obs shape: {obs.shape}")
+        _logger.info(f"[XBotSimpleEnv] Reset complete. Obs shape: {obs.shape}")
         return obs, {}
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, Dict]:
@@ -416,8 +420,8 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
             
             # 在第1步打印原始四元数用于调试
             if self.step_count == 1:
-                print(f"\n[Debug] Raw quaternion from get_body_xpos_xmat_xquat: {xquat}")
-                print(f"[Debug] Interpreting as: w={xquat[0]:.3f}, x={xquat[1]:.3f}, y={xquat[2]:.3f}, z={xquat[3]:.3f}")
+                _logger.debug(f"\n[Debug] Raw quaternion from get_body_xpos_xmat_xquat: {xquat}")
+                _logger.debug(f"[Debug] Interpreting as: w={xquat[0]:.3f}, x={xquat[1]:.3f}, y={xquat[2]:.3f}, z={xquat[3]:.3f}")
             
             real_euler = self.quaternion_to_euler(xquat)
             position_valid = True
@@ -434,17 +438,17 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         except Exception as e:
             # 如果查询失败，第一次打印错误和可用body列表
             if self.step_count == 1:
-                print(f"\n⚠️ Warning: Cannot query base body '{self.base_body_name}'")
-                print(f"   Error: {e}")
+                _logger.error(f"\n⚠️ Warning: Cannot query base body '{self.base_body_name}'")
+                _logger.error(f"   Error: {e}")
                 try:
                     all_bodies = self.model.get_body_names()
-                    print(f"   Available bodies: {all_bodies[:15]}")
+                    _logger.info(f"   Available bodies: {all_bodies[:15]}")
                     # 尝试找到包含base的body
                     base_bodies = [b for b in all_bodies if 'base' in b.lower()]
                     if base_bodies:
-                        print(f"   Bodies with 'base': {base_bodies}")
+                        _logger.info(f"   Bodies with 'base': {base_bodies}")
                 except Exception as e2:
-                    print(f"   Cannot list bodies: {e2}")
+                    _logger.error(f"   Cannot list bodies: {e2}")
                 print()
             
             # 使用qpos兜底
@@ -519,7 +523,7 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
         
         # 摔倒打印
         if is_fallen and fall_reason:
-            print(f"\n[FALL] Step={self.step_count} | {' + '.join(fall_reason)}\n")
+            _logger.info(f"\n[FALL] Step={self.step_count} | {' + '.join(fall_reason)}\n")
         
         # 详细诊断：前10步每步打印，之后每200步打印
         should_print_diagnostic = (self.step_count <= 10) or (self.step_count % 200 == 0)
@@ -557,21 +561,21 @@ class XBotSimpleEnv(OrcaGymLocalEnv):
                           f"Tau_max={np.max(np.abs(tau)):6.1f} | "
                           f"{displacement}")
                 except Exception as e:
-                    print(f"[Diagnostics] Step={self.step_count} position_valid=True but print failed: {e}")
+                    _logger.error(f"[Diagnostics] Step={self.step_count} position_valid=True but print failed: {e}")
             else:
                 # 查询失败，尝试列出所有body看看名称
                 if self.step_count == 200:
                     try:
                         all_bodies = self.model.get_body_names()
-                        print(f"[Diagnostics] Cannot find '{self.base_body_name}'. Available bodies (first 10): {all_bodies[:10]}")
+                        _logger.error(f"[Diagnostics] Cannot find '{self.base_body_name}'. Available bodies (first 10): {all_bodies[:10]}")
                     except:
                         pass
-                print(f"[Diagnostics] Step={self.step_count} | position_valid=False, cannot query base position")
+                _logger.error(f"[Diagnostics] Step={self.step_count} | position_valid=False, cannot query base position")
 
         return obs, reward, terminated, truncated, info
 
 
 if __name__ == "__main__":
     # 简单测试
-    print("XBotSimpleEnv module loaded successfully")
+    _logger.info("XBotSimpleEnv module loaded successfully")
 

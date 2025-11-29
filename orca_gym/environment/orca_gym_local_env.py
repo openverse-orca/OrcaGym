@@ -11,6 +11,10 @@ from gymnasium.core import ObsType
 
 import asyncio
 import sys
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
@@ -68,12 +72,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
-            print(f"Warning: Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+            _logger.warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
-        print(f"Initializing simulation: Class: {self.__class__.__name__}")
+        _logger.info(f"Initializing simulation: Class: {self.__class__.__name__}")
         model_xml_path = self.loop.run_until_complete(self._load_model_xml())
         self.loop.run_until_complete(self._initialize_orca_sim(model_xml_path))
         model = self.gym.model
@@ -244,7 +248,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
         if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
-            print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            _logger.warning(f"Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
             return
 
         # 同步锚点位置
@@ -279,7 +283,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             # print(f"Released actor: {self._body_anchored}")
             self._body_anchored = None
         else:
-            print("No actor is currently anchored.")
+            _logger.warning("No actor is currently anchored.")
 
     def anchor_actor(self, actor_name: str, anchor_type: AnchorType):
         assert self._body_anchored is None, "An actor is already anchored. Please release it first."
@@ -287,7 +291,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 获取actor的位姿和四元数
         actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
         if actor_xpos is None or actor_xmat is None or actor_xquat is None:
-            print(f"Warning: Actor {actor_name} not found in the simulation. Cannot anchor.")
+            _logger.warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
             return
         
         # 将锚点位置设置为actor的位姿
@@ -392,8 +396,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def get_body_xpos_xmat_xquat(self, body_name_list):
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)
         if len(body_dict) != len(body_name_list):
-            print("Body Nmae List: ", body_name_list)
-            print("Body Dict: ", body_dict)
+            _logger.error(f"Body Name List: {body_name_list}")
+            _logger.error(f"Body Dict: {body_dict}")
             raise ValueError("Some body names are not found in the simulation.")
         xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
         xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()

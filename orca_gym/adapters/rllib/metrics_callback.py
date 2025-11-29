@@ -3,6 +3,10 @@ import numpy as np
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 import time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class OrcaMetricsCallback(DefaultCallbacks):
     def __init__(self, **kwargs):
@@ -50,21 +54,21 @@ class OrcaMetricsCallback(DefaultCallbacks):
 
         return_mean = episode_return_mean / episode_len_mean if episode_len_mean > 0 else 0
         
-        print(f"=========== ORCA METRICS ===========")
-        print(f"Total environments: {total_envs}")
-        print(f"Sampled steps per second: {sampled_steps_per_second}")
-        print(f"return_mean: {return_mean}")
-        print(f"episode_return_mean: {episode_return_mean}")
-        print(f"episode_len_mean: {episode_len_mean}")
-        print(f"total_loss: {total_loss}")
-        print(f"policy_loss: {policy_loss}")
-        print(f"vf_loss: {vf_loss}")
-        print(f"entropy: {entropy}")
-        print(f"mean_kl_loss: {mean_kl_loss}")
-        print(f"grad_norm: {grad_norm}")
-        print(f"lr: {lr}")
-        print(f"diff_num_grad: {diff_num_grad}")
-        print("======================================")
+        _logger.info(f"=========== ORCA METRICS ===========")
+        _logger.info(f"Total environments: {total_envs}")
+        _logger.info(f"Sampled steps per second: {sampled_steps_per_second}")
+        _logger.info(f"return_mean: {return_mean}")
+        _logger.info(f"episode_return_mean: {episode_return_mean}")
+        _logger.info(f"episode_len_mean: {episode_len_mean}")
+        _logger.info(f"total_loss: {total_loss}")
+        _logger.info(f"policy_loss: {policy_loss}")
+        _logger.info(f"vf_loss: {vf_loss}")
+        _logger.info(f"entropy: {entropy}")
+        _logger.info(f"mean_kl_loss: {mean_kl_loss}")
+        _logger.info(f"grad_norm: {grad_norm}")
+        _logger.info(f"lr: {lr}")
+        _logger.info(f"diff_num_grad: {diff_num_grad}")
+        _logger.info("======================================")
         
         self._last_sampled_update_time = time.time()
         self._num_env_steps_sampled_lifetime_pre = num_env_steps_sampled_lifetime

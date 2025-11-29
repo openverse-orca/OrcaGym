@@ -3,6 +3,10 @@ import sys
 import copy
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class XboxJoystick:
     def __init__(self):
@@ -58,7 +62,7 @@ class XboxJoystickManager:
                 self._pygame_joysticks[-1].init()
                 xbox_joystick = XboxJoystick()
                 self._xbox_joysticks.append(xbox_joystick)
-                print("Joystick detected:", self._pygame_joysticks[-1].get_name())
+                _logger.info(f"Joystick detected: {self._pygame_joysticks[-1].get_name()}")
 
         # Initialize joystick state
         init_joystick_state = {
@@ -131,4 +135,4 @@ class XboxJoystickManager:
 
     def close(self):
         pygame.quit()
-        print("Joysticks closed")
+        _logger.info("Joysticks closed")

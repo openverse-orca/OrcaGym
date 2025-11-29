@@ -4,6 +4,10 @@ import time
 import contextlib
 import signal
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # 平台检测和条件导入
 if sys.platform == 'win32':
     import msvcrt
@@ -22,7 +26,7 @@ def create_tmp_dir(dir_name):
     # 检查目录是否存在，如果不存在则创建
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-        print(f"目录 '{dir_path}' 已创建。")
+        _logger.info(f"目录 '{dir_path}' 已创建。")
 
 
 def formate_now():
@@ -59,18 +63,18 @@ def cleanup_zombie_locks(directory_path):
                             # 进程不存在，删除僵尸锁文件
                             os.unlink(lock_path)
                             cleaned_count += 1
-                            print(f"清理僵尸锁文件: {lock_path}")
+                            _logger.info(f"清理僵尸锁文件: {lock_path}")
             except (OSError, ValueError):
                 # 锁文件损坏，删除它
                 try:
                     os.unlink(lock_path)
                     cleaned_count += 1
-                    print(f"清理损坏的锁文件: {lock_path}")
+                    _logger.info(f"清理损坏的锁文件: {lock_path}")
                 except OSError:
                     pass
     
     if cleaned_count > 0:
-        print(f"共清理了 {cleaned_count} 个僵尸锁文件")
+        _logger.info(f"共清理了 {cleaned_count} 个僵尸锁文件")
 
 
 def _windows_file_lock(lock_file, non_blocking=False, timeout=30):

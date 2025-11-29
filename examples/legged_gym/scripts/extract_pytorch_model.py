@@ -16,6 +16,10 @@ import argparse
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # RLLib imports
 try:
     import ray
@@ -25,7 +29,7 @@ try:
     from ray.rllib.utils.numpy import convert_to_numpy
     RLLIB_AVAILABLE = True
 except ImportError:
-    print("Warning: RLLib not available. RLLib checkpoint support will be disabled.")
+    _logger.warning("Warning: RLLib not available. RLLib checkpoint support will be disabled.")
     RLLIB_AVAILABLE = False
 
 # 添加项目根目录到Python路径
@@ -155,9 +159,9 @@ def _parse_value(value_str: str) -> Any:
 
 def print_model_structure(model, model_name="Model"):
     """打印模型结构"""
-    print(f"\n{'='*60}")
-    print(f"{model_name} 结构:")
-    print(f"{'='*60}")
+    _logger.info(f"\n{'='*60}")
+    _logger.info(f"{model_name} 结构:")
+    _logger.info(f"{'='*60}")
     
     total_params = 0
     trainable_params = 0
@@ -168,37 +172,37 @@ def print_model_structure(model, model_name="Model"):
             total_params += params
             trainable_params += sum(p.numel() for p in module.parameters() if p.requires_grad)
             
-            print(f"{name}: {module}")
+            _logger.info(f"{name}: {module}")
             if hasattr(module, 'weight') and module.weight is not None:
-                print(f"  Weight shape: {module.weight.shape}")
+                _logger.info(f"  Weight shape: {module.weight.shape}")
             if hasattr(module, 'bias') and module.bias is not None:
-                print(f"  Bias shape: {module.bias.shape}")
-            print(f"  Parameters: {params:,}")
+                _logger.info(f"  Bias shape: {module.bias.shape}")
+            _logger.info(f"  Parameters: {params:,}")
             print()
     
-    print(f"总参数数量: {total_params:,}")
-    print(f"可训练参数数量: {trainable_params:,}")
-    print(f"{'='*60}\n")
+    _logger.info(f"总参数数量: {total_params:,}")
+    _logger.info(f"可训练参数数量: {trainable_params:,}")
+    _logger.info(f"{'='*60}\n")
 
 def print_model_parameters(model, model_name="Model"):
     """打印模型参数"""
-    print(f"\n{'='*60}")
-    print(f"{model_name} 参数详情:")
-    print(f"{'='*60}")
+    _logger.info(f"\n{'='*60}")
+    _logger.info(f"{model_name} 参数详情:")
+    _logger.info(f"{'='*60}")
     
     for name, param in model.named_parameters():
-        print(f"{name}:")
-        print(f"  Shape: {param.shape}")
-        print(f"  Data type: {param.dtype}")
-        print(f"  Requires grad: {param.requires_grad}")
-        print(f"  Device: {param.device}")
+        _logger.info(f"{name}:")
+        _logger.info(f"  Shape: {param.shape}")
+        _logger.info(f"  Data type: {param.dtype}")
+        _logger.info(f"  Requires grad: {param.requires_grad}")
+        _logger.info(f"  Device: {param.device}")
         if param.numel() <= 20:  # 如果参数数量少，打印具体值
-            print(f"  Values: {param.data}")
+            _logger.info(f"  Values: {param.data}")
         else:
-            print(f"  Min: {param.data.min().item():.6f}")
-            print(f"  Max: {param.data.max().item():.6f}")
-            print(f"  Mean: {param.data.mean().item():.6f}")
-            print(f"  Std: {param.data.std().item():.6f}")
+            _logger.info(f"  Min: {param.data.min().item():.6f}")
+            _logger.info(f"  Max: {param.data.max().item():.6f}")
+            _logger.info(f"  Mean: {param.data.mean().item():.6f}")
+            _logger.info(f"  Std: {param.data.std().item():.6f}")
         print()
 
 def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModule, Dict[str, Any]]:
@@ -267,8 +271,8 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
                     observation_space = kwargs.get("observation_space")
                     action_space = kwargs.get("action_space")
     
-    print(f"Observation space: {observation_space}")
-    print(f"Action space: {action_space}")
+    _logger.info(f"Observation space: {observation_space}")
+    _logger.info(f"Action space: {action_space}")
     
     if observation_space is None or action_space is None:
         raise ValueError("无法从checkpoint中提取观察空间或动作空间信息")
@@ -281,7 +285,7 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
     
     # 解析 model_config 字符串为字典
     model_config = parse_model_config_string(model_config_str)
-    print(f"解析的模型配置: {model_config}")
+    _logger.info(f"解析的模型配置: {model_config}")
     
     # 创建RL模块规范
     rl_module_spec = RLModuleSpec(
@@ -304,9 +308,9 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
     # 加载状态 - 处理键名不匹配的问题
     try:
         rllib_module.load_state_dict(policy_state)
-        print("成功直接加载状态字典")
+        _logger.info("成功直接加载状态字典")
     except RuntimeError as e:
-        print(f"直接加载状态失败，尝试修复键名: {e}")
+        _logger.info(f"直接加载状态失败，尝试修复键名: {e}")
         
         # 创建新的状态字典，修复键名
         new_state_dict = {}
@@ -328,9 +332,9 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
         # 尝试加载修复后的状态字典
         try:
             rllib_module.load_state_dict(new_state_dict, strict=False)
-            print("成功加载修复后的状态字典")
+            _logger.info("成功加载修复后的状态字典")
         except Exception as e2:
-            print(f"修复后加载仍然失败: {e2}")
+            _logger.info(f"修复后加载仍然失败: {e2}")
             # 如果还是失败，尝试只加载匹配的键
             model_state_dict = rllib_module.state_dict()
             compatible_state_dict = {}
@@ -346,14 +350,14 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
                     incompatible_keys.append(f"{key}: key not found in model")
             
             if incompatible_keys:
-                print(f"发现 {len(incompatible_keys)} 个不兼容的参数:")
+                _logger.info(f"发现 {len(incompatible_keys)} 个不兼容的参数:")
                 for key_info in incompatible_keys[:5]:  # 只显示前5个
-                    print(f"  - {key_info}")
+                    _logger.info(f"  - {key_info}")
                 if len(incompatible_keys) > 5:
-                    print(f"  ... 还有 {len(incompatible_keys) - 5} 个不兼容参数")
+                    _logger.info(f"  ... 还有 {len(incompatible_keys) - 5} 个不兼容参数")
             
             rllib_module.load_state_dict(compatible_state_dict, strict=False)
-            print(f"成功加载 {len(compatible_state_dict)} 个兼容的参数")
+            _logger.info(f"成功加载 {len(compatible_state_dict)} 个兼容的参数")
     
     return rllib_module, module_class_and_ctor_args
 
@@ -362,15 +366,15 @@ def extract_pytorch_model_from_rllib(checkpoint_path: str) -> Tuple[Dict[str, An
     """从RLLib checkpoint提取PyTorch模型"""
     
     if not RLLIB_AVAILABLE:
-        print("RLLib不可用，无法加载RLLib checkpoint")
+        _logger.info("RLLib不可用，无法加载RLLib checkpoint")
         return None, None
     
-    print(f"加载RLLib checkpoint: {checkpoint_path}")
+    _logger.info(f"加载RLLib checkpoint: {checkpoint_path}")
     
     try:
         # 加载RLLib模块
         rllib_module, config = load_rllib_checkpoint(checkpoint_path)
-        print("成功加载RLLib模块")
+        _logger.info("成功加载RLLib模块")
         
         # 提取模型组件
         models = {
@@ -381,17 +385,17 @@ def extract_pytorch_model_from_rllib(checkpoint_path: str) -> Tuple[Dict[str, An
         }
         
         # 打印可用的组件
-        print("\n可用的模型组件:")
+        _logger.info("\n可用的模型组件:")
         for name, component in models.items():
             if component is not None:
-                print(f"  {name}: {type(component)}")
+                _logger.info(f"  {name}: {type(component)}")
             else:
-                print(f"  {name}: None")
+                _logger.info(f"  {name}: None")
         
         return models, config
         
     except Exception as e:
-        print(f"加载RLLib checkpoint失败: {e}")
+        _logger.info(f"加载RLLib checkpoint失败: {e}")
         return None, None
 
 
@@ -402,13 +406,13 @@ def extract_pytorch_model_from_sb3(model_path=None, config_path=None):
         # 查找最新的模型文件
         trained_models_dir = Path(__file__).parent.parent / "trained_models_tmp"
         if not trained_models_dir.exists():
-            print("未找到训练模型目录")
+            _logger.info("未找到训练模型目录")
             return None, None
         
         # 获取有.zip文件的模型目录
         model_dirs = [d for d in trained_models_dir.iterdir() if d.is_dir()]
         if not model_dirs:
-            print("未找到任何训练模型")
+            _logger.info("未找到任何训练模型")
             return None, None
         
         # 查找包含.zip文件的目录
@@ -420,36 +424,36 @@ def extract_pytorch_model_from_sb3(model_path=None, config_path=None):
                 break
         
         if model_dir_with_zip is None:
-            print("未找到包含.zip文件的模型目录")
+            _logger.info("未找到包含.zip文件的模型目录")
             return None, None
         
-        print(f"使用模型目录: {model_dir_with_zip}")
+        _logger.info(f"使用模型目录: {model_dir_with_zip}")
         
         # 查找.zip文件
         zip_files = list(model_dir_with_zip.glob("*.zip"))
         model_path = zip_files[0]
         config_path = model_dir_with_zip / "config.json"
     
-    print(f"加载模型: {model_path}")
-    print(f"加载配置: {config_path}")
+    _logger.info(f"加载模型: {model_path}")
+    _logger.info(f"加载配置: {config_path}")
     
     # 加载配置
     if config_path and config_path.exists():
         with open(config_path, 'r') as f:
             config = json.load(f)
-        print(f"模型配置: {json.dumps(config, indent=2)}")
+        _logger.info(f"模型配置: {json.dumps(config, indent=2)}")
     
     # 加载SB3模型
     try:
         sb3_model = PPO.load(str(model_path))
-        print("成功加载Stable Baselines3模型")
+        _logger.info("成功加载Stable Baselines3模型")
     except Exception as e:
-        print(f"加载模型失败: {e}")
+        _logger.info(f"加载模型失败: {e}")
         return None, None
     
     # 提取PyTorch模型
     policy = sb3_model.policy
-    print(f"策略类型: {type(policy)}")
+    _logger.info(f"策略类型: {type(policy)}")
     
     # 获取actor和critic网络
     actor_net = policy.mlp_extractor.policy_net
@@ -457,11 +461,11 @@ def extract_pytorch_model_from_sb3(model_path=None, config_path=None):
     action_net = policy.action_net
     value_net = policy.value_net
     
-    print("\n提取的PyTorch模型组件:")
-    print(f"Actor网络: {type(actor_net)}")
-    print(f"Critic网络: {type(critic_net)}")
-    print(f"Action网络: {type(action_net)}")
-    print(f"Value网络: {type(value_net)}")
+    _logger.info("\n提取的PyTorch模型组件:")
+    _logger.info(f"Actor网络: {type(actor_net)}")
+    _logger.info(f"Critic网络: {type(critic_net)}")
+    _logger.info(f"Action网络: {type(action_net)}")
+    _logger.info(f"Value网络: {type(value_net)}")
     
     return {
         'policy': policy,
@@ -571,7 +575,7 @@ def create_standalone_rllib_model(rllib_module):
                     values = torch.zeros(obs.shape[0], 1, device=obs.device)
                     
             except Exception as e:
-                print(f"获取价值估计失败: {e}")
+                _logger.info(f"获取价值估计失败: {e}")
                 # 如果无法获取价值，返回零
                 values = torch.zeros(obs.shape[0], 1, device=obs.device)
             
@@ -591,8 +595,8 @@ def main():
     
     args = parser.parse_args()
     
-    print("PyTorch模型提取和分析工具")
-    print("="*60)
+    _logger.info("PyTorch模型提取和分析工具")
+    _logger.info("="*60)
     
     # 确定模型类型和路径
     if args.type and args.checkpoint:
@@ -602,13 +606,13 @@ def main():
         # 自动检测模型类型
         trained_models_dir = Path(__file__).parent.parent / "trained_models_tmp"
         if not trained_models_dir.exists():
-            print("未找到训练模型目录")
+            _logger.info("未找到训练模型目录")
             return
         
         # 查找最新的模型文件
         model_dirs = [d for d in trained_models_dir.iterdir() if d.is_dir()]
         if not model_dirs:
-            print("未找到任何训练模型")
+            _logger.info("未找到任何训练模型")
             return
         
         # 优先查找RLLib checkpoint
@@ -634,22 +638,22 @@ def main():
         if rllib_checkpoint:
             model_type = "rllib"
             checkpoint_path = str(rllib_checkpoint)
-            print(f"自动检测到RLLib checkpoint: {checkpoint_path}")
+            _logger.info(f"自动检测到RLLib checkpoint: {checkpoint_path}")
         elif sb3_model:
             model_type = "sb3"
             checkpoint_path = str(sb3_model)
-            print(f"自动检测到SB3模型: {checkpoint_path}")
+            _logger.info(f"自动检测到SB3模型: {checkpoint_path}")
         else:
-            print("未找到支持的模型文件")
+            _logger.info("未找到支持的模型文件")
             return
     
     # 根据模型类型提取模型
     if model_type == "sb3":
-        print("处理Stable Baselines3模型...")
+        _logger.info("处理Stable Baselines3模型...")
         models, config = extract_pytorch_model_from_sb3(checkpoint_path)
         
         if models is None:
-            print("SB3模型提取失败")
+            _logger.info("SB3模型提取失败")
             return
         
         # 打印各个组件的结构
@@ -666,8 +670,8 @@ def main():
         print_model_parameters(standalone_model, "独立PyTorch模型参数")
         
         # 测试模型推理
-        print("\n测试模型推理:")
-        print("-" * 40)
+        _logger.info("\n测试模型推理:")
+        _logger.info("-" * 40)
         
         # 创建示例输入
         device = next(standalone_model.parameters()).device
@@ -681,22 +685,22 @@ def main():
         else:  # Box观察空间
             sample_obs = torch.randn(1, *obs_space.shape).to(device)
         
-        print(f"输入观察形状: {sample_obs}")
+        _logger.info(f"输入观察形状: {sample_obs}")
         
         # 推理
         with torch.no_grad():
             actions, values = standalone_model(sample_obs)
-            print(f"输出动作形状: {actions.shape}")
-            print(f"输出价值形状: {values.shape}")
-            print(f"动作范围: [{actions.min().item():.3f}, {actions.max().item():.3f}]")
-            print(f"价值范围: [{values.min().item():.3f}, {values.max().item():.3f}]")
+            _logger.info(f"输出动作形状: {actions.shape}")
+            _logger.info(f"输出价值形状: {values.shape}")
+            _logger.info(f"动作范围: [{actions.min().item():.3f}, {actions.max().item():.3f}]")
+            _logger.info(f"价值范围: [{values.min().item():.3f}, {values.max().item():.3f}]")
     
     elif model_type == "rllib":
-        print("处理RLLib APPO模型...")
+        _logger.info("处理RLLib APPO模型...")
         models, config = extract_pytorch_model_from_rllib(checkpoint_path)
         
         if models is None:
-            print("RLLib模型提取失败")
+            _logger.info("RLLib模型提取失败")
             return
         
         # 打印各个组件的结构
@@ -715,8 +719,8 @@ def main():
         print_model_parameters(standalone_model, "独立RLLib PyTorch模型参数")
         
         # 测试模型推理
-        print("\n测试模型推理:")
-        print("-" * 40)
+        _logger.info("\n测试模型推理:")
+        _logger.info("-" * 40)
         
         # 创建示例输入
         device = next(standalone_model.parameters()).device
@@ -729,15 +733,15 @@ def main():
             # 对于复杂的观察空间，使用默认形状
             sample_obs = torch.randn(1, 48).to(device)  # 假设48维观察
         
-        print(f"输入观察形状: {sample_obs.shape}")
+        _logger.info(f"输入观察形状: {sample_obs.shape}")
         
         # 推理
         with torch.no_grad():
             actions, values = standalone_model(sample_obs)
-            print(f"输出动作形状: {actions.shape}")
-            print(f"输出价值形状: {values.shape}")
-            print(f"动作范围: [{actions.min().item():.3f}, {actions.max().item():.3f}]")
-            print(f"价值范围: [{values.min().item():.3f}, {values.max().item():.3f}]")
+            _logger.info(f"输出动作形状: {actions.shape}")
+            _logger.info(f"输出价值形状: {values.shape}")
+            _logger.info(f"动作范围: [{actions.min().item():.3f}, {actions.max().item():.3f}]")
+            _logger.info(f"价值范围: [{values.min().item():.3f}, {values.max().item():.3f}]")
     
     # 保存PyTorch模型
     if not args.analyze_only:
@@ -749,9 +753,9 @@ def main():
             output_path = checkpoint_dir / f"extracted_{model_type}_pytorch_model.pth"
         
         torch.save(standalone_model.state_dict(), output_path)
-        print(f"\nPyTorch模型已保存到: {output_path}")
+        _logger.info(f"\nPyTorch模型已保存到: {output_path}")
     else:
-        print("\n仅分析模式，未保存模型")
+        _logger.info("\n仅分析模式，未保存模型")
 
 if __name__ == "__main__":
     main()
