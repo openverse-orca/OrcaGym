@@ -1,7 +1,8 @@
 import numpy as np
 from envs.manipulation.dual_arm_env import DualArmEnv
 from envs.manipulation.dual_arm_robot import DualArmRobot
-from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as config
+# 默认手部配置（当主配置中没有手部配置时使用）
+from envs.manipulation.robots.configs.gripper_2f85_config import gripper_2f85_config as default_hand_config
 
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
@@ -9,8 +10,8 @@ _logger = get_orca_logger()
 
 
 class OpenLoongGripperFixBase(DualArmRobot):
-    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
-        super().__init__(env, id, name)
+    def __init__(self, env: DualArmEnv, id: int, name: str, robot_config_name: str = None) -> None:
+        super().__init__(env, id, name, robot_config_name=robot_config_name)
 
         self.init_agent(id)
 
@@ -19,20 +20,29 @@ class OpenLoongGripperFixBase(DualArmRobot):
         _logger.info("OpenLoongGripperFixBase init_agent")
 
         super().init_agent(id)
+        print(f"[OpenLoongGripperFixBase.init_agent] 机器人 name='{self._name}', robot_config_name={self._robot_config_name}")
 
-        self._l_hand_actuator_names = [self._env.actuator(config["left_hand"]["actuator_names"][0], id)]
+        # 尝试从主配置中获取手部配置，如果没有则使用默认配置
+        if hasattr(self, '_config') and "left_hand" in self._config and "right_hand" in self._config:
+            hand_config = self._config
+            print(f"[OpenLoongGripperFixBase.init_agent] 使用主配置中的手部配置")
+        else:
+            hand_config = default_hand_config
+            print(f"[OpenLoongGripperFixBase.init_agent] 主配置中没有手部配置，使用默认配置: gripper_2f85_config")
+
+        self._l_hand_actuator_names = [self._env.actuator(hand_config["left_hand"]["actuator_names"][0], id)]
         
         self._l_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_hand_actuator_names]        
-        self._l_hand_body_names = [self._env.body(config["left_hand"]["body_names"][0], id), self._env.body(config["left_hand"]["body_names"][1], id)]
+        self._l_hand_body_names = [self._env.body(hand_config["left_hand"]["body_names"][0], id), self._env.body(hand_config["left_hand"]["body_names"][1], id)]
         self._l_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._l_hand_body_names:
                 self._l_hand_gemo_ids.append(geom_info["GeomId"])
 
-        self._r_hand_actuator_names = [self._env.actuator(config["right_hand"]["actuator_names"][0], id)]
+        self._r_hand_actuator_names = [self._env.actuator(hand_config["right_hand"]["actuator_names"][0], id)]
 
         self._r_hand_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_hand_actuator_names]
-        self._r_hand_body_names = [self._env.body(config["right_hand"]["body_names"][0], id), self._env.body(config["right_hand"]["body_names"][1], id)]
+        self._r_hand_body_names = [self._env.body(hand_config["right_hand"]["body_names"][0], id), self._env.body(hand_config["right_hand"]["body_names"][1], id)]
         self._r_hand_gemo_ids = []
         for geom_info in self._env.model.get_geom_dict().values():
             if geom_info["BodyName"] in self._r_hand_body_names:

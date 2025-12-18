@@ -6,8 +6,8 @@ from envs.manipulation.robots.configs.hand_config import hand_config as config
 
 
 class OpenLoongHandFixBase(DualArmRobot):
-    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
-        super().__init__(env, id, name)
+    def __init__(self, env: DualArmEnv, id: int, name: str, robot_config_name: str = None) -> None:
+        super().__init__(env, id, name, robot_config_name=robot_config_name)
 
         self.init_agent(id)
         

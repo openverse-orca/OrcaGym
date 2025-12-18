@@ -1,0 +1,1271 @@
+[
+    {
+        "episode_id": "f25d021f",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:08.869335+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "720ee520",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:12.009023+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "dede3be8",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:26.764391+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "a74f04f4",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:36.841582+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "c56f50c1",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:42.541635+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "356f731b",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:46.427031+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "d058befe",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:55.292546+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "77d738f8",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:30:58.811618+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "27e2fad4",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:31:02.234321+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "b0c2d2f0",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:31:05.749278+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "2d5dca60",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:32:03.043484+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "7feb1ccb",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:32:12.367541+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "d088081b",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:32:26.977455+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "c7fe91d8",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:32:50.055063+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "dd3fc9fd",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:33:06.442970+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "0e5b8f93",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:33:16.448967+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "609a84eb",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:33:42.159124+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "2fe19651",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:33:45.857973+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "a7664f53",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:07.818810+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "b65a91d9",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:10.646059+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "72c50f1f",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:14.480670+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "3dab2f4b",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:20.014105+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "90bf43cc",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:22.986220+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "8119a5ff",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:25.995123+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "b999844d",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:31.419117+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "c6fceed3",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:48.563946+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "75080c6c",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:34:58.518225+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "a03874dc",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:35:01.321111+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "4699c650",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:35:08.514678+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "f76524b4",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:35:37.737724+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "536df59c",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:35:54.501180+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "926f77ec",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:36:08.149130+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "37cc0a11",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:36:10.294191+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "ebbec5fa",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:36:31.792970+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "66028f05",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:36:36.758099+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "c91a9b14",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:36:47.487372+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "15f5855d",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:37:16.301599+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "2c513712",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:37:27.901472+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "b8283c91",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:37:30.452613+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "4b59541c",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:37:37.990363+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "a3dde716",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:37:41.149307+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "163eecf2",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:02.577958+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "4ebf42a1",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:06.288852+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "591284ce",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:32.162229+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "4febc594",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:34.894856+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "f8b9f3bb",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:38.953905+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    },
+    {
+        "episode_id": "951251cf",
+        "scene_name": "Shop",
+        "sub_scene_name": "Cashier_Operation",
+        "init_scene_text": "一个机器人站在柜台前",
+        "english_init_scene_text": "A robot stands in front of a counter.",
+        "task_name": "Do something.",
+        "english_task_name": "Do something.",
+        "data_type": "常规",
+        "episode_status": "approved",
+        "data_gen_mode": "simulation",
+        "sn_code": "A2D0001AB00029",
+        "sn_name": "青龙",
+        "label_info": {
+            "action_config": [
+                {
+                    "start_frame": 0,
+                    "end_frame": -1,
+                    "timestamp_utc": "2025-07-07T13:38:41.662198+08:00",
+                    "skill": "pick_and_place",
+                    "action_text": "Do something.",
+                    "english_action_text": "Do something."
+                }
+            ],
+            "key_frame": []
+        }
+    }
+]

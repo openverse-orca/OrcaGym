@@ -1,0 +1,35 @@
+# config.yaml
+basic:
+  parallelism_num: 1
+  datalink_auth_config: "/home/user/GameLauncher/orcasim.json"
+  orcasim_path: "/home/user/GameLauncher/OrcaStudio_2409.GameLauncher"
+  level: "3c"
+  levelorca: "3c_SH-F002_0829_1_guiji"
+
+connection:
+  orcagym_address: "localhost:50051"
+  agent_names: "openloong_gripper_2f85_fix_base_usda"
+  pico_ports: "8001"
+
+mode:
+  run_mode: "augmentation"
+  action_type: "end_effector_ik"
+
+task:
+  task_config: "a3c_task.yaml"
+  dataset: "/home/user/kps/OrcaGym/examples/openpi/processed_datasets_tmp/combined_DualArmEnv_1_0_0_3c_yuan_task_2025-08-25_09-33-57.hdf5"
+
+advanced:
+  record_length: 1200
+ 
+  playback_mode: "random"
+  rollout_times: 10
+  augmented_noise: 0
+  augmented_rounds: 20
+  teleoperation_rounds: 100
+  sample_range: 0.01
+  realtime_playback: 'False'
+  withvideo: 'True'
+  index: 0
+  sync_codec: 'False'
+  useNvenc: 1

@@ -8,25 +8,28 @@ from envs.manipulation.dual_arm_env import DualArmEnv, AgentBase, RunMode, Contr
 
 from orca_gym.utils.inverse_kinematics_controller import InverseKinematicsController
 
-from envs.manipulation.robots.configs.openloong_config import openloong_config
-robot_config = {
-    "openloong_hand_fix_base" : openloong_config,
-    "openloong_gripper_2f85_fix_base" : openloong_config,
-    "openloong_gripper_2f85_mobile_base" : openloong_config,
-}
-def get_robot_config(robot_name: str):
-    for key in robot_config.keys():
-        if key in robot_name:
-            return robot_config[key]
-        
-    raise ValueError(f"Robot configuration for {robot_name} not found in robot_config dictionary.")
+from envs.manipulation.robots.configs.robot_config_registry import get_robot_config
 
 class DualArmRobot(AgentBase):
-    def __init__(self, env: DualArmEnv, id: int, name: str) -> None:
+    def __init__(self, env: DualArmEnv, id: int, name: str, robot_config_name: str = None) -> None:
+        """
+        初始化双臂机器人
+        
+        Args:
+            env: 环境对象
+            id: 机器人ID
+            name: 机器人名称
+            robot_config_name: 可选的配置名称，如果不提供则根据机器人名称自动推断
+        """
         super().__init__(env, id, name)
+        self._robot_config_name = robot_config_name
+        print(f"[DualArmRobot.__init__] 机器人 name='{name}', robot_config_name={robot_config_name}")
 
     def init_agent(self, id: int):
-        config = get_robot_config(self._name)
+        print(f"[DualArmRobot.init_agent] 机器人 name='{self._name}', robot_config_name={self._robot_config_name}")
+        config = get_robot_config(self._name, self._robot_config_name)
+        # 存储配置，以便子类访问
+        self._config = config
         self._read_config(config, id)
         self._setup_initial_info()
         self._setup_device()
@@ -50,13 +53,13 @@ class DualArmRobot(AgentBase):
         self._r_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._r_arm_joint_names]
 
         self._r_arm_motor_names = [self._env.actuator(config["right_arm"]["motor_names"][i], id) for i in range(len(config["right_arm"]["motor_names"]))]
-        self._r_arm_position_names = [self._env.actuator(config["right_arm"]["position_names"][i], id) for i in range(len(config["right_arm"]["position_names"]))]
+        #self._r_arm_position_names = [self._env.actuator(config["right_arm"]["position_names"][i], id) for i in range(len(config["right_arm"]["position_names"]))]
         if self._env.action_use_motor():
-            self._env.disable_actuators(self._r_arm_position_names, dummy_joint_id)
+            #self._env.disable_actuators(self._r_arm_position_names, dummy_joint_id)
             self._r_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_motor_names]
         else:
             self._env.disable_actuators(self._r_arm_motor_names, dummy_joint_id)
-            self._r_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
+            #self._r_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._r_arm_position_names]
         self._r_neutral_joint_values = np.array(config["right_arm"]["neutral_joint_values"])
         self._ee_site_r  = self._env.site(config["right_arm"]["ee_center_site_name"], id)
 
@@ -67,13 +70,13 @@ class DualArmRobot(AgentBase):
         self._l_jnt_dof = [self._env.jnt_dofadr(joint_name) for joint_name in self._l_arm_joint_names]
 
         self._l_arm_motor_names = [self._env.actuator(config["left_arm"]["motor_names"][i], id) for i in range(len(config["left_arm"]["motor_names"]))]
-        self._l_arm_position_names = [self._env.actuator(config["left_arm"]["position_names"][i], id) for i in range(len(config["left_arm"]["position_names"]))]
+        #self._l_arm_position_names = [self._env.actuator(config["left_arm"]["position_names"][i], id) for i in range(len(config["left_arm"]["position_names"]))]
         if self._env.action_use_motor():
-            self._env.disable_actuators(self._l_arm_position_names, dummy_joint_id)
+            #self._env.disable_actuators(self._l_arm_position_names, dummy_joint_id)
             self._l_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_motor_names]
         else:
             self._env.disable_actuators(self._l_arm_motor_names, dummy_joint_id)
-            self._l_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
+            #self._l_arm_actuator_id = [self._env.model.actuator_name2id(actuator_name) for actuator_name in self._l_arm_position_names]
         self._l_neutral_joint_values = np.array(config["left_arm"]["neutral_joint_values"])
         self._ee_site_l  = self._env.site(config["left_arm"]["ee_center_site_name"], id)
 

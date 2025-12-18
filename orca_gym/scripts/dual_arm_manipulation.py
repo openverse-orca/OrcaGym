@@ -292,7 +292,8 @@ def register_env(orcagym_addr : str,
                  sample_range : float,
                  action_step : int,
                  camera_config : Dict[str, Any],
-                 task_config_dict: Dict[str, Any] = None) -> str:
+                 task_config_dict: Dict[str, Any] = None,
+                 robot_configs: Dict[str, str] = None) -> str:
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names_list = agent_names.split(" ")
@@ -312,7 +313,8 @@ def register_env(orcagym_addr : str,
                 'sample_range': sample_range,
                 'action_step': action_step,
                 'camera_config': camera_config,
-                'task_config_dict': task_config_dict}
+                'task_config_dict': task_config_dict,
+                'robot_configs': robot_configs}
     gym.register(
         id=env_id,
         entry_point=ENV_ENTRY_POINT[env_name],
@@ -1437,7 +1439,8 @@ def run_example(orcagym_addr : str,
                 task_config : str,
                 augmentation_path : str,
                 output_video : bool,
-                sync_codec : bool):
+                sync_codec : bool,
+                robot_configs : dict = None):
     try:
         print("simulation running... , orcagym_addr: ", orcagym_addr)
 
@@ -1455,7 +1458,7 @@ def run_example(orcagym_addr : str,
             else:
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict, robot_configs)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -1474,7 +1477,7 @@ def run_example(orcagym_addr : str,
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.TELEOPERATION, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.TELEOPERATION, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict, robot_configs)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -1517,7 +1520,7 @@ def run_example(orcagym_addr : str,
             demo_action_type = dataset_reader.get_env_kwargs()["action_type"]
             env_name = env_name.split("-OrcaGym-")[0]
             env_index = 0
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, None, robot_configs)
             print("Registered environment: ", env_id)
 
             # env = gym.make(env_id)
@@ -1543,7 +1546,7 @@ def run_example(orcagym_addr : str,
             action_step = env_kwargs["action_step"]
             demo_action_type = env_kwargs["action_type"]
 
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, demo_action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, None, robot_configs)
             print("Registered environment: ", env_id)
 
             env, policy = create_env(ckpt_path)
@@ -1579,7 +1582,7 @@ def run_example(orcagym_addr : str,
             else:
                 with open(task_config, 'r') as f:
                     task_config_dict = yaml.safe_load(f)
-            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config,task_config_dict)
+            env_id, kwargs = register_env(orcagym_addr, env_name, env_index, agent_names, pico_ports, RunMode.POLICY_NORMALIZED, action_type, ctrl_device, max_episode_steps, sample_range, action_step, camera_config, task_config_dict, robot_configs)
             print("Registered environment: ", env_id)
 
             env = gym.make(env_id)
@@ -1652,6 +1655,9 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
     withvideo = True if args.withvideo == 'True' else False
     realtime_playback = True if args.realtime_playback == 'True' else False
     sync_codec = True if args.sync_codec == 'True' else False
+    
+    # 获取机器人配置参数（如果提供）
+    robot_configs = getattr(args, 'robot_configs_dict', None)
 
     assert record_time > 0, "The record time should be greater than 0."
     assert teleoperation_rounds > 0, "The teleoperation rounds should be greater than 0."
@@ -1754,7 +1760,8 @@ def run_dual_arm_sim(args, project_root : str = None, current_file_path : str = 
                     task_config=task_config,
                     augmentation_path=augmented_path,
                     output_video=withvideo,
-                    sync_codec=sync_codec
+                    sync_codec=sync_codec,
+                    robot_configs=robot_configs
                     )
 
     # # 终止 Monitor 子进程

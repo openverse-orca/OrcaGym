@@ -84,15 +84,25 @@ class DualArmEnv(RobomimicEnv):
         control_freq: int,
         sample_range: float,
         task_config_dict: dict,
+        robot_configs: dict = None,
         **kwargs,
     ):
-
+        """
+        初始化双臂环境
+        
+        Args:
+            ...
+            robot_configs: 可选的机器人配置字典，格式为 {agent_name: config_name}
+                          例如: {"robot1": "openloong", "robot2": "d12"}
+                          如果不提供，将根据机器人名称自动推断配置
+        """
         self._run_mode = run_mode
         self._action_type = action_type
         self._sync_render = True        # 数采需要严格同步渲染，保证生成的视频与仿真数据一致
 
         self._ctrl_device = ctrl_device
         self._control_freq = control_freq
+        self._robot_configs = robot_configs or {}
 
         if self._ctrl_device == ControlDevice.VR and run_mode == RunMode.TELEOPERATION:
             self._joystick = {}
@@ -178,7 +188,38 @@ class DualArmEnv(RobomimicEnv):
         module_name, class_name = entry.rsplit(":", 1)
         module = importlib.import_module(module_name)
         class_type = getattr(module, class_name)
-        agent = class_type(self, id, name)
+        
+        # 获取该机器人的配置名称（如果提供）
+        # 首先检查是否有 "__all__" 特殊键（表示所有机器人使用相同配置）
+        robot_config_name = self._robot_configs.get("__all__", None)
+        
+        # 如果没有 "__all__"，则尝试使用机器人名称作为键
+        if robot_config_name is None:
+            robot_config_name = self._robot_configs.get(name, None)
+        
+        # 调试信息
+        print(f"[create_agent] 创建机器人 ID={id}, name='{name}'")
+        print(f"[create_agent] 当前配置字典: {self._robot_configs}")
+        print(f"[create_agent] 从字典获取的配置: {robot_config_name}")
+        
+        # 如果当前机器人名称不在配置字典中，但有配置字典且只有一个值，使用那个值
+        if robot_config_name is None and self._robot_configs:
+            if len(self._robot_configs) == 1:
+                # 只有一个配置，使用它
+                robot_config_name = list(self._robot_configs.values())[0]
+                print(f"[create_agent] 警告: 机器人 '{name}' 不在配置字典中，但检测到单一配置 '{robot_config_name}'，将使用该配置")
+            else:
+                print(f"[create_agent] 警告: 机器人 '{name}' 不在配置字典 {self._robot_configs} 中，将使用自动推断")
+        
+        print(f"[create_agent] 最终使用的配置名称: {robot_config_name}")
+        
+        # 尝试传递 robot_config_name 参数，如果类不支持则使用默认方式
+        try:
+            agent = class_type(self, id, name, robot_config_name=robot_config_name)
+        except TypeError:
+            # 兼容旧版本不支持 robot_config_name 参数的类
+            agent = class_type(self, id, name)
+        
         return agent
 
     def _init_ctrl(self):

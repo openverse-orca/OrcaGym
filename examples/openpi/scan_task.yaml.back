@@ -1,0 +1,23 @@
+# shop1任务配置文件
+
+level_name: "shop"
+type: "scan"
+range: {x: [0.2, 0.612], y: [-0.4, 0.4], z: -0.4, r: 0.3}
+
+# body, site, joint 的顺序需要保持一致
+object_bodys: [ "bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+object_sites: ["bottle_redsite", "jar_01site", "bottle_bluesite", "salt_site", "can_site"]
+object_joints: ["bottle_red_joint", "jar_01_joint", "bottle_blue_joint", "salt_joint", "can_joint"]
+
+goal_bodys: ["Barcode"]
+goal_sites: ["Barcode_site"]
+goal_joints: ["Barcode_joint"]
+
+random_actor : true
+random_actor_position: false
+random_actor_rotation: false
+actors: ["bottle_red", "jar_01", "bottle_blue", "salt", "can"]
+actors_spawnable: ["assets/prefabs/bottle_red", "assets/prefabs/jar_01", "assets/prefabs/bottle_blue", "assets/prefabs/salt", "assets/prefabs/can"]
+center: [-6.35, 2.56, 2.32]
+infinity: [1000, 1000, 1]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]
