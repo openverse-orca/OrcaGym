@@ -1,4 +1,5 @@
 hand_config = {
+    "hand_type": "hand",  # 手部类型：'hand' 表示灵巧手，'gripper' 表示夹爪
     "left_hand": {
         "motor_names": ["M_zbll_J1", "M_zbll_J2", "M_zbll_J3", "M_zbll_J4", "M_zbll_J5", "M_zbll_J6", "M_zbll_J7", "M_zbll_J8", "M_zbll_J9", "M_zbll_J10", "M_zbll_J11"],
         "body_names": ["zbll_Link1", "zbll_Link2", "zbll_Link3", "zbll_Link4", "zbll_Link5", "zbll_Link6", "zbll_Link7", "zbll_Link8", "zbll_Link9", "zbll_Link10", "zbll_Link11"],

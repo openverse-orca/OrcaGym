@@ -43,18 +43,71 @@ class ActionType:
 
 
 
+# 机器人名称到 entry 的映射（用于基于名称的查找）
 robot_entries = {
     "openloong_hand_fix_base": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
     "openloong_gripper_2f85_fix_base": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
     "openloong_gripper_2f85_mobile_base": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
+    "openloong_no_hand_fix_base": "envs.manipulation.robots.openloong_no_hand_fix_base:OpenLoongNoHandFixBase",
+}
+
+# 手部类型到 entry 的直接映射（用于基于类型的查找）
+hand_type_entries = {
+    "hand": "envs.manipulation.robots.openloong_hand_fix_base:OpenLoongHandFixBase",
+    "gripper": "envs.manipulation.robots.openloong_gripper_fix_base:OpenLoongGripperFixBase",
+    "gripper_mobile": "envs.manipulation.robots.openloong_gripper_mobile_base:OpenLoongGripperMobileBase",
+    "none": "envs.manipulation.robots.openloong_no_hand_fix_base:OpenLoongNoHandFixBase",
+    "no_hand": "envs.manipulation.robots.openloong_no_hand_fix_base:OpenLoongNoHandFixBase",
 }
 
 def get_robot_entry(name: str):
+    """
+    根据机器人名称获取 robot_entry
+    
+    Args:
+        name: 机器人名称
+        
+    Returns:
+        robot_entry 字符串
+    """
     for robot_name, entry in robot_entries.items():
         if name.startswith(robot_name):
             return entry
         
     raise ValueError(f"Robot entry for {name} not found in robot_entries.")
+
+def get_robot_entry_by_hand_type(hand_type: str, prefer_fix_base: bool = True):
+    """
+    根据 hand_type 直接获取 robot_entry
+    
+    Args:
+        hand_type: 手部类型
+            - 'hand' 表示灵巧手
+            - 'gripper' 表示夹爪（默认 fix_base）
+            - 'gripper_mobile' 表示移动底座夹爪
+            - 'none' 或 'no_hand' 表示无手
+        prefer_fix_base: 是否优先选择 fix_base（仅对 gripper 有效，如果指定了 'gripper_mobile' 则忽略）
+        
+    Returns:
+        robot_entry 字符串，如果未找到则返回 None
+    """
+    # 直接通过类型名查找
+    if hand_type in hand_type_entries:
+        entry = hand_type_entries[hand_type]
+        print(f"[get_robot_entry_by_hand_type] 直接通过类型名 '{hand_type}' 找到 entry: {entry}")
+        return entry
+    
+    # 兼容旧的行为：如果没有直接匹配，尝试智能匹配
+    if hand_type == "gripper":
+        # 根据 prefer_fix_base 选择
+        if prefer_fix_base:
+            return hand_type_entries.get("gripper")
+        else:
+            return hand_type_entries.get("gripper_mobile")
+    
+    # 如果都没找到，返回 None
+    print(f"[get_robot_entry_by_hand_type] 警告: 未找到 hand_type '{hand_type}' 对应的 entry")
+    return None
 
 class DualArmEnv(RobomimicEnv):
     """
@@ -184,11 +237,6 @@ class DualArmEnv(RobomimicEnv):
         self.init_agents()
 
     def create_agent(self, id, name):
-        entry = get_robot_entry(name)
-        module_name, class_name = entry.rsplit(":", 1)
-        module = importlib.import_module(module_name)
-        class_type = getattr(module, class_name)
-        
         # 获取该机器人的配置名称（如果提供）
         # 首先检查是否有 "__all__" 特殊键（表示所有机器人使用相同配置）
         robot_config_name = self._robot_configs.get("__all__", None)
@@ -196,11 +244,6 @@ class DualArmEnv(RobomimicEnv):
         # 如果没有 "__all__"，则尝试使用机器人名称作为键
         if robot_config_name is None:
             robot_config_name = self._robot_configs.get(name, None)
-        
-        # 调试信息
-        print(f"[create_agent] 创建机器人 ID={id}, name='{name}'")
-        print(f"[create_agent] 当前配置字典: {self._robot_configs}")
-        print(f"[create_agent] 从字典获取的配置: {robot_config_name}")
         
         # 如果当前机器人名称不在配置字典中，但有配置字典且只有一个值，使用那个值
         if robot_config_name is None and self._robot_configs:
@@ -210,6 +253,41 @@ class DualArmEnv(RobomimicEnv):
                 print(f"[create_agent] 警告: 机器人 '{name}' 不在配置字典中，但检测到单一配置 '{robot_config_name}'，将使用该配置")
             else:
                 print(f"[create_agent] 警告: 机器人 '{name}' 不在配置字典 {self._robot_configs} 中，将使用自动推断")
+        
+        # 调试信息
+        print(f"[create_agent] 创建机器人 ID={id}, name='{name}'")
+        print(f"[create_agent] 当前配置字典: {self._robot_configs}")
+        print(f"[create_agent] 从字典获取的配置: {robot_config_name}")
+        
+        # 如果提供了配置名称，尝试从配置中获取 hand_type 来确定 robot_entry
+        entry = None
+        if robot_config_name:
+            try:
+                from envs.manipulation.robots.configs.robot_config_registry import get_robot_config
+                config = get_robot_config(name, robot_config_name)
+                
+                # 检查配置中是否有 hand_type
+                if "hand_type" in config:
+                    hand_type = config["hand_type"]
+                    print(f"[create_agent] 从配置中获取 hand_type: {hand_type}")
+                    
+                    # 根据 hand_type 确定 robot_entry
+                    entry = get_robot_entry_by_hand_type(hand_type, prefer_fix_base=True)
+                    if entry:
+                        print(f"[create_agent] 根据 hand_type='{hand_type}' 选择 robot_entry: {entry}")
+                    else:
+                        print(f"[create_agent] 警告: 无法根据 hand_type='{hand_type}' 找到 robot_entry")
+            except Exception as e:
+                print(f"[create_agent] 警告: 无法从配置获取 hand_type: {e}")
+        
+        # 如果没有通过 hand_type 找到 entry，使用原来的基于 name 的方式
+        if entry is None:
+            entry = get_robot_entry(name)
+            print(f"[create_agent] 使用基于 name 的 robot_entry: {entry}")
+        
+        module_name, class_name = entry.rsplit(":", 1)
+        module = importlib.import_module(module_name)
+        class_type = getattr(module, class_name)
         
         print(f"[create_agent] 最终使用的配置名称: {robot_config_name}")
         
