@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 keywords = [ "robotics", "simulation", "reinforcement-learning", "gymnasium", "mujoco",]
 classifiers = [ "Development Status :: 4 - Beta", "Intended Audience :: Science/Research", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12", "Topic :: Scientific/Engineering :: Artificial Intelligence",]
-dependencies = [ "numpy==2.2.6", "scipy==1.16.2", "scipy-stubs==1.16.2.4", "grpcio==1.66.1", "grpcio-tools==1.66.1", "gymnasium==1.2.1", "mujoco==3.3.3", "aiofiles==25.1.0",]
+dependencies = [ "numpy==2.2.6", "scipy==1.16.2", "scipy-stubs==1.16.2.4", "grpcio==1.66.1", "grpcio-tools==1.66.1", "gymnasium==1.2.1", "mujoco==3.3.3", "aiofiles==25.1.0", "termcolor>=2.4.0",]
 [[project.authors]]
 name = "松应科技"
 email = "huangwei@orca3d.cn"
@@ -42,7 +42,7 @@ orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
 license-files = []
 
 [tool.setuptools.package-data]
-orca_gym = [ "*.proto", "py.typed",]
+orca_gym = [ "*.proto", "py.typed", "**/*.json"]
 
 [tool.setuptools.packages.find]
 include = [ "orca_gym*",]

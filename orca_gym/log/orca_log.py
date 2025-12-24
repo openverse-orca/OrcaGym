@@ -152,6 +152,9 @@ class OrcaLog:
         # Console formatter with colors
         console_formatter = ColoredFormatter(log_format, datefmt=date_format, use_colors=self.use_colors)
         
+        # Ensure log directory exists before creating file handler
+        os.makedirs(self.log_dir, exist_ok=True)
+        
         # File handler with rotation
         file_handler = RotatingFileHandler(
             self.log_path,
