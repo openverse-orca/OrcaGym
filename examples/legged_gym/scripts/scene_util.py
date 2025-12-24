@@ -6,10 +6,14 @@ import os
 import time
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def generate_height_map_file(
     orcagym_addresses: list[str],
 ):
-    print("=============> Generate height map file ...")
+    _logger.info("=============> Generate height map file ...")
 
     # 调用 ../../orca_gym/tools/generate_height_map.py
     os.system(f"python ../../orca_gym/tools/terrains/height_map_generater.py --orcagym_addresses {orcagym_addresses[0]}")
@@ -21,14 +25,14 @@ def generate_height_map_file(
     os.makedirs(height_map_dir, exist_ok=True)
     shutil.move("height_map.npy", height_map_file)
 
-    print("=============> Generate height map file done. Height map file: ", height_map_file)
+    _logger.info(f"=============> Generate height map file done. Height map file:  {height_map_file}")
 
     return height_map_file
 
 def clear_scene(
     orcagym_addresses: list[str],
 ):
-    print("=============> Clear scene ...")
+    _logger.info("=============> Clear scene ...")
 
     scene = OrcaGymScene(orcagym_addresses[0])
     scene.publish_scene()
@@ -36,14 +40,14 @@ def clear_scene(
     scene.close()
     time.sleep(1)
 
-    print("=============> Clear scene done.")
+    _logger.info("=============> Clear scene done.")
 
 
 def publish_terrain(
     orcagym_addresses: list[str],
     terrain_asset_paths: list[str],
 ):
-    print("=============> Publish terrain ...")
+    _logger.info("=============> Publish terrain ...")
     scene = OrcaGymScene(orcagym_addresses[0])
     for terrain_asset_path in terrain_asset_paths:
         terrain = Actor(
@@ -54,7 +58,7 @@ def publish_terrain(
             scale=1.0,
         )
         scene.add_actor(terrain)
-        print(f"    =============> Add terrain {terrain_asset_path} ...")
+        _logger.info(f"    =============> Add terrain {terrain_asset_path} ...")
         time.sleep(0.01)
 
     scene.publish_scene()
@@ -62,7 +66,7 @@ def publish_terrain(
     scene.close()
     time.sleep(1)
 
-    print("=============> Publish terrain done.")
+    _logger.info("=============> Publish terrain done.")
 
 def publish_scene(
     orcagym_addresses: list[str],
@@ -71,7 +75,7 @@ def publish_scene(
     agent_num: int,
     terrain_asset_paths: list[str],
 ):
-    print("=============> Publish scene ...")
+    _logger.info("=============> Publish scene ...")
     scene = OrcaGymScene(orcagym_addresses[0])
     # 排列成一个方阵，每个机器人间隔0.5米
     sqrt_width = int(np.ceil(np.sqrt(agent_num)))  # 向上取整
@@ -88,10 +92,10 @@ def publish_scene(
             scale=1.0,
         )
         scene.add_actor(actor)
-        print(f"    =============> Add agent {agent_name}_{i:03d} ...")
+        _logger.info(f"    =============> Add agent {agent_name}_{i:03d} ...")
         time.sleep(0.01)
 
-    print("=============> Publish terrain ...")
+    _logger.info("=============> Publish terrain ...")
     scene = OrcaGymScene(orcagym_addresses[0])
     for terrain_asset_path in terrain_asset_paths:
         terrain = Actor(
@@ -102,7 +106,7 @@ def publish_scene(
             scale=1.0,
         )
         scene.add_actor(terrain)
-        print(f"    =============> Add terrain {terrain_asset_path} ...")
+        _logger.info(f"    =============> Add terrain {terrain_asset_path} ...")
         time.sleep(0.01)
 
 
@@ -111,4 +115,4 @@ def publish_scene(
     scene.close()
     time.sleep(1)
 
-    print("=============> Publish scene done.")
+    _logger.info("=============> Publish scene done.")

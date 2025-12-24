@@ -17,6 +17,10 @@ import av
 import h5py
 import bisect
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class VideoPlayer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -122,10 +126,10 @@ class VideoPlayer(QWidget):
 
         self.total_frames = len(self.pts_list)
 
-        print(time_base)
-        print(self.pts_list)
-        print(self.frame_times)
-        print(self.total_frames)
+        _logger.performance(time_base)
+        _logger.info(self.pts_list)
+        _logger.performance(self.frame_times)
+        _logger.info(self.total_frames)
 
         container.close()
         return self.total_frames, self.pts_list, self.frame_times

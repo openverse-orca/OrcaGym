@@ -1,0 +1,32 @@
+# shop1任务配置文件
+
+level_name: "factory"
+type: "pick_and_place"
+range: {y: [-0.2, -0.05], x: [0.50, 0.53], z: 1, r: 0}
+
+random_light : false
+num_lights: 3
+random_light_position: true
+random_light_rotation: true
+lights: ["spotlight1", "spotlight2", "spotlight3"]
+lights_spawnable: ["assets/prefabs/spotlight","assets/prefabs/spotlight", "assets/prefabs/spotlight"]
+light_center: [178, -46, 2.32]
+light_bound: [[-0.1, 0.5], [-0.5, 0.5], [0, 0.2]]
+
+# body, site, joint 的顺序需要保持一致
+object_bodys: [ "pipe"]
+object_sites: [""]
+object_joints: ["pipe_joint"]
+
+goal_bodys: ["right_box"]
+goal_sites: [""]
+goal_joints: ["right_box"]
+
+random_actor : false
+random_actor_position: false
+random_actor_rotation: false
+actors: []
+actors_spawnable: []
+center: [-6.35, 2.56, 2.32]
+infinity: [1000, 1000, 1]
+bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

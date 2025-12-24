@@ -8,11 +8,12 @@ sys.path.append(proto_path)
 import mjc_message_pb2
 import mjc_message_pb2_grpc
 
-
-
 import numpy as np
 import scipy.linalg
 from datetime import datetime
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
 
 
 class OrcaGymBase:
@@ -32,22 +33,10 @@ class OrcaGymBase:
 
 
     def print_opt_config(self):
-        print("Opt config: ", 
-              f"timestep:{self.opt.timestep}", 
-              f"iterations:{self.opt.iterations}", 
-              f"noslip_iterations:{self.opt.noslip_iterations}",
-              f"ccd_iterations:{self.opt.ccd_iterations}",
-              f"sdf_iterations:{self.opt.sdf_iterations}",
-              f"gravity:{self.opt.gravity}",)
+        _logger.info(f"Opt config: timestep:{self.opt.timestep}, iterations:{self.opt.iterations}, noslip_iterations:{self.opt.noslip_iterations}, ccd_iterations:{self.opt.ccd_iterations}, sdf_iterations:{self.opt.sdf_iterations}, gravity:{self.opt.gravity}")
         
     def print_model_info(self, model_info):
-        print("Model info: ", f"nq:{model_info['nq']}",
-              f"nv:{model_info['nv']}",
-              f"nu:{model_info['nu']}",
-              f"nbody:{model_info['nbody']}",
-              f"njnt:{model_info['njnt']}",
-              f"ngeom:{model_info['ngeom']}",
-              f"nsite:{model_info['nsite']}",)
+        _logger.info(f"Model info: nq:{model_info['nq']}, nv:{model_info['nv']}, nu:{model_info['nu']}, nbody:{model_info['nbody']}, njnt:{model_info['njnt']}, ngeom:{model_info['ngeom']}, nsite:{model_info['nsite']}")
 
     async def set_qpos(self, qpos):
         request = mjc_message_pb2.SetQposRequest(qpos=qpos)

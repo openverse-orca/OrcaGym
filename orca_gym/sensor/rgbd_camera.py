@@ -12,6 +12,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.animation as animation
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class CameraWrapper:
     def __init__(self, name:str, port:int):
         self._name = name
@@ -118,9 +122,9 @@ class CameraCacher:
 
     async def do_stuff(self):
         uri = f"ws://localhost:{self.port}"
-        print("start connecting")
+        _logger.info("start connecting")
         async with websockets.connect(uri) as websocket:
-            print("connected")
+            _logger.info("connected")
             with open(self.name + "_video.h264", "wb") as video_file:
                 with open(self.name + "_ts.bin", "wb") as ts_file:
                     while self.running:

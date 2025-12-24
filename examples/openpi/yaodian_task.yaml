@@ -1,6 +1,9 @@
 # yaodian任务配置文件
 
 level_name: "yaodian"
+type: "pick_and_place"
+range: {x: [0.2, 0.6], y: [-0.4, 0.4], z: -0.4, r: 0.3}
+
 object_bodys: [ "niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
 object_sites: ["niuhuangwansite", "qinghuopiansite", "orangeboxsite", "pipalusite", "xiaokepiansite"]
 object_joints: ["niuhuangwan_joint", "qinghuopian_joint", "orangebox_joint", "pipalu_joint", "xiaokepian_joint"]
@@ -13,6 +16,6 @@ random_actor : true
 random_actor_position: false
 random_actor_rotation: false
 actors: ["niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
-actors_spawnable: ["niuhuangwan", "qinghuopian", "orangebox", "pipalu", "xiaokepian"]
+actors_spawnable: ["assets/prefabs/niuhuangwan", "assets/prefabs/qinghuopian", "assets/prefabs/orangebox", "assets/prefabs/pipalu", "assets/prefabs/xiaokepian"]
 center: [-6.35, 2.56, 2.32]
 bound: [[-0.5, 0.5], [-0.5, 0.5], [0, 0.15]]

@@ -1,0 +1,28 @@
+# Include important documentation files
+include README.md
+include LICENSE
+include pyproject.toml
+
+# Include proto files
+recursive-include orca_gym/protos *.proto
+
+# Include type hints marker
+include orca_gym/py.typed
+
+# Exclude unnecessary files
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+exclude .gitignore
+exclude .gitattributes
+exclude .gitmodules
+
+# Exclude directories that shouldn't be in the package
+prune examples
+prune envs
+prune doc
+prune 3rd_party
+prune tests
+prune .vscode
+prune .github
+

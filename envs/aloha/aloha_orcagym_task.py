@@ -6,6 +6,10 @@ from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from orca_gym.sensor.rgbd_camera import CameraWrapper
 from dm_control.mujoco.engine import Physics
 import time
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 class TransferCubeTask_OrcaGym(TransferCubeTask):
     def __init__(self, 
                  random,
@@ -38,7 +42,7 @@ class TransferCubeTask_OrcaGym(TransferCubeTask):
         """
         super().after_step(physics)
         
-        print("Physics step, time=", physics.time())
+        _logger.performance(f"Physics step, time={physics.time()}")
         
         data = physics.data
         self._orcagym_env.gym.update_data_external(data.qpos, data.qvel, data.qacc, data.qfrc_bias, data.time)

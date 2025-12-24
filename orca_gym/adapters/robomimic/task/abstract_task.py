@@ -10,6 +10,10 @@ import numpy as np
 import random
 import warnings, time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 DEFAULT_CONFIG = {
     "random_object": True, # 是否随机Object的位置，object应该在Agent下面
     "type": "pick_and_place", # 任务类型，默认是pick_and_place
@@ -205,12 +209,31 @@ class AbstractTask:
         self.grpc_addr = self.__get_config_setting__("grpc_addr", config)
 
     def spawn_scene(self, env: OrcaGymLocalEnv):
-        if self.first_spawn and not self.random_light:
+        # 使用 run_mode 判断是否为增广任务
+        from envs.manipulation.dual_arm_env import RunMode
+        is_augmentation_mode = (env._run_mode == RunMode.POLICY_NORMALIZED and 
+                                hasattr(env, '_task') and 
+                                hasattr(env._task, 'data') and 
+                                env._task.data is not None)
+        if self.first_spawn and not is_augmentation_mode:
             self.scene.publish_scene_without_init_env()
             self.generate_actors()
-
             self.scene.publish_scene()
             self.first_spawn = False
+        elif is_augmentation_mode:
+            # 增广模式下需要生成 actors（优化：减少 publish_scene 调用次数）
+            self.scene.publish_scene_without_init_env()
+            self.generate_actors()
+            self.scene.publish_scene()
+            if self.random_light and self.__random_count__ % self.random_cycle == 0:
+                light_idxs = self.generate_lights()
+                # 移除额外的 publish_scene_without_init_env() 调用，避免频繁发布导致崩溃
+                # self.scene.publish_scene_without_init_env()  # ❌ 删除这一行
+
+                for idx in light_idxs:
+                    self.set_light_info(self.lights[idx])
+                for actor in self.actors:
+                    self.set_actor_material(actor)
         elif self.random_light:
         # 周期性随机添加灯光
             if self.random_light and self.__random_count__ % self.random_cycle == 0:
@@ -306,7 +329,7 @@ class AbstractTask:
 
         # 容错处理
         if placed is None:
-            print(f"Warning: Failed to place objects! Falling back to default positions.")
+            _logger.error(f"Warning: Failed to place objects! Falling back to default positions.")
             placed = [(joint, obj_qpos) for joint, obj_qpos in zip(obj_joints, [np.array([0, 0, 0, 1, 0, 0, 0])] * len(obj_joints))]
 
         # 一次性写回
@@ -343,7 +366,8 @@ class AbstractTask:
         for i in idxs:
             name      = self.lights[i]
             spawnable = self.lights_spawnable[i]
-            print(f"[Debug-Light] add_light → {name} at spawnable {spawnable}")
+            # 移除调试打印，减少输出
+            # print(f"[Debug-Light] add_light → {name} at spawnable {spawnable}")
             self.add_light(name, spawnable)
         return idxs
 
@@ -388,7 +412,8 @@ class AbstractTask:
         :param color: The color of the light (optional).
         :param intensity: The intensity of the light (optional).
         """
-        print(f"[Debug-Light] set_light_info → {light_name}, color={color}, intensity={intensity}")
+        # 移除调试打印，减少输出
+        # print(f"[Debug-Light] set_light_info → {light_name}, color={color}, intensity={intensity}")
         if color is None:
             color = np.array([np.random.uniform(0.0, 1.0),
                               np.random.uniform(0.0, 1.0),
@@ -409,7 +434,8 @@ class AbstractTask:
                                    np.random.uniform(0.0, 1.0),
                                    np.random.uniform(0.0, 1.0),
                                    1.0])
-        print(f"[Debug-Actor] set_actor_material → {actor_name}, base_color={base_color}")
+        # 移除调试打印，减少输出
+        # print(f"[Debug-Actor] set_actor_material → {actor_name}, base_color={base_color}")
         self.scene.set_material_info(actor_name, base_color)
 
     def add_actor_with_pose(self, actor_name, asset_path, position, rotation):
@@ -472,7 +498,9 @@ class AbstractTask:
             json_data = json.loads(json_str)
             for object, object_info in json_data.items():
                 joint_name = object_info['joint_name']
-                qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
+                pos = np.array(object_info['position'], dtype=np.float32)
+                quat = np.array(object_info['orientation'], dtype=np.float32)
+                qpos_dict[env.joint(joint_name)] = np.concatenate([pos, quat], axis=0)
                 self.object_bodys.append(object)
                 self.object_joints.append(joint_name)
         else:
@@ -503,7 +531,9 @@ class AbstractTask:
             json_data = json.loads(json_str)
             for object, object_info in json_data.items():
                 joint_name = object_info['joint_name']
-                qpos_dict[env.joint(joint_name)] = np.array(object_info['position'], dtype=np.float32)
+                pos = np.array(object_info['position'], dtype=np.float32)
+                quat = np.array(object_info['orientation'], dtype=np.float32)
+                qpos_dict[env.joint(joint_name)] = np.concatenate([pos, quat], axis=0)
                 self.goal_bodys.append(object)
                 self.goal_joints.append(joint_name)
         env.set_joint_qpos(qpos_dict)
@@ -520,7 +550,8 @@ class AbstractTask:
                 "orientation": xquat[i * 4:(i + 1)*4].tolist(),
                 "target_body": self.target_object == self.object_bodys[i]
             }
-        print(f"info: {info}")
+        # 移除调试打印，减少IK模式下的输出
+        # print(f"info: {info}")
 
         json_str = json.dumps(info)
         return json_str

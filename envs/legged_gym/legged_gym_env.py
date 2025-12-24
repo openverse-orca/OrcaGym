@@ -11,6 +11,10 @@ import os
 import fcntl
 import shutil
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class LeggedGymEnv(OrcaGymAsyncEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
 
@@ -225,7 +229,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
 
     def _randomize_agent_foot_friction(self) -> None:
         if self._run_mode == "testing" or self._run_mode == "play" or self._run_mode == "nav":
-            print("Skip randomize foot friction in testing or play mode")
+            _logger.warning("Skip randomize foot friction in testing or play mode")
             return
 
         geom_friction_dict = {}
@@ -238,9 +242,9 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         self.set_geom_friction(geom_friction_dict)
 
     def _add_randomized_weight(self) -> None:
-        print("Add randomized weight")
+        _logger.info("Add randomized weight")
         if self._run_mode == "testing" or self._run_mode == "play" or self._run_mode == "nav":
-            print("Skip randomized weight load in testing or play mode")
+            _logger.warning("Skip randomized weight load in testing or play mode")
             return   
 
         weight_load_dict = {}
@@ -329,7 +333,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                                 if self._verify_file_integrity(temp_file_path):
                                     # 原子性地移动到最终位置
                                     shutil.move(temp_file_path, height_map_file_local_path)
-                                    print("Load height map file: ", height_map_file_local_path)
+                                    _logger.info(f"Load height map file:  {height_map_file_local_path}")
                                 else:
                                     raise Exception("Downloaded file integrity check failed")
                                     
@@ -339,7 +343,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                                     os.remove(temp_file_path)
                                 raise e
                         else:
-                            print("Height map file already exists: ", height_map_file_local_path)
+                            _logger.info(f"Height map file already exists:  {height_map_file_local_path}")
                             
                     finally:
                         # 释放锁
@@ -355,7 +359,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
                 self._height_map = np.load(height_map_file_local_path)
                 
             except Exception as e:
-                print("Load height map file failed: ", e)
+                _logger.error(f"Load height map file failed:  {e}")
                 gym.logger.warn("Height map file loading failed!, use default height map 200m x 200m")
                 self._height_map = np.zeros((2000, 2000))  # default height map, 200m x 200m
         else:
@@ -499,7 +503,7 @@ class LeggedGymEnv(OrcaGymAsyncEnv):
         self.gym.opt.filterparent = self._legged_env_config[phy_config]["filterparent"]
         self.gym.set_opt_config()
 
-        print("Phy config: ", phy_config, "Iterations: ", self.gym.opt.iterations, "Noslip iterations: ", self.gym.opt.noslip_iterations, "MPR iterations: ", self.gym.opt.ccd_iterations, "SDF iterations: ", self.gym.opt.sdf_iterations)
+        _logger.info(f"Phy config: {phy_config}, Iterations: {self.gym.opt.iterations}, Noslip iterations: {self.gym.opt.noslip_iterations}, MPR iterations: {self.gym.opt.ccd_iterations}, SDF iterations: {self.gym.opt.sdf_iterations}")
 
     def _update_no_action_ctrl(self) -> None:
         ctrl = []

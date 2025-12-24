@@ -19,6 +19,10 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 )
 from stable_baselines3.common.vec_env.patch_gym import _patch_env
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def _worker(
     remote: mp.connection.Connection,
@@ -282,7 +286,7 @@ class OrcaGymAsyncSubprocVecEnv(VecEnv):
         for env_idx, remote in enumerate(self.remotes):
             remote.send(("setup_curriculum", curriculum_name))
         results = [remote.recv() for remote in self.remotes]
-        print("Subproc setup curriculum, results: ", results)
+        _logger.info(f"Subproc setup curriculum, results:  {results}")
     
 def _split_multi_agent_obs_list(obs: List[VecEnvObs], agent_num) -> List[VecEnvObs]:
     """

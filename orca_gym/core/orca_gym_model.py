@@ -7,6 +7,9 @@ from datetime import datetime
 import mujoco
 from typing import Union
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 
 class OrcaGymModel:
     mjEQ_CONNECT = 0       # connect two bodies at a point (ball joint)
@@ -34,9 +37,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(model_info, indent=4)
-                print("Model info: ", formatted_dict)
+                _logger.debug(f"Model info: {formatted_dict}")
             else:
-                print("Model info: ", model_info)
+                _logger.debug(f"Model info: {model_info}")
 
         self.nq = model_info["nq"]
         self.nv = model_info["nv"]
@@ -48,9 +51,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(eq_list, indent=4)
-                print("Equality constraints: ", formatted_dict)
+                _logger.debug(f"Equality constraints: {formatted_dict}")
             else:
-                print("Equality constraints: ", eq_list)
+                _logger.debug(f"Equality constraints: {eq_list}")
 
         self.neq = len(eq_list)
 
@@ -62,9 +65,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(mocap_dict, indent=4)
-                print("Mocap dict: ", formatted_dict)
+                _logger.debug(f"Mocap dict: {formatted_dict}")
             else:
-                print("Mocap dict: ", mocap_dict)
+                _logger.debug(f"Mocap dict: {mocap_dict}")
 
         self.nmocap = len(mocap_dict)
 
@@ -77,9 +80,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(actuator_dict, indent=4)
-                print("Actuator dict: ", formatted_dict)
+                _logger.debug(f"Actuator dict: {formatted_dict}")
             else:
-                print("Actuator dict: ", actuator_dict)
+                _logger.debug(f"Actuator dict: {actuator_dict}")
 
     def get_actuator_dict(self):
         return self._actuator_dict
@@ -106,9 +109,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(body_dict, indent=4)
-                print("Body dict: ", formatted_dict)
+                _logger.debug(f"Body dict: {formatted_dict}")
             else:
-                print("Body dict: ", body_dict)
+                _logger.debug(f"Body dict: {body_dict}")
 
     def get_body_dict(self):
         return self._body_dict
@@ -135,9 +138,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(joint_dict, indent=4)
-                print("Joint dict: ", formatted_dict)
+                _logger.debug(f"Joint dict: {formatted_dict}")
             else:
-                print("Joint dict: ", joint_dict)
+                _logger.debug(f"Joint dict: {joint_dict}")
 
     def get_joint_dict(self):
         return self._joint_dict
@@ -164,9 +167,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(geom_dict, indent=4)
-                print("Geom dict: ", formatted_dict)
+                _logger.debug(f"Geom dict: {formatted_dict}")
             else:
-                print("Geom dict: ", geom_dict)
+                _logger.debug(f"Geom dict: {geom_dict}")
 
     def get_geom_dict(self):
         return self._geom_dict
@@ -217,9 +220,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(site_dict, indent=4)
-                print("Site dict: ", formatted_dict)
+                _logger.debug(f"Site dict: {formatted_dict}")
             else:
-                print("Site dict: ", site_dict)
+                _logger.debug(f"Site dict: {site_dict}")
 
     def get_site_dict(self):
         return self._site_dict
@@ -267,9 +270,9 @@ class OrcaGymModel:
         if self.PRINT_INIT_INFO:
             if self.PRINT_FORMATTED_INFO:
                 formatted_dict = json.dumps(sensor_dict, indent=4)
-                print("Sensor dict: ", formatted_dict)
+                _logger.debug(f"Sensor dict: {formatted_dict}")
             else:
-                print("Sensor dict: ", sensor_dict)
+                _logger.debug(f"Sensor dict: {sensor_dict}")
 
     def gen_sensor_dict(self):
         return self._sensor_dict

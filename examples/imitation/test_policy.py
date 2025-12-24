@@ -20,6 +20,10 @@ from robomimic.algo import RolloutPolicy
 import urllib.request
 import time
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def download_dataset():
     # Get pretrained checkpooint from the model zoo
@@ -74,7 +78,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     policy.start_episode()
     obs = env.reset()
     action_step = env.env.unwrapped.get_action_step()
-    print("env sample range: ", env.env.unwrapped._sample_range, "action step: ", action_step)
+    _logger.info(f"env sample range:  {env.env.unwrapped._sample_range}, action step: {action_step}")
     
     # state_dict = env.get_state()
 
@@ -129,7 +133,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
 
     except env.rollout_exceptions as e:
-        print("WARNING: got rollout exception {}".format(e))
+        _logger.error("WARNING: got rollout exception {}".format(e))
 
     stats = dict(Return=total_reward, Horizon=(step_i + 1), Success_Rate=float(success))
 
@@ -155,7 +159,7 @@ if __name__ == "__main__":
             video_skip=5, 
             camera_names=["agentview"]
         )
-        print(stats)
+        _logger.info(stats)
 
 
     video_writer.close()

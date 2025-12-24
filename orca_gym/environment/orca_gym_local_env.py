@@ -11,6 +11,10 @@ from gymnasium.core import ObsType
 
 import asyncio
 import sys
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
@@ -68,12 +72,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
-            print(f"Warning: Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+            _logger.warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
 
     def initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
-        print(f"Initializing simulation: Class: {self.__class__.__name__}")
+        _logger.info(f"Initializing simulation: Class: {self.__class__.__name__}")
         model_xml_path = self.loop.run_until_complete(self._load_model_xml())
         self.loop.run_until_complete(self._initialize_orca_sim(model_xml_path))
         model = self.gym.model
@@ -240,25 +244,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         
         
         delta_pos, delta_quat = self.get_body_manipulation_movement()
-        # print(f"Actor Manipulation: {actor_anchored}, Delta Pos: {delta_pos}, Delta Quat: {delta_quat}")
-        delta_pos *= self._render_interval
-        delta_euler = quat2euler(delta_quat)
-        delta_euler *= self._render_interval
-        delta_quat = euler2quat(delta_euler)
 
         # 移动和旋转锚点
         anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
         if anchor_xpos is None or anchor_xmat is None or anchor_xquat is None:
-            print(f"Warning: Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
+            _logger.warning(f"Anchor body {self._anchor_body_name} not found in the simulation. Cannot anchor.")
             return
 
-        # 更新锚点位置
-        anchor_xpos = anchor_xpos + delta_pos
-        # 更新锚点四元数
-        anchor_xquat = quat_mul(
-            anchor_xquat,
-            delta_quat
-        )
+        # 同步锚点位置
+        anchor_xpos = delta_pos
+        # 同步锚点四元数
+        anchor_xquat = delta_quat
 
         # 更新锚点的位置和四元数
         self.set_mocap_pos_and_quat({
@@ -287,7 +283,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             # print(f"Released actor: {self._body_anchored}")
             self._body_anchored = None
         else:
-            print("No actor is currently anchored.")
+            _logger.warning("No actor is currently anchored.")
 
     def anchor_actor(self, actor_name: str, anchor_type: AnchorType):
         assert self._body_anchored is None, "An actor is already anchored. Please release it first."
@@ -295,7 +291,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 获取actor的位姿和四元数
         actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
         if actor_xpos is None or actor_xmat is None or actor_xquat is None:
-            print(f"Warning: Actor {actor_name} not found in the simulation. Cannot anchor.")
+            _logger.warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
             return
         
         # 将锚点位置设置为actor的位姿
@@ -400,8 +396,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def get_body_xpos_xmat_xquat(self, body_name_list):
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)
         if len(body_dict) != len(body_name_list):
-            print("Body Nmae List: ", body_name_list)
-            print("Body Dict: ", body_dict)
+            _logger.error(f"Body Name List: {body_name_list}")
+            _logger.error(f"Body Dict: {body_dict}")
             raise ValueError("Some body names are not found in the simulation.")
         xpos = np.array([body_dict[body_name]['Pos'] for body_name in body_name_list]).flat.copy()
         xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
@@ -475,7 +471,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
             site_pos_quat_B[site_name] = {}
             site_pos_quat_B[site_name]["xpos"] = relative_pos_ee
-            site_pos_quat_B[site_name]["xquat"] = relative_rot_ee.as_quat().astype(np.float32)
+            site_pos_quat_B[site_name]["xquat"] = relative_rot_ee.as_quat()[[3, 0, 1, 2]].astype(np.float32)
 
         return site_pos_quat_B
 
@@ -583,6 +579,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     
     def set_actuator_trnid(self, actuator_id, trnid):
         self.gym.set_actuator_trnid(actuator_id, trnid)
+        return
+
+    def disable_actuator(self, actuator_groups: list[int]):
+        self.gym.disable_actuator(actuator_groups)
         return
 
     async def _load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):

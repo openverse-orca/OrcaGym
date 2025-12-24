@@ -4,6 +4,10 @@ from .roh_registers import *
 import numpy as np
 import threading
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 COM_PORT = 1
 ROH_ADDR = 2
 
@@ -89,15 +93,15 @@ class RobotController:
         self.gripper_changed = False
 
         self.running = True
-        print("RobotController init 。。。。")
+        _logger.info("RobotController init 。。。。")
         self.thread =threading.Thread(target=self.loop)
         self.thread.start()
 
     def MCallback(data):
-        print("推送数据的机械臂IP: ", data.arm_ip)
-        print("机械臂错误码: ", data.arm_err)
-        print("系统错误码: ", data.sys_err)
-        print("机械臂当前角度: ", list(data.joint_status.joint_position))
+        _logger.info(f"推送数据的机械臂IP:  {data.arm_ip}")
+        _logger.info(f"机械臂错误码:  {data.arm_err}")
+        _logger.info(f"系统错误码:  {data.sys_err}")
+        _logger.info(f"机械臂当前角度: {list(data.joint_status.joint_position)}")
         print("机械臂当前位姿： ", data.waypoint.position.x, data.waypoint.position.y, data.waypoint.position.z,
             data.waypoint.euler.rx, data.waypoint.euler.ry, data.waypoint.euler.rz)
 
@@ -117,7 +121,7 @@ class RobotController:
         
         #self.robot.Movej_Cmd((ctrl * 57.29577951308232).tolist()[0:6], 30, 0, 0, True)
         self.robot.Movej_Cmd((ctrl * 57.29577951308232).tolist()[0:self.ctrlnum], 30, 0, 0, True)
-        print("init_joint_state: ", ctrl)
+        _logger.info(f"init_joint_state:  {ctrl}")
 
     def sync_joint(self, ctrl: np.array):
         if not self.enabled:
@@ -125,7 +129,7 @@ class RobotController:
         
         self.mutex.acquire()
         self.ctrl = ctrl
-        print("sync_joint.............................: ", ctrl)
+        _logger.info(f"sync_joint.............................:  {ctrl}")
         self.mutex.release()
 
     def loop(self):
@@ -143,7 +147,7 @@ class RobotController:
                 mm = ctrl * 57.29577951308232
                 #self.robot.Movej_CANFD((ctrl * 57.29577951308232).tolist()[0:6], True)
                 self.robot.Movej_CANFD((ctrl * 57.29577951308232).tolist()[0:self.ctrlnum], True)
-                print("loop.............................: ", mm)
+                _logger.info(f"loop.............................:  {mm}")
                 # self.robot.Movej_Cmd((ctrl * 57.29577951308232).tolist()[0:6], 30, 0, 0, True)
 
             if self.gripper_changed:
@@ -154,10 +158,10 @@ class RobotController:
                 do_nothing = False
                 if gripper_open:
                     self.robot.Set_Gripper_Pick_On(speed=500, force=500)
-                    print("gripper pick")
+                    _logger.info("gripper pick")
                 else:
                     self.robot.Set_Gripper_Release(speed=500)
-                    print("gripper release")
+                    _logger.info("gripper release")
 
             if do_nothing:
                 time.sleep(0.002)
@@ -195,7 +199,7 @@ class RobotController:
         time.sleep(delay)
     
     def roh_test(self):
-        print("roh_test..............................")
+        _logger.info("roh_test..............................")
         self.robot.Close_Modbustcp_Mode()
 
         self.robot.Set_Modbus_Mode(1, 115200, 1, True)

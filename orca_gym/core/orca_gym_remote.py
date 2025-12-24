@@ -8,10 +8,12 @@ sys.path.append(proto_path)
 import mjc_message_pb2
 import mjc_message_pb2_grpc
 
-
 import numpy as np
 import scipy.linalg
 from datetime import datetime
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
 
 from orca_gym.core.orca_gym_model import OrcaGymModel
 from orca_gym.core.orca_gym_data import OrcaGymData
@@ -812,9 +814,9 @@ class OrcaGymRemote(OrcaGymBase):
         request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
         response = await self.stub.BeginSaveMp4File(request)
         if response.success:
-            print(f"Video saving started at {file_path}")
+            _logger.info(f"Video saving started at {file_path}")
         else:
-            print(f"Failed to start video saving: {response.error_message}")
+            _logger.error(f"Failed to start video saving: {response.error_message}")
 
     async def stop_save_video(self):
         request = mjc_message_pb2.StopSaveMp4FileRequest()

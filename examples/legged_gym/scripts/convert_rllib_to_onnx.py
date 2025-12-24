@@ -19,6 +19,10 @@ from ray.rllib.utils.numpy import convert_to_numpy
 from ray.rllib.core.columns import Columns
 import tree
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class OnnxableRLlibPolicy(nn.Module):
     """将RLlib策略包装为可导出ONNX的PyTorch模块"""
@@ -140,8 +144,8 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
                     observation_space = kwargs.get("observation_space")
                     action_space = kwargs.get("action_space")
     
-    print(f"Observation space: {observation_space}")
-    print(f"Action space: {action_space}")
+    _logger.info(f"Observation space: {observation_space}")
+    _logger.info(f"Action space: {action_space}")
     
     if observation_space is None or action_space is None:
         raise ValueError("无法从checkpoint中提取观察空间或动作空间信息")
@@ -168,7 +172,7 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
     try:
         rllib_module.load_state_dict(policy_state)
     except RuntimeError as e:
-        print(f"直接加载状态失败，尝试修复键名: {e}")
+        _logger.info(f"直接加载状态失败，尝试修复键名: {e}")
         
         # 创建新的状态字典，修复键名
         new_state_dict = {}
@@ -190,9 +194,9 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
         # 尝试加载修复后的状态字典
         try:
             rllib_module.load_state_dict(new_state_dict, strict=False)
-            print("成功加载修复后的状态字典")
+            _logger.info("成功加载修复后的状态字典")
         except Exception as e2:
-            print(f"修复后加载仍然失败: {e2}")
+            _logger.info(f"修复后加载仍然失败: {e2}")
             # 如果还是失败，尝试只加载匹配的键
             model_state_dict = rllib_module.state_dict()
             compatible_state_dict = {}
@@ -208,14 +212,14 @@ def load_rllib_checkpoint(checkpoint_path: str) -> Tuple[DefaultAPPOTorchRLModul
                     incompatible_keys.append(f"{key}: key not found in model")
             
             if incompatible_keys:
-                print(f"发现 {len(incompatible_keys)} 个不兼容的参数:")
+                _logger.info(f"发现 {len(incompatible_keys)} 个不兼容的参数:")
                 for key_info in incompatible_keys[:5]:  # 只显示前5个
-                    print(f"  - {key_info}")
+                    _logger.info(f"  - {key_info}")
                 if len(incompatible_keys) > 5:
-                    print(f"  ... 还有 {len(incompatible_keys) - 5} 个不兼容参数")
+                    _logger.info(f"  ... 还有 {len(incompatible_keys) - 5} 个不兼容参数")
             
             rllib_module.load_state_dict(compatible_state_dict, strict=False)
-            print(f"成功加载 {len(compatible_state_dict)} 个兼容的参数")
+            _logger.info(f"成功加载 {len(compatible_state_dict)} 个兼容的参数")
     
     return rllib_module, module_class_and_ctor_args
 
@@ -265,7 +269,7 @@ def convert_rllib_to_onnx(checkpoint_path: str, output_path: str, batch_size: in
         output_path: 输出ONNX文件路径
         batch_size: 批次大小
     """
-    print(f"Loading RLlib checkpoint from: {checkpoint_path}")
+    _logger.info(f"Loading RLlib checkpoint from: {checkpoint_path}")
     
     # 初始化Ray（如果还没有初始化）
     if not ray.is_initialized():
@@ -275,8 +279,8 @@ def convert_rllib_to_onnx(checkpoint_path: str, output_path: str, batch_size: in
     rllib_module, config = load_rllib_checkpoint(checkpoint_path)
     rllib_module.eval()
     
-    print(f"Model loaded successfully")
-    print(f"Model config: {config}")
+    _logger.info(f"Model loaded successfully")
+    _logger.info(f"Model config: {config}")
     
     # 创建可导出的ONNX模块
     onnx_policy = OnnxableRLlibPolicy(rllib_module)
@@ -286,10 +290,10 @@ def convert_rllib_to_onnx(checkpoint_path: str, output_path: str, batch_size: in
     observation_space = rllib_module.config.observation_space
     dummy_obs = create_dummy_observation(observation_space, batch_size)
     
-    print(f"Dummy observation shape: {dummy_obs.shape}")
+    _logger.info(f"Dummy observation shape: {dummy_obs.shape}")
     
     # 导出为ONNX
-    print(f"Exporting to ONNX: {output_path}")
+    _logger.info(f"Exporting to ONNX: {output_path}")
     
     # 设置动态轴
     dynamic_axes = {
@@ -310,7 +314,7 @@ def convert_rllib_to_onnx(checkpoint_path: str, output_path: str, batch_size: in
         verbose=False
     )
     
-    print(f"ONNX model exported successfully to: {output_path}")
+    _logger.info(f"ONNX model exported successfully to: {output_path}")
 
 
 def verify_onnx_model(onnx_path: str, checkpoint_path: str, num_tests: int = 5):
@@ -322,7 +326,7 @@ def verify_onnx_model(onnx_path: str, checkpoint_path: str, num_tests: int = 5):
         checkpoint_path: 原始checkpoint路径
         num_tests: 测试次数
     """
-    print(f"Verifying ONNX model: {onnx_path}")
+    _logger.info(f"Verifying ONNX model: {onnx_path}")
     
     # 加载原始RLlib模型
     rllib_module, _ = load_rllib_checkpoint(checkpoint_path)
@@ -336,7 +340,7 @@ def verify_onnx_model(onnx_path: str, checkpoint_path: str, num_tests: int = 5):
     
     # 运行多次测试
     for i in range(num_tests):
-        print(f"Test {i+1}/{num_tests}")
+        _logger.info(f"Test {i+1}/{num_tests}")
         
         # 创建随机观察
         dummy_obs = create_dummy_observation(observation_space, batch_size=1)
@@ -371,22 +375,22 @@ def verify_onnx_model(onnx_path: str, checkpoint_path: str, num_tests: int = 5):
                     raise ValueError(f"无法从PyTorch结果中提取动作: {torch_result}")
         
         # 比较输出
-        print(f"  ONNX output shape: {onnx_output.shape}")
-        print(f"  PyTorch output shape: {torch_action.shape}")
+        _logger.info(f"  ONNX output shape: {onnx_output.shape}")
+        _logger.info(f"  PyTorch output shape: {torch_action.shape}")
         
         # 计算差异
         diff = np.abs(onnx_output - torch_action)
         max_diff = np.max(diff)
         mean_diff = np.mean(diff)
         
-        print(f"  Max difference: {max_diff:.6f}")
-        print(f"  Mean difference: {mean_diff:.6f}")
+        _logger.info(f"  Max difference: {max_diff:.6f}")
+        _logger.info(f"  Mean difference: {mean_diff:.6f}")
         
         # 检查差异是否在可接受范围内
         if max_diff > 1e-5:
-            print(f"  WARNING: Large difference detected!")
+            _logger.warning(f"  WARNING: Large difference detected!")
         else:
-            print(f"  ✓ Outputs match within tolerance")
+            _logger.info(f"  ✓ Outputs match within tolerance")
         
         print()
 
@@ -423,10 +427,10 @@ def main():
         if args.verify:
             verify_onnx_model(args.output_path, args.checkpoint_path, args.num_tests)
         
-        print("Conversion completed successfully!")
+        _logger.info("Conversion completed successfully!")
         
     except Exception as e:
-        print(f"Error during conversion: {e}")
+        _logger.error(f"Error during conversion: {e}")
         raise
 
 

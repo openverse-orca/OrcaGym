@@ -1,5 +1,9 @@
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # real action space
 hipXmin = -24
 hipXmax = 24
@@ -11,4 +15,4 @@ kneemax = 156
 degree2radian = np.pi / 180
 
 for i in [hipXmin, hipXmax, hipYmin, hipYmax, kneemin, kneemax]:
-    print(i * degree2radian)
+    _logger.info(i * degree2radian)

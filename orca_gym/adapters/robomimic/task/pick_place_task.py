@@ -13,6 +13,10 @@ from orca_gym.environment import OrcaGymLocalEnv
 from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
 import random
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class PickPlaceTask(AbstractTask):
     def __init__(self, config: dict):
         
@@ -22,17 +26,16 @@ class PickPlaceTask(AbstractTask):
             super().__init__()
 
     def get_task(self, env: OrcaGymLocalEnv):
-        # 随机灯光说明是增广任务
-        if self.random_light:
+        from envs.manipulation.dual_arm_env import RunMode
+        is_augmentation_mode = (env._run_mode == RunMode.POLICY_NORMALIZED and 
+                            hasattr(env, '_task') and 
+                            hasattr(env._task, 'data') and 
+                            env._task.data is not None)
+        if is_augmentation_mode:
             self._get_augmentation_task_(env, self.data, sample_range=self.sample_range)
         else:
             self._get_teleperation_task_(env)
 
-        print(
-            f"{Fore.WHITE}level: {self.level_name}{Style.RESET_ALL}  "
-            f"object: {Fore.CYAN}{Style.BRIGHT}{self.target_object}{Style.RESET_ALL}  to  "
-            f"goal:   {Fore.MAGENTA}{Style.BRIGHT}{self.goal_bodys[0]}{Style.RESET_ALL}"
-            )
     def _get_teleperation_task_(self, env: OrcaGymLocalEnv) -> dict[str, str]:
         """
         随机选一个 object_bodys 里的物体，配对到第一个 goal_bodys。
@@ -48,7 +51,7 @@ class PickPlaceTask(AbstractTask):
 
             # 从 object_bodys 随机选一个
             self.target_object = random.choice(self.object_bodys)
-            print(f"self.target_object: {self.target_object}")
+
             # 只取第一个 goal
             goal_name = self.goal_bodys[0]
 
@@ -109,7 +112,7 @@ class PickPlaceTask(AbstractTask):
 
             # 如果没有尺寸信息，跳过目标
             if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
+                _logger.error(f"Error: No geometry size information found for goal {goal_name}")
                 continue
 
             mn = np.array(info["min"]).flatten()

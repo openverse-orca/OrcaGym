@@ -5,15 +5,19 @@ from tqdm import tqdm
 import datetime
 import re
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def connect_to_ftp(ftp_host, ftp_user, ftp_password, ftp_port=21):
     """连接到 FTP 服务器并返回 FTP 对象。"""
     ftp = FTP()
     try:
         ftp.connect(ftp_host, ftp_port, timeout=10)
         ftp.login(user=ftp_user, passwd=ftp_password)
-        print(f"成功连接到 {ftp_host}")
+        _logger.info(f"成功连接到 {ftp_host}")
     except all_errors as e:
-        print(f"连接失败：{e}")
+        _logger.info(f"连接失败：{e}")
         return None
     return ftp
 
@@ -21,17 +25,17 @@ def list_directory(ftp, directory):
     """列出远程 FTP 目录内容。"""
     try:
         files = ftp.nlst(directory)
-        print(f"目录 {directory} 内容: {files}")
+        _logger.info(f"目录 {directory} 内容: {files}")
         return files
     except all_errors as e:
-        print(f"列出目录错误：{e}")
+        _logger.info(f"列出目录错误：{e}")
         return []
 
 def ensure_directory_exists(directory):
     """确保目录存在，如果不存在则创建。"""
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
-        print(f"创建目录: {directory}")
+        _logger.info(f"创建目录: {directory}")
 
 def download_file(ftp, remote_file_path, local_file_path):
     """带有进度条的文件下载。"""
@@ -51,10 +55,10 @@ def download_file(ftp, remote_file_path, local_file_path):
                 # 下载文件
                 ftp.retrbinary(f'RETR {remote_file_path}', callback)
 
-        print(f"文件已下载到 {local_file_path}")
+        _logger.info(f"文件已下载到 {local_file_path}")
 
     except all_errors as e:
-        print(f"下载过程中发生错误：{e}")
+        _logger.info(f"下载过程中发生错误：{e}")
 
 def extract_tar_xz(file_path, extract_to):
     """解压 tar.xz 文件到指定目录。"""
@@ -62,10 +66,10 @@ def extract_tar_xz(file_path, extract_to):
         ensure_directory_exists(extract_to)
         with tarfile.open(file_path, "r:xz") as tar:
             tar.extractall(path=extract_to)
-        print(f"文件已解压到 {extract_to}")
+        _logger.info(f"文件已解压到 {extract_to}")
 
     except Exception as e:
-        print(f"解压错误：{e}")
+        _logger.info(f"解压错误：{e}")
 
 def find_latest_version(files, year, month):
     """根据当前年月找到最接近的版本。"""
@@ -86,19 +90,19 @@ def find_latest_version(files, year, month):
     # 找到当前年月或最近的版本
     for v_year, v_month, filename in versions:
         if (v_year < year) or (v_year == year and v_month <= month):
-            print(f"找到匹配的版本: {filename}")
+            _logger.info(f"找到匹配的版本: {filename}")
             return filename
 
-    print("未找到匹配的版本")
+    _logger.info("未找到匹配的版本")
     return None
 
 def delete_file(file_path):
     """删除指定文件。"""
     try:
         os.remove(file_path)
-        print(f"压缩包 {file_path} 已删除")
+        _logger.info(f"压缩包 {file_path} 已删除")
     except Exception as e:
-        print(f"删除文件时出错：{e}")
+        _logger.info(f"删除文件时出错：{e}")
 
 def main():
     # 获取当前年月
@@ -120,8 +124,8 @@ def main():
     extract_folder = os.path.join(parent_dir, "orca-studio-projects")
     ensure_directory_exists(extract_folder)  # 确保解压目录存在
 
-    print(f"本地下载目录: {extract_folder}")
-    print(f"解压目录: {extract_folder}")
+    _logger.info(f"本地下载目录: {extract_folder}")
+    _logger.info(f"解压目录: {extract_folder}")
 
     # 连接到 FTP 服务器
     ftp = connect_to_ftp(ftp_host, ftp_user, ftp_password, ftp_port)
@@ -134,7 +138,7 @@ def main():
     # 找到最新的版本
     version = find_latest_version(files, year, month)
     if not version:
-        print("没有找到符合条件的版本，程序退出。")
+        _logger.info("没有找到符合条件的版本，程序退出。")
         ftp.quit()
         return
 
@@ -152,9 +156,9 @@ def main():
     # 关闭 FTP 连接
     try:
         ftp.quit()
-        print("FTP 连接已关闭")
+        _logger.info("FTP 连接已关闭")
     except OSError as e:
-        print(f"关闭 FTP 连接时出错：{e}")
+        _logger.info(f"关闭 FTP 连接时出错：{e}")
 
 if __name__ == "__main__":
     main()

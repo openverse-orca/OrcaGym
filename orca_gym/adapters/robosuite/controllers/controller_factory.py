@@ -13,6 +13,10 @@ from .joint_tor import JointTorqueController
 from .joint_vel import JointVelocityController
 from .osc import OperationalSpaceController
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # Global var for linking pybullet server to multiple ik controller instances if necessary
 pybullet_server = None
 
@@ -85,7 +89,7 @@ def load_controller_config(custom_fpath=None, default_controller=None):
         with open(custom_fpath) as f:
             controller_config = json.load(f)
     except FileNotFoundError:
-        print("Error opening controller filepath at: {}. " "Please check filepath and try again.".format(custom_fpath))
+        _logger.error("Error opening controller filepath at: {}. " "Please check filepath and try again.".format(custom_fpath))
 
     # Return the loaded controller
     return controller_config

@@ -19,6 +19,10 @@ from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, Cu
 
 from scripts.grpc_client import GrpcInferenceClient, create_grpc_client
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 current_file_path = os.path.abspath('')
 project_root = os.path.dirname(os.path.dirname(current_file_path))
@@ -86,16 +90,16 @@ class KeyboardControl:
         if key_status["Space"] == 0 and self._last_key_status["Space"] == 1:
             if self.terrain_type == "flat_terrain":
                 self.terrain_type = "rough_terrain"
-                print("Switch to rough terrain")
+                _logger.info("Switch to rough terrain")
             else:
                 self.terrain_type = "flat_terrain"
-                print("Switch to flat terrain")
+                _logger.info("Switch to flat terrain")
         if key_status["M"] == 0 and self._last_key_status["M"] == 1:
             supported_model_types = ["sb3", "onnx", "grpc", "rllib"]
             if self.model_type in supported_model_types:
                 current_index = supported_model_types.index(self.model_type)
                 self.model_type = supported_model_types[(current_index + 1) % len(supported_model_types)]
-                print(f"Switch to {self.model_type} model")
+                _logger.info(f"Switch to {self.model_type} model")
 
         self._last_key_status = key_status.copy()
         # print("Lin vel: ", lin_vel, "Turn angel: ", ang_vel, "Reborn: ", reborn, "Terrain type: ", self.terrain_type)
@@ -119,7 +123,7 @@ def register_env(orcagym_addr : str,
     orcagym_addr_str = orcagym_addr.replace(":", "-")
     env_id = env_name + "-OrcaGym-" + orcagym_addr_str + f"-{env_index:03d}"
     agent_names = [f"{agent_name}_000"]
-    print("Agent names: ", agent_names)
+    _logger.info(f"Agent names:  {agent_names}")
     kwargs = {'frame_skip': FRAME_SKIP,   
                 'orcagym_addr': orcagym_addr, 
                 'env_id': env_id,
@@ -194,13 +198,13 @@ def load_rllib_model(model_file: dict):
 
     # 在脚本开头调用
     if rllib_appo_rl.setup_cuda_environment():
-        print("CUDA 环境验证通过")
+        _logger.info("CUDA 环境验证通过")
     else:
-        print("CUDA 环境设置失败，GPU 加速可能不可用")
+        _logger.info("CUDA 环境设置失败，GPU 加速可能不可用")
 
     models = {}
     for key, value in model_file.items():
-        print("Loading rllib model: ", value)
+        _logger.info(f"Loading rllib model:  {value}")
         # 从字符串中提取绝对路径
         checkpoint_path = os.path.abspath(value)
         checkpoint_path = os.path.join(
@@ -210,7 +214,7 @@ def load_rllib_model(model_file: dict):
             "rl_module",
             DEFAULT_MODULE_ID,
         )
-        print("Checkpoint path: ", checkpoint_path)
+        _logger.info(f"Checkpoint path:  {checkpoint_path}")
         rl_module = RLModule.from_checkpoint(checkpoint_path)
 
         models[key] = rl_module
@@ -274,7 +278,7 @@ def main(
             terrain_asset_paths=terrain_asset_paths,
         )
 
-        print("simulation running... , orcagym_addr: ", orcagym_addresses)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addresses}")
         env_name = "LeggedSim-v0"
         env_id, kwargs = register_env(
             orcagym_addr=orcagym_addresses[0], 
@@ -285,10 +289,10 @@ def main(
             max_episode_steps=MAX_EPISODE_STEPS,
             height_map=height_map_file,
         )
-        print("Registered environment: ", env_id)
+        _logger.info(f"Registered environment:  {env_id}")
 
         env = gym.make(env_id)
-        print("Starting simulation...")
+        _logger.info("Starting simulation...")
 
         friction_scale = config['friction_scale']
         if friction_scale is not None:
@@ -309,7 +313,7 @@ def main(
             command_model=command_model,
         )
     finally:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         # 清理gRPC客户端连接
         if model_type == "grpc" and models and "grpc" in models:
             for client in models["grpc"].values():
@@ -530,7 +534,7 @@ def run_simulation(env: gym.Env,
                 time.sleep(dt - elapsed_time.total_seconds())
             
     finally:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         env.close()
 
 if __name__ == "__main__":

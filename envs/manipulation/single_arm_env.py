@@ -12,6 +12,10 @@ from orca_gym.adapters.robomimic.robomimic_env import RobomimicEnv
 from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.utils.reward_printer import RewardPrinter
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class RunMode:
     """
     Enum class for control type
@@ -110,7 +114,7 @@ class SingleArmEnv(RobomimicEnv):
         self._ctrl_range = self.model.get_actuator_ctrlrange()
         self._ctrl_range_min = self._ctrl_range[:, 0]
         self._ctrl_range_max = self._ctrl_range[:, 1]
-        print("ctrl range: ", self._ctrl_range)
+        _logger.info(f"ctrl range:  {self._ctrl_range}")
 
         # action scale for normalization
         self._setup_action_range(self._ctrl_range[7:9])

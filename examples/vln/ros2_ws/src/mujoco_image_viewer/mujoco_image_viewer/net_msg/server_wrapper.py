@@ -12,6 +12,10 @@ import numpy as np
 import requests
 from flask import Flask, jsonify, request
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 class ServerMixin:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -77,10 +81,10 @@ def send_request(url: str, **kwargs: Any) -> dict:
             break
         except Exception as e:
             if attempt == 9:
-                print(e)
+                _logger.info(e)
                 exit()
             else:
-                print(f"Error: {e}. Retrying in 20-30 seconds... {url}")
+                _logger.error(f"Error: {e}. Retrying in 20-30 seconds... {url}")
                 time.sleep(20 + random.random() * 10)
 
     return response
@@ -144,7 +148,7 @@ def _send_request(url: str, **kwargs: Any) -> dict:
                 requests.exceptions.Timeout,
                 requests.exceptions.RequestException,
             ) as e:
-                print(e)
+                _logger.info(e)
                 if time.time() - start_time > 20:
                     raise Exception("Request timed out after 20 seconds")
 

@@ -21,6 +21,10 @@ import orca_gym.utils.rotations as rotations
 
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 ENV_ENTRY_POINT = {
     "Franka": "envs.manipulation.franka_env:FrankaEnv"
@@ -139,7 +143,7 @@ def user_comfirm_save_record(task_result, currnet_round, teleoperation_rounds):
         elif user_input == 'e':
             return False, True
         else:
-            print("Invalid input! Please input 'y', 'n' or 'e'.")
+            _logger.error(f"Invalid input! Please input 'y', 'n' or 'e'.")
 
 def add_demo_to_dataset(dataset_writer : DatasetWriter,
                         obs_list, 
@@ -222,14 +226,14 @@ def playback_episode(env : SingleArmEnv,
                     time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
 
         if done:
-            print("Episode done!")
+            _logger.info("Episode done!")
             return
 
         if terminated or truncated:
-            print("Episode terminated!")
+            _logger.info("Episode terminated!")
             return
     
-    print("Episode tunkated!")
+    _logger.info("Episode tunkated!")
 
 def reset_playback_env(env : SingleArmEnv, demo_data, sample_range=0.0):
     obs, info = env.reset(seed=42)
@@ -261,14 +265,14 @@ def do_playback(env : SingleArmEnv,
     elif playback_mode == "random":
         demo_name_index_list = np.random.permutation(list(range(len(demo_names))))
     else:
-        print("Invalid playback mode! Please input 'loop' or 'random'.")
+        _logger.error("Invalid playback mode! Please input 'loop' or 'random'.")
         return
     
     for i in demo_name_index_list:
         demo_data = dataset_reader.get_demo_data(demo_names[i])
         action_list = demo_data['actions']
         done_list = demo_data['dones']
-        print("Playing back episode: ", demo_names[i], " with ", len(action_list), " steps.")
+        _logger.info(f"Playing back episode: {demo_names[i]} with {len(action_list)} steps.")
         # for i, action in enumerate(action_list):
         #     print(f"Playback Action ({i}): ", action)
         reset_playback_env(env, demo_data)
@@ -383,7 +387,7 @@ def do_augmentation(env : SingleArmEnv,
             done = False
             while not done:
                 demo_data = dataset_reader.get_demo_data(original_demo_name)
-                print("Augmenting original demo: ", original_demo_name)
+                _logger.info(f"Augmenting original demo:  {original_demo_name}")
                 language_instruction = demo_data['language_instruction']
                 
                 obs_list, reward_list, done_list, info_list\
@@ -401,10 +405,10 @@ def do_augmentation(env : SingleArmEnv,
                         add_demo_to_dataset(dataset_writer, obs_list, reward_list, done_list, info_list, camera_frames, timestep_list, language_instruction)
                     
                     done_demo_count += 1
-                    print(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
+                    _logger.info(f"Episode done! {done_demo_count} / {need_demo_count} for round {round + 1}")
                     done = True
                 else:
-                    print("Episode failed!")
+                    _logger.error("Episode failed!")
     
 
     dataset_writer.shuffle_demos()

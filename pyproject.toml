@@ -1,54 +1,49 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = [ "setuptools>=42", "wheel",]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "OrcaGym"         # 修改为你的项目名称
-version = "25.10.0"                  # 修改为项目版本
-description = "OrcaGym"
+name = "orca-gym"
+version = "25.12.4"
+description = "OrcaGym Core - Cloud-native robotics simulation platform compatible with Gymnasium API"
 readme = "README.md"
 requires-python = ">=3.9"
-# 项目依赖，直接对应你的 requirements.txt 列表
-dependencies = [
-    "numpy>=2.0.0",
-    "scipy",
-    "scipy-stubs", # for type hints
-    "matplotlib",
-    "grpcio==1.66.1",
-    "grpcio-tools==1.66.1",
-    "gymnasium>=1.0.0",
-    "stable-baselines3>=2.3.2",
-    "sb3_contrib>=2.3.0",
-    "pygame>=2.6.0",
-    "h5py",
-    "pyyaml",
-    "websockets",
-    "numba",
-    "termcolor",
-    "mujoco>=3.3.0",
-    "tqdm",
-    "av",
-    "opencv-python",
-    "aiofiles",
-    "requests",
-    "grpcio",
-    "flask",
-    "tensorboard",
-    "trimesh"
-]
+keywords = [ "robotics", "simulation", "reinforcement-learning", "gymnasium", "mujoco",]
+classifiers = [ "Development Status :: 4 - Beta", "Intended Audience :: Science/Research", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12", "Topic :: Scientific/Engineering :: Artificial Intelligence",]
+dependencies = [ "numpy==2.2.6", "scipy==1.16.2", "scipy-stubs==1.16.2.4", "grpcio==1.66.1", "grpcio-tools==1.66.1", "gymnasium==1.2.1", "mujoco==3.3.3", "aiofiles==25.1.0", "termcolor>=2.4.0",]
+[[project.authors]]
+name = "松应科技"
+email = "huangwei@orca3d.cn"
 
-# 可选依赖，可用于开发调试、测试、格式化代码等用途
+[project.license]
+text = "MIT"
+
+[project.urls]
+Homepage = "https://github.com/openverse-orca/OrcaGym"
+Documentation = "https://github.com/openverse-orca/OrcaGym"
+Repository = "https://github.com/openverse-orca/OrcaGym"
+"Bug Tracker" = "https://github.com/openverse-orca/OrcaGym/issues"
+
 [project.optional-dependencies]
-dev = [
-    "pytest",         # 单元测试工具
-    "pytest-cov",     # 测试覆盖率工具
-    "flake8",         # 代码风格检查工具
-    "black",          # 代码格式化工具
-    "mypy",           # 静态类型检查工具
-]
+dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy",]
+rl = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard",]
+imitation = [ "h5py", "opencv-python", "tqdm",]
+devices = [ "pygame>=2.6.0",]
+sensors = [ "websockets", "av", "opencv-python", "matplotlib",]
+tools = [ "pyyaml", "trimesh", "requests", "tqdm",]
+robomimic = [ "h5py", "termcolor", "opencv-python",]
+robosuite = [ "numba",]
+all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask",]
+
+[project.scripts]
+orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
+
+[tool.setuptools]
+license-files = []
+
+[tool.setuptools.package-data]
+orca_gym = [ "*.proto", "py.typed", "**/*.json"]
 
 [tool.setuptools.packages.find]
-# 如果项目源码在 src/ 目录下，请取消下面的注释，并确保目录结构正确
-# where = ["src"]
-
-# 如果源码就在项目根目录下，此项可以忽略，setuptools 会自动发现
+include = [ "orca_gym*",]
+exclude = [ "examples*", "envs*", "doc*", "3rd_party*", "tests*",]

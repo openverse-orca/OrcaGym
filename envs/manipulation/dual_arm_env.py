@@ -11,6 +11,10 @@ from orca_gym.utils.reward_printer import RewardPrinter
 from orca_gym.adapters.robomimic.task.pick_place_task import PickPlaceTask, TaskStatus
 import importlib
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class RunMode:
     """
     Enum class for control type
@@ -148,19 +152,20 @@ class DualArmEnv(RobomimicEnv):
         self._set_obs_space()
         self._set_action_space()
 
-        from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
-        from orca_gym.scene.orca_gym_scene import OrcaGymScene
+        # Note: _task was already created above (line 109), so we don't need to create it again
+        # The following code was redundant and has been removed to avoid duplicate initialization
+        # from orca_gym.adapters.robomimic.task.abstract_task import AbstractTask
+        # from orca_gym.scene.orca_gym_scene import OrcaGymScene
         # self._task = AbstractTask()
         # self._task.grpc_addr = "192.168.1.164:50051"
         # self._task.scene = OrcaGymScene(self._task.grpc_addr)
         # self._task.actors = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.actors_spawnable = ['bottle_red', 'jar_01', 'bottle_blue', 'salt', 'can']
         # self._task.register_init_env_callback(self.init_env)
-        self._config = task_config_dict
-        self._config["grpc_addr"] = "localhost:50051"
-        self._task = PickPlaceTask(self._config)
-        
-        self._task.register_init_env_callback(self.init_env)
+        # self._config = task_config_dict
+        # self._config["grpc_addr"] = "localhost:50051"
+        # self._task = PickPlaceTask(self._config)
+        # self._task.register_init_env_callback(self.init_env)
 
 
     def init_env(self):
@@ -231,9 +236,9 @@ class DualArmEnv(RobomimicEnv):
     
     def set_task_status(self, status):
         if status == TaskStatus.SUCCESS:
-            print("Task success!")
+            _logger.info("Task success!")
         elif status == TaskStatus.FAILURE:
-            print("Task failure!")
+            _logger.error("Task failure!")
         elif status == TaskStatus.BEGIN:
             print("Start to record task....... Press left hand grip if task failed, press right hand grip if task success.")            
         self._task_status = status
@@ -297,8 +302,8 @@ class DualArmEnv(RobomimicEnv):
 
         info = {"state": self.get_state(),
                 "action": scaled_action,
-                "object": self.objects,  # 提取第一个对象的位置
-                "goal": self.goals,
+                "object": self.objects if self._run_mode == RunMode.TELEOPERATION else self._task.get_objects_info(self),
+                "goal": self.goals if self._run_mode == RunMode.TELEOPERATION else self._task.get_goals_info(self),
                 "task_status": self._task_status,
                 "language_instruction": self._task.get_language_instruction(),
                 "time_step": self.data.time,
@@ -390,12 +395,12 @@ class DualArmEnv(RobomimicEnv):
     def _debug_list_loaded_objects(self):
         all_keys = list(self.model._joint_dict.keys())
 
-        print("=== ALL JOINT KEYS IN MODEL ===")
+        _logger.info("=== ALL JOINT KEYS IN MODEL ===")
         for k in all_keys:
-            print("   ", k)
-        print("================================")
+            _logger.info(f"    {k}")
+        _logger.info("================================")
 
-        print("[Debug] before correction:", self._task.object_joints)
+        _logger.debug(f"[Debug] before correction: {self._task.object_joints}")
         corrected = []
         for short_jn in self._task.object_joints:
             sn_tokens = short_jn.lower().split("_")
@@ -406,7 +411,7 @@ class DualArmEnv(RobomimicEnv):
                 if fn_tokens[-len(sn_tokens):] == sn_tokens:
                     matches.append(full)
             if not matches:
-                print(f"[Debug] joint '{short_jn}' not found → SKIP")
+                _logger.warning(f"[Debug] joint '{short_jn}' not found → SKIP")
                 continue
             full_jn = matches[0]
             
@@ -415,17 +420,27 @@ class DualArmEnv(RobomimicEnv):
         #print("[Debug] after correction:", self._task.object_joints)
     
     def safe_get_task(self, env):
+        iteration = 0
+        max_iterations = 100  # 添加最大迭代次数限制，防止无限循环
         while True:
+            iteration += 1
+            if iteration > max_iterations:
+                break
             # 1) 生成一次 task（包括随机摆放）
             self._task.get_task(env)
     
             objs = self._task.randomized_object_positions
+            if not objs or not self._task.goal_bodys:
+                break
             goal_body = self._task.goal_bodys[0]
     
             # 2) 拿它的轴对齐包围盒
-            bbox = self.get_goal_bounding_box(goal_body)
-            min_xy = bbox['min'][:2]
-            max_xy = bbox['max'][:2]
+            try:
+                bbox = self.get_goal_bounding_box(goal_body)
+                min_xy = bbox['min'][:2]
+                max_xy = bbox['max'][:2]
+            except Exception:
+                break
     
             bad = False
             for joint_name, qpos in objs.items():
@@ -473,7 +488,7 @@ class DualArmEnv(RobomimicEnv):
             )
         else:
             # 万一格式不符，回退到无色输出
-            print(instr)
+            _logger.info(instr)
 
         self.update_objects_goals(self._task.randomized_object_positions, self._task.randomized_goal_positions)
         self.mj_forward()
@@ -553,7 +568,7 @@ class DualArmEnv(RobomimicEnv):
 
             # 如果没有尺寸信息，跳过目标
             if not info:
-                print(f"Error: No geometry size information found for goal {goal_name}")
+                _logger.error(f"Error: No geometry size information found for goal {goal_name}")
                 continue
 
             mn = np.array(info["min"]).flatten()
@@ -583,23 +598,40 @@ class DualArmEnv(RobomimicEnv):
         """
         将 demo 里记录的 objects_data 写回到仿真。
         objects_data 可能是：
-          1) 结构化 numpy array：dtype=[('joint_name',U100),('position',f4,3),('orientation',f4,4)]
-          2) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
+          1) JSON字符串格式：{"object_name": {"joint_name": "...", "position": [...], "orientation": [...]}}
+          2) 结构化 numpy array：dtype=[('joint_name',U100),('position',f4,3),('orientation',f4,4)]
+          3) 扁平浮点 ndarray：长度 = num_objects * 7，或 shape=(num_objects,7)
         """
         qpos_dict = {}
 
         arr = objects_data
-        # —— 情况 A：结构化数组（走原逻辑） ——
-        if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
+        
+        # —— 情况 A：JSON字符串格式（与PriOrcaGym兼容） ——
+        if isinstance(arr, str) or (isinstance(arr, np.ndarray) and arr.shape == () and arr.dtype == "object"):
+            import json
+            if isinstance(arr, np.ndarray):
+                json_str = arr[()]
+            else:
+                json_str = arr
+            json_data = json.loads(json_str)
+            
+            for object_name, object_info in json_data.items():
+                joint_name = object_info['joint_name']
+                position = np.array(object_info['position'], dtype=np.float32)
+                orientation = np.array(object_info['orientation'], dtype=np.float32)
+                qpos_dict[self.joint(joint_name)] = np.concatenate([position, orientation], axis=0)
+        
+        # —— 情况 B：结构化数组（走原逻辑） ——
+        elif isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
             # arr.shape = (num_objects,)
             for entry in arr:
                 name = entry['joint_name']
                 pos  = entry['position']
                 quat = entry['orientation']
-                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+                qpos_dict[self.joint(name)] = np.concatenate([pos, quat], axis=0)
 
         else:
-            # —— 情况 B：纯数值数组 ——
+            # —— 情况 C：纯数值数组 ——
             flat = np.asarray(arr, dtype=np.float32)
             # 如果是一维 (num_objects*7,)
             if flat.ndim == 1:
@@ -616,7 +648,7 @@ class DualArmEnv(RobomimicEnv):
                 name = names[idx]
                 pos  = row[0:3]
                 quat = row[3:7]
-                qpos_dict[name] = np.concatenate([pos, quat], axis=0)
+                qpos_dict[self.joint(name)] = np.concatenate([pos, quat], axis=0)
 
         self.set_joint_qpos(qpos_dict)
         # 推进仿真
@@ -633,18 +665,75 @@ class DualArmEnv(RobomimicEnv):
         将 demo 里记录的 goals 写回环境，仅做数据格式转换。
 
         goals_data 可能是：
-          1) 结构化 numpy array（dtype 包含 joint_name, position, orientation, min, max, size）
-          2) 纯浮点 ndarray：长度 = num_goals * 16，或 shape=(num_goals,16)
+          1) JSON字符串格式：{"goal_name": {"joint_name": "...", "position": [...], "orientation": [...]}}
+          2) 结构化 numpy array（dtype 包含 joint_name, position, orientation, min, max, size）
+          3) 纯浮点 ndarray：长度 = num_goals * 16，或 shape=(num_goals,16)
              对应字段顺序 [pos(3), orient(4), min(3), max(3), size(3)]
         """
         arr = goals_data
 
-        # 1) 如果已经是结构化数组，直接 copy 给 self.goals
+        # 1) 如果是JSON字符串格式（与PriOrcaGym兼容）
+        if isinstance(arr, str) or (isinstance(arr, np.ndarray) and arr.shape == () and arr.dtype == "object"):
+            import json
+            if isinstance(arr, np.ndarray):
+                json_str = arr[()]
+            else:
+                json_str = arr
+            json_data = json.loads(json_str)
+            
+            # 构建结构化数组
+            goal_dtype = np.dtype([
+                ('joint_name',  'U100'),
+                ('position',    'f4', (3,)),
+                ('orientation', 'f4', (4,)),
+                ('min',         'f4', (3,)),
+                ('max',         'f4', (3,)),
+                ('size',        'f4', (3,))
+            ])
+            entries = []
+            for goal_name, goal_info in json_data.items():
+                joint_name = goal_info['joint_name']
+                position = np.array(goal_info['position'], dtype=np.float32)
+                orientation = np.array(goal_info['orientation'], dtype=np.float32)
+                
+                # 如果没有提供min/max/size，使用默认值（从旧的self.goals获取或使用零值）
+                if 'min' in goal_info and 'max' in goal_info and 'size' in goal_info:
+                    min_val = np.array(goal_info['min'], dtype=np.float32)
+                    max_val = np.array(goal_info['max'], dtype=np.float32)
+                    size_val = np.array(goal_info['size'], dtype=np.float32)
+                else:
+                    # 如果没有提供这些字段，尝试从旧的self.goals获取
+                    if hasattr(self, 'goals') and len(self.goals) > 0:
+                        # 查找匹配的goal
+                        found = False
+                        for old_goal in self.goals:
+                            if old_goal['joint_name'] == joint_name:
+                                min_val = old_goal['min']
+                                max_val = old_goal['max']
+                                size_val = old_goal['size']
+                                found = True
+                                break
+                        if not found:
+                            min_val = np.zeros(3, dtype=np.float32)
+                            max_val = np.zeros(3, dtype=np.float32)
+                            size_val = np.zeros(3, dtype=np.float32)
+                    else:
+                        min_val = np.zeros(3, dtype=np.float32)
+                        max_val = np.zeros(3, dtype=np.float32)
+                        size_val = np.zeros(3, dtype=np.float32)
+                
+                entries.append((joint_name, position.tolist(), orientation.tolist(), 
+                               min_val.tolist(), max_val.tolist(), size_val.tolist()))
+            
+            self.goals = np.array(entries, dtype=goal_dtype)
+            return
+
+        # 2) 如果已经是结构化数组，直接 copy 给 self.goals
         if isinstance(arr, np.ndarray) and arr.dtype.fields is not None:
             self.goals = arr.copy()
             return
 
-        # 2) 否则把它变为 (num_goals, 16) 的纯数值数组
+        # 3) 否则把它变为 (num_goals, 16) 的纯数值数组
         flat = np.asarray(arr, dtype=np.float32)
         if flat.ndim == 1:
             flat = flat.reshape(-1, 16)
@@ -655,7 +744,7 @@ class DualArmEnv(RobomimicEnv):
         # joint_name 列表从旧的 self.goals 拿，如果第一次用请先跑一次 reset_model() 初始化它
         names = [entry['joint_name'] for entry in self.goals]
 
-        # 3) 重建结构化数组
+        # 4) 重建结构化数组
         goal_dtype = np.dtype([
             ('joint_name',  'U100'),
             ('position',    'f4', (3,)),

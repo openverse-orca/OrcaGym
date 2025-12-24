@@ -13,6 +13,10 @@ import trimesh
 from copy import deepcopy
 import numpy as np
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def _load_yaml(path: str):
     """安全加载 YAML 文件"""
     with open(path, "r") as f:
@@ -128,7 +132,7 @@ def convert_usdz2usdc(usdz_path, converted_dir):
     
     # Rename the file
     os.rename(original_file_path, new_file_path)
-    print(f"Renamed {original_file} to {new_file_name}")
+    _logger.info(f"Renamed {original_file} to {new_file_name}")
     
     return new_file_path
 
@@ -154,19 +158,19 @@ def remove_dome_lights_from_stage(stage):
     for prim in stage.Traverse():
         if prim.GetTypeName() == 'DomeLight':
             dome_light_paths.append(prim.GetPath())
-            print(f"Found dome light at path: {prim.GetPath()}")
+            _logger.info(f"Found dome light at path: {prim.GetPath()}")
     
     # 删除收集到的 dome lights
     for prim_path in dome_light_paths:
         stage.RemovePrim(prim_path)
         dome_lights_removed.append(prim_path)
-        print(f"Removed dome light: {prim_path}")
+        _logger.info(f"Removed dome light: {prim_path}")
     
     if dome_lights_removed:
-        print(f"Total dome lights removed: {len(dome_lights_removed)}")
+        _logger.info(f"Total dome lights removed: {len(dome_lights_removed)}")
         # 保存修改后的 stage
         stage.GetRootLayer().Save()
-        print("Stage saved with dome lights removed")
+        _logger.info("Stage saved with dome lights removed")
     
     return dome_lights_removed
 
@@ -176,7 +180,7 @@ def get_bounding_box(all_prim, params, bbox_cache):
         bbox = bbox_cache.ComputeWorldBound(prim["Prim"])
         box_range = bbox.GetRange()
         if box_range.IsEmpty():
-            print(f"Prim {prim_path} has an empty bounding box.")
+            _logger.info(f"Prim {prim_path} has an empty bounding box.")
             continue
         min_point = box_range.GetMin()
         max_point = box_range.GetMax()
@@ -185,11 +189,11 @@ def get_bounding_box(all_prim, params, bbox_cache):
         center = (min_point + max_point) / 2.0
         size = box_range.GetSize()
 
-        print(f"Prim Path: {prim_path}, Type: {prim['Type']}")
-        print(f"    Min: {min_point}")
-        print(f"    Max: {max_point}")
-        print(f"    Center: {center}")
-        print(f"    Size: {size}")
+        _logger.info(f"Prim Path: {prim_path}, Type: {prim['Type']}")
+        _logger.info(f"    Min: {min_point}")
+        _logger.info(f"    Max: {max_point}")
+        _logger.info(f"    Center: {center}")
+        _logger.info(f"    Size: {size}")
 
 def export_mesh_to_obj(prim, output_dir, axis='Y'):
     """将 USD Mesh 导出为 OBJ 文件"""
@@ -272,7 +276,7 @@ def matrix_to_pos_quat_scale(matrix: Gf.Matrix4d, scale : np.ndarray, axis : str
 
     factor = matrix.Factor()
     scale *= factor[2]
-    print(f"scale: {scale}")
+    _logger.info(f"scale: {scale}")
 
     translation = matrix.ExtractTranslation() * scale
 
@@ -396,7 +400,7 @@ def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, para
         if not any(_is_contained(box, other) for j, other in enumerate(aabb_list) if i != j):
             filtered_aabbs.append(box)
         else:
-            print(f"Filtered out AABB {i} because it is contained by another AABB.")
+            _logger.info(f"Filtered out AABB {i} because it is contained by another AABB.")
     
     # 步骤2：合并高重合度包围盒（阈值设为90%）
     merged_aabbs = []
@@ -431,7 +435,7 @@ def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, para
                     merged_aabbs.append(merged_box)
                     skip_indices.update([i, j])
                     merged = True
-                    print(f"Merged AABBs {i} and {j} into a new AABB.")
+                    _logger.info(f"Merged AABBs {i} and {j} into a new AABB.")
                     filtered_aabbs.append(merged_box)
                     break
             
@@ -465,7 +469,7 @@ def process_split_mesh(obj_name_list, asset, body, output_dir, scale, bbox, para
 
 def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     """主函数：构建 MJCF XML"""
-    print(f"Processing {usd_file}")
+    _logger.info(f"Processing {usd_file}")
 
     # 初始化 MJCF 文档
     root = ET.Element("mujoco")
@@ -474,7 +478,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     base_body = ET.SubElement(worldbody, "body")
     base_body.set("name", "base")
     if params["physics_options"]["free_joint"]:
-        print("Adding free joint to base body")
+        _logger.info("Adding free joint to base body")
         base_joint = ET.SubElement(base_body, "freejoint")
         base_joint.set("name", "base_joint")
         if params["physics_options"]["mass"] > 0:
@@ -490,12 +494,12 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     remove_dome_lights_from_stage(stage)
     
     meters_per_unit = stage.GetMetadata('metersPerUnit')
-    print(f"metersPerUnit: {meters_per_unit}")
+    _logger.info(f"metersPerUnit: {meters_per_unit}")
     config_scale = params["transform_options"]["scale"]
-    print(f"config_scale: {config_scale}")
+    _logger.info(f"config_scale: {config_scale}")
     config_scale = np.array([config_scale, config_scale, config_scale], dtype=np.float64)
     scale = config_scale * meters_per_unit
-    print(f"scale: {scale}")
+    _logger.info(f"scale: {scale}")
 
 
     # 添加usdz文件到asset
@@ -509,7 +513,7 @@ def build_mjcf_xml(usd_file, mjcf_file, output_dir, params):
     def _process_prim(prim, parent_elem, bbox_cache, scale):
         bbox = bbox_cache.ComputeWorldBound(prim)
         if bbox.GetRange().IsEmpty():
-            print(f"prim {prim.GetPath()} has an empty bounding box.")
+            _logger.info(f"prim {prim.GetPath()} has an empty bounding box.")
             return
 
         # 处理变换
@@ -578,25 +582,25 @@ def main(config_path, skip_exist_xml=False):
         
         # 检查是否跳过已存在的XML文件
         if skip_exist_xml and os.path.exists(xml_path):
-            print(f"[{i}/{total_files}] Skipping {os.path.basename(usdz_path)} - XML already exists: {xml_path}")
+            _logger.warning(f"[{i}/{total_files}] Skipping {os.path.basename(usdz_path)} - XML already exists: {xml_path}")
             skipped_count += 1
             continue
         
-        print(f"[{i}/{total_files}] Processing {os.path.basename(usdz_path)}")
+        _logger.info(f"[{i}/{total_files}] Processing {os.path.basename(usdz_path)}")
         try:
             build_mjcf_xml(usd_file=usdc_path, mjcf_file=xml_path, output_dir=usdc_dir, params=params)
             processed_count += 1
-            print(f"[{i}/{total_files}] Successfully processed {os.path.basename(usdz_path)}")
+            _logger.info(f"[{i}/{total_files}] Successfully processed {os.path.basename(usdz_path)}")
         except Exception as e:
-            print(f"[{i}/{total_files}] Error processing {os.path.basename(usdz_path)}: {str(e)}")
+            _logger.error(f"[{i}/{total_files}] Error processing {os.path.basename(usdz_path)}: {str(e)}")
             continue
     
     # 打印处理结果统计
-    print(f"\n=== Processing Summary ===")
-    print(f"Total files: {total_files}")
-    print(f"Processed: {processed_count}")
-    print(f"Skipped: {skipped_count}")
-    print(f"Failed: {total_files - processed_count - skipped_count}")
+    _logger.info(f"\n=== Processing Summary ===")
+    _logger.info(f"Total files: {total_files}")
+    _logger.info(f"Processed: {processed_count}")
+    _logger.warning(f"Skipped: {skipped_count}")
+    _logger.error(f"Failed: {total_files - processed_count - skipped_count}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process USDZ file and add mujoco physics geometry')

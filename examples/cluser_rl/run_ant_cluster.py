@@ -1,6 +1,10 @@
 import argparse
 from orca_gym.scripts.rllib_appo_rl import env_creator, test_model, run_training, setup_cuda_environment
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 
 
@@ -19,9 +23,9 @@ def main(
 
     # 在脚本开头调用
     if setup_cuda_environment():
-        print("CUDA 环境验证通过")
+        _logger.info("CUDA 环境验证通过")
     else:
-        print("CUDA 环境设置失败，GPU 加速可能不可用")
+        _logger.info("CUDA 环境设置失败，GPU 加速可能不可用")
 
     if run_mode == 'training':
         run_training(

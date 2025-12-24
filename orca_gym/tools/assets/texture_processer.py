@@ -12,6 +12,10 @@ if project_root not in sys.path:
 
 from orca_gym.utils.dir_utils import create_tmp_dir, formate_now
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def split_channel(input_image_path, save_dir):
     # 打开原始图片
@@ -24,7 +28,7 @@ def split_channel(input_image_path, save_dir):
     r.save(save_dir + input_image_path.split('/')[-1].split('.')[0] + '_r.png')
     g.save(save_dir + input_image_path.split('/')[-1].split('.')[0] + '_g.png')
     b.save(save_dir + input_image_path.split('/')[-1].split('.')[0] + '_b.png')
-    print("Split channel done!")
+    _logger.info("Split channel done!")
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Helper to Process texture image')
@@ -39,7 +43,7 @@ if __name__ == '__main__':
     tmp_dir = current_file_path + '/texture_processer_tmp/'
     
     if input_image_path is None:
-        print("Please provide the path to the input image")
+        _logger.info("Please provide the path to the input image")
         exit(1)
     
     if task == 'split_channel':    

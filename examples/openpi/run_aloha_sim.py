@@ -11,6 +11,10 @@ import tyro
 import gymnasium as gym
 import orca_gym.scripts.camera_monitor as camera_monitor
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 ENV_ENTRY_POINT = {
     "AlohaTransferCube": "envs.aloha.aloha_dm_env:AlohaDMEnv"
 }
@@ -84,7 +88,7 @@ def main(args: Args) -> None:
         obs_type=args.obs_type,
     )
     
-    print("Registered Simulation Environment: ", env_id, " with kwargs: ", kwargs)
+    _logger.info(f"Registered Simulation Environment: {env_id} with kwargs: {kwargs}")
 
     # 启动 Monitor 子进程
     ports = [7070]

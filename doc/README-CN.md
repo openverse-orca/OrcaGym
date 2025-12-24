@@ -88,4 +88,4 @@ pip install torch --extra-index-url https://download.pytorch.org/whl/cu12x
 OrcaGym 使用 MIT 许可证。详情请参见 LICENSE 文件。
 
 ## 联系
-如有任何问题或需要支持，请通过 huangwei@openverse.com.cn 与我们联系。
+如有任何问题或需要支持，请通过 huangwei@orca3d.cn 与我们联系。

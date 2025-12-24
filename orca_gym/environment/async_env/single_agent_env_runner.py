@@ -64,6 +64,10 @@ logger = logging.getLogger("ray.rllib")
 from ray.rllib.env.single_agent_env_runner import SingleAgentEnvRunner
 from orca_gym.environment.async_env.orca_gym_vector_env import OrcaGymVectorEnv
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class OrcaGymAsyncSingleAgentEnvRunner(SingleAgentEnvRunner):
     """
     Wrap the SingleAgentEnvRunner to support orca gym asynchronous environments.
@@ -79,7 +83,7 @@ class OrcaGymAsyncSingleAgentEnvRunner(SingleAgentEnvRunner):
         """
         super().__init__(config=config, **kwargs)
 
-        print("env_runner.module is : ", self.module)
+        _logger.info(f"env_runner.module is :  {self.module}")
 
        
 

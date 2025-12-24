@@ -10,6 +10,10 @@ from gymnasium.spaces import Space
 
 import asyncio
 import sys
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 from orca_gym import OrcaGymRemote, OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
@@ -128,7 +132,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
                 finite_max = np.finfo(np.float32).max
                 low = np.full(obs_data.shape, -finite_max, dtype=np.float32)
                 high = np.full(obs_data.shape, finite_max, dtype=np.float32)
-                print(f"low.dtype: {low.dtype}, high.dtype: {high.dtype}")  # 调试信息
+                _logger.debug(f"low.dtype: {low.dtype}, high.dtype: {high.dtype}")
                 
                 obs_space_dict[obs_key] = spaces.Box(
                     low=low,

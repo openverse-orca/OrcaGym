@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def get_single_demo(path: str) -> None:
     with h5py.File(path, "r") as f:
         data = f["data"]["demo_00000"]["actions"]
@@ -21,7 +25,7 @@ def get_all_demo(dir_path: str) -> None:
             df = get_single_demo(file)
             df_list.append(df)
         else:
-            print(f"File {file} does not exist")
+            _logger.info(f"File {file} does not exist")
     # concat all df
     df = pd.concat(df_list)
     # draw distribution of each column

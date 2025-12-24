@@ -10,6 +10,10 @@ from datetime import datetime
 import os
 from typing import Optional
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 ENV_ENTRY_POINT = {
     "SimulationLoop": "orca_gym.scripts.sim_env:SimEnv",
 }
@@ -48,7 +52,7 @@ def run_simulation(orcagym_addr : str,
                 scene_runtime: Optional[OrcaGymSceneRuntime] = None) -> None:
     env = None  # Initialize env to None
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addr}")
 
         env_index = 0
         env_id, kwargs = register_env(orcagym_addr, 
@@ -56,17 +60,17 @@ def run_simulation(orcagym_addr : str,
                                       env_index, 
                                       agent_name, 
                                       sys.maxsize)
-        print("Registered environment: ", env_id)
+        _logger.info(f"Registered environment:  {env_id}")
 
         env = gym.make(env_id)        
-        print("Starting simulation...")
+        _logger.info("Starting simulation...")
 
         if scene_runtime is not None:
             if hasattr(env, "set_scene_runtime"):
-                print("Setting scene runtime...")
+                _logger.performance("Setting scene runtime...")
                 env.set_scene_runtime(scene_runtime)
             elif hasattr(env.unwrapped, "set_scene_runtime"):
-                print("Setting scene runtime...")
+                _logger.performance("Setting scene runtime...")
                 env.unwrapped.set_scene_runtime(scene_runtime)
 
         obs = env.reset()
@@ -90,8 +94,13 @@ def run_simulation(orcagym_addr : str,
             env.close()
 
 
-if __name__ == "__main__":
+def main():
+    """命令行入口函数"""
     orcagym_addr = "localhost:50051"
     agent_name = "NoRobot"
     env_name = "SimulationLoop"
     run_simulation(orcagym_addr, agent_name, env_name)
+
+
+if __name__ == "__main__":
+    main()

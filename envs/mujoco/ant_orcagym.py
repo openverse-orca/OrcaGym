@@ -10,6 +10,10 @@ from orca_gym.environment.orca_gym_env import RewardType
 from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 import time
 import gymnasium as gym
+
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
 class AntOrcaGymEnv(OrcaGymLocalEnv):
     """
     A class to represent the ORCA Gym environment for the Replicator scene.
@@ -118,7 +122,7 @@ class AntOrcaGymEnv(OrcaGymLocalEnv):
             if body_name == self._base_name:
                 self._body_geom_id.append(geom["GeomId"])
 
-        print("body_geom_id: ", self._body_geom_id)
+        _logger.info(f"body_geom_id:  {self._body_geom_id}")
 
     @property
     def is_terminated(self):

@@ -71,7 +71,39 @@ Lite3Config = {
 
         "actuator_type" :        "position",  # "torque" or "position"
         "kps" :                  [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-        "kds" :                  [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7],
+        "kds" :                  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        
+        # ========== 迁移自Lite3_rl_deploy的参数 ==========
+        # 已修改：Kd值从0.7改为1.0，以匹配原始实现
+        # 注意: 原始实现中kd=1.0，现在已与原始实现保持一致
+        
+        # 观测缩放参数 (迁移自lite3_test_policy_runner_onnx.hpp)
+        "omega_scale" :          0.25,      # 角速度缩放 (base_omega * omega_scale)
+        "dof_vel_scale" :        0.05,      # 关节速度缩放 (dof_vel * dof_vel_scale)
+        "max_cmd_vel" :          [0.8, 0.8, 0.8],  # 最大命令速度 [lin_x, lin_y, ang_yaw]
+        
+        # 默认关节位置 (用于观测计算，相对默认位置的偏移)
+        # 注意: 原始实现中有两个版本:
+        # - URDF_INIT: [0, -1.35453, 2.54948] * 4
+        # - dof_pos_default_policy: [0.0, -0.8, 1.6] * 4
+        # 这里使用策略中的默认值，与neutral_joint_angles不同
+        "dof_pos_default_policy" : {
+            "FL_HipX_joint": 0.0, "FL_HipY_joint": -0.8, "FL_Knee_joint": 1.6,
+            "FR_HipX_joint": 0.0, "FR_HipY_joint": -0.8, "FR_Knee_joint": 1.6,
+            "HL_HipX_joint": 0.0, "HL_HipY_joint": -0.8, "HL_Knee_joint": 1.6,
+            "HR_HipX_joint": 0.0, "HR_HipY_joint": -0.8, "HR_Knee_joint": 1.6,
+        },
+        
+        # 动作缩放 (迁移自action_scale_robot)
+        # 注意: 原始实现中的action_scale与OrcaGym中的action_scale不同
+        # 原始: [0.125, 0.25, 0.25] * 4
+        # OrcaGym: [0.25] * 12
+        # 如果需要完全匹配，可以使用原始值
+        "action_scale_original" : [0.125, 0.25, 0.25,  # FL: HipX, HipY, Knee
+                                   0.125, 0.25, 0.25,  # FR
+                                   0.125, 0.25, 0.25,  # HL
+                                   0.125, 0.25, 0.25], # HR
+        "use_original_action_scale" : False,  # 是否使用原始动作缩放
 
         "action_scale" :         [
             0.25,    # joint name="FL_HipX_joint" joint axis="-1 0 0" range="-0.523 0.523", neutral=0.0

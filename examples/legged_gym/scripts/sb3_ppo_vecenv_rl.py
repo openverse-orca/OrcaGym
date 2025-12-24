@@ -20,6 +20,10 @@ from stable_baselines3.common.utils import get_schedule_fn, get_linear_fn
 
 from envs.legged_gym.legged_config import LeggedRobotConfig, LeggedObsConfig, CurriculumConfig, LeggedEnvConfig
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class SnapshotCallback(BaseCallback):
     def __init__(self, 
                  save_interval : int, 
@@ -167,7 +171,7 @@ def make_env(
             height_map_file=height_map_file,
             render_mode=render_mode
         )
-        print("Registering environment with id: ", env_id)
+        _logger.info(f"Registering environment with id:  {env_id}")
 
         env = gym.make(env_id)
         seed = int(env_id[-3:])
@@ -194,7 +198,7 @@ def training_model(
         model.learn(total_timesteps=total_timesteps, 
                     callback=[snapshot_callback, curriculum_callback])
     finally:
-        print(f"-----------------Save Model-----------------")
+        _logger.info(f"-----------------Save Model-----------------")
         model.save(model_file)
 
 def setup_model_ppo(
@@ -219,16 +223,16 @@ def setup_model_ppo(
     if (total_envs * n_steps) % batch_size != 0:
         suitable_batch_size = (total_envs * n_steps) // 4
         suitable_batch_size = max(min_batch_size, suitable_batch_size)
-        print(f"Warning: batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
-        print(f"自动调整为: {suitable_batch_size}")
+        _logger.warning(f"Warning: batch_size ({batch_size}) 应该是 total_envs * n_steps ({total_envs * n_steps}) 的因数。")
+        _logger.info(f"自动调整为: {suitable_batch_size}")
         batch_size = suitable_batch_size
         
     # 如果存在模型文件且指定加载现有模型，则加载模型
     if os.path.exists(f"{model_file}"):
-        print(f"加载现有模型：{model_file}")
+        _logger.info(f"加载现有模型：{model_file}")
         model = PPO.load(model_file, env=env, device=device)
     else:
-        print("初始化新模型")
+        _logger.info("初始化新模型")
         
         # 处理学习率调度
         if isinstance(agent_config["learning_rate"], dict):
@@ -237,7 +241,7 @@ def setup_model_ppo(
                 agent_config["learning_rate"]["final_value"],
                 agent_config["learning_rate"]["end_fraction"]
             )
-            print(f"学习率调度: {agent_config['learning_rate']}")
+            _logger.info(f"学习率调度: {agent_config['learning_rate']}")
         else:
             lr_schedule = agent_config["learning_rate"]
             
@@ -248,7 +252,7 @@ def setup_model_ppo(
                 agent_config["clip_range"]["final_value"],
                 agent_config["clip_range"]["end_fraction"]
             )
-            print(f"clip_range调度: {agent_config['clip_range']}")
+            _logger.info(f"clip_range调度: {agent_config['clip_range']}")
         else:
             clip_range_schedule = agent_config["clip_range"]
         
@@ -279,12 +283,12 @@ def setup_model_ppo(
         )
 
     # 打印模型摘要
-    print(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}")
-    print(f"- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
-    print(f"- Learning Rate: {agent_config['learning_rate']}")
-    print(f"- Activation Function: {policy_kwargs['activation_fn'].__name__}")
-    print(f"- Policy Network: {agent_config['pi']}")
-    print(f"- Value Network: {agent_config['vf']}")
+    _logger.info(f"模型已设置：\n- Device: {device}\n- Total Envs: {total_envs}")
+    _logger.info(f"- Batch Size: {model.batch_size}\n- n_steps: {model.n_steps}")
+    _logger.info(f"- Learning Rate: {agent_config['learning_rate']}")
+    _logger.info(f"- Activation Function: {policy_kwargs['activation_fn'].__name__}")
+    _logger.info(f"- Policy Network: {agent_config['pi']}")
+    _logger.info(f"- Value Network: {agent_config['vf']}")
 
     return model
 
@@ -325,12 +329,12 @@ def train_model(
     model = None
     env = None
     try:
-        print("simulation running... , orcagym_addresses: ", orcagym_addresses)
+        _logger.info(f"simulation running... , orcagym_addresses:  {orcagym_addresses}")
 
         env_name = "LeggedGym-v0"
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, subenv_num)
         env_num = len(orcagym_addr_list)
-        print("env num: ", env_num)
+        _logger.info(f"env num:  {env_num}")
         env_fns = [
             make_env(
                 orcagym_addr=orcagym_addr,
@@ -354,7 +358,7 @@ def train_model(
         env = OrcaGymAsyncSubprocVecEnv(env_fns, agent_num)
         env.setup_curriculum(curriculum_list[0]["name"])
 
-        print("Start Simulation!")
+        _logger.info("Start Simulation!")
         model = setup_model_ppo(
             env=env,
             env_num=env_num,
@@ -366,9 +370,9 @@ def train_model(
         training_model(model, total_timesteps, model_file, curriculum_list)
 
     finally:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         if model is not None:
-            print(f"-----------------Save Model-----------------")
+            _logger.info(f"-----------------Save Model-----------------")
             model.save(model_file)
         if env is not None:
             env.close()
@@ -390,12 +394,12 @@ def test_model(
     render_mode: str,
     ):
     try:
-        print("simulation running... , orcagym_addr: ", orcagym_addresses)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addresses}")
 
         env_name = "LeggedGym-v0"
         orcagym_addr_list, env_index_list, render_mode_list = generate_env_list(orcagym_addresses, 1)
         env_num = len(orcagym_addr_list)
-        print("env num: ", env_num)
+        _logger.info(f"env num:  {env_num}")
         env_fns = [
             make_env(
                 orcagym_addr=orcagym_addr,
@@ -433,7 +437,7 @@ def test_model(
         )
 
     except KeyboardInterrupt:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         env.close()
 
 def _segment_observation(observation, agent_num):
@@ -454,12 +458,12 @@ def _output_test_info(
     dones: np.ndarray,
     infos: list
 ):
-    print(f"----------------Test: {test}----------------")
-    print("Total Reward: ", total_rewards)
-    print("Reward: ", rewards)
-    print("Done: ", dones)
-    print("is_success: ", [agent_info["is_success"] for agent_info in infos])
-    print("---------------------------------------")
+    _logger.info(f"----------------Test: {test}----------------")
+    _logger.info(f"Total Reward:  {total_rewards}")
+    _logger.info(f"Reward:  {rewards}")
+    _logger.info(f"Done:  {dones}")
+    _logger.info(f"is_success:  {[agent_info['is_success'] for agent_info in infos]}")
+    _logger.info("---------------------------------------")
 
 def testing_model(
     env: OrcaGymAsyncSubprocVecEnv, 
@@ -493,7 +497,7 @@ def testing_model(
     total_rewards = np.zeros(agent_num)
     step = 0
     dt = time_step * frame_skip * action_skip
-    print("Start Testing!")
+    _logger.info("Start Testing!")
     try:
         while True:
             step += 1
@@ -532,6 +536,6 @@ def testing_model(
                 total_rewards = np.zeros(agent_num)
             
     finally:
-        print("退出仿真环境")
+        _logger.info("退出仿真环境")
         env.close()
         

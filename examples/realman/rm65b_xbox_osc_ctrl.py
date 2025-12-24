@@ -14,6 +14,10 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from datetime import datetime
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 # 
 TIME_STEP = 0.005
 
@@ -52,15 +56,15 @@ def continue_training(env):
 if __name__ == "__main__":
     try:
         orcagym_addr = "localhost:50051"
-        print("simulation running... , orcagym_addr: ", orcagym_addr)
+        _logger.info(f"simulation running... , orcagym_addr:  {orcagym_addr}")
 
         env_name = "RM65BXboxControl-v0"
         env_index = 0
         env_id = register_env(orcagym_addr, env_name, env_index, 20)
-        print("Registering environment with id: ", env_id)
+        _logger.info(f"Registering environment with id:  {env_id}")
 
         env = gym.make(env_id)        
-        print("Start Simulation!")
+        _logger.info("Start Simulation!")
 
         continue_training(env)
     except KeyboardInterrupt:

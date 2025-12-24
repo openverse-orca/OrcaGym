@@ -1,0 +1,43 @@
+# XBot训练配置
+# 基于OrcaGym的Stable-Baselines3 PPO框架
+
+framework: "sb3"
+orcagym_addresses: ["localhost:50051"]
+agent_name: "XBot-L"
+agent_asset_path: "humanoid-gym/resources/robots/XBot/mjcf/XBot-L.xml"  # XML路径
+training_episode: 1000  # 训练回合数
+task: "flat_terrain"
+
+training:
+  subenv_num: 16  # 子环境数量（并行环境）
+  agent_num: 1    # 每个环境中的agent数量
+  render_mode: "none"  # 训练时不渲染
+  terrain_asset_paths: 
+    flat_terrain: []  # 使用平坦地面
+  curriculum_list:
+    flat_terrain:
+      - name: "flat_terrain"
+        milestone: 2000  # 训练步数里程碑
+
+testing:
+  subenv_num: 1
+  agent_num: 1
+  render_mode: "human"  # 测试时渲染
+  terrain_asset_paths: 
+    flat_terrain: []
+  curriculum_list:
+    flat_terrain:
+      - name: "flat_terrain"
+        milestone: 2000
+
+play:
+  subenv_num: 1
+  agent_num: 1
+  render_mode: "human"
+  terrain_asset_paths: 
+    flat_terrain: []
+  curriculum_list:
+    flat_terrain:
+      - name: "flat_terrain"
+        milestone: 2000
+

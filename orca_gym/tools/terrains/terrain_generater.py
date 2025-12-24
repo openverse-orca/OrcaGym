@@ -3,6 +3,10 @@ import os
 import sys
 import argparse
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def generate_geom_terrain(num_x, num_y, geom_type, geom_size, geom_size_cale_range, max_tilt, min_step, max_step, max_total_height, min_spacing, max_spacing, rotation_z_min, rotation_z_max):
     terrain = []
     heights = [[0 for _ in range(num_y)] for _ in range(num_x)]
@@ -88,7 +92,7 @@ def generate_mujoco_xml(num_x, num_y, geom_type, geom_size, geom_size_cale_range
     with open(f"{out_file}", "w") as f:
         f.write(xml_content)
 
-    print(f"XML文件已生成为 {out_file}")
+    _logger.info(f"XML文件已生成为 {out_file}")
 
 def parse_geom_size(s):
     try:

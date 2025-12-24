@@ -7,6 +7,10 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.policies import obs_as_tensor
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class OnnxableSB3Policy(th.nn.Module):
     def __init__(self, policy: BasePolicy):
         super().__init__()
@@ -41,7 +45,7 @@ def convert_sb3_to_onnx(model_path: str, output_path: str):
 
     env = CustomEnv(model)
     obs, info = env.reset()
-    print("obs: ", obs, "info: ", info)
+    _logger.info(f"obs:  {obs}, info: {info}")
 
     # 修复：添加batch维度
     batch_obs = {}
@@ -52,7 +56,7 @@ def convert_sb3_to_onnx(model_path: str, output_path: str):
         else:
             batch_obs[key] = np.array([value])
     
-    print("Fixed obs: ", batch_obs, "info: ", info)
+    _logger.info(f"Fixed obs:  {batch_obs}, info: {info}")
 
 
     # Convert to ONNX
@@ -94,7 +98,7 @@ def check_onnx_model(onnx_path: str, model_path: str):
         obs_value = np.array(np.random.uniform(-10, 10, obs_value.shape), dtype=np.float32)
         batch_obs[key] = obs_value
     
-    print("Fixed obs: ", batch_obs, "info: ", info)
+    _logger.info(f"Fixed obs:  {batch_obs}, info: {info}")
 
     # Load ONNX model and run
     ort_session = ort.InferenceSession(onnx_path)
@@ -108,20 +112,20 @@ def check_onnx_model(onnx_path: str, model_path: str):
     torch_outputs, _ = model.predict(batch_obs, deterministic=True)
 
 
-    print("onnxruntime_outputs: ", onnxruntime_outputs)
-    print("torch_outputs: ", torch_outputs)
+    _logger.performance(f"onnxruntime_outputs:  {onnxruntime_outputs}")
+    _logger.info(f"torch_outputs:  {torch_outputs}")
 
     th.testing.assert_close(torch_outputs[0], onnxruntime_outputs[0], rtol=1e-06, atol=1e-6)
 
 
     # Debug
-    print("Observations:")
+    _logger.info("Observations:")
     for key, value in obs.items():
-        print(f"{key}: {value.shape}")
+        _logger.info(f"{key}: {value.shape}")
 
-    print("\nONNX input:")
+    _logger.info("\nONNX input:")
     for key, value in onnxruntime_input.items():
-        print(f"{key}: {value.shape}")
+        _logger.info(f"{key}: {value.shape}")
 
 
 if __name__ == "__main__":

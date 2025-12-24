@@ -7,6 +7,10 @@ from orca_gym.environment.orca_gym_local_env import OrcaGymLocalEnv
 from envs.character.character import Character
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class CharacterEnv(OrcaGymLocalEnv):
     """
     A class to represent the ORCA Gym environment for the animation character.
@@ -58,7 +62,7 @@ class CharacterEnv(OrcaGymLocalEnv):
                 high=np.array([]),
                 dtype=np.float32
             )
-            print("No action space defined, nu is 0.")
+            _logger.info(f"No action space defined, nu is 0.")
 
     
     def render_callback(self, mode='human') -> None:
@@ -120,4 +124,4 @@ class CharacterEnv(OrcaGymLocalEnv):
 
     def set_scene_runtime(self, scene_runtime: OrcaGymSceneRuntime) -> None:
         self.scene_runtime = scene_runtime
-        print("Scene runtime is set.")
+        _logger.performance("Scene runtime is set.")

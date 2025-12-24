@@ -6,6 +6,10 @@ import threading
 import time
 import logging
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def display_grayscale(image, windowname:str, waittime: int=10):
     img_bgr = np.repeat(image, 3, 2)
     cv2.imshow(windowname, img_bgr)
@@ -180,11 +184,11 @@ if __name__ == "__main__":
                 yaw = np.arctan2(T[1, 0], T[0, 0])
                 # yaw转化为角度
                 yaw = np.rad2deg(yaw)
-                print(f"yaw:{yaw:.3f} pos:[{T[0, 3]:.3f},{T[1, 3]:.3f},{T[2, 3]:.3f}]")
+                _logger.info(f"yaw:{yaw:.3f} pos:[{T[0, 3]:.3f},{T[1, 3]:.3f},{T[2, 3]:.3f}]")
                 
             # print(f"Received Array:[{server.array[0]},{server.array[1]:.3f}]",  server.cnt)
             # print(f"yaw:{server.array[2]:.3f} pos:[{server.array[3]:.3f},{server.array[4]:.3f},{server.array[5]:.3f}]")
-            print("----------------------------")
+            _logger.info("----------------------------")
             # 其他操作...
             time.sleep(0.01)
     except KeyboardInterrupt:

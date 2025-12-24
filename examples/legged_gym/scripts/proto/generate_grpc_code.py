@@ -8,6 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 
 def generate_grpc_code():
     """生成gRPC Python代码"""
@@ -15,7 +19,7 @@ def generate_grpc_code():
     proto_file = current_dir / "inference.proto"
     
     if not proto_file.exists():
-        print(f"Error: {proto_file} not found!")
+        _logger.error(f"Error: {proto_file} not found!")
         return False
     
     try:
@@ -28,28 +32,28 @@ def generate_grpc_code():
             str(proto_file)
         ]
         
-        print(f"Running command: {' '.join(cmd)}")
+        _logger.info(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=current_dir)
         
         if result.returncode == 0:
-            print("Successfully generated gRPC Python code!")
-            print("Generated files:")
+            _logger.info("Successfully generated gRPC Python code!")
+            _logger.info("Generated files:")
             for file in current_dir.glob("inference_pb2*.py"):
-                print(f"  - {file}")
+                _logger.info(f"  - {file}")
             return True
         else:
-            print(f"Error generating gRPC code:")
-            print(f"stdout: {result.stdout}")
-            print(f"stderr: {result.stderr}")
+            _logger.error(f"Error generating gRPC code:")
+            _logger.info(f"stdout: {result.stdout}")
+            _logger.info(f"stderr: {result.stderr}")
             return False
             
     except FileNotFoundError:
-        print("Error: grpc_tools.protoc not found!")
-        print("Please install grpcio-tools:")
-        print("  pip install grpcio-tools")
+        _logger.error("Error: grpc_tools.protoc not found!")
+        _logger.info("Please install grpcio-tools:")
+        _logger.info("  pip install grpcio-tools")
         return False
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        _logger.error(f"Unexpected error: {e}")
         return False
 
 
@@ -60,20 +64,20 @@ def check_dependencies():
         import grpc_tools
         return True
     except ImportError as e:
-        print(f"Missing dependency: {e}")
-        print("Please install required packages:")
-        print("  pip install grpcio grpcio-tools")
+        _logger.info(f"Missing dependency: {e}")
+        _logger.info("Please install required packages:")
+        _logger.info("  pip install grpcio grpcio-tools")
         return False
 
 
 if __name__ == "__main__":
-    print("Checking dependencies...")
+    _logger.info("Checking dependencies...")
     if not check_dependencies():
         sys.exit(1)
     
-    print("Generating gRPC Python code...")
+    _logger.info("Generating gRPC Python code...")
     if generate_grpc_code():
-        print("Done!")
+        _logger.info("Done!")
     else:
-        print("Failed to generate gRPC code!")
+        _logger.error("Failed to generate gRPC code!")
         sys.exit(1) 

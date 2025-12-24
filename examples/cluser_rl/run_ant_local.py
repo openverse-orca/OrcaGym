@@ -3,6 +3,10 @@ from orca_gym.scripts.rllib_appo_rl import env_creator, test_model, run_training
 import yaml
 import os
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 def main(config: dict,
     run_mode: str,
     checkpoint_path: str
@@ -10,9 +14,9 @@ def main(config: dict,
 
     # 在脚本开头调用
     if setup_cuda_environment():
-        print("CUDA 环境验证通过")
+        _logger.info("CUDA 环境验证通过")
     else:
-        print("CUDA 环境设置失败，GPU 加速可能不可用")
+        _logger.info("CUDA 环境设置失败，GPU 加速可能不可用")
 
     assert config['num_envs_per_env_runner'] % 32 == 0, "num_envs_per_env_runner must be a multiple of 32"
 

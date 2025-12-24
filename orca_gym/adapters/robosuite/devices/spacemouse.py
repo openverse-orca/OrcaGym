@@ -35,6 +35,10 @@ import robosuite.macros as macros
 from robosuite.devices import Device
 from robosuite.utils.transform_utils import rotation_matrix
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 AxisSpec = namedtuple("AxisSpec", ["channel", "byte1", "byte2", "scale"])
 
 SPACE_MOUSE_SPEC = {
@@ -119,7 +123,7 @@ class SpaceMouse(Device):
         rot_sensitivity=1.0,
     ):
 
-        print("Opening SpaceMouse device")
+        _logger.info("Opening SpaceMouse device")
         self.vendor_id = vendor_id
         self.product_id = product_id
         self.device = hid.device()
@@ -128,8 +132,8 @@ class SpaceMouse(Device):
         self.pos_sensitivity = pos_sensitivity
         self.rot_sensitivity = rot_sensitivity
 
-        print("Manufacturer: %s" % self.device.get_manufacturer_string())
-        print("Product: %s" % self.device.get_product_string())
+        _logger.info("Manufacturer: %s" % self.device.get_manufacturer_string())
+        _logger.info("Product: %s" % self.device.get_product_string())
 
         # 6-DOF variables
         self.x, self.y, self.z = 0, 0, 0
@@ -157,16 +161,16 @@ class SpaceMouse(Device):
 
         def print_command(char, info):
             char += " " * (30 - len(char))
-            print("{}\t{}".format(char, info))
+            _logger.info(f"{char}\t{info}")
 
-        print("")
+        _logger.info("")
         print_command("Control", "Command")
         print_command("Right button", "reset simulation")
         print_command("Left button (hold)", "close gripper")
         print_command("Move mouse laterally", "move arm horizontally in x-y plane")
         print_command("Move mouse vertically", "move arm vertically")
         print_command("Twist mouse about an axis", "rotate arm about a corresponding axis")
-        print("")
+        _logger.info("")
 
     def _reset_internal_state(self):
         """
@@ -313,5 +317,5 @@ if __name__ == "__main__":
 
     space_mouse = SpaceMouse()
     for i in range(100):
-        print(space_mouse.control, space_mouse.control_gripper)
+        _logger.info(f"space_mouse.control, space_mouse.control_gripper")
         time.sleep(0.02)

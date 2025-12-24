@@ -9,6 +9,10 @@ import copy
 from scipy.spatial.transform import Rotation as R
 import threading
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 mediapipe_hand_point_count = 21
 openloong_hand_point_count = 11
 
@@ -63,7 +67,7 @@ class HandJoystick:
         asyncio.run(self._start_server())
 
     async def _handler(self, websocket):
-        print("new connection")
+        _logger.info("new connection")
         try:
             async for message in websocket:
                 # print(message)
@@ -72,7 +76,7 @@ class HandJoystick:
                 with self.mutex:
                     self.current_hand_infos = hand_infos
         except Exception as e:
-            print("disconnected", e)
+            _logger.info(f"disconnected {e}")
 
     async def _start_server(self):
         async with serve(self._handler, "0.0.0.0", 8787, ping_interval=None):

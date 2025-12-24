@@ -1,0 +1,34 @@
+# Lite3 ONNX策略仿真配置文件
+
+# OrcaGym服务器地址
+orcagym_addresses: ["localhost:50051"]
+
+# 机器人配置
+agent_name: "Lite3"
+agent_asset_path: "assets/prefabs/lite3_usda"
+
+# ONNX模型路径
+onnx_model_path: "examples/Lite3_rl/policy.onnx"
+
+# 控制设备
+ctrl_device: "keyboard"
+
+# 推理设备: "cpu" 或 "cuda"
+# 注意: MuJoCo物理仿真本身不支持GPU，只有策略推理可以使用GPU
+# 使用GPU需要安装: pip install onnxruntime-gpu
+inference_device: "cpu"  # 可选: "cuda" (需要安装 onnxruntime-gpu)
+
+# 命令模型配置
+command_model:
+  "flat_terrain":
+    "forward_speed" : [-0.5, 0.5]      # 前进/后退速度
+    "left_speed" : [-0.3, 0.3]         # 左移/右移速度
+    "turn_speed" : 0.7853975           # 转向速度 (pi/4)
+    "turbo_scale" : 3.0                 # 加速模式倍数
+
+# 地形配置（使用平坦地形，无障碍物）
+terrain_asset_paths: ["assets/prefabs/terrain_ellipsoid_low_usda"]
+
+# 摩擦系数
+friction_scale: 1.0
+

@@ -10,6 +10,10 @@ from orca_gym.adapters.robosuite.controllers.controller_factory import controlle
 import orca_gym.adapters.robosuite.controllers.controller_config as controller_config
 import orca_gym.adapters.robosuite.utils.transform_utils as transform_utils
 
+from orca_gym.log.orca_log import get_orca_logger
+_logger = get_orca_logger()
+
+
 class GripperState:
     OPENNING = "openning"
     CLOSING = "closing"
@@ -69,7 +73,7 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
         all_actuator_ctrlrange = self.model.get_actuator_ctrlrange()
         self._arm_ctrl_range = [all_actuator_ctrlrange[actoator_id] for actoator_id in self._arm_actuator_id]
         self._gripper_ctrl_range = {actuator_name: all_actuator_ctrlrange[actuator_id] for actuator_name, actuator_id in zip(self._gripper_actuator_names, self._gripper_actuator_id)}
-        print("gripper ctrl range: ", self._gripper_ctrl_range)
+        _logger.info(f"gripper ctrl range:  {self._gripper_ctrl_range}")
         actuators_dict = self.model.get_actuator_dict()
         self.gripper_force_limit = 1 #actuators_dict[self.actuator("actuator_gripper1")]["ForceRange"][1]
         self.gripper_state = GripperState.STOPPED
@@ -177,24 +181,24 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
 
         if (joystick_state["buttons"]["A"]):
             self.gripper_state = GripperState.CLOSING
-            print("Gripper closing at: ", gripper_ctrl_1, gripper_ctrl_2)
+            _logger.info(f"Gripper closing at:  {gripper_ctrl_1, gripper_ctrl_2}")
         elif (joystick_state["buttons"]["B"]):
-            print("Gripper opening at: ", gripper_ctrl_1, gripper_ctrl_2)
+            _logger.info(f"Gripper opening at:  {gripper_ctrl_1, gripper_ctrl_2}")
             self.gripper_state = GripperState.OPENNING
 
         if self.gripper_state == GripperState.CLOSING:
             contact_force_dict = self._query_gripper_contact_force()
             compose_force = 0
             for force in contact_force_dict.values():
-                print("Gripper contact force: ", force)
+                _logger.info(f"Gripper contact force:  {force}")
                 compose_force += np.linalg.norm(force[:3])
 
             if compose_force >= self.gripper_force_limit:
                 self.gripper_state = GripperState.STOPPED
-                print("Gripper force limit reached. Stop gripper at: ", gripper_ctrl_1, gripper_ctrl_2)
+                _logger.info(f"Gripper force limit reached. Stop gripper at:  {gripper_ctrl_1, gripper_ctrl_2}")
 
         if self.gripper_state == GripperState.CLOSING:
-            print("grpper closing")
+            _logger.info("grpper closing")
             gripper_ctrl_1 += MOVE_STEP
             gripper_ctrl_11 -= MOVE_STEP
             gripper_ctrl_2 -= MOVE_STEP
@@ -202,13 +206,13 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
             if gripper_ctrl_1 > self._gripper_ctrl_range[self.actuator("actuator_gripper1")][1]:
                 gripper_ctrl_1 = self._gripper_ctrl_range[self.actuator("actuator_gripper1")][1]
                 self.gripper_state = GripperState.STOPPED
-                print("Gripper Stop at: ", gripper_ctrl_1, gripper_ctrl_2)
+                _logger.info(f"Gripper Stop at:  {gripper_ctrl_1, gripper_ctrl_2}")
             if gripper_ctrl_2 < self._gripper_ctrl_range[self.actuator("actuator_gripper2")][0]:
                 gripper_ctrl_2 = self._gripper_ctrl_range[self.actuator("actuator_gripper2")][0]
                 self.gripper_state = GripperState.STOPPED
-                print("Gripper Stop at: ", gripper_ctrl_1, gripper_ctrl_2)
+                _logger.info(f"Gripper Stop at:  {gripper_ctrl_1, gripper_ctrl_2}")
         elif self.gripper_state == GripperState.OPENNING:
-            print("gripper openning")
+            _logger.info("gripper openning")
             gripper_ctrl_1 -= MOVE_STEP
             gripper_ctrl_11 += MOVE_STEP
             gripper_ctrl_2 += MOVE_STEP
@@ -216,11 +220,11 @@ class RM65BJoystickEnv(OrcaGymRemoteEnv):
             if gripper_ctrl_1 < self._gripper_ctrl_range[self.actuator("actuator_gripper1")][0]:
                 gripper_ctrl_1 = self._gripper_ctrl_range[self.actuator("actuator_gripper1")][0]
                 self.gripper_state = GripperState.STOPPED
-                print("Gripper Stop at: ", gripper_ctrl_1, gripper_ctrl_2)
+                _logger.info(f"Gripper Stop at:  {gripper_ctrl_1, gripper_ctrl_2}")
             if gripper_ctrl_2 > self._gripper_ctrl_range[self.actuator("actuator_gripper2")][1]:
                 gripper_ctrl_2 = self._gripper_ctrl_range[self.actuator("actuator_gripper2")][1]
                 self.gripper_state = GripperState.STOPPED
-                print("Gripper Stop at: ", gripper_ctrl_1, gripper_ctrl_2)
+                _logger.info(f"Gripper Stop at:  {gripper_ctrl_1, gripper_ctrl_2}")
 
         self.ctrl[6] = gripper_ctrl_1
         self.ctrl[7] = gripper_ctrl_2
