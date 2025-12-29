@@ -379,6 +379,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def reset_simulation(self):
         self.gym.load_initial_frame()
         self.gym.update_data()
+        self.set_time_step(self.time_step)
 
     def init_qpos_qvel(self):
         self.gym.update_data()
