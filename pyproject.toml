@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orca-gym"
-version = "25.12.4"
+version = "25.12.5.4"
 description = "OrcaGym Core - Cloud-native robotics simulation platform compatible with Gymnasium API"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -42,7 +42,7 @@ orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
 license-files = []
 
 [tool.setuptools.package-data]
-orca_gym = [ "*.proto", "py.typed", "**/*.json"]
+orca_gym = [ "*.proto", "py.typed", "**/*.json",]
 
 [tool.setuptools.packages.find]
 include = [ "orca_gym*",]
