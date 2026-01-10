@@ -111,6 +111,7 @@ class OrcaGymLocal(OrcaGymBase):
         return model_xml_path
 
     async def init_simulation(self, model_xml_path):
+        self._xml_path = model_xml_path  # 保存 XML 路径，用于后续解析 mesh 文件路径
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
 
@@ -144,6 +145,8 @@ class OrcaGymLocal(OrcaGymBase):
         self.model.init_site_dict(site_dict)
         sensor_dict = self.query_all_sensors()
         self.model.init_sensor_dict(sensor_dict)
+        mesh_dict = self.query_all_meshes()
+        self.model.init_mesh_dict(mesh_dict)
 
         self.data = OrcaGymData(self.model)
         self._qpos_cache = np.array(self._mjData.qpos, copy=True)
@@ -743,6 +746,91 @@ class OrcaGymLocal(OrcaGymBase):
             }
 
         return sensor_dict
+    
+    def query_all_meshes(self):
+        """
+        查询所有 mesh 信息
+        
+        注意：MuJoCo Python 绑定的 mesh 对象不包含原始文件路径
+        需要从 XML 文件中解析获取
+        """
+        import xml.etree.ElementTree as ET
+        import os
+        
+        model = self._mjModel
+        mesh_dict = {}
+        
+        # 尝试从 XML 文件解析 mesh 文件路径和 scale
+        mesh_files_from_xml = {}
+        mesh_scales_from_xml = {}
+        if hasattr(self, '_xml_path') and self._xml_path and os.path.exists(self._xml_path):
+            try:
+                tree = ET.parse(self._xml_path)
+                root = tree.getroot()
+                
+                # 获取 XML 文件所在目录
+                xml_dir = os.path.dirname(os.path.abspath(self._xml_path))
+                
+                # 获取 meshdir（如果有的话）
+                meshdir = ""
+                compiler = root.find('compiler')
+                if compiler is not None:
+                    meshdir = compiler.get('meshdir', '')
+                
+                # 查找 <asset> 标签下的所有 <mesh> 定义
+                for mesh_elem in root.findall('.//asset/mesh'):
+                    mesh_name = mesh_elem.get('name')
+                    mesh_file = mesh_elem.get('file', '')
+                    mesh_scale_str = mesh_elem.get('scale', '')
+                    
+                    if mesh_name and mesh_file:
+                        # 构造绝对路径：xml_dir / meshdir / mesh_file
+                        if meshdir:
+                            full_path = os.path.join(xml_dir, meshdir, mesh_file)
+                        else:
+                            full_path = os.path.join(xml_dir, mesh_file)
+                        
+                        # 标准化路径
+                        full_path = os.path.abspath(full_path)
+                        mesh_files_from_xml[mesh_name] = full_path
+                        
+                        # 解析 scale（格式：\"0.2 0.2 0.2\"）
+                        if mesh_scale_str:
+                            try:
+                                scale_values = [float(x) for x in mesh_scale_str.split()]
+                                if len(scale_values) == 3:
+                                    mesh_scales_from_xml[mesh_name] = scale_values
+                                elif len(scale_values) == 1:
+                                    # 如果只有一个值，复制到三个维度
+                                    mesh_scales_from_xml[mesh_name] = [scale_values[0]] * 3
+                            except ValueError:
+                                _logger.warning(f"[query_all_meshes] Invalid scale format for mesh '{mesh_name}': '{mesh_scale_str}'")
+                        
+                _logger.info(f"[query_all_meshes] Parsed {len(mesh_files_from_xml)} mesh files from XML")
+                _logger.info(f"[query_all_meshes] Parsed {len(mesh_scales_from_xml)} mesh scales from XML")
+                _logger.info(f"[query_all_meshes] XML dir: {xml_dir}, meshdir: '{meshdir}'")
+            except Exception as e:
+                _logger.warning(f"[query_all_meshes] Failed to parse XML for mesh files: {e}")
+        else:
+            _logger.warning(f"[query_all_meshes] XML path not available, mesh File fields will be empty")
+        
+        # 构造 mesh_dict
+        for i in range(model.nmesh):
+            mesh = model.mesh(i)
+            
+            # 从 XML 解析结果中获取文件路径（已经是绝对路径）
+            mesh_file = mesh_files_from_xml.get(mesh.name, "")
+            
+            # 从 XML 解析结果中获取 scale
+            mesh_scale = mesh_scales_from_xml.get(mesh.name, [1.0, 1.0, 1.0])
+            
+            mesh_dict[mesh.name] = {
+                "ID": mesh.id,
+                "File": mesh_file,
+                "Scale": mesh_scale,
+            }
+        
+        return mesh_dict
     
     def update_data(self):
         self._qpos_cache[:] = self._mjData.qpos

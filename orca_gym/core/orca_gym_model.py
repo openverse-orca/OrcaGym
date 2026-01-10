@@ -30,6 +30,7 @@ class OrcaGymModel:
         self._body_dict = None
         self._joint_dict = None
         self._site_dict = None
+        self._mesh_dict = None
         self._init_time = datetime.now()
         
     def init_model_info(self, model_info):
@@ -296,6 +297,35 @@ class OrcaGymModel:
             if sensor["SensorId"] == sensor_id:
                 return sensor_name
         return None
+
+    def init_mesh_dict(self, mesh_dict):
+        self._mesh_id2name_map = {}
+        for i, (mesh_name, mesh) in enumerate(mesh_dict.items()):
+            mesh["MeshId"] = i
+            self._mesh_id2name_map[i] = mesh_name
+        self._mesh_dict = mesh_dict.copy()
+        if self.PRINT_INIT_INFO:
+            if self.PRINT_FORMATTED_INFO:
+                formatted_dict = json.dumps(mesh_dict, indent=4)
+                _logger.debug(f"Mesh dict: {formatted_dict}")
+            else:
+                _logger.debug(f"Mesh dict: {mesh_dict}")
+
+    def get_mesh_dict(self):
+        return self._mesh_dict
+
+    def get_mesh_byid(self, mesh_id: int):
+        mesh_name = self._mesh_id2name_map[mesh_id]
+        return self._mesh_dict[mesh_name]
+
+    def get_mesh_byname(self, mesh_name: str):
+        return self._mesh_dict.get(mesh_name, None)
+
+    def mesh_name2id(self, mesh_name):
+        return self._mesh_dict[mesh_name]["MeshId"]
+
+    def mesh_id2name(self, mesh_id):
+        return self._mesh_id2name_map.get(mesh_id, None)
 
     # def stip_agent_name(self, org_name):
     #     for agent in self.agent_names:
