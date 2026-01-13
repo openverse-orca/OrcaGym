@@ -1,5 +1,5 @@
 # OrcaGym 项目
-欢迎来到 OrcaGym 项目！OrcaGym 是一个基于 OpenAI Gymnasium 框架的增强型仿真环境，旨在与现有的 OpenAI Gym 仿真环境和算法无缝集成。由松颖科技开发的 OrcaStudio 提供了对多种物理引擎和光线追踪渲染的强大支持，提供物理和视觉的精确性。本文件将介绍 OrcaGym 项目的背景、目的、使用方法和重要事项。
+欢迎来到 OrcaGym 项目！OrcaGym 是一个基于 OpenAI Gymnasium 框架的增强型仿真环境，旨在与现有的 OpenAI Gym 仿真环境和算法无缝集成。由松应科技开发的 OrcaStudio 提供了对多种物理引擎和光线追踪渲染的强大支持，提供物理和视觉的精确性。本文件将介绍 OrcaGym 项目的背景、目的、使用方法和重要事项。
 
 ## 背景
 在机器人仿真领域，拥有一个多功能且精确的环境对算法的开发和测试至关重要。OpenAI Gym 一直是这一领域的基石，提供了一个标准化的强化学习（RL）任务接口。然而，随着对更多高级功能的需求，如支持多个物理引擎和高保真渲染，OrcaStudio 的开发应运而生。OrcaGym 连接了 OpenAI Gym 和 OrcaStudio，使得研究人员和开发者可以利用 OrcaStudio 的先进功能，同时保持与 OpenAI Gym 环境和算法的兼容性。
