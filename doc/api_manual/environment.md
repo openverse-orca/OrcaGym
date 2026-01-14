@@ -1,25 +1,45 @@
 # OrcaGym API Manual: `orca_gym/environment`
 
-本页为面向人类阅读的 API 手册（Markdown），版式尽量接近网页 API 文档：
+> **📖 这是什么文档？**  
+> 这是 `orca_gym/environment` 模块的完整 API 参考手册，采用“索引 + 详情”的版式设计，便于快速查找和深入学习。
 
-- 先索引（便于扫描）→ 再展开详情（便于查阅）
+## 📚 文档说明
 
-- 默认剔除 `remote` 相关模块
+### 文档特点
 
-- 仅列出 public 符号
+- **索引优先**：每个模块和类都提供索引表格，方便快速浏览和定位
+- **详情展开**：点击或展开详情部分，查看完整的方法签名、参数说明和使用示例
+- **面向本地环境**：本手册主要覆盖本地环境实现（`OrcaGymLocalEnv`），远程环境（`OrcaGymRemoteEnv`）相关内容已省略
+- **仅公开接口**：只列出 public 符号（不以下划线开头），聚焦实际可用的 API
 
+### 如何使用本手册
 
-## Modules（索引）
+1. **快速查找**：使用下方的模块索引表格，找到你需要的模块
+2. **浏览类列表**：进入模块后，先看“Classes（索引）”表格，了解有哪些类
+3. **查看方法**：每个类都有“方法索引”表格，快速了解可用方法
+4. **深入阅读**：展开“方法详情”部分，查看完整的签名、参数说明和使用示例
 
-| Module | 摘要 |
+### 相关文档
+
+- **快速概览**：查看 [`API_REFERENCE.md`](../API_REFERENCE.md) 了解整体架构和典型调用链
+- **详细参考**：查看 [`api_detail/environment.md`](../api_detail/environment.md) 获取自动生成的完整 API 签名列表
+- **Core 模块**：查看 [`api_manual/core.md`](core.md) 了解底层核心接口
+
+---
+
+## 📦 Modules（索引）
+
+快速浏览所有模块，点击模块名跳转到详细内容：
+
+| Module | 说明 |
 | --- | --- |
-| `orca_gym/environment/async_env/orca_gym_async_agent.py` | _No docstring._ |
-| `orca_gym/environment/async_env/orca_gym_async_env.py` | _No docstring._ |
-| `orca_gym/environment/async_env/orca_gym_vector_env.py` | _No docstring._ |
-| `orca_gym/environment/async_env/single_agent_env_runner.py` | _No docstring._ |
-| `orca_gym/environment/async_env/subproc_vec_env.py` | _No docstring._ |
-| `orca_gym/environment/orca_gym_env.py` | _No docstring._ |
-| `orca_gym/environment/orca_gym_local_env.py` | _No docstring._ |
+| [`orca_gym/environment/orca_gym_env.py`](#orca_gymenvironmentorca_gym_envpy) | **基础环境类**：所有 OrcaGym 环境的基类，提供 Gymnasium 标准接口 |
+| [`orca_gym/environment/orca_gym_local_env.py`](#orca_gymenvironmentorca_gym_local_envpy) | **本地环境实现**：绑定本地 MuJoCo backend 的完整环境实现（最常用） |
+| [`orca_gym/environment/async_env/orca_gym_async_agent.py`](#orca_gymenvironmentasync_envorca_gym_async_agentpy) | **异步智能体**：异步环境中的智能体封装 |
+| [`orca_gym/environment/async_env/orca_gym_async_env.py`](#orca_gymenvironmentasync_envorca_gym_async_envpy) | **异步环境**：支持多智能体异步执行的环境实现 |
+| [`orca_gym/environment/async_env/orca_gym_vector_env.py`](#orca_gymenvironmentasync_envorca_gym_vector_envpy) | **向量化环境**：将多个环境包装为 Gymnasium VectorEnv 接口 |
+| [`orca_gym/environment/async_env/subproc_vec_env.py`](#orca_gymenvironmentasync_envsubproc_vec_envpy) | **多进程向量环境**：基于多进程的向量化环境实现 |
+| [`orca_gym/environment/async_env/single_agent_env_runner.py`](#orca_gymenvironmentasync_envsingle_agent_env_runnerpy) | **单智能体运行器**：为 RLLib 等框架提供的单智能体环境运行器 |
 
 ---
 

@@ -3,8 +3,20 @@
 > 本文件是 **单文件 API Reference**，用于开发者快速查接口，也便于 AI 检索与引用。  
 > 文档范围以 `orca_gym` 里 **相对稳定的 core + local env** 为主；远程（`OrcaGymRemote`）相关内容本文件暂不展开。
 
+## 0. 文档导航（索引/细节/手册）
+
+本仓库的 API 文档分为三层，本文件属于“摘要 + 关键链路（Recipes）”。需要全量符号索引、完整签名与 docstring 时，跳转到下列文档：
+
+- **API Flat（平铺索引）**：按模块平铺列出符号清单（用于快速定位名字）  
+  - `doc/api_flat/INDEX.md`（相对路径：[`./api_flat/INDEX.md`](./api_flat/INDEX.md)）
+- **API Detail（细节参考）**：每个符号包含 **签名 + docstring（原样收录）**（用于工具无法读代码时的“离线参考”）  
+  - `doc/api_detail/INDEX.md`（相对路径：[`./api_detail/INDEX.md`](./api_detail/INDEX.md)）
+- **API Manual（手册版）**：更偏“浏览体验”的手册式排版（用于人工阅读）  
+  - `doc/api_manual/INDEX.md`（相对路径：[`./api_manual/INDEX.md`](./api_manual/INDEX.md)）
+
 ## 目录
 
+- [0. 文档导航（索引/细节/手册）](#0-文档导航索引细节手册)
 - [1. 总览](#1-总览)
 - [2. 关键概念与术语](#2-关键概念与术语)
 - [3. 顶层公共入口 (`orca_gym`)](#3-顶层公共入口-orca_gym)
