@@ -1,0 +1,2 @@
+本示例原项目地址：git@github.com:engineai-robotics/engineai_legged_gym.git
+主要将由isaacgym训练的机器人PPO模型移植到orcagym环境中。
