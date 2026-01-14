@@ -17,7 +17,7 @@ class OrcaGymData:
             - qacc (关节加速度): 所有关节的广义加速度，对应 qvel 的导数
             - qfrc_bias (偏置力): 包括重力、科里奥利力、离心力等被动力，用于动力学计算
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:208-214):
+        使用示例:
             ```python
             # 获取当前状态
             state = {
@@ -28,7 +28,7 @@ class OrcaGymData:
             }
             ```
         
-        使用示例 (参考 envs/xbot_gym/xbot_simple_env.py:200-201):
+        使用示例:
             ```python
             # 获取特定关节的状态
             q = self.data.qpos[-12:].astype(np.float64)  # 最后12个关节位置

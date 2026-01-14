@@ -26,7 +26,6 @@
   - [6.6 观测构建链：从 data/model/sensor 拼观测](#66-观测构建链从-datamodelsensor-拼观测)
   - [6.7 接触/外力链：contact → contact_force/cfrc_ext](#67-接触外力链contact--contact_forcecfrc_ext)
   - [6.8 常见“数据不同步”问题自检表](#68-常见数据不同步问题自检表)
-- [7. 常见用法索引（从 examples/envs 反向查接口）](#7-常见用法索引从-examplesenvs-反向查接口)
 
 ---
 
@@ -220,7 +219,7 @@ OrcaGym 的核心形态是：**Gymnasium 环境（Python）** 驱动 **MuJoCo �
 #### 4.4.1 与环境时间的关系
 
 - `env.dt = env.gym.opt.timestep * env.frame_skip`
-- 如果你在策略侧使用控制频率：`control_hz = 1 / env.dt`（常见于 `examples/`）
+- 策略侧控制频率可按 `control_hz = 1 / env.dt` 计算。
 
 ---
 
@@ -288,7 +287,7 @@ OrcaGym 的核心形态是：**Gymnasium 环境（Python）** 驱动 **MuJoCo �
 
 #### 4.5.5 方法字典（建议作为“查接口”主入口）
 
-下面按“你在开发中最常问的问题”组织，每个条目尽量保持 **一句话目的 + 关键注意点**。
+按主题分组如下：
 
 ##### A) 资源/模型加载与缓存
 
@@ -333,7 +332,7 @@ OrcaGym 的核心形态是：**Gymnasium 环境（Python）** 驱动 **MuJoCo �
 
 - `update_data()`
   - **目的**：将 `_mjData.{qpos,qvel,qacc,qfrc_bias,time}` 同步到 `self.data`
-  - **注意**：如果你只改了 `_mjData`，不调用它，`self.data` 仍是旧值
+  - **注意**：若仅修改 `_mjData` 而未调用该方法，`self.data` 仍可能保持旧值
 
 ##### D) 状态设置（qpos/qvel）与一致性
 
@@ -347,7 +346,7 @@ OrcaGym 的核心形态是：**Gymnasium 环境（Python）** 驱动 **MuJoCo �
 - `load_initial_frame()`
   - **目的**：reset 到初始状态（MuJoCo `mj_resetData`）
 
-##### E) 常用查询（你要观测/奖励/控制就会用）
+##### E) 常用查询（观测/奖励/控制常用）
 
 - `query_joint_qpos(joint_names)` / `query_joint_qvel(joint_names)` / `query_joint_qacc(joint_names)`
   - **返回**：`{joint_name: np.ndarray}`（不同关节类型长度不同）
@@ -533,9 +532,9 @@ env.reset()
 ```python
 import gymnasium as gym
 
-# 示例：用你已经注册好的 env_id（参考 examples/ 或 envs/ 注册逻辑）
+# 使用已注册的 env_id（例如任务环境 ID）
 env = gym.make(
-    "LeggedGym-v0",
+    "YOUR_ENV_ID",
     frame_skip=5,
     orcagym_addr="localhost:50051",
     agent_names=["agent0"],
@@ -567,8 +566,6 @@ action (policy 输出)
 参考：
 
 - `orca_gym/environment/orca_gym_local_env.py`：`do_simulation`
-- `envs/legged_gym/legged_sim_env.py`：`do_simulation(self.ctrl, self.frame_skip)` 用法
-- `envs/xbot_gym/xbot_simple_env.py`：decimation 多次物理步进用法
 
 最小代码片段（标准 Gym step loop）：
 
@@ -577,7 +574,7 @@ import numpy as np
 import gymnasium as gym
 
 env = gym.make(
-    "LeggedGym-v0",
+    "YOUR_ENV_ID",
     frame_skip=5,
     orcagym_addr="localhost:50051",
     agent_names=["agent0"],
@@ -596,12 +593,12 @@ for _ in range(100):
 
 ### 6.3 修改状态链：set_qpos/qvel 后为什么要 mj_forward
 
-当你直接修改状态（例如 reset、mocap 更新、关节设定）后：
+当直接修改状态（例如 reset、mocap 更新、关节设定）后：
 
 ```
 set_joint_qpos / set_joint_qvel / set_mocap_pos_and_quat
   -> mj_forward()
-  -> (可选) update_data()  # 如果你后续要从 env.data 读取
+  -> (可选) update_data()  # 若后续需要从 env.data 读取
 ```
 
 原因：
@@ -619,7 +616,7 @@ set_joint_qpos / set_joint_qvel / set_mocap_pos_and_quat
 ```python
 import numpy as np
 
-# 假设你已经有 env（OrcaGymLocalEnv），且想设置某些关节到目标位置
+# 前置：已有 env（OrcaGymLocalEnv），并需将部分关节设置到目标位置
 # joint_qpos = {"hip_joint": np.array([0.1], dtype=np.float64), ...}
 joint_qpos = {}
 
@@ -644,7 +641,7 @@ env.render()
   -> env.do_body_manipulation()      # 一些交互逻辑在这里处理
 ```
 
-因此如果你依赖“场景交互”，但 `render_mode` 不是 human/force 或者渲染频率过低，你可能会观察到：
+因此，当依赖“场景交互”但 `render_mode` 非 human/force，或渲染频率过低时，可能出现：
 
 - UI 操作没生效
 - override 控制没进入 `set_ctrl`
@@ -661,7 +658,7 @@ import time
 import gymnasium as gym
 
 env = gym.make(
-    "LeggedGym-v0",
+    "YOUR_ENV_ID",
     frame_skip=5,
     orcagym_addr="localhost:50051",
     agent_names=["agent0"],
@@ -719,7 +716,7 @@ anchor_type = AnchorType.WELD  # 或 AnchorType.BALL
 env.anchor_actor(actor_name, anchor_type)
 
 # 3) 通过 mocap 移动锚点（驱动物体跟随）
-# 注意：这里 mocap 名称需要与你模型一致；多数场景 env 内部会封装好 anchor body 名称
+# 注意：mocap 名称需与模型一致；多数场景会在 env 内部封装好 anchor body 名称
 env.set_mocap_pos_and_quat({
     env._anchor_body_name: {  # 这是 OrcaGymLocalEnv 里的默认锚点名（模型里需存在）
         "pos": np.array([0.5, 0.0, 0.8], dtype=np.float64),
@@ -734,7 +731,7 @@ env.update_data()
 
 ### 6.6 观测构建链：从 data/model/sensor 拼观测
 
-你在自定义环境时，最常见的观测来源是：
+自定义环境时，常见的观测来源包括：
 
 - `env.data.qpos/qvel/qacc/qfrc_bias/time`
 - `env.model` 的结构信息（关节列表、索引/adr、执行器范围等）
@@ -753,7 +750,6 @@ do_simulation(...) / update_data()
 参考：
 
 - `orca_gym/environment/orca_gym_env.py`：`generate_observation_space`
-- `envs/legged_gym/legged_sim_env.py`、`envs/xbot_gym/xbot_simple_env.py`：从 `data` 取状态构建观测的典型写法
 
 最小代码片段（从 data 拼一个 numpy 观测）：
 
@@ -808,27 +804,11 @@ print("cfrc_ext shape:", cfrc_ext.shape)
 
 ### 6.8 常见“数据不同步”问题自检表
 
-如果你遇到“读到旧状态 / 观测跳变 / 位姿不对”，优先检查：
+若出现“读到旧状态 / 观测跳变 / 位姿不对”，优先检查：
 
-- 你是否在 `mj_step/do_simulation` 后 **调用了 `update_data()`**？
-- 你是否修改了 `qpos/qvel/mocap` 后 **调用了 `mj_forward()`**？
-- 你是否在使用 `env.data.qpos` 时忘记 `copy()`，导致后续被覆盖？
-- 你是否在多线程/多进程环境里并发读写同一个 env（不推荐）？
+- 是否在 `mj_step/do_simulation` 后 **调用了 `update_data()`**？
+- 是否在修改 `qpos/qvel/mocap` 后 **调用了 `mj_forward()`**？
+- 读取 `env.data.qpos` 时是否遗漏 `copy()`，导致后续被覆盖？
+- 是否在多线程/多进程环境中并发读写同一 env（不推荐）？
 
 ---
-
-## 7. 常见用法索引（从 examples/envs 反向查接口）
-
-下面是“你想做某件事”时通常会用到的入口（文件路径仅作索引，具体实现以源码为准）：
-
-- **根据 actuator ctrl range 构建动作空间**
-  - `envs/realman/rm65b_joystick_env.py`：使用 `model.get_actuator_ctrlrange()` + `generate_action_space`
-
-- **仿真步进（控制 → 物理步 → 同步 data）**
-  - `envs/legged_gym/legged_sim_env.py`：`do_simulation(self.ctrl, self.frame_skip)` + `gym.update_data()`
-  - `envs/xbot_gym/xbot_simple_env.py`：多次 decimation 步进
-
-- **抓取/锚定（mocap + 等式约束）**
-  - `orca_gym/environment/orca_gym_local_env.py`：锚点 body + 等式约束更新流程
-
-

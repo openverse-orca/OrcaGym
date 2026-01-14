@@ -39,7 +39,7 @@ def get_qpos_size(joint_type):
         - BALL 关节: 4个元素 (四元数)
         - SLIDE/HINGE 关节: 1个元素 (单个标量)
     
-    使用示例 (参考 orca_gym/core/orca_gym_local.py:798-800):
+    使用示例:
         ```python
         # 查询关节在 qpos 中的长度
         joint_type = self._mjModel.jnt_type[joint_id]
@@ -66,7 +66,7 @@ def get_dof_size(joint_type):
         - BALL 关节: 3个自由度 (3个旋转)
         - SLIDE/HINGE 关节: 1个自由度 (单个标量)
     
-    使用示例 (参考 orca_gym/core/orca_gym_local.py:798-800):
+    使用示例:
         ```python
         # 查询关节的自由度数量
         joint_type = self._mjModel.jnt_type[joint_id]
@@ -92,7 +92,7 @@ class AnchorType:
         - WELD: 焊接锚定，完全固定位置和姿态
         - BALL: 球关节锚定，固定位置但允许旋转
     
-    使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:288-312):
+    使用示例:
         ```python
         # 使用焊接锚定抓取物体
         self.anchor_actor("object_name", AnchorType.WELD)
@@ -115,7 +115,7 @@ class CaptureMode:
         - 同步模式 (SYNC): 每个相机帧都与仿真步进对齐，性能较低但帧对齐
         - 异步模式 (ASYNC): 相机帧独立捕获，性能较高但可能不完全对齐
     
-    使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:128-132):
+    使用示例:
         ```python
         # 开始保存视频，使用异步模式（默认，性能更好）
         env.begin_save_video("output.mp4", CaptureMode.ASYNC)
@@ -142,7 +142,7 @@ def get_eq_type(anchor_type: AnchorType):
     Returns:
         mujoco.mjtEq: 对应的等式约束类型
     
-    使用示例 (参考 orca_gym/core/orca_gym_local.py:331):
+    使用示例:
         ```python
         # 在更新等式约束时使用
         eq_type = get_eq_type(AnchorType.WELD)  # 返回 mjEQ_WELD
@@ -177,7 +177,7 @@ class OrcaGymLocal(OrcaGymBase):
         - 提供封装后的模型和数据对象 (self.model, self.data)
         - 支持控制覆盖 (override_ctrls)，允许外部控制特定执行器
     
-    使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:104):
+    使用示例:
         ```python
         # 在环境初始化时创建
         self.gym = OrcaGymLocal(self.stub)
@@ -204,7 +204,7 @@ class OrcaGymLocal(OrcaGymBase):
             - _mjData: MuJoCo 数据对象，包含所有动态仿真状态
             - override_ctrls: 控制覆盖字典，允许外部覆盖特定执行器的控制值
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:104):
+        使用示例:
             ```python
             # 在环境初始化时创建
             self.stub = GrpcServiceStub(self.channel)
@@ -233,7 +233,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             model_xml_path: 模型 XML 文件的本地路径
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:88-91):
+        使用示例:
             ```python
             # 在环境初始化时调用
             model_xml_path = await self.gym.load_model_xml()
@@ -261,7 +261,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             model_xml_path: 模型 XML 文件的路径
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:93-95):
+        使用示例:
             ```python
             # 在环境初始化时调用
             model_xml_path = await self.gym.load_model_xml()
@@ -319,7 +319,7 @@ class OrcaGymLocal(OrcaGymBase):
         将当前的关节位置和仿真时间发送到服务器，用于可视化。
         同时接收服务器返回的控制覆盖值（如果用户在界面中手动控制）。
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:221, 228):
+        使用示例:
             ```python
             # 在环境的 render 方法中调用
             await self.gym.render()
@@ -580,7 +580,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             time_step: 时间步长（秒），通常为 0.001-0.01
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:368-373):
+        使用示例:
             ```python
             # 在环境初始化时设置
             self.gym.set_time_step(0.001)  # 1000 Hz
@@ -623,7 +623,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             response: gRPC 响应对象
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:372):
+        使用示例:
             ```python
             # 在设置时间步长时同步到服务器
             await self.gym.set_timestep_remote(0.001)
@@ -720,7 +720,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             model_info: 包含所有维度信息的字典
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:127-129):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             model_info = self.query_model_info()
@@ -765,7 +765,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             equality_constraints: 等式约束列表，每个元素包含约束的详细信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:131-132):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             eq_list = self.query_all_equality_constraints()
@@ -815,7 +815,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             actuator_dict: 执行器字典，键为执行器名称，值为执行器信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:135-136):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             actuator_dict = self.query_all_actuators()
@@ -947,7 +947,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             body_dict: body 字典，键为 body 名称，值为 body 信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:137-138):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             body_dict = self.query_all_bodies()
@@ -1003,7 +1003,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             joint_dict: 关节字典，键为关节名称，值为关节信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:139-140):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             joint_dict = self.query_all_joints()
@@ -1053,7 +1053,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             geom_dict: 几何体字典，键为几何体名称，值为几何体信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:141-142):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             geom_dict = self.query_all_geoms()
@@ -1104,7 +1104,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             site_dict: site 字典，键为 site 名称，值为 site 信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:143-144):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             site_dict = self.query_all_sites()
@@ -1144,7 +1144,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             sensor_dict: 传感器字典，键为传感器名称，值为传感器信息
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:145-146):
+        使用示例:
             ```python
             # 在初始化仿真时调用
             sensor_dict = self.query_all_sensors()
@@ -1178,7 +1178,7 @@ class OrcaGymLocal(OrcaGymBase):
             - 缓存: 使用 _qpos_cache 等数组作为中间缓存，避免频繁分配内存
             - qfrc_bias: 偏置力，包括重力、科里奥利力等被动力
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:190, 375-377):
+        使用示例:
             ```python
             # 在仿真步进后调用，同步最新状态
             self.gym.mj_step(nstep)
@@ -1224,7 +1224,7 @@ class OrcaGymLocal(OrcaGymBase):
         术语说明:
             - mj_resetData: MuJoCo 的重置函数，将所有动态数据重置为初始值
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:379-382):
+        使用示例:
             ```python
             # 在重置仿真时调用
             self.gym.load_initial_frame()
@@ -1279,7 +1279,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             body_pos_mat_quat_list: 字典，键为 body 名称，值为包含 'Pos'、'Mat'、'Quat' 的字典
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:397-406):
+        使用示例:
             ```python
             # 在环境的方法中调用
             body_dict = self.gym.query_body_xpos_xmat_xquat(["base_link"])
@@ -1317,7 +1317,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             sensor_data_dict: 字典，键为传感器名称，值为传感器数据数组
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:408-410):
+        使用示例:
             ```python
             # 查询 IMU 传感器数据
             sensor_data = self.gym.query_sensor_data(["imu_accelerometer", "imu_gyro"])
@@ -1349,7 +1349,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             ctrl: 控制输入数组，形状 (nu,)
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:349-350):
+        使用示例:
             ```python
             # 在仿真步进前设置控制
             self.gym.set_ctrl(action)  # action 形状: (nu,)
@@ -1376,7 +1376,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             nstep: 步进次数，通常为 1 或 frame_skip
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:352-353):
+        使用示例:
             ```python
             # 在 do_simulation 中调用
             self.gym.set_ctrl(ctrl)
@@ -1396,7 +1396,7 @@ class OrcaGymLocal(OrcaGymBase):
             - 前向计算: 根据当前状态和输入计算下一时刻的状态
             - 包括: 正向运动学、动力学、约束等计算
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:355-356):
+        使用示例:
             ```python
             # 在设置状态后调用
             self.gym.set_joint_qpos(qpos)
@@ -1489,7 +1489,7 @@ class OrcaGymLocal(OrcaGymBase):
             jacr: 输出数组，用于存储旋转雅可比，形状 (3, nv)
             site_id: site 的 ID
         
-        使用示例 (参考 orca_gym/core/orca_gym_local.py:918-925):
+        使用示例:
             ```python
             # 计算 site 的雅可比矩阵
             site_id = self._mjModel.site("end_effector").id
@@ -1586,7 +1586,7 @@ class OrcaGymLocal(OrcaGymBase):
             old_obj1_id, old_obj2_id: 原约束的两个 body ID
             new_obj1_id, new_obj2_id: 新约束的两个 body ID
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:325-330):
+        使用示例:
             ```python
             # 修改约束以连接物体
             self.gym.modify_equality_objects(
@@ -1617,7 +1617,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             constraint_list: 约束列表，每个元素包含 obj1_id、obj2_id、eq_data、eq_type
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:346):
+        使用示例:
             ```python
             # 更新约束列表
             eq_list = self.model.get_eq_list()
@@ -1670,7 +1670,7 @@ class OrcaGymLocal(OrcaGymBase):
             mocap_data: 字典，键为 mocap body 名称，值为包含 'pos' 和 'quat' 的字典
             send_remote: 是否同步到远程服务器（用于渲染）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:521-523):
+        使用示例:
             ```python
             # 设置锚点位置
             await self.gym.set_mocap_pos_and_quat({
@@ -1707,7 +1707,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             contacts: 接触信息列表，每个元素包含接触 ID、维度、几何体 ID 等
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:525-526):
+        使用示例:
             ```python
             # 查询当前所有接触
             contacts = self.gym.query_contact_simple()
@@ -1762,7 +1762,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             contact_force_dict: 字典，键为接触 ID，值为6维力向量
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:534-536):
+        使用示例:
             ```python
             # 查询接触力
             contact_ids = [0, 1, 2]  # 接触点 ID
@@ -1791,7 +1791,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             cfrc_ext: 外部约束力数组，形状 (nbody, 6)
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:538-540):
+        使用示例:
             ```python
             # 获取所有 body 的外部约束力
             cfrc_ext = self.gym.get_cfrc_ext()
@@ -1817,7 +1817,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             actuator_torques: 字典，键为执行器名称，值为6维扭矩向量
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:542-544):
+        使用示例:
             ```python
             # 查询执行器扭矩
             torques = self.gym.query_actuator_torques(["joint1_actuator", "joint2_actuator"])
@@ -1877,7 +1877,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             combined_vel: 6维速度向量，前3个为线速度，后3个为角速度（基座坐标系）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:554-555):
+        使用示例:
             ```python
             # 查询末端执行器相对于基座的速度
             vel_B = self.gym.query_velocity_body_B("end_effector", "base_link")
@@ -1922,7 +1922,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             relative_pos: 相对位置数组 [x, y, z]（基座坐标系）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:557-559):
+        使用示例:
             ```python
             # 查询末端执行器相对于基座的位置
             pos_B = self.gym.query_position_body_B("end_effector", "base_link")
@@ -1960,7 +1960,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             relative_quat: 相对四元数 [x, y, z, w]（基座坐标系）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:561-563):
+        使用示例:
             ```python
             # 查询末端执行器相对于基座的姿态
             quat_B = self.gym.query_orientation_body_B("end_effector", "base_link")
@@ -2023,7 +2023,7 @@ class OrcaGymLocal(OrcaGymBase):
             linear_vel_odom: 线速度 [vx, vy, vz]（里程计坐标系）
             angular_vel_odom: 角速度 [wx, wy, wz]（里程计坐标系）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:569-571):
+        使用示例:
             ```python
             # 查询机器人速度（相对于初始位置）
             linear, angular = self.gym.query_robot_velocity_odom(
@@ -2062,7 +2062,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             pos_odom: 位置 [x, y, z]（里程计坐标系）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:573-575):
+        使用示例:
             ```python
             # 查询机器人位置（相对于初始位置）
             pos_odom = self.gym.query_robot_position_odom(
@@ -2097,7 +2097,7 @@ class OrcaGymLocal(OrcaGymBase):
         Returns:
             quat_odom: 四元数 [x, y, z, w]（里程计坐标系，SciPy 格式）
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:577-579):
+        使用示例:
             ```python
             # 查询机器人姿态（相对于初始姿态）
             quat_odom = self.gym.query_robot_orientation_odom(

@@ -43,7 +43,7 @@ class OrcaGymOptConfig:
         6. 碰撞检测: ccd_tolerance, ccd_iterations
         7. 其他: jacobian, cone, disableflags, enableflags
     
-    使用示例 (参考 orca_gym/environment/orca_gym_env.py:290):
+    使用示例:
         ```python
         # 访问时间步长
         dt = self.gym.opt.timestep * self.frame_skip

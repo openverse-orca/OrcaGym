@@ -18,7 +18,7 @@ def main():
     # 检查参数
     if len(sys.argv) != 3:
         _logger.info("用法: python rename_dirs.py <相对路径> <目标目录名>")
-        _logger.info("示例: python rename_dirs.py examples/openpi/records_tmp/ shop")
+        _logger.info("示例: python rename_dirs.py <INPUT_DIR> <PREFIX>")
         sys.exit(1)
     
     relative_path = sys.argv[1].strip('/')  # 去除可能的末尾斜杠

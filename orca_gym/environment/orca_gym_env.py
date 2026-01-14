@@ -108,7 +108,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
             - Box Space: 连续动作空间，每个维度有上下界限制
             - 动作: 发送给执行器的控制命令，通常是扭矩、位置或速度
         
-        使用示例 (参考 envs/realman/rm65b_joystick_env.py:134):
+        使用示例:
             ```python
             # 根据执行器控制范围生成动作空间
             ctrlrange = self.model.get_actuator_ctrlrange()
@@ -132,7 +132,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
             - Dict Space: 字典类型的观测空间，包含多个子空间
             - Box Space: 连续观测空间，每个维度有上下界限制
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:103):
+        使用示例:
             ```python
             # 根据观测数据生成观测空间
             obs = self._get_obs()  # 获取示例观测
@@ -276,7 +276,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
             - frame_skip: 每次 Gym step() 执行的物理步进次数，用于加速仿真
             - 控制频率: 1/dt，表示每秒执行多少次控制更新
         
-        使用示例 (参考 examples/legged_gym/run_legged_sim.py:43):
+        使用示例:
             ```python
             # 计算控制频率
             REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP

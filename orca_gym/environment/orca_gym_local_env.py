@@ -196,7 +196,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             ctrl: 控制输入数组，形状 (nu,)，nu 为执行器数量
             n_frames: 步进次数，通常等于 frame_skip
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:179):
+        使用示例:
             ```python
             # 在 step 函数中执行仿真
             for _ in range(self._action_skip):
@@ -207,7 +207,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
                 self.do_simulation(self.ctrl, self.frame_skip)
             ```
         
-        使用示例 (参考 envs/xbot_gym/xbot_simple_env.py):
+        使用示例:
             ```python
             # 在 step 中执行多次物理步进（decimation）
             for _ in range(self.decimation):
@@ -386,7 +386,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         设置所有执行器的控制值，形状必须为 (nu,)，其中 nu 是执行器数量。
         通常在调用 mj_step() 之前设置。
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:152-154):
+        使用示例:
             ```python
             # 在重置时清零控制
             self.ctrl = np.zeros(self.nu)
@@ -394,7 +394,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             self.mj_forward()
             ```
         
-        使用示例 (参考 envs/xbot_gym/xbot_simple_env.py:91):
+        使用示例:
             ```python
             # 准备控制数组
             self.ctrl = np.zeros(self.nu, dtype=np.float32)
@@ -411,7 +411,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         执行 nstep 次物理仿真步进，每次步进的时间为 timestep。
         在调用前需要先设置控制输入 (set_ctrl)。
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:179):
+        使用示例:
             ```python
             # 在 step 函数中执行仿真
             self.set_ctrl(self.ctrl)
@@ -427,7 +427,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         更新所有动力学相关状态，包括位置、速度、加速度、力等。
         在设置关节状态、mocap 位置等操作后需要调用，确保状态一致。
         
-        使用示例 (参考 envs/legged_gym/legged_sim_env.py:83, 154, 246):
+        使用示例:
             ```python
             # 在初始化时调用，避免 NaN 错误
             self.mj_forward()
@@ -472,7 +472,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             - 雅可比矩阵: 详见 mj_jacBody 的说明
             - Site: 标记点，详见 init_site_dict 的说明
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:487-492):
+        使用示例:
             ```python
             # 计算 site 的雅可比矩阵用于速度计算
             query_dict = self.gym.mj_jac_site(["end_effector"])
@@ -503,7 +503,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         从 OrcaSim 服务器获取最新的 qpos、qvel、qacc 等状态数据，
         更新到本地的 self.data 中。在每次仿真步进后自动调用。
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:190):
+        使用示例:
             ```python
             # 在 do_simulation 中自动调用
             self._step_orca_sim_simulation(ctrl, n_frames)
@@ -523,7 +523,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         加载初始帧，同步数据，并重新设置时间步长。
         在环境 reset() 时调用，将仿真恢复到初始状态。
         
-        使用示例 (参考 orca_gym/environment/orca_gym_env.py:165):
+        使用示例:
             ```python
             # 在 reset 函数中调用
             def reset(self, seed=None, options=None):
@@ -543,7 +543,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         在环境初始化时调用，保存初始状态用于后续重置。
         保存的值可以通过 self.init_qpos 和 self.init_qvel 访问。
         
-        使用示例 (参考 orca_gym/environment/orca_gym_env.py:68):
+        使用示例:
             ```python
             # 在 __init__ 中调用
             self.model, self.data = self.initialize_simulation()
@@ -591,7 +591,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             xmat: 旋转矩阵数组，形状 (len(body_name_list)*9,)，每9个元素为一个 body 的 3x3 矩阵（按行展开）
             xquat: 四元数数组，形状 (len(body_name_list)*4,)，每4个元素为一个 body 的 [w, x, y, z]
         
-        使用示例 (参考 examples/replicator/cameras_env.py:159, 168):
+        使用示例:
             ```python
             # 获取相机 body 的位姿
             camera_pos, _, camera_quat = self.get_body_xpos_xmat_xquat([self._camera_body_name])
@@ -599,14 +599,14 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             # camera_quat: [w, x, y, z]
             ```
         
-        使用示例 (参考 envs/xbot_gym/xbot_simple_env.py:456):
+        使用示例:
             ```python
             # 获取基座位置用于计算高度
             base_pos, _, _ = self.get_body_xpos_xmat_xquat([self.base_body_name])
             real_base_z = float(base_pos[2])  # z 坐标
             ```
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:249, 292):
+        使用示例:
             ```python
             # 获取锚点 body 的位姿用于物体操作
             anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
@@ -914,7 +914,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
                 - pos: 位置数组 [x, y, z]
                 - quat: 四元数 [w, x, y, z]
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:260-265, 275-280):
+        使用示例:
             ```python
             # 设置锚点位置用于物体操作
             self.set_mocap_pos_and_quat({

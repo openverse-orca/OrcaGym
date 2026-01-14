@@ -56,7 +56,7 @@ class OrcaGymModel:
             - 常见类型: CONNECT (球关节连接)、WELD (焊接固定)、JOINT (关节耦合) 等
             - 用途: 实现抓取、固定物体等操作，通过约束将两个 body 连接在一起
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:316-347):
+        使用示例:
             ```python
             # 获取等式约束列表用于物体操作
             eq_list = self.model.get_eq_list()
@@ -81,7 +81,7 @@ class OrcaGymModel:
         术语说明:
             - 等式约束: 用于连接两个 body 的约束关系，详见 init_eq_list 的说明
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:316):
+        使用示例:
             ```python
             # 获取约束列表用于修改
             eq_list = self.model.get_eq_list()
@@ -102,7 +102,7 @@ class OrcaGymModel:
             - 用途: 用于物体操作，通过等式约束将 mocap body 与真实物体连接，移动 mocap body 即可控制物体
             - 常见应用: 抓取、拖拽、移动物体等操作
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:260-265):
+        使用示例:
             ```python
             # 设置 mocap body 位置用于物体操作
             self.set_mocap_pos_and_quat({
@@ -171,7 +171,7 @@ class OrcaGymModel:
         
         将执行器名称转换为对应的 ID，用于设置控制输入。
         
-        使用示例 (参考 envs/realman/rm65b_joystick_env.py:67-70):
+        使用示例:
             ```python
             # 获取执行器 ID 列表用于控制
             self._arm_actuator_id = [
@@ -234,7 +234,7 @@ class OrcaGymModel:
         
         将 body 名称转换为对应的 ID，用于需要 ID 的底层操作。
         
-        使用示例 (参考 orca_gym/environment/orca_gym_local_env.py:323-324):
+        使用示例:
             ```python
             # 在更新等式约束时使用
             body_id = self.model.body_name2id(actor_name)
@@ -338,7 +338,7 @@ class OrcaGymModel:
         
         返回可迭代的 body 名称集合，用于查找特定 body 或遍历所有 body。
         
-        使用示例 (参考 envs/xbot_gym/xbot_simple_env.py:108-127):
+        使用示例:
             ```python
             # 查找包含特定关键词的 body
             all_bodies = self.model.get_body_names()
@@ -348,7 +348,7 @@ class OrcaGymModel:
                     break
             ```
         
-        使用示例 (参考 examples/replicator/lights_env.py):
+        使用示例:
             ```python
             # 遍历所有 body 进行查询
             for body_name in self.model.get_body_names():
@@ -379,7 +379,7 @@ class OrcaGymModel:
             - 控制范围: 执行器能够接受的最小和最大控制值，超出范围会被截断
             - nu: 执行器数量，等于动作空间的维度
         
-        使用示例 (参考 envs/realman/rm65b_joystick_env.py:73-77):
+        使用示例:
             ```python
             # 获取执行器控制范围并定义动作空间
             all_actuator_ctrlrange = self.model.get_actuator_ctrlrange()
