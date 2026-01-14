@@ -8,197 +8,13 @@
 
 ---
 
-## `orca_gym/core/orca_gym.py`
-
-中文概览：核心层：Model/Data/Local backend 与 MuJoCo 控制查询接口。
-
-### Classes
-
-<details>
-<summary>class OrcaGymBase</summary>
-
-
-gRPC 基础封装（local/remote backend 的基类）。
-
-用途：
-- 作为 `OrcaGymLocal` 的基类，封装最基础的 gRPC 调用与 model/opt/data 指针。
-- 提供通用的异步接口（pause_simulation、set_qpos/qvel、mj_forward/inverse/step 等）。
-
-关键属性（由子类填充）：
-- `stub`：gRPC 服务存根，用于与服务端通信
-- `model`：`OrcaGymModel` 对象（静态模型信息）
-- `opt`：`OrcaGymOptConfig` 对象（MuJoCo 优化配置）
-- `data`：`OrcaGymData` 对象（动态仿真状态）
-
-术语速查（面向首次接触 gRPC/异步编程的读者）：
-- gRPC / stub：gRPC 是远程过程调用框架；stub 是客户端存根，用于调用远程服务（类似“函数代理”）
-- 异步方法（async/await）：异步方法需要 `await` 调用，不会阻塞当前线程；常用于网络 I/O 操作
-- 被动模式：OrcaGym 采用“被动模式”，仿真状态初始为 PAUSED，由 Gym 的 `step()` 主动驱动物理步进
-- `mj_forward/inverse/step`：MuJoCo 的核心计算函数；`mj_forward` 更新运动学/传感器，`mj_inverse` 计算逆动力学，`mj_step` 执行物理步进
-
-注意：
-- 该基类通常不直接使用；实际开发中通过 `OrcaGymLocal`（本地 backend）访问。
-- 所有异步方法（如 `pause_simulation`、`set_qpos`）需要在 `async` 函数中 `await` 调用。
-#### Methods
-
-##### `OrcaGymBase.pause_simulation`
-
-Signature:
-
-```python
-async def pause_simulation(self)
-```
-
-Docstring:
-
-将仿真状态设置为 PAUSED（暂停）。
-
-说明：
-- OrcaGym 采用“被动模式”，仿真状态初始为 PAUSED，由 Gym 的 `step()` 主动驱动物理步进。
-- 该方法通过 gRPC 调用服务端，设置仿真状态为暂停。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymBase.print_opt_config`
-
-Signature:
-
-```python
-def print_opt_config(self)
-```
-
-Docstring:
-
-打印优化配置信息（用于调试）。
-
-输出包含：timestep、iterations、noslip_iterations、ccd_iterations、sdf_iterations、gravity 等。
-##### `OrcaGymBase.print_model_info`
-
-Signature:
-
-```python
-def print_model_info(self, model_info)
-```
-
-Docstring:
-
-打印模型基本信息（用于调试）。
-
-参数：
-- `model_info`：模型信息字典，包含 nq、nv、nu、nbody、njnt、ngeom、nsite 等维度参数。
-##### `OrcaGymBase.set_qpos`
-
-Signature:
-
-```python
-async def set_qpos(self, qpos)
-```
-
-Docstring:
-
-设置广义坐标 `qpos`（远程调用版本）。
-
-参数：
-- `qpos`：`(nq,)` 广义坐标数组
-
-说明：
-- 该方法通过 gRPC 调用服务端，设置关节位置。
-- 修改状态后通常需要调用 `mj_forward()` 更新派生量。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymBase.mj_forward`
-
-Signature:
-
-```python
-async def mj_forward(self)
-```
-
-Docstring:
-
-执行 MuJoCo 前向计算（远程调用版本）。
-
-说明：
-- 更新所有动力学相关状态（位置、速度、加速度、力等）。
-- 在设置关节状态、mocap 位置等操作后需要调用，确保状态一致。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymBase.mj_inverse`
-
-Signature:
-
-```python
-async def mj_inverse(self)
-```
-
-Docstring:
-
-执行 MuJoCo 逆动力学计算（远程调用版本）。
-
-说明：
-- 根据给定的加速度计算所需的力和力矩。
-- 用于计算实现特定运动所需的控制输入。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymBase.mj_step`
-
-Signature:
-
-```python
-async def mj_step(self, nstep)
-```
-
-Docstring:
-
-执行 MuJoCo 仿真步进（远程调用版本）。
-
-参数：
-- `nstep`：步进次数，通常为 1 或 frame_skip
-
-说明：
-- 执行 nstep 次物理仿真步进，每次步进的时间为 timestep。
-- 在调用前需要先设置控制输入。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymBase.set_qvel`
-
-Signature:
-
-```python
-async def set_qvel(self, qvel)
-```
-
-Docstring:
-
-设置广义速度 `qvel`（远程调用版本）。
-
-参数：
-- `qvel`：`(nv,)` 广义速度数组
-
-说明：
-- 该方法通过 gRPC 调用服务端，设置关节速度。
-- 修改状态后通常需要调用 `mj_forward()` 更新派生量。
-
-注意：
-- 异步方法，需要在 `async` 函数中 `await` 调用。
-</details>
-
-
----
-
 ## `orca_gym/core/orca_gym_data.py`
 
 中文概览：核心层：Model/Data/Local backend 与 MuJoCo 控制查询接口。
 
 ### Classes
 
-<details>
-<summary>class OrcaGymData</summary>
-
+## class OrcaGymData
 
 动态状态容器（本地副本）。
 
@@ -222,18 +38,16 @@ Docstring:
 - 该对象用于“读”；写入通常由 `update_*` 方法完成（上层完成同步后调用）。
 - 读取数组用于长期保存/跨步比较时，建议在调用侧使用 `copy()`，避免后续同步覆盖。
 
-#### Methods
+### Methods
 
-##### `OrcaGymData.update_qpos_qvel_qacc`
+#### `OrcaGymData.update_qpos_qvel_qacc`
 
 Signature:
-
 ```python
 def update_qpos_qvel_qacc(self, qpos, qvel, qacc)
 ```
 
-Docstring:
-
+Description:
 同步关节状态（qpos/qvel/qacc）。
 
 参数：
@@ -244,16 +58,14 @@ Docstring:
 说明：
 - 通常在 backend 完成数据同步后调用，用于刷新本地副本。
 - 该方法仅更新字段，不做一致性计算；需要运动学/传感器派生量一致时，应由上层按既定链路调用 `mj_forward()` 等接口。
-##### `OrcaGymData.update_qfrc_bias`
+#### `OrcaGymData.update_qfrc_bias`
 
 Signature:
-
 ```python
 def update_qfrc_bias(self, qfrc_bias)
 ```
 
-Docstring:
-
+Description:
 同步偏置力 `qfrc_bias`。
 
 参数：
@@ -261,8 +73,6 @@ Docstring:
 
 说明：
 - 通常由 backend 计算并在数据同步后刷新到本地副本。
-</details>
-
 
 ---
 
@@ -272,9 +82,7 @@ Docstring:
 
 ### Classes
 
-<details>
-<summary>class AnchorType</summary>
-
+## class AnchorType
 
 锚点类型枚举
 
@@ -295,11 +103,7 @@ Docstring:
     # 释放物体
     self.release_body_anchored()  # 内部使用 AnchorType.NONE
 
-</details>
-
-<details>
-<summary>class CaptureMode</summary>
-
+## class CaptureMode
 
 视频捕获模式枚举
 
@@ -316,11 +120,7 @@ Docstring:
     env.begin_save_video("output.mp4", CaptureMode.SYNC)
     ```
 
-</details>
-
-<details>
-<summary>class OrcaGymLocal</summary>
-
+## class OrcaGymLocal
 
 OrcaGym 本地仿真接口
 
@@ -353,18 +153,16 @@ OrcaGym 本地仿真接口
     body_names = list(self.gym.model.get_body_names())
     qpos = self.gym.data.qpos
     ```
-#### Methods
+### Methods
 
-##### `OrcaGymLocal.load_model_xml`
+#### `OrcaGymLocal.load_model_xml`
 
 Signature:
-
 ```python
 async def load_model_xml(self)
 ```
 
-Docstring:
-
+Description:
 从服务器加载模型 XML 文件
 
 从 OrcaSim 服务器获取模型 XML 文件，下载依赖的资源文件（mesh、hfield等），
@@ -379,16 +177,14 @@ Returns:
     model_xml_path = await self.gym.load_model_xml()
     # 返回: "/path/to/model.xml"
     ```
-##### `OrcaGymLocal.init_simulation`
+#### `OrcaGymLocal.init_simulation`
 
 Signature:
-
 ```python
 async def init_simulation(self, model_xml_path)
 ```
 
-Docstring:
-
+Description:
 初始化 MuJoCo 仿真
 
 从 XML 文件加载 MuJoCo 模型，创建数据对象，初始化所有模型信息容器
@@ -412,16 +208,14 @@ Args:
     self.model = self.gym.model
     self.data = self.gym.data
     ```
-##### `OrcaGymLocal.render`
+#### `OrcaGymLocal.render`
 
 Signature:
-
 ```python
 async def render(self)
 ```
 
-Docstring:
-
+Description:
 渲染当前仿真状态到 OrcaSim 服务器
 
 将当前的关节位置和仿真时间发送到服务器，用于可视化。
@@ -433,16 +227,14 @@ Docstring:
     await self.gym.render()
     # 服务器会更新可视化，并可能返回控制覆盖值
     ```
-##### `OrcaGymLocal.update_local_env`
+#### `OrcaGymLocal.update_local_env`
 
 Signature:
-
 ```python
 async def update_local_env(self, qpos, time)
 ```
 
-Docstring:
-
+Description:
 更新本地环境状态到服务器，并接收控制覆盖值
 
 将当前状态发送到服务器用于渲染，同时接收用户通过界面手动控制的值。
@@ -462,16 +254,14 @@ Args:
     await self.gym.update_local_env(self.data.qpos, self._mjData.time)
     # 如果用户在界面中控制，override_ctrls 会被更新
     ```
-##### `OrcaGymLocal.load_content_file`
+#### `OrcaGymLocal.load_content_file`
 
 Signature:
-
 ```python
 async def load_content_file(self, content_file_name, remote_file_dir='', local_file_dir='', temp_file_path=None)
 ```
 
-Docstring:
-
+Description:
 从服务器下载并缓存模型资源文件（mesh、hfield 等）。
 
 参数：
@@ -491,16 +281,14 @@ Docstring:
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
 - 文件锁超时时间为 30 秒。
-##### `OrcaGymLocal.process_xml_node`
+#### `OrcaGymLocal.process_xml_node`
 
 Signature:
-
 ```python
 async def process_xml_node(self, node)
 ```
 
-Docstring:
-
+Description:
 递归处理 XML 节点，下载缺失的资源文件。
 
 参数：
@@ -514,16 +302,14 @@ Docstring:
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
 - 该方法由 `process_xml_file` 内部调用，通常不需要直接使用。
-##### `OrcaGymLocal.begin_save_video`
+#### `OrcaGymLocal.begin_save_video`
 
 Signature:
-
 ```python
 async def begin_save_video(self, file_path, capture_mode=CaptureMode.ASYNC)
 ```
 
-Docstring:
-
+Description:
 开始保存视频到指定路径。
 
 参数：
@@ -537,16 +323,14 @@ Docstring:
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
 - 调用 `stop_save_video()` 停止保存。
-##### `OrcaGymLocal.stop_save_video`
+#### `OrcaGymLocal.stop_save_video`
 
 Signature:
-
 ```python
 async def stop_save_video(self)
 ```
 
-Docstring:
-
+Description:
 停止保存视频。
 
 说明：
@@ -555,16 +339,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.get_current_frame`
+#### `OrcaGymLocal.get_current_frame`
 
 Signature:
-
 ```python
 async def get_current_frame(self) -> int
 ```
 
-Docstring:
-
+Description:
 获取当前相机帧索引。
 
 返回：
@@ -575,16 +357,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.get_camera_time_stamp`
+#### `OrcaGymLocal.get_camera_time_stamp`
 
 Signature:
-
 ```python
 async def get_camera_time_stamp(self, last_frame) -> dict
 ```
 
-Docstring:
-
+Description:
 获取相机时间戳。
 
 参数：
@@ -598,16 +378,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.get_frame_png`
+#### `OrcaGymLocal.get_frame_png`
 
 Signature:
-
 ```python
 async def get_frame_png(self, image_path)
 ```
 
-Docstring:
-
+Description:
 获取相机帧的 PNG 图像及位姿信息。
 
 参数：
@@ -621,16 +399,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.xml_file_dir`
+#### `OrcaGymLocal.xml_file_dir`
 
 Signature:
-
 ```python
 def xml_file_dir(self)
 ```
 
-Docstring:
-
+Description:
 获取 XML 文件缓存目录。
 
 返回：
@@ -639,16 +415,14 @@ Docstring:
 说明：
 - 用于存储从服务器下载的 XML 模型文件和资源文件（mesh、hfield 等）。
 - 目录不存在时会自动创建。
-##### `OrcaGymLocal.process_xml_file`
+#### `OrcaGymLocal.process_xml_file`
 
 Signature:
-
 ```python
 async def process_xml_file(self, file_path)
 ```
 
-Docstring:
-
+Description:
 处理 XML 文件，下载缺失的资源文件。
 
 参数：
@@ -661,16 +435,14 @@ Docstring:
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
 - 该方法由 `load_model_xml` 内部调用，通常不需要直接使用。
-##### `OrcaGymLocal.load_local_env`
+#### `OrcaGymLocal.load_local_env`
 
 Signature:
-
 ```python
 async def load_local_env(self)
 ```
 
-Docstring:
-
+Description:
 从服务器加载本地环境 XML 文件。
 
 返回：
@@ -684,16 +456,14 @@ Docstring:
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
 - 该方法由 `load_model_xml` 内部调用，通常不需要直接使用。
-##### `OrcaGymLocal.get_body_manipulation_anchored`
+#### `OrcaGymLocal.get_body_manipulation_anchored`
 
 Signature:
-
 ```python
 async def get_body_manipulation_anchored(self)
 ```
 
-Docstring:
-
+Description:
 获取当前被锚定的 body 信息。
 
 返回：
@@ -704,16 +474,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.get_body_manipulation_movement`
+#### `OrcaGymLocal.get_body_manipulation_movement`
 
 Signature:
-
 ```python
 async def get_body_manipulation_movement(self)
 ```
 
-Docstring:
-
+Description:
 获取 body 操作移动增量。
 
 返回：
@@ -724,16 +492,14 @@ Docstring:
 
 注意：
 - 异步方法，需要在 `async` 函数中 `await` 调用。
-##### `OrcaGymLocal.set_time_step`
+#### `OrcaGymLocal.set_time_step`
 
 Signature:
-
 ```python
 def set_time_step(self, time_step)
 ```
 
-Docstring:
-
+Description:
 设置仿真时间步长（本地和远程）
 
 同时更新本地 MuJoCo 模型的时间步长和远程服务器的时间步长。
@@ -747,16 +513,14 @@ Args:
     self.gym.set_time_step(0.001)  # 1000 Hz
     await self.gym.set_timestep_remote(0.001)  # 同步到服务器
     ```
-##### `OrcaGymLocal.set_opt_timestep`
+#### `OrcaGymLocal.set_opt_timestep`
 
 Signature:
-
 ```python
 def set_opt_timestep(self, timestep)
 ```
 
-Docstring:
-
+Description:
 设置本地 MuJoCo 模型的时间步长
 
 术语说明:
@@ -772,16 +536,14 @@ Args:
     if self._mjModel is not None:
         self.set_opt_timestep(0.001)
     ```
-##### `OrcaGymLocal.set_timestep_remote`
+#### `OrcaGymLocal.set_timestep_remote`
 
 Signature:
-
 ```python
 async def set_timestep_remote(self, timestep)
 ```
 
-Docstring:
-
+Description:
 异步设置远程服务器的时间步长
 
 将时间步长同步到 OrcaSim 服务器，确保本地和远程一致。
@@ -797,16 +559,14 @@ Returns:
     # 在设置时间步长时同步到服务器
     await self.gym.set_timestep_remote(0.001)
     ```
-##### `OrcaGymLocal.set_opt_config`
+#### `OrcaGymLocal.set_opt_config`
 
 Signature:
-
 ```python
 def set_opt_config(self)
 ```
 
-Docstring:
-
+Description:
 将 `self.opt` 的配置参数同步到本地 MuJoCo 模型。
 
 说明：
@@ -815,16 +575,14 @@ Docstring:
 
 注意：
 - 该方法会覆盖 `_mjModel.opt` 的所有字段，确保与 `self.opt` 一致。
-##### `OrcaGymLocal.query_opt_config`
+#### `OrcaGymLocal.query_opt_config`
 
 Signature:
-
 ```python
 def query_opt_config(self)
 ```
 
-Docstring:
-
+Description:
 查询本地 MuJoCo 模型的优化配置。
 
 返回：
@@ -836,16 +594,14 @@ Docstring:
 
 注意：
 - 返回的字典可用于初始化 `OrcaGymOptConfig` 对象。
-##### `OrcaGymLocal.query_model_info`
+#### `OrcaGymLocal.query_model_info`
 
 Signature:
-
 ```python
 def query_model_info(self)
 ```
 
-Docstring:
-
+Description:
 查询模型基本信息（维度参数）
 
 返回模型的各种维度信息，用于初始化 OrcaGymModel 对象。
@@ -870,16 +626,14 @@ Returns:
     self.model = OrcaGymModel(model_info)
     # 之后可以通过 self.model.nq, self.model.nv 等访问维度
     ```
-##### `OrcaGymLocal.query_all_equality_constraints`
+#### `OrcaGymLocal.query_all_equality_constraints`
 
 Signature:
-
 ```python
 def query_all_equality_constraints(self)
 ```
 
-Docstring:
-
+Description:
 查询所有等式约束
 
 返回模型中所有等式约束的信息，用于物体操作等功能。
@@ -900,16 +654,14 @@ Returns:
     self.model.init_eq_list(eq_list)
     # 之后可以通过 self.model.get_eq_list() 访问
     ```
-##### `OrcaGymLocal.query_all_mocap_bodies`
+#### `OrcaGymLocal.query_all_mocap_bodies`
 
 Signature:
-
 ```python
 def query_all_mocap_bodies(self)
 ```
 
-Docstring:
-
+Description:
 查询所有 mocap body。
 
 返回：
@@ -921,16 +673,14 @@ Docstring:
 
 注意：
 - mocap body 的 ID 在模型加载后保持不变。
-##### `OrcaGymLocal.query_all_actuators`
+#### `OrcaGymLocal.query_all_actuators`
 
 Signature:
-
 ```python
 def query_all_actuators(self)
 ```
 
-Docstring:
-
+Description:
 查询所有执行器信息
 
 返回所有执行器的详细信息，包括名称、关联关节、控制范围、齿轮比等。
@@ -951,28 +701,24 @@ Returns:
     self.model.init_actuator_dict(actuator_dict)
     # 之后可以通过 self.model.get_actuator_dict() 访问
     ```
-##### `OrcaGymLocal.get_goal_bounding_box`
+#### `OrcaGymLocal.get_goal_bounding_box`
 
 Signature:
-
 ```python
 def get_goal_bounding_box(self, goal_body_name)
 ```
 
-Docstring:
-
+Description:
 计算目标物体（goal_body_name）在世界坐标系下的轴对齐包围盒。
 支持 BOX、SPHERE 类型，BOX 会考虑 geom 的旋转。
-##### `OrcaGymLocal.set_actuator_trnid`
+#### `OrcaGymLocal.set_actuator_trnid`
 
 Signature:
-
 ```python
 def set_actuator_trnid(self, actuator_id, trnid)
 ```
 
-Docstring:
-
+Description:
 设置执行器的传输目标 ID。
 
 参数：
@@ -985,16 +731,14 @@ Docstring:
 
 注意：
 - 修改后需要重新初始化模型才能生效。
-##### `OrcaGymLocal.disable_actuator`
+#### `OrcaGymLocal.disable_actuator`
 
 Signature:
-
 ```python
 def disable_actuator(self, actuator_groups)
 ```
 
-Docstring:
-
+Description:
 禁用指定组的执行器。
 
 参数：
@@ -1006,16 +750,14 @@ Docstring:
 
 注意：
 - 组 ID 从 0 开始；每个组对应一个位标志。
-##### `OrcaGymLocal.query_all_bodies`
+#### `OrcaGymLocal.query_all_bodies`
 
 Signature:
-
 ```python
 def query_all_bodies(self)
 ```
 
-Docstring:
-
+Description:
 查询所有 body 信息
 
 返回所有 body 的详细信息，包括位置、姿态、质量、惯性等。
@@ -1036,16 +778,14 @@ Returns:
     self.model.init_body_dict(body_dict)
     # 之后可以通过 self.model.get_body_dict() 访问
     ```
-##### `OrcaGymLocal.query_all_joints`
+#### `OrcaGymLocal.query_all_joints`
 
 Signature:
-
 ```python
 def query_all_joints(self)
 ```
 
-Docstring:
-
+Description:
 查询所有关节信息
 
 返回所有关节的详细信息，包括类型、范围、位置、轴等。
@@ -1067,16 +807,14 @@ Returns:
     self.model.init_joint_dict(joint_dict)
     # 之后可以通过 self.model.get_joint_dict() 访问
     ```
-##### `OrcaGymLocal.query_all_geoms`
+#### `OrcaGymLocal.query_all_geoms`
 
 Signature:
-
 ```python
 def query_all_geoms(self)
 ```
 
-Docstring:
-
+Description:
 查询所有几何体信息
 
 返回所有几何体的详细信息，包括类型、大小、摩擦、位置等。
@@ -1097,16 +835,14 @@ Returns:
     self.model.init_geom_dict(geom_dict)
     # 之后可以通过 self.model.get_geom_dict() 访问
     ```
-##### `OrcaGymLocal.query_all_sites`
+#### `OrcaGymLocal.query_all_sites`
 
 Signature:
-
 ```python
 def query_all_sites(self)
 ```
 
-Docstring:
-
+Description:
 查询所有 site 信息
 
 返回所有 site 的详细信息，包括位置、姿态等。
@@ -1125,16 +861,14 @@ Returns:
     self.model.init_site_dict(site_dict)
     # 之后可以通过 self.model.get_site_dict() 访问
     ```
-##### `OrcaGymLocal.query_all_sensors`
+#### `OrcaGymLocal.query_all_sensors`
 
 Signature:
-
 ```python
 def query_all_sensors(self)
 ```
 
-Docstring:
-
+Description:
 查询所有传感器信息
 
 返回所有传感器的详细信息，包括类型、维度、地址等。
@@ -1155,16 +889,14 @@ Returns:
     self.model.init_sensor_dict(sensor_dict)
     # 之后可以通过 self.model.gen_sensor_dict() 访问
     ```
-##### `OrcaGymLocal.update_data`
+#### `OrcaGymLocal.update_data`
 
 Signature:
-
 ```python
 def update_data(self)
 ```
 
-Docstring:
-
+Description:
 从 MuJoCo 数据更新到封装的 data 对象
 
 将 _mjData 中的最新状态（qpos、qvel、qacc、qfrc_bias、time）同步到
@@ -1184,16 +916,14 @@ Docstring:
     current_qpos = self.data.qpos.copy()
     current_qvel = self.data.qvel.copy()
     ```
-##### `OrcaGymLocal.update_data_external`
+#### `OrcaGymLocal.update_data_external`
 
 Signature:
-
 ```python
 def update_data_external(self, qpos, qvel, qacc, qfrc_bias, time)
 ```
 
-Docstring:
-
+Description:
 从外部环境更新数据（用于与外部仿真器协作）。
 
 参数：
@@ -1209,16 +939,14 @@ Docstring:
 
 注意：
 - 该方法用于特殊场景，通常不需要直接使用。
-##### `OrcaGymLocal.query_qfrc_bias`
+#### `OrcaGymLocal.query_qfrc_bias`
 
 Signature:
-
 ```python
 def query_qfrc_bias(self)
 ```
 
-Docstring:
-
+Description:
 查询偏置力 `qfrc_bias`。
 
 返回：
@@ -1230,16 +958,14 @@ Docstring:
 
 注意：
 - 该值在 `mj_step` 或 `mj_forward` 后更新。
-##### `OrcaGymLocal.load_initial_frame`
+#### `OrcaGymLocal.load_initial_frame`
 
 Signature:
-
 ```python
 def load_initial_frame(self)
 ```
 
-Docstring:
-
+Description:
 重置仿真数据到初始状态
 
 将 MuJoCo 数据重置为初始状态，包括位置、速度、加速度等。
@@ -1254,16 +980,14 @@ Docstring:
     self.gym.load_initial_frame()
     self.gym.update_data()  # 同步到封装的 data 对象
     ```
-##### `OrcaGymLocal.query_joint_offsets`
+#### `OrcaGymLocal.query_joint_offsets`
 
 Signature:
-
 ```python
 def query_joint_offsets(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节在 `qpos/qvel/qacc` 数组中的起始索引。
 
 参数：
@@ -1278,16 +1002,14 @@ Docstring:
 
 注意：
 - 索引用于从全局数组中提取特定关节的状态。
-##### `OrcaGymLocal.query_joint_lengths`
+#### `OrcaGymLocal.query_joint_lengths`
 
 Signature:
-
 ```python
 def query_joint_lengths(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节在 `qpos/qvel/qacc` 数组中的长度。
 
 参数：
@@ -1302,16 +1024,14 @@ Docstring:
 
 注意：
 - 长度与关节类型相关，见 `get_qpos_size` 和 `get_dof_size`。
-##### `OrcaGymLocal.query_body_xpos_xmat_xquat`
+#### `OrcaGymLocal.query_body_xpos_xmat_xquat`
 
 Signature:
-
 ```python
 def query_body_xpos_xmat_xquat(self, body_name_list)
 ```
 
-Docstring:
-
+Description:
 查询 body 的位姿（位置、旋转矩阵、四元数）
 
 从 MuJoCo 数据中直接查询 body 的位姿信息。
@@ -1336,16 +1056,14 @@ Returns:
     base_mat = body_dict["base_link"]["Mat"]  # 9个元素，3x3矩阵按行展开
     base_quat = body_dict["base_link"]["Quat"]  # [w, x, y, z]
     ```
-##### `OrcaGymLocal.query_sensor_data`
+#### `OrcaGymLocal.query_sensor_data`
 
 Signature:
-
 ```python
 def query_sensor_data(self, sensor_names)
 ```
 
-Docstring:
-
+Description:
 查询传感器数据
 
 从 MuJoCo 的 sensordata 数组中读取指定传感器的当前值。
@@ -1368,16 +1086,14 @@ Returns:
     accel = sensor_data["imu_accelerometer"]  # 加速度数据
     gyro = sensor_data["imu_gyro"]  # 角速度数据
     ```
-##### `OrcaGymLocal.set_ctrl`
+#### `OrcaGymLocal.set_ctrl`
 
 Signature:
-
 ```python
 def set_ctrl(self, ctrl)
 ```
 
-Docstring:
-
+Description:
 设置控制输入，应用控制覆盖（如果存在）
 
 设置执行器控制值，如果存在控制覆盖（来自用户界面手动控制），
@@ -1395,16 +1111,14 @@ Args:
     self.gym.set_ctrl(action)  # action 形状: (nu,)
     # 如果用户在界面中手动控制，对应执行器的值会被覆盖
     ```
-##### `OrcaGymLocal.mj_step`
+#### `OrcaGymLocal.mj_step`
 
 Signature:
-
 ```python
 def mj_step(self, nstep)
 ```
 
-Docstring:
-
+Description:
 执行 MuJoCo 仿真步进
 
 执行 nstep 次物理仿真步进，每次步进的时间为 timestep。
@@ -1423,16 +1137,14 @@ Args:
     self.gym.set_ctrl(ctrl)
     self.gym.mj_step(nstep=5)  # 步进 5 次
     ```
-##### `OrcaGymLocal.mj_forward`
+#### `OrcaGymLocal.mj_forward`
 
 Signature:
-
 ```python
 def mj_forward(self)
 ```
 
-Docstring:
-
+Description:
 执行 MuJoCo 前向计算
 
 更新所有动力学相关状态，包括位置、速度、加速度、力等。
@@ -1448,16 +1160,14 @@ Docstring:
     self.gym.set_joint_qpos(qpos)
     self.gym.mj_forward()  # 更新所有相关状态
     ```
-##### `OrcaGymLocal.mj_inverse`
+#### `OrcaGymLocal.mj_inverse`
 
 Signature:
-
 ```python
 def mj_inverse(self)
 ```
 
-Docstring:
-
+Description:
 执行 MuJoCo 逆动力学计算
 
 根据给定的加速度计算所需的力和力矩。
@@ -1473,16 +1183,14 @@ Docstring:
     self.gym.mj_inverse()
     required_force = self._mjData.qfrc_actuator
     ```
-##### `OrcaGymLocal.mj_fullM`
+#### `OrcaGymLocal.mj_fullM`
 
 Signature:
-
 ```python
 def mj_fullM(self)
 ```
 
-Docstring:
-
+Description:
 计算完整的质量矩阵
 
 返回系统的完整质量矩阵 M，形状 (nv, nv)，用于动力学计算。
@@ -1501,16 +1209,14 @@ Returns:
     M = self.gym.mj_fullM()  # 形状: (nv, nv)
     # 用于计算: tau = M @ qacc + C + G
     ```
-##### `OrcaGymLocal.mj_jacBody`
+#### `OrcaGymLocal.mj_jacBody`
 
 Signature:
-
 ```python
 def mj_jacBody(self, jacp, jacr, body_id)
 ```
 
-Docstring:
-
+Description:
 计算 body 的雅可比矩阵
 
 术语说明:
@@ -1531,16 +1237,14 @@ Args:
     body_id = self.model.body_name2id("end_effector")
     self.gym.mj_jacBody(jacp, jacr, body_id)
     ```
-##### `OrcaGymLocal.mj_jacSite`
+#### `OrcaGymLocal.mj_jacSite`
 
 Signature:
-
 ```python
 def mj_jacSite(self, jacp, jacr, site_id)
 ```
 
-Docstring:
-
+Description:
 计算 site 的雅可比矩阵
 
 术语说明:
@@ -1560,16 +1264,14 @@ Args:
     jacr = np.zeros((3, self.model.nv))
     self.gym.mj_jacSite(jacp, jacr, site_id)
     ```
-##### `OrcaGymLocal.query_joint_qpos`
+#### `OrcaGymLocal.query_joint_qpos`
 
 Signature:
-
 ```python
 def query_joint_qpos(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节的位置（qpos）。
 
 参数：
@@ -1584,16 +1286,14 @@ Docstring:
 
 注意：
 - 返回的数组是视图（view），修改会影响原始数据；如需独立副本，应使用 `copy()`。
-##### `OrcaGymLocal.query_joint_qvel`
+#### `OrcaGymLocal.query_joint_qvel`
 
 Signature:
-
 ```python
 def query_joint_qvel(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节的速度（qvel）。
 
 参数：
@@ -1608,16 +1308,14 @@ Docstring:
 
 注意：
 - 返回的数组是视图（view），修改会影响原始数据；如需独立副本，应使用 `copy()`。
-##### `OrcaGymLocal.query_joint_qacc`
+#### `OrcaGymLocal.query_joint_qacc`
 
 Signature:
-
 ```python
 def query_joint_qacc(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节的加速度（qacc）。
 
 参数：
@@ -1632,16 +1330,14 @@ Docstring:
 
 注意：
 - 返回的数组是视图（view），修改会影响原始数据；如需独立副本，应使用 `copy()`。
-##### `OrcaGymLocal.jnt_qposadr`
+#### `OrcaGymLocal.jnt_qposadr`
 
 Signature:
-
 ```python
 def jnt_qposadr(self, joint_name)
 ```
 
-Docstring:
-
+Description:
 查询关节在 `qpos` 数组中的起始地址。
 
 参数：
@@ -1656,16 +1352,14 @@ Docstring:
 
 注意：
 - 地址在模型加载后保持不变。
-##### `OrcaGymLocal.jnt_dofadr`
+#### `OrcaGymLocal.jnt_dofadr`
 
 Signature:
-
 ```python
 def jnt_dofadr(self, joint_name)
 ```
 
-Docstring:
-
+Description:
 查询关节在 `qvel/qacc` 数组中的起始地址。
 
 参数：
@@ -1680,16 +1374,14 @@ Docstring:
 
 注意：
 - 地址在模型加载后保持不变。
-##### `OrcaGymLocal.query_site_pos_and_mat`
+#### `OrcaGymLocal.query_site_pos_and_mat`
 
 Signature:
-
 ```python
 def query_site_pos_and_mat(self, site_names)
 ```
 
-Docstring:
-
+Description:
 查询 site 的位置和旋转矩阵。
 
 参数：
@@ -1704,16 +1396,14 @@ Docstring:
 
 注意：
 - 返回的数组是视图（view），修改会影响原始数据；如需独立副本，应使用 `copy()`。
-##### `OrcaGymLocal.query_site_size`
+#### `OrcaGymLocal.query_site_size`
 
 Signature:
-
 ```python
 def query_site_size(self, site_names)
 ```
 
-Docstring:
-
+Description:
 查询 site 的尺寸。
 
 参数：
@@ -1728,16 +1418,14 @@ Docstring:
 
 注意：
 - 返回的数组是副本（copy），修改不会影响原始数据。
-##### `OrcaGymLocal.set_joint_qpos`
+#### `OrcaGymLocal.set_joint_qpos`
 
 Signature:
-
 ```python
 def set_joint_qpos(self, joint_qpos)
 ```
 
-Docstring:
-
+Description:
 设置指定关节的位置（qpos）。
 
 参数：
@@ -1750,16 +1438,14 @@ Docstring:
 注意：
 - 数组长度必须与关节类型匹配（FREE: 7, BALL: 4, HINGE/SLIDE: 1）。
 - 修改后建议调用 `mj_forward()` 确保状态一致。
-##### `OrcaGymLocal.set_joint_qvel`
+#### `OrcaGymLocal.set_joint_qvel`
 
 Signature:
-
 ```python
 def set_joint_qvel(self, joint_qvel)
 ```
 
-Docstring:
-
+Description:
 设置指定关节的速度（qvel）。
 
 参数：
@@ -1772,16 +1458,14 @@ Docstring:
 注意：
 - 数组长度必须与关节类型匹配（FREE: 6, BALL: 3, HINGE/SLIDE: 1）。
 - 修改后建议调用 `mj_forward()` 确保状态一致。
-##### `OrcaGymLocal.mj_jac_site`
+#### `OrcaGymLocal.mj_jac_site`
 
 Signature:
-
 ```python
 def mj_jac_site(self, site_names)
 ```
 
-Docstring:
-
+Description:
 计算多个 site 的雅可比矩阵。
 
 参数：
@@ -1797,16 +1481,14 @@ Docstring:
 
 注意：
 - 返回的数组是新分配的，修改不会影响原始数据。
-##### `OrcaGymLocal.modify_equality_objects`
+#### `OrcaGymLocal.modify_equality_objects`
 
 Signature:
-
 ```python
 def modify_equality_objects(self, old_obj1_id, old_obj2_id, new_obj1_id, new_obj2_id)
 ```
 
-Docstring:
-
+Description:
 修改等式约束的目标对象
 
 将等式约束从一个 body 对转移到另一个 body 对，用于物体操作。
@@ -1829,16 +1511,14 @@ Args:
         new_obj2_id=eq["obj2_id"]
     )
     ```
-##### `OrcaGymLocal.update_equality_constraints`
+#### `OrcaGymLocal.update_equality_constraints`
 
 Signature:
-
 ```python
 def update_equality_constraints(self, constraint_list)
 ```
 
-Docstring:
-
+Description:
 更新等式约束的参数
 
 更新约束的类型和数据，用于改变约束的刚度和行为。
@@ -1857,16 +1537,14 @@ Args:
     # 修改约束参数...
     self.gym.update_equality_constraints(eq_list)
     ```
-##### `OrcaGymLocal.set_mocap_pos_and_quat`
+#### `OrcaGymLocal.set_mocap_pos_and_quat`
 
 Signature:
-
 ```python
 async def set_mocap_pos_and_quat(self, mocap_data, send_remote=False)
 ```
 
-Docstring:
-
+Description:
 设置 mocap body 的位置和四元数
 
 设置 mocap body 的位姿，用于物体操作。如果 send_remote=True，同时同步到服务器。
@@ -1889,16 +1567,14 @@ Args:
         }
     }, send_remote=True)
     ```
-##### `OrcaGymLocal.query_contact_simple`
+#### `OrcaGymLocal.query_contact_simple`
 
 Signature:
-
 ```python
 def query_contact_simple(self)
 ```
 
-Docstring:
-
+Description:
 查询简单接触信息
 
 返回当前所有接触点的基本信息，包括接触的几何体对。
@@ -1918,16 +1594,14 @@ Returns:
     for contact in contacts:
         print(f"Contact between geom {contact['Geom1']} and {contact['Geom2']}")
     ```
-##### `OrcaGymLocal.set_geom_friction`
+#### `OrcaGymLocal.set_geom_friction`
 
 Signature:
-
 ```python
 def set_geom_friction(self, geom_friction_dict)
 ```
 
-Docstring:
-
+Description:
 设置几何体的摩擦系数。
 
 参数：
@@ -1939,16 +1613,14 @@ Docstring:
 
 注意：
 - 修改后需要重新初始化模型才能生效（或使用动态修改接口）。
-##### `OrcaGymLocal.add_extra_weight`
+#### `OrcaGymLocal.add_extra_weight`
 
 Signature:
-
 ```python
 def add_extra_weight(self, random_weight_dict)
 ```
 
-Docstring:
-
+Description:
 为指定 body 添加额外质量。
 
 参数：
@@ -1961,16 +1633,14 @@ Docstring:
 注意：
 - 修改后需要重新初始化模型才能生效（或使用动态修改接口）。
 - `pos` 是质心位置偏移，`weight` 是额外质量（会加到原有质量上）。
-##### `OrcaGymLocal.query_contact_force`
+#### `OrcaGymLocal.query_contact_force`
 
 Signature:
-
 ```python
 def query_contact_force(self, contact_ids)
 ```
 
-Docstring:
-
+Description:
 查询接触力
 
 计算指定接触点的接触力，包括线性力和力矩。
@@ -1992,16 +1662,14 @@ Returns:
     forces = self.gym.query_contact_force(contact_ids)
     force_0 = forces[0]  # [fx, fy, fz, mx, my, mz]
     ```
-##### `OrcaGymLocal.get_cfrc_ext`
+#### `OrcaGymLocal.get_cfrc_ext`
 
 Signature:
-
 ```python
 def get_cfrc_ext(self)
 ```
 
-Docstring:
-
+Description:
 获取外部约束力
 
 返回所有 body 受到的外部约束力，包括接触力、等式约束力等。
@@ -2019,16 +1687,14 @@ Returns:
     cfrc_ext = self.gym.get_cfrc_ext()
     base_force = cfrc_ext[base_body_id]  # 基座的受力
     ```
-##### `OrcaGymLocal.query_actuator_torques`
+#### `OrcaGymLocal.query_actuator_torques`
 
 Signature:
-
 ```python
 def query_actuator_torques(self, actuator_names)
 ```
 
-Docstring:
-
+Description:
 查询执行器扭矩
 
 计算执行器产生的实际扭矩，考虑齿轮比等因素。
@@ -2050,16 +1716,14 @@ Returns:
     torques = self.gym.query_actuator_torques(["joint1_actuator", "joint2_actuator"])
     torque_1 = torques["joint1_actuator"]  # 6维向量
     ```
-##### `OrcaGymLocal.query_joint_dofadrs`
+#### `OrcaGymLocal.query_joint_dofadrs`
 
 Signature:
-
 ```python
 def query_joint_dofadrs(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 查询指定关节在 `qvel/qacc` 数组中的起始地址。
 
 参数：
@@ -2074,16 +1738,14 @@ Docstring:
 
 注意：
 - 地址在模型加载后保持不变。
-##### `OrcaGymLocal.query_velocity_body_B`
+#### `OrcaGymLocal.query_velocity_body_B`
 
 Signature:
-
 ```python
 def query_velocity_body_B(self, ee_body, base_body)
 ```
 
-Docstring:
-
+Description:
 查询 body 相对于基座 body 的速度（基座坐标系）
 
 计算末端执行器相对于基座的线速度和角速度，在基座坐标系中表示。
@@ -2107,16 +1769,14 @@ Returns:
     linear_vel = vel_B[:3]  # 线速度
     angular_vel = vel_B[3:]  # 角速度
     ```
-##### `OrcaGymLocal.query_position_body_B`
+#### `OrcaGymLocal.query_position_body_B`
 
 Signature:
-
 ```python
 def query_position_body_B(self, ee_body, base_body)
 ```
 
-Docstring:
-
+Description:
 查询 body 相对于基座 body 的位置（基座坐标系）
 
 计算末端执行器相对于基座的位置，在基座坐标系中表示。
@@ -2138,16 +1798,14 @@ Returns:
     pos_B = self.gym.query_position_body_B("end_effector", "base_link")
     # 返回: [x, y, z]，相对于基座的位置
     ```
-##### `OrcaGymLocal.query_orientation_body_B`
+#### `OrcaGymLocal.query_orientation_body_B`
 
 Signature:
-
 ```python
 def query_orientation_body_B(self, ee_body, base_body)
 ```
 
-Docstring:
-
+Description:
 查询 body 相对于基座 body 的姿态（基座坐标系）
 
 计算末端执行器相对于基座的姿态（四元数），在基座坐标系中表示。
@@ -2169,16 +1827,14 @@ Returns:
     quat_B = self.gym.query_orientation_body_B("end_effector", "base_link")
     # 返回: [x, y, z, w]，相对于基座的姿态
     ```
-##### `OrcaGymLocal.query_joint_axes_B`
+#### `OrcaGymLocal.query_joint_axes_B`
 
 Signature:
-
 ```python
 def query_joint_axes_B(self, joint_names, base_body)
 ```
 
-Docstring:
-
+Description:
 查询关节轴在基座坐标系中的方向。
 
 参数：
@@ -2194,16 +1850,14 @@ Docstring:
 
 注意：
 - 返回的数组是副本（copy），修改不会影响原始数据。
-##### `OrcaGymLocal.query_robot_velocity_odom`
+#### `OrcaGymLocal.query_robot_velocity_odom`
 
 Signature:
-
 ```python
 def query_robot_velocity_odom(self, base_body, initial_base_pos, initial_base_quat)
 ```
 
-Docstring:
-
+Description:
 查询机器人在里程计坐标系中的速度
 
 计算机器人基座相对于初始位置的速度，在初始姿态的坐标系中表示。
@@ -2229,16 +1883,14 @@ Returns:
         "base_link", initial_pos, initial_quat
     )
     ```
-##### `OrcaGymLocal.query_robot_position_odom`
+#### `OrcaGymLocal.query_robot_position_odom`
 
 Signature:
-
 ```python
 def query_robot_position_odom(self, base_body, initial_base_pos, initial_base_quat)
 ```
 
-Docstring:
-
+Description:
 查询机器人在里程计坐标系中的位置
 
 计算机器人基座相对于初始位置的位置，在初始姿态的坐标系中表示。
@@ -2261,16 +1913,14 @@ Returns:
         "base_link", initial_pos, initial_quat
     )
     ```
-##### `OrcaGymLocal.query_robot_orientation_odom`
+#### `OrcaGymLocal.query_robot_orientation_odom`
 
 Signature:
-
 ```python
 def query_robot_orientation_odom(self, base_body, initial_base_pos, initial_base_quat)
 ```
 
-Docstring:
-
+Description:
 查询机器人在里程计坐标系中的姿态
 
 计算机器人基座相对于初始姿态的旋转，在初始姿态的坐标系中表示。
@@ -2293,22 +1943,17 @@ Returns:
         "base_link", initial_pos, initial_quat
     )
     ```
-</details>
 
 ### Functions
 
-<details>
-<summary>function get_qpos_size</summary>
-
+### function get_qpos_size
 
 Signature:
-
 ```python
 def get_qpos_size(joint_type)
 ```
 
-Docstring:
-
+Description:
 获取关节在 qpos 数组中的元素数量
 
 术语说明:
@@ -2324,20 +1969,14 @@ Docstring:
     qpos_size = get_qpos_size(joint_type)  # 返回 1, 3, 4 或 7
     ```
 
-</details>
-
-<details>
-<summary>function get_dof_size</summary>
-
+### function get_dof_size
 
 Signature:
-
 ```python
 def get_dof_size(joint_type)
 ```
 
-Docstring:
-
+Description:
 获取关节的自由度数量（在 qvel 数组中的元素数量）
 
 术语说明:
@@ -2354,20 +1993,14 @@ Docstring:
     dof_size = get_dof_size(joint_type)  # 返回 1, 3 或 6
     ```
 
-</details>
-
-<details>
-<summary>function get_eq_type</summary>
-
+### function get_eq_type
 
 Signature:
-
 ```python
 def get_eq_type(anchor_type)
 ```
 
-Docstring:
-
+Description:
 根据锚点类型获取对应的等式约束类型
 
 术语说明:
@@ -2388,9 +2021,6 @@ Returns:
     eq["eq_type"] = eq_type
     ```
 
-</details>
-
-
 ---
 
 ## `orca_gym/core/orca_gym_model.py`
@@ -2399,9 +2029,7 @@ Returns:
 
 ### Classes
 
-<details>
-<summary>class OrcaGymModel</summary>
-
+## class OrcaGymModel
 
 静态模型信息容器（MuJoCo 模型的封装）。
 
@@ -2428,29 +2056,25 @@ Returns:
 注意：
 - 该对象在环境初始化时由 backend 填充（通过 `query_all_*` 系列方法）。
 - 名称与 ID 的映射在初始化后保持不变（除非模型被重新加载）。
-#### Methods
+### Methods
 
-##### `OrcaGymModel.init_model_info`
+#### `OrcaGymModel.init_model_info`
 
 Signature:
-
 ```python
 def init_model_info(self, model_info)
 ```
 
-Docstring:
-
+Description:
 初始化模型基本信息（维度参数）
-##### `OrcaGymModel.init_eq_list`
+#### `OrcaGymModel.init_eq_list`
 
 Signature:
-
 ```python
 def init_eq_list(self, eq_list)
 ```
 
-Docstring:
-
+Description:
 初始化等式约束列表
 
 术语说明:
@@ -2465,16 +2089,14 @@ Docstring:
     # 修改约束以连接物体
     eq["obj2_id"] = self.model.body_name2id(actor_name)
     ```
-##### `OrcaGymModel.get_eq_list`
+#### `OrcaGymModel.get_eq_list`
 
 Signature:
-
 ```python
 def get_eq_list(self)
 ```
 
-Docstring:
-
+Description:
 获取等式约束列表
 
 术语说明:
@@ -2489,16 +2111,14 @@ Docstring:
             # 修改约束目标
             eq["obj2_id"] = self.model.body_name2id(actor_name)
     ```
-##### `OrcaGymModel.init_mocap_dict`
+#### `OrcaGymModel.init_mocap_dict`
 
 Signature:
-
 ```python
 def init_mocap_dict(self, mocap_dict)
 ```
 
-Docstring:
-
+Description:
 初始化 mocap body 字典
 
 术语说明:
@@ -2516,16 +2136,14 @@ Docstring:
         }
     })
     ```
-##### `OrcaGymModel.init_actuator_dict`
+#### `OrcaGymModel.init_actuator_dict`
 
 Signature:
-
 ```python
 def init_actuator_dict(self, actuator_dict)
 ```
 
-Docstring:
-
+Description:
 初始化执行器字典，建立名称和ID的映射关系
 
 术语说明:
@@ -2540,49 +2158,41 @@ Docstring:
     actuator_dict = self.model.get_actuator_dict()
     actuator_id = self.model.actuator_name2id("joint1_actuator")
     ```
-##### `OrcaGymModel.get_actuator_dict`
+#### `OrcaGymModel.get_actuator_dict`
 
 Signature:
-
 ```python
 def get_actuator_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有执行器字典
-##### `OrcaGymModel.get_actuator_byid`
+#### `OrcaGymModel.get_actuator_byid`
 
 Signature:
-
 ```python
 def get_actuator_byid(self, id)
 ```
 
-Docstring:
-
+Description:
 根据ID获取执行器信息
-##### `OrcaGymModel.get_actuator_byname`
+#### `OrcaGymModel.get_actuator_byname`
 
 Signature:
-
 ```python
 def get_actuator_byname(self, name)
 ```
 
-Docstring:
-
+Description:
 根据名称获取执行器信息
-##### `OrcaGymModel.actuator_name2id`
+#### `OrcaGymModel.actuator_name2id`
 
 Signature:
-
 ```python
 def actuator_name2id(self, actuator_name)
 ```
 
-Docstring:
-
+Description:
 执行器名称转ID
 
 将执行器名称转换为对应的 ID，用于设置控制输入。
@@ -2595,27 +2205,23 @@ Docstring:
         for actuator_name in self._arm_moto_names
     ]
     ```
-##### `OrcaGymModel.actuator_id2name`
+#### `OrcaGymModel.actuator_id2name`
 
 Signature:
-
 ```python
 def actuator_id2name(self, actuator_id)
 ```
 
-Docstring:
-
+Description:
 执行器ID转名称
-##### `OrcaGymModel.init_body_dict`
+#### `OrcaGymModel.init_body_dict`
 
 Signature:
-
 ```python
 def init_body_dict(self, body_dict)
 ```
 
-Docstring:
-
+Description:
 初始化 body 字典，建立名称和ID的映射关系
 
 术语说明:
@@ -2630,49 +2236,41 @@ Docstring:
     body_names = list(self.model.get_body_names())
     body_id = self.model.body_name2id("base_link")
     ```
-##### `OrcaGymModel.get_body_dict`
+#### `OrcaGymModel.get_body_dict`
 
 Signature:
-
 ```python
 def get_body_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有 body 字典
-##### `OrcaGymModel.get_body_byid`
+#### `OrcaGymModel.get_body_byid`
 
 Signature:
-
 ```python
 def get_body_byid(self, id)
 ```
 
-Docstring:
-
+Description:
 根据ID获取 body 信息
-##### `OrcaGymModel.get_body_byname`
+#### `OrcaGymModel.get_body_byname`
 
 Signature:
-
 ```python
 def get_body_byname(self, name)
 ```
 
-Docstring:
-
+Description:
 根据名称获取 body 信息
-##### `OrcaGymModel.body_name2id`
+#### `OrcaGymModel.body_name2id`
 
 Signature:
-
 ```python
 def body_name2id(self, body_name)
 ```
 
-Docstring:
-
+Description:
 Body 名称转ID
 
 将 body 名称转换为对应的 ID，用于需要 ID 的底层操作。
@@ -2683,27 +2281,23 @@ Body 名称转ID
     body_id = self.model.body_name2id(actor_name)
     eq["obj2_id"] = body_id
     ```
-##### `OrcaGymModel.body_id2name`
+#### `OrcaGymModel.body_id2name`
 
 Signature:
-
 ```python
 def body_id2name(self, body_id)
 ```
 
-Docstring:
-
+Description:
 Body ID转名称
-##### `OrcaGymModel.init_joint_dict`
+#### `OrcaGymModel.init_joint_dict`
 
 Signature:
-
 ```python
 def init_joint_dict(self, joint_dict)
 ```
 
-Docstring:
-
+Description:
 初始化关节字典，建立名称和ID的映射关系
 
 术语说明:
@@ -2718,137 +2312,113 @@ Docstring:
     joint_dict = self.model.get_joint_dict()
     joint_id = self.model.joint_name2id("joint1")
     ```
-##### `OrcaGymModel.get_joint_dict`
+#### `OrcaGymModel.get_joint_dict`
 
 Signature:
-
 ```python
 def get_joint_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有关节字典
-##### `OrcaGymModel.get_joint_byid`
+#### `OrcaGymModel.get_joint_byid`
 
 Signature:
-
 ```python
 def get_joint_byid(self, id)
 ```
 
-Docstring:
-
+Description:
 根据ID获取关节信息
-##### `OrcaGymModel.get_joint_byname`
+#### `OrcaGymModel.get_joint_byname`
 
 Signature:
-
 ```python
 def get_joint_byname(self, name)
 ```
 
-Docstring:
-
+Description:
 根据名称获取关节信息
-##### `OrcaGymModel.joint_name2id`
+#### `OrcaGymModel.joint_name2id`
 
 Signature:
-
 ```python
 def joint_name2id(self, joint_name)
 ```
 
-Docstring:
-
+Description:
 关节名称转ID
-##### `OrcaGymModel.joint_id2name`
+#### `OrcaGymModel.joint_id2name`
 
 Signature:
-
 ```python
 def joint_id2name(self, joint_id)
 ```
 
-Docstring:
-
+Description:
 关节ID转名称
-##### `OrcaGymModel.init_geom_dict`
+#### `OrcaGymModel.init_geom_dict`
 
 Signature:
-
 ```python
 def init_geom_dict(self, geom_dict)
 ```
 
-Docstring:
-
+Description:
 初始化几何体字典，建立名称和ID的映射关系
-##### `OrcaGymModel.get_geom_dict`
+#### `OrcaGymModel.get_geom_dict`
 
 Signature:
-
 ```python
 def get_geom_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有几何体字典
-##### `OrcaGymModel.get_geom_byid`
+#### `OrcaGymModel.get_geom_byid`
 
 Signature:
-
 ```python
 def get_geom_byid(self, id)
 ```
 
-Docstring:
-
+Description:
 根据ID获取几何体信息
-##### `OrcaGymModel.get_geom_byname`
+#### `OrcaGymModel.get_geom_byname`
 
 Signature:
-
 ```python
 def get_geom_byname(self, name)
 ```
 
-Docstring:
-
+Description:
 根据名称获取几何体信息
-##### `OrcaGymModel.geom_name2id`
+#### `OrcaGymModel.geom_name2id`
 
 Signature:
-
 ```python
 def geom_name2id(self, geom_name)
 ```
 
-Docstring:
-
+Description:
 几何体名称转ID
-##### `OrcaGymModel.geom_id2name`
+#### `OrcaGymModel.geom_id2name`
 
 Signature:
-
 ```python
 def geom_id2name(self, geom_id)
 ```
 
-Docstring:
-
+Description:
 几何体ID转名称
-##### `OrcaGymModel.get_body_names`
+#### `OrcaGymModel.get_body_names`
 
 Signature:
-
 ```python
 def get_body_names(self)
 ```
 
-Docstring:
-
+Description:
 获取所有 body 名称列表
 
 返回可迭代的 body 名称集合，用于查找特定 body 或遍历所有 body。
@@ -2869,38 +2439,32 @@ Docstring:
     for body_name in self.model.get_body_names():
         pos, _, quat = self.get_body_xpos_xmat_xquat([body_name])
     ```
-##### `OrcaGymModel.get_geom_body_name`
+#### `OrcaGymModel.get_geom_body_name`
 
 Signature:
-
 ```python
 def get_geom_body_name(self, geom_id)
 ```
 
-Docstring:
-
+Description:
 根据几何体ID获取其所属的 body 名称
-##### `OrcaGymModel.get_geom_body_id`
+#### `OrcaGymModel.get_geom_body_id`
 
 Signature:
-
 ```python
 def get_geom_body_id(self, geom_id)
 ```
 
-Docstring:
-
+Description:
 根据几何体ID获取其所属的 body ID
-##### `OrcaGymModel.get_actuator_ctrlrange`
+#### `OrcaGymModel.get_actuator_ctrlrange`
 
 Signature:
-
 ```python
 def get_actuator_ctrlrange(self)
 ```
 
-Docstring:
-
+Description:
 获取所有执行器的控制范围（用于定义动作空间）
 
 返回形状为 (nu, 2) 的数组，每行包含 [min, max] 控制范围。
@@ -2918,27 +2482,23 @@ Docstring:
     # ctrlrange 形状: (nu, 2)，每行为 [min, max]
     self.action_space = self.generate_action_space(all_actuator_ctrlrange)
     ```
-##### `OrcaGymModel.get_joint_qposrange`
+#### `OrcaGymModel.get_joint_qposrange`
 
 Signature:
-
 ```python
 def get_joint_qposrange(self, joint_names)
 ```
 
-Docstring:
-
+Description:
 获取指定关节的位置范围
-##### `OrcaGymModel.init_site_dict`
+#### `OrcaGymModel.init_site_dict`
 
 Signature:
-
 ```python
 def init_site_dict(self, site_dict)
 ```
 
-Docstring:
-
+Description:
 初始化 site 字典
 
 术语说明:
@@ -2952,60 +2512,50 @@ Docstring:
     # 可以通过以下方式查询:
     site_pos, site_quat = self.query_site_pos_and_quat(["end_effector"])
     ```
-##### `OrcaGymModel.get_site_dict`
+#### `OrcaGymModel.get_site_dict`
 
 Signature:
-
 ```python
 def get_site_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有 site 字典
-##### `OrcaGymModel.get_site`
+#### `OrcaGymModel.get_site`
 
 Signature:
-
 ```python
 def get_site(self, name_or_id)
 ```
 
-Docstring:
-
+Description:
 根据名称或ID获取 site 信息
-##### `OrcaGymModel.site_name2id`
+#### `OrcaGymModel.site_name2id`
 
 Signature:
-
 ```python
 def site_name2id(self, site_name)
 ```
 
-Docstring:
-
+Description:
 Site 名称转ID
-##### `OrcaGymModel.site_id2name`
+#### `OrcaGymModel.site_id2name`
 
 Signature:
-
 ```python
 def site_id2name(self, site_id)
 ```
 
-Docstring:
-
+Description:
 Site ID转名称
-##### `OrcaGymModel.init_sensor_dict`
+#### `OrcaGymModel.init_sensor_dict`
 
 Signature:
-
 ```python
 def init_sensor_dict(self, sensor_dict)
 ```
 
-Docstring:
-
+Description:
 初始化传感器字典，识别传感器类型
 
 术语说明:
@@ -3023,52 +2573,42 @@ Docstring:
     # 可以通过以下方式查询:
     sensor_data = self.query_sensor_data(["imu_accelerometer", "imu_gyro"])
     ```
-##### `OrcaGymModel.gen_sensor_dict`
+#### `OrcaGymModel.gen_sensor_dict`
 
 Signature:
-
 ```python
 def gen_sensor_dict(self)
 ```
 
-Docstring:
-
+Description:
 获取所有传感器字典
-##### `OrcaGymModel.get_sensor`
+#### `OrcaGymModel.get_sensor`
 
 Signature:
-
 ```python
 def get_sensor(self, name_or_id)
 ```
 
-Docstring:
-
+Description:
 根据名称或ID获取传感器信息
-##### `OrcaGymModel.sensor_name2id`
+#### `OrcaGymModel.sensor_name2id`
 
 Signature:
-
 ```python
 def sensor_name2id(self, sensor_name)
 ```
 
-Docstring:
-
+Description:
 传感器名称转ID
-##### `OrcaGymModel.sensor_id2name`
+#### `OrcaGymModel.sensor_id2name`
 
 Signature:
-
 ```python
 def sensor_id2name(self, sensor_id)
 ```
 
-Docstring:
-
+Description:
 传感器ID转名称
-</details>
-
 
 ---
 
@@ -3076,8 +2616,7 @@ Docstring:
 
 中文概览：核心层：Model/Data/Local backend 与 MuJoCo 控制查询接口。
 
-<details>
-<summary>Module docstring</summary>
+### Module docstring
 
 OrcaGymOptConfig - MuJoCo 仿真器优化配置
 
@@ -3099,4 +2638,3 @@ OrcaGymOptConfig - MuJoCo 仿真器优化配置
     solver = env.gym.opt.solver
     ```
 
-</details>
