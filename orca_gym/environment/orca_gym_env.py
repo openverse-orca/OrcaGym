@@ -14,7 +14,7 @@ import sys
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
 
-from orca_gym import OrcaGymRemote, OrcaGymLocal
+from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 

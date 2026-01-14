@@ -29,28 +29,32 @@ from datetime import datetime
 
 class OrcaGymOptConfig:
     """
-    MuJoCo 仿真器优化配置容器
-    
-    存储 MuJoCo 仿真器的所有配置参数，包括时间步长、求解器、积分器、
-    碰撞检测、物理参数等。这些参数影响仿真的精度、稳定性和性能。
-    
-    配置参数分类:
-        1. 时间相关: timestep, apirate
-        2. 求解器相关: solver, iterations, tolerance
-        3. 物理参数: gravity, density, viscosity, wind, magnetic
-        4. 接触参数: o_margin, o_solref, o_solimp, o_friction
-        5. 积分器: integrator, impratio
-        6. 碰撞检测: ccd_tolerance, ccd_iterations
-        7. 其他: jacobian, cone, disableflags, enableflags
-    
-    使用示例:
-        ```python
-        # 访问时间步长
-        dt = self.gym.opt.timestep * self.frame_skip
-        
-        # 访问重力
-        gravity = self.gym.opt.gravity  # [x, y, z]
-        ```
+    MuJoCo 优化配置容器（`opt` 参数的封装）。
+
+    用途：
+    - 存储 MuJoCo 仿真器的所有配置参数（时间步长、求解器、积分器、碰撞检测、物理参数等）。
+    - 这些参数影响仿真的精度、稳定性和性能。
+    - 常用于解释 `env.dt`、控制频率、稳定性/性能权衡。
+
+    配置参数分类：
+    - 时间相关：`timestep`、`apirate`
+    - 求解器相关：`solver`、`iterations`、`tolerance`
+    - 物理参数：`gravity`、`density`、`viscosity`、`wind`、`magnetic`
+    - 接触参数：`o_margin`、`o_solref`、`o_solimp`、`o_friction`
+    - 积分器：`integrator`、`impratio`
+    - 碰撞检测：`ccd_tolerance`、`ccd_iterations`
+
+    术语速查（面向首次接触 MuJoCo 优化的读者）：
+    - `timestep`：物理仿真时间步长（秒），通常为 0.001-0.01；越小越精确但计算越慢；`env.dt = timestep * frame_skip`
+    - `solver`：求解器类型，用于求解约束优化问题（如 CG、Newton 等）
+    - `iterations`：求解器迭代次数，越多越精确但计算越慢
+    - `tolerance`：求解器容差，越小越精确但迭代次数越多
+    - `gravity`：重力加速度 `[x, y, z]`，通常为 `[0, 0, -9.81]` m/s²
+    - `o_margin/o_solref/o_solimp/o_friction`：接触约束参数，控制碰撞/接触的刚度和行为
+
+    注意：
+    - 该对象在环境初始化时从服务器获取（通过 `query_opt_config()`）。
+    - 通过 `env.gym.opt` 访问；修改配置需调用 `set_opt_config()` 同步到本地模型。
     """
 
     def __init__(self, opt_config: dict):

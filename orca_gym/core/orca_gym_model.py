@@ -12,6 +12,33 @@ _logger = get_orca_logger()
 
 
 class OrcaGymModel:
+    """
+    静态模型信息容器（MuJoCo 模型的封装）。
+
+    用途：
+    - 存储模型的静态信息（body、joint、actuator、site、sensor、等式约束、mocap 等）。
+    - 提供名称与 ID 的双向映射（`body_name2id`、`joint_name2id` 等）。
+    - 提供结构查询接口（`get_body_names`、`get_actuator_ctrlrange` 等），用于环境初始化与观测构建。
+
+    关键字段（维度参数）：
+    - `nq`：`qpos` 长度（广义坐标数）
+    - `nv`：`qvel/qacc` 长度（自由度数）
+    - `nu`：执行器数量（动作空间维度）
+    - `ngeom`：几何体数量
+
+    术语速查（面向首次接触 MuJoCo 模型的读者）：
+    - Body：刚体，物理仿真的基本单元；每个 body 有质量、惯性、位置、姿态等属性
+    - Joint：关节，连接两个 body 的约束，定义相对运动（旋转/滑动/自由等）
+    - Actuator：执行器，驱动关节的元件（电机/液压缸等），对应动作空间的维度
+    - Site：标记点，不参与物理仿真，用于标记关键位置（如末端执行器、目标点）
+    - Sensor：传感器，测量物理量的虚拟设备（加速度计、陀螺仪、触觉等）
+    - 等式约束（Equality Constraint）：强制两个 body 满足某种关系的约束（WELD/CONNECT 等），常用于抓取/固定物体
+    - Mocap Body：可自由移动的虚拟 body，不受物理约束，常配合等式约束实现物体操作
+
+    注意：
+    - 该对象在环境初始化时由 backend 填充（通过 `query_all_*` 系列方法）。
+    - 名称与 ID 的映射在初始化后保持不变（除非模型被重新加载）。
+    """
     mjEQ_CONNECT = 0       # connect two bodies at a point (ball joint)
     mjEQ_WELD = 1          # fix relative position and orientation of two bodies
     mjEQ_JOINT = 2         # couple the values of two scalar joints with cubic

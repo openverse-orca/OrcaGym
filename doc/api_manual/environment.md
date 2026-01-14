@@ -9,7 +9,7 @@
 
 - **索引优先**：每个模块和类都提供索引表格，方便快速浏览和定位
 - **详情展开**：点击或展开详情部分，查看完整的方法签名、参数说明和使用示例
-- **面向本地环境**：本手册主要覆盖本地环境实现（`OrcaGymLocalEnv`），远程环境（`OrcaGymRemoteEnv`）相关内容已省略
+- **面向本地环境**：本手册主要覆盖本地环境实现（`OrcaGymLocalEnv`）
 - **仅公开接口**：只列出 public 符号（不以下划线开头），聚焦实际可用的 API
 
 ### 如何使用本手册
@@ -58,8 +58,52 @@
 <details>
 <summary>Class docstring</summary>
 
-_No docstring._
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -634,8 +678,52 @@ _No docstring._
 <details>
 <summary>Class docstring</summary>
 
-_No docstring._
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -931,7 +1019,6 @@ The Vector Environments have the additional attributes for users to understand t
 - :attr:`single_observation_space` - The observation space of a single sub-environment
 - :attr:`action_space` - The batched action space of the vector environment
 - :attr:`single_action_space` - The action space of a single sub-environment
-
 </details>
 
 
@@ -1095,8 +1182,52 @@ Args:
 <details>
 <summary>Class docstring</summary>
 
-Wrap the SingleAgentEnvRunner to support orca gym asynchronous environments.
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -1146,32 +1277,52 @@ with the updated configuration.
 <details>
 <summary>Class docstring</summary>
 
-Creates a multiprocess vectorized wrapper for multiple environments, distributing each environment to its own
-process, allowing significant speed up when the environment is computationally complex.
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
-For performance reasons, if your environment is not IO bound, the number of environments should not exceed the
-number of logical cores on your CPU.
-
-.. warning::
-
-    Only 'forkserver' and 'spawn' start methods are thread-safe,
-    which is important when TensorFlow sessions or other non thread-safe
-    libraries are used in the parent (see issue #217). However, compared to
-    'fork' they incur a small start-up cost and have restrictions on
-    global variables. With those methods, users must wrap the code in an
-    ``if __name__ == "__main__":`` block.
-    For more information, see the multiprocessing documentation.
-
-:param env_fns: Environments to run in subprocesses
-:param start_method: method used to start the subprocesses.
-       Must be one of the methods returned by multiprocessing.get_all_start_methods().
-       Defaults to 'forkserver' on available platforms, and 'spawn' otherwise.
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
 
 
-修改baseline3中的SubprocVecEnv，对于每个环境，创建 agent_num 个智能体，每个智能体共享一个环境
-通过拼接每个agent的action和obs，来实现异步多环境的功能
-agent_num: 每个环境中智能体的数量
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
 
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -1369,8 +1520,52 @@ _No docstring._
 <details>
 <summary>Class docstring</summary>
 
-_No docstring._
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -1381,8 +1576,52 @@ _No docstring._
 <details>
 <summary>Class docstring</summary>
 
-Superclass for all OrcaSim environments.
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -1695,12 +1934,11 @@ def dt(self) -> float
     # 计算控制频率
     REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP
     CONTROL_FREQ = 1 / REALTIME_STEP  # 50 Hz
-    
+
     # 在循环中使用
     dt = env.dt  # 获取环境时间步长
     sim_time += dt  # 累计仿真时间
     ```
-
 </details>
 
 
@@ -1848,8 +2086,52 @@ Set the time step of the simulation.
 <details>
 <summary>Class docstring</summary>
 
-_No docstring._
+实现基于多个Agent的向量环境。
+这样可以用一个Mujoco Instance 来同时运行多个 env
+最后转换成VectorEnv的接口格式
 
+# ┌────────────┬────────────────┬──────────────────────┐
+# │            │ Mujoco Env     │ Robots in Mujoco     │
+# ├────────────┼────────────────┼──────────────────────┤
+# │ Vector Env │ OrcaGymAsyncEnv│ num_envs             │
+# │ RLLib      │ num_env_runners│ num_envs_per_runner  │
+# │ LeggedGym  │ subenv_num     │ agent_num            │
+# └────────────┴────────────────┴──────────────────────┘
+
+
+Base class for vectorized environments to run multiple independent copies of the same environment in parallel.
+
+Vector environments can provide a linear speed-up in the steps taken per second through sampling multiple
+sub-environments at the same time. Gymnasium contains two generalised Vector environments: :class:`AsyncVectorEnv`
+and :class:`SyncVectorEnv` along with several custom vector environment implementations.
+For :func:`reset` and :func:`step` batches `observations`, `rewards`,  `terminations`, `truncations` and
+`info` for each sub-environment, see the example below. For the `rewards`, `terminations`, and `truncations`,
+the data is packaged into a NumPy array of shape `(num_envs,)`. For `observations` (and `actions`, the batching
+process is dependent on the type of observation (and action) space, and generally optimised for neural network
+input/outputs. For `info`, the data is kept as a dictionary such that a key will give the data for all sub-environment.
+
+For creating environments, :func:`make_vec` is a vector environment equivalent to :func:`make` for easily creating
+vector environments that contains several unique arguments for modifying environment qualities, number of environment,
+vectorizer type, vectorizer arguments.
+
+Note:
+    The info parameter of :meth:`reset` and :meth:`step` was originally implemented before v0.25 as a list
+    of dictionary for each sub-environment. However, this was modified in v0.25+ to be a dictionary with a NumPy
+    array for each key. To use the old info style, utilise the :class:`DictInfoToList` wrapper.
+
+To avoid having to wait for all sub-environments to terminated before resetting, implementations will autoreset
+sub-environments on episode end (`terminated or truncated is True`). As a result, when adding observations
+to a replay buffer, this requires knowing when an observation (and info) for each sub-environment are the first
+observation from an autoreset. We recommend using an additional variable to store this information such as
+``has_autoreset = np.logical_or(terminated, truncated)``.
+
+The Vector Environments have the additional attributes for users to understand the implementation
+
+- :attr:`num_envs` - The number of sub-environment in the vector environment
+- :attr:`observation_space` - The batched observation space of the vector environment
+- :attr:`single_observation_space` - The observation space of a single sub-environment
+- :attr:`action_space` - The batched action space of the vector environment
+- :attr:`single_action_space` - The action space of a single sub-environment
 </details>
 
 
@@ -2369,15 +2651,14 @@ def mj_forward(self)
     ```python
     # 在初始化时调用，避免 NaN 错误
     self.mj_forward()
-    
+
     # 在设置初始状态后调用
     self.set_ctrl(self.ctrl)
     self.mj_forward()
-    
+
     # 在重置后调用
     self.mj_forward()
     ```
-
 </details>
 
 
@@ -2479,11 +2760,10 @@ def update_data(self)
     # 在 do_simulation 中自动调用
     self._step_orca_sim_simulation(ctrl, n_frames)
     self.gym.update_data()  # 同步最新状态
-    
+
     # 之后可以安全访问 self.data.qpos, self.data.qvel 等
     current_qpos = self.data.qpos.copy()
     ```
-
 </details>
 
 
@@ -2537,12 +2817,11 @@ def init_qpos_qvel(self)
     self.model, self.data = self.initialize_simulation()
     self.reset_simulation()
     self.init_qpos_qvel()  # 保存初始状态
-    
+
     # 在 reset_model 中使用
     self.data.qpos[:] = self.init_qpos  # 恢复到初始位置
     self.data.qvel[:] = self.init_qvel  # 恢复到初始速度
     ```
-
 </details>
 
 
@@ -2669,11 +2948,10 @@ def query_joint_qpos(self, joint_names)
     # 查询特定关节位置
     joint_pos = self.query_joint_qpos(["joint1", "joint2", "joint3"])
     # 返回: {"joint1": value1, "joint2": value2, "joint3": value3}
-    
+
     # 用于构建观测空间
     obs["joint_pos"] = np.array([joint_pos[name] for name in joint_names])
     ```
-
 </details>
 
 
@@ -2697,11 +2975,10 @@ def query_joint_qvel(self, joint_names)
     # 查询关节速度用于观测
     joint_vel = self.query_joint_qvel(["joint1", "joint2"])
     # 返回: {"joint1": vel1, "joint2": vel2}
-    
+
     # 用于计算奖励（速度惩罚）
     vel_penalty = sum(abs(v) for v in joint_vel.values())
     ```
-
 </details>
 
 
@@ -2832,12 +3109,11 @@ Returns:
     ee_site = self.query_site_pos_and_quat(["end_effector"])
     ee_pos = ee_site["end_effector"]["xpos"]  # [x, y, z]
     ee_quat = ee_site["end_effector"]["xquat"]  # [w, x, y, z]
-    
+
     # 用于计算到目标的距离
     target_site = self.query_site_pos_and_quat(["target"])
     distance = np.linalg.norm(ee_pos - target_site["target"]["xpos"])
     ```
-
 </details>
 
 
@@ -2879,12 +3155,11 @@ def query_site_pos_and_quat_B(self, site_names, base_body_list) -> Dict[str, Dic
     ```python
     # 查询末端执行器相对于基座的位置
     ee_pos_B, ee_quat_B = self.query_site_pos_and_quat_B(
-        ["end_effector"], 
+        ["end_effector"],
         ["base_link"]
     )
     # 返回的是相对于基座的位置，用于逆运动学计算
     ```
-
 </details>
 
 
@@ -3036,7 +3311,7 @@ Args:
         }
     })
     self.mj_forward()  # 更新状态
-    
+
     # 释放物体时移动到远处
     self.set_mocap_pos_and_quat({
         self._anchor_body_name: {
@@ -3045,7 +3320,6 @@ Args:
         }
     })
     ```
-
 </details>
 
 

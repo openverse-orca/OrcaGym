@@ -1,7 +1,7 @@
 # OrcaGym API Reference (Markdown)
 
 > 本文件是 **单文件 API Reference**，用于开发者快速查接口，也便于 AI 检索与引用。  
-> 文档范围以 `orca_gym` 里 **相对稳定的 core + local env** 为主；远程（`OrcaGymRemote`）相关内容本文件暂不展开。
+> 文档范围以 `orca_gym` 里 **相对稳定的 core + local env** 为主；远程相关内容本文件暂不展开。
 
 ## 0. 文档导航（索引/细节/手册）
 
