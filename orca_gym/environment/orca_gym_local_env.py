@@ -77,6 +77,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def initialize_simulation(
         self,
     ) -> Tuple[OrcaGymModel, OrcaGymData]:
+        """初始化仿真，加载模型并创建模型和数据对象"""
         _logger.info(f"Initializing simulation: Class: {self.__class__.__name__}")
         model_xml_path = self.loop.run_until_complete(self._load_model_xml())
         self.loop.run_until_complete(self._initialize_orca_sim(model_xml_path))
@@ -85,14 +86,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return model, data
     
     async def _load_model_xml(self):
+        """异步加载模型 XML 文件路径"""
         model_xml_path = await self.gym.load_model_xml()
         return model_xml_path
 
     async def _initialize_orca_sim(self, model_xml_path):
+        """异步初始化 OrcaSim 仿真"""
         await self.gym.init_simulation(model_xml_path)
         return
 
     def initialize_grpc(self):
+        """初始化 gRPC 通信通道和客户端"""
         self.channel = grpc.aio.insecure_channel(
             self.orcagym_addr,
             options=[
@@ -104,16 +108,20 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.gym = OrcaGymLocal(self.stub)
     
     def pause_simulation(self):
+        """暂停仿真（采用被动模式）"""
         self.loop.run_until_complete(self._pause_simulation())
 
     async def _pause_simulation(self):
+        """异步暂停仿真"""
         await self.gym.pause_simulation()
 
     async def _close_grpc(self):
+        """异步关闭 gRPC 通道"""
         if self.channel:
             await self.channel.close()
 
     def close(self):
+        """关闭环境，清理资源"""
         self.loop.run_until_complete(self._close_grpc())
 
     async def _get_body_manipulation_anchored(self):
@@ -179,7 +187,32 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def do_simulation(self, ctrl, n_frames) -> None:
         """
-        Step the simulation n number of frames and applying a control action.
+        执行仿真步进：设置控制并步进 n_frames 次，然后同步数据
+        
+        这是环境 step() 函数的核心方法，执行一次完整的仿真步进。
+        包括：设置控制输入、执行物理步进、同步最新状态。
+        
+        Args:
+            ctrl: 控制输入数组，形状 (nu,)，nu 为执行器数量
+            n_frames: 步进次数，通常等于 frame_skip
+        
+        使用示例:
+            ```python
+            # 在 step 函数中执行仿真
+            for _ in range(self._action_skip):
+                # 计算扭矩控制
+                torque_ctrl = agent.compute_torques(self.data.qpos, self.data.qvel)
+                self.set_ctrl(torque_ctrl)
+                # 执行仿真步进
+                self.do_simulation(self.ctrl, self.frame_skip)
+            ```
+        
+        使用示例:
+            ```python
+            # 在 step 中执行多次物理步进（decimation）
+            for _ in range(self.decimation):
+                self.do_simulation(self.ctrl, 1)  # 每次步进1个物理步
+            ```
         """
         # Check control input is contained in the action space
         if np.array(ctrl).shape != (self.model.nu,):
@@ -347,25 +380,116 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.mj_forward()
 
     def set_ctrl(self, ctrl):
+        """
+        设置控制输入（执行器命令）
+        
+        设置所有执行器的控制值，形状必须为 (nu,)，其中 nu 是执行器数量。
+        通常在调用 mj_step() 之前设置。
+        
+        使用示例:
+            ```python
+            # 在重置时清零控制
+            self.ctrl = np.zeros(self.nu)
+            self.set_ctrl(self.ctrl)
+            self.mj_forward()
+            ```
+        
+        使用示例:
+            ```python
+            # 准备控制数组
+            self.ctrl = np.zeros(self.nu, dtype=np.float32)
+            # ... 计算控制值 ...
+            self.set_ctrl(self.ctrl)
+            ```
+        """
         self.gym.set_ctrl(ctrl)
 
     def mj_step(self, nstep):
+        """
+        执行 MuJoCo 仿真步进
+        
+        执行 nstep 次物理仿真步进，每次步进的时间为 timestep。
+        在调用前需要先设置控制输入 (set_ctrl)。
+        
+        使用示例:
+            ```python
+            # 在 step 函数中执行仿真
+            self.set_ctrl(self.ctrl)
+            self.do_simulation(self.ctrl, self.frame_skip)  # 内部调用 mj_step
+            ```
+        """
         self.gym.mj_step(nstep)
 
     def mj_forward(self):
+        """
+        执行 MuJoCo 前向计算（更新动力学状态）
+        
+        更新所有动力学相关状态，包括位置、速度、加速度、力等。
+        在设置关节状态、mocap 位置等操作后需要调用，确保状态一致。
+        
+        使用示例:
+            ```python
+            # 在初始化时调用，避免 NaN 错误
+            self.mj_forward()
+            
+            # 在设置初始状态后调用
+            self.set_ctrl(self.ctrl)
+            self.mj_forward()
+            
+            # 在重置后调用
+            self.mj_forward()
+            ```
+        """
         self.gym.mj_forward()
 
     def mj_jacBody(self, jacp, jacr, body_id):
+        """
+        计算 body 的雅可比矩阵（位置和旋转）
+        
+        术语说明:
+            - 雅可比矩阵 (Jacobian Matrix): 描述关节速度到 body 速度的线性映射关系
+            - jacp: 位置雅可比，形状 (3, nv)，将关节速度映射到 body 的线性速度
+            - jacr: 旋转雅可比，形状 (3, nv)，将关节速度映射到 body 的角速度
+            - 用途: 用于逆运动学、速度控制、力控制等算法
+        
+        使用示例:
+            ```python
+            # 计算末端执行器的雅可比矩阵
+            jacp = np.zeros((3, self.model.nv))
+            jacr = np.zeros((3, self.model.nv))
+            body_id = self.model.body_name2id("end_effector")
+            self.mj_jacBody(jacp, jacr, body_id)
+            # 计算末端执行器速度: v = jacp @ qvel, omega = jacr @ qvel
+            ```
+        """
         self.gym.mj_jacBody(jacp, jacr, body_id)
 
     def mj_jacSite(self, jacp, jacr, site_name):
+        """
+        计算 site 的雅可比矩阵（位置和旋转）
+        
+        术语说明:
+            - 雅可比矩阵: 详见 mj_jacBody 的说明
+            - Site: 标记点，详见 init_site_dict 的说明
+        
+        使用示例:
+            ```python
+            # 计算 site 的雅可比矩阵用于速度计算
+            query_dict = self.gym.mj_jac_site(["end_effector"])
+            jacp = query_dict["end_effector"]["jacp"]  # (3, nv)
+            jacr = query_dict["end_effector"]["jacr"]  # (3, nv)
+            # 计算 site 速度: v = jacp @ self.data.qvel
+            ```
+        """
         self.gym.mj_jacSite(jacp, jacr, site_name)
 
     def _step_orca_sim_simulation(self, ctrl, n_frames):
+        """执行仿真步进：设置控制并步进 n_frames 次"""
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
 
     def set_time_step(self, time_step):
+        """设置仿真时间步长"""
         self.time_step = time_step
         self.realtime_step = time_step * self.frame_skip
         self.gym.set_time_step(time_step)
@@ -373,28 +497,121 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return
 
     def update_data(self):
+        """
+        从服务器同步最新的仿真数据
+        
+        从 OrcaSim 服务器获取最新的 qpos、qvel、qacc 等状态数据，
+        更新到本地的 self.data 中。在每次仿真步进后自动调用。
+        
+        使用示例:
+            ```python
+            # 在 do_simulation 中自动调用
+            self._step_orca_sim_simulation(ctrl, n_frames)
+            self.gym.update_data()  # 同步最新状态
+            
+            # 之后可以安全访问 self.data.qpos, self.data.qvel 等
+            current_qpos = self.data.qpos.copy()
+            ```
+        """
         self.gym.update_data()
         return
 
     def reset_simulation(self):
+        """
+        重置仿真到初始状态
+        
+        加载初始帧，同步数据，并重新设置时间步长。
+        在环境 reset() 时调用，将仿真恢复到初始状态。
+        
+        使用示例:
+            ```python
+            # 在 reset 函数中调用
+            def reset(self, seed=None, options=None):
+                self.reset_simulation()  # 重置到初始状态
+                obs, info = self.reset_model()  # 重置模型特定状态
+                return obs, info
+            ```
+        """
         self.gym.load_initial_frame()
         self.gym.update_data()
         self.set_time_step(self.time_step)
 
     def init_qpos_qvel(self):
+        """
+        初始化并保存初始关节位置和速度
+        
+        在环境初始化时调用，保存初始状态用于后续重置。
+        保存的值可以通过 self.init_qpos 和 self.init_qvel 访问。
+        
+        使用示例:
+            ```python
+            # 在 __init__ 中调用
+            self.model, self.data = self.initialize_simulation()
+            self.reset_simulation()
+            self.init_qpos_qvel()  # 保存初始状态
+            
+            # 在 reset_model 中使用
+            self.data.qpos[:] = self.init_qpos  # 恢复到初始位置
+            self.data.qvel[:] = self.init_qvel  # 恢复到初始速度
+            ```
+        """
         self.gym.update_data()
         self.init_qpos = self.gym.data.qpos.ravel().copy()
         self.init_qvel = self.gym.data.qvel.ravel().copy()
 
     def query_joint_offsets(self, joint_names) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        """查询关节在状态数组中的偏移量（位置、速度、加速度）"""
         qpos_offsets, qvel_offsets, qacc_offsets = self.gym.query_joint_offsets(joint_names)
         return qpos_offsets, qvel_offsets, qacc_offsets
     
     def query_joint_lengths(self, joint_names):
+        """查询关节状态数组的长度（位置、速度、加速度维度）"""
         qpos_lengths, qvel_lengths, qacc_lengths = self.gym.query_joint_lengths(joint_names)
         return qpos_lengths, qvel_lengths, qacc_lengths
     
     def get_body_xpos_xmat_xquat(self, body_name_list):
+        """
+        获取 body 的位姿（位置、旋转矩阵、四元数）
+        
+        返回指定 body 在世界坐标系中的位置、旋转矩阵和四元数。
+        这是最常用的位姿查询方法，用于获取机器人基座、末端执行器等关键 body 的位姿。
+        
+        术语说明:
+            - 位姿 (Pose): 物体的位置和姿态的组合
+            - 位置 (Position): 物体在空间中的坐标 [x, y, z]
+            - 旋转矩阵 (Rotation Matrix): 3x3 矩阵，描述物体的旋转姿态
+            - 四元数 (Quaternion): [w, x, y, z] 格式，用于表示旋转，避免万向锁问题
+            - 世界坐标系: 固定的全局坐标系，所有位置和姿态都相对于此坐标系
+        
+        Args:
+            body_name_list: body 名称列表，如 ["base_link", "end_effector"]
+        
+        Returns:
+            xpos: 位置数组，形状 (len(body_name_list)*3,)，每3个元素为一个 body 的 [x, y, z]
+            xmat: 旋转矩阵数组，形状 (len(body_name_list)*9,)，每9个元素为一个 body 的 3x3 矩阵（按行展开）
+            xquat: 四元数数组，形状 (len(body_name_list)*4,)，每4个元素为一个 body 的 [w, x, y, z]
+        
+        使用示例:
+            ```python
+            # 获取相机 body 的位姿
+            camera_pos, _, camera_quat = self.get_body_xpos_xmat_xquat([self._camera_body_name])
+            # camera_pos: [x, y, z]
+            # camera_quat: [w, x, y, z]
+            ```
+        
+        使用示例:
+            ```python
+            # 获取基座位置用于计算高度
+            base_pos, _, _ = self.get_body_xpos_xmat_xquat([self.base_body_name])
+            real_base_z = float(base_pos[2])  # z 坐标
+            ```
+        
+        使用示例:
+            ```python
+            # 获取锚点 body 的位姿用于物体操作
+            anchor_xpos, anchor_xmat, anchor_xquat = self.get_body_xpos_xmat_xquat([self._anchor_body_name])
+            ```
+        """
         body_dict = self.gym.query_body_xpos_xmat_xquat(body_name_list)
         if len(body_dict) != len(body_name_list):
             _logger.error(f"Body Name List: {body_name_list}")
@@ -406,30 +623,104 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return xpos, xmat, xquat
     
     def query_sensor_data(self, sensor_names):
+        """查询传感器数据"""
         sensor_data_dict = self.gym.query_sensor_data(sensor_names)
         return sensor_data_dict
     
     def query_joint_qpos(self, joint_names):
+        """
+        查询关节位置
+        
+        返回指定关节的当前位置，字典格式，键为关节名称，值为位置值或数组。
+        
+        使用示例:
+            ```python
+            # 查询特定关节位置
+            joint_pos = self.query_joint_qpos(["joint1", "joint2", "joint3"])
+            # 返回: {"joint1": value1, "joint2": value2, "joint3": value3}
+            
+            # 用于构建观测空间
+            obs["joint_pos"] = np.array([joint_pos[name] for name in joint_names])
+            ```
+        """
         joint_qpos_dict = self.gym.query_joint_qpos(joint_names)
         return joint_qpos_dict
     
     def query_joint_qvel(self, joint_names):
+        """
+        查询关节速度
+        
+        返回指定关节的当前速度，字典格式，键为关节名称，值为速度值或数组。
+        
+        使用示例:
+            ```python
+            # 查询关节速度用于观测
+            joint_vel = self.query_joint_qvel(["joint1", "joint2"])
+            # 返回: {"joint1": vel1, "joint2": vel2}
+            
+            # 用于计算奖励（速度惩罚）
+            vel_penalty = sum(abs(v) for v in joint_vel.values())
+            ```
+        """
         joint_qvel_dict = self.gym.query_joint_qvel(joint_names)
         return joint_qvel_dict
     
     def query_joint_qacc(self, joint_names):
+        """
+        查询关节加速度
+        
+        返回指定关节的当前加速度，字典格式，键为关节名称，值为加速度值或数组。
+        
+        使用示例:
+            ```python
+            # 查询关节加速度
+            joint_acc = self.query_joint_qacc(["joint1", "joint2"])
+            # 用于分析运动状态或计算动力学
+            ```
+        """
         joint_qacc_dict = self.gym.query_joint_qacc(joint_names)
         return joint_qacc_dict
     
     def jnt_qposadr(self, joint_name):
+        """
+        获取关节在 qpos 数组中的起始地址
+        
+        返回关节在全局 qpos 数组中的起始索引，用于访问特定关节的位置数据。
+        不同关节类型占用的位置数量不同（旋转关节1个，自由关节7个等）。
+        
+        使用示例:
+            ```python
+            # 获取关节在 qpos 中的地址
+            joint_addr = self.jnt_qposadr("joint1")
+            joint_nq = self.model.get_joint_byname("joint1")["JointNq"]
+            # 提取该关节的位置
+            joint_qpos = self.data.qpos[joint_addr:joint_addr+joint_nq]
+            ```
+        """
         joint_qposadr = self.gym.jnt_qposadr(joint_name)
         return joint_qposadr
     
     def jnt_dofadr(self, joint_name):
+        """
+        获取关节在 qvel 数组中的起始地址
+        
+        返回关节在全局 qvel 数组中的起始索引，用于访问特定关节的速度数据。
+        通常等于自由度数量（旋转关节1个，自由关节6个等）。
+        
+        使用示例:
+            ```python
+            # 获取关节在 qvel 中的地址
+            joint_dofadr = self.jnt_dofadr("joint1")
+            joint_nv = self.model.get_joint_byname("joint1")["JointNv"]
+            # 提取该关节的速度
+            joint_qvel = self.data.qvel[joint_dofadr:joint_dofadr+joint_nv]
+            ```
+        """
         joint_dofadr = self.gym.jnt_dofadr(joint_name)
         return joint_dofadr
         
     def query_site_pos_and_mat(self, site_names):
+        """查询 site 的位置和旋转矩阵"""
         query_dict = self.gym.query_site_pos_and_mat(site_names)
         site_dict = {}
         for site in query_dict:
@@ -440,6 +731,32 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return site_dict
     
     def query_site_pos_and_quat(self, site_names) -> Dict[str, Dict[str, Union[NDArray[np.float64], NDArray[np.float64]]]]:
+        """
+        查询 site 的位置和四元数（从旋转矩阵转换）
+        
+        返回指定 site 在世界坐标系中的位置和四元数。
+        Site 通常用于标记末端执行器、目标点等关键位置。
+        
+        Args:
+            site_names: site 名称列表，如 ["end_effector", "target"]
+        
+        Returns:
+            字典，键为 site 名称，值为包含 'xpos' 和 'xquat' 的字典
+            - xpos: 位置数组 [x, y, z]
+            - xquat: 四元数 [w, x, y, z]
+        
+        使用示例:
+            ```python
+            # 查询末端执行器位姿
+            ee_site = self.query_site_pos_and_quat(["end_effector"])
+            ee_pos = ee_site["end_effector"]["xpos"]  # [x, y, z]
+            ee_quat = ee_site["end_effector"]["xquat"]  # [w, x, y, z]
+            
+            # 用于计算到目标的距离
+            target_site = self.query_site_pos_and_quat(["target"])
+            distance = np.linalg.norm(ee_pos - target_site["target"]["xpos"])
+            ```
+        """
         query_dict = self.gym.query_site_pos_and_mat(site_names)
         site_dict = {}
         for site in query_dict:
@@ -450,11 +767,30 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return site_dict
     
     def query_site_size(self, site_names):
+        """查询 site 的尺寸"""
         site_size_dict = self.gym.query_site_size(site_names)
         return site_size_dict
 
 
     def query_site_pos_and_quat_B(self, site_names, base_body_list) -> Dict[str, Dict[str, Union[NDArray[np.float32], NDArray[np.float32]]]]:
+        """
+        查询 site 相对于基座 body 的位置和四元数（基座坐标系）
+        
+        术语说明:
+            - 基座坐标系 (Base Frame): 以机器人基座为原点的局部坐标系
+            - 相对位姿: 相对于基座的位置和姿态，而不是世界坐标系
+            - 用途: 在机器人控制中，通常需要知道末端执行器相对于基座的位置
+        
+        使用示例:
+            ```python
+            # 查询末端执行器相对于基座的位置
+            ee_pos_B, ee_quat_B = self.query_site_pos_and_quat_B(
+                ["end_effector"], 
+                ["base_link"]
+            )
+            # 返回的是相对于基座的位置，用于逆运动学计算
+            ```
+        """
         site_dict = self.gym.query_site_pos_and_mat(site_names)
         base_pos, _, base_quat = self.get_body_xpos_xmat_xquat(base_body_list)
         site_pos_quat_B = {}
@@ -478,12 +814,41 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
 
     def set_joint_qpos(self, joint_qpos):
+        """
+        设置关节位置
+        
+        直接设置关节位置，用于重置或初始化机器人姿态。
+        设置后需要调用 mj_forward() 更新动力学状态。
+        
+        使用示例:
+            ```python
+            # 在重置时设置初始关节位置
+            initial_qpos = np.array([0.0, 0.5, -1.0, ...])  # 初始姿态
+            self.set_joint_qpos(initial_qpos)
+            self.mj_forward()  # 更新状态
+            ```
+        """
         self.gym.set_joint_qpos(joint_qpos)
 
     def set_joint_qvel(self, joint_qvel):
+        """
+        设置关节速度
+        
+        直接设置关节速度，用于重置或初始化机器人运动状态。
+        设置后需要调用 mj_forward() 更新动力学状态。
+        
+        使用示例:
+            ```python
+            # 在重置时清零速度
+            initial_qvel = np.zeros(self.model.nv)
+            self.set_joint_qvel(initial_qvel)
+            self.mj_forward()  # 更新状态
+            ```
+        """
         self.gym.set_joint_qvel(joint_qvel)
     
     def query_site_xvalp_xvalr(self, site_names) -> Tuple[Dict[str, NDArray[np.float64]], Dict[str, NDArray[np.float64]]]:
+        """查询 site 的线速度和角速度（世界坐标系）"""
         query_dict = self.gym.mj_jac_site(site_names)
         xvalp_dict = {}
         xvalr_dict = {}
@@ -494,6 +859,24 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return xvalp_dict, xvalr_dict        
     
     def query_site_xvalp_xvalr_B(self, site_names, base_body_list) -> Tuple[Dict[str, NDArray[np.float32]], Dict[str, NDArray[np.float32]]]:
+        """
+        查询 site 相对于基座 body 的线速度和角速度（基座坐标系）
+        
+        术语说明:
+            - 线速度 (Linear Velocity): 物体在空间中的移动速度 [vx, vy, vz]
+            - 角速度 (Angular Velocity): 物体绕轴旋转的速度 [wx, wy, wz]
+            - 基座坐标系: 详见 query_site_pos_and_quat_B 的说明
+        
+        使用示例:
+            ```python
+            # 查询末端执行器相对于基座的速度
+            linear_vel_B, angular_vel_B = self.query_site_xvalp_xvalr_B(
+                ["end_effector"],
+                ["base_link"]
+            )
+            # 用于速度控制或计算速度误差
+            ```
+        """
         query_dict = self.gym.mj_jac_site(site_names)
         _, base_mat, _ = self.get_body_xpos_xmat_xquat(base_body_list)
         xvalp_dict = {}
@@ -516,30 +899,68 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return xvalp_dict, xvalr_dict
     
     def update_equality_constraints(self, eq_list):
+        """更新等式约束列表"""
         self.gym.update_equality_constraints(eq_list)
 
     def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict):
+        """
+        设置 mocap body 的位置和四元数（用于物体操作）
+        
+        Mocap body 是用于物体操作的虚拟 body，通过设置其位姿可以控制被锚定的物体。
+        常用于实现抓取、拖拽等操作。
+        
+        Args:
+            mocap_pos_and_quat_dict: 字典，键为 mocap body 名称，值为包含 'pos' 和 'quat' 的字典
+                - pos: 位置数组 [x, y, z]
+                - quat: 四元数 [w, x, y, z]
+        
+        使用示例:
+            ```python
+            # 设置锚点位置用于物体操作
+            self.set_mocap_pos_and_quat({
+                self._anchor_body_name: {
+                    "pos": np.array([0.5, 0.0, 0.8], dtype=np.float64),
+                    "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+                }
+            })
+            self.mj_forward()  # 更新状态
+            
+            # 释放物体时移动到远处
+            self.set_mocap_pos_and_quat({
+                self._anchor_body_name: {
+                    "pos": np.array([0.0, 0.0, -1000.0], dtype=np.float64),
+                    "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+                }
+            })
+            ```
+        """
         send_remote = self.render_mode == "human" and not self.is_subenv
         self.loop.run_until_complete(self.gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict, send_remote))
 
     def query_contact_simple(self):
+        """查询简单接触信息"""
         return self.gym.query_contact_simple()
     
     def set_geom_friction(self, geom_friction_dict):
+        """设置几何体的摩擦系数"""
         self.gym.set_geom_friction(geom_friction_dict)
 
     def add_extra_weight(self, weight_load_dict):
+        """为 body 添加额外重量"""
         self.gym.add_extra_weight(weight_load_dict)
     
     def query_contact_force(self, contact_ids):
+        """查询接触力"""
         contact_force = self.gym.query_contact_force(contact_ids)
         return contact_force
     
     def get_cfrc_ext(self):
+        """获取外部约束力"""
         cfrc_ext = self.gym.get_cfrc_ext()
         return cfrc_ext
 
     def query_actuator_torques(self, actuator_names):
+        """查询执行器扭矩"""
         actuator_torques = self.gym.query_actuator_torques(actuator_names)
         return actuator_torques
 

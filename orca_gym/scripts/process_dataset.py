@@ -445,8 +445,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 定义输入和输出的基目录
-    # BASE_INPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
-    # BASE_OUTPUT_DIR = "/home/orcatest/Orcagym_kps/OrcaGym/examples/openpi/records_tmp/shop/"
     SCRIPT_PATH = os.path.abspath(__file__)
     # 向上递归查找 OrcaGym 根目录（假设脚本在 orca_gym/scripts 下，根目录是 OrcaGym 的父目录）
     ORCA_GYM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_PATH)))

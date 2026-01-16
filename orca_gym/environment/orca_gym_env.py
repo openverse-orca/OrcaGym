@@ -14,7 +14,7 @@ import sys
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
 
-from orca_gym import OrcaGymRemote, OrcaGymLocal
+from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
 from orca_gym.utils.rotations import mat2quat, quat2mat
 
@@ -101,7 +101,20 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     def generate_action_space(self, bounds : NDArray[np.float64]) -> Space:
         """
-        Generate the action space for the environment.
+        生成环境的动作空间
+        
+        术语说明:
+            - 动作空间 (Action Space): 强化学习中智能体可以执行的所有动作的集合
+            - Box Space: 连续动作空间，每个维度有上下界限制
+            - 动作: 发送给执行器的控制命令，通常是扭矩、位置或速度
+        
+        使用示例:
+            ```python
+            # 根据执行器控制范围生成动作空间
+            ctrlrange = self.model.get_actuator_ctrlrange()
+            self.action_space = self.generate_action_space(ctrlrange)
+            # 动作空间形状: (nu,)，每个值在 [min, max] 范围内
+            ```
         """
         low, high = 0.0, 0.0
         if len(bounds.T) > 0:
@@ -111,7 +124,21 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     def generate_observation_space(self, obs: Union[Dict[str, Any], np.ndarray]) -> spaces.Space:
         """
-        Generate the observation space for the environment.
+        生成环境的观测空间
+        
+        术语说明:
+            - 观测空间 (Observation Space): 强化学习中智能体能够观察到的状态信息集合
+            - 观测 (Observation): 智能体在每个时间步接收到的状态信息
+            - Dict Space: 字典类型的观测空间，包含多个子空间
+            - Box Space: 连续观测空间，每个维度有上下界限制
+        
+        使用示例:
+            ```python
+            # 根据观测数据生成观测空间
+            obs = self._get_obs()  # 获取示例观测
+            self.observation_space = self.generate_observation_space(obs)
+            # 观测空间可能是 Dict 或 Box，取决于 obs 的类型
+            ```
         """
         if obs is None:
             raise ValueError("obs dictionary is None")
@@ -170,29 +197,34 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         return obs, info
 
     def set_seed_value(self, seed=None):
+        """设置随机数种子"""
         self.seed_value = seed
         self.np_random = np.random.RandomState(seed)
         return [seed]
 
     def _name_with_agent0(self, name: str) -> str:
+        """为第一个智能体添加名称前缀"""
         if len(self._agent_names) > 0:
             return f"{self._agent_names[0]}_{name}"
         else:
             return name
         
     def _name_with_agent(self, agent_id: int, name: str) -> str:
+        """为指定智能体添加名称前缀"""
         if len(self._agent_names) > 0:
             return f"{self._agent_names[agent_id]}_{name}"
         else:
             return name
 
     def body(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的 body 名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
             return self._name_with_agent(agent_id, name)
         
     def joint(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的关节名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
@@ -200,6 +232,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         
     
     def actuator(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的执行器名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
@@ -207,6 +240,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         
     
     def site(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的 site 名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
@@ -214,12 +248,14 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         
     
     def mocap(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的 mocap 名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
             return self._name_with_agent(agent_id, name)
 
     def sensor(self, name: str, agent_id = None) -> str:
+        """获取带智能体前缀的传感器名称"""
         if agent_id == None:
             return self._name_with_agent0(name)
         else:
@@ -228,10 +264,34 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
 
     @property
     def dt(self) -> float:
+        """
+        获取环境时间步长（物理时间步长 × frame_skip）
+        
+        这是 Gym 环境的时间步长，即每次 step() 对应的时间间隔。
+        等于物理仿真时间步长乘以 frame_skip。
+        
+        术语说明:
+            - 时间步长 (Time Step): 每次仿真步进对应的时间间隔
+            - 物理时间步长 (Timestep): MuJoCo 物理引擎的时间步长，通常很小（如 0.001s）
+            - frame_skip: 每次 Gym step() 执行的物理步进次数，用于加速仿真
+            - 控制频率: 1/dt，表示每秒执行多少次控制更新
+        
+        使用示例:
+            ```python
+            # 计算控制频率
+            REALTIME_STEP = TIME_STEP * FRAME_SKIP * ACTION_SKIP
+            CONTROL_FREQ = 1 / REALTIME_STEP  # 50 Hz
+            
+            # 在循环中使用
+            dt = env.dt  # 获取环境时间步长
+            sim_time += dt  # 累计仿真时间
+            ```
+        """
         return self.gym.opt.timestep * self.frame_skip
     
     @property
     def agent_num(self) -> int:
+        """获取智能体数量"""
         return len(self._agent_names)
 
     def do_simulation(self, ctrl, n_frames) -> None:
