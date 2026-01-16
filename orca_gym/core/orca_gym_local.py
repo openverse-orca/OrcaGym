@@ -942,6 +942,28 @@ class OrcaGymLocal(OrcaGymBase):
     def mj_jacSite(self, jacp, jacr, site_id):
         mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, site_id)
 
+    def mj_apply_force_at_site(self, site_name: str, force: np.ndarray, torque: np.ndarray):
+        """
+        在指定 SITE 点施加力和力矩
+        
+        Args:
+            site_name: SITE 名称
+            force: 力向量 [fx, fy, fz]（3D numpy 数组）
+            torque: 力矩向量 [tx, ty, tz]（3D numpy 数组）
+        """
+        site_xpos = self._mjData.site(site_name).xpos
+        body_id = self.model.get_site(site_name)['BodyID']
+        
+        # 调用 mj_applyFT
+        mujoco.mj_applyFT(
+            self._mjModel,
+            self._mjData,
+            force,              # 力向量
+            torque,             # 力矩向量
+            site_xpos,          # 施力点
+            body_id             # 目标 body
+        )
+
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
         for joint_name in joint_names:

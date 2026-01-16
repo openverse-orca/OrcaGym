@@ -361,6 +361,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def mj_jacSite(self, jacp, jacr, site_name):
         self.gym.mj_jacSite(jacp, jacr, site_name)
 
+    def mj_apply_force_at_site(self, site_name, force, torque):
+        self.gym.mj_apply_force_at_site(site_name, force, torque)
+
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         self.set_ctrl(ctrl)
         self.mj_step(nstep=n_frames)
