@@ -951,8 +951,20 @@ class OrcaGymLocal(OrcaGymBase):
             force: 力向量 [fx, fy, fz]（3D numpy 数组）
             torque: 力矩向量 [tx, ty, tz]（3D numpy 数组）
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         site_xpos = self._mjData.site(site_name).xpos
         body_id = self.model.get_site(site_name)['BodyID']
+        
+        # 打印应用力之前的 qfrc_applied 状态（相关 DOF）
+        qfrc_before = self._mjData.qfrc_applied.copy()
+        logger.info(f"[DEBUG] Applying force to SITE '{site_name}':")
+        logger.info(f"[DEBUG]   - site_xpos: [{site_xpos[0]:.3f}, {site_xpos[1]:.3f}, {site_xpos[2]:.3f}]")
+        logger.info(f"[DEBUG]   - body_id: {body_id}")
+        logger.info(f"[DEBUG]   - force: [{force[0]:.3f}, {force[1]:.3f}, {force[2]:.3f}]")
+        logger.info(f"[DEBUG]   - torque: [{torque[0]:.3f}, {torque[1]:.3f}, {torque[2]:.3f}]")
+        logger.info(f"[DEBUG]   - qfrc_applied before (first 10 DOF): {qfrc_before[:10]}")
         
         # 调用 mj_applyFT
         mujoco.mj_applyFT(
@@ -961,8 +973,16 @@ class OrcaGymLocal(OrcaGymBase):
             force,              # 力向量
             torque,             # 力矩向量
             site_xpos,          # 施力点
-            body_id             # 目标 body
+            body_id,             # 目标 body
+            self._mjData.qfrc_applied  # 累积到 qfrc_applied
         )
+        
+        # 打印应用力之后的 qfrc_applied 状态
+        qfrc_after = self._mjData.qfrc_applied.copy()
+        qfrc_diff = qfrc_after - qfrc_before
+        logger.info(f"[DEBUG]   - qfrc_applied after (first 10 DOF): {qfrc_after[:10]}")
+        logger.info(f"[DEBUG]   - qfrc_applied diff (first 10 DOF): {qfrc_diff[:10]}")
+        logger.info(f"[DEBUG]   - Total qfrc_applied change: {np.linalg.norm(qfrc_diff):.6f}")
 
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
