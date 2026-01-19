@@ -153,10 +153,36 @@ class OrcaGymScene:
                 quat = actor.rotation,
                 scale = actor.scale,)
         
+        _logger.info(f"尝试添加 Actor: name='{actor.name}', spawnable_name='{actor.asset_path}', position={actor.position}, scale={actor.scale}")
         response = await self.stub.AddActor(request)
         if response.status != mjc_message_pb2.AddActorResponse.SUCCESS:
-            _logger.error(f"Add actor failed:  {response.error_message}")
-            raise Exception("Add actor failed.")
+            _logger.error("=" * 80)
+            _logger.error("添加 Actor 失败！详细信息：")
+            _logger.error(f"  Actor 名称 (name): '{actor.name}'")
+            _logger.error(f"  Spawnable 路径 (asset_path): '{actor.asset_path}'")
+            _logger.error(f"  位置 (position): {actor.position}")
+            _logger.error(f"  旋转 (rotation): {actor.rotation}")
+            _logger.error(f"  缩放 (scale): {actor.scale}")
+            _logger.error(f"  错误消息: {response.error_message}")
+            _logger.error("=" * 80)
+            _logger.error("可能的原因：")
+            if "already exists" in response.error_message.lower() or "name already" in response.error_message.lower():
+                _logger.error("  ⚠️  Actor 名称已存在！")
+                _logger.error("  - 场景中已经存在同名的 actor")
+                _logger.error("  - 解决方案：在添加 actor 之前先清空场景（调用 publish_scene() 发布空场景）")
+                _logger.error("  - 或者使用不同的 actor 名称")
+            elif "spawnable" in response.error_message.lower() and "not found" in response.error_message.lower():
+                _logger.error("  ⚠️  Spawnable 路径不存在！")
+                _logger.error("  1. Spawnable 路径不存在或拼写错误")
+                _logger.error("  2. 资产文件未正确导入到 OrcaStudio")
+                _logger.error("  3. 路径格式不正确（检查是否有双斜杠、路径分隔符等）")
+            else:
+                _logger.error("  1. Spawnable 路径不存在或拼写错误")
+                _logger.error("  2. 资产文件未正确导入到 OrcaStudio")
+                _logger.error("  3. 路径格式不正确（检查是否有双斜杠、路径分隔符等）")
+                _logger.error("  4. Actor 名称冲突（场景中已存在同名 actor）")
+            _logger.error("=" * 80)
+            raise Exception(f"Add actor failed. Actor name: '{actor.name}', Spawnable path: '{actor.asset_path}', Error: {response.error_message}")
         
     def add_actor(self, actor: Actor):
         self.loop.run_until_complete(self._add_actor(actor))
