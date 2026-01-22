@@ -160,10 +160,12 @@ class KeyboardInputSourceOrcaStudio:
     def update_keyboard_state(self, keyboard_state : dict[str, int]):
         key_pressed_events = self.get_key_pressed()
 
-        # print(f"Key pressed events: {key_pressed_events}")
+        # 先将所有映射的键重置为0
+        for key in self.keyboard_map.values():
+            if key in keyboard_state:
+                keyboard_state[key] = 0
 
-        [keyboard_state.update({key: 0}) for key in self.keyboard_map.values()]
-
+        # 然后设置按下的键为1
         for event in key_pressed_events:
             if event in self.keyboard_map:
                 key_name = self.keyboard_map[event]
@@ -188,7 +190,8 @@ class KeyboardInput:
             "W": 0, "A": 0, "S": 0, "D": 0,
             "Space": 0, "LShift": 0, "RShift": 0, "Ctrl": 0, "Alt": 0,
             "Esc": 0, "Enter": 0, "Up": 0, "Down": 0,
-            "Left": 0, "Right": 0, "Q": 0, "E": 0, "R": 0, "F": 0, "Z": 0, "X": 0, "Y": 0
+            "Left": 0, "Right": 0, "Q": 0, "E": 0, "R": 0, "F": 0, "Z": 0, "X": 0, "Y": 0,
+            "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0, "9": 0
         }
 
 
@@ -346,4 +349,3 @@ class KeyboardClient:
             finally:
                 self.client_socket.close()
                 _logger.info("键盘客户端已关闭")
-
