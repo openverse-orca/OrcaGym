@@ -946,43 +946,59 @@ class OrcaGymLocal(OrcaGymBase):
         """
         在指定 SITE 点施加力和力矩
         
+        直接操作 xfrc_applied，避免 mj_applyFT 只能作用于 qfrc_applied 的限制。
+        通过手动计算力产生的扭矩，将 site 点的力等效转换到 body 中心。
+        
+        物理原理：
+        - 力 F 作用在 site 点，等效到 body 中心时：
+        - 力不变：F_body = F
+        - 产生附加扭矩：τ_induced = r × F，其中 r = site_pos - body_pos
+        - 总扭矩：τ_total = r × F + τ_user
+        
         Args:
             site_name: SITE 名称
-            force: 力向量 [fx, fy, fz]（3D numpy 数组）
-            torque: 力矩向量 [tx, ty, tz]（3D numpy 数组）
+            force: 力向量 [fx, fy, fz]（world frame，3D numpy 数组）
+            torque: 力矩向量 [tx, ty, tz]（world frame，3D numpy 数组）
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        
         site_xpos = self._mjData.site(site_name).xpos
         body_id = self.model.get_site(site_name)['BodyID']
+        body_xpos = self._mjData.xpos[body_id]
         
-        # 打印应用力之前的 qfrc_applied 状态（相关 DOF）
-        qfrc_before = self._mjData.qfrc_applied.copy()
-        logger.debug(f"Applying force to SITE '{site_name}':")
-        logger.debug(f"  - site_xpos: [{site_xpos[0]:.3f}, {site_xpos[1]:.3f}, {site_xpos[2]:.3f}]")
-        logger.debug(f"  - body_id: {body_id}")
-        logger.debug(f"  - force: [{force[0]:.3f}, {force[1]:.3f}, {force[2]:.3f}]")
-        logger.debug(f"  - torque: [{torque[0]:.3f}, {torque[1]:.3f}, {torque[2]:.3f}]")
-        logger.debug(f"  - qfrc_applied before (first 10 DOF): {qfrc_before[:10]}")
+        # 计算力臂向量（从 body 中心指向 site）
+        r = site_xpos - body_xpos
         
-        # 调用 mj_applyFT
-        mujoco.mj_applyFT(
-            self._mjModel,
-            self._mjData,
-            force,              # 力向量
-            torque,             # 力矩向量
-            site_xpos,          # 施力点
-            body_id,             # 目标 body
-            self._mjData.qfrc_applied  # 累积到 qfrc_applied
-        )
+        # 力在 site 点产生的扭矩 = r × F（叉乘）
+        induced_torque = np.cross(r, force)
         
-        # 打印应用力之后的 qfrc_applied 状态
-        qfrc_after = self._mjData.qfrc_applied.copy()
-        qfrc_diff = qfrc_after - qfrc_before
-        logger.debug(f"   - qfrc_applied after (first 10 DOF): {qfrc_after[:10]}")
-        logger.debug(f"   - qfrc_applied diff (first 10 DOF): {qfrc_diff[:10]}")
-        logger.debug(f"   - Total qfrc_applied change: {np.linalg.norm(qfrc_diff):.6f}")
+        # 总扭矩 = 力产生的扭矩 + 用户指定的扭矩
+        total_torque = induced_torque + torque
+        
+        # 直接累加到 xfrc_applied（笛卡尔空间外力，world frame）
+        # 与 mj_clear_xfrc_applied_for_site 对称，都操作 xfrc_applied
+        self._mjData.xfrc_applied[body_id, :3] += force
+        self._mjData.xfrc_applied[body_id, 3:] += total_torque
+
+    def mj_clear_xfrc_applied_for_site(self, site_name: str):
+        """
+        清零指定 SITE 所属 body 的 xfrc_applied
+        
+        用于实现脉冲力：每帧清零上一帧的外力，避免累积误差
+        
+        Args:
+            site_name: SITE 名称
+        """
+        try:
+            site_id = mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_SITE, site_name)
+            if site_id < 0:
+                return  # site 不存在，静默返回
+            
+            body_id = self._mjModel.site_bodyid[site_id]
+            # 清零该 body 的 xfrc_applied (笛卡尔空间外力)
+            self._mjData.xfrc_applied[body_id] = 0
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to clear xfrc_applied for site '{site_name}': {e}")
 
     def query_joint_qpos(self, joint_names):
         joint_qpos_dict = {}
