@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orca-gym"
-version = "26.2.1.2"
+version = "26.2.1.3"
 description = "OrcaGym Core - Cloud-native robotics simulation platform compatible with Gymnasium API"
 readme = "README.md"
 requires-python = ">=3.9"
