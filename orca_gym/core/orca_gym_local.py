@@ -718,7 +718,9 @@ class OrcaGymLocal(OrcaGymBase):
         site_dict = {}
         for i in range(model.nsite):
             site = model.site(i)
-            bodyname = model.body(site.bodyid[0]).name
+            # Read user data if nuser_site > 0 (set via <size nuser_site="N"/> in MJCF).
+            # user[0] encodes particleRadius for _SPH_PARTICLE_RENDER_BOUNDS sites.
+            user_data = list(model.site_user[i]) if model.nuser_site > 0 else []
             site_dict[site.name] = {
                 "ID": site.id,
                 "BodyID": site.bodyid[0],
@@ -728,6 +730,7 @@ class OrcaGymLocal(OrcaGymBase):
                 "LocalPos": site.pos,
                 "LocalQuat": site.quat,
                 "Size": site.size,
+                "User": user_data,
             }
 
         return site_dict 
