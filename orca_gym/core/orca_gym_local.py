@@ -727,6 +727,7 @@ class OrcaGymLocal(OrcaGymBase):
                 "Mat": site.matid[0],
                 "LocalPos": site.pos,
                 "LocalQuat": site.quat,
+                "Size": site.size,
             }
 
         return site_dict 
