@@ -483,6 +483,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         """
         self.gym.mj_jacSite(jacp, jacr, site_name)
 
+    def mj_apply_force_at_site(self, site_name, force, torque):
+        self.gym.mj_apply_force_at_site(site_name, force, torque)
+
+    def mj_clear_xfrc_applied_for_site(self, site_name):
+        self.gym.mj_clear_xfrc_applied_for_site(site_name)
+
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         """执行仿真步进：设置控制并步进 n_frames 次"""
         self.set_ctrl(ctrl)

@@ -154,6 +154,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
                 _registered_method=True)
+        self.SetActorLuaParamString = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetActorLuaParamString',
+                request_serializer=mjc__message__pb2.SetActorLuaParamStringRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetActorLuaParamStringResponse.FromString,
+                _registered_method=True)
         self.QueryModelInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/QueryModelInfo',
                 request_serializer=mjc__message__pb2.QueryModelInfoRequest.SerializeToString,
@@ -618,6 +623,13 @@ class GrpcServiceServicer(object):
 
     def SetActorAnimParamString(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetActorLuaParamString(self, request, context):
+        """lua参数控制
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -1131,6 +1143,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetActorAnimParamString,
                     request_deserializer=mjc__message__pb2.SetActorAnimParamStringRequest.FromString,
                     response_serializer=mjc__message__pb2.SetActorAnimParamStringResponse.SerializeToString,
+            ),
+            'SetActorLuaParamString': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetActorLuaParamString,
+                    request_deserializer=mjc__message__pb2.SetActorLuaParamStringRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetActorLuaParamStringResponse.SerializeToString,
             ),
             'QueryModelInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.QueryModelInfo,
@@ -2096,6 +2113,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/SetActorAnimParamString',
             mjc__message__pb2.SetActorAnimParamStringRequest.SerializeToString,
             mjc__message__pb2.SetActorAnimParamStringResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetActorLuaParamString(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetActorLuaParamString',
+            mjc__message__pb2.SetActorLuaParamStringRequest.SerializeToString,
+            mjc__message__pb2.SetActorLuaParamStringResponse.FromString,
             options,
             channel_credentials,
             insecure,

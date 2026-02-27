@@ -293,3 +293,20 @@ class OrcaGymScene:
             
     def set_actor_anim_param_string(self, actor_name: str, param_name: str, value: str):
         self.loop.run_until_complete(self._set_actor_anim_param_string(actor_name, param_name, value))
+
+    
+
+    async def _set_actor_lua_param_string(self, actor_name: str, param_name: str, value: str):
+        async with self.lock:
+            request = mjc_message_pb2.SetActorLuaParamStringRequest(
+                actor_name = actor_name,
+                param_name = param_name,
+                value = value,)
+            
+            response = await self.stub.SetActorLuaParamString(request)
+            if response.status != mjc_message_pb2.SetActorLuaParamStringResponse.SUCCESS:
+                _logger.error(f"Set actor lua param string failed:  {response.error_message}")
+                raise Exception("Set actor lua param string failed.")
+            
+    def set_actor_lua_param_string(self, actor_name: str, param_name: str, value: str):
+        self.loop.run_until_complete(self._set_actor_lua_param_string(actor_name, param_name, value))
