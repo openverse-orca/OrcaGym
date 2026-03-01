@@ -71,7 +71,6 @@ class AlohaEnv(OrcaGymLocalEnv):
         self.nq = self.model.nq
         self.nv = self.model.nv        
         
-        self.gym._mjModel.opt.apirate = 100.0
         self.gym._mjModel.opt.ccd_iterations = 50
         self.gym._mjModel.opt.ccd_tolerance = 1e-06
         self.gym._mjModel.opt.cone = 0
