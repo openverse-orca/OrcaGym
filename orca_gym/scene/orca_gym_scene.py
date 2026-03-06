@@ -310,3 +310,89 @@ class OrcaGymScene:
             
     def set_actor_lua_param_string(self, actor_name: str, param_name: str, value: str):
         self.loop.run_until_complete(self._set_actor_lua_param_string(actor_name, param_name, value))
+
+    def set_ui_text(self, actor_name: int, 
+                    message: str = "", showtime: int = 0, blinkfreq: int = 0, 
+                    color: str = "", size: int = 0):
+        """
+        Set UI Text by formatting parameters and calling set_actor_lua_param_string.
+        
+        Args:
+            actor_name: The actor name as integer (1-6):
+                1: SimMessText
+                2: SimTipText
+                3: SimUpleftText
+                4: SimUprightText
+                5: SimBottomleft
+                6: SimBottomrightText
+            message: The text message to display.
+            showtime: The time to show the message (integer).
+            blinkfreq: The blink frequency (integer).
+            color: The color of the text.
+            size: The size of the text (integer).
+        """
+        # Map integer actor_name to string
+        actor_name_map = {
+            1: "SimMessText",
+            2: "SimTipText",
+            3: "SimUpleftText",
+            4: "SimUprightText",
+            5: "SimBottomleft",
+            6: "SimBottomrightText",
+        }
+        
+        if actor_name not in actor_name_map:
+            raise ValueError(f"Invalid actor_name: {actor_name}. Must be an integer between 1 and 6.")
+        
+        actor_name_str = actor_name_map[actor_name]
+        param_name = "SetText"  # Fixed parameter name
+        
+        # Format value string: message:"" showtime:"" blinkfreq:"" color:"" size:""
+        value_parts = [
+            f'message:"{message}"',
+            f'showtime:"{showtime}"',
+            f'blinkfreq:"{blinkfreq}"',
+            f'color:"{color}"',
+            f'size:"{size}"'
+        ]
+        value_str = " ".join(value_parts)
+        self.set_actor_lua_param_string(actor_name_str, param_name, value_str)
+
+    def set_image_enabled(self, actor_name: int, enabled: bool):
+        """
+        Set Image enabled/disabled by calling set_actor_lua_param_string.
+        
+        Args:
+            actor_name: The actor name as integer (0-1):
+                0: Imagemidlebig
+                1: Imagetoplit
+            enabled: Whether to enable the image (boolean, converted to "true" or "false").
+        """
+        # Map integer actor_name to string
+        actor_name_map = {
+            0: "Imagemidlebig",
+            1: "Imagetoplit",
+        }
+        
+        if actor_name not in actor_name_map:
+            raise ValueError(f"Invalid actor_name: {actor_name}. Must be an integer 0 or 1.")
+        
+        actor_name_str = actor_name_map[actor_name]
+        param_name = "SetImageEnabled"  # Fixed parameter name
+        value = "true" if enabled else "false"  # Convert boolean to string
+        
+        self.set_actor_lua_param_string(actor_name_str, param_name, value)
+
+    def get_rundata(self, scriptname: str, stepname: str):
+        """
+        Set data collection information by calling set_actor_lua_param_string.
+        
+        Args:
+            scriptname: The name of the script.
+            stepname: The name of the step.
+        """
+        actor_name = "httpdata"
+        param_name = "rundatacol"
+        value = f"scriptname:{scriptname} step: {stepname}"
+        
+        self.set_actor_lua_param_string(actor_name, param_name, value)
