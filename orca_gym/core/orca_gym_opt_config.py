@@ -37,7 +37,7 @@ class OrcaGymOptConfig:
     - 常用于解释 `env.dt`、控制频率、稳定性/性能权衡。
 
     配置参数分类：
-    - 时间相关：`timestep`、`apirate`
+    - 时间相关：`timestep`
     - 求解器相关：`solver`、`iterations`、`tolerance`
     - 物理参数：`gravity`、`density`、`viscosity`、`wind`、`magnetic`
     - 接触参数：`o_margin`、`o_solref`、`o_solimp`、`o_friction`
@@ -76,9 +76,6 @@ class OrcaGymOptConfig:
         # ========== 时间相关参数 ==========
         self.timestep = opt_config['timestep']
         """物理仿真时间步长 (秒)，通常为 0.001-0.01，越小越精确但计算越慢"""
-        
-        self.apirate = opt_config['apirate']
-        """API 调用频率，控制与外部系统的通信频率"""
         
         # ========== 求解器参数 ==========
         self.impratio = opt_config['impratio']
