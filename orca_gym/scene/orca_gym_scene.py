@@ -3,6 +3,7 @@ from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 import orca_gym.protos.mjc_message_pb2 as mjc_message_pb2
 import asyncio
 import numpy as np
+import platform
 
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
@@ -393,6 +394,7 @@ class OrcaGymScene:
         """
         actor_name = "httpdata"
         param_name = "rundatacol"
-        value = f"scriptname:{scriptname} step: {stepname}"
+        os_version = platform.platform()
+        value = f"scriptname:{scriptname} step:{stepname} reserve:{os_version}"
         
         self.set_actor_lua_param_string(actor_name, param_name, value)
