@@ -46,4 +46,4 @@ orca_gym = [ "*.proto", "py.typed", "**/*.json",]
 
 [tool.setuptools.packages.find]
 include = [ "orca_gym*",]
-exclude = [ "examples*", "envs*", "doc*", "3rd_party*", "tests*",]
+exclude = [ "doc*", "3rd_party*", "tests*",]

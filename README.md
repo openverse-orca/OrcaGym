@@ -6,7 +6,12 @@
 
 欢迎来到 OrcaGym！这是 OrcaGym 的核心库，提供与 OpenAI Gym/Gymnasium 接口兼容的机器人仿真环境。与松应科技的 OrcaStudio、OrcaLab 平台联合开发，OrcaGym 为多物理引擎和分布式仿真提供强大支持，同时保持与流行 RL 框架的编程接口兼容性。
 
-> **注意**: `orca-gym` PyPI 包仅包含核心功能模块。如需使用强化学习训练、模仿学习、输入设备等功能，请参考各 `examples` 目录下的 README，按需安装额外依赖。
+> **样例与数据采集已迁移**  
+> 原仓库中的遥操作、数据采集与相关示例已独立至 **[OrcaManipulation](https://github.com/openverse-orca/OrcaManipulation)**，欢迎体验：  
+> - 克隆：<https://github.com/openverse-orca/OrcaManipulation.git>  
+> - 主页：<https://github.com/openverse-orca/OrcaManipulation>
+
+> **注意**: `orca-gym` PyPI 包仅包含核心功能模块。强化学习、模仿学习、输入设备、数据采集等**应用层示例**请前往上述 OrcaManipulation 仓库，并按其文档安装依赖；本仓库仍可通过可选依赖 `pip install orca-gym[rl]` 等安装算法侧常用库。
 
 ## 背景
 机器人仿真作为具身智能训练的关键平台，需要物理准确性和可扩展的基础设施。传统解决方案往往在保真度和计算效率之间面临权衡，特别是在扩展到分布式系统时。OrcaGym 通过将实时物理仿真与云原生架构相结合来弥合这一差距，使研究人员能够在高保真环境中原型化算法并在大规模部署。
@@ -74,13 +79,13 @@ pip install -e ".[devices]"
 pip install -e ".[sensors]"
 ```
 
-### 特定示例的额外依赖
+### 应用示例与数据采集
 
-如果你想运行 `examples` 目录中的示例代码，请参考各示例目录下的 README 文件，了解需要安装的额外依赖。例如：
-
-- **强化学习训练** (`examples/legged_gym`, `examples/cluser_rl`): 需要 `pip install orca-gym[rl]` 和可能的 PyTorch/CUDA 支持
-- **模仿学习** (`examples/imitation`, `examples/openpi`): 需要 `pip install orca-gym[imitation]` 和相关依赖
-- **输入设备** (`examples/realman`): 需要 `pip install orca-gym[devices]`
+- **遥操作、HDF5 采集、数据增强等**：请克隆 **[OrcaManipulation](https://github.com/openverse-orca/OrcaManipulation.git)**，跟随其 `README.md` / `QUICK_START.md` 安装与运行。
+- **本包可选依赖**（算法与工具链，按需安装）：
+  - `pip install orca-gym[rl]` — 强化学习常见依赖（如 SB3）
+  - `pip install orca-gym[imitation]` — 模仿学习相关
+  - `pip install orca-gym[devices]` — 输入设备支持
 
 
 ## OrcaStudio、OrcaLab 配置
@@ -120,50 +125,24 @@ orcagym-loop
 - **scene**: 场景管理和运行时
 - **utils**: 实用工具函数（旋转、控制器等）
 
-**不包含**：
-- 训练示例代码 (`examples/`)
-- 特定环境实现 (`envs/`)
-- 适配器 (`orca_gym/adapters/`)
-- 输入设备 (`orca_gym/devices/`)
-- 传感器 (`orca_gym/sensor/`)
-- 工具脚本 (`orca_gym/tools/`, `orca_gym/scripts/`)
+**不包含（已迁移）**：
+- 训练 / 遥操作 / 数据采集等**应用示例与配套环境** → 见 **[OrcaManipulation](https://github.com/openverse-orca/OrcaManipulation)**（[克隆地址](https://github.com/openverse-orca/OrcaManipulation.git)）
 
-这些功能可以通过克隆仓库获取，并按需安装对应的可选依赖。
+**说明**：`orca-gym` 发行包仍包含 `orca_gym` 下的 **adapters / devices / sensor / tools / scripts** 等扩展模块；其中部分能力依赖可选安装（如 `[rl]`、`[devices]`）。文档、第三方源码（`doc/`、`3rd_party/`）不进入 PyPI 包。
 
 ## 使用示例
 
-### 四足机器人仿真 (Legged Gym)
+完整可运行示例（含数据采集、VR 遥控、数据增强等）已迁移至 **[OrcaManipulation](https://github.com/openverse-orca/OrcaManipulation)**：
 
-OrcaGym 提供了完整的四足机器人仿真环境，支持强化学习训练和实时控制。
-
-**快速开始**：
 ```bash
-# 克隆项目并安装依赖
-git clone https://github.com/openverse-orca/OrcaGym.git
-cd OrcaGym
-pip install -e .
-
-# 运行四足机器人仿真
-cd examples/legged_gym
-python run_legged_sim.py --config configs/lite3_sim_config.yaml
+git clone https://github.com/openverse-orca/OrcaManipulation.git
+cd OrcaManipulation
+# 详见仓库内 README / QUICK_START.md
 ```
 
-**主要功能**：
-- **实时仿真**：支持键盘控制 (WASD 移动，Space 重置，M 切换模式)
-- **强化学习训练**：集成 Stable-Baselines3 和 Ray RLLib
-- **gRPC 服务**：支持远程推理和分布式训练
-- **地形生成**：动态生成各种复杂地形
+欢迎体验：[OrcaManipulation 主页](https://github.com/openverse-orca/OrcaManipulation) · [Git 克隆地址](https://github.com/openverse-orca/OrcaManipulation.git)
 
-**训练示例**：
-```bash
-# 使用 Stable-Baselines3 训练
-python run_legged_rl.py --config configs/lite3_sim_config.yaml --mode training
-
-# 使用 Ray RLLib 训练
-python run_legged_rl.py --config configs/lite3_sim_config.yaml --mode rllib_training
-```
-
-更多示例请参考 `examples/` 目录下的各个子项目。
+**本仓库**：安装 `orca-gym` 后，可使用 `orcagym-loop` 与 OrcaStudio / OrcaLab 联调（见上文「使用 orcagym-loop 命令」）；在自有代码中继承 `orca_gym` 的环境与核心 API 搭建自定义环境即可。
 
 ## 性能与配置考虑
 
