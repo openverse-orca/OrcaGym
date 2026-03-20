@@ -814,7 +814,6 @@ class OrcaGymLocal(OrcaGymBase):
         - 该方法会覆盖 `_mjModel.opt` 的所有字段，确保与 `self.opt` 一致。
         """
         self._mjModel.opt.timestep = self.opt.timestep
-        self._mjModel.opt.apirate = self.opt.apirate
         self._mjModel.opt.impratio = self.opt.impratio
         self._mjModel.opt.tolerance = self.opt.tolerance
         self._mjModel.opt.ls_tolerance = self.opt.ls_tolerance
@@ -861,7 +860,6 @@ class OrcaGymLocal(OrcaGymBase):
         """
         opt_config = {
             "timestep": self._mjModel.opt.timestep,
-            "apirate": self._mjModel.opt.apirate,
             "impratio": self._mjModel.opt.impratio,
             "tolerance": self._mjModel.opt.tolerance,
             "ls_tolerance": self._mjModel.opt.ls_tolerance,

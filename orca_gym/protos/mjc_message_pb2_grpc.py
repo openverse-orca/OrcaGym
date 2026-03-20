@@ -424,6 +424,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.SetGeomFrictionRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.SetGeomFrictionResponse.FromString,
                 _registered_method=True)
+        self.SetFlexVertPos = channel.unary_unary(
+                '/MujocoMessage.GrpcService/SetFlexVertPos',
+                request_serializer=mjc__message__pb2.SetFlexVertPosRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.SetFlexVertPosResponse.FromString,
+                _registered_method=True)
         self.MJ_Forward = channel.unary_unary(
                 '/MujocoMessage.GrpcService/MJ_Forward',
                 request_serializer=mjc__message__pb2.MJ_ForwardRequest.SerializeToString,
@@ -959,6 +964,12 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetFlexVertPos(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def MJ_Forward(self, request, context):
         """动力学计算
         """
@@ -1413,6 +1424,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.SetGeomFriction,
                     request_deserializer=mjc__message__pb2.SetGeomFrictionRequest.FromString,
                     response_serializer=mjc__message__pb2.SetGeomFrictionResponse.SerializeToString,
+            ),
+            'SetFlexVertPos': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetFlexVertPos,
+                    request_deserializer=mjc__message__pb2.SetFlexVertPosRequest.FromString,
+                    response_serializer=mjc__message__pb2.SetFlexVertPosResponse.SerializeToString,
             ),
             'MJ_Forward': grpc.unary_unary_rpc_method_handler(
                     servicer.MJ_Forward,
@@ -3571,6 +3587,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/SetGeomFriction',
             mjc__message__pb2.SetGeomFrictionRequest.SerializeToString,
             mjc__message__pb2.SetGeomFrictionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetFlexVertPos(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/SetFlexVertPos',
+            mjc__message__pb2.SetFlexVertPosRequest.SerializeToString,
+            mjc__message__pb2.SetFlexVertPosResponse.FromString,
             options,
             channel_credentials,
             insecure,

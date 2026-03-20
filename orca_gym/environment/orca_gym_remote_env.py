@@ -403,7 +403,6 @@ class OrcaGymRemoteEnv(OrcaGymBaseEnv):
     def set_opt_config(self):
         opt_config = {
             "timestep": self.gym.opt.timestep,
-            "apirate": self.gym.opt.apirate,
             "impratio": self.gym.opt.impratio,
             "tolerance": self.gym.opt.tolerance,
             "ls_tolerance": self.gym.opt.ls_tolerance,
