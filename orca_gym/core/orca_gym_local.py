@@ -937,6 +937,13 @@ class OrcaGymLocal(OrcaGymBase):
             'nuser_actuator': self._mjModel.nuser_actuator,
             'nuser_sensor': self._mjModel.nuser_sensor,
             'nconmax': self._mjModel.nconmax,
+            # Flex 相关信息，用于可靠的 flex body 判断
+            'nflex': self._mjModel.nflex,
+            'nflexvert': self._mjModel.nflexvert,
+            'flex_vertbodyid': list(self._mjModel.flex_vertbodyid),  # 所有 flex vertex 的 body id
+            'flex_vertadr': list(self._mjModel.flex_vertadr) if self._mjModel.nflex > 0 else [],
+            'flex_vertnum': list(self._mjModel.flex_vertnum) if self._mjModel.nflex > 0 else [],
+            'flex_names': [mujoco.mj_id2name(self._mjModel, mujoco.mjtObj.mjOBJ_FLEX, i) for i in range(self._mjModel.nflex)] if self._mjModel.nflex > 0 else [],
         }
         return model_info
     
