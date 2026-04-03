@@ -183,7 +183,6 @@ class OrcaGymRemote(OrcaGymBase):
         response = await self.stub.QueryOptConfig(request)
         opt_config = {
             "timestep": response.timestep,
-            "apirate": response.apirate,
             "impratio": response.impratio,
             "tolerance": response.tolerance,
             "ls_tolerance": response.ls_tolerance,
@@ -217,7 +216,6 @@ class OrcaGymRemote(OrcaGymBase):
     async def set_opt_config(self, opt_config):
         request = mjc_message_pb2.SetOptConfigRequest(
             timestep=opt_config["timestep"],
-            apirate=opt_config["apirate"],
             impratio=opt_config["impratio"],
             tolerance=opt_config["tolerance"],
             ls_tolerance=opt_config["ls_tolerance"],

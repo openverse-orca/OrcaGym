@@ -3,12 +3,36 @@ import os
 import grpc
 import numpy as np
 import json
+import re
 from datetime import datetime
+from dataclasses import dataclass
+from typing import Union, Tuple, Optional, Literal
 import mujoco
-from typing import Union
 
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
+
+
+@dataclass
+class FlexBodyInfo:
+    """
+    Flex body 解析结果。
+    
+    用于存储 flex body 名称解析后的信息，包括原始名称、
+    实际用于物理计算的 body 名称、flex 类型等。
+    
+    Attributes:
+        original_name: 原始传入的 body 名称（如 "bunny_uv_softbody"）
+        actual_body_name: 实际用于约束的 body 名称（如 "bunny_uv_softbody_0_0_0"）
+        flex_type: flex 类型（"normal", "vertex", "trilinear", "quadratic"）
+        flex_name: flex 的基准名称
+        vertex_index: 对于 vertex 类型，表示顶点索引
+    """
+    original_name: str
+    actual_body_name: str
+    flex_type: Literal["normal", "vertex", "trilinear", "quadratic"]
+    flex_name: Optional[str] = None
+    vertex_index: Optional[int] = None
 
 
 class OrcaGymModel:
@@ -585,35 +609,150 @@ class OrcaGymModel:
     def mesh_id2name(self, mesh_id):
         return self._mesh_id2name_map.get(mesh_id, None)
 
-    # def stip_agent_name(self, org_name):
-    #     for agent in self.agent_names:
-    #         if org_name.startswith(agent + "_"):
-    #             return agent, org_name[len(agent + "_"):]
-    #     return "", org_name     # No agent name prefix found, use empty string
+    # =========================================================================
+    # Flex Body 处理方法
+    # 用于解析和处理 flex 相关的 body 名称（vertex/trilinear/quadratic）
+    # =========================================================================
 
-    # def update_actuator_info(self, actuator_info):
-    #     for actuator in actuator_info:
-    #         agent_name, actuator_name = self.stip_agent_name(actuator["ActuatorName"])
-    #         agent = next((r for r in self.agents if r.name == agent_name), None)
-    #         if agent is not None:
-    #             agent.add_actuator(actuator_name, actuator["JointName"], actuator["GearRatio"])
+    def parse_flex_vertex_name(self, body_name: str) -> Optional[Tuple[str, int]]:
+        """
+        解析 flex vertex body 名称，格式为 {flex_name}_{vertex_index}。
 
-    # def update_body_info(self, body_info_list):
-    #     for body_info in body_info_list:
-    #         agent_name, body_name = self.stip_agent_name(body_info["body_name"])
-    #         agent = next((r for r in self.agents if r.name == agent_name), None)
-    #         if agent is not None:
-    #             agent.add_body(body_name, body_info["body_id"])
+        MuJoCo 为未固定的 flex 顶点创建隐式 body，命名约定为：
+        {flexcomp_name}_{vertex_index}（例如 "flag_uv_flag_0"）。
 
-    # def update_joint_info(self, joint_info_list):
-    #     for joint_info in joint_info_list:
-    #         agent_name, joint_name = self.stip_agent_name(joint_info["joint_name"])
-    #         agent = next((r for r in self.agents if r.name == agent_name), None)
-    #         if agent is not None:
-    #             agent.add_joint(joint_name, joint_info["joint_id"], joint_info["joint_body_id"], joint_info["joint_type"])
+        Args:
+            body_name: 要解析的 body 名称
 
-    # def agent(self, name):
-    #     agent = next((r for r in self.agents if r.name == name), None)
-    #     if (agent is None):
-    #         raise ValueError("Agent " + name + " not found")
-    #     return agent
+        Returns:
+            Tuple of (flex_name, vertex_index) 如果名称匹配 flex vertex 模式，
+            None 否则
+        """
+        # 匹配模式：以 _{整数} 结尾的名称
+        match = re.match(r'^(.+)_(\d+)$', body_name)
+        if match:
+            flex_name = match.group(1)
+            vertex_index = int(match.group(2))
+            return (flex_name, vertex_index)
+        return None
+
+    def resolve_trilinear_control_node(self, flex_name: str) -> Optional[str]:
+        """
+        查找 Trilinear flex 的 control node body 名称。
+
+        Trilinear 类型的 flex 有 8 个 control nodes，命名格式为：
+        {flex_name}_{i}_{j}_{k}，其中 i,j,k 为 0 或 1。
+
+        Args:
+            flex_name: flex 的基准名称（如 "bunny_uv_softbody"）
+
+        Returns:
+            有效的 control node body 名称，如果找不到则返回 None
+        """
+        body_names = self.get_body_names()
+        
+        # Trilinear: 8 nodes (0-1 for each dimension)
+        for i, j, k in [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
+                        (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)]:
+            control_node_name = f"{flex_name}_{i}_{j}_{k}"
+            if control_node_name in body_names:
+                _logger.debug(f"Found Trilinear control node: {control_node_name} for flex: {flex_name}")
+                return control_node_name
+        
+        return None
+
+    def resolve_quadratic_control_node(self, flex_name: str) -> Optional[str]:
+        """
+        查找 Quadratic flex 的 control node body 名称。
+
+        Quadratic 类型的 flex 有 27 个 control nodes，命名格式为：
+        {flex_name}_{i}_{j}_{k}，其中 i,j,k 为 0, 1 或 2。
+
+        Args:
+            flex_name: flex 的基准名称（如 "bunny_uv_softbody"）
+
+        Returns:
+            有效的 control node body 名称，如果找不到则返回 None
+        """
+        body_names = self.get_body_names()
+        
+        # Quadratic: 27 nodes (0-2 for each dimension)
+        for i, j, k in [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0), (0, 1, 1), (0, 1, 2), 
+                        (0, 2, 0), (0, 2, 1), (0, 2, 2),
+                        (1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 1, 0), (1, 1, 1), (1, 1, 2), 
+                        (1, 2, 0), (1, 2, 1), (1, 2, 2),
+                        (2, 0, 0), (2, 0, 1), (2, 0, 2), (2, 1, 0), (2, 1, 1), (2, 1, 2), 
+                        (2, 2, 0), (2, 2, 1), (2, 2, 2)]:
+            control_node_name = f"{flex_name}_{i}_{j}_{k}"
+            if control_node_name in body_names:
+                _logger.debug(f"Found Quadratic control node: {control_node_name} for flex: {flex_name}")
+                return control_node_name
+        
+        return None
+
+    def resolve_flex_body_name(self, body_name: str) -> Optional[FlexBodyInfo]:
+        """
+        解析 flex body 名称，支持普通 flex vertex 和 interpolated mode (trilinear/quadratic)。
+
+        此方法统一处理所有 flex 类型的名称解析：
+        1. 普通 flex vertex：检查是否为 {flex_name}_{index} 格式且存在
+        2. Trilinear flex：查找对应的 control node (8 nodes)
+        3. Quadratic flex：查找对应的 control node (27 nodes)
+
+        Args:
+            body_name: 要解析的 body 名称（可能是 flex name 或 flex vertex name）
+
+        Returns:
+            FlexBodyInfo: 包含原始名称、实际 body 名称、flex 类型等信息
+            None: 如果不是 flex body 或无法解析
+        """
+        body_names = list(self.get_body_names())
+        
+        # 1. 检查是否直接存在（普通 body 或普通 flex vertex）
+        if body_name in body_names:
+            # 检查是否是 flex vertex 格式
+            vertex_info = self.parse_flex_vertex_name(body_name)
+            if vertex_info:
+                flex_name, vertex_idx = vertex_info
+                return FlexBodyInfo(
+                    original_name=body_name,
+                    actual_body_name=body_name,
+                    flex_type="vertex",
+                    flex_name=flex_name,
+                    vertex_index=vertex_idx
+                )
+            return None  # 普通 body，不是 flex
+        
+        # 2. 尝试解析为 Trilinear flex
+        trilinear_node = self.resolve_trilinear_control_node(body_name)
+        if trilinear_node:
+            return FlexBodyInfo(
+                original_name=body_name,
+                actual_body_name=trilinear_node,
+                flex_type="trilinear",
+                flex_name=body_name
+            )
+        
+        # 3. 尝试解析为 Quadratic flex
+        quadratic_node = self.resolve_quadratic_control_node(body_name)
+        if quadratic_node:
+            return FlexBodyInfo(
+                original_name=body_name,
+                actual_body_name=quadratic_node,
+                flex_type="quadratic",
+                flex_name=body_name
+            )
+        
+        return None
+
+    def is_flex_body(self, body_name: str) -> bool:
+        """
+        判断给定名称是否为 flex 相关 body。
+
+        Args:
+            body_name: 要检查的 body 名称
+
+        Returns:
+            True 如果是 flex vertex 或 interpolated flex，False 否则
+        """
+        return self.resolve_flex_body_name(body_name) is not None

@@ -63,6 +63,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.mj_forward()
 
         self._body_anchored = None
+        self._is_flex_vertex_anchored = False  # 标记当前锚定的是否为 flex vertex
         self._anchor_body_name = "ActorManipulator_Anchor"
         self._anchor_dummy_body_name = "ActorManipulator_dummy"
         body_names = self.model.get_body_names()
@@ -271,11 +272,11 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             if self._body_anchored is not None:
                 self.release_body_anchored()
             return
-        
+
         if self._body_anchored is None:
             self.anchor_actor(actor_anchored, anchor_type)
-        
-        
+
+
         delta_pos, delta_quat = self.get_body_manipulation_movement()
 
         # 移动和旋转锚点
@@ -286,8 +287,15 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
         # 同步锚点位置
         anchor_xpos = delta_pos
-        # 同步锚点四元数
-        anchor_xquat = delta_quat
+
+        # 对于 flex vertex，旋转操作无意义，忽略 delta_quat 保持单位四元数
+        # 普通 body 正常应用旋转
+        if self._is_flex_vertex_anchored:
+            # Flex vertex 只响应平移，固定使用单位四元数
+            anchor_xquat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+        else:
+            # 普通 body 正常更新旋转
+            anchor_xquat = delta_quat
 
         # 更新锚点的位置和四元数
         self.set_mocap_pos_and_quat({
@@ -315,34 +323,79 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
             # print(f"Released actor: {self._body_anchored}")
             self._body_anchored = None
+            self._is_flex_vertex_anchored = False  # 重置 flex vertex 标记
         else:
             _logger.warning("No actor is currently anchored.")
 
     def anchor_actor(self, actor_name: str, anchor_type: AnchorType):
-        assert self._body_anchored is None, "An actor is already anchored. Please release it first."
-        
-        # 获取actor的位姿和四元数
-        actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actor_name])
-        if actor_xpos is None or actor_xmat is None or actor_xquat is None:
-            _logger.warning(f"Actor {actor_name} not found in the simulation. Cannot anchor.")
-            return
-        
-        # 将锚点位置设置为actor的位姿
+        """
+        锚定一个 actor（body 或 flex），用于通过 mocap body 进行拖拽操作。
 
+        支持三种类型的 actor：
+        1. 普通 body：直接使用其位置和方向
+        2. Flex vertex（如 flag_uv_flag_0）：使用 BALL 类型锚点，忽略方向
+        3. Interpolated flex（Trilinear/Quadratic）：查找 control node，使用 BALL 类型锚点
+
+        Args:
+            actor_name: 要锚定的 actor 名称
+            anchor_type: 锚点类型（WELD/BALL），对 flex 类型会被强制改为 BALL
+        """
+        assert self._body_anchored is None, "An actor is already anchored. Please release it first."
+
+        # 使用模型类统一解析 flex body 信息
+        # 这会处理普通 body、flex vertex、trilinear、quadratic 所有情况
+        flex_info = self.model.resolve_flex_body_name(actor_name)
+
+        if flex_info:
+            # 是 flex body（vertex/trilinear/quadratic）
+            actual_actor_name = flex_info.actual_body_name
+            is_flex_anchor = True
+            effective_anchor_type = AnchorType.BALL
+            # Flex vertex 没有方向意义，使用默认单位四元数
+            anchor_quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+            _logger.debug(f"Anchoring flex {flex_info.flex_type}: {actor_name} -> {actual_actor_name} with forced BALL type")
+        else:
+            # 普通 body
+            actual_actor_name = actor_name
+            is_flex_anchor = False
+            effective_anchor_type = anchor_type
+            # 普通 body 根据 WELD/BALL 类型决定是否使用 actor 的原始方向
+            if anchor_type == AnchorType.WELD:
+                # WELD 类型保持 actor 的原始方向，需要获取 actor 的姿态
+                pass  # anchor_quat 将在获取位置后设置
+            else:
+                # BALL 类型使用默认方向
+                anchor_quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+        # 获取 actor 的位置（使用实际 body 名称，确保 body 存在）
+        try:
+            actor_xpos, actor_xmat, actor_xquat = self.get_body_xpos_xmat_xquat([actual_actor_name])
+        except ValueError as e:
+            _logger.warning(f"Actor {actor_name} (actual: {actual_actor_name}) not found in the simulation. Cannot anchor. Error: {e}")
+            return
+
+        # 对于普通 body 的 WELD 类型，使用 actor 的原始方向
+        if not is_flex_anchor and anchor_type == AnchorType.WELD:
+            anchor_quat = actor_xquat
+
+        # 设置锚点位置到 mocap body
         mocap_pos_and_quat_dict = {
             self._anchor_body_name: {
                 "pos": actor_xpos,
-                "quat": actor_xquat if anchor_type == AnchorType.WELD else np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+                "quat": anchor_quat
             }
         }
         self.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
         self.mj_forward()
 
-        self.update_anchor_equality_constraints(actor_name, anchor_type)
+        # 更新等式约束，将锚点与 actor 连接
+        # 对于 flex 类型，使用实际的 control node 名称
+        self.update_anchor_equality_constraints(actual_actor_name, effective_anchor_type)
 
-
+        # 存储原始 actor 名称和 flex 标记
         self._body_anchored = actor_name
-        # print(f"Anchored actor: {self._body_anchored} at position {actor_xpos} with quaternion {actor_xquat}")
+        self._is_flex_vertex_anchored = is_flex_anchor
+        # print(f"Anchored actor: {self._body_anchored} at position {actor_xpos} with quaternion {anchor_quat}")
 
     def update_anchor_equality_constraints(self, actor_name: str, anchor_type: AnchorType):
         # 更新锚点的平衡约束
