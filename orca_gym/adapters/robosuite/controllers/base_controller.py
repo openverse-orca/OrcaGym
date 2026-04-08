@@ -158,8 +158,10 @@ class Controller(object, metaclass=abc.ABCMeta):
             # self.ee_pos_vel = np.array(self.sim.data.get_site_xvelp(self.eef_name))
             # self.ee_ori_vel = np.array(self.sim.data.get_site_xvelr(self.eef_name))
 
-            self.joint_pos = np.array(self.gym.data.qpos[self.qpos_index])
-            self.joint_vel = np.array(self.gym.data.qvel[self.qvel_index])
+            joint_qpos_dict = self.gym.query_joint_qpos(self.joint_index)
+            self.joint_pos = np.concatenate([joint_qpos_dict[n] for n in self.joint_index])
+            joint_qvel_dict = self.gym.query_joint_qvel(self.joint_index)
+            self.joint_vel = np.concatenate([joint_qvel_dict[n] for n in self.joint_index])
 
             self.J_pos = np.array(jacp[:, self.qvel_index])
             self.J_ori = np.array(jacr[:, self.qvel_index])
