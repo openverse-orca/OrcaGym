@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
@@ -625,6 +626,20 @@ class OrcaGymLocal(OrcaGymBase):
         await self.process_xml_node(root)
         return
 
+    def _sanitize_local_env_xml_for_newer_mujoco(self, xml_content, file_name):
+        """
+        兼容清洗：移除在新版本 MuJoCo 中已废弃的 XML 属性。
+
+        当前主要处理：
+        - flex/flexcomp contact 的 `vertcollide` 属性（MuJoCo 3.7.0 不再识别）
+        """
+        sanitized = re.sub(rb'\svertcollide="[^"]*"', b'', xml_content)
+        if sanitized != xml_content:
+            _logger.warning(
+                f"Sanitized deprecated XML attribute `vertcollide` for file: {file_name}"
+            )
+        return sanitized
+
     async def load_local_env(self):
         """
         从服务器加载本地环境 XML 文件。
@@ -667,6 +682,7 @@ class OrcaGymLocal(OrcaGymBase):
                 # print("Load xml from remote: ", file_name)
 
                 xml_content = response.xml_content
+                xml_content = self._sanitize_local_env_xml_for_newer_mujoco(xml_content, file_name)
                 
                 # 原子化保存：先写入临时文件，再移动到最终位置
                 temp_file = tempfile.NamedTemporaryFile(
@@ -686,6 +702,31 @@ class OrcaGymLocal(OrcaGymBase):
                     shutil.move(temp_file.name, file_path)
                 except Exception as e:
                     # 清理临时文件
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
+
+            # 兼容历史缓存：即使文件已存在，也执行一次关键字清洗
+            with open(file_path, 'rb') as f:
+                existing_xml = f.read()
+            sanitized_xml = self._sanitize_local_env_xml_for_newer_mujoco(existing_xml, file_name)
+            if sanitized_xml != existing_xml:
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb',
+                    dir=self.xml_file_dir,
+                    delete=False,
+                    prefix=f"{file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(sanitized_xml)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    shutil.move(temp_file.name, file_path)
+                except Exception as e:
                     try:
                         os.unlink(temp_file.name)
                     except OSError:
@@ -814,7 +855,9 @@ class OrcaGymLocal(OrcaGymBase):
         - 该方法会覆盖 `_mjModel.opt` 的所有字段，确保与 `self.opt` 一致。
         """
         self._mjModel.opt.timestep = self.opt.timestep
-        self._mjModel.opt.apirate = self.opt.apirate
+        # MuJoCo 3.6+ removed `apirate`; guard for cross-version compatibility.
+        if hasattr(self._mjModel.opt, "apirate"):
+            self._mjModel.opt.apirate = self.opt.apirate
         self._mjModel.opt.impratio = self.opt.impratio
         self._mjModel.opt.tolerance = self.opt.tolerance
         self._mjModel.opt.ls_tolerance = self.opt.ls_tolerance
@@ -861,7 +904,8 @@ class OrcaGymLocal(OrcaGymBase):
         """
         opt_config = {
             "timestep": self._mjModel.opt.timestep,
-            "apirate": self._mjModel.opt.apirate,
+            # MuJoCo 3.6+ removed `apirate`; keep a default for config compatibility.
+            "apirate": getattr(self._mjModel.opt, "apirate", 0.0),
             "impratio": self._mjModel.opt.impratio,
             "tolerance": self._mjModel.opt.tolerance,
             "ls_tolerance": self._mjModel.opt.ls_tolerance,
