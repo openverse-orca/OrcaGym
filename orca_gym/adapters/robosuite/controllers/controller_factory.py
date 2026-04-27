@@ -8,6 +8,7 @@ from copy import deepcopy
 import numpy as np
 
 from .interpolators.linear_interpolator import LinearInterpolator
+from .custom_ik import CustomInverseKinematicsController
 from .joint_pos import JointPositionController
 from .joint_tor import JointTorqueController
 from .joint_vel import JointVelocityController
@@ -118,7 +119,7 @@ def controller_factory(name, params):
     if params["interpolation"] == "linear":
         interpolator = LinearInterpolator(
             ndim=params["ndim"],
-            controller_freq=(1 / params["sim"].model.opt.timestep),
+            controller_freq=(1 / params["sim"].opt.timestep),
             policy_freq=params["policy_freq"],
             ramp_ratio=params["ramp_ratio"],
         )
@@ -137,6 +138,9 @@ def controller_factory(name, params):
             interpolator.set_states(dim=3)  # EE control uses dim 3 for pos
         params["control_ori"] = False
         return OperationalSpaceController(interpolator_pos=interpolator, **params)
+
+    if name == "CUSTOM_IK_POSE":
+        return CustomInverseKinematicsController(**params)
 
     if name == "IK_POSE":
         ori_interpolator = None

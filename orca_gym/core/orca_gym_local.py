@@ -625,6 +625,37 @@ class OrcaGymLocal(OrcaGymBase):
         await self.process_xml_node(root)
         return
 
+    def _build_load_local_env_error(self, status=None, error_message=""):
+        parts = ["Load local env failed."]
+        if status is not None:
+            parts.append(f"error code: {status}")
+        if error_message:
+            parts.append(f"error message: {error_message}")
+
+        parts.extend([
+            "",
+            "MuJoCo 场景初始化失败，当前无法加载仿真环境。",
+            "这通常不是 Python 调用方式本身的问题，而是场景在服务端初始化时未成功完成。",
+            "",
+            "常见原因包括：",
+            "1. joint、body、geom、site、actuator、sensor 等名称重复",
+            "2. 模型初始姿态重叠严重，导致接触或约束异常",
+            "3. 关节层级、axis、range、damping、stiffness、armature 等物理参数配置不合理",
+            "4. equality / weld / connect 等约束配置异常",
+            "5. mesh、纹理、XML 引用资源缺失或路径错误",
+            "6. 仿真服务刚启动，MuJoCo 仍在初始化中",
+            "",
+            "建议排查：",
+            "1. 如果是刚点击运行，请等待几秒后重试",
+            "2. 检查最近修改过的 MJCF/XML 或者配置好的布局，重点排查重名、重叠、约束和关节参数",
+            "3. 确认 OrcaStudio / OrcaLab 中场景本身已正常启动",
+            "4. 如仍失败，请查阅 MuJoCo 官方文档：",
+            "   - XML Reference: https://mujoco.readthedocs.io/en/latest/XMLreference.html",
+            "   - Modeling: https://mujoco.readthedocs.io/en/latest/modeling.html",
+            "   - Python: https://mujoco.readthedocs.io/en/latest/python.html",
+        ])
+        return "\n".join(parts)
+
     async def load_local_env(self):
         """
         从服务器加载本地环境 XML 文件。
@@ -647,7 +678,7 @@ class OrcaGymLocal(OrcaGymBase):
         response = await self.stub.LoadLocalEnv(request)
 
         if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
-            raise Exception("Load local env failed. error code: {}".format(response.status), "error message: {}".format(response.error_message))
+            raise Exception(self._build_load_local_env_error(response.status, response.error_message))
 
         # 文件存储在指定路径
         file_name = response.file_name
@@ -662,7 +693,7 @@ class OrcaGymLocal(OrcaGymBase):
                 response = await self.stub.LoadLocalEnv(request)
 
                 if response.status != mjc_message_pb2.LoadLocalEnvResponse.SUCCESS:
-                    raise Exception("Load local env failed.")
+                    raise Exception(self._build_load_local_env_error(response.status, response.error_message))
                 
                 # print("Load xml from remote: ", file_name)
 
@@ -937,6 +968,13 @@ class OrcaGymLocal(OrcaGymBase):
             'nuser_actuator': self._mjModel.nuser_actuator,
             'nuser_sensor': self._mjModel.nuser_sensor,
             'nconmax': self._mjModel.nconmax,
+            # Flex 相关信息，用于可靠的 flex body 判断
+            'nflex': self._mjModel.nflex,
+            'nflexvert': self._mjModel.nflexvert,
+            'flex_vertbodyid': list(self._mjModel.flex_vertbodyid),  # 所有 flex vertex 的 body id
+            'flex_vertadr': list(self._mjModel.flex_vertadr) if self._mjModel.nflex > 0 else [],
+            'flex_vertnum': list(self._mjModel.flex_vertnum) if self._mjModel.nflex > 0 else [],
+            'flex_names': [mujoco.mj_id2name(self._mjModel, mujoco.mjtObj.mjOBJ_FLEX, i) for i in range(self._mjModel.nflex)] if self._mjModel.nflex > 0 else [],
         }
         return model_info
     

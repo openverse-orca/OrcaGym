@@ -98,6 +98,27 @@ class OrcaGymModel:
         self.nv = model_info["nv"]
         self.nu = model_info["nu"]
         self.ngeom = model_info["ngeom"]
+
+        # 初始化 flex 相关信息
+        self._nflex = model_info.get("nflex", 0)
+        self._nflexvert = model_info.get("nflexvert", 0)
+        self._flex_vertbodyid = model_info.get("flex_vertbodyid", [])
+        self._flex_vertadr = model_info.get("flex_vertadr", [])
+        self._flex_vertnum = model_info.get("flex_vertnum", [])
+        self._flex_names = model_info.get("flex_names", [])
+
+        # 构建 body_id 到 flex 信息的映射，用于快速查询
+        self._flex_body_cache = {}  # body_id -> (flex_id, local_vertex_index)
+        if self._nflex > 0 and len(self._flex_vertadr) > 0 and len(self._flex_vertnum) > 0:
+            for flex_id in range(self._nflex):
+                if flex_id < len(self._flex_vertadr) and flex_id < len(self._flex_vertnum):
+                    vert_adr = self._flex_vertadr[flex_id]
+                    vert_num = self._flex_vertnum[flex_id]
+                    for local_idx in range(vert_num):
+                        global_idx = vert_adr + local_idx
+                        if global_idx < len(self._flex_vertbodyid):
+                            body_id = self._flex_vertbodyid[global_idx]
+                            self._flex_body_cache[body_id] = (flex_id, local_idx)
     
     def init_eq_list(self, eq_list):
         """
@@ -614,27 +635,59 @@ class OrcaGymModel:
     # 用于解析和处理 flex 相关的 body 名称（vertex/trilinear/quadratic）
     # =========================================================================
 
+    def get_flex_info_by_body_id(self, body_id: int) -> Optional[Tuple[int, int]]:
+        """
+        根据 body_id 获取 flex 信息。
+
+        通过查询预构建的 flex body 缓存，判断给定 body_id 是否属于某个 flex。
+
+        Args:
+            body_id: body 的 ID
+
+        Returns:
+            Tuple of (flex_id, local_vertex_index) 如果 body 属于 flex vertex，
+            None 否则
+        """
+        return self._flex_body_cache.get(body_id)
+
     def parse_flex_vertex_name(self, body_name: str) -> Optional[Tuple[str, int]]:
         """
-        解析 flex vertex body 名称，格式为 {flex_name}_{vertex_index}。
+        解析 flex vertex body 名称。
 
-        MuJoCo 为未固定的 flex 顶点创建隐式 body，命名约定为：
-        {flexcomp_name}_{vertex_index}（例如 "flag_uv_flag_0"）。
+        通过查询 MuJoCo 的 flex_vertbodyid 数组来判断 body 是否属于 flex，
+        而不是依赖名称格式。这样可以准确识别 flex vertex，即使 body 名称
+        被用户自定义为任意格式。
 
         Args:
             body_name: 要解析的 body 名称
 
         Returns:
-            Tuple of (flex_name, vertex_index) 如果名称匹配 flex vertex 模式，
+            Tuple of (flex_name, vertex_index) 如果 body 属于 flex vertex，
             None 否则
         """
-        # 匹配模式：以 _{整数} 结尾的名称
-        match = re.match(r'^(.+)_(\d+)$', body_name)
-        if match:
-            flex_name = match.group(1)
-            vertex_index = int(match.group(2))
-            return (flex_name, vertex_index)
-        return None
+        body_id = self.body_name2id(body_name)
+        if body_id is None:
+            return None
+
+        flex_info = self.get_flex_info_by_body_id(body_id)
+        if flex_info is None:
+            return None
+
+        flex_id, local_vertex_idx = flex_info
+        if flex_id >= len(self._flex_names):
+            return None
+
+        flex_name = self._flex_names[flex_id]
+        if flex_name is None:
+            return None
+
+        # 计算全局 vertex index (vert_adr + local_idx)
+        if flex_id < len(self._flex_vertadr):
+            global_vertex_idx = self._flex_vertadr[flex_id] + local_vertex_idx
+        else:
+            global_vertex_idx = local_vertex_idx
+
+        return (flex_name, global_vertex_idx)
 
     def resolve_trilinear_control_node(self, flex_name: str) -> Optional[str]:
         """

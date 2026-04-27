@@ -1,0 +1,17 @@
+{
+    "type": "CUSTOM_IK_POSE",
+    "interpolation": null,
+    "policy_freq": 20,
+    "input_max": 1,
+    "input_min": -1,
+    "output_max": 0.05,
+    "output_min": -0.05,
+    "kp": 0.25,
+    "lambda_value": 1e-3,
+    "alpha_value": 1,
+    "convergence_threshold": 1e-3,
+    "max_joint_delta": 0.3,
+    "pos_scale": 1.0,
+    "rot_scale": 0.5,
+    "max_iter": 20
+}
