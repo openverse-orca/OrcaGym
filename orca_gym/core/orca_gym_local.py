@@ -1820,6 +1820,102 @@ class OrcaGymLocal(OrcaGymBase):
         """
         mujoco.mj_forward(self._mjModel, self._mjData)
 
+    def get_timer_stats(self) -> dict[str, tuple[float, int]]:
+        timer = self._mjData.timer
+        stats: dict[str, tuple[float, int]] = {}
+        for name in dir(mujoco.mjtTimer):
+            if name.startswith('mjTIMER'):
+                idx = getattr(mujoco.mjtTimer, name)
+                stats[name] = (float(timer.duration[idx]), int(timer.number[idx]))
+        return stats
+
+    def get_constraint_counts(self) -> dict[str, int]:
+        d = self._mjData
+        return {
+            'nefc': int(d.nefc),
+            'ne': int(d.ne),
+            'nf': int(d.nf),
+            'ncon': int(d.ncon),
+        }
+
+    def get_contact_sources(self) -> dict[tuple[str, str], int]:
+        d = self._mjData
+        m = self._mjModel
+        result: dict[tuple[str, str], int] = {}
+        for i in range(d.ncon):
+            ct = d.contact[i]
+            g1, g2 = ct.geom1, ct.geom2
+            b1, b2 = m.geom_bodyid[g1], m.geom_bodyid[g2]
+            name1 = m.body(b1).name
+            name2 = m.body(b2).name
+            if b1 > b2:
+                key = (name2, name1)
+            else:
+                key = (name1, name2)
+            result[key] = result.get(key, 0) + 1
+        return result
+
+    _AGGREGATE_TIMERS = {'mjTIMER_STEP', 'mjTIMER_FORWARD', 'mjTIMER_POSITION'}
+
+    def log_profile(self, label: str = "") -> None:
+        timer_stats = self.get_timer_stats()
+        total_duration, total_count = timer_stats.get('mjTIMER_STEP', (0, 0))
+        if total_duration <= 0:
+            return
+
+        non_aggregate = {
+            name: (dur, cnt)
+            for name, (dur, cnt) in timer_stats.items()
+            if name not in self._AGGREGATE_TIMERS and dur > 0
+        }
+        sorted_items = sorted(
+            non_aggregate.items(), key=lambda item: item[1][0], reverse=True
+        )
+        if not sorted_items:
+            return
+        top_name, (top_duration, _) = sorted_items[0]
+        top_pct = top_duration / total_duration * 100
+
+        prefix = f"[{label}] " if label else ""
+        _logger.performance(
+            f"{prefix}total={total_duration*1e3:.1f}ms (x{total_count} steps) | "
+            f"bottleneck: {top_name}={top_duration*1e3:.1f}ms ({top_pct:.1f}%)"
+        )
+
+        constraint_dur = timer_stats.get('mjTIMER_CONSTRAINT', (0, 0))[0]
+        pos_make_dur = timer_stats.get('mjTIMER_POS_MAKE', (0, 0))[0]
+        pos_kinematics_dur = timer_stats.get('mjTIMER_POS_KINEMATICS', (0, 0))[0]
+        col_broad_dur = timer_stats.get('mjTIMER_COL_BROAD', (0, 0))[0]
+        col_narrow_dur = timer_stats.get('mjTIMER_COL_NARROW', (0, 0))[0]
+        pos_col_dur = timer_stats.get('mjTIMER_POS_COLLISION', (0, 0))[0]
+
+        _logger.performance(
+            f"{prefix}CONSTRAINT={constraint_dur*1e3:.1f}ms ({constraint_dur/total_duration*100:.1f}%), "
+            f"POS_MAKE={pos_make_dur*1e3:.1f}ms ({pos_make_dur/total_duration*100:.1f}%), "
+            f"POS_KINEMATICS={pos_kinematics_dur*1e3:.1f}ms ({pos_kinematics_dur/total_duration*100:.1f}%), "
+            f"POS_COLLISION={pos_col_dur*1e3:.1f}ms ({pos_col_dur/total_duration*100:.1f}%), "
+            f"BROAD={col_broad_dur*1e3:.1f}ms, "
+            f"NARROW={col_narrow_dur*1e3:.1f}ms"
+        )
+
+        cc = self.get_constraint_counts()
+        contact_constraints = cc['nefc'] - cc['ne'] - cc['nf']
+        per_constraint_us = (constraint_dur * 1e6) / (cc['nefc'] * total_count) if cc['nefc'] > 0 and total_count > 0 else 0
+        _logger.performance(
+            f"{prefix}nefc={cc['nefc']} (ne={cc['ne']}+nf={cc['nf']}+contact={contact_constraints}) "
+            f"ncon={cc['ncon']} | "
+            f"per_constraint={per_constraint_us:.2f}us/step"
+        )
+
+        if cc['ncon'] > 0:
+            sources = self.get_contact_sources()
+            sorted_sources = sorted(sources.items(), key=lambda x: x[1], reverse=True)
+            _logger.performance(
+                f"{prefix}Contact Sources: ncon={cc['ncon']} from {len(sorted_sources)} body pairs"
+            )
+            for (b1, b2), count in sorted_sources:
+                _logger.performance(f"  {b1} ↔ {b2}: {count}")
+
     def mj_inverse(self):
         """
         执行 MuJoCo 逆动力学计算
