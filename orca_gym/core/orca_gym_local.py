@@ -1,5 +1,7 @@
 import sys
 import os
+from typing import Optional
+
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
@@ -191,12 +193,22 @@ class OrcaGymLocal(OrcaGymBase):
         qpos = self.gym.data.qpos
         ```
     """
-    def __init__(self, stub):
+    def __init__(
+        self,
+        stub,
+        *,
+        skip_grpc_load: bool = False,
+        local_xml_path: Optional[str] = None,
+        xml_assets_dir: Optional[str] = None,
+    ):
         """
         初始化 OrcaGymLocal 对象
         
         Args:
-            stub: gRPC 服务存根，用于与 OrcaSim 服务器通信
+            stub: gRPC 服务存根，用于与 OrcaSim 服务器通信；离线短链模式下可为 None
+            skip_grpc_load: 为 True 时不经 gRPC 拉取 MJCF/资源（见 local_xml_path）
+            local_xml_path: 本地 MJCF XML 绝对或相对路径（与 skip_grpc_load 联用）
+            xml_assets_dir: mesh/hfield 等资源目录；默认取 local_xml_path 所在目录
         
         术语说明:
             - gRPC Stub: gRPC 客户端存根，用于调用远程服务
@@ -213,6 +225,9 @@ class OrcaGymLocal(OrcaGymBase):
         """
         super().__init__(stub = stub)
 
+        self._skip_grpc_load = bool(skip_grpc_load)
+        self._local_xml_path = local_xml_path
+        self._xml_assets_dir = xml_assets_dir
         self._timestep = 0.001
         self._mjModel = None
         self._mjData = None
@@ -240,6 +255,21 @@ class OrcaGymLocal(OrcaGymBase):
             # 返回: "/path/to/model.xml"
             ```
         """
+        if self._local_xml_path:
+            model_xml_path = os.path.abspath(os.path.expanduser(self._local_xml_path))
+            if not os.path.isfile(model_xml_path):
+                raise FileNotFoundError(
+                    f"local_xml_path not found: {model_xml_path}"
+                )
+            if self._xml_assets_dir is None:
+                self._xml_assets_dir = os.path.dirname(model_xml_path)
+            _logger.info(
+                f"Model XML Path (skip_grpc_load): {model_xml_path}, "
+                f"assets_dir={self._xml_assets_dir}"
+            )
+            await self.process_xml_file(model_xml_path)
+            return model_xml_path
+
         model_xml_path = await self.load_local_env()
 
         _logger.info(f"Model XML Path: {model_xml_path}")
@@ -315,6 +345,12 @@ class OrcaGymLocal(OrcaGymBase):
         self._qacc_cache = np.array(self._mjData.qacc, copy=True)
         self.update_data()
 
+    async def pause_simulation(self):
+        """离线短链模式：无 OrcaStudio 时不调用 gRPC SetSimulationState。"""
+        if self._skip_grpc_load:
+            return None
+        return await super().pause_simulation()
+
     async def render(self):
         """
         渲染当前仿真状态到 OrcaSim 服务器
@@ -386,6 +422,11 @@ class OrcaGymLocal(OrcaGymBase):
         - 异步方法，需要在 `async` 函数中 `await` 调用。
         - 文件锁超时时间为 30 秒。
         """
+        if self._skip_grpc_load or self.stub is None:
+            raise FileNotFoundError(
+                f"Offline mode: content file not on disk and gRPC disabled: {content_file_name}"
+            )
+
         request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name, file_dir=remote_file_dir)
         response = await self.stub.LoadContentFile(request)
 
@@ -472,6 +513,11 @@ class OrcaGymLocal(OrcaGymBase):
                 # 使用文件锁防止多进程重复下载
                 async with file_lock(content_file_path):
                     if not os.path.exists(content_file_path):
+                        if self._skip_grpc_load:
+                            raise FileNotFoundError(
+                                f"Offline mode: missing mesh/asset '{content_file_path}' "
+                                f"(place file under xml assets dir)"
+                            )
                         # 下载文件
                         _logger.debug(f"Load content file: {content_file_name}")
                         await self.load_content_file(content_file_name)
@@ -595,7 +641,12 @@ class OrcaGymLocal(OrcaGymBase):
         说明：
         - 用于存储从服务器下载的 XML 模型文件和资源文件（mesh、hfield 等）。
         - 目录不存在时会自动创建。
+        - 离线短链模式（local_xml_path）下使用 xml_assets_dir，与 MJCF 同目录解析 mesh。
         """
+        if self._xml_assets_dir:
+            assets = os.path.abspath(os.path.expanduser(self._xml_assets_dir))
+            os.makedirs(assets, exist_ok=True)
+            return assets
         user_home = os.path.expanduser('~')  # 自动适配Windows/Linux/Mac
         save_dir = os.path.join(user_home, '.orcagym', 'tmp')
         os.makedirs(save_dir, exist_ok=True)
@@ -829,6 +880,10 @@ class OrcaGymLocal(OrcaGymBase):
             await self.gym.set_timestep_remote(0.001)
             ```
         """
+        if self._skip_grpc_load or self.stub is None:
+            if self._mjModel is not None:
+                self.set_opt_timestep(timestep)
+            return None
         request = mjc_message_pb2.SetOptTimestepRequest(timestep=timestep)
         response = await self.stub.SetOptTimestep(request)
         return response
@@ -1714,6 +1769,29 @@ class OrcaGymLocal(OrcaGymBase):
             body_pos_mat_quat_list[body_name] = body_pos_mat_quat
             
         return body_pos_mat_quat_list
+    
+    def query_body_xpos_xmat_xquat_xvel(self, body_name_list):
+        """
+        查询 body 位姿与世界系线速度（body 原点，m/s）。
+        
+        线速度由 mj_jacBody @ qvel 得到，与 binding_utils.get_body_xvelp 一致。
+        """
+        import mujoco
+        nv = self._mjModel.nv
+        jacp = np.zeros((3, nv), dtype=np.float64)
+        body_pos_mat_quat_vel_list = {}
+        for body_name in body_name_list:
+            body_id = self._mjModel.body(body_name).id
+            mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, None, body_id)
+            lin_vel = jacp @ self._mjData.qvel
+            body_pos_mat_quat_vel = {
+                "Pos": self._mjData.xpos[body_id],
+                "Mat": self._mjData.xmat[body_id],
+                "Quat": self._mjData.xquat[body_id],
+                "LinVel": np.array(lin_vel, dtype=np.float64),
+            }
+            body_pos_mat_quat_vel_list[body_name] = body_pos_mat_quat_vel
+        return body_pos_mat_quat_vel_list
     
     def query_sensor_data(self, sensor_names):
         """
