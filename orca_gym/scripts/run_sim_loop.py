@@ -88,7 +88,15 @@ def run_simulation(orcagym_addr : str,
                                       sys.maxsize)
         _logger.info(f"Registered environment:  {env_id}")
 
-        env = gym.make(env_id)        
+        env = gym.make(env_id)
+        u = env.unwrapped
+        mj_ts = u.gym._mjModel.opt.timestep if getattr(u.gym, "_mjModel", None) is not None else float("nan")
+        print(
+            f"[MuJoCo] script TIME_STEP={TIME_STEP}, kwarg={kwargs['time_step']}, "
+            f"opt.timestep={u.gym.opt.timestep}, mjModel.timestep={mj_ts}, "
+            f"frame_skip={u.frame_skip}, env.dt={u.dt}, REALTIME_STEP={REALTIME_STEP}",
+            flush=True,
+        )
         _logger.info("Starting simulation...")
 
         if scene_runtime is not None:

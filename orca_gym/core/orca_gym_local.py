@@ -1,7 +1,7 @@
 import sys
 import os
+import re
 from typing import Optional
-
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
@@ -676,6 +676,20 @@ class OrcaGymLocal(OrcaGymBase):
         await self.process_xml_node(root)
         return
 
+    def _sanitize_local_env_xml_for_newer_mujoco(self, xml_content, file_name):
+        """
+        兼容清洗：移除在新版本 MuJoCo 中已废弃的 XML 属性。
+
+        当前主要处理：
+        - flex/flexcomp contact 的 `vertcollide` 属性（MuJoCo 3.7.0 不再识别）
+        """
+        sanitized = re.sub(rb'\svertcollide="[^"]*"', b'', xml_content)
+        if sanitized != xml_content:
+            _logger.warning(
+                f"Sanitized deprecated XML attribute `vertcollide` for file: {file_name}"
+            )
+        return sanitized
+
     def _build_load_local_env_error(self, status=None, error_message=""):
         parts = ["Load local env failed."]
         if status is not None:
@@ -749,7 +763,8 @@ class OrcaGymLocal(OrcaGymBase):
                 # print("Load xml from remote: ", file_name)
 
                 xml_content = response.xml_content
-                
+                xml_content = self._sanitize_local_env_xml_for_newer_mujoco(xml_content, file_name)
+
                 # 原子化保存：先写入临时文件，再移动到最终位置
                 temp_file = tempfile.NamedTemporaryFile(
                     mode='wb', 
@@ -773,7 +788,32 @@ class OrcaGymLocal(OrcaGymBase):
                     except OSError:
                         pass
                     raise e
-        
+
+            # 兼容历史缓存：即使文件已存在，也执行一次关键字清洗
+            with open(file_path, 'rb') as f:
+                existing_xml = f.read()
+            sanitized_xml = self._sanitize_local_env_xml_for_newer_mujoco(existing_xml, file_name)
+            if sanitized_xml != existing_xml:
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb',
+                    dir=self.xml_file_dir,
+                    delete=False,
+                    prefix=f"{file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(sanitized_xml)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    shutil.move(temp_file.name, file_path)
+                except Exception as e:
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
+
         # 返回绝对路径
         return os.path.abspath(file_path)
 
