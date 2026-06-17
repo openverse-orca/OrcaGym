@@ -197,6 +197,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     async def _get_frame_png(self, image_path):
         return await self.gym.get_frame_png(image_path)
 
+    def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        return self.loop.run_until_complete(self._query_lidar_point_cloud(entity_name))
+
+    async def _query_lidar_point_cloud(self, entity_name: str):
+        return await self.gym.query_lidar_point_cloud(entity_name)
+
     def get_body_manipulation_movement(self):
         actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
         delta_pos = actor_movement["delta_pos"]

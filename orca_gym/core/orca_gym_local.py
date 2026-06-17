@@ -630,6 +630,68 @@ class OrcaGymLocal(OrcaGymBase):
             }
         return result
 
+    async def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        """
+        查询 LiDAR 点云数据
+
+        通过 gRPC 从引擎端获取指定 LiDAR 实体的点云数据，包括距离图像和 3D 点坐标。
+
+        参数：
+        - `entity_name`：LiDAR 实体名称（对应 O3DE 中的 Entity 名称）
+
+        返回：
+        - 成功时返回字典，包含以下字段：
+            - bin_count: 水平方向 bin 数量
+            - vertical_layers: 垂直层数
+            - angular_resolution: 每个 bin 的角分辨率（弧度）
+            - max_h_angle: 水平总视场角（弧度）
+            - min_v_angle: 最小垂直角（弧度）
+            - v_step: 垂直层间步进（弧度）
+            - min_range: 最小探测距离
+            - max_range: 最大探测距离
+            - ranges: 距离数组，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
+            - points: 3D 点数组，形状 (bin_count, vertical_layers, 3)
+        - 失败时返回 None
+
+        注意：
+        - 异步方法，需要在 `async` 函数中 `await` 调用。
+        - ranges 和 points 使用 numpy.frombuffer 零拷贝解析。
+        """
+        request = mjc_message_pb2.LiDARPointCloudRequest(entity_name=entity_name)
+        response = await self.stub.QueryLiDARPointCloud(request)
+
+        if response.status == mjc_message_pb2.LiDARPointCloudResponse.ENTITY_NOT_FOUND:
+            _logger.error(f"LiDAR entity not found: {entity_name}")
+            return None
+        if response.status == mjc_message_pb2.LiDARPointCloudResponse.NO_DATA:
+            _logger.warning(f"LiDAR ring buffer is empty for entity: {entity_name}")
+            return None
+
+        result = {
+            'bin_count': response.bin_count,
+            'vertical_layers': response.vertical_layers,
+            'angular_resolution': response.angular_resolution,
+            'max_h_angle': response.max_h_angle,
+            'min_v_angle': response.min_v_angle,
+            'v_step': response.v_step,
+            'min_range': response.min_range,
+            'max_range': response.max_range,
+        }
+
+        if response.range_data:
+            ranges = np.frombuffer(response.range_data, dtype=np.float32).copy()
+            result['ranges'] = ranges.reshape(response.bin_count, response.vertical_layers)
+        else:
+            result['ranges'] = np.full((response.bin_count, response.vertical_layers), -1.0, dtype=np.float32)
+
+        if response.point_data:
+            points = np.frombuffer(response.point_data, dtype=np.float32).copy()
+            result['points'] = points.reshape(response.bin_count, response.vertical_layers, 3)
+        else:
+            result['points'] = np.zeros((response.bin_count, response.vertical_layers, 3), dtype=np.float32)
+
+        return result
+
     @property
     def xml_file_dir(self):
         """

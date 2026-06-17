@@ -117,7 +117,8 @@ service GrpcService {
   rpc MJ_JacSubtreeCom (JacSubtreeComRequest) returns (JacSubtreeComResponse);
   rpc MJ_JacBodyCom (JacBodyComRequest) returns (JacBodyComResponse);  
   rpc MJ_Jac(MJ_JacRequest) returns (MJ_JacResponse);
-  rpc CalcFullMassMatrix(CalcFullMassMatrixRequest) returns (CalcFullMassMatrixResponse); // 计算全局的质量矩阵，不只包含机器人本体，还有其他有关节的物品
+  rpc CalcFullMassMatrix(CalcFullMassMatrixRequest) returns (CalcFullMassMatrixResponse);
+  rpc QueryLiDARPointCloud(LiDARPointCloudRequest) returns (LiDARPointCloudResponse);
 }
 
 enum SimulationState {
@@ -1288,4 +1289,28 @@ message SetFlexVertPosResponse {
     }
     Status status = 1;
     string error_message = 2;
+}
+
+message LiDARPointCloudRequest {
+    string entity_name = 1;
+}
+
+message LiDARPointCloudResponse {
+    enum Status {
+        SUCCESS = 0;
+        ENTITY_NOT_FOUND = 1;
+        NO_DATA = 2;
+    }
+    Status status = 1;
+    string error_message = 2;
+    uint32 bin_count = 3;
+    uint32 vertical_layers = 4;
+    float angular_resolution = 5;
+    float max_h_angle = 6;
+    float min_v_angle = 7;
+    float v_step = 8;
+    float min_range = 9;
+    float max_range = 10;
+    bytes range_data = 11;
+    bytes point_data = 12;
 }
