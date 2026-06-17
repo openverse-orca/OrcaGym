@@ -47,7 +47,16 @@ class PicoJoystickKey(enum.Enum):
 
 
 class PicoJoystick:
-    def __init__(self, port=8001):
+    @staticmethod
+    def load_replay_data(path: str) -> list:
+        """加载预制轨迹 JSON（每帧含 leftHand/rightHand，与 VR TCP 消息同形）。"""
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError(f"replay JSON must be a list of frames: {path}")
+        return data
+
+    def __init__(self, port=8001, replay_mode=False, replay_data=None):
         self.mutex = threading.Lock()
         self.running = True
         self.current_transform = None
@@ -56,9 +65,22 @@ class PicoJoystick:
         self.suceess_XY = 0 #XY键长按次数
         self.key_event = {}
         self.reset_pos = False
-        self.loop = asyncio.new_event_loop()
-        self.clients = set()  # 初始化 self.clients
+        self._replay_mode = bool(replay_mode)
+        self._replay_frames = list(replay_data) if replay_data else []
+        self._replay_index = 0
+        self.clients = set()
         self.port = port
+        self.loop = None
+        self.thread = None
+
+        if self._replay_mode:
+            if self._replay_frames:
+                frame = self._replay_frames[0]
+                self.current_transform = self.extract_all_transform(frame)
+                self.current_key_state = self.extract_key_state(frame)
+            return
+
+        self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self._start_server_thread)
         self.thread.start()
 
@@ -70,8 +92,23 @@ class PicoJoystick:
 
     def close(self):
         self.running = False
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        self.thread.join()
+        if self._replay_mode:
+            return
+        if self.loop is not None:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.thread is not None:
+            self.thread.join()
+
+    def _advance_replay_frame(self) -> None:
+        """回放模式：每宏步推进一帧（末帧保持）。"""
+        if not self._replay_frames:
+            return
+        idx = min(self._replay_index, len(self._replay_frames) - 1)
+        frame = self._replay_frames[idx]
+        self.current_transform = self.extract_all_transform(frame)
+        self.current_key_state = self.extract_key_state(frame)
+        if self._replay_index < len(self._replay_frames) - 1:
+            self._replay_index += 1
 
     def _start_server_thread(self):
         asyncio.set_event_loop(self.loop)
@@ -126,6 +163,9 @@ class PicoJoystick:
         self.key_event[key] = event
 
     def update(self, keys: list[PicoJoystickKey]):
+        if self._replay_mode:
+            with self.mutex:
+                self._advance_replay_frame()
         transform = self.get_transform_list()
         key_state = self.get_key_state()
         for key in keys:
