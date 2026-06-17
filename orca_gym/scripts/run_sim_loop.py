@@ -1,3 +1,6 @@
+import sys
+sys.path.append("/home/orca/Projects/OrcaGym")
+
 from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import numpy as np
@@ -119,6 +122,13 @@ def run_simulation(orcagym_addr : str,
             action = env.action_space.sample()
     
             obs, reward, terminated, truncated, info = env.step(action)
+            lidar_cloud = env.unwrapped.query_lidar_point_cloud("LiDAR")
+            if lidar_cloud is not None:
+                ranges = lidar_cloud['ranges']
+                points = lidar_cloud['points']
+                valid_mask = ranges > 0
+                valid_points = points[valid_mask]
+                print(f"Valid points size: {valid_points.shape[0]}")
 
             env.render()
 
