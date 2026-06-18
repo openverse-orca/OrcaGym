@@ -364,6 +364,16 @@ class OrcaGymLocal(OrcaGymBase):
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
+    async def push_visual_state(self, qpos, time) -> None:
+        """
+        仅将 qpos 推送到 Studio MuJoCo 视口做运动学显示，不读取 override_ctrls。
+
+        用于 replay + skip_render 场景：避免 Studio 界面控制覆盖 OSC 力矩，
+        同时让 Studio 窗口中的机器人跟随 OrcaGym 本地仿真。
+        """
+        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        await self.stub.UpdateLocalEnv(request)
+
     async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
         """
         从服务器下载并缓存模型资源文件（mesh、hfield 等）。
