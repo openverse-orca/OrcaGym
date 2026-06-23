@@ -69,6 +69,12 @@ def query_lidar(stub, entity_name):
     else:
         result["points"] = np.zeros((response.bin_count, response.vertical_layers, 3), dtype=np.float32)
 
+    if response.intensity_data:
+        intensities = np.frombuffer(response.intensity_data, dtype=np.float32).copy()
+        result["intensities"] = intensities.reshape(response.bin_count, response.vertical_layers)
+    else:
+        result["intensities"] = np.zeros((response.bin_count, response.vertical_layers), dtype=np.float32)
+
     return result
 
 

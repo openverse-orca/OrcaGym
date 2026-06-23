@@ -1313,4 +1313,5 @@ message LiDARPointCloudResponse {
     float max_range = 10;
     bytes range_data = 11;
     bytes point_data = 12;
+    bytes intensity_data = 13;
 }
