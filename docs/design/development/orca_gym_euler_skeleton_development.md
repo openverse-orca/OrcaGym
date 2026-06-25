@@ -907,18 +907,18 @@ def test_do_simulation_no_euler_private_access():
 
 #### 验收标准
 
-- [ ] K1：`__dict__` 含 `_gym`/`_stub`/`_channel`，不含 `gym`/`stub`/`channel`
-- [ ] K2：`_BLOCKED_ATTRS` 拦截 + `__dir__` 只暴露公共 API
-- [ ] K2：`_BLOCKED_ATTRS` 全部 8 个 `_mjData`/`_mjModel` 变体都被拦截
-- [ ] K2/K4：三层穿墙路径（`env._gym._sim._mjData`/`env._gym._sim._mjModel.opt`/`env._gym._sim._mjData.xfrc_applied`）在第一层 `env._gym` 即被拦截
-- [ ] K4：源码 grep 不到 `_gym._sim`/`_gym._studio`/`_gym._registry`/`_gym._opt`/`_gym._view`/`_gym._euler`
-- [ ] K6：`env.data` 类型为 `OrcaGymDataView`
-- [ ] K7：`model`/`sim_config`/`dt` 通过 Gym 公共属性委托
-- [ ] K8：`do_simulation` 源码 grep 不到 `_euler`，`env._gym._euler` 穿墙在第一层即被拦截
-- [ ] K9：源码 grep 不到 `gym.studio`（允许 `_studio_bridge` 和 `_gym.studio_bridge()`），`env._gym.studio` 穿墙在第一层即被拦截
-- [ ] K10：`__setattr__` 屏蔽父类的 `gym`/`stub`/`channel`/`model`/`data` 赋值
-- [ ] K11：公共方法返回 typed 对象
-- [ ] K12：docstring 含使用契约
+- [x] K1：`__dict__` 含 `_gym`/`_stub`/`_channel`，不含 `gym`/`stub`/`channel`（`TestEnvK1NamingConstraint.test_env_no_public_internal_attrs`）
+- [x] K2：`_BLOCKED_ATTRS` 拦截 + `__dir__` 只暴露公共 API（`TestEnvK2Isolation.test_env_blocked_attrs_raise_guidance` / `test_env_dir_only_exposes_public_api` / `test_env_dir_contains_public_api`）
+- [x] K2：`_BLOCKED_ATTRS` 全部 8 个 `_mjData`/`_mjModel` 变体都被拦截（`TestEnvK2ViolationPatterns.test_env_all_mjdata_mjmodel_variants_blocked`）
+- [x] K2/K4：三层穿墙路径（`env._gym._sim._mjData`/`env._gym._sim._mjModel.opt`/`env._gym._sim._mjData.xfrc_applied`）在第一层 `env._gym` 即被拦截（`TestEnvK2ViolationPatterns.test_env_multilayer_tunnel_*`；`env._gym._sim` 在 OrcaGymEuler `__getattr__` 层拦截）
+- [x] K4：源码 grep 不到 `_gym._sim`/`_gym._studio`/`_gym._registry`/`_gym._opt`/`_gym._view`/`_gym._euler`（`TestEnvK4NoGymPrivateAccess.test_env_no_gym_private_access`，AST 去除 docstring 后检查）
+- [x] K6：`env.data` 类型为 `OrcaGymDataView`（`TestEnvK6DataView.test_data_property_returns_view`）
+- [x] K7：`model`/`sim_config`/`dt` 通过 Gym 公共属性委托（`TestEnvK7PropertyDelegation.test_data_delegates_to_gym` / `test_sim_config_delegates_to_gym` / `test_dt_uses_sim_config`）
+- [x] K8：`do_simulation` 源码 grep 不到 `_euler`，`env._gym._euler` 穿墙在第一层即被拦截（`TestEnvK8NoEulerPrivate.test_do_simulation_no_euler_private_access` + `TestEnvK2ViolationPatterns.test_env_k8_euler_tunnel_blocked`，词边界正则忽略 `orca_gym_euler` 模块名）
+- [x] K9：源码 grep 不到 `gym.studio`（允许 `_studio_bridge` 和 `_gym.studio_bridge()`），`env._gym.studio` 穿墙在第一层即被拦截（`TestEnvK9StudioAccess.test_no_studio_property_access` + `TestEnvK2ViolationPatterns.test_env_k9_studio_tunnel_blocked`）
+- [x] K10：`__setattr__` 屏蔽父类的 `gym`/`stub`/`channel`/`model`/`data` 赋值（`TestEnvK10ParentShielding.test_parent_*_assignment_shielded`）
+- [x] K11：公共方法返回 typed 对象（`TestEnvK11TypedReturn.test_data_returns_view_not_mjdata` / `test_sim_config_returns_config`）
+- [x] K12：docstring 含使用契约（`TestEnvK12Docstring.test_env_docstring_has_contract`）
 
 ---
 
@@ -966,10 +966,10 @@ def test_do_simulation_no_euler_private_access():
 - [x] P2-Step2: MuJoCoSimCore 骨架 + 测试通过
 - [x] P2-Step3: OrcaStudioBridge 骨架 + 测试通过
 - [x] P2-Step4: OrcaGymEuler 骨架 + 测试通过（K3/K5/K8/K9）
-- [ ] P3-Step1: OrcaGymEulerEnv 骨架 + 测试通过（K1/K2/K4/K6/K7/K8/K9/K10/K11/K12）
-- [ ] `--component core/euler` 全量通过
-- [ ] `--component environment/euler` 全量通过
-- [ ] 源码审查：无穿墙访问、无 public property 暴露子组件、无 `_mjData`/`_mjModel` 公共暴露
+- [x] P3-Step1: OrcaGymEulerEnv 骨架 + 测试通过（K1/K2/K4/K6/K7/K8/K9/K10/K11/K12）
+- [x] `--component core/euler` 全量通过（80 测试）
+- [x] `--component environment/euler` 全量通过（43 测试）
+- [x] 源码审查：无穿墙访问、无 public property 暴露子组件、无 `_mjData`/`_mjModel` 公共暴露
 
 ---
 
