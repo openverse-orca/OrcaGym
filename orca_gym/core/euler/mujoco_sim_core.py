@@ -118,12 +118,35 @@ class MuJoCoSimCore:
         self._mjData.xfrc_applied[:] = 0
 
     def sync_to_view(self, view) -> None:
-        """将 _mjData 状态同步到 OrcaGymDataView（P2 实现）。
+        """将 _mjData 状态同步到 OrcaGymDataView。
+
+        基本状态（qpos/qvel/qacc/qfrc_bias/time）使用 copy；
+        xfrc_applied 使用只读视图（不 copy，共享内存）；
+        body/site 派生状态使用视图。
 
         Args:
             view: OrcaGymDataView 实例。
         """
-        raise NotImplementedError("sync_to_view 将在 P2 阶段实现")
+        self._require_initialized()
+        d = self._mjData
+        # 基本状态（copy，避免后续 step 覆盖）
+        view._qpos = d.qpos.copy()
+        view._qvel = d.qvel.copy()
+        view._qacc = d.qacc.copy()
+        view._qfrc_bias = d.qfrc_bias.copy()
+        view._time = float(d.time)
+        # 扩展字段
+        view._xfrc_applied = d.xfrc_applied  # 只读视图，不 copy
+        view._actuator_force = d.actuator_force.copy()
+        view._contact = [d.contact[i] for i in range(d.ncon)]
+        # body 派生状态（视图，共享内存）
+        view._xpos = d.xpos
+        view._xquat = d.xquat
+        view._xmat = d.xmat
+        view._cvel = d.cvel
+        # site 派生状态（视图）
+        view._site_xpos = d.site_xpos
+        view._site_xmat = d.site_xmat
 
     def _require_initialized(self) -> None:
         if self._mjModel is None or self._mjData is None:
