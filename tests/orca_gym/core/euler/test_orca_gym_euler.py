@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import unittest
 
@@ -41,13 +42,13 @@ class TestOrcaGymEuler(unittest.TestCase):
 
     def test_init_simulation_delegates_to_sim_core(self) -> None:
         # gym.init_simulation(path) 后 sim_core 已加载
-        self.gym.init_simulation(_SCENE_XML)
+        asyncio.run(self.gym.init_simulation(_SCENE_XML))
         self.assertIsNotNone(self.gym._sim._mjModel)
         self.assertIsNotNone(self.gym._sim._mjData)
 
     def test_mj_step_delegates(self) -> None:
         # gym.mj_step(1) 后 time 推进
-        self.gym.init_simulation(_SCENE_XML)
+        asyncio.run(self.gym.init_simulation(_SCENE_XML))
         t0 = float(self.gym._sim._mjData.time)
         self.gym.mj_step(1)
         t1 = float(self.gym._sim._mjData.time)
@@ -55,12 +56,12 @@ class TestOrcaGymEuler(unittest.TestCase):
 
     def test_mj_forward_delegates(self) -> None:
         # gym.mj_forward() 不报错
-        self.gym.init_simulation(_SCENE_XML)
+        asyncio.run(self.gym.init_simulation(_SCENE_XML))
         self.gym.mj_forward()
 
     def test_set_ctrl_delegates(self) -> None:
         # gym.set_ctrl(ctrl) 后 sim_core 的 ctrl 一致
-        self.gym.init_simulation(_SCENE_XML)
+        asyncio.run(self.gym.init_simulation(_SCENE_XML))
         ctrl = np.array([0.7], dtype=np.float64)
         self.gym.set_ctrl(ctrl)
         np.testing.assert_allclose(np.asarray(self.gym._sim._mjData.ctrl), ctrl)

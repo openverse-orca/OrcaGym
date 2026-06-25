@@ -24,15 +24,22 @@
 
 ### 1.4 阶段总览
 
-| 阶段 | 名称 | 核心交付 | 联调能力 |
-|------|------|---------|---------|
-| **P1** | 基础设施骨架 | MuJoCoSimCore + OrcaGymEuler 骨架 + 封装隔离机制 | 无 |
-| **P2** | 状态视图与配置 | OrcaGymDataView + SimConfig + ModelRegistry | 无 |
-| **P3** | Studio 集成与端到端联调 | OrcaStudioBridge + OrcaGymEulerEnv 骨架 + `run_simple.py` | **可联调** |
-| **P4** | API 完备化 | query_*/set_*/apply_body_force 等完整 API | 可联调 |
-| **P5** | 典型用户模式 E2E 验证 | OrcaPlayground 4 个典型模式 example + Protocol | 可联调 |
+| 阶段 | 名称 | 核心交付 | 联调能力 | 课程示例 |
+|------|------|---------|---------|---------|
+| **P1** | 基础设施骨架 | MuJoCoSimCore + OrcaGymEuler 骨架 + 封装隔离机制 | 无 | —（内部基础设施，不对外） |
+| **P2** | 状态视图与配置 | OrcaGymDataView + SimConfig + ModelRegistry | 无 | —（内部基础设施，不对外） |
+| **P3** | Studio 集成与端到端联调 | OrcaStudioBridge + OrcaGymEulerEnv 骨架 + `hello_euler.py` | **可联调** | 第 1 课 |
+| **P3A** | 在线模式渲染循环 | override_ctrls + sync_render + do_body_manipulation | 可联调 | 第 2 课 |
+| **P3B** | SB3 强化学习集成 | Gymnasium API 契约 + SB3 PPO 训练 | 可联调 | 第 3 课 |
+| **P4** | API 完备化 | query_*/set_*/apply_body_force 等完整 API | 可联调 | 第 4、5 课 |
+| **P5** | 典型用户模式 E2E 验证 | OrcaGymEnvProtocol + 简单/力应用模式 example | 可联调 | （并入第 1、5 课） |
+| 后续 phase | Euler 求解器耦合 | OrcaGymEulerEnv 与 Euler 求解器深度耦合 | 可联调 | 第 6 课（预留） |
 
-**E2E 验证策略**：不构造 `OrcaGymEulerEnv` 桩，采用外置 OrcaPlayground example 驱动，这是最终用户的典型用法，是真正的 E2E 验证。P3 的 `run_simple.py` 提供最早联调入口，P5 扩展到 4 个典型用户模式全覆盖。
+**E2E 验证策略**：不构造 `OrcaGymEulerEnv` 桩，采用外置 OrcaPlayground example 驱动，这是最终用户的典型用法，是真正的 E2E 验证。每个开发阶段对应一门课程示例（见 `OrcaPlayground/examples/euler/TUTORIAL.md`），既是验证载体也是教学用例。P3 的 `hello_euler.py` 提供最早联调入口。
+
+> **推荐用户模式**：用户应首选 `do_simulation` 委托式步进（第 1 课），而非手动 `mj_step` 循环。手动循环式（原 G1 模式）与多 Agent Legged 模式不再作为推荐模式单独设课。
+>
+> **课程设计参考**：[OrcaFlow examples/TUTORIAL.md](../../../../OrcaFlow/examples/TUTORIAL.md)。每个 example 引入 1-2 个新概念，由浅入深。每完成一个阶段开发后，更新 `OrcaPlayground/examples/euler/TUTORIAL.md` 中对应课程章节。
 
 ---
 
@@ -418,7 +425,7 @@ OrcaPlayground/
 ├── examples/
 │   └── euler/                          # Euler example 入口脚本目录
 │       ├── __init__.py
-│       └── run_simple.py               # P3：最小联调入口
+│       └── 01_hello_euler/hello_euler.py               # P3：最小联调入口
 ```
 
 #### 4.4.2 `envs/euler/simple_env.py`（P3 最小联调 Env）
@@ -459,13 +466,13 @@ class SimpleEulerEnv(OrcaGymEulerEnv):
         }
 ```
 
-#### 4.4.3 `examples/euler/run_simple.py`（P3 最小联调入口）
+#### 4.4.3 `examples/euler/01_hello_euler/hello_euler.py`（P3 最小联调入口）
 
 ```python
 """SimpleEulerEnv 端到端联调入口。
 
 用法:
-  python run_simple.py --orcagym_addr <ip:port> --scene <scene_xml>
+  python 01_hello_euler/hello_euler.py --orcagym_addr <ip:port> --scene <scene_xml>
 """
 import argparse
 import os
@@ -512,7 +519,7 @@ if __name__ == "__main__":
 
 #### 4.4.4 P3 联调验证清单
 
-通过 `run_simple.py` 驱动，验证完整链路：
+通过 `01_hello_euler/hello_euler.py` 驱动，验证完整链路：
 
 - [ ] OrcaStudio 启动，加载测试场景 XML
 - [ ] `SimpleEulerEnv` 连接 gRPC，加载模型
@@ -526,11 +533,212 @@ if __name__ == "__main__":
 ### 4.5 验收标准
 
 - [ ] 所有 P3 单元测试通过
-- [ ] `examples/euler/run_simple.py` 可连接 OrcaStudio 完成完整循环
+- [ ] `examples/euler/01_hello_euler/hello_euler.py` 可连接 OrcaStudio 完成完整循环
 - [ ] `OrcaGymEulerEnv` 可加载模型、步进、渲染
 - [ ] `env.data`/`env.model`/`env.sim_config` 可正常访问
 - [ ] Studio 视口显示与仿真状态同步
 - [ ] `env.data` 访问不误触发封装隔离拦截
+
+---
+
+## 4A. 阶段 P3A：在线模式端到端渲染循环
+
+### 4A.1 背景
+
+P3 完成了离线模式的端到端联调，但在线模式（连接 OrcaStudio、从服务器获取 XML、开启 render 循环、观察渲染结果）存在以下缺陷，需在进入 P4 API 完备化之前先跑通：
+
+1. **`override_ctrls` 未应用**：`OrcaStudioBridge.render()` 接收了 Studio UI 返回的控制覆盖值，但 `OrcaGymEuler.set_ctrl()` 未应用，用户无法通过 Studio UI 交互控制仿真。
+2. **`render_mode` 未通过构造函数传入**：`OrcaGymEulerEnv` 未接收 `render_mode` 参数，无法灵活控制渲染开关。
+3. **`do_body_manipulation` 缺失**：`OrcaGymLocalEnv.render()` 会处理 body 锚点拖拽（用户在 Studio 中拖拽物体），`OrcaGymEulerEnv` 缺失此逻辑。
+4. **`sync_render` 模式缺失**：`OrcaGymLocalEnv` 支持同步渲染（每个物理步都渲染），`OrcaGymEulerEnv` 只有异步渲染。
+
+### 4A.2 目标
+
+修复上述缺陷，使 `examples/euler/02_online_render/online_render.py`（第 2 课）在在线模式下能：
+- 从 OrcaStudio 获取 XML 启动仿真
+- 开启 render() 循环，Studio 视口实时显示仿真状态
+- 用户可通过 Studio UI 拖拽物体、手动控制执行器
+- 观察渲染结果与仿真状态同步
+
+### 4A.3 交付物
+
+#### 4A.3.1 `OrcaGymEuler.set_ctrl` 应用 `override_ctrls`
+
+```python
+def set_ctrl(self, ctrl: np.ndarray) -> None:
+    """设置控制输入，应用 Studio UI 返回的 override_ctrls。"""
+    ctrl = ctrl.copy()
+    for idx, value in self._studio.override_ctrls.items():
+        if 0 <= idx < len(ctrl):
+            ctrl[idx] = value
+    self._sim.set_ctrl(ctrl)
+```
+
+#### 4A.3.2 `OrcaGymEulerEnv` 增加 `render_mode`/`sync_render` 参数
+
+```python
+def __init__(
+    self,
+    frame_skip: int,
+    orcagym_addr: str,
+    agent_names: list[str],
+    time_step: float,
+    *,
+    render_mode: str = "human",
+    sync_render: bool = False,
+    ...
+):
+    self._render_mode = render_mode
+    self._sync_render = sync_render
+```
+
+#### 4A.3.3 `OrcaGymEulerEnv.render` 支持 `sync_render` 与 `do_body_manipulation`
+
+```python
+def render(self):
+    if self.render_mode not in ["human", "force"]:
+        return
+    if self._skip_grpc_load:
+        return
+    if self.sync_render:
+        self.render_count += self._render_count_interval
+        if self.render_count >= 1.0:
+            self.loop.run_until_complete(self.gym.render())
+            self.do_body_manipulation()
+            self.render_count -= 1
+    else:
+        time_diff = time.perf_counter() - self._render_time_step
+        if time_diff > self._render_interval:
+            self._render_time_step = time.perf_counter()
+            self.loop.run_until_complete(self.gym.render())
+            self.do_body_manipulation()
+```
+
+#### 4A.3.4 `OrcaGymEulerEnv.do_body_manipulation` 实现
+
+从 `OrcaGymLocalEnv.do_body_manipulation` 迁移，使用 `OrcaStudioBridge` 的 gRPC 方法：
+
+```python
+def do_body_manipulation(self):
+    """处理 Studio UI 的 body 锚点拖拽操作。"""
+    if self._anchor_body_id is None:
+        return
+    actor_anchored, anchor_type = self.loop.run_until_complete(
+        self.gym.studio.get_body_manipulation_anchored()
+    )
+    if actor_anchored is None:
+        if self._body_anchored is not None:
+            self.release_body_anchored()
+        return
+    if self._body_anchored is None:
+        self.anchor_actor(actor_anchored, anchor_type)
+    delta_pos, delta_quat = self.loop.run_until_complete(
+        self.gym.studio.get_body_manipulation_movement()
+    )
+    # 更新锚点 mocap 位置...
+    self.set_mocap_pos_and_quat({...})
+    self.mj_forward()
+```
+
+#### 4A.3.5 `02_online_render/online_render.py`（第 2 课：在线渲染入口）
+
+```bash
+# 在线模式（连接 OrcaStudio，默认在线）
+python examples/euler/02_online_render/online_render.py --addr <ip:port> --steps 200
+
+# 同步渲染（每个物理步都渲染）
+python examples/euler/02_online_render/online_render.py --sync-render
+```
+
+### 4A.4 验证清单
+
+- [ ] `02_online_render/online_render.py` 可连接 OrcaStudio
+- [ ] 从 OrcaStudio 获取 XML 并加载模型
+- [ ] Studio 视口显示摆杆初始状态
+- [ ] 100 步循环后 Studio 视口实时更新
+- [ ] 用户在 Studio UI 拖拽物体，仿真响应正确
+- [ ] 用户在 Studio UI 手动控制执行器，`override_ctrls` 生效
+- [ ] `render_mode="none"` 时不渲染
+- [ ] `sync_render=True` 时每个物理步都渲染
+
+### 4A.5 验收标准
+
+- [ ] `OrcaGymEuler.set_ctrl` 正确应用 `override_ctrls`
+- [ ] `OrcaGymEulerEnv` 支持 `render_mode`/`sync_render` 参数
+- [ ] `OrcaGymEulerEnv.render` 支持 `sync_render` 与 `do_body_manipulation`
+- [ ] `02_online_render/online_render.py` 可完成完整在线循环
+- [ ] Studio 视口显示与仿真状态同步
+- [ ] 用户可通过 Studio UI 交互（拖拽、手动控制）
+
+---
+
+## 4B. 阶段 P3B：SB3 强化学习集成（倒立摆）
+
+### 4B.1 目标
+
+在 P3 端到端联调基础上，引入 Stable Baselines3（SB3）强化学习框架，实现真正的倒立摆 RL 训练（离线 & 在线），验证 `SimpleEulerEnv` 符合 Gymnasium API 契约，可被主流 RL 库直接消费。
+
+### 4B.2 奖励函数修正
+
+**问题**：P3 阶段奖励函数为 `reward = cos(theta)`，目标是摆杆水平位置（theta=0 时 cos=1），与倒立摆目标（竖直向上）不符。随机采样时摆杆恰好经过水平位置，导致终端显示奖励"上升"的假象，与学习无关。
+
+**修正**：采用 Gymnasium Pendulum-v1 标准 cost 函数（负奖励）：
+
+```python
+# theta=0 为直立目标（场景 XML 已调整：摆杆沿 +z 方向，theta=0 = upright）
+reward = -(theta**2 + 0.1 * theta_dot**2 + 0.001 * action**2)
+```
+
+- `theta=0`（直立）时 cost=0（最优）
+- `theta=π`（倒挂）时 cost≈π²≈9.87（最差）
+- 目标：最小化 cost（即 reward 趋近 0）
+
+**场景 XML 调整**：`simple_pendulum.xml` 中摆杆 geom 位置从 `pos="0.5 0 0"`（水平）改为 `pos="0 0 0.5"`（竖直），使 `theta=0` 对应直立位置，符合 Gymnasium Pendulum-v1 惯例。motor `gear` 从 1 调整为 10，确保电机扭矩（10 Nm）大于重力扭矩（~5 Nm），使控制器有能力平衡摆杆。
+
+### 4B.3 观测空间 SB3 兼容化
+
+**问题**：P3 阶段观测为 Dict 类型，SB3 默认仅支持 Box 观测空间。
+
+**修正**：观测改为 Box 类型 `[cos(theta), sin(theta), theta_dot]`，与 Gymnasium Pendulum-v1 一致，使用 cos/sin 编码角度避免 2π 周期性问题。
+
+### 4B.4 Episode 截断
+
+**问题**：P3 阶段 `truncated=False`，episode 永不结束，SB3 Monitor 无法收集 episode 奖励。
+
+**修正**：添加 `MAX_EPISODE_STEPS = 200`（与 Pendulum-v1 一致），`step_count >= 200` 时 `truncated=True`。
+
+### 4B.5 SB3 PPO 训练脚本
+
+`OrcaPlayground/examples/euler/03_rl_ppo/train_ppo.py`（第 3 课）实现：
+
+- **离线训练**：`python examples/euler/03_rl_ppo/train_ppo.py --total-timesteps 100000`（默认 `skip_grpc_load=True`）
+- **在线训练**：`python examples/euler/03_rl_ppo/train_ppo.py --no-skip-grpc --render-mode human --addr <studio-addr>`
+- **评估**：`python examples/euler/03_rl_ppo/train_ppo.py --eval --model-path 03_rl_ppo/models/ppo_pendulum.zip`
+- **Monitor 包装器**：收集 episode 奖励，`RewardLoggingCallback` 每 `n_steps` 打印平均奖励
+- **模型保存/加载**：`PPO.save()` / `PPO.load()`，模型存储于 `examples/euler/03_rl_ppo/models/`
+
+### 4B.6 验证结果
+
+**离线训练（100k 步）奖励曲线**：
+
+| 训练步数 | 平均奖励 | 说明 |
+|---------|---------|------|
+| 2,048 | -2596.93 | 随机策略，摆杆倒下 |
+| 28,672 | -96.55 | 开始学习平衡 |
+| 40,960 | -3.25 | 接近平衡 |
+| 100,352 | -0.43 | 稳定平衡 |
+
+**评估结果**：`mean_reward = -0.1431 ± 0.0951`（5 回合），摆杆稳定直立 200 步。
+
+### 4B.7 验收标准
+
+- [x] 奖励函数修正为 Pendulum-v1 标准 cost（`theta=0` 直立目标）
+- [x] 观测空间为 Box 类型 `[cos, sin, theta_dot]`
+- [x] Episode 截断（200 步）
+- [x] SB3 PPO 离线训练奖励从 -2596 改善至 -0.43
+- [x] 评估 mean_reward 接近 0（-0.14）
+- [x] `03_rl_ppo/train_ppo.py --no-skip-grpc` 支持在线模式（连接 OrcaStudio 渲染）
+- [x] OrcaGym 61 个单元测试全通过
 
 ---
 
@@ -704,9 +912,12 @@ if __name__ == "__main__":
 
 ### 6.1 目标
 
-在 OrcaPlayground 的 `envs/euler` 和 `examples/euler` 目录下，为每种典型用户开发模式设计一个 `OrcaGymEulerEnv` 子类和对应的命令行入口脚本，作为真正的 E2E 验证。同时引入 `OrcaGymEnvProtocol` 平滑外围组件迁移。
+在 OrcaPlayground 的 `envs/euler` 和 `examples/euler` 目录下，为推荐的典型用户开发模式设计 `OrcaGymEulerEnv` 子类和对应的命令行入口脚本，作为真正的 E2E 验证。同时引入 `OrcaGymEnvProtocol` 平滑外围组件迁移。
 
-**核心原则**：P5 不再是"迁移原 Env"，而是"用 Euler 体系重新实现典型用户模式"，每个 example 都是最终用户的真实用法，是真正的 E2E 验证。
+**核心原则**：
+- P5 不再是"迁移原 Env"，而是"用 Euler 体系重新实现推荐用户模式"，每个 example 都是最终用户的真实用法。
+- **推荐 `do_simulation` 委托式步进**（第 1 课 `SimpleEulerEnv`）作为首选模式；手动 `mj_step` 循环式（原 G1 模式）不再作为推荐模式单独设课。
+- 多 Agent Legged 模式为过时设计，不再单独设课；后续将根据新设计补充。
 
 ### 6.2 交付物
 
@@ -736,75 +947,44 @@ class OrcaGymEnvProtocol(Protocol):
     # ... 其余公共方法 ...
 ```
 
-#### 6.2.2 OrcaPlayground 典型用户模式 E2E 验证
+#### 6.2.2 OrcaPlayground 推荐用户模式 E2E 验证
 
-在 P3 的 `simple_env.py` 基础上，P5 扩展覆盖所有典型用户开发模式。每个模式对应一个 `OrcaGymEulerEnv` 子类 + 一个命令行入口脚本：
+P5 覆盖以下推荐模式（每个模式对应一个 `OrcaGymEulerEnv` 子类 + 命令行入口脚本）：
 
 ```
 OrcaPlayground/
 ├── envs/
 │   └── euler/
 │       ├── __init__.py
-│       ├── simple_env.py           # P3：简单委托式（对应 D12Env）
-│       ├── loop_env.py             # P5：手动循环式 + query_*（对应 G1Env）
-│       ├── force_env.py            # P5：apply_body_force + equality（对应 fluid SimEnv）
-│       └── multi_agent_env.py      # P5：多 agent + 接触查询 + 传感器（对应 LeggedSimEnv）
+│       ├── simple_env.py           # P3：简单委托式（对应 D12Env，推荐首选）
+│       └── force_env.py            # P5：apply_body_force + equality（对应 fluid SimEnv）
 ├── examples/
 │   └── euler/
 │       ├── __init__.py
-│       ├── run_simple.py           # P3：简单委托式入口
-│       ├── run_loop.py             # P5：手动循环式入口
-│       ├── run_force.py            # P5：力应用入口
-│       └── run_multi_agent.py      # P5：多 agent 入口
+│       ├── 01_hello_euler/hello_euler.py      # 第 1 课：简单委托式入口（P3）
+│       ├── 02_online_render/online_render.py   # 第 2 课：在线渲染入口（P3A）
+│       ├── 03_rl_ppo/train_ppo.py              # 第 3 课：SB3 PPO 入口（P3B）
+│       ├── 04_query_api/query_api.py           # 第 4 课：状态查询入口（P4，待开发）
+│       ├── 05_force_apply/force_apply.py       # 第 5 课：力应用入口（P4/P5，待开发）
+│       └── 06_solver_coupling/                 # 第 6 课：Euler 求解器耦合（后续 phase，预留）
 ```
 
-##### 模式 A：简单委托式（`simple_env.py`，P3 已完成）
+##### 模式 A：简单委托式（`simple_env.py`，P3 已完成，推荐首选）
 
-对应 D12Env 模式：Env 仅做 `reset_model`/`_get_obs`，步进完全委托给基类 `do_simulation`。
+Env 仅做 `reset_model`/`_get_obs`，步进完全委托给基类 `do_simulation`。这是推荐的用户开发模式。
 
 验证点：
 - `env.data.qpos`/`env.data.qvel` 读取
 - `env.do_simulation` 步进
 - `env.render()` 渲染
 
-##### 模式 B：手动循环式（`loop_env.py`，P5）
+##### 模式 B：力应用式（`force_env.py`，P5）
 
-对应 G1Env 模式：Env 在 `step` 中手动调用 `mj_step` + `query_*` 构建观测。
-
-```python
-class LoopEulerEnv(OrcaGymEulerEnv):
-    """手动循环式 Env，验证 query_* API（对应 G1Env 模式）。"""
-
-    def _get_obs(self) -> dict:
-        joint_names = [...]
-        return {
-            "joint_qpos": self.query_joint_qpos(joint_names),
-            "joint_qvel": self.query_joint_qvel(joint_names),
-            "body_xpos": self.get_body_xpos_xmat_xquat(["pelvis"]),
-            "sensor_data": self.query_sensor_data(["imu_gyro"]),
-        }
-
-    def step(self, action):
-        self.set_ctrl(action)
-        for _ in range(self.frame_skip):
-            self.mj_step(1)
-            self.update_data()
-        return self._get_obs(), 0.0, False, False, {}
-```
-
-验证点：
-- `query_joint_qpos`/`query_joint_qvel`
-- `get_body_xpos_xmat_xquat`
-- `query_sensor_data`
-- 手动 `mj_step` + `update_data` 循环
-
-##### 模式 C：力应用式（`force_env.py`，P5）
-
-对应 fluid SimEnv 模式：Env 通过 `apply_body_force` 施加外力，操作 equality 约束。
+Env 通过 `apply_body_force` 施加外力，操作 equality 约束。
 
 ```python
 class ForceEulerEnv(OrcaGymEulerEnv):
-    """力应用式 Env，验证 apply_body_force + equality（对应 fluid SimEnv 模式）。"""
+    """力应用式 Env，验证 apply_body_force + equality。"""
 
     def apply_fluid_force(self, body_name: str, force: np.ndarray, torque: np.ndarray):
         # 使用正式 API，替代 self.gym._mjData.xfrc_applied[...] = ...
@@ -823,48 +1003,20 @@ class ForceEulerEnv(OrcaGymEulerEnv):
 - `update_equality_constraints`
 - 力应用后步进结果正确
 
-##### 模式 D：多 Agent 复杂式（`multi_agent_env.py`，P5）
-
-对应 LeggedSimEnv 模式：多 agent、接触查询、传感器、里程计。
-
-```python
-class MultiAgentEulerEnv(OrcaGymEulerEnv):
-    """多 Agent 复杂式 Env，验证接触/传感器/里程计（对应 LeggedSimEnv 模式）。"""
-
-    def _get_obs(self) -> dict:
-        return {
-            "joint_qpos": self.query_joint_qpos(self._joint_names),
-            "contact": self.query_contact_simple(),
-            "contact_force": self.query_contact_force(self._contact_ids),
-            "actuator_torque": self.query_actuator_torques(self._actuator_names),
-            "robot_pos_odom": self.query_robot_position_odom(
-                self._base_body, self._init_pos, self._init_quat
-            ),
-        }
-```
-
-验证点：
-- `query_contact_simple`/`query_contact_force`
-- `query_actuator_torques`
-- `query_robot_position_odom`
-- 多 agent 名称空间解析
-
 #### 6.2.3 命令行入口脚本
 
-每个模式对应一个 `run_*.py`，结构参考 P3 的 `run_simple.py`：
+每个模式对应一个课程入口脚本，结构参考 P3 的 `01_hello_euler/hello_euler.py`：
 
-| 入口脚本 | 驱动 Env | 验证模式 |
-|---------|---------|---------|
-| `run_simple.py` | `SimpleEulerEnv` | 简单委托式（P3） |
-| `run_loop.py` | `LoopEulerEnv` | 手动循环式 + query_* |
-| `run_force.py` | `ForceEulerEnv` | apply_body_force + equality |
-| `run_multi_agent.py` | `MultiAgentEulerEnv` | 多 agent + 接触/传感器/里程计 |
+| 课程 | 入口脚本 | 驱动 Env | 验证模式 |
+|------|---------|---------|---------|
+| 第 1 课 | `01_hello_euler/hello_euler.py` | `SimpleEulerEnv` | 简单委托式（P3，推荐首选） |
+| 第 5 课 | `05_force_apply/force_apply.py` | `ForceEulerEnv` | apply_body_force + equality |
 
 #### 6.2.4 迁移指南文档
 
 `docs/design/development/migration_guide.md`（P5 末尾撰写），包含：
 - 83 处绕道的完整替代方案清单（架构文档第 9.2 节）
-- 4 个典型用户模式的 Euler 实现示例（即 `envs/euler/` 下的 4 个 Env）
+- 推荐用户模式的 Euler 实现示例（即 `envs/euler/` 下的 Env 子类）
 - 从原 `OrcaGymLocalEnv` 子类迁移到 `OrcaGymEulerEnv` 子类的步骤
 - 常见陷阱和注意事项
 
@@ -880,35 +1032,46 @@ class MultiAgentEulerEnv(OrcaGymEulerEnv):
 
 #### `tests/orca_gym/environment/euler/test_euler_envs_api.py`
 
-针对 `envs/euler/` 下的 4 个 Env，在无 Studio 环境下用本地 MJCF 验证 API 调用正确性：
+针对 `envs/euler/` 下的 Env 子类，在无 Studio 环境下用本地 MJCF 验证 API 调用正确性：
 
 | 测试用例 | 验证点 |
 |---------|--------|
 | `test_simple_env_obs_uses_data_view` | `SimpleEulerEnv._get_obs` 使用 `env.data` 而非 `gym._mjData` |
-| `test_loop_env_query_methods` | `LoopEulerEnv` 的 query_* 返回正确 |
 | `test_force_env_apply_body_force` | `ForceEulerEnv.apply_body_force` 生效 |
 | `test_force_env_clear_forces` | `ForceEulerEnv.clear_forces` 清零 |
-| `test_multi_agent_env_contacts` | `MultiAgentEulerEnv` 接触查询正常 |
-| `test_multi_agent_env_odom` | `MultiAgentEulerEnv` 里程计计算正确 |
-| `test_all_envs_no_mjdata_access` | 4 个 Env 源码无 `_mjData`/`_mjModel` 访问 |
+| `test_all_envs_no_mjdata_access` | Env 源码无 `_mjData`/`_mjModel` 访问 |
 
 ### 6.4 E2E 验证清单（需 OrcaStudio 环境）
 
-通过 4 个 `run_*.py` 入口脚本驱动，验证完整链路：
+通过课程入口脚本驱动，验证完整链路：
 
-- [ ] `run_simple.py` 完成 100 步循环，Studio 视口更新
-- [ ] `run_loop.py` 手动循环步进，query_* 返回正确
-- [ ] `run_force.py` 施加外力后物体运动符合预期
-- [ ] `run_multi_agent.py` 多 agent 接触/传感器/里程计正常
-- [ ] 所有 4 个 Env 源码无 `_mjData`/`_mjModel` 直接访问
+- [ ] `01_hello_euler/hello_euler.py`（第 1 课）完成 100 步循环，Studio 视口更新
+- [ ] `05_force_apply/force_apply.py`（第 5 课）施加外力后物体运动符合预期
+- [ ] 所有 Env 源码无 `_mjData`/`_mjModel` 直接访问
 
 ### 6.5 验收标准
 
 - [ ] `OrcaGymEnvProtocol` 定义完成，两个 Env 都满足
-- [ ] `envs/euler/` 下 4 个 EulerEnv 子类实现完成
-- [ ] `examples/euler/` 下 4 个入口脚本可连接 OrcaStudio 完成完整循环
-- [ ] 4 个 Env 源码无任何 `_mjData`/`_mjModel` 直接访问残留
+- [ ] `envs/euler/` 下 EulerEnv 子类实现完成（simple + force）
+- [ ] `examples/euler/` 下入口脚本可连接 OrcaStudio 完成完整循环
+- [ ] Env 源码无任何 `_mjData`/`_mjModel` 直接访问残留
 - [ ] 迁移指南文档完成
+
+---
+
+## 6X. 后续 phase：Euler 求解器耦合（预留）
+
+### 6X.1 目标
+
+实现 `OrcaGymEulerEnv` 与 Euler 求解器的深度耦合，作为后续 phase 的开发内容（不在 Phase 1 范围内）。
+
+### 6X.2 状态
+
+**预留**：具体设计（API 契约、场景、验证点、课程示例 `06_solver_coupling/`）待后续 phase 设计文档确定后补充。当前不提供实现。
+
+### 6X.3 课程对应
+
+- 第 6 课：Euler 求解器耦合（`examples/euler/06_solver_coupling/`，预留）
 
 ---
 
@@ -942,9 +1105,9 @@ P1 (基础设施骨架)
 |--------|------|------|
 | **M1 封装隔离验证** | P1 完成 | `_mjData` 访问被拦截 |
 | **M2 API 完备验证** | P2 完成 | DataView/SimConfig 覆盖所有绕道场景 |
-| **M3 端到端联调** | P3 完成 | `examples/euler/run_simple.py` 驱动 Studio 同步 |
+| **M3 端到端联调** | P3 完成 | `examples/euler/01_hello_euler/hello_euler.py` 驱动 Studio 同步 |
 | **M4 完整 API** | P4 完成 | 所有公共 API 可用 |
-| **M5 典型模式 E2E** | P5 完成 | 4 个 `run_*.py` 入口脚本全部通过 |
+| **M5 典型模式 E2E** | P5 完成 | 推荐模式入口脚本（simple + force）全部通过 |
 
 ---
 
@@ -1041,7 +1204,7 @@ class TestE2EStudioIntegration(unittest.TestCase):
 | 单元测试（mock stub） | P1-P4 | 验证单个类/方法，无需 Studio |
 | OrcaPlayground example 驱动 | P3, P5 | 真实用户用法，需 Studio 环境 |
 
-P3 的 `examples/euler/run_simple.py` 和 P5 的 4 个 `run_*.py` 入口脚本构成完整的 E2E 验证矩阵，覆盖所有典型用户开发模式。
+P3 的 `examples/euler/01_hello_euler/hello_euler.py` 和 P5 的力应用入口脚本构成 E2E 验证矩阵，覆盖推荐的用户开发模式（简单委托式 + 力应用式）。
 
 ---
 
@@ -1089,15 +1252,15 @@ P3 的 `examples/euler/run_simple.py` 和 P5 的 4 个 `run_*.py` 入口脚本�
 | 阶段 | 文件路径 | 说明 |
 |------|---------|------|
 | P3 | `OrcaPlayground/envs/euler/__init__.py` | Env 子类模块初始化 |
-| P3 | `OrcaPlayground/envs/euler/simple_env.py` | 简单委托式 Env（对应 D12Env） |
+| P3 | `OrcaPlayground/envs/euler/simple_env.py` | 简单委托式 Env（对应 D12Env，推荐首选） |
 | P3 | `OrcaPlayground/examples/euler/__init__.py` | example 模块初始化 |
-| P3 | `OrcaPlayground/examples/euler/run_simple.py` | 简单委托式入口 |
-| P5 | `OrcaPlayground/envs/euler/loop_env.py` | 手动循环式 Env（对应 G1Env） |
+| P3 | `OrcaPlayground/examples/euler/01_hello_euler/hello_euler.py` | 第 1 课：简单委托式入口 |
+| P3A | `OrcaPlayground/examples/euler/02_online_render/online_render.py` | 第 2 课：在线渲染入口 |
+| P3B | `OrcaPlayground/examples/euler/03_rl_ppo/train_ppo.py` | 第 3 课：SB3 PPO 入口 |
+| P4 | `OrcaPlayground/examples/euler/04_query_api/query_api.py` | 第 4 课：状态查询入口（待开发） |
 | P5 | `OrcaPlayground/envs/euler/force_env.py` | 力应用式 Env（对应 fluid SimEnv） |
-| P5 | `OrcaPlayground/envs/euler/multi_agent_env.py` | 多 Agent 复杂式 Env（对应 LeggedSimEnv） |
-| P5 | `OrcaPlayground/examples/euler/run_loop.py` | 手动循环式入口 |
-| P5 | `OrcaPlayground/examples/euler/run_force.py` | 力应用入口 |
-| P5 | `OrcaPlayground/examples/euler/run_multi_agent.py` | 多 Agent 入口 |
+| P5 | `OrcaPlayground/examples/euler/05_force_apply/force_apply.py` | 第 5 课：力应用入口（待开发） |
+| 后续 phase | `OrcaPlayground/examples/euler/06_solver_coupling/` | 第 6 课：Euler 求解器耦合（预留） |
 
 ---
 
@@ -1109,19 +1272,19 @@ P3 的 `examples/euler/run_simple.py` 和 P5 的 4 个 `run_*.py` 入口脚本�
 |------|---------|---------|-----------|
 | **P1** | 基础设施骨架 + 封装隔离 | 无 | M1 封装隔离验证 |
 | **P2** | DataView + SimConfig + ModelRegistry | 无 | M2 API 完备验证 |
-| **P3** | StudioBridge + Env 骨架 + `run_simple.py` | **可联调** | M3 端到端联调 |
+| **P3** | StudioBridge + Env 骨架 + `01_hello_euler/hello_euler.py` | **可联调** | M3 端到端联调 |
 | **P4** | 完整公共 API | 可联调 | M4 完整 API |
-| **P5** | 4 个典型模式 E2E + Protocol | 可联调 | M5 典型模式 E2E |
+| **P5** | 推荐模式 E2E + Protocol | 可联调 | M5 典型模式 E2E |
 
 **关键设计**：
 - P1 完成后即可验证封装隔离机制（`__getattr__`/`__dir__`）
-- P2 与 P3 可并行，P3 完成后即可通过 `examples/euler/run_simple.py` 开始端到端联调
+- P2 与 P3 可并行，P3 完成后即可通过 `examples/euler/01_hello_euler/hello_euler.py` 开始端到端联调
 - P4 按 API 类别分批实现，每批配套单元测试
-- P5 通过 OrcaPlayground 的 4 个典型用户模式 example 驱动真正的 E2E 验证，引入 Protocol 平滑过渡
+- P5 通过 OrcaPlayground 的推荐用户模式 example（simple + force）驱动真正的 E2E 验证，引入 Protocol 平滑过渡
 
 **E2E 验证原则**：
 - 不构造 `OrcaGymEulerEnv` 桩，采用外置 OrcaPlayground example 驱动
 - 每个 example 对应一种典型用户开发模式，是最终用户的真实用法
-- P3 的 `run_simple.py` 提供最早联调入口，P5 扩展到 4 个模式全覆盖
+- P3 的 `01_hello_euler/hello_euler.py` 提供最早联调入口，P5 扩展到推荐模式（simple + force）覆盖
 
 每个阶段都有独立的验收标准和单元测试，确保渐进式交付和持续验证。
