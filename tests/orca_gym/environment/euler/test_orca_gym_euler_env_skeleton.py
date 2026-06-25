@@ -1,8 +1,8 @@
-"""P3-Step1: OrcaGymEulerEnv 骨架验收测试。
+"""P3-Step1/阶段二-Step6: OrcaGymEulerEnv 验收测试。
 
 验证 OrcaGymEulerEnv 的隔离机制（K1/K2/K4/K6/K7/K8/K9/K10/K11/K12）、
 父类和解（K10 方案 A）、公共 API 完整性（架构 §5.3, §11, §12.5），
-不验证 MuJoCo/Studio 功能正确性（骨架阶段功能方法 raise NotImplementedError）。
+以及生命周期与步进方法在离线模式真实工作（阶段二 Step 6 验收标准）。
 
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component environment/euler
@@ -11,6 +11,8 @@
 import pathlib
 import re
 import unittest
+
+import numpy as np
 
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
@@ -49,12 +51,20 @@ def _exec_source_without_docstrings() -> str:
 
 
 def _make_skeleton_env() -> OrcaGymEulerEnv:
-    """构造骨架模式 Env（skip_grpc_load=True，生命周期方法 no-op）。"""
+    """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
+    # OrcaPlayground 是 OrcaGym 的同级目录
+    # __file__ = OrcaGym/tests/orca_gym/environment/euler/test_*.py
+    # parents[4] = OrcaGym，再向上一级到 repo 根，再到 OrcaPlayground
+    _pendulum_xml = (
+        pathlib.Path(__file__).resolve().parents[4].parent
+        / "OrcaPlayground" / "envs" / "euler" / "scenes" / "simple_pendulum.xml"
+    )
     return OrcaGymEulerEnv(
         frame_skip=4,
         orcagym_addr="localhost:50051",
         agent_names=["agent0"],
         time_step=0.002,
+        model_xml_path=str(_pendulum_xml),
         skip_grpc_load=True,
     )
 
@@ -307,11 +317,12 @@ class TestEnvK8NoEulerPrivate(unittest.TestCase):
             "（耦合查询通过 has_euler/step_with_coupling）",
         )
 
-    def test_do_simulation_raises_not_implemented(self):
-        """骨架阶段 do_simulation raise NotImplementedError。"""
+    def test_do_simulation_validates_action_dim(self):
+        """do_simulation 对错误维度抛 ValueError（K4/K8 合规）。"""
         import numpy as np
         env = _make_skeleton_env()
-        with self.assertRaises(NotImplementedError):
+        # pendulum nu=1，传入 nu=0 的数组应抛 ValueError
+        with self.assertRaises(ValueError):
             env.do_simulation(np.zeros(0), 1)
 
 
@@ -389,18 +400,20 @@ class TestEnvK10ParentShielding(unittest.TestCase):
     def test_parent_model_assignment_shielded(self):
         """父类 self.model = M 后 env.model 走 property（从 _gym.model 取），不接受父类赋值。
 
-        骨架阶段 _gym.model 抛 NotImplementedError，证明 env.model 委托到 _gym.model
+        env.model 委托到 _gym.model（OrcaGymModel 实例），证明 env.model 走 property
         而非返回父类赋值的 "fake_model"。
         """
+        from orca_gym.core.orca_gym_model import OrcaGymModel
         env = _make_skeleton_env()
         # 模拟父类赋值 self.model = "fake_model"
         env.model = "fake_model"
         # model 不存在于 __dict__（被 __setattr__ 忽略）
         self.assertNotIn("model", env.__dict__)
-        # env.model 走 property 委托到 _gym.model（骨架阶段抛 NotImplementedError，
+        # env.model 走 property 委托到 _gym.model（返回 OrcaGymModel 实例，
         # 证明未返回父类赋值的 "fake_model"）
-        with self.assertRaises(NotImplementedError):
-            _ = env.model
+        result = env.model
+        self.assertIsInstance(result, OrcaGymModel)
+        self.assertNotEqual(result, "fake_model")
 
     def test_parent_data_assignment_shielded(self):
         """父类 self.data = D 后 env.data 走 property（从 _gym.data 取），不接受父类赋值。"""
@@ -448,39 +461,91 @@ class TestEnvK12Docstring(unittest.TestCase):
         self.assertIn("禁止", doc)
 
 
-class TestEnvMethodStubs(unittest.TestCase):
-    """补充：验证功能方法在骨架阶段按约定 raise NotImplementedError。"""
+class TestEnvLifecycleAndStepping(unittest.TestCase):
+    """阶段二 Step 6: OrcaGymEulerEnv 生命周期与步进真实功能测试。
 
-    def test_simulation_methods_raise_not_implemented(self):
-        """骨架阶段仿真控制方法 raise NotImplementedError。"""
-        import numpy as np
-        env = _make_skeleton_env()
-        with self.assertRaises(NotImplementedError):
-            env.mj_step(1)
-        with self.assertRaises(NotImplementedError):
-            env.mj_forward()
-        with self.assertRaises(NotImplementedError):
-            env.set_ctrl(np.zeros(0))
-        with self.assertRaises(NotImplementedError):
-            env.do_simulation(np.zeros(0), 1)
+    验证离线模式 initialize_simulation/reset_simulation/init_qpos_qvel/do_simulation
+    真实工作（对应 Step 6 验收标准）。
+    """
 
-    def test_render_raises_not_implemented(self):
-        """骨架阶段 render raise NotImplementedError。"""
+    def test_initialize_simulation_loads_model(self):
+        """离线模式 initialize_simulation 成功加载 pendulum 模型。"""
         env = _make_skeleton_env()
-        with self.assertRaises(NotImplementedError):
-            env.render()
+        model, view = env.initialize_simulation()
+        # model 是 OrcaGymModel（pendulum nq=1）
+        from orca_gym.core.orca_gym_model import OrcaGymModel
+        self.assertIsInstance(model, OrcaGymModel)
+        self.assertEqual(model.nq, 1)
+        # view 是 OrcaGymDataView
+        self.assertIsInstance(view, OrcaGymDataView)
 
-    def test_ctrl_property_raises_not_implemented(self):
-        """骨架阶段 ctrl getter/setter raise NotImplementedError。"""
-        import numpy as np
+    def test_reset_simulation_clears_state(self):
+        """reset_simulation 后 qpos 回到初始状态。"""
         env = _make_skeleton_env()
-        with self.assertRaises(NotImplementedError):
-            _ = env.ctrl
-        with self.assertRaises(NotImplementedError):
-            env.ctrl = np.zeros(0)
+        env.do_simulation(np.array([1.0]), 1)
+        env.reset_simulation()
+        np.testing.assert_array_almost_equal(env.data.qpos, np.zeros(1))
+
+    def test_init_qpos_qvel_saves_initial_state(self):
+        """init_qpos_qvel 正确保存初始 qpos/qvel。"""
+        env = _make_skeleton_env()
+        env.init_qpos_qvel()
+        self.assertEqual(env.init_qpos.shape, (1,))
+        self.assertEqual(env.init_qvel.shape, (1,))
+        np.testing.assert_array_almost_equal(env.init_qpos, np.zeros(1))
+
+    def test_do_simulation_advances_time(self):
+        """do_simulation(ctrl, 5) 步进 5 帧后 env.data.time 增加 5 * timestep。"""
+        env = _make_skeleton_env()
+        time_before = float(env.data.time)
+        env.do_simulation(np.array([0.0]), 5)
+        time_after = float(env.data.time)
+        expected_dt = 5 * env.sim_config.timestep
+        self.assertAlmostEqual(time_after - time_before, expected_dt, places=5)
+
+    def test_set_joint_qpos_writes_state(self):
+        """set_joint_qpos 正确写入 qpos。"""
+        env = _make_skeleton_env()
+        env.set_joint_qpos(np.array([0.5]))
+        env.mj_forward()
+        env._gym.sync_to_view()
+        self.assertAlmostEqual(float(env.data.qpos[0]), 0.5)
+
+    def test_set_joint_qvel_writes_state(self):
+        """set_joint_qvel 正确写入 qvel。"""
+        env = _make_skeleton_env()
+        env.set_joint_qvel(np.array([0.3]))
+        env.mj_forward()
+        env._gym.sync_to_view()
+        self.assertAlmostEqual(float(env.data.qvel[0]), 0.3)
+
+    def test_ctrl_property_returns_actuator_force(self):
+        """ctrl getter 返回 actuator_force（阶段二简化实现）。"""
+        env = _make_skeleton_env()
+        env.set_ctrl(np.array([0.7]))
+        env._gym.sync_to_view()
+        # actuator_force 反映已设置的 ctrl
+        self.assertEqual(env.ctrl.shape, (1,))
+
+    def test_ctrl_setter_delegates_to_set_ctrl(self):
+        """ctrl setter 委托到 set_ctrl，set_ctrl 写入 mjData.ctrl。"""
+        env = _make_skeleton_env()
+        env.ctrl = np.array([0.5])
+        # 验证 set_ctrl 写入 mjData.ctrl（需通过 actuator_force 间接验证）
+        # set_ctrl 后调用 mj_forward 更新 actuator_force
+        env.mj_forward()
+        env._gym.sync_to_view()
+        # ctrl getter 读 actuator_force，pendulum 的 actuator_force == ctrl（无齿轮比）
+        np.testing.assert_array_almost_equal(env.ctrl, np.array([0.5]))
+
+    def test_render_offline_returns_none(self):
+        """离线模式 render 返回 None（无 OrcaStudio 可渲染，Step 8）。"""
+        env = _make_skeleton_env()
+        result = env.render()
+        self.assertIsNone(result)
 
     def test_gymnasium_methods_raise_not_implemented(self):
-        """骨架阶段 step/reset_model/_get_obs raise NotImplementedError（待子类实现）。"""
+        """step/reset_model/_get_obs 仍 raise NotImplementedError（待子类实现）。"""
         env = _make_skeleton_env()
         with self.assertRaises(NotImplementedError):
             env.reset_model()

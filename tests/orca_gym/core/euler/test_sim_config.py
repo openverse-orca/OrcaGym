@@ -1,24 +1,37 @@
-"""P1-Step1: SimConfig 骨架验收测试。
+"""阶段二 Step 2: SimConfig 功能验收测试。
 
-验证 SimConfig 的签名和 typed 接口完整（架构 §5.6, §12.2），
-不验证 MuJoCo 功能正确性（骨架阶段不持有真实 mjModel）。
+验证 SimConfig 的 typed 接口和委托机制（架构 §5.6, §12.2）。
+未绑定时 property 走缓存占位字段；绑定后委托真实 `_mj_model.opt.*`。
+`_bind` 仅切换引用不同步缓存值——绑定后 mj_model.opt 保留 XML 原值，
+Env 层负责显式重新应用需生效的缓存配置。
 
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
+import os
 import unittest
 
+import mujoco
 import numpy as np
 
 from orca_gym.core.euler.sim_config import SimConfig
 
 
+# 测试用 XML 模型：单铰链倒立摆（timestep=0.002, integrator=RK4, gravity=0 0 -9.81）
+_PENDULUM_XML = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "..", "..",
+    "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
+)
+_PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
+
+
 class TestSimConfigSkeleton(unittest.TestCase):
-    """SimConfig 骨架验收测试（对应 P1-Step1 验收标准）。"""
+    """SimConfig 结构验收：property 签名、方法存在、docstring 契约。"""
 
     def test_sim_config_constructable(self):
-        """SimConfig() 可无参构造（骨架不依赖真实 mjModel）。"""
+        """SimConfig() 可无参构造（未绑定时使用缓存默认值）。"""
         config = SimConfig()
         self.assertIsInstance(config, SimConfig)
 
@@ -54,6 +67,10 @@ class TestSimConfigSkeleton(unittest.TestCase):
         """to_dict 方法存在且可调用。"""
         self.assertTrue(callable(getattr(SimConfig, "to_dict", None)))
 
+    def test_sim_config_has_bind_method(self):
+        """_bind 方法存在且可调用（阶段二新增）。"""
+        self.assertTrue(callable(getattr(SimConfig, "_bind", None)))
+
     def test_sim_config_docstring_has_contract(self):
         """docstring 含「使用契约」和「禁止」关键词（K12）。"""
         doc = SimConfig.__doc__ or ""
@@ -61,47 +78,150 @@ class TestSimConfigSkeleton(unittest.TestCase):
         self.assertIn("禁止", doc)
 
 
-class TestSimConfigPropertyMechanism(unittest.TestCase):
-    """补充：验证 property getter/setter 机制在占位字段上可用。
+class TestSimConfigUnboundCache(unittest.TestCase):
+    """未绑定时 property 走缓存占位字段（对应阶段二 Step 2 验收标准）。"""
 
-    骨架阶段 property 操作内部占位字段（架构 §12.2 允许），
-    此测试验证接口机制本身可用，不验证 MuJoCo 功能。
-    """
-
-    def test_timestep_round_trip(self):
+    def test_timestep_round_trip_unbound(self):
+        """未绑定时 timestep setter 写入缓存，getter 读缓存。"""
         config = SimConfig()
         config.timestep = 0.005
         self.assertAlmostEqual(config.timestep, 0.005)
 
-    def test_integrator_round_trip(self):
+    def test_integrator_round_trip_unbound(self):
         config = SimConfig()
         config.integrator = 1
         self.assertEqual(config.integrator, 1)
 
-    def test_iterations_round_trip(self):
+    def test_iterations_round_trip_unbound(self):
         config = SimConfig()
         config.iterations = 200
         self.assertEqual(config.iterations, 200)
 
-    def test_gravity_round_trip(self):
+    def test_gravity_round_trip_unbound(self):
         config = SimConfig()
         new_g = np.array([0.0, 0.0, -10.0])
         config.gravity = new_g
         np.testing.assert_array_equal(config.gravity, new_g)
 
-    def test_load_from_dict_sets_values(self):
+    def test_unbound_defaults(self):
+        """未绑定时返回合理默认值（timestep=0.002, gravity=[0,0,-9.81]）。"""
+        config = SimConfig()
+        self.assertAlmostEqual(config.timestep, 0.002)
+        self.assertEqual(config.integrator, 0)
+        self.assertEqual(config.iterations, 100)
+        np.testing.assert_array_equal(config.gravity, np.array([0.0, 0.0, -9.81]))
+
+    def test_load_from_dict_sets_values_unbound(self):
         config = SimConfig()
         config.load_from_dict({"timestep": 0.001, "iterations": 50})
         self.assertAlmostEqual(config.timestep, 0.001)
         self.assertEqual(config.iterations, 50)
 
-    def test_to_dict_returns_all_keys(self):
+    def test_to_dict_returns_all_keys_unbound(self):
         config = SimConfig()
         d = config.to_dict()
         self.assertIn("timestep", d)
         self.assertIn("integrator", d)
         self.assertIn("iterations", d)
         self.assertIn("gravity", d)
+
+
+class TestSimConfigBoundDelegation(unittest.TestCase):
+    """绑定后 property 委托真实 _mj_model.opt.*（对应阶段二 Step 2 验收标准）。
+
+    _bind 仅切换引用不同步缓存值——绑定后 mj_model.opt 保留 XML 原值，
+    Env 层负责显式重新应用需生效的缓存配置（如 timestep）。
+    """
+
+    def setUp(self):
+        """每个测试前加载真实 mjModel。"""
+        self.mj_model = mujoco.MjModel.from_xml_path(_PENDULUM_XML)
+
+    def test_bind_preserves_xml_opt_values(self):
+        """_bind 后 mj_model.opt 保留 XML 原值（不同步缓存默认值）。"""
+        config = SimConfig()  # 未绑定，缓存有默认值（integrator=0）
+        # 绑定前 mj_model.opt 保持 XML 原值
+        self.assertAlmostEqual(self.mj_model.opt.timestep, 0.002)
+
+        config._bind(self.mj_model)
+
+        # 绑定后 mj_model.opt 仍为 XML 原值，未被缓存默认值覆盖
+        self.assertAlmostEqual(self.mj_model.opt.timestep, 0.002)
+        self.assertEqual(int(self.mj_model.opt.integrator), 1)  # RK4 from XML
+
+    def test_bound_getter_reads_mjmodel_opt(self):
+        """绑定后 getter 读取 mj_model.opt.*（XML 原值）。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+
+        # pendulum.xml: timestep=0.002, integrator=RK4(1), gravity=[0,0,-9.81]
+        self.assertAlmostEqual(config.timestep, 0.002)
+        self.assertEqual(int(config.integrator), 1)
+
+    def test_bound_setter_writes_mjmodel_opt(self):
+        """绑定后 setter 写入 mj_model.opt.*。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+
+        config.timestep = 0.01
+        self.assertAlmostEqual(self.mj_model.opt.timestep, 0.01)
+        self.assertAlmostEqual(config.timestep, 0.01)
+
+        config.iterations = 300
+        self.assertEqual(int(self.mj_model.opt.iterations), 300)
+
+    def test_bound_gravity_round_trip(self):
+        """绑定后 gravity setter/getter 委托 mj_model.opt.gravity。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+
+        new_g = np.array([0.0, 0.0, -5.0])
+        config.gravity = new_g
+        np.testing.assert_array_almost_equal(
+            np.array(self.mj_model.opt.gravity), new_g
+        )
+        np.testing.assert_array_almost_equal(config.gravity, new_g)
+
+    def test_bound_load_from_dict(self):
+        """绑定后 load_from_dict 委托 mj_model.opt.*。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+
+        config.load_from_dict({"timestep": 0.001, "iterations": 50})
+        self.assertAlmostEqual(self.mj_model.opt.timestep, 0.001)
+        self.assertEqual(int(self.mj_model.opt.iterations), 50)
+
+    def test_bound_to_dict(self):
+        """绑定后 to_dict 读取 mj_model.opt.*。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+
+        d = config.to_dict()
+        self.assertAlmostEqual(d["timestep"], 0.002)
+        self.assertIn("integrator", d)
+        self.assertIn("iterations", d)
+        self.assertIn("gravity", d)
+
+    def test_env_reapplies_cached_timestep_after_bind(self):
+        """模拟 Env 层流程：未绑定设 timestep → bind → 重新应用 timestep。"""
+        config = SimConfig()  # 未绑定
+        config.timestep = 0.005  # Env 在 init_simulation 前设置
+
+        # init_simulation 后绑定
+        config._bind(self.mj_model)
+        # 绑定后 getter 读 XML 原值（0.002），缓存值未自动生效
+        self.assertAlmostEqual(config.timestep, 0.002)
+
+        # Env 层显式重新应用（Step 6 模式）
+        config.timestep = 0.005
+        self.assertAlmostEqual(self.mj_model.opt.timestep, 0.005)
+        self.assertAlmostEqual(config.timestep, 0.005)
+
+    def test_construct_with_mj_model_directly(self):
+        """SimConfig(mj_model) 直接绑定，property 立即委托。"""
+        config = SimConfig(self.mj_model)
+        self.assertAlmostEqual(config.timestep, 0.002)
+        self.assertEqual(int(config.integrator), 1)
 
 
 if __name__ == "__main__":

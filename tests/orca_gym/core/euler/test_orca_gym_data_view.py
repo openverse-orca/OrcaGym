@@ -1,18 +1,29 @@
-"""P1-Step2: OrcaGymDataView 骨架验收测试。
+"""P1-Step2/阶段二-Step4: OrcaGymDataView 验收测试。
 
 验证 OrcaGymDataView 的字段定义、方法签名、__getattr__ 兜底机制完整
-（架构 §5.7, §7.4, §12.2），不验证 MuJoCo 功能正确性（骨架阶段
-不持有真实数据，查询方法 raise NotImplementedError）。
+（架构 §5.7, §7.4, §12.2），以及 body/site 查询方法在绑定真实 mjData/mjModel
+后返回正确结果（阶段二 Step 4 验收标准）。
 
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
+import os
 import unittest
 
+import mujoco
 import numpy as np
 
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
+
+
+# 测试用 XML 模型：单铰链倒立摆（nbody=2, nsite=1）
+_PENDULUM_XML = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "..", "..",
+    "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
+)
+_PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
 
 
 class TestOrcaGymDataViewSkeleton(unittest.TestCase):
@@ -113,28 +124,98 @@ class TestOrcaGymDataViewFieldTypes(unittest.TestCase):
         self.assertIsNotNone(view.contact)
 
 
-class TestOrcaGymDataViewMethodStubs(unittest.TestCase):
-    """补充：验证查询方法在骨架阶段按约定 raise NotImplementedError。
+class TestOrcaGymDataViewRealQuery(unittest.TestCase):
+    """阶段二 Step 4: body/site 查询方法真实查询测试。
 
-    骨架阶段不实现真实查询逻辑（架构 §1.3），方法体应为占位。
+    验证 _sync_from_mjdata 后基本字段零拷贝视图一致，body/site 查询方法
+    返回正确结果（对应阶段二 Step 4 验收标准）。
     """
 
-    def test_body_query_methods_raise_not_implemented(self):
-        view = OrcaGymDataView()
-        for method_name in [
-            "body_xpos", "body_xquat", "body_xmat",
-            "body_cvel", "body_subtree_mass",
-        ]:
-            with self.subTest(method=method_name):
-                with self.assertRaises(NotImplementedError):
-                    getattr(view, method_name)("dummy_body")
+    def setUp(self):
+        """每个测试前加载真实 mjModel/mjData 并同步到 view。"""
+        self.mj_model = mujoco.MjModel.from_xml_path(_PENDULUM_XML)
+        self.mj_data = mujoco.MjData(self.mj_model)
+        # 前向计算以填充 xpos/xquat/xmat/cvel 等派生字段
+        mujoco.mj_forward(self.mj_model, self.mj_data)
+        self.view = OrcaGymDataView()
+        self.view._sync_from_mjdata(self.mj_data, self.mj_model)
 
-    def test_site_query_methods_raise_not_implemented(self):
+    def test_sync_makes_qpos_zero_copy_view(self):
+        """sync_from_mjdata 后 view.qpos 与 mj_data.qpos 一致（零拷贝视图）。"""
+        # 数值一致
+        np.testing.assert_array_equal(self.view.qpos, self.mj_data.qpos)
+        # 零拷贝：修改 mj_data.qpos 后 view.qpos 同步变化
+        self.mj_data.qpos[0] = 0.5
+        self.assertEqual(self.view.qpos[0], 0.5)
+
+    def test_sync_makes_qvel_zero_copy_view(self):
+        """sync_from_mjdata 后 view.qvel 与 mj_data.qvel 一致（零拷贝视图）。"""
+        np.testing.assert_array_equal(self.view.qvel, self.mj_data.qvel)
+
+    def test_sync_populates_time(self):
+        """sync_from_mjdata 后 view.time 为 float 类型。"""
+        self.assertIsInstance(self.view.time, float)
+        self.assertEqual(self.view.time, float(self.mj_data.time))
+
+    def test_body_xpos_returns_correct_shape(self):
+        """body_xpos("pendulum") 返回 (3,) 数组。"""
+        xpos = self.view.body_xpos("pendulum")
+        self.assertEqual(xpos.shape, (3,))
+
+    def test_body_xpos_correct_value(self):
+        """body_xpos("pendulum") 与 mj_data.body(1).xpos 一致。"""
+        np.testing.assert_array_equal(
+            self.view.body_xpos("pendulum"),
+            self.mj_data.body(1).xpos,
+        )
+
+    def test_body_xpos_world(self):
+        """body_xpos("world") 返回原点 [0,0,0]。"""
+        xpos = self.view.body_xpos("world")
+        np.testing.assert_array_almost_equal(xpos, np.zeros(3))
+
+    def test_body_xquat_returns_correct_shape(self):
+        """body_xquat("pendulum") 返回 (4,) 数组。"""
+        xquat = self.view.body_xquat("pendulum")
+        self.assertEqual(xquat.shape, (4,))
+
+    def test_body_xmat_returns_correct_shape(self):
+        """body_xmat("pendulum") 返回 (9,) 数组（MuJoCo 扁平存储）。"""
+        xmat = self.view.body_xmat("pendulum")
+        self.assertEqual(xmat.shape, (9,))
+
+    def test_body_cvel_returns_correct_shape(self):
+        """body_cvel("pendulum") 返回 (6,) 数组。"""
+        cvel = self.view.body_cvel("pendulum")
+        self.assertEqual(cvel.shape, (6,))
+
+    def test_body_subtree_mass_correct(self):
+        """body_subtree_mass("pendulum") 返回正确质量（1.0）。"""
+        mass = self.view.body_subtree_mass("pendulum")
+        self.assertAlmostEqual(mass, 1.0)
+
+    def test_site_xpos_returns_correct_shape(self):
+        """site_xpos("tip") 返回 (3,) 数组。"""
+        xpos = self.view.site_xpos("tip")
+        self.assertEqual(xpos.shape, (3,))
+
+    def test_site_xpos_correct_value(self):
+        """site_xpos("tip") 与 mj_data.site(0).xpos 一致。"""
+        np.testing.assert_array_equal(
+            self.view.site_xpos("tip"),
+            self.mj_data.site(0).xpos,
+        )
+
+    def test_site_xmat_returns_correct_shape(self):
+        """site_xmat("tip") 返回 (9,) 数组（MuJoCo 扁平存储）。"""
+        xmat = self.view.site_xmat("tip")
+        self.assertEqual(xmat.shape, (9,))
+
+    def test_query_before_sync_raises(self):
+        """未 sync 前调用 body_xpos 抛 TypeError（_mj_model 为 None）。"""
         view = OrcaGymDataView()
-        for method_name in ["site_xpos", "site_xmat"]:
-            with self.subTest(method=method_name):
-                with self.assertRaises(NotImplementedError):
-                    getattr(view, method_name)("dummy_site")
+        with self.assertRaises(TypeError):
+            view.body_xpos("pendulum")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,13 @@
-"""SimConfig — MuJoCo 求解器参数配置（骨架）。
+"""SimConfig — MuJoCo 求解器参数配置（阶段二填充）。
 
-本模块属于 OrcaGym Euler 体系骨架阶段（P1-Step1），提供 typed 的 MuJoCo
+本模块属于 OrcaGym Euler 体系阶段二（P4-Step2），提供 typed 的 MuJoCo
 求解器参数读写接口，替代直接访问 `_mjModel.opt.*`。
 
-骨架阶段不持有真实 `mjModel`，property 通过内部占位字段实现读写。
-P4 填充阶段将改为委托 `mj_model.opt.*`。
+阶段二 Step 2 将 property 改为委托 `mj_model.opt.*`。未绑定时（init_simulation
+前）getter 返回缓存默认值，setter 写入缓存；绑定后（_bind 调用后）getter/setter
+委托真实 `_mj_model.opt.*`。`_bind` 仅切换引用不同步缓存值——绑定后 mj_model.opt
+保留 XML 原值，由 Env 层（如 Step 6 的 `sim_config.timestep = self._time_step`）
+显式重新应用需生效的缓存配置。
 """
 
 import numpy as np
@@ -20,6 +23,7 @@ class SimConfig:
         读取: ts = env.sim_config.timestep
         写入: env.sim_config.timestep = 0.002
         批量: env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
+        绑定: sim_config._bind(mj_model)  # 供 OrcaGymEuler.init_simulation 调用
 
     禁止:
         不要通过 env._gym._sim._mjModel.opt.* 绕道访问。
@@ -29,54 +33,89 @@ class SimConfig:
         """初始化求解器配置。
 
         Args:
-            mj_model: MuJoCo 模型对象。骨架阶段不依赖真实 mjModel，
-                使用内部占位字段；P4 填充阶段将委托 mj_model.opt.*。
+            mj_model: MuJoCo 模型对象。None 时使用缓存占位字段，
+                待 _bind(mj_model) 绑定后委托真实 mj_model.opt.*。
         """
-        # 骨架阶段：存储引用供 P4 填充，但 property 走占位字段
         self._mj_model = mj_model
-        # 占位默认值（合理的 MuJoCo 默认）
+        # 缓存默认值（合理的 MuJoCo 默认）；未绑定时 getter 返回这些值。
+        # 绑定后 getter 委托 mj_model.opt.*（保留 XML 原值），
+        # Env 层负责显式重新应用需生效的缓存配置（如 timestep）。
         self._timestep: float = 0.002
         self._integrator: int = 0
         self._iterations: int = 100
         self._gravity: np.ndarray = np.array([0.0, 0.0, -9.81])
 
-    # --- 骨架包含的 property（架构 §12.2）---
+    # --- 绑定方法（供 OrcaGymEuler.init_simulation 后调用）---
+
+    def _bind(self, mj_model) -> None:
+        """绑定真实 mjModel，切换 property 委托到 mj_model.opt.*。
+
+        供 OrcaGymEuler.init_simulation 在加载 mjModel 后调用。
+        绑定后 mj_model.opt 保留 XML 原值（不同步缓存），由 Env 层
+        显式重新应用需生效的缓存配置（如 `sim_config.timestep = ts`）。
+
+        Args:
+            mj_model: MuJoCo MjModel 对象。
+        """
+        self._mj_model = mj_model
+
+    # --- property（架构 §12.2）---
 
     @property
     def timestep(self) -> float:
         """物理仿真时间步长（秒）。"""
+        if self._mj_model is not None:
+            return float(self._mj_model.opt.timestep)
         return self._timestep
 
     @timestep.setter
     def timestep(self, value: float) -> None:
-        self._timestep = float(value)
+        v = float(value)
+        self._timestep = v  # 始终缓存
+        if self._mj_model is not None:
+            self._mj_model.opt.timestep = v
 
     @property
     def integrator(self) -> int:
         """积分器类型（MuJoCo mjtIntegrator 枚举值）。"""
+        if self._mj_model is not None:
+            return int(self._mj_model.opt.integrator)
         return self._integrator
 
     @integrator.setter
     def integrator(self, value: int) -> None:
-        self._integrator = int(value)
+        v = int(value)
+        self._integrator = v
+        if self._mj_model is not None:
+            self._mj_model.opt.integrator = v
 
     @property
     def iterations(self) -> int:
         """求解器迭代次数。"""
+        if self._mj_model is not None:
+            return int(self._mj_model.opt.iterations)
         return self._iterations
 
     @iterations.setter
     def iterations(self, value: int) -> None:
-        self._iterations = int(value)
+        v = int(value)
+        self._iterations = v
+        if self._mj_model is not None:
+            self._mj_model.opt.iterations = v
 
     @property
     def gravity(self) -> np.ndarray:
         """重力加速度向量 (3,)。"""
+        if self._mj_model is not None:
+            return self._mj_model.opt.gravity
         return self._gravity
 
     @gravity.setter
     def gravity(self, value: np.ndarray) -> None:
-        self._gravity = np.asarray(value, dtype=np.float64)
+        v = np.asarray(value, dtype=np.float64)
+        self._gravity = v
+        if self._mj_model is not None:
+            self._mj_model.opt.gravity[:] = v
 
     # --- 批量读写 ---
 

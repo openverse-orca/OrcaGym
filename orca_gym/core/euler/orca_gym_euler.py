@@ -1,8 +1,12 @@
-"""OrcaGymEuler — 仿真核心 Facade，组合子组件（骨架）。
+"""OrcaGymEuler — 仿真核心 Facade，组合子组件（阶段二填充）。
 
-本模块属于 OrcaGym Euler 体系骨架阶段（P2-Step4），是骨架阶段的核心交付物。
+本模块属于 OrcaGym Euler 体系阶段二（P2-Step4 骨架 + P4-Step5 委托填充），
 组合 MuJoCoSimCore/OrcaStudioBridge/ModelRegistry/SimConfig/OrcaGymDataView
 子组件，实现隔离机制（K3/K5/K8/K9）。
+
+阶段二 Step 5 填充委托方法，将 Env 调用转发到
+MuJoCoSimCore/ModelRegistry/SimConfig，并实现 model property 返回缓存的
+OrcaGymModel。
 
 核心设计:
     - 不暴露 _mjModel/_mjData（K3）—— 通过 __getattribute__ 拦截
@@ -75,6 +79,7 @@ class OrcaGymEuler:
         self._opt = SimConfig()
         self._view = OrcaGymDataView()
         self._euler = None    # EulerOrchestrator | None（骨架阶段恒为 None）
+        self._orca_model = None  # OrcaGymModel | None（init_simulation 后填充，model property 返回缓存）
 
     # --- K3/K5: 隔离机制 ---
 
@@ -125,26 +130,33 @@ class OrcaGymEuler:
     # --- 生命周期 ---
 
     async def init_simulation(self, model_xml_path: str) -> None:
-        """初始化仿真（加载模型、同步 Studio）。
+        """初始化仿真：加载模型、绑定 SimConfig/ModelRegistry、同步 DataView。
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实初始化。
         """
-        raise NotImplementedError("init_simulation 待 P4 填充")
+        sim = object.__getattribute__(self, "_sim")
+        opt = object.__getattribute__(self, "_opt")
+        registry = object.__getattribute__(self, "_registry")
+        view = object.__getattribute__(self, "_view")
+
+        sim.init_simulation(model_xml_path)
+        # 绑定 SimConfig/ModelRegistry 到真实 mjModel
+        opt._bind(sim._mjModel)           # 内部访问，不对外
+        registry._bind(sim._mjModel)
+        # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
+        object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
+        # 首次同步 DataView
+        sim.sync_to_view(view)
 
     async def load_model_xml(self) -> str:
-        """从 OrcaStudio 加载模型 XML 字符串。
+        """加载模型 XML（在线模式从 Studio 拉取，离线模式返回本地路径）。
 
         Returns:
             MuJoCo 模型 XML 字符串。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实加载。
         """
-        raise NotImplementedError("load_model_xml 待 P4 填充")
+        studio = object.__getattribute__(self, "_studio")
+        return await studio.load_model_xml()
 
     # --- 仿真控制（委托 _sim）---
 
@@ -153,40 +165,51 @@ class OrcaGymEuler:
 
         Args:
             nstep: 步进次数。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实步进。
         """
-        raise NotImplementedError("mj_step 待 P4 填充")
+        object.__getattribute__(self, "_sim").step(nstep)
 
     def mj_forward(self) -> None:
-        """执行 MuJoCo 前向计算（不步进，仅更新派生量）。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实前向计算。
-        """
-        raise NotImplementedError("mj_forward 待 P4 填充")
+        """执行 MuJoCo 前向计算（不步进，仅更新派生量）。"""
+        object.__getattribute__(self, "_sim").forward()
 
     def set_ctrl(self, ctrl: np.ndarray) -> None:
-        """设置控制输入。
+        """设置控制输入，应用 override_ctrls（如果存在）。
+
+        override 逻辑在 Gym 层：从 Bridge 取 override_ctrls，应用到 ctrl 后
+        再传给 SimCore。保持 MuJoCoSimCore.set_ctrl 的纯净（只写 _mjData.ctrl）。
 
         Args:
             ctrl: 控制输入数组。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实控制设置。
         """
-        raise NotImplementedError("set_ctrl 待 P4 填充")
+        studio = object.__getattribute__(self, "_studio")
+        overrides = studio.get_override_ctrls()
+        if overrides:
+            ctrl = ctrl.copy()
+            for idx, value in overrides.items():
+                if 0 <= idx < len(ctrl):
+                    ctrl[idx] = value
+        object.__getattribute__(self, "_sim").set_ctrl(ctrl)
+
+    def set_qpos_qvel(self, qpos: np.ndarray, qvel: np.ndarray) -> None:
+        """设置广义坐标和速度（供 set_joint_qpos/qvel 使用）。
+
+        Args:
+            qpos: 广义坐标数组。
+            qvel: 广义速度数组。
+        """
+        object.__getattribute__(self, "_sim").set_qpos_qvel(qpos, qvel)
+
+    def reset_data(self) -> None:
+        """重置 MjData 到初始状态。"""
+        object.__getattribute__(self, "_sim").reset_data()
 
     # --- 状态同步 ---
 
     def sync_to_view(self) -> None:
-        """将 MuJoCo 状态同步到 OrcaGymDataView（env.data）。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实同步。
-        """
-        raise NotImplementedError("sync_to_view 待 P4 填充")
+        """将 MuJoCo 状态同步到 OrcaGymDataView（env.data）。"""
+        object.__getattribute__(self, "_sim").sync_to_view(
+            object.__getattribute__(self, "_view")
+        )
 
     # --- K5/K6: 状态访问（返回 typed 对象，不返回子组件引用）---
 
@@ -200,12 +223,21 @@ class OrcaGymEuler:
 
     @property
     def model(self):
-        """返回模型结构抽象（OrcaGymModel）。
+        """返回缓存的 OrcaGymModel。
 
-        Raises:
-            NotImplementedError: 骨架阶段未构建真实模型。
+        init_simulation 后构建一次并缓存，后续访问直接返回缓存。
         """
-        raise NotImplementedError("model 待 P4 填充（需 build_orca_gym_model）")
+        return object.__getattribute__(self, "_orca_model")
+
+    @property
+    def nq(self) -> int:
+        """广义坐标维度（qpos 维度）。"""
+        return object.__getattribute__(self, "_sim").nq
+
+    @property
+    def nu(self) -> int:
+        """控制输入维度（ctrl 维度）。"""
+        return object.__getattribute__(self, "_sim").nu
 
     @property
     def sim_config(self) -> SimConfig:
@@ -230,18 +262,15 @@ class OrcaGymEuler:
     async def render(self) -> None:
         """渲染当前仿真状态到 OrcaStudio。
 
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实渲染。
+        从 DataView 读取 qpos/time（不直接触 _mjData），委托到 studio.render。
         """
-        raise NotImplementedError("render 待 P4 填充")
+        view = object.__getattribute__(self, "_view")
+        studio = object.__getattribute__(self, "_studio")
+        await studio.render(view.qpos, view.time)
 
     async def pause_simulation(self) -> None:
-        """通知 OrcaStudio 暂停仿真。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实暂停。
-        """
-        raise NotImplementedError("pause_simulation 待 P4 填充")
+        """通知 OrcaStudio 暂停仿真。"""
+        await object.__getattribute__(self, "_studio").pause_simulation()
 
     # --- K8: 步进耦合查询（供 do_simulation 使用，不暴露 _euler）---
 
@@ -256,17 +285,16 @@ class OrcaGymEuler:
         return object.__getattribute__(self, "_euler") is not None
 
     def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
-        """执行带 Euler 耦合的步进。
+        """带 Euler 耦合的步进（骨架阶段无 Euler，等价于纯 MuJoCo 步进）。
 
         供 do_simulation 使用，替代 do_simulation 内部直接读 self._gym._euler。
-        骨架阶段无 Euler，raise NotImplementedError。
+        has_euler()=False 时等价于 set_ctrl + step。后续 Euler 耦合实现时扩展。
 
         Args:
             ctrl: 控制输入数组。
             n_frames: 帧数。
             dt: 时间步长。
-
-        Raises:
-            NotImplementedError: 骨架阶段未实现 Euler 耦合。
         """
-        raise NotImplementedError("step_with_coupling 待 P4 填充")
+        sim = object.__getattribute__(self, "_sim")
+        sim.set_ctrl(ctrl)
+        sim.step(n_frames)

@@ -1,7 +1,12 @@
-"""OrcaGymEulerEnv — Euler 环境 Facade（骨架）。
+"""OrcaGymEulerEnv — Euler 环境 Facade（阶段二填充）。
 
-本模块属于 OrcaGym Euler 体系骨架阶段（P3-Step1），是骨架阶段**最关键**的交付物。
+本模块属于 OrcaGym Euler 体系阶段二（P3-Step1 骨架 + P4-Step6 生命周期与步进填充），
 继承 OrcaGymBaseEnv，实现 Env 层隔离机制（K1/K2/K4/K6/K7/K8/K9/K10/K11/K12）。
+
+阶段二 Step 6 填充生命周期方法（initialize_grpc/initialize_simulation/
+reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
+步进方法（do_simulation/mj_step/mj_forward/set_ctrl）、状态设置方法
+（set_joint_qpos/set_joint_qvel），替换骨架的 no-op / NotImplementedError。
 
 核心设计:
     - 持有 _gym/_stub/_channel/_studio_bridge（带下划线，K1）
@@ -108,9 +113,10 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
-        # 骨架模式标记：skip_grpc_load=True 时生命周期方法安全 no-op，
-        # 功能方法仍 raise NotImplementedError。
-        self._skeleton_mode = skip_grpc_load
+        # _time_step 缓存：set_time_step 在 initialize_simulation 前被父类调用，
+        # 此时 SimConfig 未绑定 mjModel，缓存到 _time_step，
+        # 在 initialize_simulation 末尾重新设置。
+        self._time_step = time_step
 
         # 父类 __init__ 无条件调用 asyncio.get_event_loop()，在 Python 3.12 中
         # 若先前测试已关闭事件循环（asyncio.run / loop.close）会抛 RuntimeError。
@@ -192,70 +198,82 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         """初始化 gRPC 通信管道并创建 OrcaGymEuler 实例。
 
         K9 合规：Studio 交互通过自持 _studio_bridge，不通过 gym.studio。
-        骨架阶段: skip_grpc_load=True 时创建 stub=None 的 Gym，不连接 gRPC。
+        离线模式: skip_grpc_load=True 时创建 stub=None 的 Gym，不连接 gRPC。
+        在线模式: 待 2.2 Step 3 填充。
         """
         if self._skip_grpc_load:
-            # 离线/骨架模式：不创建 gRPC channel
+            # 离线模式：不创建 gRPC channel
             object.__setattr__(self, "_channel", None)
             object.__setattr__(self, "_stub", None)
             self.gym = OrcaGymEuler(stub=None)   # __setattr__ 转发到 _gym
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             return
-        # 在线模式待 P4 填充（创建 grpc.aio.insecure_channel + GrpcServiceStub）
-        raise NotImplementedError("initialize_grpc 在线模式待 P4 填充")
+        # 在线模式待 2.2 Step 3 填充（创建 grpc.aio.insecure_channel + GrpcServiceStub）
+        raise NotImplementedError("initialize_grpc 在线模式待 2.2 Step 3 填充")
 
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
-        """初始化仿真数据结构，返回 (OrcaGymModel, OrcaGymDataView)。
+        """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
 
         K6 合规：返回 OrcaGymDataView 而非 OrcaGymData。
-        骨架阶段: 返回 (None, OrcaGymDataView 占位)，父类 __setattr__ 忽略赋值。
         """
-        if self._skeleton_mode:
-            return None, self._gym.data
-        raise NotImplementedError("initialize_simulation 待 P4 填充（需 build_orca_gym_model）")
+        # 1. 获取模型 XML 路径（离线：本地路径；在线：从 Studio 拉取）
+        if self._skip_grpc_load:
+            model_xml_path = self._local_xml_path
+        else:
+            model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
+        # 2. 初始化仿真
+        self.loop.run_until_complete(self._gym.init_simulation(model_xml_path))
+        # 3. 应用缓存的 time_step（init_simulation 前设置的值需重新生效）
+        self._gym.sim_config.timestep = self._time_step
+        # 4. 返回 (OrcaGymModel, OrcaGymDataView)
+        return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
-        """重置仿真环境。"""
-        if self._skeleton_mode:
-            return
-        raise NotImplementedError("reset_simulation 待 P4 填充")
+        """重置 MjData 到初始状态并同步 DataView。"""
+        self._gym.reset_data()
+        self._gym.sync_to_view()
 
     def init_qpos_qvel(self) -> None:
-        """初始化 qpos 和 qvel。"""
-        if self._skeleton_mode:
-            return
-        raise NotImplementedError("init_qpos_qvel 待 P4 填充")
+        """保存初始 qpos/qvel。"""
+        self._gym.sync_to_view()
+        self.init_qpos = self._gym.data.qpos.ravel().copy()
+        self.init_qvel = self._gym.data.qvel.ravel().copy()
 
     def set_time_step(self, time_step: float) -> None:
-        """设置仿真时间步长。
+        """设置仿真时间步长（缓存，init_simulation 后生效）。
 
-        骨架阶段: 通过 SimConfig 设置（K7 合规，不触 _mjModel.opt）。
+        父类 __init__ 在 initialize_simulation 前调用本方法，此时 SimConfig
+        未绑定 mjModel，缓存到 self._time_step，在 initialize_simulation
+        末尾重新设置。
         """
-        if self._skeleton_mode:
-            self._gym.sim_config.timestep = time_step
-            return
-        raise NotImplementedError("set_time_step 在线模式待 P4 填充")
+        self._time_step = time_step
+        self.realtime_step = time_step * self.frame_skip
+        # 若 Gym 已初始化（init_simulation 已执行），直接设置
+        if hasattr(self, "_gym") and self._gym is not None:
+            try:
+                self._gym.sim_config.timestep = time_step
+            except RuntimeError:
+                pass   # SimConfig 未绑定，缓存待 init_simulation
 
     def pause_simulation(self) -> None:
-        """通知 OrcaStudio 暂停仿真。
-
-        K9 合规：通过 self._studio_bridge，不通过 gym.studio。
-        骨架阶段: no-op（无 Studio 连接）。
-        """
-        if self._skeleton_mode:
+        """暂停仿真（离线模式 no-op）。"""
+        if self._skip_grpc_load:
             return
-        raise NotImplementedError("pause_simulation 待 P4 填充")
+        # 在线模式待 2.2 Step 3
+        self.loop.run_until_complete(self._gym.pause_simulation())
 
     def close(self) -> None:
-        """关闭所有进程（渲染上下文等）。"""
-        if self._skeleton_mode:
+        """关闭环境（离线模式 no-op）。"""
+        if self._skip_grpc_load:
             return
-        raise NotImplementedError("close 待 P4 填充")
+        # 在线模式关闭 gRPC channel
+        if self._channel is not None:
+            self.loop.run_until_complete(self._channel.close())
 
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
     def do_simulation(self, ctrl: np.ndarray, n_frames: int) -> None:
-        """标准仿真步进（含 Euler 耦合）。
+        """标准仿真步进（含 Euler 耦合，骨架阶段等价于纯 MuJoCo）。
 
         K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler 等私有。
         K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
@@ -265,35 +283,54 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
             n_frames: 帧数。
 
         Raises:
-            NotImplementedError: 骨架阶段未实现真实步进。
             ValueError: ctrl 形状不匹配。
         """
-        if self._skeleton_mode:
-            raise NotImplementedError("do_simulation 待 P4 填充")
-        # P4 实现模板（K4/K8 合规）:
-        #   if np.array(ctrl).shape != (self.model.nu,):
-        #       raise ValueError(...)
-        #   self._gym.step_with_coupling(ctrl, n_frames, self.dt)
-        #   self._gym.sync_to_view()
-        raise NotImplementedError("do_simulation 待 P4 填充")
+        if np.array(ctrl).shape != (self.model.nu,):
+            raise ValueError(
+                f"Action dimension mismatch. Expected {(self.model.nu,)}, "
+                f"found {np.array(ctrl).shape}"
+            )
+        self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+        self._gym.sync_to_view()
 
     def mj_step(self, nstep: int) -> None:
         """纯 MuJoCo 步进（无 Euler 耦合），委托 self._gym.mj_step()。"""
-        if self._skeleton_mode:
-            raise NotImplementedError("mj_step 待 P4 填充")
-        raise NotImplementedError("mj_step 待 P4 填充")
+        self._gym.mj_step(nstep)
 
     def mj_forward(self) -> None:
         """MuJoCo 前向计算（不步进，仅更新派生量），委托 self._gym.mj_forward()。"""
-        if self._skeleton_mode:
-            raise NotImplementedError("mj_forward 待 P4 填充")
-        raise NotImplementedError("mj_forward 待 P4 填充")
+        self._gym.mj_forward()
 
     def set_ctrl(self, ctrl: np.ndarray) -> None:
         """设置控制输入，委托 self._gym.set_ctrl()。"""
-        if self._skeleton_mode:
-            raise NotImplementedError("set_ctrl 待 P4 填充")
-        raise NotImplementedError("set_ctrl 待 P4 填充")
+        self._gym.set_ctrl(ctrl)
+
+    # --- 状态设置（reset_model 必需）---
+
+    def set_joint_qpos(self, qpos: np.ndarray) -> None:
+        """设置广义坐标 qpos（全量设置，reset_model 用）。
+
+        注意：设置后需调用 mj_forward() 以更新派生量。
+
+        Args:
+            qpos: 广义坐标数组。
+        """
+        self._gym.set_qpos_qvel(qpos, self._gym.data.qvel)
+
+    def set_joint_qvel(self, qvel: np.ndarray) -> None:
+        """设置广义速度 qvel（全量设置，reset_model 用）。
+
+        Args:
+            qvel: 广义速度数组。
+        """
+        self._gym.set_qpos_qvel(self._gym.data.qpos, qvel)
+
+    def _sync_view(self) -> None:
+        """同步 DataView（子类内部使用，封装 _gym.sync_to_view()）。
+
+        K4 合规：子类通过本方法同步 DataView，不直接触 _gym。
+        """
+        self._gym.sync_to_view()
 
     # --- K6/K7: 状态访问（通过 Gym 公共属性，不触私有）---
 
@@ -333,13 +370,13 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
     @property
     def ctrl(self) -> np.ndarray:
-        """返回当前控制输入。"""
-        raise NotImplementedError("ctrl getter 待 P4 填充")
+        """返回当前控制输入（读 actuator_force，阶段二简化实现）。"""
+        return self._gym.data.actuator_force
 
     @ctrl.setter
     def ctrl(self, value: np.ndarray) -> None:
-        """设置控制输入。"""
-        raise NotImplementedError("ctrl setter 待 P4 填充")
+        """设置控制输入，委托 self._gym.set_ctrl()。"""
+        self._gym.set_ctrl(value)
 
     # --- 渲染（K9: Studio 交互通过 self._studio_bridge）---
 
@@ -348,10 +385,16 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
         K9 合规: 通过 self._studio_bridge，不通过 gym.studio。
 
-        Raises:
-            NotImplementedError: 骨架阶段未实现真实渲染。
+        离线模式（skip_grpc_load=True）: 无 OrcaStudio 可渲染，返回 None。
+        在线模式: 待 2.2 Step 2 填充 gRPC 渲染调用。
+
+        Returns:
+            None（离线模式无渲染；在线模式待填充）。
         """
-        raise NotImplementedError("render 待 P4 填充")
+        if self._skip_grpc_load:
+            return None
+        # 在线模式渲染待 2.2 Step 2 填充
+        raise NotImplementedError("render 在线模式待 2.2 Step 2 填充")
 
     def do_body_manipulation(self) -> None:
         """物体操作占位（P4 填充）。"""
