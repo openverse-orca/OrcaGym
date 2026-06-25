@@ -24,14 +24,17 @@ reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
 """
 
 import asyncio
+import time
 from typing import Any, Dict, Tuple, Union
 
+import grpc
 import numpy as np
 from numpy.typing import NDArray
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from ..orca_gym_env import OrcaGymBaseEnv
 
 
@@ -117,6 +120,12 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         # 此时 SimConfig 未绑定 mjModel，缓存到 _time_step，
         # 在 initialize_simulation 末尾重新设置。
         self._time_step = time_step
+        # 渲染节流字段（render_mode="human" 在线渲染时使用）
+        self._render_count = 0.0
+        self._render_count_interval = 0.0
+        self._render_time_step = 0.0
+        self._render_interval = 1.0 / self.metadata.get("render_fps", 30)
+        self._last_frame_index = -1
 
         # 父类 __init__ 无条件调用 asyncio.get_event_loop()，在 Python 3.12 中
         # 若先前测试已关闭事件循环（asyncio.run / loop.close）会抛 RuntimeError。
@@ -199,7 +208,7 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
         K9 合规：Studio 交互通过自持 _studio_bridge，不通过 gym.studio。
         离线模式: skip_grpc_load=True 时创建 stub=None 的 Gym，不连接 gRPC。
-        在线模式: 待 2.2 Step 3 填充。
+        在线模式: 创建 grpc.aio.insecure_channel + GrpcServiceStub。
         """
         if self._skip_grpc_load:
             # 离线模式：不创建 gRPC channel
@@ -207,9 +216,20 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
             object.__setattr__(self, "_stub", None)
             self.gym = OrcaGymEuler(stub=None)   # __setattr__ 转发到 _gym
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
+            if self._local_xml_path:
+                self._studio_bridge.configure_offline(self._local_xml_path)
             return
-        # 在线模式待 2.2 Step 3 填充（创建 grpc.aio.insecure_channel + GrpcServiceStub）
-        raise NotImplementedError("initialize_grpc 在线模式待 2.2 Step 3 填充")
+        # 在线模式：创建 gRPC channel + stub
+        object.__setattr__(self, "_channel", grpc.aio.insecure_channel(
+            self.orcagym_addr,
+            options=[
+                ('grpc.max_receive_message_length', 1024 * 1024 * 1024),
+                ('grpc.max_send_message_length', 1024 * 1024 * 1024),
+            ],
+        ))
+        object.__setattr__(self, "_stub", GrpcServiceStub(self._channel))
+        self.gym = OrcaGymEuler(stub=self._stub)
+        self._studio_bridge = self._gym.studio_bridge()
 
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
         """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
@@ -225,7 +245,10 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         self.loop.run_until_complete(self._gym.init_simulation(model_xml_path))
         # 3. 应用缓存的 time_step（init_simulation 前设置的值需重新生效）
         self._gym.sim_config.timestep = self._time_step
-        # 4. 返回 (OrcaGymModel, OrcaGymDataView)
+        # 4. 在线模式：同步时间步到远端 OrcaStudio
+        if not self._skip_grpc_load:
+            self._studio_bridge.set_timestep_remote(self._time_step)
+        # 5. 返回 (OrcaGymModel, OrcaGymDataView)
         return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
@@ -240,20 +263,24 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         self.init_qvel = self._gym.data.qvel.ravel().copy()
 
     def set_time_step(self, time_step: float) -> None:
-        """设置仿真时间步长（缓存，init_simulation 后生效）。
+        """设置仿真时间步长（本地缓存 + 远端同步）。
 
         父类 __init__ 在 initialize_simulation 前调用本方法，此时 SimConfig
         未绑定 mjModel，缓存到 self._time_step，在 initialize_simulation
-        末尾重新设置。
+        末尾重新设置。initialize_simulation 后调用时，本地立即生效，
+        在线模式同步到远端 OrcaStudio。
         """
         self._time_step = time_step
         self.realtime_step = time_step * self.frame_skip
-        # 若 Gym 已初始化（init_simulation 已执行），直接设置
+        # 本地：若 Gym 已初始化（init_simulation 已执行），直接设置
         if hasattr(self, "_gym") and self._gym is not None:
             try:
                 self._gym.sim_config.timestep = time_step
             except RuntimeError:
                 pass   # SimConfig 未绑定，缓存待 init_simulation
+        # 远端：在线模式同步到 OrcaStudio
+        if not self._skip_grpc_load and hasattr(self, "_studio_bridge"):
+            self._studio_bridge.set_timestep_remote(time_step)
 
     def pause_simulation(self) -> None:
         """暂停仿真（离线模式 no-op）。"""
@@ -378,27 +405,54 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         """设置控制输入，委托 self._gym.set_ctrl()。"""
         self._gym.set_ctrl(value)
 
-    # --- 渲染（K9: Studio 交互通过 self._studio_bridge）---
+    # --- 渲染（K9: Studio 交互通过 self._studio_bridge / self._gym.render）---
 
     def render(self) -> Union[NDArray[np.float64], None]:
-        """渲染当前仿真状态。
+        """渲染当前仿真状态到 OrcaStudio。
 
-        K9 合规: 通过 self._studio_bridge，不通过 gym.studio。
+        K9 合规: 通过 self._gym.render()（Gym 公共方法），不触 _gym.studio。
+
+        节流策略（复用老体系）:
+            - sync_render=True: 按计数器节流（每 N 物理步渲染一帧）
+            - sync_render=False: 按墙钟 fps 节流（render_fps）
 
         离线模式（skip_grpc_load=True）: 无 OrcaStudio 可渲染，返回 None。
-        在线模式: 待 2.2 Step 2 填充 gRPC 渲染调用。
+        render_mode 不在 ["human", "force"] 时立即返回 None。
 
         Returns:
-            None（离线模式无渲染；在线模式待填充）。
+            None（Euler 渲染不返回像素数组，由 OrcaStudio 负责显示）。
         """
+        if self._render_mode not in ["human", "force"]:
+            return None
         if self._skip_grpc_load:
             return None
-        # 在线模式渲染待 2.2 Step 2 填充
-        raise NotImplementedError("render 在线模式待 2.2 Step 2 填充")
+        # 在线模式：节流后委托 gym.render()
+        if self._sync_render:
+            self._render_count += self._render_count_interval
+            if self._render_count >= 1.0:
+                self.loop.run_until_complete(self._gym.render())
+                self.do_body_manipulation()
+                self._render_count -= 1.0
+        else:
+            time_diff = time.perf_counter() - self._render_time_step
+            if time_diff > self._render_interval:
+                self._render_time_step = time.perf_counter()
+                self.loop.run_until_complete(self._gym.render())
+                self.do_body_manipulation()
+        return None
 
     def do_body_manipulation(self) -> None:
-        """物体操作占位（P4 填充）。"""
-        raise NotImplementedError("do_body_manipulation 待 P4 填充")
+        """处理 Studio UI 体操作（阶段二占位实现）。
+
+        阶段二仅查询 Studio 的锚定/运动状态但不实际应用，
+        完整的体操作力应用在 P4 实现。
+        离线模式 no-op。
+        """
+        if self._skip_grpc_load:
+            return
+        # 查询状态（占位，不应用；P4 实现体操作力应用）
+        self.loop.run_until_complete(self._studio_bridge.get_body_manipulation_anchored())
+        self.loop.run_until_complete(self._studio_bridge.get_body_manipulation_movement())
 
     def studio_bridge(self):
         """返回 OrcaStudio 桥接对象（K9 方法访问模式）。

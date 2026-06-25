@@ -1074,11 +1074,11 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
 #### 验收标准
 
-- [ ] 在线模式 `initialize_grpc` 成功创建 channel + stub
-- [ ] `render()` 在 `render_mode="human"` 时调用 gRPC render
-- [ ] `render_mode="none"` 时 `render()` 立即返回 None
-- [ ] `sync_render` 节流逻辑正确
-- [ ] K9 合规：源码 grep 不到 `self._gym.studio.` / `self._gym._studio.`
+- [x] 在线模式 `initialize_grpc` 成功创建 channel + stub
+- [x] `render()` 在 `render_mode="human"` 时调用 gRPC render
+- [x] `render_mode="none"` 时 `render()` 立即返回 None
+- [x] `sync_render` 节流逻辑正确
+- [x] K9 合规：源码 grep 不到 `self._gym.studio.` / `self._gym._studio.`
 
 ---
 
@@ -1113,10 +1113,10 @@ cd /home/superfhwl/repo/OrcaPlayground
 
 #### 验收标准
 
-- [ ] 脚本退出码 0
-- [ ] 输出包含「第 2 课验证通过」
-- [ ] Studio 视口显示摆杆运动
-- [ ] 无 `NotImplementedError` / gRPC 连接异常
+- [x] 脚本退出码 0
+- [x] 输出包含「第 2 课验证通过」
+- [x] Studio 视口显示摆杆运动
+- [x] 无 `NotImplementedError` / gRPC 连接异常
 
 ---
 

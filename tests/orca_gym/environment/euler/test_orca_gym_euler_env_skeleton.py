@@ -50,7 +50,7 @@ def _exec_source_without_docstrings() -> str:
     return exec_source
 
 
-def _make_skeleton_env() -> OrcaGymEulerEnv:
+def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) -> OrcaGymEulerEnv:
     """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
     # OrcaPlayground 是 OrcaGym 的同级目录
     # __file__ = OrcaGym/tests/orca_gym/environment/euler/test_*.py
@@ -66,6 +66,8 @@ def _make_skeleton_env() -> OrcaGymEulerEnv:
         time_step=0.002,
         model_xml_path=str(_pendulum_xml),
         skip_grpc_load=True,
+        render_mode=render_mode,
+        sync_render=sync_render,
     )
 
 
@@ -544,6 +546,23 @@ class TestEnvLifecycleAndStepping(unittest.TestCase):
         result = env.render()
         self.assertIsNone(result)
 
+    def test_render_mode_none_returns_none(self):
+        """render_mode='none' 时 render 立即返回 None（Step 3 验收标准）。"""
+        env = _make_skeleton_env(render_mode="none")
+        result = env.render()
+        self.assertIsNone(result)
+
+    def test_render_mode_human_offline_returns_none(self):
+        """render_mode='human' 离线模式 render 返回 None（Step 3）。"""
+        env = _make_skeleton_env(render_mode="human")
+        result = env.render()
+        self.assertIsNone(result)
+
+    def test_do_body_manipulation_offline_noop(self):
+        """离线模式 do_body_manipulation no-op 不抛异常（Step 3）。"""
+        env = _make_skeleton_env()
+        env.do_body_manipulation()   # 不应抛异常
+
     def test_gymnasium_methods_raise_not_implemented(self):
         """step/reset_model/_get_obs 仍 raise NotImplementedError（待子类实现）。"""
         env = _make_skeleton_env()
@@ -574,6 +593,111 @@ class TestEnvParentReconciliation(unittest.TestCase):
         # 父类 dt: self.gym.opt.timestep * self.frame_skip（会因 env.gym 拦截而失败）
         # 子类 dt: self._gym.sim_config.timestep * self.frame_skip（应成功）
         self.assertEqual(env.dt, env._gym.sim_config.timestep * env.frame_skip)
+
+
+class TestEnvInitializeGrpcOnlineMode(unittest.TestCase):
+    """阶段二 Step 3: initialize_grpc 在线模式测试。
+
+    由于真实 gRPC 服务不可用，通过 mock 验证 channel/stub 创建逻辑。
+    """
+
+    def test_initialize_grpc_online_creates_channel_and_stub(self):
+        """在线模式 initialize_grpc 创建 grpc.aio channel + GrpcServiceStub。
+
+        通过 mock grpc.aio.insecure_channel 和 GrpcServiceStub 验证调用。
+        """
+        from unittest import mock
+
+        # 直接调用 initialize_grpc，mock 掉 grpc.aio.insecure_channel 和 GrpcServiceStub
+        # 由于父类 __init__ 会在 super().__init__ 中调用 initialize_grpc，
+        # 我们需要构造一个 skip_grpc_load=True 的 env，然后手动调用 initialize_grpc
+        env = _make_skeleton_env()
+
+        # mock grpc.aio.insecure_channel 和 GrpcServiceStub
+        with mock.patch("orca_gym.environment.euler.orca_gym_euler_env.grpc.aio.insecure_channel") as mock_channel, \
+             mock.patch("orca_gym.environment.euler.orca_gym_euler_env.GrpcServiceStub") as mock_stub_class:
+            mock_channel.return_value = mock.MagicMock(name="channel")
+            mock_stub = mock.MagicMock(name="stub")
+            mock_stub_class.return_value = mock_stub
+
+            # 强制走在线模式
+            env._skip_grpc_load = False
+            env.initialize_grpc()
+
+            # 验证 channel 创建（带大消息选项）
+            mock_channel.assert_called_once()
+            call_args = mock_channel.call_args
+            self.assertEqual(call_args[0][0], "localhost:50051")
+            options = call_args[1]["options"]
+            # 验证包含大消息长度选项
+            option_keys = [opt[0] for opt in options]
+            self.assertIn("grpc.max_receive_message_length", option_keys)
+            self.assertIn("grpc.max_send_message_length", option_keys)
+
+            # 验证 stub 创建
+            mock_stub_class.assert_called_once()
+
+            # 验证 _channel 和 _stub 被设置
+            self.assertIsNotNone(env._channel)
+            self.assertIsNotNone(env._stub)
+            # 验证 _studio_bridge 被设置
+            self.assertIsNotNone(env._studio_bridge)
+
+    def test_initialize_grpc_offline_configures_bridge(self):
+        """离线模式 initialize_grpc 配置 studio_bridge 的 local_xml_path。"""
+        env = _make_skeleton_env()
+        # 离线模式下 studio_bridge 应已配置 local_xml_path
+        bridge = env.studio_bridge()
+        self.assertIsNotNone(bridge._local_xml_path)
+        self.assertTrue(bridge._local_xml_path.endswith("simple_pendulum.xml"))
+
+
+class TestEnvRenderThrottling(unittest.TestCase):
+    """阶段二 Step 3: render 节流逻辑测试。"""
+
+    def test_render_sync_render_counter_logic(self):
+        """sync_render=True 时按计数器节流（_render_count 累积）。"""
+        env = _make_skeleton_env(render_mode="human", sync_render=True)
+        # 离线模式 render 直接返回 None，不进入节流逻辑
+        # 验证 _render_count 初始为 0
+        self.assertEqual(env._render_count, 0.0)
+        env.render()
+        # 离线模式不进入节流，_render_count 不变
+        self.assertEqual(env._render_count, 0.0)
+
+    def test_render_interval_initialized_from_fps(self):
+        """_render_interval 从 metadata.render_fps 初始化（30fps → 1/30）。"""
+        env = _make_skeleton_env()
+        expected = 1.0 / 30
+        self.assertAlmostEqual(env._render_interval, expected, places=6)
+
+    def test_render_throttle_fields_initialized(self):
+        """渲染节流字段在 __init__ 中正确初始化。"""
+        env = _make_skeleton_env()
+        self.assertEqual(env._render_count, 0.0)
+        self.assertEqual(env._render_count_interval, 0.0)
+        self.assertEqual(env._render_time_step, 0.0)
+        self.assertEqual(env._last_frame_index, -1)
+
+
+class TestEnvK9ComplianceSourceAudit(unittest.TestCase):
+    """阶段二 Step 3: K9 源码合规审查。"""
+
+    def test_no_gym_studio_tunnel_access(self):
+        """源码不含 self._gym.studio. / self._gym._studio. 穿墙访问（K9）。"""
+        import pathlib
+        source_path = (
+            pathlib.Path(__file__).resolve().parent
+            / ".." / ".." / ".." / ".."
+            / "orca_gym" / "environment" / "euler" / "orca_gym_euler_env.py"
+        )
+        source = source_path.resolve().read_text(encoding="utf-8")
+        forbidden = ["self._gym.studio.", "self._gym._studio."]
+        for pattern in forbidden:
+            self.assertNotIn(
+                pattern, source,
+                f"K9 违规: orca_gym_euler_env.py 包含穿墙访问 '{pattern}'",
+            )
 
 
 if __name__ == "__main__":
