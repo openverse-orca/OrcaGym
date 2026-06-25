@@ -1227,10 +1227,10 @@ cd /home/superfhwl/repo/OrcaPlayground
 
 #### 验收标准
 
-- [ ] 20k 步快速验证无异常退出
-- [ ] 100k 步训练后 `mean_reward > -5`
-- [ ] 模型文件 `ppo_pendulum.zip` 生成
-- [ ] 评估模式可加载模型并运行
+- [x] 20k 步快速验证无异常退出
+- [x] 100k 步训练后 `mean_reward > -5`
+- [x] 模型文件 `ppo_pendulum.zip` 生成
+- [x] 评估模式可加载模型并运行
 
 ---
 
@@ -1312,12 +1312,12 @@ def test_phase2_model_type():
 
 ### 8.1 总体验收标准
 
-- [ ] **阶段 2.1 完成**：Lesson 1（`01_hello_euler.py`）端到端运行通过
-- [ ] **阶段 2.2 完成**：Lesson 2（`02_online_render.py`）端到端运行通过（需 OrcaStudio）
-- [ ] **阶段 2.3 完成**：Lesson 3（`03_rl_ppo.py`）训练 100k 步后 `mean_reward > -5`
-- [ ] **架构合规**：K1–K12 约束回归测试全部通过
-- [ ] **源码 grep**：§7.2 所有 grep 命令无结果
-- [ ] **`SimpleEulerEnv` 违规修正**：`reset_model` 不再穿墙访问 `_sim._mjData`
+- [x] **阶段 2.1 完成**：Lesson 1（`01_hello_euler.py`）端到端运行通过
+- [x] **阶段 2.2 完成**：Lesson 2（`02_online_render.py`）端到端运行通过（需 OrcaStudio）
+- [x] **阶段 2.3 完成**：Lesson 3（`03_rl_ppo.py`）训练 100k 步后 `mean_reward > -5`
+- [x] **架构合规**：K1–K12 约束回归测试全部通过
+- [x] **源码 grep**：§7.2 所有 grep 命令无结果
+- [x] **`SimpleEulerEnv` 违规修正**：`reset_model` 不再穿墙访问 `_sim._mjData`
 
 ### 8.2 交付物清单
 
