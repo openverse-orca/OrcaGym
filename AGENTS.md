@@ -55,7 +55,7 @@ python some_script.py
 
 Euler 体系使用 GPU 加速时（MuJoCoFlow / Flow 在 GPU 上求解），**无法在 TRAE sandbox 内正确运行**。sandbox 剥离了所有进程能力，导致 `cuInit` 返回 `CUDA_ERROR_304`。AI agent 必须使用 **TRAE 命令白名单** 旁路 sandbox，才能调用 GPU。
 
-> 用户侧的白名单配置教程见 `DEVELOPMENT_GUIDE.md`。本规则约束 AI agent 的命令格式。
+> 用户侧的白名单配置教程见 `DEVELOPER_GUIDE.md`。本规则约束 AI agent 的命令格式。
 
 ### 核心规则
 

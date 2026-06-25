@@ -1,4 +1,4 @@
-# Development Guide
+# Developer Guide
 
 本指南面向首次接入 OrcaGym 开发的用户，指导完成本地环境配置与 GPU 旁路设置。
 
