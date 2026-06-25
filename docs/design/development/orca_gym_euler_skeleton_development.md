@@ -339,8 +339,8 @@ class ModelRegistry:
 
 #### 验收标准
 
-- [ ] 类可独立构造
-- [ ] 2 个 build 方法 + 3 个查询方法签名完整
+- [x] 类可独立构造
+- [x] 2 个 build 方法 + 3 个查询方法签名完整
 
 ---
 
@@ -404,9 +404,9 @@ class MuJoCoSimCore:
 
 #### 验收标准
 
-- [ ] `_mjModel`/`_mjData` 为私有属性（带下划线）
-- [ ] 生命周期方法 + 力应用方法 + nq/nv/nu property 签名完整
-- [ ] docstring 明确禁止外部访问 `_mjModel`/`_mjData`
+- [x] `_mjModel`/`_mjData` 为私有属性（带下划线）
+- [x] 生命周期方法 + 力应用方法 + nq/nv/nu property 签名完整
+- [x] docstring 明确禁止外部访问 `_mjModel`/`_mjData`
 
 ---
 
@@ -463,10 +463,10 @@ class OrcaStudioBridge:
 
 #### 验收标准
 
-- [ ] 类可无参构造（stub=None）
-- [ ] 7 个骨架方法签名完整
-- [ ] **不持有 `_mjData`/`_mjModel`**（依赖反转）
-- [ ] docstring 说明依赖反转设计
+- [x] 类可无参构造（stub=None）
+- [x] 7 个骨架方法签名完整
+- [x] **不持有 `_mjData`/`_mjModel`**（依赖反转）
+- [x] docstring 说明依赖反转设计
 
 ---
 
@@ -572,14 +572,35 @@ class OrcaGymEuler:
 | `test_gym_sim_config_returns_config` | `gym.sim_config` 返回 `SimConfig` 实例 | — |
 | `test_gym_docstring_has_contract` | docstring 含「API 契约」和「禁止」关键词 | K12 |
 
+##### 违规访问拦截测试（对照架构 §6.2/§6.3/§6.5/§7.6）
+
+以下测试对照架构文档明确列举的违规访问模式，验证 `_BLOCKED_ATTRS` 全部变体、多层穿墙路径、K8/K9 违规模式均被拦截：
+
+| 测试用例 | 验证内容 | 对应 K 约束 |
+|---------|---------|-----------|
+| `test_all_mjdata_mjmodel_variants_blocked` | `_mjData`/`_mjModel` 全部 8 个变体（`mj_data`/`mj_model`/`_mj_data`/`_mj_model`/`mjData`/`mjModel`）都被拦截 | K3 |
+| `test_all_component_variants_blocked` | 子组件全部带/不带下划线变体（`_sim`/`sim`/`_studio`/`studio` 等 12 个）都被拦截 | K5 |
+| `test_multilayer_tunnel_mjdata_blocked` | 多层穿墙 `gym._sim._mjData` 在第一层 `gym._sim` 即被拦截（架构 §6.2 R1） | K3/K5 |
+| `test_multilayer_tunnel_mjmodel_blocked` | 多层穿墙 `gym._sim._mjModel` 在第一层即被拦截（架构 §6.5 C1） | K3/K5 |
+| `test_multilayer_tunnel_xfrc_blocked` | 多层穿墙 `gym._sim._mjData.xfrc_applied` 在第一层即被拦截（架构 §6.3 W2） | K3/K5 |
+| `test_k8_euler_private_access_blocked` | `gym._euler` 访问被拦截，引导消息含 `has_euler`/`step_with_coupling`（架构 §8.2） | K8 |
+| `test_k9_studio_property_access_blocked` | `gym.studio` 访问被拦截，引导消息含 `studio_bridge`（架构 §7.1 M2） | K9 |
+| `test_k5_sim_access_guided_to_step_methods` | `gym._sim` 访问被拦截，引导消息含 `mj_step`/`mj_forward`/`do_simulation` | K5 |
+| `test_k5_opt_access_guided_to_sim_config` | `gym._opt` 访问被拦截，引导消息含 `sim_config` | K5 |
+| `test_k5_view_access_guided_to_data` | `gym._view` 访问被拦截，引导消息含 `env.data` | K5 |
+| `test_blocked_attrs_frozenset_complete` | `_BLOCKED_ATTRS` 是 frozenset 且包含全部 20 个拦截名（8 引擎内部 + 12 子组件） | K3/K5 |
+
 #### 验收标准
 
-- [ ] K3：`_BLOCKED_ATTRS` 含 `_mjData`/`_mjModel` + 子组件名，`__getattr__` 拦截并返回引导
-- [ ] K5：不提供 `studio`/`sim`/`opt`/`view`/`euler` 的 public property
-- [ ] K5：`__dir__` 不列出任何子组件对象或引擎内部
-- [ ] K8：`has_euler()` 返回 `False`，`step_with_coupling()` 存在
-- [ ] K9：`studio_bridge()` 是方法，`gym.studio` 抛 `AttributeError`
-- [ ] K12：docstring 含 API 契约框
+- [x] K3：`_BLOCKED_ATTRS` 含 `_mjData`/`_mjModel` + 子组件名，`__getattribute__` 拦截并返回引导
+- [x] K3：`_BLOCKED_ATTRS` 全部 8 个变体（`mj_data`/`_mj_data`/`mjData` 等）都被拦截
+- [x] K5：不提供 `studio`/`sim`/`opt`/`view`/`euler` 的 public property
+- [x] K5：`__dir__` 不列出任何子组件对象或引擎内部
+- [x] K3/K5：多层穿墙路径（`gym._sim._mjData`/`gym._sim._mjModel`/`gym._sim._mjData.xfrc_applied`）在第一层即被拦截
+- [x] K8：`has_euler()` 返回 `False`，`step_with_coupling()` 存在，`gym._euler` 访问被拦截并引导
+- [x] K9：`studio_bridge()` 是方法，`gym.studio` 抛 `AttributeError` 并引导用 `studio_bridge()`
+- [x] K5：引导消息针对不同违规类型给出精准引导（`_sim`→步进方法、`_opt`→`sim_config`、`_view`→`env.data`、`_euler`→`has_euler`、`_studio`→`studio_bridge`）
+- [x] K12：docstring 含 API 契约框
 
 ---
 
@@ -788,6 +809,21 @@ def dt(self) -> float:
 | `test_env_dir_only_exposes_public_api` | `dir(env)` 不含 `gym`/`stub`/`channel`/`_gym`/`_studio_bridge`/`_mjData`/`_mjModel` |
 | `test_env_dir_contains_public_api` | `dir(env)` 含 `data`/`model`/`sim_config`/`dt`/`ctrl`/`do_simulation`/`mj_step`/`mj_forward`/`set_ctrl`/`render` |
 
+##### K2 违规访问拦截测试（对照架构 §6.2/§6.3/§6.5/§7.6）
+
+以下测试验证 Env 层 `_BLOCKED_ATTRS` 全部变体、三层穿墙路径、K4/K8/K9 违规模式均被拦截。Env 层是用户直接接触的入口，穿墙路径比 Gym 层多一层（`env._gym._sim._mjData`）：
+
+| 测试用例 | 验证内容 | 对应 K 约束 |
+|---------|---------|-----------|
+| `test_env_all_mjdata_mjmodel_variants_blocked` | Env `_BLOCKED_ATTRS` 中 `_mjData`/`_mjModel` 全部 8 个变体都被拦截 | K2 |
+| `test_env_all_internal_component_variants_blocked` | `gym`/`stub`/`channel` 及其带下划线变体都被拦截 | K1/K2 |
+| `test_env_multilayer_tunnel_mjdata_blocked` | 三层穿墙 `env._gym._sim._mjData` 在第一层 `env._gym` 即被拦截（架构 §6.2 R1） | K2/K4 |
+| `test_env_multilayer_tunnel_mjmodel_opt_blocked` | 三层穿墙 `env._gym._sim._mjModel.opt` 在第一层即被拦截（架构 §6.5 C1） | K2/K4 |
+| `test_env_multilayer_tunnel_xfrc_blocked` | 三层穿墙 `env._gym._sim._mjData.xfrc_applied` 在第一层即被拦截（架构 §6.3 W2） | K2/K4 |
+| `test_env_k8_euler_tunnel_blocked` | 四层穿墙 `env._gym._euler` 在第一层 `env._gym` 即被拦截（架构 §8.2） | K2/K8 |
+| `test_env_k9_studio_tunnel_blocked` | 穿墙 `env._gym.studio` 在第一层 `env._gym` 即被拦截（架构 §7.1 M2） | K2/K9 |
+| `test_env_blocked_attrs_frozenset_complete` | Env `_BLOCKED_ATTRS` 是 frozenset 且包含全部拦截名 | K2 |
+
 ##### K4: 不穿墙访问 Gym 私有
 
 | 测试用例 | 验证内容 |
@@ -873,11 +909,13 @@ def test_do_simulation_no_euler_private_access():
 
 - [ ] K1：`__dict__` 含 `_gym`/`_stub`/`_channel`，不含 `gym`/`stub`/`channel`
 - [ ] K2：`_BLOCKED_ATTRS` 拦截 + `__dir__` 只暴露公共 API
+- [ ] K2：`_BLOCKED_ATTRS` 全部 8 个 `_mjData`/`_mjModel` 变体都被拦截
+- [ ] K2/K4：三层穿墙路径（`env._gym._sim._mjData`/`env._gym._sim._mjModel.opt`/`env._gym._sim._mjData.xfrc_applied`）在第一层 `env._gym` 即被拦截
 - [ ] K4：源码 grep 不到 `_gym._sim`/`_gym._studio`/`_gym._registry`/`_gym._opt`/`_gym._view`/`_gym._euler`
 - [ ] K6：`env.data` 类型为 `OrcaGymDataView`
 - [ ] K7：`model`/`sim_config`/`dt` 通过 Gym 公共属性委托
-- [ ] K8：`do_simulation` 源码 grep 不到 `_euler`
-- [ ] K9：源码 grep 不到 `gym.studio`（允许 `_studio_bridge` 和 `_gym.studio_bridge()`）
+- [ ] K8：`do_simulation` 源码 grep 不到 `_euler`，`env._gym._euler` 穿墙在第一层即被拦截
+- [ ] K9：源码 grep 不到 `gym.studio`（允许 `_studio_bridge` 和 `_gym.studio_bridge()`），`env._gym.studio` 穿墙在第一层即被拦截
 - [ ] K10：`__setattr__` 屏蔽父类的 `gym`/`stub`/`channel`/`model`/`data` 赋值
 - [ ] K11：公共方法返回 typed 对象
 - [ ] K12：docstring 含使用契约
@@ -924,10 +962,10 @@ def test_do_simulation_no_euler_private_access():
 
 - [x] P1-Step1: SimConfig 骨架 + 测试通过
 - [x] P1-Step2: OrcaGymDataView 骨架 + 测试通过
-- [ ] P2-Step1: ModelRegistry 骨架 + 测试通过
-- [ ] P2-Step2: MuJoCoSimCore 骨架 + 测试通过
-- [ ] P2-Step3: OrcaStudioBridge 骨架 + 测试通过
-- [ ] P2-Step4: OrcaGymEuler 骨架 + 测试通过（K3/K5/K8/K9）
+- [x] P2-Step1: ModelRegistry 骨架 + 测试通过
+- [x] P2-Step2: MuJoCoSimCore 骨架 + 测试通过
+- [x] P2-Step3: OrcaStudioBridge 骨架 + 测试通过
+- [x] P2-Step4: OrcaGymEuler 骨架 + 测试通过（K3/K5/K8/K9）
 - [ ] P3-Step1: OrcaGymEulerEnv 骨架 + 测试通过（K1/K2/K4/K6/K7/K8/K9/K10/K11/K12）
 - [ ] `--component core/euler` 全量通过
 - [ ] `--component environment/euler` 全量通过
