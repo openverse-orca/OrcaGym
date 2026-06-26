@@ -94,29 +94,6 @@ class TestEnvK1NamingConstraint(unittest.TestCase):
 class TestEnvK2Isolation(unittest.TestCase):
     """K2: Env 层隔离机制。"""
 
-    def test_env_blocked_attrs_raise_guidance(self):
-        """访问 env.gym/env.stub/env._mjData/env._mjModel/env.mjData/env.mjModel 抛 AttributeError。"""
-        env = _make_skeleton_env()
-        blocked_names = [
-            "gym", "stub", "channel",
-            "_mjData", "_mjModel", "mj_data", "mj_model",
-            "_mj_data", "_mj_model", "mjData", "mjModel",
-        ]
-        for name in blocked_names:
-            with self.subTest(attr=name):
-                with self.assertRaises(AttributeError):
-                    getattr(env, name)
-
-    def test_env_blocked_attrs_message_has_guidance(self):
-        """AttributeError 消息含引导文本（env.data/env.sim_config/env.do_simulation）。"""
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError) as ctx:
-            _ = env.gym
-        msg = str(ctx.exception)
-        self.assertIn("env.data", msg)
-        self.assertIn("env.sim_config", msg)
-        self.assertIn("env.do_simulation", msg)
-
     def test_env_dir_only_exposes_public_api(self):
         """dir(env) 不含 gym/stub/channel/_gym/_studio_bridge/_mjData/_mjModel。"""
         env = _make_skeleton_env()
@@ -142,101 +119,6 @@ class TestEnvK2Isolation(unittest.TestCase):
         for name in expected_public:
             with self.subTest(attr=name):
                 self.assertIn(name, d, f"dir(env) 应包含公共 API '{name}'")
-
-    def test_env_no_internal_property(self):
-        """类不定义 gym/stub/channel 的 property 或属性（K1/K2）。"""
-        class_attrs = vars(OrcaGymEulerEnv)
-        for prop_name in ["gym", "stub", "channel"]:
-            self.assertNotIn(
-                prop_name, class_attrs,
-                f"类不应定义 '{prop_name}' 属性/property（K1/K2: 不暴露内部组件）",
-            )
-
-
-class TestEnvK2ViolationPatterns(unittest.TestCase):
-    """K2 违规访问拦截测试（对照架构 §6.2/§6.3/§6.5/§7.6）。
-
-    验证 Env 层 _BLOCKED_ATTRS 全部变体、三层穿墙路径、K4/K8/K9 违规模式均被拦截。
-    Env 层是用户直接接触的入口，穿墙路径比 Gym 层多一层（env._gym._sim._mjData）。
-    """
-
-    def test_env_all_mjdata_mjmodel_variants_blocked(self):
-        """Env _BLOCKED_ATTRS 中 _mjData/_mjModel 全部 8 个变体都被拦截（K2）。"""
-        env = _make_skeleton_env()
-        variants = [
-            "_mjData", "_mjModel", "mj_data", "mj_model",
-            "_mj_data", "_mj_model", "mjData", "mjModel",
-        ]
-        for name in variants:
-            with self.subTest(attr=name):
-                with self.assertRaises(AttributeError):
-                    getattr(env, name)
-
-    def test_env_all_internal_component_variants_blocked(self):
-        """gym/stub/channel 都被拦截（K1/K2）。"""
-        env = _make_skeleton_env()
-        for name in ["gym", "stub", "channel"]:
-            with self.subTest(attr=name):
-                with self.assertRaises(AttributeError):
-                    getattr(env, name)
-
-    def test_env_multilayer_tunnel_mjdata_blocked(self):
-        """三层穿墙 env._gym._sim._mjData 在第一层 env._gym 即被拦截（架构 §6.2 R1）。
-
-        架构 §6.2 违规示例: env._gym._sim._mjData.qpos
-        本测试验证 Env 层第一层拦截: env._gym 抛 AttributeError。
-        """
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError):
-            env._gym._sim._mjData    # 第一层 env._gym 即被拦截
-
-    def test_env_multilayer_tunnel_mjmodel_opt_blocked(self):
-        """三层穿墙 env._gym._sim._mjModel.opt 在第一层即被拦截（架构 §6.5 C1）。
-
-        架构 §6.5 违规示例: env._gym._sim._mjModel.opt.timestep
-        """
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError):
-            env._gym._sim._mjModel.opt    # 第一层 env._gym 即被拦截
-
-    def test_env_multilayer_tunnel_xfrc_blocked(self):
-        """三层穿墙 env._gym._sim._mjData.xfrc_applied 在第一层即被拦截（架构 §6.3 W2）。
-
-        架构 §6.3 违规示例: env._gym._sim._mjData.xfrc_applied[body_id, :3] = force
-        """
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError):
-            env._gym._sim._mjData.xfrc_applied    # 第一层 env._gym 即被拦截
-
-    def test_env_k8_euler_tunnel_blocked(self):
-        """四层穿墙 env._gym._euler 在第一层 env._gym 即被拦截（架构 §8.2）。
-
-        架构 §8.2 违规示例: if self._gym._euler is not None
-        """
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError):
-            env._gym._euler    # 第一层 env._gym 即被拦截
-
-    def test_env_k9_studio_tunnel_blocked(self):
-        """穿墙 env._gym.studio 在第一层 env._gym 即被拦截（架构 §7.1 M2）。
-
-        架构 §7.1 M2: Studio 交互通过方法 studio_bridge() 而非 property。
-        """
-        env = _make_skeleton_env()
-        with self.assertRaises(AttributeError):
-            env._gym.studio    # 第一层 env._gym 即被拦截
-
-    def test_env_blocked_attrs_frozenset_complete(self):
-        """Env _BLOCKED_ATTRS 是 frozenset 且包含全部拦截名（K2 完整性）。"""
-        self.assertIsInstance(OrcaGymEulerEnv._BLOCKED_ATTRS, frozenset)
-        expected_blocked = {
-            # L3 引擎内部 (8)
-            "_mjData", "_mjModel", "mj_data", "mj_model",
-            "_mj_data", "_mj_model", "mjData", "mjModel",
-            # L2 内部组件 (3, 父类残留的公共名)
-            "gym", "stub", "channel",
-        }
-        self.assertEqual(OrcaGymEulerEnv._BLOCKED_ATTRS, expected_blocked)
 
 
 class TestEnvK4NoGymPrivateAccess(unittest.TestCase):
@@ -361,79 +243,6 @@ class TestEnvK9StudioAccess(unittest.TestCase):
         env = _make_skeleton_env()
         bridge = env.studio_bridge()
         self.assertIsInstance(bridge, OrcaStudioBridge)
-
-
-class TestEnvK10ParentShielding(unittest.TestCase):
-    """K10: __setattr__ 屏蔽父类的 gym/stub/channel/model/data 赋值（方案 A）。"""
-
-    def test_parent_gym_assignment_shielded(self):
-        """父类 self.gym = X 后 env.gym 抛 AttributeError，env._gym 是 X。"""
-        env = _make_skeleton_env()
-        original_gym = env._gym
-        # 模拟父类赋值 self.gym = new_value
-        env.gym = "fake_gym_value"
-        # _gym 被转发更新
-        self.assertEqual(env._gym, "fake_gym_value")
-        # gym 不存在于 __dict__（被 __setattr__ 转发）
-        self.assertNotIn("gym", env.__dict__)
-        # env.gym 抛 AttributeError（__getattr__ 拦截）
-        with self.assertRaises(AttributeError):
-            _ = env.gym
-        # 恢复
-        env._gym = original_gym
-
-    def test_parent_stub_assignment_shielded(self):
-        """父类 self.stub = S 后 env.stub 抛 AttributeError，env._stub 是 S。"""
-        env = _make_skeleton_env()
-        env.stub = "fake_stub"
-        self.assertEqual(env._stub, "fake_stub")
-        self.assertNotIn("stub", env.__dict__)
-        with self.assertRaises(AttributeError):
-            _ = env.stub
-
-    def test_parent_channel_assignment_shielded(self):
-        """父类 self.channel = C 后 env.channel 抛 AttributeError，env._channel 是 C。"""
-        env = _make_skeleton_env()
-        env.channel = "fake_channel"
-        self.assertEqual(env._channel, "fake_channel")
-        self.assertNotIn("channel", env.__dict__)
-        with self.assertRaises(AttributeError):
-            _ = env.channel
-
-    def test_parent_model_assignment_shielded(self):
-        """父类 self.model = M 后 env.model 走 property（从 _gym.model 取），不接受父类赋值。
-
-        env.model 委托到 _gym.model（OrcaGymModel 实例），证明 env.model 走 property
-        而非返回父类赋值的 "fake_model"。
-        """
-        from orca_gym.core.orca_gym_model import OrcaGymModel
-        env = _make_skeleton_env()
-        # 模拟父类赋值 self.model = "fake_model"
-        env.model = "fake_model"
-        # model 不存在于 __dict__（被 __setattr__ 忽略）
-        self.assertNotIn("model", env.__dict__)
-        # env.model 走 property 委托到 _gym.model（返回 OrcaGymModel 实例，
-        # 证明未返回父类赋值的 "fake_model"）
-        result = env.model
-        self.assertIsInstance(result, OrcaGymModel)
-        self.assertNotEqual(result, "fake_model")
-
-    def test_parent_data_assignment_shielded(self):
-        """父类 self.data = D 后 env.data 走 property（从 _gym.data 取），不接受父类赋值。"""
-        env = _make_skeleton_env()
-        # 模拟父类赋值 self.data = "fake_data"
-        env.data = "fake_data"
-        # data 不存在于 __dict__（被 __setattr__ 忽略）
-        self.assertNotIn("data", env.__dict__)
-        # env.data 走 property，返回 _gym.data（不是 "fake_data"）
-        self.assertIsInstance(env.data, OrcaGymDataView)
-        self.assertNotEqual(env.data, "fake_data")
-
-    def test_shielded_attrs_frozenset_complete(self):
-        """_SHIELDED_ATTRS 是 frozenset 且包含 gym/stub/channel/model/data。"""
-        self.assertIsInstance(OrcaGymEulerEnv._SHIELDED_ATTRS, frozenset)
-        expected = {"gym", "stub", "channel", "model", "data"}
-        self.assertEqual(OrcaGymEulerEnv._SHIELDED_ATTRS, expected)
 
 
 class TestEnvK11TypedReturn(unittest.TestCase):
@@ -573,26 +382,80 @@ class TestEnvLifecycleAndStepping(unittest.TestCase):
             env._get_obs()
 
 
-class TestEnvParentReconciliation(unittest.TestCase):
-    """补充：验证父类和解（架构 §12.5 方案 A）生效。"""
+class TestEnvK14Inheritance(unittest.TestCase):
+    """K14: 继承链约束 — 直接继承 gym.Env + OrcaGymEnvMixin，不继承 OrcaGymBaseEnv。"""
 
-    def test_env_inherits_base_env(self):
-        """OrcaGymEulerEnv 继承 OrcaGymBaseEnv。"""
+    def test_env_inheritance_chain(self):
+        """OrcaGymEulerEnv.__bases__ 含 gym.Env 和 OrcaGymEnvMixin，不含 OrcaGymBaseEnv。"""
+        from orca_gym.environment.orca_gym_env_mixin import OrcaGymEnvMixin
         from orca_gym.environment.orca_gym_env import OrcaGymBaseEnv
-        self.assertTrue(issubclass(OrcaGymEulerEnv, OrcaGymBaseEnv))
+        import gymnasium as gym
 
-    def test_parent_init_completes_without_error(self):
-        """父类 __init__ 完整执行不报错（K10 屏蔽生效）。"""
-        # 若 K10 屏蔽失效，父类 __init__ 会在 self.gym=None 或 self.model,self.data=... 时出错
+        bases = OrcaGymEulerEnv.__bases__
+        self.assertIn(OrcaGymEnvMixin, bases)
+        self.assertIn(gym.Env, bases)
+        self.assertNotIn(OrcaGymBaseEnv, bases)
+
+    def test_env_gym_attr_natural_attribute_error(self):
+        """env.gym 抛 AttributeError（Python 原生，属性不存在）。"""
         env = _make_skeleton_env()
-        # 构造成功即说明父类 __init__ 完整执行
+        with self.assertRaises(AttributeError):
+            _ = env.gym
+
+    def test_env_stub_attr_natural_attribute_error(self):
+        """env.stub 抛 AttributeError。"""
+        env = _make_skeleton_env()
+        with self.assertRaises(AttributeError):
+            _ = env.stub
+
+    def test_env_channel_attr_natural_attribute_error(self):
+        """env.channel 抛 AttributeError。"""
+        env = _make_skeleton_env()
+        with self.assertRaises(AttributeError):
+            _ = env.channel
+
+    def test_env_no_blocked_attrs_classvar(self):
+        """Env 类不定义 _BLOCKED_ATTRS / _SHIELDED_ATTRS / __getattr__ / __setattr__。"""
+        class_attrs = vars(OrcaGymEulerEnv)
+        self.assertNotIn("_BLOCKED_ATTRS", class_attrs)
+        self.assertNotIn("_SHIELDED_ATTRS", class_attrs)
+        self.assertNotIn("__getattr__", class_attrs)
+        self.assertNotIn("__setattr__", class_attrs)
+
+    def test_env_mixin_methods_available(self):
+        """Env 通过 Mixin 继承获得 body/joint/actuator/site/mocap/sensor 等方法。"""
+        env = _make_skeleton_env()
+        mixin_methods = [
+            "body", "joint", "actuator", "site", "mocap", "sensor",
+            "generate_action_space", "generate_observation_space",
+            "set_seed_value", "_get_reset_info",
+        ]
+        for method in mixin_methods:
+            with self.subTest(method=method):
+                self.assertTrue(callable(getattr(env, method, None)),
+                                f"Env 缺少 Mixin 方法 '{method}'")
+        # agent_num 是 property，不是 callable
+        self.assertTrue(hasattr(env, "agent_num"))
+
+    def test_env_body_namespace_works(self):
+        """env.body('torso') 返回 'agent0_torso'（Mixin 方法真实工作）。"""
+        env = _make_skeleton_env()
+        result = env.body("torso")
+        self.assertEqual(result, "agent0_torso")
+
+    def test_env_agent_num_works(self):
+        """env.agent_num 返回 1（Mixin property 真实工作）。"""
+        env = _make_skeleton_env()
+        self.assertEqual(env.agent_num, 1)
+
+    def test_env_init_completes_without_error(self):
+        """__init__ 完整执行不报错（自主编排生命周期生效）。"""
+        env = _make_skeleton_env()
         self.assertIsNotNone(env._gym)
 
-    def test_dt_overrides_parent(self):
-        """env.dt 覆盖父类的 self.gym.opt.timestep * frame_skip，使用 sim_config。"""
+    def test_env_dt_uses_sim_config(self):
+        """env.dt 使用 sim_config.timestep * frame_skip。"""
         env = _make_skeleton_env()
-        # 父类 dt: self.gym.opt.timestep * self.frame_skip（会因 env.gym 拦截而失败）
-        # 子类 dt: self._gym.sim_config.timestep * self.frame_skip（应成功）
         self.assertEqual(env.dt, env._gym.sim_config.timestep * env.frame_skip)
 
 

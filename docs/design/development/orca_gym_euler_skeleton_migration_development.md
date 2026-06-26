@@ -908,6 +908,47 @@ class TestEnvK14Inheritance(unittest.TestCase):
 <conda-base>/envs/orca/bin/python -m pytest tests/orca_gym/environment/euler/test_orca_gym_euler_env_skeleton.py -v
 ```
 
+#### 3.2.4 设计决策说明：`gym.Env` 不写泛型参数
+
+**问题背景**：原 `OrcaGymBaseEnv` 继承 `gym.Env[NDArray[np.float64], NDArray[np.float32]]`，阶段 2 切换后的 `OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env)` 未写泛型参数。需明确该决策的依据。
+
+**调研结论**：`gym.Env[A, B]` 与 `gym.Env` 在运行时完全等价（`__class_getitem__` 返回原类），泛型参数仅服务于 mypy/pyright 静态类型检查。
+
+| 项目 | 实际写法 | 是否写泛型 |
+|------|---------|-----------|
+| Gymnasium 官方文档示例 `GridWorldEnv` | `class GridWorldEnv(gym.Env)` | ❌ 不写 |
+| SB3 自定义环境文档 `CustomEnv` | `class CustomEnv(gym.Env)` | ❌ 不写 |
+| Gymnasium 经典环境 `MujocoEnv` | `class MujocoEnv(gym.Env)` | ❌ 不写 |
+| SB3 测试用例 `IdentityEnv` | `class IdentityEnv(gym.Env, Generic[T])` | ✅ 写（测试场景） |
+| 原 `OrcaGymBaseEnv` | `class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]])` | ✅ 写 |
+
+**原 BaseEnv 泛型的缺陷**：`OrcaGymBaseEnv` 作为抽象基类，将 `ObsType=np.float64`、`ActType=np.float32` 固化到基类签名，但子类（多智能体、机械臂、车辆）的 obs/act 类型未必都是 `NDArray[np.float64]/NDArray[np.float32]`。正确做法应让基类保持 `Generic[ObsType, ActType]`，由子类按需参数化。且 OrcaGym 项目从未配置 mypy/pyright 检查，泛型参数实际是死代码。
+
+**决策**：`OrcaGymEulerEnv` 保持 `class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env)`，不写泛型参数。
+
+**理由**：
+
+1. **与官方/SB3 主流实践一致**：和 `GridWorldEnv`、`CustomEnv`、`MujocoEnv` 同款写法
+2. **降低维护成本**：不写错误的泛型比写错的泛型好（原 BaseEnv 的固化类型就是错误示范）
+3. **OrcaGymEulerEnv 是基类**：子类（SimpleEulerEnv 等）obs/act 类型由各自场景决定，不应固化
+4. **项目未配置 mypy**：写了也是死代码，无实际校验
+
+**未来路径**：若项目启用 mypy/pyright 检查，正确做法是让 Mixin/Env 保持泛型变量开放：
+
+```python
+from typing import Generic, TypeVar
+ObsType = TypeVar("ObsType")
+ActType = TypeVar("ActType")
+
+class OrcaGymEnvMixin(Generic[ObsType, ActType]): ...
+class OrcaGymEulerEnv(
+    OrcaGymEnvMixin[NDArray[np.float64], NDArray[np.float32]],
+    gym.Env[NDArray[np.float64], NDArray[np.float32]],
+): ...
+```
+
+但这是未来工程，当前阶段保持简单，不引入 TypeVar/Generic 复杂度。
+
 ---
 
 ### 阶段 3：端到端验证
