@@ -4,10 +4,14 @@
 （架构 §5.7, §7.4, §12.2），以及 body/site 查询方法在绑定真实 mjData/mjModel
 后返回正确结果（阶段二 Step 4 验收标准）。
 
+阶段三 3.1.4 扩展：cfrc_ext 字段 + geom_xpos/xmat/size 查询方法的
+架构遵从性测试 + 功能单元测试。
+
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
+import inspect
 import os
 import unittest
 
@@ -24,6 +28,14 @@ _PENDULUM_XML = os.path.join(
     "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
+
+# G1 模型 XML（阶段三 3.1.4 功能测试用，含 geom manipulation_box_geom）
+_G1_XML = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "..", "..",
+    "OrcaPlayground", "envs", "euler", "robots", "g1_29dof_camera.xml",
+)
+_G1_XML = os.path.abspath(_G1_XML)
 
 
 class TestOrcaGymDataViewSkeleton(unittest.TestCase):
@@ -216,6 +228,107 @@ class TestOrcaGymDataViewRealQuery(unittest.TestCase):
         view = OrcaGymDataView()
         with self.assertRaises(TypeError):
             view.body_xpos("pendulum")
+
+
+# =============================================================================
+# 阶段三 3.1.4：OrcaGymDataView 扩展查询字段（cfrc_ext + geom 查询）
+# =============================================================================
+
+
+class TestDataViewCfrcExtGeomArchCompliance(unittest.TestCase):
+    """子步骤 3.1.4 架构遵从性测试（K6 零拷贝视图 + P2 不泄漏 MjData）。
+
+    对应文档 §5.5 架构遵从性测试表。
+    """
+
+    def setUp(self):
+        self.mj_model = mujoco.MjModel.from_xml_path(_G1_XML)
+        self.mj_data = mujoco.MjData(self.mj_model)
+        mujoco.mj_forward(self.mj_model, self.mj_data)
+        self.view = OrcaGymDataView()
+        self.view._sync_from_mjdata(self.mj_data, self.mj_model)
+
+    def test_dataview_cfrc_ext_is_view_not_copy(self):
+        """K6: cfrc_ext.base 非None（零拷贝视图），修改 _mjData.cfrc_ext 后 DataView 同步。"""
+        # sync 后 cfrc_ext 与 mj_data.cfrc_ext 共享内存
+        np.testing.assert_array_equal(self.view.cfrc_ext, self.mj_data.cfrc_ext)
+        # 零拷贝验证：修改 mj_data.cfrc_ext 后 view.cfrc_ext 同步变化
+        original = self.view.cfrc_ext[1, 0]
+        self.mj_data.cfrc_ext[1, 0] = original + 99.0
+        self.assertAlmostEqual(self.view.cfrc_ext[1, 0], original + 99.0)
+
+    def test_dataview_geom_query_returns_ndarray(self):
+        """K6/K11: geom_xpos/xmat/size 返回 np.ndarray。"""
+        gname = "manipulation_box_geom"
+        for method_name in ("geom_xpos", "geom_xmat", "geom_size"):
+            with self.subTest(method=method_name):
+                result = getattr(self.view, method_name)(gname)
+                self.assertIsInstance(result, np.ndarray)
+
+    def test_dataview_no_mjdata_leak(self):
+        """K6/P2: grep 断言 3.1.4 新增 geom 查询区块不 return self._mj_data/_mj_model。
+
+        注意：阶段二遗留的 body/site 查询方法采用 ``return self._mj_data.body(id).xpos``
+        风格，属于已验收代码，不在本子步骤修改范围。3.1.4 新增 geom 查询
+        方法应采用局部变量风格（与 SimCore 3.1.3 一致），避免直接 return self._mj_data。
+        """
+        source = inspect.getsource(OrcaGymDataView)
+        start = source.find("# --- geom 查询方法（阶段三 3.1.4）---")
+        end = source.find("# --- M3: __getattr__ 兜底")
+        self.assertGreater(start, 0, "未找到 3.1.4 geom 查询区块")
+        self.assertGreater(end, start, "未找到 M3 __getattr__ 兜底区块")
+        block_source = source[start:end]
+        self.assertNotIn(
+            "return self._mj_data", block_source,
+            "3.1.4 geom 查询区块不得 return self._mj_data（P2 泄漏）",
+        )
+        self.assertNotIn(
+            "return self._mj_model", block_source,
+            "3.1.4 geom 查询区块不得 return self._mj_model（P2 泄漏）",
+        )
+
+
+class TestDataViewCfrcExtGeomFunctional(unittest.TestCase):
+    """子步骤 3.1.4 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §5.5 功能单元测试表。验证 cfrc_ext/geom 数值与 _mjData/_mjModel 一致。
+    """
+
+    def setUp(self):
+        self.mj_model = mujoco.MjModel.from_xml_path(_G1_XML)
+        self.mj_data = mujoco.MjData(self.mj_model)
+        mujoco.mj_forward(self.mj_model, self.mj_data)
+        self.view = OrcaGymDataView()
+        self.view._sync_from_mjdata(self.mj_data, self.mj_model)
+
+    def test_cfrc_ext_matches_mjdata(self):
+        """view.cfrc_ext 与 _mjData.cfrc_ext 数值一致。"""
+        np.testing.assert_array_equal(self.view.cfrc_ext, self.mj_data.cfrc_ext)
+        self.assertEqual(self.view.cfrc_ext.shape, (self.mj_model.nbody, 6))
+
+    def test_geom_xpos_matches_mjdata(self):
+        """与 _mjData.geom_xpos 一致。"""
+        gname = "manipulation_box_geom"
+        gid = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, gname)
+        result = self.view.geom_xpos(gname)
+        np.testing.assert_array_equal(result, self.mj_data.geom_xpos[gid])
+        self.assertEqual(result.shape, (3,))
+
+    def test_geom_xmat_matches_mjdata(self):
+        """与 _mjData.geom_xmat 一致。"""
+        gname = "manipulation_box_geom"
+        gid = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, gname)
+        result = self.view.geom_xmat(gname)
+        np.testing.assert_array_equal(result, self.mj_data.geom_xmat[gid])
+        self.assertEqual(result.shape, (9,))  # 扁平存储
+
+    def test_geom_size_matches_model(self):
+        """与 _mjModel.geom_size 一致。"""
+        gname = "manipulation_box_geom"
+        gid = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, gname)
+        result = self.view.geom_size(gname)
+        np.testing.assert_array_equal(result, self.mj_model.geom_size[gid])
+        self.assertEqual(result.shape, (3,))
 
 
 if __name__ == "__main__":

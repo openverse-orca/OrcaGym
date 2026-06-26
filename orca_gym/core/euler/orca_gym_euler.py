@@ -298,3 +298,112 @@ class OrcaGymEuler:
         sim = object.__getattribute__(self, "_sim")
         sim.set_ctrl(ctrl)
         sim.step(n_frames)
+
+    # --- 查询委托（阶段三 3.1.6，全部经 object.__getattribute__ 访问子组件）---
+    # 架构 K3：委托方法必须用 object.__getattribute__(self, "_sim"/...) 访问
+    # 子组件，不得直接 self._sim（被 __getattribute__ 拦截）。
+
+    def query_joint_qpos(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qpos（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_qpos(joint_names)
+
+    def query_joint_qvel(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qvel（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_qvel(joint_names)
+
+    def query_joint_qacc(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qacc（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_qacc(joint_names)
+
+    def query_joint_offsets(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节偏移（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_offsets(joint_names)
+
+    def query_joint_lengths(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节长度（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_lengths(joint_names)
+
+    def query_joint_dofadrs(self, joint_names: list[str]) -> dict[str, int]:
+        """查询关节 dof 起始地址（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_joint_dofadrs(joint_names)
+
+    def jnt_qposadr(self, joint_name: str) -> int:
+        """查询单关节 qpos 起始地址（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").jnt_qposadr(joint_name)
+
+    def jnt_dofadr(self, joint_name: str) -> int:
+        """查询单关节 dof 起始地址（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").jnt_dofadr(joint_name)
+
+    def query_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 body 的 xpos/xmat/xquat（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_body_xpos_xmat_xquat(
+            body_name_list
+        )
+
+    def query_body_xpos_xmat_xquat_xvel(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 body 的 xpos/xmat/xquat/xvel（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_body_xpos_xmat_xquat_xvel(
+            body_name_list
+        )
+
+    def query_site_pos_and_mat(self, site_names: list[str]) -> dict[str, dict]:
+        """查询 site 的 pos 和 mat（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_site_pos_and_mat(site_names)
+
+    def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
+        """查询 site 尺寸（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_site_size(site_names)
+
+    def query_sensor_data(
+        self, sensor_names: list[str]
+    ) -> dict[str, np.ndarray]:
+        """查询传感器数据（委托 SimCore，从 _orca_model 拼装 sensor_info）。
+
+        K3：SimCore 不持有 OrcaGymModel，sensor_info 由 Gym 从 _orca_model
+        拼装后传入。
+        """
+        sim = object.__getattribute__(self, "_sim")
+        model = object.__getattribute__(self, "_orca_model")
+        sensor_info = {name: model.get_sensor(name) for name in sensor_names}
+        return sim.query_sensor_data(sensor_names, sensor_info)
+
+    def query_actuator_torques(
+        self, actuator_names: list[str]
+    ) -> dict[str, np.ndarray]:
+        """查询执行器力矩（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_actuator_torques(
+            actuator_names
+        )
+
+    def query_contact_simple(self) -> list[dict]:
+        """查询简单接触信息（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_contact_simple()
+
+    def query_contact_force(self, contact_ids: list[int]) -> dict[int, np.ndarray]:
+        """查询接触力（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").query_contact_force(contact_ids)
+
+    def get_cfrc_ext(self) -> np.ndarray:
+        """查询外部约束力 cfrc_ext（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").get_cfrc_ext()
+
+    def get_goal_bounding_box(self, geom_name: str) -> np.ndarray:
+        """查询 geom 尺寸（委托 SimCore）。"""
+        return object.__getattribute__(self, "_sim").get_goal_bounding_box(geom_name)
+
+    def body_subtree_mass(self, body_name: str) -> float:
+        """查询 body 子树总质量（委托 ModelRegistry）。"""
+        return object.__getattribute__(self, "_registry").body_subtree_mass(body_name)
+
+    def equality_data_width(self) -> int:
+        """查询等式约束数据宽度（委托 ModelRegistry）。"""
+        return object.__getattribute__(self, "_registry").equality_data_width()
+
+    def equality_object_ids(self, eq_idx: int) -> tuple[int, int]:
+        """查询等式约束关联对象 id（委托 ModelRegistry）。"""
+        return object.__getattribute__(self, "_registry").equality_object_ids(eq_idx)

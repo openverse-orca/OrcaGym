@@ -349,7 +349,7 @@ class ModelRegistry:
         return mocap_body_dict
 
     # --- 扩展查询方法（架构 §5.5，覆盖用户绕道访问的模型结构）---
-    # 留待完整 P4 实现（Lesson 4/5）。
+    # 阶段三 3.1.5 填充：替换 NotImplementedError 为真实实现。
 
     def body_subtree_mass(self, body_name: str) -> float:
         """查询 body 子树总质量。
@@ -360,12 +360,13 @@ class ModelRegistry:
             body_name: body 名称（已含 agent 前缀）。
 
         Returns:
-            body 子树总质量（标量）。
-
-        Raises:
-            NotImplementedError: 留待完整 P4 填充。
+            body 子树总质量（Python float 标量，非 numpy 泄漏）。
         """
-        raise NotImplementedError("body_subtree_mass 待 P4 填充")
+        body_id = mujoco.mj_name2id(
+            self._mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name
+        )
+        mass = float(self._mj_model.body_subtreemass[body_id])
+        return mass
 
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（eq_data 每行元素数）。
@@ -373,12 +374,12 @@ class ModelRegistry:
         替代直接访问 _mjModel.eq_data.shape[1]。
 
         Returns:
-            等式约束数据宽度。
-
-        Raises:
-            NotImplementedError: 留待完整 P4 填充。
+            等式约束数据宽度（Python int）。无等式约束时返回 0。
         """
-        raise NotImplementedError("equality_data_width 待 P4 填充")
+        if self._mj_model.neq == 0:
+            return 0
+        width = int(self._mj_model.eq_data.shape[1])
+        return width
 
     def equality_object_ids(self, eq_idx: int) -> Tuple[int, int]:
         """查询等式约束关联的两个对象 id。
@@ -389,9 +390,8 @@ class ModelRegistry:
             eq_idx: 等式约束索引。
 
         Returns:
-            (obj1_id, obj2_id) 元组。
-
-        Raises:
-            NotImplementedError: 留待完整 P4 填充。
+            (obj1_id, obj2_id) 元组，均为 Python int。
         """
-        raise NotImplementedError("equality_object_ids 待 P4 填充")
+        obj1 = int(self._mj_model.eq_obj1id[eq_idx])
+        obj2 = int(self._mj_model.eq_obj2id[eq_idx])
+        return (obj1, obj2)

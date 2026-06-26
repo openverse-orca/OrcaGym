@@ -40,6 +40,9 @@ class OrcaGymDataView:
         self.actuator_force: np.ndarray = np.array([])
         self.contact: list = []
 
+        # --- 扩展字段（阶段三 3.1.4）---
+        self.cfrc_ext: np.ndarray = np.array([])
+
         # --- 内部引用（不对外暴露，由 _sync_from_mjdata 设置）---
         self._mj_data = None
         self._mj_model = None
@@ -68,6 +71,7 @@ class OrcaGymDataView:
         self.xfrc_applied = mj_data.xfrc_applied
         self.actuator_force = mj_data.actuator_force
         self.contact = mj_data.contact
+        self.cfrc_ext = mj_data.cfrc_ext
 
     # --- body 查询方法 ---
 
@@ -162,6 +166,55 @@ class OrcaGymDataView:
         """
         site_id = mujoco.mj_name2id(self._mj_model, mujoco.mjtObj.mjOBJ_SITE, site_name)
         return self._mj_data.site(site_id).xmat
+
+    # --- geom 查询方法（阶段三 3.1.4）---
+
+    def _geom_id(self, geom_name: str) -> int:
+        """解析 geom 名称到 geom_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+
+    def geom_xpos(self, geom_name: str) -> np.ndarray:
+        """查询 geom 的世界坐标位置 (3,)。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            geom 的世界坐标位置，形状 (3,)，为 _mj_data 的零拷贝视图。
+        """
+        gid = self._geom_id(geom_name)
+        xpos = self._mj_data.geom_xpos[gid]
+        return xpos
+
+    def geom_xmat(self, geom_name: str) -> np.ndarray:
+        """查询 geom 的世界坐标旋转矩阵 (9,)。
+
+        MuJoCo 以扁平数组存储旋转矩阵（行优先），如需 (3, 3) 可调用
+        ``.reshape(3, 3)``。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            geom 的世界坐标旋转矩阵（扁平存储），形状 (9,)，为 _mj_data 的零拷贝视图。
+        """
+        gid = self._geom_id(geom_name)
+        xmat = self._mj_data.geom_xmat[gid]
+        return xmat
+
+    def geom_size(self, geom_name: str) -> np.ndarray:
+        """查询 geom 的尺寸 (3,)。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            geom 的尺寸，形状 (3,)，为 _mj_model 的零拷贝视图。
+            对于 box geom，值为半尺寸 (hx, hy, hz)。
+        """
+        gid = self._geom_id(geom_name)
+        size = self._mj_model.geom_size[gid]
+        return size
 
     # --- M3: __getattr__ 兜底（架构 §7.4）---
 

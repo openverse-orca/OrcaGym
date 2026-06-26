@@ -1,16 +1,21 @@
 """阶段二 Step 3: ModelRegistry 功能验收测试。
 
 验证 ModelRegistry 的 build_orca_gym_model 真实构建（架构 §5.5, §12.2）。
-`build_orca_gym_data` 和扩展查询方法仍 raise NotImplementedError（留待完整 P4）。
+`build_orca_gym_data` 仍 raise NotImplementedError（留待完整 P4）。
+
+阶段三 3.1.5 扩展：3 个扩展查询方法（body_subtree_mass/equality_data_width/
+equality_object_ids）已实现，新增架构遵从性测试 + 功能单元测试。
 
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
+import inspect
 import os
 import unittest
 
 import mujoco
+import numpy as np
 
 from orca_gym.core.euler.model_registry import ModelRegistry
 from orca_gym.core.orca_gym_model import OrcaGymModel
@@ -23,6 +28,14 @@ _PENDULUM_XML = os.path.join(
     "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
+
+# G1 模型 XML（阶段三 3.1.5 功能测试用，含 pelvis body + equality 约束）
+_G1_XML = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "..", "..",
+    "OrcaPlayground", "envs", "euler", "robots", "g1_29dof_camera.xml",
+)
+_G1_XML = os.path.abspath(_G1_XML)
 
 
 class TestModelRegistrySkeleton(unittest.TestCase):
@@ -56,21 +69,16 @@ class TestModelRegistrySkeleton(unittest.TestCase):
 
 
 class TestModelRegistryMethodStubs(unittest.TestCase):
-    """build_orca_gym_data 和扩展查询方法仍 raise NotImplementedError（留待完整 P4）。"""
+    """build_orca_gym_data 仍 raise NotImplementedError（留待完整 P4）。
+
+    注意：阶段三 3.1.5 已实现 body_subtree_mass/equality_data_width/
+    equality_object_ids，不再 raise NotImplementedError。
+    """
 
     def test_build_orca_gym_data_raises_not_implemented(self):
         registry = ModelRegistry()
         with self.assertRaises(NotImplementedError):
             registry.build_orca_gym_data()
-
-    def test_query_methods_raise_not_implemented(self):
-        registry = ModelRegistry()
-        with self.assertRaises(NotImplementedError):
-            registry.body_subtree_mass("dummy_body")
-        with self.assertRaises(NotImplementedError):
-            registry.equality_data_width()
-        with self.assertRaises(NotImplementedError):
-            registry.equality_object_ids(0)
 
 
 class TestModelRegistryBuildModel(unittest.TestCase):
@@ -177,6 +185,94 @@ class TestModelRegistryBuildModel(unittest.TestCase):
         model = registry.build_orca_gym_model()
         self.assertIsInstance(model, OrcaGymModel)
         self.assertEqual(model.nq, 1)
+
+
+# =============================================================================
+# 阶段三 3.1.5：ModelRegistry 扩展查询方法（body_subtree_mass/equality_*）
+# =============================================================================
+
+
+class TestModelRegistryExtQueryArchCompliance(unittest.TestCase):
+    """子步骤 3.1.5 架构遵从性测试（K11 typed 返回 + P2 不泄漏 _mj_model）。
+
+    对应文档 §5.6 架构遵从性测试表。
+    """
+
+    def setUp(self):
+        self.mj_model = mujoco.MjModel.from_xml_path(_G1_XML)
+        self.registry = ModelRegistry(self.mj_model)
+
+    def test_registry_body_subtree_mass_returns_float(self):
+        """K11: body_subtree_mass 返回 Python float（非 numpy 泄漏）。"""
+        result = self.registry.body_subtree_mass("pelvis")
+        self.assertIsInstance(result, float)
+        self.assertNotIsInstance(result, (np.floating,))
+
+    def test_registry_equality_returns_typed(self):
+        """K11: equality_data_width 返回 int，equality_object_ids 返回 tuple[int, int]。"""
+        width = self.registry.equality_data_width()
+        self.assertIsInstance(width, int)
+        self.assertNotIsInstance(width, (np.integer,))
+
+        # G1 有 1 个 equality 约束（weld）
+        self.assertGreater(self.mj_model.neq, 0)
+        ids = self.registry.equality_object_ids(0)
+        self.assertIsInstance(ids, tuple)
+        self.assertEqual(len(ids), 2)
+        for oid in ids:
+            self.assertIsInstance(oid, int)
+            self.assertNotIsInstance(oid, (np.integer,))
+
+    def test_registry_no_mjmodel_leak(self):
+        """P2/K11: grep 断言 3.1.5 扩展查询区块不 return self._mj_model。"""
+        source = inspect.getsource(ModelRegistry)
+        start = source.find("# --- 扩展查询方法")
+        self.assertGreater(start, 0, "未找到扩展查询方法区块")
+        block_source = source[start:]
+        self.assertNotIn(
+            "return self._mj_model", block_source,
+            "ModelRegistry 扩展查询方法不得 return self._mj_model（P2 泄漏）",
+        )
+
+
+class TestModelRegistryExtQueryFunctional(unittest.TestCase):
+    """子步骤 3.1.5 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §5.6 功能单元测试表。验证数值与 _mjModel 一致。
+    """
+
+    def setUp(self):
+        self.mj_model = mujoco.MjModel.from_xml_path(_G1_XML)
+        self.registry = ModelRegistry(self.mj_model)
+
+    def test_body_subtree_mass_positive(self):
+        """body_subtree_mass("pelvis") 返回正标量。"""
+        mass = self.registry.body_subtree_mass("pelvis")
+        self.assertGreater(mass, 0.0)
+
+    def test_body_subtree_mass_matches_mujoco(self):
+        """与 _mjModel.body_subtreemass[body_id] 一致。"""
+        body_name = "pelvis"
+        body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        expected = float(self.mj_model.body_subtreemass[body_id])
+        result = self.registry.body_subtree_mass(body_name)
+        self.assertAlmostEqual(result, expected)
+
+    def test_equality_data_width_matches_model(self):
+        """与 _mjModel.eq_data.shape[1] 一致。"""
+        expected = int(self.mj_model.eq_data.shape[1])
+        result = self.registry.equality_data_width()
+        self.assertEqual(result, expected)
+
+    def test_equality_object_ids_matches_model(self):
+        """与 eq_obj1id/eq_obj2id 一致。"""
+        eq_idx = 0
+        expected = (
+            int(self.mj_model.eq_obj1id[eq_idx]),
+            int(self.mj_model.eq_obj2id[eq_idx]),
+        )
+        result = self.registry.equality_object_ids(eq_idx)
+        self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":

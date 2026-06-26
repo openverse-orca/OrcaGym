@@ -4,11 +4,15 @@
 （架构 §5.2, §7.1-7.4, §12.2, §12.3），以及委托方法在 init_simulation 后
 正确转发到 MuJoCoSimCore/ModelRegistry/SimConfig（阶段二 Step 5 验收标准）。
 
+阶段三 3.1.6 扩展：查询委托链路测试（关节/Body/Site/传感器/执行器/接触/Geom
++ body_subtree_mass），验证 K3 object.__getattribute__ + K2 __dir__ + K11 typed 返回。
+
 运行方式:
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
 import asyncio
+import inspect
 import os
 import unittest
 
@@ -28,6 +32,14 @@ _PENDULUM_XML = os.path.join(
     "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
+
+# G1 模型 XML（阶段三 3.1.6 功能测试用，含传感器/执行器/equality）
+_G1_XML = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "..", "..",
+    "OrcaPlayground", "envs", "euler", "robots", "g1_29dof_camera.xml",
+)
+_G1_XML = os.path.abspath(_G1_XML)
 
 
 class TestOrcaGymEulerSkeleton(unittest.TestCase):
@@ -467,6 +479,141 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             "sim", "studio", "registry", "opt", "view", "euler",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)
+
+
+# =============================================================================
+# 阶段三 3.1.6：OrcaGymEuler 查询委托链路
+# =============================================================================
+
+
+class TestGymQueryDelegationArchCompliance(unittest.TestCase):
+    """子步骤 3.1.6 架构遵从性测试（K3/K2/K5/K11）。
+
+    对应文档 §5.7 架构遵从性测试表。
+    """
+
+    def test_gym_query_delegates_use_getattribute(self):
+        """K3: grep 断言新增委托方法均用 object.__getattribute__(self, "_sim"/"_registry"/"_orca_model")。"""
+        source = inspect.getsource(OrcaGymEuler)
+        start = source.find("# --- 查询委托（阶段三 3.1.6")
+        self.assertGreater(start, 0, "未找到 3.1.6 查询委托区块")
+        block_source = source[start:]
+        # 委托方法不应直接 self._sim（被 __getattribute__ 拦截）
+        self.assertNotIn(
+            "self._sim.", block_source,
+            "3.1.6 委托方法不得直接 self._sim（K3 必须用 object.__getattribute__）",
+        )
+        self.assertNotIn(
+            "self._registry.", block_source,
+            "3.1.6 委托方法不得直接 self._registry（K3）",
+        )
+        self.assertNotIn(
+            "self._orca_model", block_source,
+            "3.1.6 委托方法不得直接 self._orca_model（K3）",
+        )
+        # 应包含 object.__getattribute__ 调用
+        self.assertIn("object.__getattribute__(self, \"_sim\")", block_source)
+        self.assertIn("object.__getattribute__(self, \"_registry\")", block_source)
+        self.assertIn("object.__getattribute__(self, \"_orca_model\")", block_source)
+
+    def test_gym_dir_no_internal_leak(self):
+        """K2/K3: dir(gym) 不含 _sim/_studio/_registry/_mjData/_mjModel。"""
+        gym = OrcaGymEuler()
+        d = dir(gym)
+        for name in ["_sim", "_studio", "_registry", "_mjData", "_mjModel"]:
+            with self.subTest(attr=name):
+                self.assertNotIn(name, d)
+
+    def test_gym_no_new_property_for_internal(self):
+        """K5: grep 断言 3.1.6 委托区块不新增 @property 暴露 _sim/_studio/_registry。"""
+        source = inspect.getsource(OrcaGymEuler)
+        start = source.find("# --- 查询委托（阶段三 3.1.6")
+        block_source = source[start:]
+        # 委托区块不应包含 @property 装饰器
+        self.assertNotIn("@property", block_source)
+
+    def test_gym_query_returns_typed(self):
+        """K11: gym.query_joint_qpos 返回 dict[str, np.ndarray]，非 MjData。"""
+        gym = OrcaGymEuler()
+        asyncio.run(gym.init_simulation(_G1_XML))
+        result = gym.query_joint_qpos(["left_hip_pitch_joint"])
+        self.assertIsInstance(result, dict)
+        for k, v in result.items():
+            self.assertIsInstance(k, str)
+            self.assertIsInstance(v, np.ndarray)
+
+    def test_gym_sensor_delegates_assemble_sensor_info(self):
+        """K3: query_sensor_data 从 _orca_model 拼装 sensor_info 传入 SimCore。"""
+        gym = OrcaGymEuler()
+        asyncio.run(gym.init_simulation(_G1_XML))
+        sensor_names = ["left_hip_pitch_pos"]
+        result = gym.query_sensor_data(sensor_names)
+        self.assertIsInstance(result, dict)
+        self.assertIn("left_hip_pitch_pos", result)
+        self.assertIsInstance(result["left_hip_pitch_pos"], np.ndarray)
+
+
+class TestGymQueryDelegationFunctional(unittest.TestCase):
+    """子步骤 3.1.6 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §5.7 功能单元测试表。验证委托链路结果与底层 SimCore/Registry 一致。
+    """
+
+    def setUp(self):
+        self.gym = OrcaGymEuler()
+        asyncio.run(self.gym.init_simulation(_G1_XML))
+        self.gym.mj_forward()
+
+    def test_gym_query_joint_qpos_delegates_to_simcore(self):
+        """Gym 委托结果与 SimCore 直接调用结果一致。"""
+        joint_names = ["left_hip_pitch_joint", "left_hip_roll_joint"]
+        gym_result = self.gym.query_joint_qpos(joint_names)
+        # 通过 object.__getattribute__ 取 _sim 直接调用 SimCore
+        sim = object.__getattribute__(self.gym, "_sim")
+        sim_result = sim.query_joint_qpos(joint_names)
+        for name in joint_names:
+            np.testing.assert_array_equal(gym_result[name], sim_result[name])
+
+    def test_gym_query_sensor_data_assembles_sensor_info(self):
+        """sensor_info 正确拼装，传感器数据正确。"""
+        sensor_names = ["left_hip_pitch_pos"]
+        gym_result = self.gym.query_sensor_data(sensor_names)
+        # 直接从 SimCore + 手动拼装 sensor_info 对比
+        sim = object.__getattribute__(self.gym, "_sim")
+        model = object.__getattribute__(self.gym, "_orca_model")
+        sensor_info = {name: model.get_sensor(name) for name in sensor_names}
+        sim_result = sim.query_sensor_data(sensor_names, sensor_info)
+        np.testing.assert_array_equal(
+            gym_result["left_hip_pitch_pos"],
+            sim_result["left_hip_pitch_pos"],
+        )
+
+    def test_gym_body_subtree_mass_delegates_to_registry(self):
+        """委托结果与 Registry 直接调用一致。"""
+        body_name = "pelvis"
+        gym_result = self.gym.body_subtree_mass(body_name)
+        registry = object.__getattribute__(self.gym, "_registry")
+        registry_result = registry.body_subtree_mass(body_name)
+        self.assertAlmostEqual(gym_result, registry_result)
+
+    def test_gym_query_body_xpos_delegates_to_simcore(self):
+        """query_body_xpos_xmat_xquat 委托 SimCore 结果一致。"""
+        body_names = ["pelvis"]
+        gym_result = self.gym.query_body_xpos_xmat_xquat(body_names)
+        sim = object.__getattribute__(self.gym, "_sim")
+        sim_result = sim.query_body_xpos_xmat_xquat(body_names)
+        for name in body_names:
+            np.testing.assert_array_equal(
+                gym_result[name]["xpos"], sim_result[name]["xpos"]
+            )
+
+    def test_gym_get_goal_bounding_box_delegates_to_simcore(self):
+        """get_goal_bounding_box 委托 SimCore 结果一致。"""
+        geom_name = "manipulation_box_geom"
+        gym_result = self.gym.get_goal_bounding_box(geom_name)
+        sim = object.__getattribute__(self.gym, "_sim")
+        sim_result = sim.get_goal_bounding_box(geom_name)
+        np.testing.assert_array_equal(gym_result, sim_result)
 
 
 if __name__ == "__main__":

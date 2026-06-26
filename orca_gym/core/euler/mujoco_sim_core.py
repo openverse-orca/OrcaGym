@@ -141,6 +141,411 @@ class MuJoCoSimCore:
         """
         raise NotImplementedError("clear_all_forces 待完整 P4 填充")
 
+    # --- 关节查询（阶段三 3.1.1）---
+
+    def _joint_id(self, joint_name: str) -> int:
+        """解析关节名称到 joint_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+
+    def _joint_qpos_len(self, joint_id: int) -> int:
+        """关节 qpos 长度（按类型：free=7, ball=4, hinge/slide=1）。"""
+        jtype = self._mjModel.jnt_type[joint_id]
+        if jtype == mujoco.mjtJoint.mjJNT_FREE:
+            return 7
+        if jtype == mujoco.mjtJoint.mjJNT_BALL:
+            return 4
+        return 1  # HINGE / SLIDE
+
+    def _joint_qvel_len(self, joint_id: int) -> int:
+        """关节 qvel/qacc 长度（按类型：free=6, ball=3, hinge/slide=1）。"""
+        jtype = self._mjModel.jnt_type[joint_id]
+        if jtype == mujoco.mjtJoint.mjJNT_FREE:
+            return 6
+        if jtype == mujoco.mjtJoint.mjJNT_BALL:
+            return 3
+        return 1  # HINGE / SLIDE
+
+    def query_joint_qpos(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qpos（按关节类型切片）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qpos 切片 np.ndarray]。切片为 _mjData.qpos 的
+            视图（零拷贝），长度按关节类型（free=7, ball=4, hinge/slide=1）。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(self._mjModel.jnt_qposadr[jid])
+            n = self._joint_qpos_len(jid)
+            result[name] = self._mjData.qpos[adr:adr + n]
+        return result
+
+    def query_joint_qvel(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qvel（按 dof 偏移切片）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qvel 切片 np.ndarray]。切片为 _mjData.qvel 的
+            视图（零拷贝），长度按关节类型（free=6, ball=3, hinge/slide=1）。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(self._mjModel.jnt_dofadr[jid])
+            n = self._joint_qvel_len(jid)
+            result[name] = self._mjData.qvel[adr:adr + n]
+        return result
+
+    def query_joint_qacc(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qacc（按 dof 偏移切片，qacc 与 qvel 共享 dof 地址）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qacc 切片 np.ndarray]。切片为 _mjData.qacc 的
+            视图（零拷贝），长度与 qvel 相同。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(self._mjModel.jnt_dofadr[jid])
+            n = self._joint_qvel_len(jid)
+            result[name] = self._mjData.qacc[adr:adr + n]
+        return result
+
+    def query_joint_offsets(
+        self, joint_names: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """查询关节 qpos/qvel/qacc 偏移量。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            (qpos_offsets, qvel_offsets, qacc_offsets) 三个 np.ndarray，
+            长度等于 joint_names。qacc 偏移与 qvel 相同（共享 dof 地址）。
+        """
+        qpos_adrs = []
+        qvel_adrs = []
+        qacc_adrs = []
+        for name in joint_names:
+            jid = self._joint_id(name)
+            qpos_adrs.append(int(self._mjModel.jnt_qposadr[jid]))
+            dof_adr = int(self._mjModel.jnt_dofadr[jid])
+            qvel_adrs.append(dof_adr)
+            qacc_adrs.append(dof_adr)
+        return (
+            np.array(qpos_adrs, dtype=int),
+            np.array(qvel_adrs, dtype=int),
+            np.array(qacc_adrs, dtype=int),
+        )
+
+    def query_joint_lengths(
+        self, joint_names: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """查询关节 qpos/qvel/qacc 长度。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            (qpos_lengths, qvel_lengths, qacc_lengths) 三个 np.ndarray，
+            长度等于 joint_names。qacc 长度与 qvel 相同。
+        """
+        qpos_lens = []
+        qvel_lens = []
+        qacc_lens = []
+        for name in joint_names:
+            jid = self._joint_id(name)
+            qpos_lens.append(self._joint_qpos_len(jid))
+            n_qvel = self._joint_qvel_len(jid)
+            qvel_lens.append(n_qvel)
+            qacc_lens.append(n_qvel)
+        return (
+            np.array(qpos_lens, dtype=int),
+            np.array(qvel_lens, dtype=int),
+            np.array(qacc_lens, dtype=int),
+        )
+
+    def query_joint_dofadrs(self, joint_names: list[str]) -> dict[str, int]:
+        """查询关节 dof 起始地址（jnt_dofadr）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> dof 起始地址 int]。
+        """
+        return {
+            name: int(self._mjModel.jnt_dofadr[self._joint_id(name)])
+            for name in joint_names
+        }
+
+    def jnt_qposadr(self, joint_name: str) -> int:
+        """查询关节 qpos 起始地址。
+
+        Args:
+            joint_name: 关节名称。
+
+        Returns:
+            qpos 起始地址（int，非 numpy 标量）。
+        """
+        return int(self._mjModel.jnt_qposadr[self._joint_id(joint_name)])
+
+    def jnt_dofadr(self, joint_name: str) -> int:
+        """查询关节 qvel 起始地址（dof 地址）。
+
+        Args:
+            joint_name: 关节名称。
+
+        Returns:
+            qvel 起始地址（int，非 numpy 标量）。
+        """
+        return int(self._mjModel.jnt_dofadr[self._joint_id(joint_name)])
+
+    # --- Body/Site 查询（阶段三 3.1.2）---
+
+    def _body_id(self, body_name: str) -> int:
+        """解析 body 名称到 body_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name)
+
+    def _site_id(self, site_name: str) -> int:
+        """解析 site 名称到 site_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_SITE, site_name)
+
+    def query_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict]:
+        """查询 body 位姿（xpos/xmat/xquat）。
+
+        Args:
+            body_name_list: body 名称列表。
+
+        Returns:
+            dict[body_name -> {"xpos": np.ndarray(3,),
+                               "xmat": np.ndarray(3,3),
+                               "xquat": np.ndarray(4,)}]。
+            所有数组为 _mjData 的零拷贝视图。
+        """
+        result: dict[str, dict] = {}
+        for name in body_name_list:
+            bid = self._body_id(name)
+            result[name] = {
+                "xpos": self._mjData.xpos[bid],
+                "xmat": self._mjData.xmat[bid].reshape(3, 3),
+                "xquat": self._mjData.xquat[bid],
+            }
+        return result
+
+    def query_body_xpos_xmat_xquat_xvel(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict]:
+        """查询 body 位姿 + 世界系线速度（mj_jacBody @ qvel）。
+
+        依赖 ``mj_jacBody``（原生 ``mujoco.mj_jacBody``，3.3 子步骤将提供 SimCore
+        jac 封装后可改用封装）。当前直接调用原生函数计算世界系线速度。
+
+        Args:
+            body_name_list: body 名称列表。
+
+        Returns:
+            dict[body_name -> {"xpos": np.ndarray(3,),
+                               "xmat": np.ndarray(3,3),
+                               "xquat": np.ndarray(4,),
+                               "xvel": np.ndarray(3,)}]。
+            ``xpos``/``xmat``/``xquat`` 为零拷贝视图；``xvel`` 为新建数组
+            （jac @ qvel 计算结果，非视图）。
+        """
+        result: dict[str, dict] = {}
+        nv = self._mjModel.nv
+        for name in body_name_list:
+            bid = self._body_id(name)
+            # 世界系线速度 = jacp @ qvel（body 原点平移雅可比）
+            jacp = np.zeros((3, nv))
+            jacr = np.zeros((3, nv))
+            mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, jacr, bid)
+            xvel = jacp @ self._mjData.qvel
+            result[name] = {
+                "xpos": self._mjData.xpos[bid],
+                "xmat": self._mjData.xmat[bid].reshape(3, 3),
+                "xquat": self._mjData.xquat[bid],
+                "xvel": xvel,
+            }
+        return result
+
+    def query_site_pos_and_mat(self, site_names: list[str]) -> dict[str, dict]:
+        """查询 site xpos/xmat。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> {"xpos": np.ndarray(3,),
+                               "xmat": np.ndarray(3,3,)}]。
+            所有数组为 _mjData 的零拷贝视图。
+        """
+        result: dict[str, dict] = {}
+        for name in site_names:
+            sid = self._site_id(name)
+            result[name] = {
+                "xpos": self._mjData.site_xpos[sid],
+                "xmat": self._mjData.site_xmat[sid].reshape(3, 3),
+            }
+        return result
+
+    def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
+        """查询 site 尺寸。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> site_size np.ndarray(3,)]。
+            数组为 _mjModel.site_size 的零拷贝视图。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in site_names:
+            sid = self._site_id(name)
+            result[name] = self._mjModel.site_size[sid]
+        return result
+
+    # --- 传感器/执行器/接触/Geom 查询（阶段三 3.1.3）---
+
+    def _sensor_id(self, sensor_name: str) -> int:
+        """解析传感器名称到 sensor_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_SENSOR, sensor_name)
+
+    def _actuator_id(self, actuator_name: str) -> int:
+        """解析执行器名称到 actuator_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name)
+
+    def _geom_id(self, geom_name: str) -> int:
+        """解析 geom 名称到 geom_id（内部辅助）。"""
+        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+
+    def query_sensor_data(
+        self, sensor_names: list[str], sensor_info: dict
+    ) -> dict[str, np.ndarray]:
+        """查询传感器数据（按 adr/dim 切片 sensordata）。
+
+        ``sensor_info`` 由 ``OrcaGymModel`` 提供（含每个传感器的 adr/dim），
+        SimCore 不持有 ``OrcaGymModel``（解耦）。若 ``sensor_info`` 缺少某传感器
+        条目，则回退到从 ``_mjModel`` 直接读取 adr/dim。
+
+        Args:
+            sensor_names: 传感器名称列表。
+            sensor_info: 传感器元信息 dict，键为传感器名，值为含 ``adr``/``dim``
+                键的 dict（来自 ``OrcaGymModel``）。
+
+        Returns:
+            dict[sensor_name -> sensordata 切片 np.ndarray]。切片为
+            _mjData.sensordata 的零拷贝视图。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in sensor_names:
+            # 优先使用 sensor_info，缺失则回退到 _mjModel
+            info = sensor_info.get(name) if sensor_info else None
+            if info is not None and "adr" in info and "dim" in info:
+                adr = int(info["adr"])
+                dim = int(info["dim"])
+            else:
+                sid = self._sensor_id(name)
+                adr = int(self._mjModel.sensor_adr[sid])
+                dim = int(self._mjModel.sensor_dim[sid])
+            result[name] = self._mjData.sensordata[adr:adr + dim]
+        return result
+
+    def query_actuator_torques(self, actuator_names: list[str]) -> dict[str, np.ndarray]:
+        """查询执行器力矩（actuator_force 切片）。
+
+        Args:
+            actuator_names: 执行器名称列表。
+
+        Returns:
+            dict[actuator_name -> actuator_force 切片 np.ndarray]。切片为
+            _mjData.actuator_force 的零拷贝视图（长度为该执行器的控制维度，
+            通常为 1）。
+        """
+        result: dict[str, np.ndarray] = {}
+        for name in actuator_names:
+            aid = self._actuator_id(name)
+            # actuator_force 索引为 actuator_id（每个执行器通常 1 维）
+            adr = aid
+            dim = int(self._mjModel.actuator_ctrlsz[aid]) if hasattr(
+                self._mjModel, "actuator_ctrlsz"
+            ) else 1
+            # actuator_force 与 ctrl 共享布局，每执行器通常 1 维
+            result[name] = self._mjData.actuator_force[adr:adr + max(dim, 1)]
+        return result
+
+    def query_contact_simple(self) -> list[dict]:
+        """查询简单接触信息（遍历 contact 列表）。
+
+        Returns:
+            list[dict]，每个 dict 描述一个接触，含键：
+            ``geom1`` (int)、``geom2`` (int)、``dist`` (float)、
+            ``pos`` (np.ndarray(3,))、``frame`` (np.ndarray(9,) 扁平)。
+            无接触时返回空列表。
+        """
+        contacts: list[dict] = []
+        ncon = self._mjData.ncon
+        for i in range(ncon):
+            con = self._mjData.contact[i]
+            contacts.append({
+                "geom1": int(con.geom1),
+                "geom2": int(con.geom2),
+                "dist": float(con.dist),
+                "pos": self._mjData.contact[i].pos,
+                "frame": self._mjData.contact[i].frame,
+            })
+        return contacts
+
+    def query_contact_force(self, contact_ids: list[int]) -> dict[int, np.ndarray]:
+        """查询接触力（mj_contactForce）。
+
+        Args:
+            contact_ids: 接触索引列表（对应 _mjData.contact 数组下标）。
+
+        Returns:
+            dict[contact_id -> force np.ndarray(6,)]，前 3 分量为接触力，
+            后 3 分量为接触力矩（由 ``mujoco.mj_contactForce`` 计算）。
+        """
+        result: dict[int, np.ndarray] = {}
+        for cid in contact_ids:
+            force = np.zeros(6)
+            mujoco.mj_contactForce(self._mjModel, self._mjData, cid, force)
+            result[cid] = force
+        return result
+
+    def get_cfrc_ext(self) -> np.ndarray:
+        """查询外部约束力（cfrc_ext）。
+
+        Returns:
+            np.ndarray，形状 (nbody, 6)，为 _mjData.cfrc_ext 的零拷贝视图。
+        """
+        cfrc = self._mjData.cfrc_ext
+        return cfrc
+
+    def get_goal_bounding_box(self, geom_name: str) -> np.ndarray:
+        """查询 geom 尺寸（bounding box）。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            np.ndarray(3,)，为 _mjModel.geom_size[geom_id] 的零拷贝视图。
+            对于 box geom，值为半尺寸 (hx, hy, hz)。
+        """
+        gid = self._geom_id(geom_name)
+        size = self._mjModel.geom_size[gid]
+        return size
+
     # --- 维度 property ---
 
     @property
