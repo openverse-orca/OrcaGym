@@ -6,9 +6,11 @@
 
 **变更目标**：将 `OrcaGymEulerEnv` 的继承链从 `OrcaGymBaseEnv` 切换为 `OrcaGymEnvMixin, gym.Env`，删除 `_BLOCKED_ATTRS`/`__getattr__`/`__setattr__`/`_SHIELDED_ATTRS` 补丁机制，通过 `OrcaGymEnvMixin` 共享公共方法。
 
-**上游约束**：架构文档 `docs/design/architecture/orca_gym_euler_architecture.md`（§5.9 OrcaGymEnvMixin 定义、§7.1 M0 Python 原生属性不存在、§12.3 K14 继承链约束）。
+**上游约束**：架构文档 `docs/design/architecture/orca_gym_euler_architecture.md`（§5.9 OrcaGymEnvMixin 定义、§7.1 M0-M7 多层封装隔离机制、§7.2 ruff SLF001 配置、§7.3 AGENTS.md 内容要求、§12.3 K14 继承链约束）。
 
 **前提条件**：阶段二功能填充已完成（生命周期、步进、状态设置、渲染方法均已真实实现），本方案不修改这些已填充的功能逻辑，仅变更继承结构和隔离机制。
+
+**实施次序**：阶段 0 先行落地 ruff SLF001 静态检查与 AGENTS.md AI 行为约束（架构 §7.2/§7.3），**一次性覆盖 6 个自研仓库**（OrcaGym / OrcaFlow / OrcaEuler / OrcaPlayground / OrcaManipulation / OrcaLab），为后续阶段 1-3 的编码提供静态检查基线；阶段 1-3 在此基础上完成 OrcaGym 继承链切换与端到端验证。
 
 ---
 
@@ -16,17 +18,35 @@
 
 ### 2.1 新增文件
 
-| 文件 | 内容 |
-|------|------|
-| `orca_gym/environment/orca_gym_env_mixin.py` | `OrcaGymEnvMixin` 类，迁移自 `OrcaGymBaseEnv` 的 10 个公共方法 |
-| `tests/orca_gym/environment/test_orca_gym_env_mixin.py` | Mixin 单元测试 |
+| 文件 | 仓库 | 内容 | 阶段 |
+|------|------|------|------|
+| `tests/orca_gym/test_ruff_config.py` | OrcaGym | ruff SLF001 配置与可执行性测试 | 阶段 0 |
+| `tests/orca_gym/test_agents_md.py` | OrcaGym | AGENTS.md API 隔离章节内容校验测试 | 阶段 0 |
+| `tests/test_ruff_config.py` | OrcaFlow/OrcaPlayground/OrcaManipulation | 同上（各仓库根 `tests/`） | 阶段 0 |
+| `tests/test_agents_md.py` | OrcaFlow/OrcaPlayground/OrcaManipulation | 同上 | 阶段 0 |
+| `orca/euler/tests/test_ruff_config.py` | OrcaEuler | 同上 | 阶段 0 |
+| `orca/euler/tests/test_agents_md.py` | OrcaEuler | 同上 | 阶段 0 |
+| `test/test_ruff_config.py` | OrcaLab | 同上（OrcaLab 测试目录为 `test/`，单数） | 阶段 0 |
+| `test/test_agents_md.py` | OrcaLab | 同上 | 阶段 0 |
+| `pyproject.toml` | OrcaPlayground | 新建，仅含 `[tool.ruff.lint]` 段（不破坏 `setup.py`） | 阶段 0 |
+| `AGENTS.md` | OrcaManipulation | 新建，含测试环境规则 + API 隔离章节 | 阶段 0 |
+| `AGENTS.md` | OrcaLab | 新建，含测试环境规则 + API 隔离章节（适配 OrcaLab 编辑器/UI 仓） | 阶段 0 |
+| `orca_gym/environment/orca_gym_env_mixin.py` | OrcaGym | `OrcaGymEnvMixin` 类，迁移自 `OrcaGymBaseEnv` 的 10 个公共方法 | 阶段 1 |
+| `tests/orca_gym/environment/test_orca_gym_env_mixin.py` | OrcaGym | Mixin 单元测试 | 阶段 1 |
 
 ### 2.2 修改文件
 
-| 文件 | 变更内容 |
-|------|---------|
-| `orca_gym/environment/euler/orca_gym_euler_env.py` | 继承链切换、删除补丁机制、重写 `__init__`、更新 `__dir__` |
-| `tests/orca_gym/environment/euler/test_orca_gym_euler_env_skeleton.py` | 删除 K2/K10 旧测试，新增 K14 测试 |
+| 文件 | 仓库 | 变更内容 | 阶段 |
+|------|------|---------|------|
+| `AGENTS.md` | OrcaGym | 删除过时的 `__getattr__`/`_BLOCKED_ATTRS`/M1-M6 描述，新增"API 隔离强制"章节 | 阶段 0 |
+| `AGENTS.md` | OrcaFlow/OrcaEuler | 追加 "API Isolation Enforcement" 英文章节 | 阶段 0 |
+| `AGENTS.md` | OrcaPlayground | 新增"API 隔离强制"章节（适配示例仓） | 阶段 0 |
+| `pyproject.toml` | OrcaGym | 新增 `[tool.ruff.lint]` SLF001 配置，`dev` 依赖增加 `ruff` | 阶段 0 |
+| `pyproject.toml` | OrcaFlow/OrcaEuler | `select` 追加 `"SLF001"`，`dev` 增加 `ruff`，OrcaFlow 加 `exclude` | 阶段 0 |
+| `pyproject.toml` | OrcaManipulation | 新增 `[tool.ruff.lint]` 段 | 阶段 0 |
+| `pyproject.toml` | OrcaLab | 新增 `[tool.ruff.lint]` 段，`dev` 依赖增加 `ruff` | 阶段 0 |
+| `orca_gym/environment/euler/orca_gym_euler_env.py` | OrcaGym | 继承链切换、删除补丁机制、重写 `__init__`、更新 `__dir__` | 阶段 2 |
+| `tests/orca_gym/environment/euler/test_orca_gym_euler_env_skeleton.py` | OrcaGym | 删除 K2/K10 旧测试，新增 K14 测试 | 阶段 2 |
 
 ### 2.3 不修改的文件
 
@@ -40,6 +60,342 @@
 ---
 
 ## 3. 实施阶段
+
+### 阶段 0：基础设施先行（AGENTS.md + ruff）—— 六仓库统一实施
+
+**目标**：在编码变更前，先落地架构文档 §7.2（ruff SLF001 静态检查）和 §7.3（AGENTS.md AI 行为约束）的要求，为后续阶段 1-3 的编码提供静态检查基线和 AI 行为约束。
+
+**上游约束**：架构文档 §7.1（M1 ruff SLF001、M2 AGENTS.md）、§7.2（ruff 配置）、§7.3（AGENTS.md 内容要求）。
+
+**实施范围**：阶段 0 一次性处理以下 6 个自研仓库，统一落地 ruff SLF001 配置与 AGENTS.md API 隔离章节：
+
+| 仓库 | 配置文件 | ruff 现状 | AGENTS.md 现状 | fork 目录 |
+|------|---------|----------|---------------|----------|
+| OrcaGym | `pyproject.toml` | 无 ruff 段 | 有（中文，含过时 `__getattr__`/`_BLOCKED_ATTRS`/M1-M6） | 无 |
+| OrcaFlow | `pyproject.toml` | `select=["E","F","W","I"]`，无 SLF001 | 有（英文，Warp fork 主题） | `orca/flow/src/warp_fork/`（232 报警） |
+| OrcaEuler | `pyproject.toml` | `select=["E","F","W","I"]`，无 SLF001 | 有（英文，Euler 框架主题） | 无 |
+| OrcaPlayground | `setup.py`（无 pyproject.toml） | 无 ruff 配置 | 有（中文，示例仓，引用 OrcaGym 架构） | 无 |
+| OrcaManipulation | `pyproject.toml` | 无 ruff 段 | **无**（仅 `DEVELOPER_GUIDE.md`） | 无 |
+| OrcaLab | `pyproject.toml` | 无 ruff 段（`dev` 含 `flake8`/`black`/`mypy`） | **无** | 无（自研代码在 `orcalab/`） |
+
+#### 3.0.1 各仓库统一配置 ruff SLF001
+
+SLF001 基于类型作用域判断"内部访问 vs 外部穿墙"：类内部访问 `self._private` 不报警，外部对象访问 `obj._private` 报警。无需逐文件配置即可精准识别。
+
+**统一配置模板**（写入各仓库配置文件的 `[tool.ruff.lint]` 段）：
+
+```toml
+[tool.ruff.lint]
+select = ["SLF001"]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许白盒访问（测试就是要测内部）
+"tests/**" = ["SLF001"]
+# __init__.py 允许 re-export
+"**/__init__.py" = ["SLF001", "F401"]
+```
+
+> - OrcaFlow/OrcaEuler 已有 `select = ["E", "F", "W", "I"]`，在原列表追加 `"SLF001"` 即可（合并为 `select = ["E", "F", "W", "I", "SLF001"]`），保留既有规则。
+> - **OrcaLab 测试目录为 `test/`（单数，非 `tests/`）**，其 `per-file-ignores` 须写 `"test/**" = ["SLF001"]`，模板中的 `"tests/**"` 不匹配 OrcaLab。
+
+**各仓库配置落点**：
+
+| 仓库 | 配置文件 | 操作 |
+|------|---------|------|
+| OrcaGym | `pyproject.toml` | 新增 `[tool.ruff.lint]` 段；`dev` 依赖追加 `ruff` |
+| OrcaFlow | `pyproject.toml` | `select` 追加 `"SLF001"`；`dev` 追加 `ruff` |
+| OrcaEuler | `pyproject.toml` | `select` 追加 `"SLF001"`；`dev` 追加 `ruff` |
+| OrcaPlayground | 新建 `pyproject.toml`（仅含 `[tool.ruff.lint]` 段，不破坏现有 `setup.py`） | 新增 ruff 配置 |
+| OrcaManipulation | `pyproject.toml` | 新增 `[tool.ruff.lint]` 段 |
+| OrcaLab | `pyproject.toml` | 新增 `[tool.ruff.lint]` 段，`per-file-ignores` 用 `"test/**"`；`dev` 追加 `ruff` |
+
+**第三方 fork 目录排除原则**：
+
+SLF001 只约束自研代码。第三方 fork 代码遵循上游实现风格，存在大量同框架跨模块访问 `_` 前缀属性（如 `module._find_kernel()`、`self._setup_nnz_transfer()`），这些是框架内部协作，SLF001 无法与"外部穿墙"区分。
+
+各仓库须执行以下流程：
+
+1. **识别 fork 目录**：扫描仓库内的第三方 fork 代码（通常带 `LICENSE`/`NOTICE`/`apply_namespace.sh` 等上游标记）
+2. **基线扫描**：对 fork 目录单独执行 `ruff check --select SLF001`，确认报警来自上游风格而非本仓库引入
+3. **配置排除**：在 `[tool.ruff.lint.exclude]` 中排除该目录
+
+```toml
+[tool.ruff.lint.exclude]
+# 第三方 fork 代码遵循上游风格，不强制 SLF001
+# 仅 OrcaFlow 需要配置：
+"orca/flow/src/warp_fork/"
+```
+
+> 已知 fork 目录基线（截至扫描日）：
+>
+> | 仓库 | fork 目录 | SLF001 报警数 | 来源 |
+> |------|----------|--------------|------|
+> | OrcaFlow | `orca/flow/src/warp_fork/` | 232 | Warp 项目 |
+>
+> 报警集中在 `python/context.py`（~70+）、`python/sparse.py`（~80+）、`python/codegen.py`（~29）、`python/tape.py`（~6）等，均为 Warp 上游内部协作访问，排除即可。其余 5 仓库无 fork 目录，无需配置 `exclude`。
+
+#### 3.0.2 各仓库统一配置 AGENTS.md API 隔离章节
+
+架构 §7.3 要求每个自研仓库根目录配置 `AGENTS.md`，含"API 隔离强制"章节。各仓库现有 AGENTS.md 风格不同（OrcaGym/OrcaPlayground 中文、OrcaFlow/OrcaEuler 英文、OrcaManipulation/OrcaLab 无），处理方式如下：
+
+**OrcaGym**（更新现有）：
+
+- 删除规则 2 中"跳过 `__getattr__` 拦截机制"禁止项、"`_BLOCKED_ATTRS`"相关描述（机制已删除）
+- 将"M1-M6 六层机制"更新为"M0-M7 多层封装隔离机制"（架构 §7.1）
+- 新增"规则 4：API 隔离强制"章节（内容见下）
+
+**OrcaPlayground**（更新现有）：
+
+- 规则 2 引用的"M0-M7 多层封装隔离机制"已是最新（无需改过时描述）
+- 新增"规则 4：API 隔离强制"章节，内容适配示例仓（禁止穿墙访问 `env._gym._sim._mjData` 等，引导走 `env.data.*`/`env.sim_config.*` 公共 API）
+
+**OrcaFlow / OrcaEuler**（追加章节）：
+
+- 现有 AGENTS.md 为英文、聚焦 Warp fork / Euler 框架主题，保留不动
+- 追加"API Isolation Enforcement"章节（英文），约束 AI 不得穿墙访问自研类的 `_` 前缀属性（如 Euler 的 `solver._xxx`、Flow 的内部 `_` 属性），并要求执行 `ruff check --select SLF001`
+
+**OrcaManipulation**（新建）：
+
+- 仓库目前无 `AGENTS.md`，从模板创建
+- 含测试环境规则（`orca` conda 环境）+ "规则 2：API 隔离强制"章节（适配操作仓：禁止穿墙访问 OrcaGym env 的 `_` 前缀属性，走公共 API）
+
+**OrcaLab**（新建）：
+
+- 仓库目前无 `AGENTS.md`，从模板创建
+- 含测试环境规则（`orca` conda 环境）+ "API 隔离强制"章节（适配 OrcaLab 编辑器/UI 仓：约束 AI 不得穿墙访问 `orcalab/` 自研类的 `_` 前缀属性，如内部 service/bus 的 `_` 成员；OrcaLab 通过 `orca-gym` 依赖调用 OrcaGym 时走公共 API，禁止 `env._gym._sim._mjData` 穿墙），并要求执行 `ruff check --select SLF001 orcalab/`
+
+**"API 隔离强制"章节模板**（OrcaGym 版，其余仓库按自身语言和组件调整）：
+
+```markdown
+## 规则 4：API 隔离强制
+
+本仓库采用 `_` 前缀社区约定 + ruff SLF001 静态检查 + `__dir__` 控制，
+引导 AI 和用户走公共 API（架构 §7）。
+
+### 禁止穿墙访问
+
+不得访问以下 `_` 前缀内部属性（类内部合法的 `self._xxx` 委托除外）：
+
+- `env._gym` / `env._stub` / `env._channel` / `env._studio_bridge`
+- `env._gym._sim` / `env._gym._sim._mjData` / `env._gym._sim._mjModel`
+- 任何自研类的 `_` 前缀属性
+
+> `env.gym` / `env.stub` / `env.channel` 在 `OrcaGymEulerEnv` 中不存在
+> （直接继承 `gym.Env`，Python 原生 `AttributeError`）。
+
+### 必须使用公共 API
+
+| 操作 | 正确 | 禁止 |
+|------|------|------|
+| 读取状态 | `env.data.qpos` / `env.data.body_xpos(name)` / `env.query_*()` | `env._gym._sim._mjData.qpos` |
+| 写入状态 | `env.set_joint_qpos()` / `env.apply_body_force()` | `env._gym._sim._mjData.xfrc_applied[...]` |
+| 步进 | `env.do_simulation(ctrl, n_frames)` / `env.step()` | `env._gym._sim._mjData.step()` |
+| 求解器配置 | `env.sim_config.timestep = 0.002` | `env._gym._sim._mjModel.opt.timestep = 0.002` |
+
+### 必须执行 ruff
+
+提交代码前必须执行，零报警方可提交：
+
+    <conda-base>/envs/orca/bin/python -m ruff check --select SLF001 orca_gym/
+
+### 缺失功能时扩展公共方法
+
+若公共 API 不满足需求，**暂停并提交用户决策**，不得自行穿墙访问内部属性。
+扩展方式：
+- 在 `OrcaGymEulerEnv` 增加公共方法（委托到 `_gym` 公共 API）
+- 在 `OrcaGymEuler` 增加公共方法（委托到 `_sim` 公共 API）
+- 在 `OrcaGymDataView` 增加字段访问器
+```
+
+> 各仓库的 ruff 扫描目标路径不同（OrcaGym: `orca_gym/`、OrcaFlow: `orca/`、OrcaEuler: `orca/`、OrcaPlayground: `envs/`+`examples/`、OrcaManipulation: `envs/`+`examples/`、OrcaLab: `orcalab/`），AGENTS.md 的 ruff 命令示例按各自路径填写。
+
+#### 3.0.3 建立现有代码的 ruff 扫描基线
+
+配置完成后，对各仓库自研代码执行 ruff 扫描，记录基线报警（阶段二功能填充时可能引入的 `self._gym._sim` 访问）：
+
+```bash
+# OrcaGym（Euler 子目录，阶段 2/3 重点）
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 orca_gym/environment/euler/ orca_gym/core/euler/
+# OrcaFlow
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 orca/
+# OrcaEuler
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 orca/
+# OrcaPlayground
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 envs/ examples/
+# OrcaManipulation
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 envs/ examples/
+# OrcaLab
+<conda-base>/envs/orca/bin/python -m ruff check --select SLF001 orcalab/
+```
+
+> 若仓库根配置文件已含 `[tool.ruff.lint]` 且 `exclude`，ruff 会自动跳过 fork 目录（如 OrcaFlow 的 `warp_fork/`），无需额外参数。加 `--statistics` 可查看报警分布。
+
+**基线处理原则**：
+
+- 若现有代码存在 SLF001 报警，记录到基线清单（报警位置 + 数量）
+- 阶段 2 切换继承链时，同步修复 OrcaGym 基线报警（改为公共 API 委托）；其余仓库基线报警按需修复
+- 阶段 3 验收时，OrcaGym 零报警方为通过；其余仓库阶段 0 验收即记录基线，后续各自迭代消化
+- **fork 目录报警不纳入基线**：已通过 `exclude` 排除，验收时不计入
+
+#### 3.0.4 测试
+
+各仓库在自身 `tests/` 下新建两个测试文件，校验本仓库的 ruff 配置与 AGENTS.md 内容。测试逻辑统一，仅配置文件路径和 AGENTS.md 路径按仓库调整。
+
+**测试文件落点**：
+
+| 仓库 | ruff 配置测试 | AGENTS.md 测试 |
+|------|--------------|---------------|
+| OrcaGym | `tests/orca_gym/test_ruff_config.py` | `tests/orca_gym/test_agents_md.py` |
+| OrcaFlow | `tests/test_ruff_config.py` | `tests/test_agents_md.py` |
+| OrcaEuler | `orca/euler/tests/test_ruff_config.py` | `orca/euler/tests/test_agents_md.py` |
+| OrcaPlayground | `tests/test_ruff_config.py` | `tests/test_agents_md.py` |
+| OrcaManipulation | `tests/test_ruff_config.py` | `tests/test_agents_md.py` |
+| OrcaLab | `test/test_ruff_config.py`（`test/` 单数） | `test/test_agents_md.py` |
+
+> OrcaFlow/OrcaEuler 用 `unittest`（遵循其 AGENTS.md 约定），测试类与断言与下方一致，仅 `Path(__file__).resolve().parents[N]` 的层数按仓库目录深度调整，指向各自根目录的配置文件。
+
+**`test_ruff_config.py`**（以 OrcaGym 为例，`parents[3]` 指向仓库根）：
+
+```python
+"""ruff SLF001 配置与可执行性测试。"""
+
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+
+class TestRuffConfig(unittest.TestCase):
+    """ruff 配置与可执行性。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
+        cls.content = cls.pyproject.read_text()
+
+    def test_ruff_installed(self):
+        """ruff 已安装且可执行。"""
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "--version"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, "ruff 未安装")
+        self.assertIn("ruff", result.stdout.lower())
+
+    def test_ruff_config_has_slf001(self):
+        """配置文件已配置 SLF001。"""
+        self.assertIn("[tool.ruff.lint]", self.content)
+        self.assertIn("SLF001", self.content)
+
+    def test_ruff_tests_ignored(self):
+        """测试目录已配置 SLF001 忽略。"""
+        # OrcaGym/OrcaFlow/OrcaEuler/OrcaPlayground/OrcaManipulation 用 "tests/**"
+        # OrcaLab 测试目录为单数 test/，用 "test/**"
+        self.assertTrue(
+            "tests/**" in self.content or "test/**" in self.content
+        )
+
+    def test_ruff_init_ignored(self):
+        """__init__.py 已配置忽略。"""
+        self.assertIn("__init__.py", self.content)
+
+    def test_ruff_exclude_section_exists(self):
+        """配置文件含 [tool.ruff.lint.exclude] 段（第三方 fork 排除）。
+
+        OrcaFlow 必须含此段并排除 warp_fork/；
+        其余仓库此段可为空但段头应存在（统一模板）。
+        """
+        self.assertIn("[tool.ruff.lint.exclude]", self.content)
+```
+
+> OrcaPlayground 用 `setup.py` 无 `pyproject.toml`，阶段 0 为其新建仅含 ruff 配置的 `pyproject.toml`，测试指向该文件。
+
+**`test_agents_md.py`**（以 OrcaGym 为例，校验中文 AGENTS.md）：
+
+```python
+"""AGENTS.md API 隔离章节内容校验测试。"""
+
+import unittest
+from pathlib import Path
+
+
+class TestAgentsMd(unittest.TestCase):
+    """AGENTS.md 内容约束。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.content = (Path(__file__).resolve().parents[3] / "AGENTS.md").read_text()
+
+    def test_has_api_isolation_section(self):
+        """AGENTS.md 包含 API 隔离强制章节。"""
+        # 中文仓库（OrcaGym/OrcaPlayground/OrcaManipulation/OrcaLab）匹配中文标题
+        # 英文仓库（OrcaFlow/OrcaEuler）匹配 "API Isolation Enforcement"
+        self.assertTrue(
+            "API 隔离强制" in self.content
+            or "API Isolation Enforcement" in self.content
+        )
+
+    def test_has_ruff_requirement(self):
+        """AGENTS.md 要求执行 ruff SLF001。"""
+        self.assertIn("ruff check", self.content)
+        self.assertIn("SLF001", self.content)
+
+    def test_has_public_api_table(self):
+        """AGENTS.md 含"正确 vs 禁止"公共 API 对照表。
+
+        各仓库 API 例子不同：
+        - OrcaGym/OrcaPlayground/OrcaManipulation：env.data.qpos / env.sim_config
+        - OrcaFlow/OrcaEuler/OrcaLab：各自组件的公共 API
+        统一校验对照表标记（中文"正确"/"禁止"或英文"Correct"/"Forbidden"）。
+        """
+        has_cn = "正确" in self.content and "禁止" in self.content
+        has_en = "Correct" in self.content and "Forbidden" in self.content
+        self.assertTrue(has_cn or has_en, "缺少公共 API 对照表")
+
+    def test_no_legacy_getattr_description(self):
+        """AGENTS.md 不再描述 __getattr__ 拦截机制（仅 OrcaGym 需清理）。"""
+        self.assertNotIn("__getattr__ 拦截", self.content)
+        self.assertNotIn("_BLOCKED_ATTRS", self.content)
+
+    def test_mechanism_version_updated(self):
+        """机制描述更新为 M0-M7（仅 OrcaGym 原含 M1-M6）。"""
+        self.assertNotIn("M1-M6 六层机制", self.content)
+```
+
+> - OrcaFlow/OrcaEuler 的 AGENTS.md 为英文且原本不含过时 `__getattr__`/`_BLOCKED_ATTRS`/M1-M6 描述，`test_no_legacy_getattr_description` 和 `test_mechanism_version_updated` 对它们恒真通过。
+> - `test_has_api_isolation_section` 允许匹配英文标题 "API Isolation Enforcement"。
+> - `test_has_public_api_table` 用通用对照表标记校验，不绑定具体 API 名，兼容 OrcaFlow/OrcaEuler/OrcaLab 等非 env 仓库。
+> - OrcaManipulation/OrcaLab 新建 AGENTS.md 后同样通过上述全部断言。
+
+#### 3.0.5 验收标准
+
+| 验收项 | 验证方式 | 适用仓库 |
+|--------|---------|---------|
+| 配置文件含 `[tool.ruff.lint]` + SLF001 | `test_ruff_config_has_slf001` | 全部 6 仓库 |
+| 测试目录 SLF001 忽略 | `test_ruff_tests_ignored` | 全部 6 仓库 |
+| `__init__.py` 忽略 | `test_ruff_init_ignored` | 全部 6 仓库 |
+| 配置文件含 `[tool.ruff.lint.exclude]` 段 | `test_ruff_exclude_section_exists` | 全部 6 仓库 |
+| 第三方 fork 目录已排除 | `exclude` 含 `warp_fork/` | 仅 OrcaFlow |
+| ruff 可执行 | `test_ruff_installed` | 全部 6 仓库 |
+| AGENTS.md 含 API 隔离章节 | `test_has_api_isolation_section` | 全部 6 仓库 |
+| AGENTS.md 含 ruff 要求 | `test_has_ruff_requirement` | 全部 6 仓库 |
+| AGENTS.md 含公共 API 对照表 | `test_has_public_api_table` | 全部 6 仓库 |
+| AGENTS.md 无过时 `__getattr__`/`_BLOCKED_ATTRS` | `test_no_legacy_getattr_description` | 全部 6 仓库 |
+| AGENTS.md 机制版本更新 | `test_mechanism_version_updated` | 全部 6 仓库 |
+| 现有代码基线已记录（不含 fork 目录报警） | ruff 扫描输出（人工记录报警清单） | 全部 6 仓库 |
+
+**运行命令**（各仓库根目录执行）：
+
+```bash
+# OrcaGym
+<conda-base>/envs/orca/bin/python -m pytest tests/orca_gym/test_ruff_config.py tests/orca_gym/test_agents_md.py -v
+# OrcaFlow / OrcaEuler / OrcaPlayground / OrcaManipulation（各自根目录）
+<conda-base>/envs/orca/bin/python -m unittest tests.test_ruff_config tests.test_agents_md -v
+# OrcaLab（测试目录为 test/ 单数）
+<conda-base>/envs/orca/bin/python -m unittest test.test_ruff_config test.test_agents_md -v
+```
+
+---
 
 ### 阶段 1：新建 OrcaGymEnvMixin
 
@@ -639,21 +995,26 @@ select = ["SLF001"]
 ## 4. 实施顺序与依赖
 
 ```
+阶段 0: 基础设施先行（AGENTS.md + ruff）
+   │   （配置 ruff SLF001、更新 AGENTS.md、建立扫描基线）
+   ▼
 阶段 1: 新建 OrcaGymEnvMixin
    │   （无破坏性，现有测试不受影响）
    ▼
 阶段 2: 切换 Env 继承链 + 删除补丁机制
-   │   （核心变更，Env 测试需同步更新）
+   │   （核心变更，Env 测试需同步更新，同步修复阶段 0 基线报警）
    ▼
 阶段 3: 端到端验证
-       （SimpleEulerEnv + Gym 层 + ruff + example）
+       （SimpleEulerEnv + Gym 层 + ruff 零报警 + example）
 ```
 
 **关键约束**：
 
+- 阶段 0 必须先于阶段 1-3 完成（ruff 与 AGENTS.md 是后续编码的静态检查基线和 AI 行为约束）
 - 阶段 1 和阶段 2 不可并行（阶段 2 依赖阶段 1 的 Mixin 文件）
 - 阶段 2 内部的代码变更和测试更新必须同步提交（避免中间状态测试失败）
-- 阶段 3 必须在阶段 2 全部通过后执行
+- 阶段 2 须同步修复阶段 0 记录的基线报警（改为公共 API 委托）
+- 阶段 3 必须在阶段 2 全部通过后执行，ruff SLF001 零报警为硬性验收项
 
 ---
 
@@ -665,6 +1026,8 @@ select = ["SLF001"]
 2. **Mixin 保留**：阶段 1 的 `OrcaGymEnvMixin` 文件可保留（无破坏性），待问题解决后重新尝试阶段 2
 3. **测试回滚**：`git revert` 阶段 2 的测试更新提交
 
+**阶段 0 回滚**：`AGENTS.md`/`pyproject.toml` 的变更可独立 `git revert`，不影响现有代码运行（ruff 配置仅新增不删除既有依赖）。阶段 0 的两个测试文件可保留或删除。
+
 **不可回滚的情况**：无。本方案不修改 `OrcaGymBaseEnv`/`OrcaGymLocalEnv`/Gym 层/子组件，仅变更 Env 继承链。
 
 ---
@@ -675,13 +1038,17 @@ select = ["SLF001"]
 
 | # | 条件 | 验证方式 |
 |---|------|---------|
-| 1 | `OrcaGymEnvMixin` 文件存在且测试通过 | 阶段 1 测试 |
-| 2 | `OrcaGymEulerEnv` 继承 `OrcaGymEnvMixin, gym.Env` | `test_env_inheritance_chain` |
-| 3 | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError` | `test_env_gym_attr_natural_attribute_error` 等 |
-| 4 | `_BLOCKED_ATTRS`/`__getattr__`/`__setattr__`/`_SHIELDED_ATTRS` 已删除 | `test_env_no_blocked_attrs_classvar` |
-| 5 | Mixin 方法在 Env 上可用 | `test_env_mixin_methods_available` |
-| 6 | Env 骨架测试全部通过 | 阶段 2 测试 |
-| 7 | SimpleEulerEnv 合规测试通过 | 阶段 3 测试 |
-| 8 | Gym 层测试全部通过 | 阶段 3 测试 |
-| 9 | ruff SLF001 零报警 | 阶段 3 扫描 |
-| 10 | Example 端到端运行正常 | 阶段 3 example |
+| 1 | 6 仓库配置文件含 ruff SLF001 配置 | 阶段 0 各仓库 `test_ruff_config_has_slf001` |
+| 2 | 6 仓库 ruff 可执行 | 阶段 0 各仓库 `test_ruff_installed` |
+| 3 | 6 仓库 AGENTS.md 含 API 隔离章节且无过时描述 | 阶段 0 各仓库 `test_agents_md.py` 全部通过 |
+| 4 | OrcaFlow `warp_fork/` 已排除且 6 仓库现有代码 ruff 基线已记录 | 阶段 0 扫描输出 |
+| 5 | `OrcaGymEnvMixin` 文件存在且测试通过 | 阶段 1 测试 |
+| 6 | `OrcaGymEulerEnv` 继承 `OrcaGymEnvMixin, gym.Env` | `test_env_inheritance_chain` |
+| 7 | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError` | `test_env_gym_attr_natural_attribute_error` 等 |
+| 8 | `_BLOCKED_ATTRS`/`__getattr__`/`__setattr__`/`_SHIELDED_ATTRS` 已删除 | `test_env_no_blocked_attrs_classvar` |
+| 9 | Mixin 方法在 Env 上可用 | `test_env_mixin_methods_available` |
+| 10 | Env 骨架测试全部通过 | 阶段 2 测试 |
+| 11 | SimpleEulerEnv 合规测试通过 | 阶段 3 测试 |
+| 12 | Gym 层测试全部通过 | 阶段 3 测试 |
+| 13 | OrcaGym ruff SLF001 零报警（含阶段 0 基线报警已修复） | 阶段 3 扫描 |
+| 14 | Example 端到端运行正常 | 阶段 3 example |

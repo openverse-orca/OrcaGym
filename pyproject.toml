@@ -25,7 +25,7 @@ Repository = "https://github.com/openverse-orca/OrcaGym"
 "Bug Tracker" = "https://github.com/openverse-orca/OrcaGym/issues"
 
 [project.optional-dependencies]
-dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy",]
+dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy", "ruff",]
 rl = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard",]
 imitation = [ "h5py", "opencv-python", "tqdm",]
 devices = [ "pygame>=2.6.0",]
@@ -47,3 +47,15 @@ orca_gym = [ "*.proto", "py.typed", "**/*.json",]
 [tool.setuptools.packages.find]
 include = [ "orca_gym*",]
 exclude = [ "doc*", "3rd_party*", "tests*",]
+
+[tool.ruff.lint]
+select = ["SLF001"]
+# 第三方 fork 代码遵循上游风格，不强制 SLF001
+# OrcaGym 自身无 fork 目录，此处为空数组（统一模板）
+exclude = []
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许白盒访问（测试就是要测内部）
+"tests/**" = ["SLF001"]
+# __init__.py 允许 re-export
+"**/__init__.py" = ["SLF001", "F401"]
