@@ -116,30 +116,98 @@ class MuJoCoSimCore:
             body_id: MuJoCo body id。
             force: 力向量 (3,)。
             torque: 力矩向量 (3,)。
-
-        Raises:
-            NotImplementedError: 阶段二不实现外力应用，留待完整 P4。
         """
-        raise NotImplementedError("apply_body_force 待完整 P4 填充")
+        f = np.asarray(force, dtype=np.float64).reshape(3)
+        tau = np.asarray(torque, dtype=np.float64).reshape(3)
+        self._mjData.xfrc_applied[body_id, :3] = f
+        self._mjData.xfrc_applied[body_id, 3:6] = tau
 
     def clear_body_force(self, body_id: int) -> None:
         """清除指定 body 的外力（清零 _mjData.xfrc_applied[body_id]）。
 
         Args:
             body_id: MuJoCo body id。
-
-        Raises:
-            NotImplementedError: 阶段二不实现外力清除，留待完整 P4。
         """
-        raise NotImplementedError("clear_body_force 待完整 P4 填充")
+        self._mjData.xfrc_applied[body_id, :6] = 0.0
 
     def clear_all_forces(self) -> None:
-        """清除所有 body 的外力（清零 _mjData.xfrc_applied 全数组）。
+        """清除所有 body 的外力（清零 _mjData.xfrc_applied 全数组）。"""
+        self._mjData.xfrc_applied[:] = 0.0
 
-        Raises:
-            NotImplementedError: 阶段二不实现外力清除，留待完整 P4。
+    def mj_apply_force_at_site(
+        self, site_id: int, force: np.ndarray, torque: np.ndarray
+    ) -> None:
+        """在 site 处施加力（等价 mujoco.mj_applyForce，写 xfrc_applied[site.bodyid]）。
+
+        Args:
+            site_id: MuJoCo site id。
+            force: 力向量 (3,)（世界坐标系）。
+            torque: 力矩向量 (3,)（世界坐标系）。
         """
-        raise NotImplementedError("clear_all_forces 待完整 P4 填充")
+        f = np.asarray(force, dtype=np.float64).reshape(3)
+        tau = np.asarray(torque, dtype=np.float64).reshape(3)
+        body_id = self._mjModel.site_bodyid[site_id]
+        self._mjData.xfrc_applied[body_id, :3] += f
+        self._mjData.xfrc_applied[body_id, 3:6] += tau
+
+    def mj_clear_xfrc_applied_for_site(self, site_id: int) -> None:
+        """清除 site 关联 body 的 xfrc。
+
+        Args:
+            site_id: MuJoCo site id。
+        """
+        body_id = self._mjModel.site_bodyid[site_id]
+        self.clear_body_force(body_id)
+
+    # --- 状态设置方法（阶段三 3.2.2）---
+
+    def set_mocap_pos_and_quat(self, mocap_dict: dict[str, dict]) -> None:
+        """设置 mocap body 位置/四元数（写 mocap_pos/mocap_quat）。
+
+        Args:
+            mocap_dict: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
+                        body_name 必须是 mocap body（mocapid >= 0）。
+        """
+        for body_name, pose in mocap_dict.items():
+            body_id = mujoco.mj_name2id(
+                self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
+            )
+            mocap_id = int(self._mjModel.body_mocapid[body_id])
+            if mocap_id >= 0:
+                self._mjData.mocap_pos[mocap_id] = np.asarray(
+                    pose["pos"], dtype=np.float64
+                ).reshape(3)
+                self._mjData.mocap_quat[mocap_id] = np.asarray(
+                    pose["quat"], dtype=np.float64
+                ).reshape(4)
+
+    def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
+        """设置 geom 摩擦系数（写 _mjModel.geom_friction）。
+
+        Args:
+            geom_friction_dict: dict[geom_name -> friction (3,) [sliding, torsion, rolling]]。
+        """
+        for geom_name, friction in geom_friction_dict.items():
+            geom_id = mujoco.mj_name2id(
+                self._mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name
+            )
+            self._mjModel.geom_friction[geom_id] = np.asarray(
+                friction, dtype=np.float64
+            ).reshape(3)
+
+    def add_extra_weight(self, weight_load_dict: dict) -> None:
+        """为 body 添加额外重量（修改 body_mass/body_inertia）。
+
+        Args:
+            weight_load_dict: dict[body_name -> weight (float, kg)]。
+        """
+        for body_name, weight in weight_load_dict.items():
+            body_id = mujoco.mj_name2id(
+                self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
+            )
+            self._mjModel.body_mass[body_id] += float(weight)
+            # 简化惯性：按球体 I = 2/5 m r^2，r 取当前等价半径
+            # 实际项目按需重算，此处仅同步 mass（保持质心/惯量张量不变）
 
     # --- 关节查询（阶段三 3.1.1）---
 

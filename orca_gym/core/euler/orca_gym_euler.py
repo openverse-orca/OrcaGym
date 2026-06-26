@@ -400,6 +400,80 @@ class OrcaGymEuler:
         """查询 body 子树总质量（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").body_subtree_mass(body_name)
 
+    def geom_friction(self, geom_name: str) -> np.ndarray:
+        """查询 geom 摩擦系数 (3,)（委托 ModelRegistry，只读视图）。"""
+        return object.__getattribute__(self, "_registry").geom_friction(geom_name)
+
+    # --- 力应用方法（阶段三 3.2.1，委托 SimCore）---
+
+    def apply_body_force(
+        self, body_id: int, force: np.ndarray, torque: np.ndarray
+    ) -> None:
+        """对指定 body 施加外力/力矩（委托 SimCore）。
+
+        Args:
+            body_id: MuJoCo body id。
+            force: 力向量 (3,)。
+            torque: 力矩向量 (3,)。
+        """
+        object.__getattribute__(self, "_sim").apply_body_force(body_id, force, torque)
+
+    def clear_body_force(self, body_id: int) -> None:
+        """清除指定 body 的外力（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").clear_body_force(body_id)
+
+    def clear_all_forces(self) -> None:
+        """清除所有 body 的外力（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").clear_all_forces()
+
+    def mj_apply_force_at_site(
+        self, site_id: int, force: np.ndarray, torque: np.ndarray
+    ) -> None:
+        """在 site 处施加力（委托 SimCore）。
+
+        Args:
+            site_id: MuJoCo site id。
+            force: 力向量 (3,)（世界坐标系）。
+            torque: 力矩向量 (3,)（世界坐标系）。
+        """
+        object.__getattribute__(self, "_sim").mj_apply_force_at_site(site_id, force, torque)
+
+    def mj_clear_xfrc_applied_for_site(self, site_id: int) -> None:
+        """清除 site 关联 body 的 xfrc（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").mj_clear_xfrc_applied_for_site(site_id)
+
+    # --- 状态设置方法（阶段三 3.2.4，委托 SimCore/Bridge）---
+
+    def set_mocap_pos_and_quat(self, mocap_dict: dict[str, dict]) -> None:
+        """设置 mocap body 位置/四元数（本地写入，委托 SimCore）。
+
+        远端同步由 env.set_mocap_pos_and_quat 调用 set_mocap_pos_and_quat_remote 完成。
+
+        Args:
+            mocap_dict: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
+        """
+        object.__getattribute__(self, "_sim").set_mocap_pos_and_quat(mocap_dict)
+
+    async def set_mocap_pos_and_quat_remote(
+        self, mocap_data: dict, send_remote: bool = False
+    ) -> None:
+        """远端同步 mocap 位姿到 OrcaStudio（委托 Bridge）。
+
+        Args:
+            mocap_data: dict[body_name -> {"pos": (3,), "quat": (4,)}]。
+            send_remote: 是否真正发送到远端。
+        """
+        bridge = object.__getattribute__(self, "_studio")
+        await bridge.set_mocap_pos_and_quat(mocap_data, send_remote)
+
+    def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
+        """设置 geom 摩擦系数（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").set_geom_friction(geom_friction_dict)
+
+    def add_extra_weight(self, weight_load_dict: dict) -> None:
+        """为 body 添加额外重量（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").add_extra_weight(weight_load_dict)
+
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_data_width()

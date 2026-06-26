@@ -368,6 +368,22 @@ class ModelRegistry:
         mass = float(self._mj_model.body_subtreemass[body_id])
         return mass
 
+    def geom_friction(self, geom_name: str) -> np.ndarray:
+        """查询 geom 摩擦系数 (3,) [sliding, torsion, rolling]（只读视图）。
+
+        替代直接访问 _mjModel.geom_friction[id]。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            geom 摩擦系数数组，形状 (3,)。
+        """
+        geom_id = mujoco.mj_name2id(
+            self._mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name
+        )
+        return np.asarray(self._mj_model.geom_friction[geom_id]).copy()
+
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（eq_data 每行元素数）。
 

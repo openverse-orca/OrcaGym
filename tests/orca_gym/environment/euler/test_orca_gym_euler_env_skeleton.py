@@ -13,6 +13,7 @@ import re
 import unittest
 
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
@@ -698,6 +699,641 @@ class TestEnvK9ComplianceSourceAudit(unittest.TestCase):
                 pattern, source,
                 f"K9 违规: orca_gym_euler_env.py 包含穿墙访问 '{pattern}'",
             )
+
+
+# =============================================================================
+# 阶段三 3.1.7：OrcaGymEulerEnv 公共查询 API
+# =============================================================================
+
+
+def _make_g1_env() -> OrcaGymEulerEnv:
+    """构造加载 G1 XML 的离线 Env（用于 sensor/contact 等需要丰富场景的测试）。"""
+    _g1_xml = (
+        pathlib.Path(__file__).resolve().parents[4].parent
+        / "OrcaPlayground" / "envs" / "euler" / "robots" / "g1_29dof_camera.xml"
+    )
+    return OrcaGymEulerEnv(
+        frame_skip=4,
+        orcagym_addr="localhost:50051",
+        agent_names=["agent0"],
+        time_step=0.002,
+        model_xml_path=str(_g1_xml),
+        skip_grpc_load=True,
+    )
+
+
+class TestEnvQueryDelegationArchCompliance(unittest.TestCase):
+    """子步骤 3.1.7 架构遵从性测试（K1/K2/K4/K11/K12）。
+
+    对应文档 §5.8 架构遵从性测试表。
+    """
+
+    def test_env_query_no_gym_private_access(self):
+        """K4: grep 断言 3.1.7 查询区块不触 self._gym._sim/_studio/_registry/_mjData/_mjModel。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 公共查询 API（阶段三 3.1.7")
+        self.assertGreater(start, 0, "未找到 3.1.7 公共查询 API 区块")
+        block_source = source[start:]
+        # 找区块结束（下一个 --- 分隔符或 # --- Gymnasium）
+        end = block_source.find("# --- Gymnasium 接口")
+        if end > 0:
+            block_source = block_source[:end]
+        forbidden = [
+            "self._gym._sim", "self._gym._studio", "self._gym._registry",
+            "self._gym._opt", "self._gym._view", "self._gym._euler",
+            "self._gym._mjData", "self._gym._mjModel",
+        ]
+        for pattern in forbidden:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(
+                    pattern, block_source,
+                    f"K4 违规: 3.1.7 查询区块包含穿墙访问 '{pattern}'",
+                )
+
+    def test_env_query_uses_self_gym_only(self):
+        """K1/K4: grep 断言查询方法均用 self._gym.<公共方法> 委托，不 self._sim/self._studio。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 公共查询 API（阶段三 3.1.7")
+        block_source = source[start:]
+        end = block_source.find("# --- Gymnasium 接口")
+        if end > 0:
+            block_source = block_source[:end]
+        # 不应直接触 self._sim / self._studio（Env 不持有这些子组件）
+        self.assertNotIn("self._sim", block_source)
+        self.assertNotIn("self._studio", block_source)
+        self.assertNotIn("self._registry", block_source)
+        # 应包含 self._gym. 委托调用
+        self.assertIn("self._gym.query_", block_source)
+        self.assertIn("self._gym.body_subtree_mass", block_source)
+
+    def test_env_dir_includes_new_query_methods(self):
+        """K2: dir(env) 含 query_joint_qpos 等新方法。"""
+        env = _make_skeleton_env()
+        d = dir(env)
+        expected_methods = [
+            "query_joint_qpos", "query_joint_qvel", "query_joint_qacc",
+            "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
+            "jnt_qposadr", "jnt_dofadr",
+            "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
+            "query_site_pos_and_mat", "query_site_size",
+            "query_sensor_data", "query_actuator_torques",
+            "query_contact_simple", "query_contact_force",
+            "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
+        ]
+        for name in expected_methods:
+            with self.subTest(method=name):
+                self.assertIn(name, d, f"dir(env) 应包含新查询方法 '{name}'")
+
+    def test_env_dir_no_internal_leak(self):
+        """K2: dir(env) 不含 _sim/_studio/_registry/_mjData/_mjModel。"""
+        env = _make_skeleton_env()
+        d = dir(env)
+        for name in ["_sim", "_studio", "_registry", "_mjData", "_mjModel"]:
+            with self.subTest(attr=name):
+                self.assertNotIn(name, d)
+
+    def test_env_query_returns_typed(self):
+        """K11: 公共查询方法返回 ndarray/dict/tuple，非 MjData/MjModel。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        # query_joint_qpos 返回 dict[str, np.ndarray]
+        result = env.query_joint_qpos(["hinge"])
+        self.assertIsInstance(result, dict)
+        self.assertIsInstance(result["hinge"], np.ndarray)
+        # jnt_qposadr 返回 int
+        adr = env.jnt_qposadr("hinge")
+        self.assertIsInstance(adr, int)
+        # body_subtree_mass 返回 float
+        mass = env.body_subtree_mass("pendulum")
+        self.assertIsInstance(mass, float)
+
+    def test_env_query_docstrings_present(self):
+        """K12: 新增查询方法有 docstring（含用法与禁止说明）。"""
+        methods_to_check = [
+            "query_joint_qpos", "query_joint_qvel", "query_joint_qacc",
+            "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
+            "jnt_qposadr", "jnt_dofadr",
+            "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
+            "query_site_pos_and_mat", "query_site_size",
+            "query_sensor_data", "query_actuator_torques",
+            "query_contact_simple", "query_contact_force",
+            "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
+        ]
+        for name in methods_to_check:
+            with self.subTest(method=name):
+                method = getattr(OrcaGymEulerEnv, name)
+                doc = method.__doc__ or ""
+                self.assertTrue(
+                    doc.strip(),
+                    f"方法 {name} 缺少 docstring（K12）",
+                )
+                # docstring 应含「委托 self._gym」或「委托」说明
+                self.assertIn("委托", doc)
+
+
+class TestEnvQueryDelegationFunctional(unittest.TestCase):
+    """子步骤 3.1.7 功能单元测试。
+
+    对应文档 §5.8 功能单元测试表。验证 Env 委托链路结果与 Gym 底层一致。
+    pendulum 用于基础测试，G1 XML 用于 sensor/contact 测试。
+    """
+
+    def test_env_query_joint_qpos_returns_correct_slice(self):
+        """env.query_joint_qpos(["hinge"]) 返回正确切片（与 _gym.data.qpos 一致）。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        result = env.query_joint_qpos(["hinge"])
+        # pendulum nq=1，hinge 的 qpos 切片应等于 data.qpos[0]
+        expected = env.data.qpos[0]
+        np.testing.assert_array_equal(result["hinge"], np.array([expected]))
+
+    def test_env_get_body_xpos_xmat_xquat_returns_dict(self):
+        """get_body_xpos_xmat_xquat 返回 dict[body -> {xpos/xmat/xquat}]，形状正确。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        result = env.get_body_xpos_xmat_xquat(["pendulum"])
+        self.assertIsInstance(result, dict)
+        self.assertIn("pendulum", result)
+        # xpos 形状 (3,)，xmat 形状 (3,3) 或 (9,)，xquat 形状 (4,)
+        self.assertEqual(result["pendulum"]["xpos"].shape, (3,))
+        self.assertEqual(result["pendulum"]["xquat"].shape, (4,))
+
+    def test_env_query_sensor_data_matches_sensordata(self):
+        """env.query_sensor_data 与 _gym.data.sensordata 切片一致（G1 XML）。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        sensor_name = "left_hip_pitch_pos"
+        result = env.query_sensor_data([sensor_name])
+        self.assertIsInstance(result, dict)
+        self.assertIn(sensor_name, result)
+        self.assertIsInstance(result[sensor_name], np.ndarray)
+        # 与 Gym 直接调用结果一致
+        gym_result = env._gym.query_sensor_data([sensor_name])
+        np.testing.assert_array_equal(result[sensor_name], gym_result[sensor_name])
+
+    def test_env_query_contact_simple_returns_list(self):
+        """env.query_contact_simple 返回 list[dict]，结构正确。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        result = env.query_contact_simple()
+        self.assertIsInstance(result, list)
+        # 接触列表可能为空（G1 初始姿态无接触），但元素结构应正确
+        for contact in result:
+            self.assertIsInstance(contact, dict)
+
+    def test_env_body_subtree_mass_positive(self):
+        """env.body_subtree_mass 返回正标量（pendulum body 质量 > 0）。"""
+        env = _make_skeleton_env()
+        mass = env.body_subtree_mass("pendulum")
+        self.assertIsInstance(mass, float)
+        self.assertGreater(mass, 0.0)
+        # pendulum arm geom mass=1，子树质量应为 1.0
+        self.assertAlmostEqual(mass, 1.0, places=5)
+
+    def test_env_query_delegates_match_gym_direct(self):
+        """Env 委托结果与 env._gym 直接调用完全一致（pendulum 多方法）。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        # joint qpos
+        env_qpos = env.query_joint_qpos(["hinge"])
+        gym_qpos = env._gym.query_joint_qpos(["hinge"])
+        np.testing.assert_array_equal(env_qpos["hinge"], gym_qpos["hinge"])
+        # body xpos
+        env_body = env.get_body_xpos_xmat_xquat(["pendulum"])
+        gym_body = env._gym.query_body_xpos_xmat_xquat(["pendulum"])
+        np.testing.assert_array_equal(
+            env_body["pendulum"]["xpos"], gym_body["pendulum"]["xpos"]
+        )
+        # body subtree mass
+        env_mass = env.body_subtree_mass("pendulum")
+        gym_mass = env._gym.body_subtree_mass("pendulum")
+        self.assertAlmostEqual(env_mass, gym_mass)
+
+
+# =============================================================================
+# 阶段三 3.1.8：OrcaGymEulerEnv 基座坐标系变换方法
+# =============================================================================
+
+
+class TestEnvBaseTransformArchCompliance(unittest.TestCase):
+    """子步骤 3.1.8 架构遵从性测试（K4/K11/K12/P2）。
+
+    对应文档 §5.9 架构遵从性测试表。
+    """
+
+    def test_env_base_transform_no_gym_private(self):
+        """K4: grep 断言 *_B/*_odom 方法不触 self._gym._sim/_mjData/_mjModel，仅调公共方法。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 基座坐标系变换方法（阶段三 3.1.8")
+        self.assertGreater(start, 0, "未找到 3.1.8 基座变换区块")
+        block_source = source[start:]
+        end = block_source.find("# --- Gymnasium 接口")
+        if end > 0:
+            block_source = block_source[:end]
+        forbidden = [
+            "self._gym._sim", "self._gym._mjData", "self._gym._mjModel",
+            "self._gym._studio", "self._gym._registry",
+            "self._mjData", "self._mjModel",
+        ]
+        for pattern in forbidden:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(
+                    pattern, block_source,
+                    f"K4 违规: 3.1.8 基座变换区块包含穿墙访问 '{pattern}'",
+                )
+
+    def test_env_base_transform_no_simcore_dependency(self):
+        """K4/P2: grep 断言 Env 层变换方法不 import MuJoCoSimCore，不直接访问 _mjData。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        # 整个 Env 文件不应 import MuJoCoSimCore
+        self.assertNotIn("MuJoCoSimCore", source)
+        # 变换区块不应直接访问 _mjData/_mjModel（应通过 self.data/self.model）
+        start = source.find("# --- 基座坐标系变换方法（阶段三 3.1.8")
+        block_source = source[start:]
+        end = block_source.find("# --- Gymnasium 接口")
+        if end > 0:
+            block_source = block_source[:end]
+        self.assertNotIn("self._mjData", block_source)
+        self.assertNotIn("self._mjModel", block_source)
+
+    def test_env_base_transform_returns_typed(self):
+        """K11: 返回 ndarray/dict/tuple，非 MjData/MjModel。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        # query_site_pos_and_quat_B 返回 dict[str, dict]
+        result = env.query_site_pos_and_quat_B(["imu"], ["pelvis"])
+        self.assertIsInstance(result, dict)
+        self.assertIn("imu", result)
+        self.assertIsInstance(result["imu"]["xpos"], np.ndarray)
+        self.assertEqual(result["imu"]["xpos"].shape, (3,))
+        self.assertEqual(result["imu"]["xquat"].shape, (4,))
+        # query_position_body_B 返回 ndarray
+        pos = env.query_position_body_B("left_hip_pitch_link", "pelvis")
+        self.assertIsInstance(pos, np.ndarray)
+        self.assertEqual(pos.shape, (3,))
+        # query_robot_position_odom 返回 ndarray
+        base_pos = env.data.body_xpos("pelvis")
+        base_quat = env.data.body_xquat("pelvis")
+        odom_pos = env.query_robot_position_odom("pelvis", base_pos, base_quat)
+        self.assertIsInstance(odom_pos, np.ndarray)
+
+    def test_env_base_transform_docstrings_present(self):
+        """K12: 新增 *_B/*_odom 方法有 docstring。"""
+        methods_to_check = [
+            "query_site_pos_and_quat_B", "query_site_xvalp_xvalr",
+            "query_site_xvalp_xvalr_B", "query_velocity_body_B",
+            "query_position_body_B", "query_orientation_body_B",
+            "query_joint_axes_B", "query_robot_velocity_odom",
+            "query_robot_position_odom", "query_robot_orientation_odom",
+        ]
+        for name in methods_to_check:
+            with self.subTest(method=name):
+                method = getattr(OrcaGymEulerEnv, name)
+                doc = method.__doc__ or ""
+                self.assertTrue(doc.strip(), f"方法 {name} 缺少 docstring（K12）")
+
+    def test_env_base_transform_dir_includes_methods(self):
+        """K2: dir(env) 含 query_site_pos_and_quat_B 等新方法。"""
+        env = _make_skeleton_env()
+        d = dir(env)
+        expected = [
+            "query_site_pos_and_quat_B", "query_site_xvalp_xvalr",
+            "query_site_xvalp_xvalr_B", "query_velocity_body_B",
+            "query_position_body_B", "query_orientation_body_B",
+            "query_joint_axes_B", "query_robot_velocity_odom",
+            "query_robot_position_odom", "query_robot_orientation_odom",
+        ]
+        for name in expected:
+            with self.subTest(method=name):
+                self.assertIn(name, d)
+
+
+class TestEnvBaseTransformFunctional(unittest.TestCase):
+    """子步骤 3.1.8 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §5.9 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_query_site_pos_and_quat_B_relative(self):
+        """基座坐标系变换正确（与世界系差一个基座变换）。"""
+        result = self.env.query_site_pos_and_quat_B(["imu"], ["pelvis"])
+        # 世界系 site pos
+        site_world = self.env.data.site_xpos("imu")
+        # 世界系 base pos
+        base_world = self.env.data.body_xpos("pelvis")
+        base_quat = self.env.data.body_xquat("pelvis")  # [w,x,y,z]
+        # 手动计算相对位置
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        expected_pos = rot_base.inv().apply(site_world - base_world)
+        np.testing.assert_allclose(result["imu"]["xpos"], expected_pos, atol=1e-6)
+
+    def test_query_velocity_body_B_consistency(self):
+        """末端在基座系下速度 = 基座逆变换 ⊗ 世界系速度差。"""
+        vel_B = self.env.query_velocity_body_B("left_hip_pitch_link", "pelvis")
+        self.assertEqual(vel_B.shape, (6,))
+        # 手动计算：ee_cvel - base_cvel，然后 base_rot.T 变换
+        ee_cvel = self.env.data.body_cvel("left_hip_pitch_link")
+        base_cvel = self.env.data.body_cvel("pelvis")
+        base_mat = self.env.data.body_xmat("pelvis").reshape(3, 3)
+        expected_lin = base_mat.T @ (ee_cvel[3:] - base_cvel[3:])
+        expected_ang = base_mat.T @ (ee_cvel[:3] - base_cvel[:3])
+        np.testing.assert_allclose(vel_B[:3], expected_lin, atol=1e-6)
+        np.testing.assert_allclose(vel_B[3:], expected_ang, atol=1e-6)
+
+    def test_query_robot_position_odom_accumulates(self):
+        """里程计累积正确（初始时刻位置 = 0）。"""
+        base_pos = self.env.data.body_xpos("pelvis").copy()
+        base_quat = self.env.data.body_xquat("pelvis").copy()
+        # 初始时刻，里程计位置应为 0
+        odom_pos = self.env.query_robot_position_odom("pelvis", base_pos, base_quat)
+        np.testing.assert_allclose(odom_pos, np.zeros(3), atol=1e-6)
+        # 步进后里程计位置 = 初始逆变换 ⊗ (新位置 - 初始位置)
+        self.env.do_simulation(np.zeros(self.env.model.nu), 1)
+        new_pos = self.env.data.body_xpos("pelvis")
+        rot_init = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        expected = rot_init.inv().apply(new_pos - base_pos)
+        odom_pos2 = self.env.query_robot_position_odom("pelvis", base_pos, base_quat)
+        np.testing.assert_allclose(odom_pos2, expected, atol=1e-5)
+
+    def test_query_joint_axes_B_transformed(self):
+        """关节轴在基座系下正确变换。"""
+        result = self.env.query_joint_axes_B(["left_hip_pitch_joint"], "pelvis")
+        self.assertIn("left_hip_pitch_joint", result)
+        axis_B = result["left_hip_pitch_joint"]
+        self.assertEqual(axis_B.shape, (3,))
+        # 手动计算
+        joint_info = self.env.model.get_joint_byname("left_hip_pitch_joint")
+        jnt_axis = joint_info["Axis"]
+        body_id = joint_info["BodyID"]
+        body_name = self.env.model.body_id2name(body_id)
+        body_quat = self.env.data.body_xquat(body_name)
+        base_quat = self.env.data.body_xquat("pelvis")
+        body_rot = R.from_quat([body_quat[1], body_quat[2], body_quat[3], body_quat[0]])
+        base_rot = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        expected = base_rot.inv().apply(body_rot.apply(jnt_axis))
+        np.testing.assert_allclose(axis_B, expected, atol=1e-6)
+
+    def test_query_orientation_body_B_returns_quat(self):
+        """query_orientation_body_B 返回 [x,y,z,w] 四元数。"""
+        quat_B = self.env.query_orientation_body_B("left_hip_pitch_link", "pelvis")
+        self.assertEqual(quat_B.shape, (4,))
+        # 手动计算
+        base_quat = self.env.data.body_xquat("pelvis")
+        ee_quat = self.env.data.body_xquat("left_hip_pitch_link")
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot_ee = R.from_quat([ee_quat[1], ee_quat[2], ee_quat[3], ee_quat[0]])
+        expected = (rot_base.inv() * rot_ee).as_quat()
+        np.testing.assert_allclose(quat_B, expected, atol=1e-6)
+
+
+# =============================================================================
+# 阶段三 3.2.4：OrcaGymEulerEnv 力应用与设置委托
+# =============================================================================
+
+
+class TestEnvForceArchCompliance(unittest.TestCase):
+    """子步骤 3.2.4 架构遵从性测试（K1/K2/K4/K9/K12）。
+
+    对应文档 §6.5 架构遵从性测试表。
+    """
+
+    def test_env_force_no_gym_private_access(self):
+        """K4: grep 断言力应用/设置方法不触 self._gym._sim/_mjData/_mjModel。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 力应用与状态设置委托（阶段三 3.2.4）")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        end = block.find("# --- Gymnasium 接口")
+        if end > 0:
+            block = block[:end]
+        forbidden = [
+            "self._gym._sim", "self._gym._mjData", "self._gym._mjModel",
+            "self._gym._studio", "self._gym._registry",
+            "self._mjData", "self._mjModel",
+        ]
+        for pattern in forbidden:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(
+                    pattern, block,
+                    f"K4 违规: 3.2.4 力应用区块包含穿墙访问 '{pattern}'",
+                )
+
+    def test_env_force_uses_self_gym_and_model(self):
+        """K1/K4: grep 断言走 self._gym.<方法> + self.model.body_name2id。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 力应用与状态设置委托（阶段三 3.2.4）")
+        block = source[start:]
+        end = block.find("# --- Gymnasium 接口")
+        if end > 0:
+            block = block[:end]
+        self.assertIn("self._gym.apply_body_force", block)
+        self.assertIn("self.model.body_name2id", block)
+        self.assertIn("self.model.site_name2id", block)
+        # 不应直接访问 self._sim
+        self.assertNotIn("self._sim", block)
+
+    def test_env_mocap_uses_studio_bridge(self):
+        """K9: grep 断言 set_mocap_pos_and_quat 远端同步走 self._gym.set_mocap_pos_and_quat_remote。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("def set_mocap_pos_and_quat")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        end = block.find("def set_geom_friction")
+        if end > 0:
+            block = block[:end]
+        self.assertIn("self._gym.set_mocap_pos_and_quat_remote", block)
+        # 不应直接访问 gym.studio（老体系穿墙）
+        self.assertNotIn("gym.studio", block)
+
+    def test_env_force_dir_includes_new_methods(self):
+        """K2: dir(env) 含 apply_body_force/clear_all_forces 等。"""
+        env = _make_skeleton_env()
+        d = dir(env)
+        expected = [
+            "apply_body_force", "clear_body_force", "clear_all_forces",
+            "mj_apply_force_at_site", "mj_clear_xfrc_applied_for_site",
+            "set_mocap_pos_and_quat", "set_geom_friction", "add_extra_weight",
+        ]
+        for name in expected:
+            with self.subTest(method=name):
+                self.assertIn(name, d)
+
+    def test_env_force_docstrings_present(self):
+        """K12: 新增力应用/设置方法有 docstring。"""
+        methods_to_check = [
+            "apply_body_force", "clear_body_force", "clear_all_forces",
+            "mj_apply_force_at_site", "mj_clear_xfrc_applied_for_site",
+            "set_mocap_pos_and_quat", "set_geom_friction", "add_extra_weight",
+        ]
+        for name in methods_to_check:
+            with self.subTest(method=name):
+                method = getattr(OrcaGymEulerEnv, name)
+                doc = method.__doc__ or ""
+                self.assertTrue(doc.strip(), f"方法 {name} 缺少 docstring（K12）")
+
+
+class TestEnvForceFunctional(unittest.TestCase):
+    """子步骤 3.2.4 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §6.5 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+        self.pelvis_id = self.env.model.body_name2id("pelvis")
+
+    def test_env_apply_body_force_writes_xfrc(self):
+        """施力后 env.data.xfrc_applied[body_id, :3] 等于 force。"""
+        self.env.clear_all_forces()
+        force = np.array([1.0, 2.0, 3.0])
+        torque = np.array([0.1, 0.2, 0.3])
+        self.env.apply_body_force("pelvis", force, torque)
+        # 需 forward 让 sync_to_view 生效（env.data 是 view）
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, :3], force, atol=1e-6
+        )
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, 3:6], torque, atol=1e-6
+        )
+
+    def test_env_clear_body_force_zeroes_xfrc(self):
+        """清力后 env.data.xfrc_applied[body_id, :6] 为 0。"""
+        self.env.apply_body_force("pelvis", np.ones(3), np.ones(3))
+        self.env.clear_body_force("pelvis")
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, :6], 0.0, atol=1e-6
+        )
+
+    def test_env_set_mocap_pos_and_quat_writes_mocap(self):
+        """mocap_pos/quat 正确写入（通过 DataView 只读查询验证）。"""
+        pos = np.array([0.5, 0.3, 0.8])
+        quat = np.array([1.0, 0.0, 0.0, 0.0])
+        self.env.set_mocap_pos_and_quat(
+            {"ActorManipulator_Anchor": {"pos": pos, "quat": quat}}
+        )
+        # 通过 DataView 只读查询验证（K6：不触 _mjData）
+        np.testing.assert_allclose(
+            self.env.data.mocap_pos("ActorManipulator_Anchor"), pos, atol=1e-6
+        )
+        np.testing.assert_allclose(
+            self.env.data.mocap_quat("ActorManipulator_Anchor"), quat, atol=1e-6
+        )
+
+    def test_env_set_geom_friction_persists(self):
+        """geom_friction 修改持久化（通过 Env 只读查询验证，K4 不穿墙）。"""
+        new_friction = np.array([2.5, 0.01, 0.002])
+        self.env.set_geom_friction({"manipulation_box_geom": new_friction})
+        # 通过 env.geom_friction 公共方法验证（K4：不触 _gym/_mjModel）
+        np.testing.assert_allclose(
+            self.env.geom_friction("manipulation_box_geom"),
+            new_friction,
+            atol=1e-6,
+        )
+
+    def test_env_apply_force_pelvis_z_changes(self):
+        """施力后 pelvis z 位置变化（步进验证）。"""
+        self.env.clear_all_forces()
+        self.env.mj_forward()
+        z_before = float(self.env.data.body_xpos("pelvis")[2])
+        # 施加向上的力（大于重力，使 pelvis 上升）
+        self.env.apply_body_force("pelvis", np.array([0.0, 0.0, 500.0]), np.zeros(3))
+        self.env.do_simulation(np.zeros(self.env.model.nu), 10)
+        z_after = float(self.env.data.body_xpos("pelvis")[2])
+        self.assertNotEqual(z_before, z_after)
+
+
+# =============================================================================
+# 阶段三 3.2.5：OrcaGymDataView xfrc_applied 只读保护验证
+# =============================================================================
+
+
+class TestDataViewXfrcReadOnlyArchCompliance(unittest.TestCase):
+    """子步骤 3.2.5 架构遵从性测试（K6/P4）。
+
+    对应文档 §6.6 架构遵从性测试表。
+    """
+
+    def test_dataview_xfrc_is_view_not_copy(self):
+        """K6: env.data.xfrc_applied.base 非 None（零拷贝视图）。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        # 零拷贝视图：base 非 None（共享 _mjData.xfrc_applied 数据）
+        self.assertIsNotNone(env.data.xfrc_applied.base)
+
+    def test_dataview_xfrc_direct_write_blocked(self):
+        """P4/K6: 直接写 env.data.xfrc_applied[...] 抛 ValueError（只读）。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        with self.assertRaises(ValueError):
+            env.data.xfrc_applied[0, :3] = np.array([1.0, 2.0, 3.0])
+
+    def test_env_data_is_dataview_after_force(self):
+        """K6: 施力后 isinstance(env.data, OrcaGymDataView) 仍为 True。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        env.apply_body_force("pelvis", np.array([1.0, 0.0, 0.0]), np.zeros(3))
+        env.mj_forward()
+        self.assertIsInstance(env.data, OrcaGymDataView)
+
+
+class TestDataViewXfrcReadOnlyFunctional(unittest.TestCase):
+    """子步骤 3.2.5 功能单元测试。
+
+    对应文档 §6.6 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+        self.pelvis_id = self.env.model.body_name2id("pelvis")
+
+    def test_apply_force_blocked_via_data_view(self):
+        """env.data.xfrc_applied 只读，直接写应引导报错。"""
+        # 只读视图，直接写抛 ValueError
+        with self.assertRaises(ValueError):
+            self.env.data.xfrc_applied[self.pelvis_id, :3] = [1.0, 2.0, 3.0]
+        # 引导用户走 apply_body_force
+        self.env.apply_body_force("pelvis", np.array([1.0, 2.0, 3.0]), np.zeros(3))
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, :3],
+            [1.0, 2.0, 3.0],
+            atol=1e-6,
+        )
+
+    def test_xfrc_readable_after_apply_force(self):
+        """env.apply_body_force() 后 env.data.xfrc_applied 可读到正确的力。"""
+        self.env.clear_all_forces()
+        force = np.array([5.0, 0.0, -2.0])
+        torque = np.array([0.1, 0.2, 0.3])
+        self.env.apply_body_force("pelvis", force, torque)
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, :3], force, atol=1e-6
+        )
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, 3:6], torque, atol=1e-6
+        )
+
+    def test_clear_all_forces_works_through_simcore(self):
+        """SimCore 通过 _mjData 写入不受 DataView 只读视图影响。"""
+        self.env.apply_body_force("pelvis", np.ones(3), np.ones(3))
+        self.env.mj_forward()
+        # 确认有力
+        self.assertGreater(np.abs(self.env.data.xfrc_applied[self.pelvis_id, :3]).sum(), 0)
+        # 清除（SimCore 写 _mjData，DataView 视图同步）
+        self.env.clear_all_forces()
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.xfrc_applied[self.pelvis_id, :6], 0.0, atol=1e-6
+        )
 
 
 if __name__ == "__main__":

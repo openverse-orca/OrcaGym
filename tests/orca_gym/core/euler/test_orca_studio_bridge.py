@@ -161,5 +161,133 @@ class TestOrcaStudioBridgeOfflineNoOp(unittest.TestCase):
         self.assertEqual(ctrls, {0: 0.5, 1: -0.3})
 
 
+# =============================================================================
+# 阶段三 3.2.3：OrcaStudioBridge mocap 远端同步
+# =============================================================================
+
+
+class TestBridgeMocapArchCompliance(unittest.TestCase):
+    """子步骤 3.2.3 架构遵从性测试（K9/P2）。
+
+    对应文档 §6.4 架构遵从性测试表。
+    """
+
+    def test_bridge_mocap_offline_noop(self):
+        """K9: 离线模式（_stub is None）不抛错，直接 return。"""
+        import asyncio
+        bridge = OrcaStudioBridge()  # stub=None
+        # send_remote=True 但 stub=None，应 no-op 不抛错
+        asyncio.run(
+            bridge.set_mocap_pos_and_quat(
+                {"anchor": {"pos": np.zeros(3), "quat": np.array([1, 0, 0, 0])}},
+                send_remote=True,
+            )
+        )
+
+    def test_bridge_mocap_no_mjdata_dependency(self):
+        """K9/P2: grep 断言 Bridge 不 import MjData/MjModel，仅操作 gRPC stub。"""
+        import inspect
+        import re as _re
+        source = inspect.getsource(OrcaStudioBridge)
+        # set_mocap_pos_and_quat 区块
+        start = source.find("async def set_mocap_pos_and_quat")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        # 去除 docstring（其中可能引用 _mjData 作为禁止说明）
+        block = _re.sub(r'"""[\s\S]*?"""', '', block, count=1)
+        # 不应访问 _mjData/_mjModel（代码体）
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+        # 应通过 self._stub.SetMocapPosAndQuat 走 gRPC
+        self.assertIn("self._stub.SetMocapPosAndQuat", block)
+
+    def test_bridge_mocap_async_signature(self):
+        """K9: 方法为 async def，返回 None。"""
+        import asyncio
+        import inspect
+        # async def
+        self.assertTrue(inspect.iscoroutinefunction(OrcaStudioBridge.set_mocap_pos_and_quat))
+        # 返回 None
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(
+            bridge.set_mocap_pos_and_quat({}, send_remote=True)
+        )
+        self.assertIsNone(ret)
+
+
+class TestBridgeMocapFunctional(unittest.TestCase):
+    """子步骤 3.2.3 功能单元测试。
+
+    对应文档 §6.4 功能单元测试表。
+    """
+
+    def test_set_mocap_remote_offline_returns_none(self):
+        """离线模式返回 None 不抛错。"""
+        import asyncio
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(
+            bridge.set_mocap_pos_and_quat(
+                {"anchor": {"pos": np.array([1, 2, 3]), "quat": np.array([1, 0, 0, 0])}},
+                send_remote=True,
+            )
+        )
+        self.assertIsNone(ret)
+
+    def test_set_mocap_remote_online_calls_stub(self):
+        """在线模式（mock stub）调用 SetMocapPosAndQuat。"""
+        import asyncio
+
+        captured = {}
+
+        class MockStub:
+            async def SetMocapPosAndQuat(self, request):
+                captured["request"] = request
+                # 返回一个简单 response（success 字段）
+                from orca_gym.protos import mjc_message_pb2
+                return mjc_message_pb2.SetMocapPosAndQuatResponse(success=[True])
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        asyncio.run(
+            bridge.set_mocap_pos_and_quat(
+                {
+                    "anchor1": {
+                        "pos": np.array([0.5, 0.3, 0.8]),
+                        "quat": np.array([0.7071, 0.0, 0.7071, 0.0]),
+                    }
+                },
+                send_remote=True,
+            )
+        )
+        # 断言 stub 被调用
+        self.assertIn("request", captured)
+        req = captured["request"]
+        self.assertEqual(len(req.mocap_body_info), 1)
+        info = req.mocap_body_info[0]
+        self.assertEqual(info.mocap_body_name, "anchor1")
+        self.assertEqual(list(info.pos), [0.5, 0.3, 0.8])
+        self.assertEqual(list(info.quat), [0.7071, 0.0, 0.7071, 0.0])
+
+    def test_set_mocap_send_remote_false_noop(self):
+        """send_remote=False 时即使有 stub 也不调用。"""
+        import asyncio
+
+        called = {"count": 0}
+
+        class MockStub:
+            async def SetMocapPosAndQuat(self, request):
+                called["count"] += 1
+                from orca_gym.protos import mjc_message_pb2
+                return mjc_message_pb2.SetMocapPosAndQuatResponse(success=[True])
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        asyncio.run(
+            bridge.set_mocap_pos_and_quat(
+                {"anchor": {"pos": np.zeros(3), "quat": np.array([1, 0, 0, 0])}},
+                send_remote=False,
+            )
+        )
+        self.assertEqual(called["count"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

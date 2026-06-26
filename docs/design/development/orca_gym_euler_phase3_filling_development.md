@@ -637,10 +637,10 @@ class OrcaGymEulerEnv:
 | `test_env_body_subtree_mass_positive` | 返回正标量 |
 
 **子步骤验收**：
-- [ ] 全部公共查询 API 实现完成（委托 `self._gym`）
-- [ ] 架构遵从性测试通过（K1/K2/K4/K11/K12）
-- [ ] 功能单元测试通过（加载 G1 XML 验证查询数值正确）
-- [ ] grep 断言：`orca_gym_euler_env.py` 无 `self._gym._xxx` 穿墙访问
+- [x] 全部公共查询 API 实现完成（委托 `self._gym`）
+- [x] 架构遵从性测试通过（K1/K2/K4/K11/K12）
+- [x] 功能单元测试通过（加载 G1 XML 验证查询数值正确）
+- [x] grep 断言：`orca_gym_euler_env.py` 无 `self._gym._xxx` 穿墙访问
 
 ---
 
@@ -688,10 +688,10 @@ class OrcaGymEulerEnv:
 | `test_query_joint_axes_B_transformed` | 关节轴在基座系下正确变换 |
 
 **子步骤验收**：
-- [ ] 全部基座坐标系变换方法实现完成（纯 NumPy，Env 层）
-- [ ] 架构遵从性测试通过（K4 不触私有 + K11 typed 返回 + K12 docstring）
-- [ ] 功能单元测试通过（基座变换数值正确）
-- [ ] grep 断言：变换方法不 import `MuJoCoSimCore`，不直接访问 `_mjData`
+- [x] 全部基座坐标系变换方法实现完成（纯 NumPy，Env 层）
+- [x] 架构遵从性测试通过（K4 不触私有 + K11 typed 返回 + K12 docstring）
+- [x] 功能单元测试通过（基座变换数值正确）
+- [x] grep 断言：变换方法不 import `MuJoCoSimCore`，不直接访问 `_mjData`
 
 ---
 
@@ -756,10 +756,10 @@ class MuJoCoSimCore:
 | `test_mj_clear_xfrc_for_site_clears_body` | 清 site xfrc 后关联 body 的 xfrc 清零 |
 
 **子步骤验收**：
-- [ ] 5 个力应用方法实现完成
-- [ ] 架构遵从性测试通过（P2 只写 xfrc + K11 返回 None）
-- [ ] 功能单元测试通过（xfrc 写入/清零数值正确）
-- [ ] grep 断言：力应用方法不 `return self._mjData`
+- [x] 5 个力应用方法实现完成
+- [x] 架构遵从性测试通过（P2 只写 xfrc + K11 返回 None）
+- [x] 功能单元测试通过（xfrc 写入/清零数值正确）
+- [x] grep 断言：力应用方法不 `return self._mjData`
 
 ---
 
@@ -810,10 +810,10 @@ class MuJoCoSimCore:
 | `test_add_extra_weight_increases_mass` | 添加重量后 body_mass 增加 |
 
 **子步骤验收**：
-- [ ] 3 个状态设置方法实现完成
-- [ ] 架构遵从性测试通过（K11 返回 None + P2 不泄漏）
-- [ ] 功能单元测试通过（写入数值正确）
-- [ ] `set_geom_friction`/`add_extra_weight` 写 `_mjModel`（非 `_mjData`）
+- [x] 3 个状态设置方法实现完成
+- [x] 架构遵从性测试通过（K11 返回 None + P2 不泄漏）
+- [x] 功能单元测试通过（写入数值正确）
+- [x] `set_geom_friction`/`add_extra_weight` 写 `_mjModel`（非 `_mjData`）
 
 ---
 
@@ -850,10 +850,10 @@ class OrcaStudioBridge:
 | `test_set_mocap_remote_online_calls_stub` | 在线模式（mock stub）调用 `SetMocapPosAndQuat` |
 
 **子步骤验收**：
-- [ ] `set_mocap_pos_and_quat` async 方法实现完成
-- [ ] 架构遵从性测试通过（K9 走 bridge + 离线 no-op）
-- [ ] 功能单元测试通过（离线 no-op + 在线委托 stub）
-- [ ] grep 断言：Bridge 不 import `MjData`/`MjModel`
+- [x] `set_mocap_pos_and_quat` async 方法实现完成
+- [x] 架构遵从性测试通过（K9 走 bridge + 离线 no-op）
+- [x] 功能单元测试通过（离线 no-op + 在线委托 stub）
+- [x] grep 断言：Bridge 不 import `MjData`/`MjModel`
 
 ---
 
@@ -914,10 +914,10 @@ class OrcaGymEulerEnv:
 | `test_env_apply_force_pelvis_z_changes` | 施力后 pelvis z 位置变化（步进验证） |
 
 **子步骤验收**：
-- [ ] Gym + Env 力应用与设置委托方法实现完成
-- [ ] 架构遵从性测试通过（K1/K2/K4/K9/K12）
-- [ ] 功能单元测试通过（施力后 xfrc/pelvis z 变化验证）
-- [ ] grep 断言：`orca_gym_euler_env.py` 力应用方法无 `self._gym._xxx`
+- [x] Gym + Env 力应用与设置委托方法实现完成
+- [x] 架构遵从性测试通过（K1/K2/K4/K9/K12）
+- [x] 功能单元测试通过（施力后 xfrc/pelvis z 变化验证）
+- [x] grep 断言：`orca_gym_euler_env.py` 力应用方法无 `self._gym._xxx`
 
 ---
 
@@ -943,10 +943,10 @@ class OrcaGymEulerEnv:
 | `test_xfrc_readable_after_apply_force` | `env.apply_body_force()` 后 `env.data.xfrc_applied` 可读到正确的力 |
 
 **子步骤验收**：
-- [ ] DataView `xfrc_applied` 只读保护验证完成（直接写被阻断或 warning）
-- [ ] 架构遵从性测试通过（K6 DataView + P4 力应用可追踪）
-- [ ] 功能单元测试通过（只读保护 + 施力后可读）
-- [ ] 用户无法绕过 `apply_body_force()` 直接写 `xfrc_applied`
+- [x] DataView `xfrc_applied` 只读保护验证完成（直接写被阻断或 warning）
+- [x] 架构遵从性测试通过（K6 DataView + P4 力应用可追踪）
+- [x] 功能单元测试通过（只读保护 + 施力后可读）
+- [x] 用户无法绕过 `apply_body_force()` 直接写 `xfrc_applied`
 
 ---
 

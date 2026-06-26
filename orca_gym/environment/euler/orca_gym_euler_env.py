@@ -30,11 +30,13 @@ from typing import Any, Dict, Tuple, Union
 import grpc
 import numpy as np
 from numpy.typing import NDArray
+from scipy.spatial.transform import Rotation as R
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 from orca_gym.core.euler.sim_config import SimConfig
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
+from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env import OrcaGymBaseEnv
 
 
@@ -460,6 +462,554 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         替代 gym.studio property 式穿墙。
         """
         return self._studio_bridge
+
+    # --- 公共查询 API（阶段三 3.1.7，全部委托 self._gym 公共方法，K4）---
+    # 架构 K4：Env 层查询方法只触 self._gym.<公共方法>，不触 _gym._sim/_registry 等私有。
+
+    def query_joint_qpos(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qpos（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qpos 切片 np.ndarray]。
+        """
+        return self._gym.query_joint_qpos(joint_names)
+
+    def query_joint_qvel(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qvel（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qvel 切片 np.ndarray]。
+        """
+        return self._gym.query_joint_qvel(joint_names)
+
+    def query_joint_qacc(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节 qacc（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> qacc 切片 np.ndarray]。
+        """
+        return self._gym.query_joint_qacc(joint_names)
+
+    def query_joint_offsets(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节偏移（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> offset np.ndarray]。
+        """
+        return self._gym.query_joint_offsets(joint_names)
+
+    def query_joint_lengths(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        """查询关节长度（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> length np.ndarray]。
+        """
+        return self._gym.query_joint_lengths(joint_names)
+
+    def query_joint_dofadrs(self, joint_names: list[str]) -> dict[str, int]:
+        """查询关节 dof 起始地址（委托 self._gym）。
+
+        Args:
+            joint_names: 关节名称列表。
+
+        Returns:
+            dict[joint_name -> dofadr int]。
+        """
+        return self._gym.query_joint_dofadrs(joint_names)
+
+    def jnt_qposadr(self, joint_name: str) -> int:
+        """查询单关节 qpos 起始地址（委托 self._gym）。
+
+        Args:
+            joint_name: 关节名称。
+
+        Returns:
+            qpos 起始地址（int）。
+        """
+        return self._gym.jnt_qposadr(joint_name)
+
+    def jnt_dofadr(self, joint_name: str) -> int:
+        """查询单关节 dof 起始地址（委托 self._gym）。
+
+        Args:
+            joint_name: 关节名称。
+
+        Returns:
+            dof 起始地址（int）。
+        """
+        return self._gym.jnt_dofadr(joint_name)
+
+    def get_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 body 的 xpos/xmat/xquat（委托 self._gym）。
+
+        Args:
+            body_name_list: body 名称列表。
+
+        Returns:
+            dict[body_name -> {"xpos": ..., "xmat": ..., "xquat": ...}]。
+        """
+        return self._gym.query_body_xpos_xmat_xquat(body_name_list)
+
+    def get_body_xpos_xmat_xquat_xvel(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 body 的 xpos/xmat/xquat/xvel（委托 self._gym）。
+
+        Args:
+            body_name_list: body 名称列表。
+
+        Returns:
+            dict[body_name -> {"xpos": ..., "xmat": ..., "xquat": ..., "xvel": ...}]。
+        """
+        return self._gym.query_body_xpos_xmat_xquat_xvel(body_name_list)
+
+    def query_site_pos_and_mat(self, site_names: list[str]) -> dict[str, dict]:
+        """查询 site 的 pos 和 mat（委托 self._gym）。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> {"pos": ..., "mat": ...}]。
+        """
+        return self._gym.query_site_pos_and_mat(site_names)
+
+    def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
+        """查询 site 尺寸（委托 self._gym）。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> size np.ndarray]。
+        """
+        return self._gym.query_site_size(site_names)
+
+    def query_sensor_data(self, sensor_names: list[str]) -> dict[str, np.ndarray]:
+        """查询传感器数据（委托 self._gym）。
+
+        Args:
+            sensor_names: 传感器名称列表。
+
+        Returns:
+            dict[sensor_name -> sensordata 切片 np.ndarray]。
+        """
+        return self._gym.query_sensor_data(sensor_names)
+
+    def query_actuator_torques(self, actuator_names: list[str]) -> dict[str, np.ndarray]:
+        """查询执行器力矩（委托 self._gym）。
+
+        Args:
+            actuator_names: 执行器名称列表。
+
+        Returns:
+            dict[actuator_name -> actuator_force 切片 np.ndarray]。
+        """
+        return self._gym.query_actuator_torques(actuator_names)
+
+    def query_contact_simple(self) -> list[dict]:
+        """查询简单接触信息（委托 self._gym）。
+
+        Returns:
+            list[dict]，每个 dict 含 geom1/geom2/dist/pos/frame 键。
+        """
+        return self._gym.query_contact_simple()
+
+    def query_contact_force(self, contact_ids: list[int]) -> dict[int, np.ndarray]:
+        """查询接触力（委托 self._gym）。
+
+        Args:
+            contact_ids: 接触索引列表。
+
+        Returns:
+            dict[contact_id -> force np.ndarray(6,)]。
+        """
+        return self._gym.query_contact_force(contact_ids)
+
+    def get_cfrc_ext(self) -> np.ndarray:
+        """查询外部约束力 cfrc_ext（委托 self._gym）。
+
+        Returns:
+            np.ndarray，形状 (nbody, 6)。
+        """
+        return self._gym.get_cfrc_ext()
+
+    def get_goal_bounding_box(self, geom_name: str) -> np.ndarray:
+        """查询 geom 尺寸（bounding box，委托 self._gym）。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            np.ndarray(3,)，geom 半尺寸 (hx, hy, hz)。
+        """
+        return self._gym.get_goal_bounding_box(geom_name)
+
+    def body_subtree_mass(self, body_name: str) -> float:
+        """查询 body 子树总质量（委托 self._gym）。
+
+        Args:
+            body_name: body 名称。
+
+        Returns:
+            body 子树总质量（float 标量）。
+        """
+        return self._gym.body_subtree_mass(body_name)
+
+    # --- 基座坐标系变换方法（阶段三 3.1.8，纯 NumPy，Env 层实现）---
+    # 架构 P2/K4：变换方法依赖 scipy.Rotation + DataView/Model/_gym 公共查询，
+    # 不下沉到 SimCore（保持 SimCore 只做 MuJoCo 原生操作），不触 _mjData/_mjModel。
+    # 签名与 OrcaGymLocalEnv 完全一致（老代码零改动迁移：gym. -> env.）。
+
+    def query_site_pos_and_quat_B(
+        self, site_names: list[str], base_body_list: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 site 相对于基座 body 的位置和四元数（基座坐标系）。
+
+        纯 NumPy 变换：基于 self._gym.query_site_pos_and_mat +
+        query_body_xpos_xmat_xquat 公共查询，不触 _mjData/_mjModel（K4/P2）。
+
+        Args:
+            site_names: site 名称列表。
+            base_body_list: 基座 body 名称列表（取第一个为基座）。
+
+        Returns:
+            dict[site_name -> {"xpos": (3,), "xquat": (4,) [w,x,y,z]}]（基座坐标系）。
+        """
+        site_dict = self._gym.query_site_pos_and_mat(site_names)
+        base_result = self._gym.query_body_xpos_xmat_xquat(base_body_list)
+        base_name = base_body_list[0]
+        base_pos = np.asarray(base_result[base_name]["xpos"], dtype=np.float64)
+        base_quat = np.asarray(base_result[base_name]["xquat"], dtype=np.float64)  # [w,x,y,z]
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot_base_inv = rot_base.inv()
+
+        result: dict[str, dict[str, np.ndarray]] = {}
+        for site_name, site_value in site_dict.items():
+            ee_pos = np.asarray(site_value["xpos"], dtype=np.float64)
+            ee_quat = mat2quat(np.asarray(site_value["xmat"], dtype=np.float64).reshape(3, 3))  # [w,x,y,z]
+            rot_ee = R.from_quat([ee_quat[1], ee_quat[2], ee_quat[3], ee_quat[0]])
+            relative_rot = rot_base_inv * rot_ee
+            relative_pos = rot_base_inv.apply(ee_pos - base_pos)
+            result[site_name] = {
+                "xpos": relative_pos,
+                "xquat": relative_rot.as_quat()[[3, 0, 1, 2]].astype(np.float32),  # [w,x,y,z]
+            }
+        return result
+
+    def query_site_xvalp_xvalr(
+        self, site_names: list[str]
+    ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+        """查询 site 的线速度和角速度（世界坐标系）。
+
+        依赖 self._gym.mj_jac_site（阶段三 3.3.2 实现）+ self.data.qvel。
+        纯 NumPy：jacp @ qvel / jacr @ qvel。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            (xvalp_dict, xvalr_dict)：dict[site_name -> 速度 (3,)]。
+        """
+        query_dict = self._gym.mj_jac_site(site_names)
+        xvalp_dict: dict[str, np.ndarray] = {}
+        xvalr_dict: dict[str, np.ndarray] = {}
+        qvel = self.data.qvel
+        for site in query_dict:
+            xvalp_dict[site] = np.asarray(query_dict[site]["jacp"]).reshape(3, -1) @ qvel
+            xvalr_dict[site] = np.asarray(query_dict[site]["jacr"]).reshape(3, -1) @ qvel
+        return xvalp_dict, xvalr_dict
+
+    def query_site_xvalp_xvalr_B(
+        self, site_names: list[str], base_body_list: list[str]
+    ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+        """查询 site 相对于基座 body 的线速度和角速度（基座坐标系）。
+
+        依赖 self._gym.mj_jac_site（阶段三 3.3.2 实现）+ query_body_xpos_xmat_xquat。
+        纯 NumPy：基座逆变换 ⊗ 世界系速度差。
+
+        Args:
+            site_names: site 名称列表。
+            base_body_list: 基座 body 名称列表（取第一个为基座）。
+
+        Returns:
+            (xvalp_dict_B, xvalr_dict_B)：dict[site_name -> 速度 (3,) float32]。
+        """
+        query_dict = self._gym.mj_jac_site(site_names)
+        base_result = self._gym.query_body_xpos_xmat_xquat(base_body_list)
+        base_name = base_body_list[0]
+        base_mat = np.asarray(base_result[base_name]["xmat"], dtype=np.float64).reshape(3, 3)
+        qvel = self.data.qvel
+
+        xvalp_dict: dict[str, np.ndarray] = {}
+        xvalr_dict: dict[str, np.ndarray] = {}
+        # 固定基座：基座速度为 0
+        base_xvalp = np.zeros(3)
+        base_xvalr = np.zeros(3)
+        for site in query_dict:
+            ee_xvalp = np.asarray(query_dict[site]["jacp"]).reshape(3, -1) @ qvel
+            ee_xvalr = np.asarray(query_dict[site]["jacr"]).reshape(3, -1) @ qvel
+            linear_vel_B = base_mat.T @ (ee_xvalp - base_xvalp)
+            angular_vel_B = base_mat.T @ (ee_xvalr - base_xvalr)
+            xvalp_dict[site] = linear_vel_B.astype(np.float32)
+            xvalr_dict[site] = angular_vel_B.astype(np.float32)
+        return xvalp_dict, xvalr_dict
+
+    def query_velocity_body_B(self, ee_body: str, base_body: str) -> np.ndarray:
+        """查询 body 相对于基座 body 的速度（基座坐标系）。
+
+        纯 NumPy：基于 self.data.body_cvel（世界系空间速度）+ body_xmat 变换。
+        不触 _mjData/_mjModel（K4/P2）。
+
+        Args:
+            ee_body: 末端执行器 body 名称。
+            base_body: 基座 body 名称。
+
+        Returns:
+            combined_vel (6,)：前3线速度，后3角速度（基座坐标系，float32）。
+        """
+        ee_cvel = np.asarray(self.data.body_cvel(ee_body), dtype=np.float64)  # [ang(3), lin(3)]
+        base_cvel = np.asarray(self.data.body_cvel(base_body), dtype=np.float64)
+        base_mat = np.asarray(self.data.body_xmat(base_body), dtype=np.float64).reshape(3, 3)
+        linear_vel_B = base_mat.T @ (ee_cvel[3:] - base_cvel[3:])
+        angular_vel_B = base_mat.T @ (ee_cvel[:3] - base_cvel[:3])
+        return np.concatenate([linear_vel_B, angular_vel_B]).astype(np.float32)
+
+    def query_position_body_B(self, ee_body: str, base_body: str) -> np.ndarray:
+        """查询 body 相对于基座 body 的位置（基座坐标系）。
+
+        纯 NumPy：基于 self.data.body_xpos/body_xquat 公共查询。
+
+        Args:
+            ee_body: 末端执行器 body 名称。
+            base_body: 基座 body 名称。
+
+        Returns:
+            relative_pos (3,)（基座坐标系）。
+        """
+        base_pos = np.asarray(self.data.body_xpos(base_body), dtype=np.float64)
+        base_quat = np.asarray(self.data.body_xquat(base_body), dtype=np.float64)  # [w,x,y,z]
+        ee_pos = np.asarray(self.data.body_xpos(ee_body), dtype=np.float64)
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        relative_pos = rot_base.inv().apply(ee_pos - base_pos)
+        return relative_pos
+
+    def query_orientation_body_B(self, ee_body: str, base_body: str) -> np.ndarray:
+        """查询 body 相对于基座 body 的姿态（基座坐标系）。
+
+        纯 NumPy：基于 self.data.body_xquat 公共查询。
+
+        Args:
+            ee_body: 末端执行器 body 名称。
+            base_body: 基座 body 名称。
+
+        Returns:
+            relative_quat (4,) [x,y,z,w]（基座坐标系，SciPy 格式，float32）。
+        """
+        base_quat = np.asarray(self.data.body_xquat(base_body), dtype=np.float64)  # [w,x,y,z]
+        ee_quat = np.asarray(self.data.body_xquat(ee_body), dtype=np.float64)
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot_ee = R.from_quat([ee_quat[1], ee_quat[2], ee_quat[3], ee_quat[0]])
+        relative_rot = rot_base.inv() * rot_ee
+        return relative_rot.as_quat().astype(np.float32)
+
+    def query_joint_axes_B(
+        self, joint_names: list[str], base_body: str
+    ) -> dict[str, np.ndarray]:
+        """查询关节轴在基座坐标系中的方向。
+
+        纯 NumPy：基于 self.model.get_joint_byname（Axis/BodyID）+
+        self.data.body_xquat 变换。不触 _mjModel/_mjData（K4/P2）。
+
+        Args:
+            joint_names: 关节名称列表。
+            base_body: 基座 body 名称。
+
+        Returns:
+            dict[joint_name -> 轴方向 (3,) float32]（基座坐标系）。
+        """
+        base_quat = np.asarray(self.data.body_xquat(base_body), dtype=np.float64)  # [w,x,y,z]
+        rot_base = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+
+        result: dict[str, np.ndarray] = {}
+        for joint_name in joint_names:
+            joint_info = self.model.get_joint_byname(joint_name)
+            jnt_axis = np.asarray(joint_info["Axis"], dtype=np.float64)
+            body_id = joint_info["BodyID"]
+            body_name = self.model.body_id2name(body_id)
+            body_quat = np.asarray(self.data.body_xquat(body_name), dtype=np.float64)
+            body_rot = R.from_quat([body_quat[1], body_quat[2], body_quat[3], body_quat[0]])
+            axis_global = body_rot.apply(jnt_axis)
+            axis_base = rot_base.inv().apply(axis_global)
+            result[joint_name] = axis_base.astype(np.float32)
+        return result
+
+    def query_robot_velocity_odom(
+        self, base_body: str, initial_base_pos: np.ndarray, initial_base_quat: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """查询机器人在里程计坐标系中的速度。
+
+        纯 NumPy：基于 self.data.body_cvel + initial_base_quat 变换。
+
+        Args:
+            base_body: 基座 body 名称。
+            initial_base_pos: 初始基座位置（未使用，接口一致性保留）。
+            initial_base_quat: 初始基座四元数 [w,x,y,z]。
+
+        Returns:
+            (linear_vel_odom (3,), angular_vel_odom (3,))（里程计坐标系，float32）。
+        """
+        base_cvel = np.asarray(self.data.body_cvel(base_body), dtype=np.float64)  # [ang(3), lin(3)]
+        initial_rot = R.from_quat(
+            [initial_base_quat[1], initial_base_quat[2], initial_base_quat[3], initial_base_quat[0]]
+        )
+        linear_vel_odom = initial_rot.inv().apply(base_cvel[3:])
+        angular_vel_odom = initial_rot.inv().apply(base_cvel[:3])
+        return linear_vel_odom.astype(np.float32), angular_vel_odom.astype(np.float32)
+
+    def query_robot_position_odom(
+        self, base_body: str, initial_base_pos: np.ndarray, initial_base_quat: np.ndarray
+    ) -> np.ndarray:
+        """查询机器人在里程计坐标系中的位置。
+
+        纯 NumPy：基于 self.data.body_xpos + initial_base_pos/quat 变换。
+
+        Args:
+            base_body: 基座 body 名称。
+            initial_base_pos: 初始基座位置 [x,y,z]。
+            initial_base_quat: 初始基座四元数 [w,x,y,z]。
+
+        Returns:
+            pos_odom (3,)（里程计坐标系，float32）。
+        """
+        base_pos = np.asarray(self.data.body_xpos(base_body), dtype=np.float64)
+        initial_rot = R.from_quat(
+            [initial_base_quat[1], initial_base_quat[2], initial_base_quat[3], initial_base_quat[0]]
+        )
+        relative_pos = base_pos - np.asarray(initial_base_pos, dtype=np.float64)
+        pos_odom = initial_rot.inv().apply(relative_pos)
+        return pos_odom.astype(np.float32)
+
+    def query_robot_orientation_odom(
+        self, base_body: str, initial_base_pos: np.ndarray, initial_base_quat: np.ndarray
+    ) -> np.ndarray:
+        """查询机器人在里程计坐标系中的姿态。
+
+        纯 NumPy：基于 self.data.body_xquat + initial_base_quat 变换。
+
+        Args:
+            base_body: 基座 body 名称。
+            initial_base_pos: 初始基座位置（未使用，接口一致性保留）。
+            initial_base_quat: 初始基座四元数 [w,x,y,z]。
+
+        Returns:
+            quat_odom (4,) [x,y,z,w]（里程计坐标系，SciPy 格式，float32）。
+        """
+        base_quat = np.asarray(self.data.body_xquat(base_body), dtype=np.float64)  # [w,x,y,z]
+        initial_rot = R.from_quat(
+            [initial_base_quat[1], initial_base_quat[2], initial_base_quat[3], initial_base_quat[0]]
+        )
+        base_rot = R.from_quat([base_quat[1], base_quat[2], base_quat[3], base_quat[0]])
+        rot = initial_rot.inv() * base_rot
+        return rot.as_quat().astype(np.float32)
+
+    # --- 力应用与状态设置委托（阶段三 3.2.4）---
+    # 架构 K4：按 body_name/site_name 解析 id 后委托 self._gym，不触 _mjData/_mjModel。
+    # 签名与 OrcaGymLocalEnv 一致（老代码零改动迁移：gym. -> env.）。
+
+    def apply_body_force(
+        self, body_name: str, force: np.ndarray, torque: np.ndarray
+    ) -> None:
+        """对指定 body 施加外力/力矩（按名称解析 id 后委托 self._gym）。
+
+        Args:
+            body_name: body 名称。
+            force: 力向量 (3,)。
+            torque: 力矩向量 (3,)。
+        """
+        body_id = self.model.body_name2id(body_name)
+        self._gym.apply_body_force(body_id, force, torque)
+
+    def clear_body_force(self, body_name: str) -> None:
+        """清除指定 body 的外力。"""
+        body_id = self.model.body_name2id(body_name)
+        self._gym.clear_body_force(body_id)
+
+    def clear_all_forces(self) -> None:
+        """清除所有 body 的外力。"""
+        self._gym.clear_all_forces()
+
+    def mj_apply_force_at_site(
+        self, site_name: str, force: np.ndarray, torque: np.ndarray
+    ) -> None:
+        """在 site 处施加力（按名称解析 id 后委托 self._gym）。"""
+        site_id = self.model.site_name2id(site_name)
+        self._gym.mj_apply_force_at_site(site_id, force, torque)
+
+    def mj_clear_xfrc_applied_for_site(self, site_name: str) -> None:
+        """清除 site 关联 body 的 xfrc。"""
+        site_id = self.model.site_name2id(site_name)
+        self._gym.mj_clear_xfrc_applied_for_site(site_id)
+
+    def set_mocap_pos_and_quat(self, mocap_pos_and_quat_dict: dict) -> None:
+        """设置 mocap body 位置/四元数（本地写入 + 远端同步）。
+
+        本地写入委托 self._gym.set_mocap_pos_and_quat；
+        若为渲染模式且非子环境，则同步到远端 Studio。
+
+        Args:
+            mocap_pos_and_quat_dict: dict[body_name -> {"pos": (3,), "quat": (4,)}]。
+        """
+        self._gym.set_mocap_pos_and_quat(mocap_pos_and_quat_dict)
+        send_remote = (
+            self._render_mode == "human"
+            and not getattr(self, "_is_subenv", False)
+        )
+        self.loop.run_until_complete(
+            self._gym.set_mocap_pos_and_quat_remote(
+                mocap_pos_and_quat_dict, send_remote
+            )
+        )
+
+    def set_geom_friction(self, geom_friction_dict: dict) -> None:
+        """设置 geom 摩擦系数。"""
+        self._gym.set_geom_friction(geom_friction_dict)
+
+    def add_extra_weight(self, weight_load_dict: dict) -> None:
+        """为 body 添加额外重量。"""
+        self._gym.add_extra_weight(weight_load_dict)
+
+    # --- 只读查询委托（阶段三 3.2.4，K4：通过公共方法而非 _gym 穿墙）---
+
+    def geom_friction(self, geom_name: str) -> np.ndarray:
+        """查询 geom 摩擦系数 (3,) [sliding, torsion, rolling]（只读视图）。
+
+        替代直接访问 _mjModel.geom_friction[id]。
+
+        Args:
+            geom_name: geom 名称。
+
+        Returns:
+            geom 摩擦系数数组，形状 (3,)。
+        """
+        return self._gym.geom_friction(geom_name)
 
     # --- Gymnasium 接口（子类实现）---
 

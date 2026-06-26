@@ -271,3 +271,37 @@ class OrcaStudioBridge:
             "delta_pos": np.array(response.delta_pos),
             "delta_quat": np.array(response.delta_quat),
         }
+
+    # --- mocap 远端同步（阶段三 3.2.3）---
+
+    async def set_mocap_pos_and_quat(
+        self, mocap_data: dict, send_remote: bool = False
+    ) -> None:
+        """设置 mocap 位姿并同步到远端 Studio（依赖反转：接收 mocap_data）。
+
+        离线模式（_stub is None）直接 return，不抛错。
+        在线模式通过 gRPC stub.SetMocapPosAndQuat 同步到远端。
+
+        Args:
+            mocap_data: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
+                        本方法不写入 _mjData，仅做远端同步；
+                        本地写入由 SimCore.set_mocap_pos_and_quat 完成。
+            send_remote: 是否真正发送到远端。False 时 no-op（仅本地已写入）。
+        """
+        if self._stub is None:
+            return
+        if not send_remote:
+            return
+        mocap_infos = []
+        for body_name, pose in mocap_data.items():
+            pos = np.asarray(pose["pos"], dtype=np.float64).reshape(3).tolist()
+            quat = np.asarray(pose["quat"], dtype=np.float64).reshape(4).tolist()
+            mocap_infos.append(
+                mjc_message_pb2.SetMocapPosAndQuatRequest.MocapBodyInfo(
+                    mocap_body_name=body_name, pos=pos, quat=quat
+                )
+            )
+        request = mjc_message_pb2.SetMocapPosAndQuatRequest(
+            mocap_body_info=mocap_infos
+        )
+        await self._stub.SetMocapPosAndQuat(request)

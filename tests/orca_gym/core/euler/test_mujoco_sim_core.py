@@ -63,8 +63,11 @@ class TestMuJoCoSimCoreStructure(unittest.TestCase):
                 self.assertTrue(callable(getattr(MuJoCoSimCore, name, None)))
 
     def test_sim_core_has_force_methods(self):
-        """apply_body_force/clear_body_force/clear_all_forces 方法存在。"""
-        for name in ["apply_body_force", "clear_body_force", "clear_all_forces"]:
+        """apply_body_force/clear_body_force/clear_all_forces + site 力方法存在。"""
+        for name in [
+            "apply_body_force", "clear_body_force", "clear_all_forces",
+            "mj_apply_force_at_site", "mj_clear_xfrc_applied_for_site",
+        ]:
             with self.subTest(method=name):
                 self.assertTrue(callable(getattr(MuJoCoSimCore, name, None)))
 
@@ -82,17 +85,221 @@ class TestMuJoCoSimCoreStructure(unittest.TestCase):
         self.assertIn("_mjData", doc)
 
 
-class TestMuJoCoSimCoreForceStubs(unittest.TestCase):
-    """力应用方法仍 raise NotImplementedError（留待完整 P4）。"""
+class TestSimCoreForceMethodsArchCompliance(unittest.TestCase):
+    """子步骤 3.2.1 架构遵从性测试（P2/K11）。
 
-    def test_force_methods_raise_not_implemented(self):
+    对应文档 §6.2 架构遵从性测试表。
+    """
+
+    def test_simcore_force_methods_write_xfrc_only(self):
+        """P2/K11: grep 断言力应用方法只写 xfrc_applied，不返回 MjData/MjModel。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        # 找到力应用区块
+        start = source.find("def apply_body_force")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        end = block.find("# --- 关节查询")
+        if end > 0:
+            block = block[:end]
+        # 写 xfrc_applied（合法）
+        self.assertIn("xfrc_applied", block)
+        # 不返回 _mjData/_mjModel
+        self.assertNotIn("return self._mjData", block)
+        self.assertNotIn("return self._mjModel", block)
+
+    def test_simcore_force_methods_return_none(self):
+        """K11: apply_body_force/clear_* 返回 None（写操作无返回值）。"""
         sim = MuJoCoSimCore()
-        with self.assertRaises(NotImplementedError):
-            sim.apply_body_force(0, None, None)
-        with self.assertRaises(NotImplementedError):
-            sim.clear_body_force(0)
-        with self.assertRaises(NotImplementedError):
-            sim.clear_all_forces()
+        sim.init_simulation(_PENDULUM_XML)
+        ret = sim.apply_body_force(0, np.zeros(3), np.zeros(3))
+        self.assertIsNone(ret)
+        ret = sim.clear_body_force(0)
+        self.assertIsNone(ret)
+        ret = sim.clear_all_forces()
+        self.assertIsNone(ret)
+        # 新增 site 力方法也返回 None
+        ret = sim.mj_apply_force_at_site(0, np.zeros(3), np.zeros(3))
+        self.assertIsNone(ret)
+        ret = sim.mj_clear_xfrc_applied_for_site(0)
+        self.assertIsNone(ret)
+
+    def test_simcore_force_no_mjdata_leak(self):
+        """P2/K11: grep 断言不 return self._mjData。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("def apply_body_force")
+        block = source[start:]
+        end = block.find("# --- 关节查询")
+        if end > 0:
+            block = block[:end]
+        self.assertNotIn("return self._mjData", block)
+
+
+class TestSimCoreForceMethodsFunctional(unittest.TestCase):
+    """子步骤 3.2.1 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §6.2 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+        # pelvis body_id（用于 body 力测试）
+        self.pelvis_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "pelvis"
+        )
+        self.imu_site_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_SITE, "imu"
+        )
+        # imu site 关联的 body_id（site_bodyid[imu_site_id]）
+        self.imu_body_id = int(self.sim._mjModel.site_bodyid[self.imu_site_id])
+
+    def test_apply_body_force_writes_xfrc(self):
+        """施力后 _mjData.xfrc_applied[body_id, :3] 等于 force。"""
+        force = np.array([1.0, 2.0, 3.0])
+        torque = np.array([0.1, 0.2, 0.3])
+        self.sim.apply_body_force(self.pelvis_id, force, torque)
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.pelvis_id, :3], force
+        )
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.pelvis_id, 3:6], torque
+        )
+
+    def test_clear_body_force_zeroes_xfrc(self):
+        """清力后 xfrc_applied[body_id, :6] 为 0。"""
+        self.sim.apply_body_force(self.pelvis_id, np.ones(3), np.ones(3))
+        self.sim.clear_body_force(self.pelvis_id)
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.pelvis_id, :6], 0.0
+        )
+
+    def test_clear_all_forces_zeroes_all(self):
+        """清全部后 xfrc_applied[:] 为 0。"""
+        self.sim.apply_body_force(self.pelvis_id, np.ones(3), np.ones(3))
+        self.sim.clear_all_forces()
+        np.testing.assert_allclose(self.sim._mjData.xfrc_applied[:], 0.0)
+
+    def test_mj_apply_force_at_site_writes_body_xfrc(self):
+        """site 施力后关联 body 的 xfrc 写入（累加）。"""
+        force = np.array([0.5, 0.0, 0.0])
+        torque = np.array([0.0, 0.5, 0.0])
+        # 先清零
+        self.sim.clear_all_forces()
+        self.sim.mj_apply_force_at_site(self.imu_site_id, force, torque)
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.imu_body_id, :3], force
+        )
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.imu_body_id, 3:6], torque
+        )
+
+    def test_mj_clear_xfrc_for_site_clears_body(self):
+        """清 site xfrc 后关联 body 的 xfrc 清零。"""
+        self.sim.mj_apply_force_at_site(self.imu_site_id, np.ones(3), np.ones(3))
+        self.sim.mj_clear_xfrc_applied_for_site(self.imu_site_id)
+        np.testing.assert_allclose(
+            self.sim._mjData.xfrc_applied[self.imu_body_id, :6], 0.0
+        )
+
+
+# =============================================================================
+# 阶段三 3.2.2：MuJoCoSimCore 状态设置方法
+# =============================================================================
+
+
+class TestSimCoreSetMethodsArchCompliance(unittest.TestCase):
+    """子步骤 3.2.2 架构遵从性测试（P2/K11）。
+
+    对应文档 §6.3 架构遵从性测试表。
+    """
+
+    def test_simcore_set_methods_return_none(self):
+        """K11: 3 个设置方法返回 None（写操作无返回值）。"""
+        sim = MuJoCoSimCore()
+        sim.init_simulation(_G1_XML)
+        ret = sim.set_mocap_pos_and_quat(
+            {"ActorManipulator_Anchor": {"pos": np.zeros(3), "quat": np.array([1, 0, 0, 0])}}
+        )
+        self.assertIsNone(ret)
+        ret = sim.set_geom_friction({"manipulation_box_geom": np.array([1.0, 0.005, 0.0001])})
+        self.assertIsNone(ret)
+        ret = sim.add_extra_weight({"pelvis": 1.0})
+        self.assertIsNone(ret)
+
+    def test_simcore_set_methods_no_mjdata_leak(self):
+        """P2/K11: grep 断言不 return self._mjData/self._mjModel。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("# --- 状态设置方法（阶段三 3.2.2）")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        end = block.find("# --- 关节查询")
+        if end > 0:
+            block = block[:end]
+        self.assertNotIn("return self._mjData", block)
+        self.assertNotIn("return self._mjModel", block)
+
+    def test_simcore_set_geom_friction_writes_model(self):
+        """P2: grep 断言 set_geom_friction 写 _mjModel.geom_friction（模型字段，非 data）。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("def set_geom_friction")
+        end = source.find("def add_extra_weight")
+        block = source[start:end]
+        self.assertIn("_mjModel.geom_friction", block)
+
+
+class TestSimCoreSetMethodsFunctional(unittest.TestCase):
+    """子步骤 3.2.2 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §6.3 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+        # mocap body id + mocap_id
+        self.mocap_body_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "ActorManipulator_Anchor"
+        )
+        self.mocap_id = int(self.sim._mjModel.body_mocapid[self.mocap_body_id])
+        # geom id
+        self.box_geom_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_GEOM, "manipulation_box_geom"
+        )
+        # pelvis body id
+        self.pelvis_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "pelvis"
+        )
+
+    def test_set_mocap_pos_and_quat_writes_mocap(self):
+        """mocap_pos/quat 正确写入。"""
+        pos = np.array([0.5, 0.3, 0.8])
+        quat = np.array([0.7071, 0.0, 0.7071, 0.0])  # w,x,y,z
+        self.sim.set_mocap_pos_and_quat(
+            {"ActorManipulator_Anchor": {"pos": pos, "quat": quat}}
+        )
+        np.testing.assert_allclose(
+            self.sim._mjData.mocap_pos[self.mocap_id], pos, atol=1e-6
+        )
+        np.testing.assert_allclose(
+            self.sim._mjData.mocap_quat[self.mocap_id], quat, atol=1e-6
+        )
+
+    def test_set_geom_friction_persists(self):
+        """geom_friction 修改持久化。"""
+        new_friction = np.array([2.5, 0.01, 0.002])
+        self.sim.set_geom_friction({"manipulation_box_geom": new_friction})
+        np.testing.assert_allclose(
+            self.sim._mjModel.geom_friction[self.box_geom_id], new_friction, atol=1e-6
+        )
+
+    def test_add_extra_weight_increases_mass(self):
+        """添加重量后 body_mass 增加。"""
+        old_mass = float(self.sim._mjModel.body_mass[self.pelvis_id])
+        self.sim.add_extra_weight({"pelvis": 2.0})
+        new_mass = float(self.sim._mjModel.body_mass[self.pelvis_id])
+        self.assertAlmostEqual(new_mass - old_mass, 2.0, places=6)
 
 
 class TestMuJoCoSimCoreFunctional(unittest.TestCase):

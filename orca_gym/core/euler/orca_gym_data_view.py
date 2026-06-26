@@ -57,6 +57,9 @@ class OrcaGymDataView:
         _mjData 当前状态。body/site 查询方法通过 _mj_data/_mj_model
         按需读取。
 
+        P4 力应用可追踪：xfrc_applied 设为只读视图，直接写会抛
+        ValueError，引导用户走 env.apply_body_force()。
+
         Args:
             mj_data: MuJoCo MjData 对象。
             mj_model: MuJoCo MjModel 对象。
@@ -68,7 +71,11 @@ class OrcaGymDataView:
         self.qacc = mj_data.qacc
         self.qfrc_bias = mj_data.qfrc_bias
         self.time = float(mj_data.time)
-        self.xfrc_applied = mj_data.xfrc_applied
+        # P4: xfrc_applied 只读保护（用 view 隔离 writeable 标志，
+        # 不影响 SimCore 通过 _mjData.xfrc_applied 写入，零拷贝 base 非 None）
+        _xfrc_view = mj_data.xfrc_applied.view()
+        _xfrc_view.flags.writeable = False
+        self.xfrc_applied = _xfrc_view
         self.actuator_force = mj_data.actuator_force
         self.contact = mj_data.contact
         self.cfrc_ext = mj_data.cfrc_ext
@@ -166,6 +173,42 @@ class OrcaGymDataView:
         """
         site_id = mujoco.mj_name2id(self._mj_model, mujoco.mjtObj.mjOBJ_SITE, site_name)
         return self._mj_data.site(site_id).xmat
+
+    # --- mocap 查询方法（阶段三 3.2.4，只读验证用）---
+
+    def mocap_pos(self, body_name: str) -> np.ndarray:
+        """查询 mocap body 的位置 (3,)（只读视图）。
+
+        Args:
+            body_name: mocap body 名称。
+
+        Returns:
+            mocap_pos[body_id], 形状 (3,)。非 mocap body 返回 NaN。
+        """
+        body_id = mujoco.mj_name2id(
+            self._mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name
+        )
+        mocap_id = int(self._mj_model.body_mocapid[body_id])
+        if mocap_id < 0:
+            return np.full(3, np.nan)
+        return self._mj_data.mocap_pos[mocap_id]
+
+    def mocap_quat(self, body_name: str) -> np.ndarray:
+        """查询 mocap body 的四元数 (4,) [w,x,y,z]（只读视图）。
+
+        Args:
+            body_name: mocap body 名称。
+
+        Returns:
+            mocap_quat[body_id], 形状 (4,)。非 mocap body 返回 NaN。
+        """
+        body_id = mujoco.mj_name2id(
+            self._mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name
+        )
+        mocap_id = int(self._mj_model.body_mocapid[body_id])
+        if mocap_id < 0:
+            return np.full(4, np.nan)
+        return self._mj_data.mocap_quat[mocap_id]
 
     # --- geom 查询方法（阶段三 3.1.4）---
 
