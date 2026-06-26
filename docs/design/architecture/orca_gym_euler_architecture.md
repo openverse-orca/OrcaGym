@@ -81,28 +81,28 @@
 
 ```
 gym.Env
-  └── OrcaGymBaseEnv                          (保留，提供 step/reset 框架)
-        └── OrcaGymEulerEnv (新)              (Facade + 契约执行者)
-              │
-              │   组合（非继承）
-              ├── _gym: OrcaGymEuler           (仿真核心 Facade)
-              │     ├── _sim: MuJoCoSimCore    # 持有 _mjModel/_mjData（不对外暴露）
-              │     ├── _studio: OrcaStudioBridge  # gRPC 集成
-              │     ├── _registry: ModelRegistry  # 模型信息
-              │     ├── _opt: SimConfig        # 求解器配置（typed）
-              │     └── _euler: EulerOrchestrator | None  # Euler 耦合（占位，后续设计）
-              │
-              │   公共 API（用户面向）
-              ├── .data → OrcaGymDataView      # 完整状态视图
-              ├── .model → OrcaGymModel        # 模型结构（原样复用）
-              ├── .sim_config → SimConfig      # 求解器配置
-              ├── .ctrl → np.ndarray           # 控制数组
-              │
-              ├── 仿真控制
-              ├── 状态查询
-              ├── 状态设置
-              ├── 名称空间
-              └── Studio 交互
+  └── OrcaGymEulerEnv (新)                    (Facade + 契约执行者，直接继承 gym.Env)
+        │   ↑ OrcaGymEnvMixin（名称空间、动作/观测空间生成、reset 编排）
+        │
+        │   组合（非继承）
+        ├── _gym: OrcaGymEuler           (仿真核心 Facade)
+        │     ├── _sim: MuJoCoSimCore    # 持有 _mjModel/_mjData（不对外暴露）
+        │     ├── _studio: OrcaStudioBridge  # gRPC 集成
+        │     ├── _registry: ModelRegistry  # 模型信息
+        │     ├── _opt: SimConfig        # 求解器配置（typed）
+        │     └── _euler: EulerOrchestrator | None  # Euler 耦合（占位，后续设计）
+        │
+        │   公共 API（用户面向）
+        ├── .data → OrcaGymDataView      # 完整状态视图
+        ├── .model → OrcaGymModel        # 模型结构（原样复用）
+        ├── .sim_config → SimConfig      # 求解器配置
+        ├── .ctrl → np.ndarray           # 控制数组
+        │
+        ├── 仿真控制
+        ├── 状态查询
+        ├── 状态设置
+        ├── 名称空间
+        └── Studio 交互
 ```
 
 ### 4.2 与 OrcaGymLocalEnv 体系的对比
@@ -114,7 +114,7 @@ gym.Env
 | `OrcaGymData` | 5 字段缓存，不完整 | `OrcaGymDataView` 完整只读视图 |
 | 求解器配置 | 无接口，绕道 `opt.*` | `SimConfig` typed 配置 |
 | 外力注入 | 直接写 `xfrc_applied` | `apply_body_force()` 显式方法 |
-| 继承体系 | 继承自腐化的 `OrcaGymBase` 链 | 独立类，不继承 `OrcaGymLocal` |
+| 继承体系 | 继承自腐化的 `OrcaGymBase` 链 | 直接继承 `gym.Env` + `OrcaGymEnvMixin` |
 
 ### 4.3 与 OrcaGymLocalEnv 体系的共存策略
 
@@ -130,10 +130,12 @@ gym.Env
 
 **职责**：作为 Gymnasium `Env` 的实现，组合 `OrcaGymEuler` 仿真核心，向用户代码暴露统一 API。
 
+**继承结构**：`OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env)`。直接继承 `gym.Env`，通过 `OrcaGymEnvMixin` 共享名称空间、动作/观测空间生成、reset 编排等公共方法（见 §5.9）。不继承 `OrcaGymBaseEnv`，避免父类的 `self.gym`/`self.model`/`self.data` 赋值与 Euler 体系 K1/K6 冲突。
+
 **设计契约**：
 
 ```python
-class OrcaGymEulerEnv(OrcaGymBaseEnv):
+class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     """OrcaGym Euler 双引擎环境。
 
     使用契约:
@@ -144,6 +146,7 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
     禁止:
         不要访问 env._gym._sim._mjData 或任何内部 MuJoCo 对象。
+        env.gym/env.stub/env.channel 不存在，直接继承 gym.Env 不创建这些属性。
         缺少功能时，扩展本类的公共方法。
     """
 ```
@@ -168,7 +171,7 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 **设计要点**：
 
 - 持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`、`EulerOrchestrator`
-- **不暴露** `_mjModel`/`_mjData`，通过 `__getattr__` 拦截引导性错误
+- **不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀社区约定 + ruff SLF001 静态检查（见 §7）
 - 通过 `__dir__` 控制可见性，IDE 自动补全只显示公共 API
 
 ```python
@@ -377,6 +380,75 @@ class EulerOrchestrator:
         raise NotImplementedError
 ```
 
+### 5.9 OrcaGymEnvMixin — 环境公共方法混入
+
+**职责**：抽取 `OrcaGymLocalEnv`/`OrcaGymBaseEnv` 中与仿真引擎无关的公共方法，供 `OrcaGymEulerEnv` 和 `OrcaGymLocalEnv` 共享，避免代码重复。
+
+**设计要点**：
+
+- **纯方法集合**：不定义 `__init__`，不持有状态，不引入编排冲突
+- **无引擎依赖**：方法仅依赖 `self._agent_names`/`self.frame_skip` 等基础字段，不访问 `self.gym`/`self._gym`/`self._mjData`
+- **Euler 和 Local 共用**：两个 Env 体系都继承此 Mixin，方法签名一致
+
+```python
+class OrcaGymEnvMixin:
+    """OrcaGym 环境公共方法 Mixin。
+
+    提供名称空间解析、动作/观测空间生成、reset 编排等方法。
+    不定义 __init__，不持有状态，子类自行初始化 _agent_names 等字段。
+    """
+
+    # --- 名称空间解析（自动添加 agent 前缀）---
+    def body(self, name: str, agent_id: int = None) -> str: ...
+    def joint(self, name: str, agent_id: int = None) -> str: ...
+    def actuator(self, name: str, agent_id: int = None) -> str: ...
+    def site(self, name: str, agent_id: int = None) -> str: ...
+    def mocap(self, name: str, agent_id: int = None) -> str: ...
+    def sensor(self, name: str, agent_id: int = None) -> str: ...
+
+    # --- 空间生成 ---
+    def generate_action_space(self, bounds: np.ndarray) -> Space: ...
+    def generate_observation_space(self, obs: Union[Dict, np.ndarray]) -> Space: ...
+
+    # --- reset 编排 ---
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None): ...
+    def set_seed_value(self, seed: int = None) -> list: ...
+    def _get_reset_info(self) -> Dict[str, float]: ...
+
+    # --- 辅助 ---
+    def _name_with_agent0(self, name: str) -> str: ...
+    def _name_with_agent(self, agent_id: int, name: str) -> str: ...
+    @property
+    def agent_num(self) -> int: ...
+```
+
+**迁移映射**：
+
+| 原位置（OrcaGymBaseEnv） | 新位置 | 说明 |
+|---|---|---|
+| `body`/`joint`/`actuator`/`site`/`mocap`/`sensor` | Mixin | 名称空间解析，零改动迁移 |
+| `_name_with_agent0`/`_name_with_agent` | Mixin | 名称前缀辅助方法 |
+| `generate_action_space`/`generate_observation_space` | Mixin | 空间生成，零改动迁移 |
+| `reset`/`set_seed_value`/`_get_reset_info` | Mixin | reset 编排，子类提供 `reset_simulation`/`reset_model`/`render` |
+| `agent_num` property | Mixin | 返回 `len(self._agent_names)` |
+| `dt` property | **不迁入** Mixin | Euler 和 Local 各自实现（依赖不同：`_gym.sim_config.timestep` vs `gym.opt.timestep`） |
+
+**使用方式**：
+
+```python
+# Euler 体系
+class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
+    def __init__(self, ...):
+        self._agent_names = agent_names
+        self._gym = OrcaGymEuler(...)
+        # Mixin 方法可直接使用
+        ...
+
+# Local 体系（可选重构，不强制）
+class OrcaGymLocalEnv(OrcaGymEnvMixin, gym.Env):
+    ...
+```
+
 ---
 
 ## 6. API 契约
@@ -386,8 +458,8 @@ class EulerOrchestrator:
 | 层级 | 含义 | 违反后果 |
 |------|------|---------|
 | **L1 公共 API** | `__dir__` 暴露的方法和属性，用户应使用 | 正常工作 |
-| **L2 内部组件** | `_gym`/`_sim`/`_studio` 等，用户不应访问 | `__getattr__` 拦截，引导性错误 |
-| **L3 引擎内部** | `_mjModel`/`_mjData`，用户绝不应访问 | `__getattr__` 拦截，引导性错误 |
+| **L2 内部组件** | `_gym`/`_sim`/`_studio` 等，用户不应访问 | ruff SLF001 报警（见 §7） |
+| **L3 引擎内部** | `_mjModel`/`_mjData`，用户绝不应访问 | ruff SLF001 报警（见 §7） |
 
 ### 6.2 状态读取契约
 
@@ -406,7 +478,7 @@ qpos = env.data.qpos
 body_pos = env.data.body_xpos("link1")
 
 # 错误（违反 R1）
-qpos = env._gym._sim._mjData.qpos  # __getattr__ 拦截
+qpos = env._gym._sim._mjData.qpos  # ruff SLF001 报警
 ```
 
 ### 6.3 状态写入契约
@@ -424,7 +496,7 @@ env.apply_body_force("link1", force, torque)
 env.mj_forward()
 
 # 错误（违反 W1/W2）
-env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # __getattr__ 拦截
+env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # ruff SLF001 报警
 ```
 
 ### 6.4 仿真步进契约
@@ -463,7 +535,7 @@ env.sim_config.iterations = 100
 env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 
 # 错误（违反 C1）
-env._gym._sim._mjModel.opt.timestep = 0.002  # __getattr__ 拦截
+env._gym._sim._mjModel.opt.timestep = 0.002  # ruff SLF001 报警
 ```
 
 ### 6.6 名称空间契约
@@ -497,41 +569,59 @@ body_name = env.body("object")
 
 ### 7.1 机制总览
 
-Python 无法真正阻止属性访问，但通过多层引导让"正确方式"成为阻力最小的路径：
+本架构通过多层引导让"正确方式"成为阻力最小的路径。`OrcaGymEulerEnv` 直接继承 `gym.Env`，不创建 `gym`/`stub`/`channel` 属性，Python 原生即拒绝访问；其余内部对象依赖 `_` 前缀社区约定 + ruff SLF001 静态检查 + AGENTS.md AI 行为约束：
 
 | 机制 | 实现 | 效果 |
 |------|------|------|
-| **M1 `__getattr__` 拦截** | Env/Gym 层不存储 `_mjData`/`_mjModel`，访问时触发引导性错误 | AI/用户立即知道正确替代方案 |
-| **M2 `__dir__` 控制** | 只暴露公共 API，不列出 `_gym`/`_sim` | IDE 自动补全引导正确路径 |
-| **M3 DataView 兜底** | `OrcaGymDataView.__getattr__` 缺字段时引导扩展 | 缺功能时引导扩展而非绕道 |
-| **M4 类型标注** | 公共方法返回 typed 对象，不返回 `mujoco.MjData` | AI 代码生成走正确路径 |
-| **M5 docstring 契约** | 类文档明确列出正确用法和禁止事项 | 阅读 API 即知契约 |
-| **M6 路径深度** | `_mjData` 在 `env._gym._sim._mjData` 三层之下 | 天然屏障，AI 难以猜到 |
+| **M0 Python 原生属性不存在** | `OrcaGymEulerEnv` 直接继承 `gym.Env`，`__init__` 中只赋值 `_gym`/`_stub`/`_channel`，不创建 `gym`/`stub`/`channel` | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError`（Python 原生，零运行时开销，零补丁代码） |
+| **M1 ruff SLF001 静态检查** | 配置 `ruff check --select SLF001`，扫描外部访问 `_` 前缀属性的代码 | 提交前/CI 阶段检测穿墙访问（如 `env._gym._sim`），零运行时开销 |
+| **M2 AGENTS.md AI 约束** | 每个自研仓库根目录配置 `AGENTS.md`，明文禁止 AI 使用 `_` 前缀属性并要求执行 ruff | 从输入端约束 AI 代码生成行为 |
+| **M3 `__dir__` 控制** | Env/Gym/DataView 实现 `__dir__`，只暴露公共 API | IDE 自动补全引导正确路径 |
+| **M4 DataView 兜底** | `OrcaGymDataView.__getattr__` 缺字段时引导扩展 | 缺功能时引导扩展而非绕道 |
+| **M5 类型标注** | 公共方法返回 typed 对象，不返回 `mujoco.MjData` | AI 代码生成走正确路径 |
+| **M6 docstring 契约** | 类文档明确列出正确用法和禁止事项 | 阅读 API 即知契约 |
+| **M7 路径深度** | `_mjData` 在 `env._gym._sim._mjData` 三层之下 | 天然屏障，AI 难以猜到 |
 
-### 7.2 `__getattr__` 拦截实现
+### 7.2 ruff SLF001 静态检查
 
-```python
-class OrcaGymEuler:
-    _BLOCKED_ATTRS = frozenset({
-        "_mjData", "_mjModel", "mj_data", "mj_model",
-        "_mj_data", "_mj_model", "mjData", "mjModel",
-    })
+SLF001（flake8-self 规则）基于类型作用域判断"内部访问 vs 外部穿墙"：类内部访问自己的 `self._private` 不报警，外部对象访问 `obj._private` 报警。无需 `per-file-ignores` 即可精准识别。
 
-    def __getattr__(self, name: str):
-        if name in self._BLOCKED_ATTRS:
-            raise AttributeError(
-                f"'{type(self).__name__}' 不直接暴露 '{name}'。\n"
-                f"  读取 MuJoCo 状态 → 使用 env.data（OrcaGymDataView），如 env.data.qpos\n"
-                f"  写入外力 → 使用 env.apply_body_force(body_name, force, torque)\n"
-                f"  配置求解器 → 使用 env.sim_config\n"
-                f"  查询 body 属性 → 使用 env.data.body_xpos(name) 等\n"
-                f"  如果以上 API 都不满足需求，请在 OrcaGymEulerEnv 中扩展新方法，"
-                f"不要直接访问内部 MuJoCo 对象。"
-            )
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+**配置（各仓库 `pyproject.toml`）**：
+
+```toml
+[tool.ruff.lint]
+select = ["SLF001"]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许白盒访问（测试就是要测内部）
+"tests/**" = ["SLF001"]
+# __init__.py 允许 re-export
+"**/__init__.py" = ["SLF001", "F401"]
 ```
 
-### 7.3 `__dir__` 控制实现
+**检测效果**：
+
+| 代码 | SLF001 结果 | 说明 |
+|------|------------|------|
+| `self._sim.step()`（在 Gym 类内） | 不报警 | 类内部访问自己的 `_sim` |
+| `self._gym._sim.step()`（在 Env 类内） | 报警 | Env 外部访问 Gym 的 `_sim` |
+| `env._gym._mjData`（链式穿墙） | 报警 | 外部访问 `_mjData` |
+| `self._gym.step()`（公共方法委托） | 不报警 | 走公共 API |
+
+**执行要求**：AI 代理在提交代码前必须执行 `ruff check --select SLF001`，零报警方可提交。CI 流水线强制扫描。
+
+### 7.3 AGENTS.md AI 行为约束
+
+每个自研代码仓（OrcaGym / OrcaFlow / OrcaEuler / OrcaPlayground / OrcaManipulation / OrcaRobot）根目录必须配置 `AGENTS.md`，包含"API 隔离强制"章节，明文约束 AI：
+
+1. **禁止穿墙访问**：不得访问 `env._mjData` / `env._gym._sim` / `env._studio_bridge` 等任何 `_` 前缀内部属性（类内部合法的 `self._xxx` 委托除外）。
+2. **必须使用公共 API**：读取状态用 `env.data.*`，写入外力用 `env.apply_body_force()`，配置求解器用 `env.sim_config`。
+3. **必须执行 ruff**：提交前执行 `ruff check --select SLF001`，零报警方可提交。
+4. **缺失功能时扩展公共方法**：若公共 API 不满足需求，暂停并提交用户决策，不得自行穿墙。
+
+`AGENTS.md` 模板见各仓库根目录，新增仓库必须从模板创建。
+
+### 7.4 `__dir__` 控制实现
 
 ```python
 class OrcaGymEuler:
@@ -549,7 +639,7 @@ class OrcaGymEuler:
         ]
 ```
 
-### 7.4 OrcaGymDataView 兜底
+### 7.5 OrcaGymDataView 兜底
 
 ```python
 class OrcaGymDataView:
@@ -562,23 +652,24 @@ class OrcaGymDataView:
         )
 ```
 
-### 7.5 机制组合效果
+### 7.6 机制组合效果
 
 | 场景 | 触发机制 | AI/用户看到的 |
 |------|---------|-------------|
-| AI 生成 `env._mjData.qpos` | `__getattr__` 拦截 | 引导性错误：用 `env.data.qpos` |
-| AI 生成 `env._gym._mjData` | Gym 层 `__getattr__` 拦截 | 引导性错误：用 `env.data` |
-| AI 生成 `env.data.xfrc_applied` | DataView `__getattr__` | 引导：用 `env.apply_body_force()` |
-| AI 生成 `env._mjModel.opt.iterations` | `__getattr__` 拦截 | 引导：用 `env.sim_config.iterations` |
+| AI 生成 `env._mjData.qpos` | ruff SLF001 | 提交前报警：用 `env.data.qpos` |
+| AI 生成 `env._gym._mjData` | ruff SLF001 | 提交前报警：用 `env.data` |
+| AI 生成 `env.data.xfrc_applied`（写入） | DataView `__getattr__` + 只读视图 | 运行时引导：用 `env.apply_body_force()` |
+| AI 生成 `env._mjModel.opt.iterations` | ruff SLF001 | 提交前报警：用 `env.sim_config.iterations` |
 | AI 在 IDE 中补全 `env.` | `__dir__` 控制 | 只看到公共 API |
 | AI 阅读 class docstring | 类型标注 + 契约 | 知道正确用法和禁止事项 |
+| AI 未执行 ruff 直接提交 | AGENTS.md 约束 + CI 门禁 | CI 拒绝合并 |
 
-### 7.6 与 OrcaGymLocalEnv 的隔离强度对比
+### 7.7 与 OrcaGymLocalEnv 的隔离强度对比
 
-| 系统 | 绕道路径 | 层数 | 内部组件是否可见 |
-|------|---------|------|----------------|
-| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` 是公共属性 |
-| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` 不列出，`__getattr__` 拦截 |
+| 系统 | 绕道路径 | 层数 | 内部组件是否可见 | 静态检查 |
+|------|---------|------|----------------|---------|
+| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` 是公共属性 | 无 |
+| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` 不列出 | ruff SLF001 报警 |
 
 ---
 
@@ -763,7 +854,7 @@ self.do_simulation(torques, self.frame_skip)
 |------|------|--------|
 | **阶段 1：骨架实现** | OrcaGymEulerEnv + OrcaGymEuler 骨架，纯 MuJoCo 行为，与 OrcaGymLocalEnv API 对齐 | 可运行的纯 MuJoCo 环境 |
 | **阶段 2：API 完备** | OrcaGymDataView、SimConfig、apply_body_force 等完整实现，覆盖 83 处绕道场景 | 用户可零绕道使用 |
-| **阶段 3：封装隔离** | `__getattr__`/`__dir__`/DataView 兜底机制实现 | AI/用户被引导走正确路径 |
+| **阶段 3：封装隔离** | ruff SLF001 配置 + AGENTS.md 约束 + `__dir__`/DataView 兜底机制实现 | AI/用户被引导走正确路径 |
 | **阶段 4：迁移验证** | 选取 OrcaPlayground 中代表性 Env 迁移到 OrcaGymEulerEnv，验证兼容性 | 迁移指南 + 验证报告 |
 | **阶段 5：Euler 耦合** | EulerOrchestrator 实现，MuJoCo + Euler 多求解器耦合编排 | 双引擎环境（后续单独设计） |
 
@@ -790,14 +881,16 @@ self.do_simulation(torques, self.frame_skip)
 
 ## 11. 设计决策记录
 
-### 11.1 为何不继承 OrcaGymLocalEnv
+### 11.1 为何直接继承 gym.Env + OrcaGymEnvMixin
 
-**决策**：`OrcaGymEulerEnv` 继承 `OrcaGymBaseEnv`，不继承 `OrcaGymLocalEnv`。
+**决策**：`OrcaGymEulerEnv` 直接继承 `gym.Env`，通过 `OrcaGymEnvMixin` 共享公共方法，不继承 `OrcaGymBaseEnv` 也不继承 `OrcaGymLocalEnv`。
 
 **理由**：
 - `OrcaGymLocalEnv` 是上帝类，继承会继承所有职责耦合
 - `OrcaGymLocal` 的 `_mjModel`/`_mjData` 暴露设计与 P2 原则冲突
-- 独立类可以自由设计封装机制，不受父类约束
+- `OrcaGymBaseEnv` 的 `self.gym`/`self.model`/`self.data` 赋值与 Euler 体系 K1/K6 直接冲突，需要 `__setattr__` 屏蔽等补丁机制
+- 直接继承 `gym.Env` 后，`env.gym`/`env.stub`/`env.channel` 天然不存在（Python 原生 AttributeError），无需任何拦截机制
+- `OrcaGymEnvMixin` 抽取名称空间、空间生成、reset 编排等与引擎无关的方法，避免代码重复
 
 ### 11.2 为何放弃 MuJoCoAdapter
 
@@ -834,7 +927,7 @@ self.do_simulation(torques, self.frame_skip)
 
 `OrcaGymEulerEnv` + `OrcaGymEuler` 的开发采用**骨架先行、逐步填充**策略：先完整实现满足全部架构约束的最小骨架，再逐步填入 P4 的 64 个 `query_*/set_*` 方法与 Studio 交互方法。
 
-**风险**：若骨架本身不满足约束（命名带下划线缺失、Env 层无 `__getattr__`/`__dir__`、Env 穿墙访问 Gym 私有属性、与父类 `OrcaGymBaseEnv` 契约未和解），后续填充阶段会持续受 `OrcaGymLocalEnv`/`OrcaGymLocal` 老架构影响，逐步滑回上帝类 + 封装泄漏的老路。骨架是承重墙，必须一次到位。
+**风险**：若骨架本身不满足约束（命名带下划线缺失、Env 层无 `__dir__`、Env 穿墙访问 Gym 私有属性、未配置 ruff SLF001、继承 `OrcaGymBaseEnv` 引入父类赋值冲突），后续填充阶段会持续受 `OrcaGymLocalEnv`/`OrcaGymLocal` 老架构影响，逐步滑回上帝类 + 封装泄漏的老路。骨架是承重墙，必须一次到位。
 
 本节明确骨架必须满足的**全部架构约束**及对应实现要点。任何不满足本节规约的骨架视为不合格，不得进入 P4 填充阶段。
 
@@ -844,7 +937,8 @@ self.do_simulation(torques, self.frame_skip)
 
 | 组件 | 骨架包含 | 骨架不包含（P4 填充） |
 |------|---------|---------------------|
-| `OrcaGymEulerEnv` | 生命周期、`do_simulation`/`mj_step`/`mj_forward`/`set_ctrl`、`data`/`model`/`sim_config`/`ctrl`/`dt` 属性、`render`、名称空间（继承）、隔离机制、父类契约和解 | `query_*`/`set_*`/`apply_body_force`/Studio 交互 12 方法 |
+| `OrcaGymEnvMixin` | 名称空间解析、空间生成、reset 编排、`agent_num`（迁移自 `OrcaGymBaseEnv`） | — |
+| `OrcaGymEulerEnv` | 生命周期、`do_simulation`/`mj_step`/`mj_forward`/`set_ctrl`、`data`/`model`/`sim_config`/`ctrl`/`dt` 属性、`render`、隔离机制 | `query_*`/`set_*`/`apply_body_force`/Studio 交互 12 方法 |
 | `OrcaGymEuler` | 子组件组合、`init_simulation`/`mj_step`/`mj_forward`/`set_ctrl`/`sync_to_view`/`render`/`load_model_xml`/`pause_simulation` 委托、`data`/`model`/`sim_config` 属性、隔离机制 | 力应用委托、Studio 交互委托、Euler 耦合 |
 | `MuJoCoSimCore` | `init_simulation`/`step`/`forward`/`set_ctrl`/`sync_to_view`、`nq`/`nv`/`nu` 属性 | `apply_body_force`/`clear_*`（P2 已含，骨架直接保留） |
 | `OrcaGymDataView` | 5 基本字段 + `xfrc_applied`/`actuator_force`/`contact` + body/site 查询方法 | 其余字段扩展 |
@@ -859,17 +953,18 @@ self.do_simulation(torques, self.frame_skip)
 | # | 约束 | 架构依据 | 验收方式 |
 |---|------|---------|---------|
 | K1 | Env 持有 `_gym`/`_stub`/`_channel`（带下划线），不持有 `gym`/`stub`/`channel` | §6.1 C2, §11.4 | 源码审查 + `test_env_no_public_internal_attrs` |
-| K2 | Env 实现 `_BLOCKED_ATTRS` + `__getattr__` + `__dir__` | §7.1 M1/M2, §7.6 | `test_env_blocked_attrs_raise_guidance` + `test_env_dir_only_exposes_public_api` |
-| K3 | Gym 实现 `_BLOCKED_ATTRS` + `__getattr__` + `__dir__`（已满足，P1 交付） | §7.1 M1/M2, §7.2, §7.3 | P1 测试 |
-| K4 | Env 不直接访问 Gym 的 `_sim`/`_studio`/`_registry`/`_opt`/`_view`/`_euler` 私有属性 | §6.1 C2, §11.3 | `test_env_no_gym_private_access`（源码 grep） |
-| K5 | Gym 不通过 public property 暴露 `_studio`/`_sim`/`_registry`/`_opt`/`_view` | §5.4, §7.1 M2 | 源码审查 + `test_gym_no_internal_property` |
-| K6 | `env.data` 类型为 `OrcaGymDataView`，不存在 `OrcaGymData` 双轨 | §4.2, §5.1, §6.2 R1 | `test_data_property_type` + 父类契约和解（见 12.5） |
+| K2 | Env 实现 `__dir__`，且仓库配置 ruff SLF001 | §7.1 M1/M3, §7.2, §7.6 | `test_env_dir_only_exposes_public_api` + ruff SLF001 扫描零报警 |
+| K3 | Gym 实现 `__dir__`，且仓库配置 ruff SLF001 | §7.1 M1/M3, §7.4 | ruff SLF001 扫描零报警 |
+| K4 | Env 不直接访问 Gym 的 `_sim`/`_studio`/`_registry`/`_opt`/`_view`/`_euler` 私有属性 | §6.1 C2, §11.3 | ruff SLF001 扫描（`test_env_no_gym_private_access` 改为 ruff 验证） |
+| K5 | Gym 不通过 public property 暴露 `_studio`/`_sim`/`_registry`/`_opt`/`_view` | §5.4, §7.1 M3 | 源码审查 + `test_gym_no_internal_property` |
+| K6 | `env.data` 类型为 `OrcaGymDataView`，不存在 `OrcaGymData` 双轨 | §4.2, §5.1, §6.2 R1 | `test_data_property_type` |
 | K7 | `env.model`/`env.sim_config`/`env.dt` 通过 Gym 公共委托获取，不触 Gym 私有 | §6.1 C2, §6.5 C1 | 源码审查 |
-| K8 | `do_simulation` 内部不读 `self._gym._euler`，通过 Gym 公共方法委托 | §8.2, §11.3 | 源码审查（骨架阶段 `_euler` 恒为 None，但仍不得直接读） |
-| K9 | Studio 交互通过 Env 自持 `_studio_bridge` 或 Gym 委托方法，不通过 `gym.studio` property | §5.4, §7.1 M2, §6.1 C2 | 源码审查 + `test_no_studio_property_access` |
-| K10 | 父类 `OrcaGymBaseEnv` 的 `self.gym`/`self.model`/`self.data` 赋值被 Euler 体系显式接管或屏蔽 | §4.3, §11.1 | 见 12.5 和解方案 |
-| K11 | 所有公共方法返回 typed 对象，不返回 `mujoco.MjData`/`mujoco.MjModel` | §7.1 M4 | 类型标注审查 |
-| K12 | Env/Gym/DataView 类 docstring 明确列出正确用法与禁止事项 | §7.1 M5 | 源码审查 |
+| K8 | `do_simulation` 内部不读 `self._gym._euler`，通过 Gym 公共方法委托 | §8.2, §11.3 | ruff SLF001 扫描（骨架阶段 `_euler` 恒为 None，但仍不得直接读） |
+| K9 | Studio 交互通过 Env 自持 `_studio_bridge` 或 Gym 委托方法，不通过 `gym.studio` property | §5.4, §7.1 M3, §6.1 C2 | 源码审查 + `test_no_studio_property_access` |
+| K11 | 所有公共方法返回 typed 对象，不返回 `mujoco.MjData`/`mujoco.MjModel` | §7.1 M5 | 类型标注审查 |
+| K12 | Env/Gym/DataView 类 docstring 明确列出正确用法与禁止事项 | §7.1 M6 | 源码审查 |
+| K13 | 仓库根目录配置 `AGENTS.md`，包含"API 隔离强制"章节（见 §7.3） | §7.1 M2, §7.3 | 源码审查 |
+| K14 | `OrcaGymEulerEnv` 直接继承 `gym.Env` + `OrcaGymEnvMixin`，不继承 `OrcaGymBaseEnv` | §4.1, §5.1, §5.9, §11.1 | 源码审查 + `test_env_inheritance_chain` |
 
 ### 12.4 骨架签名规约
 
@@ -878,7 +973,7 @@ self.do_simulation(torques, self.frame_skip)
 #### 12.4.1 `OrcaGymEulerEnv` 骨架
 
 ```python
-class OrcaGymEulerEnv(OrcaGymBaseEnv):
+class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     """OrcaGym Euler 环境 Facade。
 
     使用契约:
@@ -889,18 +984,14 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 
     禁止:
         不要访问 env._gym._sim._mjData 或任何内部 MuJoCo 对象。
-        不要访问 env._gym._studio / env._studio_bridge（内部组件）。
+        env.gym/env.stub/env.channel 不存在（直接继承 gym.Env，不创建这些属性）。
         缺少功能时，扩展本类的公共方法。
     """
 
-    # K2: Env 层隔离机制（与 Gym 层对称）
-    _BLOCKED_ATTRS = frozenset({
-        # L3 引擎内部
-        "_mjData", "_mjModel", "mj_data", "mj_model",
-        "_mj_data", "_mj_model", "mjData", "mjModel",
-        # L2 内部组件（含父类残留的公共名）
-        "gym", "stub", "channel",
-    })
+    # K2: Env 层隔离机制（__dir__ + ruff SLF001，见 §7）
+    # 不实现 _BLOCKED_ATTRS / __getattr__ / __getattribute__ / __setattr__。
+    # env.gym/env.stub/env.channel 天然不存在（Python 原生 AttributeError）。
+    # 穿墙访问 _gym._sim 等依赖 ruff SLF001 静态检查。
 
     def __init__(
         self,
@@ -914,13 +1005,27 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
         render_mode: str = "human",
         sync_render: bool = False,
         **kwargs,
-    ) -> None: ...
+    ) -> None:
+        # 直接赋值内部字段，无需 __setattr__ 屏蔽
+        self._agent_names = agent_names
+        self.frame_skip = frame_skip
+        self._gym: OrcaGymEuler = ...
+        self._stub = ...
+        self._channel = ...
+        self._studio_bridge = ...
+        # 生命周期由本类 __init__ 自主编排，不调用父类 OrcaGymBaseEnv.__init__
+        self.initialize_grpc()
+        self.pause_simulation()
+        self.set_time_step(time_step)
+        self.initialize_simulation()
+        self.reset_simulation()
+        self.init_qpos_qvel()
+        ...
 
     # --- K2: 隔离机制 ---
-    def __getattr__(self, name: str): ...   # 拦截 _BLOCKED_ATTRS，返回引导性错误
     def __dir__(self) -> list[str]: ...     # 只列 L1 公共 API，不含 _gym/_studio_bridge/_mjData
 
-    # --- 生命周期（实现 OrcaGymBaseEnv 抽象方法）---
+    # --- 生命周期（本类自主实现，不继承自 OrcaGymBaseEnv）---
     def initialize_grpc(self) -> None: ...
     def initialize_simulation(self) -> tuple[OrcaGymModel, OrcaGymDataView]: ...  # K6: 返回 DataView
     def reset_simulation(self) -> None: ...
@@ -943,7 +1048,7 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
     @property
     def sim_config(self) -> SimConfig: ...
     @property
-    def dt(self) -> float: ...
+    def dt(self) -> float: ...   # 直接实现：self._gym.sim_config.timestep * self.frame_skip
     @property
     def ctrl(self) -> np.ndarray: ...
     @ctrl.setter
@@ -958,15 +1063,14 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
     def reset_model(self) -> tuple[dict, dict]: ...
     def _get_obs(self) -> dict: ...
 
-    # --- K10: 父类契约屏蔽（见 12.5）---
-    # 不在 __dir__ 暴露 gym/stub/channel；父类赋值通过 __setattr__ 屏蔽或 property 接管
+    # 名称空间、空间生成、reset 编排继承自 OrcaGymEnvMixin（见 §5.9）
 ```
 
 **关键约束说明**：
 
 - **K1 命名**：内部对象一律 `_gym`/`_stub`/`_channel`/`_studio_bridge`，无下划线版本不存储。
-- **K2 Env 隔离**：`_BLOCKED_ATTRS` 必须包含父类残留的公共名 `gym`/`stub`/`channel`，访问时触发引导错误指明用 `env.data`/`env.sim_config` 替代。
-- **K4 不穿墙**：Env 内部实现只调 `self._gym.mj_step()`/`self._gym.data`/`self._gym.sim_config` 等 Gym 的**公共**方法/属性，**绝不**写 `self._gym._opt`/`self._gym._registry`/`self._gym._view`/`self._gym._sim`/`self._gym._studio`。
+- **K2 Env 隔离**：Env 实现 `__dir__`（只列公共 API，不含 `gym`/`stub`/`channel`/`_gym`/`_studio_bridge`）。穿墙访问由 ruff SLF001 检测：Env 内部 `self._gym` 合法，外部访问 `env._gym._sim` 报警。
+- **K4 不穿墙**：Env 内部实现只调 `self._gym.mj_step()`/`self._gym.data`/`self._gym.sim_config` 等 Gym 的**公共**方法/属性，**绝不**写 `self._gym._opt`/`self._gym._registry`/`self._gym._view`/`self._gym._sim`/`self._gym._studio`。违反由 ruff SLF001 检测。
 - **K9 Studio 访问**：Env 在 `initialize_grpc` 时 `self._studio_bridge = self._gym.studio_bridge`（Gym 提供**方法** `studio_bridge()` 而非 property `studio`，或 Env 在构造时从 Gym 取一次引用自持）。此后 Env 的 Studio 交互方法委托 `self._studio_bridge`，**不**写 `self._gym.studio.xxx`。
 
 #### 12.4.2 `OrcaGymEuler` 骨架
@@ -984,18 +1088,14 @@ class OrcaGymEuler:
     └─────────────────────────────────────────────────────────────┘
     """
 
-    _BLOCKED_ATTRS = frozenset({
-        "_mjData", "_mjModel", "mj_data", "mj_model",
-        "_mj_data", "_mj_model", "mjData", "mjModel",
-        # K5: 子组件对象也不对外暴露
-        "_sim", "_studio", "_registry", "_opt", "_view", "_euler",
-        "sim", "studio", "registry", "opt", "view", "euler",
-    })
+    # K3/K5: 隔离机制（__dir__ + ruff SLF001，见 §7）
+    # 不实现 _BLOCKED_ATTRS / __getattr__ / __getattribute__。
+    # 子组件对象 _sim/_studio/_registry/_opt/_view/_euler 带 _ 前缀，
+    # 外部访问由 ruff SLF001 检测；内部 self._sim 合法。
 
     def __init__(self, stub=None) -> None: ...
 
     # --- K3/K5: 隔离机制 ---
-    def __getattr__(self, name: str): ...   # 拦截 _BLOCKED_ATTRS
     def __dir__(self) -> list[str]: ...     # 只列公共 API，不含子组件对象
 
     # --- 生命周期 ---
@@ -1034,7 +1134,7 @@ class OrcaGymEuler:
 
 **关键约束说明**：
 
-- **K5 不暴露子组件**：`_sim`/`_studio`/`_registry`/`_opt`/`_view`/`_euler` 全部进入 `_BLOCKED_ATTRS`，且**不提供**对应的 public property（`studio`/`sim`/`opt` 等）。`OrcaGymDataView`/`SimConfig`/`OrcaGymModel` 作为 typed 返回值是可以的（它们本身是公共类型），但返回**子组件对象本身**（如 `OrcaStudioBridge` 实例）不允许。
+- **K5 不暴露子组件**：`_sim`/`_studio`/`_registry`/`_opt`/`_view`/`_euler` 带 `_` 前缀（外部访问由 ruff SLF001 检测），且**不提供**对应的 public property（`studio`/`sim`/`opt` 等）。`OrcaGymDataView`/`SimConfig`/`OrcaGymModel` 作为 typed 返回值是可以的（它们本身是公共类型），但返回**子组件对象本身**（如 `OrcaStudioBridge` 实例）不允许。
 - **K9 Studio 桥接**：用**方法** `studio_bridge()` 而非 property，且文档约定仅 Env 在 `initialize_grpc` 时调用一次取引用。这样 `gym.studio` 在 IDE 自动补全中不出现（不在 `__dir__`），且语义上"取一次引用"比"每次 property 访问"更显式。
 - **K8 耦合查询**：`has_euler()` + `step_with_coupling()` 封装了 `do_simulation` 对 `_euler` 的访问，Env 不需要知道 `_euler` 存在。
 
@@ -1095,91 +1195,33 @@ def render(self):
     self._gym.studio.render(...)         # gym.studio 当 property 用
 ```
 
-### 12.5 父类 `OrcaGymBaseEnv` 契约和解（K10）
-
-`OrcaGymBaseEnv.__init__` 会执行 `self.gym = None`、`self.model, self.data = self.initialize_simulation()`、`self.gym.opt.timestep`（见 [orca_gym_env.py](../../../../orca_gym/environment/orca_gym_env.py) L53/L55/L290）——这些与 Euler 体系的 K1/K2/K6 直接冲突。骨架必须显式和解，不能假装问题不存在。
-
-**和解方案（三选一，推荐方案 A）**：
-
-#### 方案 A：`__setattr__` 屏蔽 + property 接管（推荐）
-
-Env 在 `__init__` 中对父类会赋值的关键字段做屏蔽，property 接管读取：
-
-```python
-class OrcaGymEulerEnv(OrcaGymBaseEnv):
-    _SHIELDED_ATTRS = frozenset({"gym", "stub", "channel", "model", "data"})
-
-    def __setattr__(self, name, value):
-        # 父类尝试给 self.gym / self.model / self.data 赋值时，转发到带下划线字段或忽略
-        if name == "gym":
-            object.__setattr__(self, "_gym", value)   # 转发
-            return
-        if name == "stub":
-            object.__setattr__(self, "_stub", value)
-            return
-        if name == "channel":
-            object.__setattr__(self, "_channel", value)
-            return
-        if name == "model":
-            return   # 忽略：model 始终通过 @property 从 self._gym.model 取
-        if name == "data":
-            return   # 忽略：data 始终通过 @property 从 self._gym.data 取
-        super().__setattr__(name, value)
-
-    @property
-    def model(self) -> OrcaGymModel:
-        return self._gym.model
-
-    @property
-    def data(self) -> OrcaGymDataView:
-        return self._gym.data
-
-    @property
-    def dt(self) -> float:
-        # 替代父类的 self.gym.opt.timestep * self.frame_skip
-        return self._gym.sim_config.timestep * self.frame_skip
-```
-
-- **优点**：不修改父类，隔离彻底，`__getattr__` 对 `gym`/`stub`/`channel` 的拦截仍生效（因为 `__setattr__` 转发到 `_gym`，实际不创建 `gym` 属性）。
-- **注意**：`__setattr__` 必须在 `super().__init__()` 之前生效，因此需在 Env `__init__` 最开头设置（Python 的 `__setattr__` 是类级方法，定义即生效，无需额外动作）。
-
-#### 方案 B：修改父类 `OrcaGymBaseEnv`
-
-把父类的 `self.gym`/`self.model`/`self.data` 改为 `_gym`/`_model`/`_data`，所有子类统一。但架构 §4.3 明确"原有继承体系不动"，**不采用**。
-
-#### 方案 C：Env 不继承 `OrcaGymBaseEnv`
-
-独立实现 Gymnasium `Env`。但架构 §11.1 明确"继承 `OrcaGymBaseEnv`，不继承 `OrcaGymLocalEnv`"是为了复用 step/reset 框架，**不采用**。
-
-**结论**：骨架采用方案 A。`initialize_simulation` 返回 `(OrcaGymModel, OrcaGymDataView)`，父类的 `self.model, self.data = ...` 赋值被 `__setattr__` 忽略，实际读取走 property。
-
-### 12.6 骨架验收测试（硬性门槛）
+### 12.5 骨架验收测试（硬性门槛）
 
 以下测试用例是骨架阶段的**验收门槛**，全部通过方可进入 P4 填充。测试位置：`tests/orca_gym/environment/euler/test_orca_gym_euler_env_skeleton.py` 和 `tests/orca_gym/core/euler/test_orca_gym_euler.py`。
 
-#### Env 层（对应 K1/K2/K4/K6/K9/K10）
+#### Env 层（对应 K1/K2/K4/K6/K9/K13/K14）
 
 | 测试用例 | 验收点 |
 |---------|--------|
 | `test_env_no_public_internal_attrs` | K1：Env 实例 `__dict__` 不含 `gym`/`stub`/`channel`（含 `_gym`/`_stub`/`_channel`） |
-| `test_env_blocked_attrs_raise_guidance` | K2：访问 `env.gym`/`env.stub`/`env._mjData`/`env._mjModel` 抛 `AttributeError` 且消息含引导文本 |
 | `test_env_dir_only_exposes_public_api` | K2：`dir(env)` 不含 `gym`/`stub`/`channel`/`_gym`/`_studio_bridge`/`_mjData`/`_mjModel` |
-| `test_env_no_gym_private_access` | K4：Env 源码 grep 不到 `_gym._sim`/`_gym._studio`/`_gym._registry`/`_gym._opt`/`_gym._view`/`_gym._euler` |
+| `ruff check --select SLF001` 零报警 | K2/K4/K8：Env 源码无外部穿墙访问 `_gym._sim`/`_gym._studio`/`_gym._mjData`/`_gym._euler` 等 |
 | `test_data_property_returns_view` | K6：`env.data` 是 `OrcaGymDataView` 实例，非 `OrcaGymData` |
 | `test_no_studio_property_access` | K9：Env 源码 grep 不到 `gym.studio`（允许 `_studio_bridge` 和 `_gym.studio_bridge()`） |
-| `test_parent_assignment_shielded` | K10：父类 `self.gym = X` 后 `env.gym` 仍抛 `AttributeError`，`env._gym` 是 X |
-| `test_do_simulation_no_euler_private_access` | K8：`do_simulation` 源码 grep 不到 `_euler` |
+| `test_env_gym_attr_natural_attribute_error` | K1/K14：`env.gym` 抛 `AttributeError`（Python 原生，属性不存在） |
+| `test_env_inheritance_chain` | K14：`OrcaGymEulerEnv.__bases__` 含 `gym.Env` 和 `OrcaGymEnvMixin`，不含 `OrcaGymBaseEnv` |
+| `AGENTS.md` 存在且含"API 隔离强制"章节 | K13：仓库根目录配置完整 |
 
-#### Gym 层（对应 K3/K5/K8，P1 已有，补充）
+#### Gym 层（对应 K3/K5/K8）
 
 | 测试用例 | 验收点 |
 |---------|--------|
-| `test_gym_blocked_attrs_include_components` | K5：`gym._sim`/`gym._studio`/`gym._opt`/`gym._view` 抛 `AttributeError` |
+| `ruff check --select SLF001` 零报警 | K3/K5：Gym 源码无外部穿墙访问 `_sim._mjData`/`_studio`/`_opt` 等 |
 | `test_gym_no_internal_property` | K5：Gym 源码无 `@property def studio`/`@property def sim`/`@property def opt` |
 | `test_gym_has_euler_and_step_with_coupling` | K8：`has_euler()`/`step_with_coupling()` 存在且可调用 |
 | `test_gym_studio_bridge_is_method_not_property` | K9：`studio_bridge` 是方法，`gym.studio` 抛 `AttributeError` |
 
-### 12.7 骨架与 P4 填充的边界
+### 12.6 骨架与 P4 填充的边界
 
 骨架完成后，P4 填充阶段**不得破坏**以下不变性（架构 §10.3）：
 
@@ -1187,11 +1229,13 @@ class OrcaGymEulerEnv(OrcaGymBaseEnv):
 |--------|-------------|------------|
 | `_mjModel`/`_mjData` 永不作为公共属性暴露 | K1/K2/K3 | 新增方法不得返回 `_mjData`/`_mjModel` |
 | `env.data` 类型恒为 `OrcaGymDataView` | K6 | 新增 `query_*` 可读 DataView，不得改 `data` 返回类型 |
-| Env 不穿墙访问 Gym 私有 | K4/K8 | 新增 `set_*`/`apply_body_force` 通过 Gym 公共方法委托 |
+| Env 不穿墙访问 Gym 私有 | K4/K8 | 新增 `set_*`/`apply_body_force` 通过 Gym 公共方法委托，ruff SLF001 零报警 |
 | Studio 桥接不作为公共 property | K5/K9 | 新增 Studio 交互方法委托 `self._studio_bridge`，不复活 `gym.studio` |
 | `__dir__` 与公共 API 同步 | K2 | 每新增一个公共方法，同步加入 Env/Gym 的 `__dir__`，并补 `test_dir_matches_public_api` |
+| ruff SLF001 零报警 | K2/K3/K4/K8 | 每批方法提交前执行 `ruff check --select SLF001`，CI 强制 |
+| 继承链不变 | K14 | P4 填充不得改继承关系，保持 `OrcaGymEnvMixin, gym.Env` |
 
-P4 填充每批方法后，必须重跑 12.6 的全部骨架验收测试，确保骨架约束未被破坏。
+P4 填充每批方法后，必须重跑 12.5 的全部骨架验收测试 + ruff SLF001 扫描，确保骨架约束未被破坏。
 
 ---
 
@@ -1200,9 +1244,10 @@ P4 填充每批方法后，必须重跑 12.6 的全部骨架验收测试，确�
 本文论述了 `OrcaGymEulerEnv` + `OrcaGymEuler` 的架构设计，核心要点：
 
 1. **Facade + 职责内聚分解**替代上帝类，组件按职责划分为 `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig`/`EulerOrchestrator`
-2. **完备的公共 API 契约**（P1 完备性）覆盖所有合法 MuJoCo 操作需求，消除用户绕道理由
-3. **多层封装隔离机制**（`__getattr__` 拦截 + `__dir__` 控制 + DataView 兜底 + 类型标注 + docstring 契约 + 路径深度）引导 AI 和用户走正确路径
-4. **步进编排契约**明确 `do_simulation`（含耦合）与 `mj_step`（纯 MuJoCo）的语义区分
-5. **迁移策略**约 70% 零改动、25% 机械替换、5% 设计调整，外围组件通过 Protocol 平滑过渡
+2. **直接继承 `gym.Env` + `OrcaGymEnvMixin`**：不继承 `OrcaGymBaseEnv`，避免父类 `self.gym`/`self.model`/`self.data` 赋值冲突；公共方法通过 Mixin 共享，避免代码重复
+3. **完备的公共 API 契约**（P1 完备性）覆盖所有合法 MuJoCo 操作需求，消除用户绕道理由
+4. **多层封装隔离机制**（ruff SLF001 静态检查 + AGENTS.md AI 约束 + Python 原生属性不存在 + `__dir__` 控制 + DataView 兜底 + 类型标注 + docstring 契约）引导 AI 和用户走正确路径
+5. **步进编排契约**明确 `do_simulation`（含耦合）与 `mj_step`（纯 MuJoCo）的语义区分
+6. **迁移策略**约 70% 零改动、25% 机械替换、5% 设计调整，外围组件通过 Protocol 平滑过渡
 
 本架构为未来 OrcaGym 主路径奠定基础，Euler 耦合编排将在后续文档中单独设计。
