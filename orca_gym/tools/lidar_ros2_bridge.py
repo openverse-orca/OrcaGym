@@ -1,0 +1,242 @@
+"""
+LiDAR ROS2 Bridge — 将 gRPC LiDAR 数据转换为 ROS2 消息发布
+
+发布 Topic:
+  /scan          — sensor_msgs/LaserScan (2D, 最低垂直层)
+  /point_cloud   — sensor_msgs/PointCloud2 (3D, 含 intensity)
+
+依赖安装:
+  1. sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py ros-humble-std-msgs
+  2. conda create -n ros2_bridge python=3.10 -y
+  3. conda run -n ros2_bridge pip install numpy grpcio grpcio-tools protobuf
+
+用法:
+  source /opt/ros/humble/setup.bash
+  conda activate ros2_bridge
+  export PYTHONPATH=/opt/ros/humble/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:$PYTHONPATH
+  export LD_LIBRARY_PATH=/opt/ros/humble/lib:$LD_LIBRARY_PATH
+  python lidar_ros2_bridge.py --entity LiDAR --frame_id base_scan
+
+RViz2 查看:
+  rviz2
+  → Fixed Frame: base_scan
+  → Add → LaserScan → Topic: /scan
+  → Add → PointCloud2 → Topic: /point_cloud
+"""
+
+import argparse
+import sys
+import os
+import struct
+import time
+
+_ros2_root = "/opt/ros/humble"
+_ros2_py_path = f"{_ros2_root}/local/lib/python3.10/dist-packages:{_ros2_root}/lib/python3.10/site-packages"
+if _ros2_py_path not in os.environ.get("PYTHONPATH", ""):
+    os.environ["PYTHONPATH"] = _ros2_py_path + ":" + os.environ.get("PYTHONPATH", "")
+if _ros2_root + "/lib" not in os.environ.get("LD_LIBRARY_PATH", ""):
+    os.environ["LD_LIBRARY_PATH"] = _ros2_root + "/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
+
+import numpy as np
+import grpc
+
+proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
+sys.path.append(proto_path)
+import mjc_message_pb2
+import mjc_message_pb2_grpc
+
+try:
+    import rclpy
+    from rclpy.node import Node
+    from sensor_msgs.msg import LaserScan, PointCloud2, PointField
+    from std_msgs.msg import Header
+except ImportError:
+    print("[ERROR] ROS2 Python packages not found. Install with:")
+    print("  sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py")
+    print("  source /opt/ros/humble/setup.bash")
+    sys.exit(1)
+
+
+def query_lidar(stub, entity_name):
+    request = mjc_message_pb2.LiDARPointCloudRequest(entity_name=entity_name)
+    try:
+        response = stub.QueryLiDARPointCloud(request, timeout=2.0)
+    except grpc.RpcError as e:
+        print(f"[ERROR] gRPC call failed: {e.code()}")
+        return None
+
+    if response.status == mjc_message_pb2.LiDARPointCloudResponse.ENTITY_NOT_FOUND:
+        print(f"[ERROR] LiDAR entity not found: {entity_name}")
+        return None
+    if response.status == mjc_message_pb2.LiDARPointCloudResponse.NO_DATA:
+        return None
+
+    result = {
+        "bin_count": response.bin_count,
+        "vertical_layers": response.vertical_layers,
+        "angular_resolution": response.angular_resolution,
+        "max_h_angle": response.max_h_angle,
+        "min_v_angle": response.min_v_angle,
+        "v_step": response.v_step,
+        "min_range": response.min_range,
+        "max_range": response.max_range,
+    }
+
+    if response.range_data:
+        ranges = np.frombuffer(response.range_data, dtype=np.float32).copy()
+        result["ranges"] = ranges.reshape(response.bin_count, response.vertical_layers)
+    else:
+        result["ranges"] = np.full((response.bin_count, response.vertical_layers), -1.0, dtype=np.float32)
+
+    if response.point_data:
+        points = np.frombuffer(response.point_data, dtype=np.float32).copy()
+        result["points"] = points.reshape(response.bin_count, response.vertical_layers, 3)
+    else:
+        result["points"] = np.zeros((response.bin_count, response.vertical_layers, 3), dtype=np.float32)
+
+    if response.intensity_data:
+        intensities = np.frombuffer(response.intensity_data, dtype=np.float32).copy()
+        result["intensities"] = intensities.reshape(response.bin_count, response.vertical_layers)
+    else:
+        result["intensities"] = np.zeros((response.bin_count, response.vertical_layers), dtype=np.float32)
+
+    return result
+
+
+def to_laser_scan(data, frame_id, stamp):
+    msg = LaserScan()
+    msg.header = Header(frame_id=frame_id, stamp=stamp)
+
+    msg.angle_min = 0.0
+    msg.angle_max = data["max_h_angle"]
+    msg.angle_increment = data["angular_resolution"]
+    msg.time_increment = 0.0
+    msg.scan_time = 1.0 / 10.0
+    msg.range_min = data["min_range"]
+    msg.range_max = data["max_range"]
+
+    ranges_2d = data["ranges"][:, 0]
+    intensities_2d = data["intensities"][:, 0]
+
+    valid = ranges_2d > 0
+    msg.ranges = [float(r) if v else float("inf") for r, v in zip(ranges_2d, valid)]
+    msg.intensities = [float(i) if v else 0.0 for i, v in zip(intensities_2d, valid)]
+
+    return msg
+
+
+def to_point_cloud2(data, frame_id, stamp):
+    msg = PointCloud2()
+    msg.header = Header(frame_id=frame_id, stamp=stamp)
+
+    ranges = data["ranges"]
+    points = data["points"]
+    intensities = data["intensities"]
+
+    valid = ranges > 0
+    pts = points[valid]
+    ints = intensities[valid]
+
+    n = pts.shape[0]
+
+    msg.height = 1
+    msg.width = n
+
+    msg.fields = [
+        PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
+        PointField(name="intensity", offset=12, datatype=PointField.FLOAT32, count=1),
+    ]
+
+    msg.is_bigendian = False
+    msg.point_step = 16
+    msg.row_step = msg.point_step * n
+    msg.is_dense = True
+
+    buf = bytearray(n * 16)
+    for i in range(n):
+        struct.pack_into("ffff", buf, i * 16,
+                         float(pts[i, 0]), float(pts[i, 1]), float(pts[i, 2]),
+                         float(ints[i]))
+
+    msg.data = bytes(buf)
+    return msg
+
+
+class LiDARRos2Bridge(Node):
+    def __init__(self, stub, entity_name, frame_id, hz):
+        super().__init__("lidar_ros2_bridge")
+        self.stub = stub
+        self.entity_name = entity_name
+        self.frame_id = frame_id
+
+        self.scan_pub = self.create_publisher(LaserScan, "/scan", 10)
+        self.cloud_pub = self.create_publisher(PointCloud2, "/point_cloud", 10)
+
+        interval = 1.0 / hz
+        self.timer = self.create_timer(interval, self.timer_callback)
+
+        self.frame_count = 0
+        self.get_logger().info(
+            f"Bridge started: entity={entity_name}, frame_id={frame_id}, hz={hz}"
+        )
+
+    def timer_callback(self):
+        data = query_lidar(self.stub, self.entity_name)
+        if data is None:
+            return
+
+        self.frame_count += 1
+        now = self.get_clock().now().to_msg()
+
+        scan_msg = to_laser_scan(data, self.frame_id, now)
+        cloud_msg = to_point_cloud2(data, self.frame_id, now)
+
+        self.scan_pub.publish(scan_msg)
+        self.cloud_pub.publish(cloud_msg)
+
+        if self.frame_count % 30 == 0:
+            n_valid = int(np.sum(data["ranges"] > 0))
+            self.get_logger().info(
+                f"Published frame {self.frame_count}: {n_valid} valid points"
+            )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="LiDAR ROS2 Bridge")
+    parser.add_argument("--addr", type=str, default="localhost:50051",
+                        help="gRPC server address")
+    parser.add_argument("--entity", type=str, default="LiDAR",
+                        help="LiDAR entity name")
+    parser.add_argument("--frame_id", type=str, default="base_scan",
+                        help="TF frame ID for ROS2 messages")
+    parser.add_argument("--hz", type=float, default=10,
+                        help="Publish rate in Hz")
+    args = parser.parse_args()
+
+    channel = grpc.insecure_channel(
+        args.addr,
+        options=[
+            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+            ("grpc.max_send_message_length", 1024 * 1024 * 1024),
+        ],
+    )
+    stub = mjc_message_pb2_grpc.GrpcServiceStub(channel)
+
+    rclpy.init()
+    node = LiDARRos2Bridge(stub, args.entity, args.frame_id, args.hz)
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+        channel.close()
+
+
+if __name__ == "__main__":
+    main()

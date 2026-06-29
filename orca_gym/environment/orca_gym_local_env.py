@@ -41,6 +41,9 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         time_step: float,        
         **kwargs        
     ):
+        self._skip_grpc_load = bool(kwargs.pop("skip_grpc_load", False))
+        self._local_xml_path = kwargs.pop("local_xml_path", None)
+        self._xml_assets_dir = kwargs.pop("xml_assets_dir", None)
         super().__init__(
             frame_skip = frame_skip,
             orcagym_addr = orcagym_addr,
@@ -98,6 +101,16 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def initialize_grpc(self):
         """初始化 gRPC 通信通道和客户端"""
+        if self._skip_grpc_load:
+            self.channel = None
+            self.stub = None
+            self.gym = OrcaGymLocal(
+                None,
+                skip_grpc_load=True,
+                local_xml_path=self._local_xml_path,
+                xml_assets_dir=self._xml_assets_dir,
+            )
+            return
         self.channel = grpc.aio.insecure_channel(
             self.orcagym_addr,
             options=[
@@ -110,6 +123,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     
     def pause_simulation(self):
         """暂停仿真（采用被动模式）"""
+        if self._skip_grpc_load:
+            return
         self.loop.run_until_complete(self._pause_simulation())
 
     async def _pause_simulation(self):
@@ -123,6 +138,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def close(self):
         """关闭环境，清理资源"""
+        if self._skip_grpc_load:
+            return
         self.loop.run_until_complete(self._close_grpc())
 
     async def _get_body_manipulation_anchored(self):
@@ -179,6 +196,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     async def _get_frame_png(self, image_path):
         return await self.gym.get_frame_png(image_path)
+
+    def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        return self.loop.run_until_complete(self._query_lidar_point_cloud(entity_name))
+
+    async def _query_lidar_point_cloud(self, entity_name: str):
+        return await self.gym.query_lidar_point_cloud(entity_name)
 
     def get_body_manipulation_movement(self):
         actor_movement = self.loop.run_until_complete(self._get_body_manipulation_movement())
@@ -542,6 +565,25 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
     def mj_clear_xfrc_applied_for_site(self, site_name):
         self.gym.mj_clear_xfrc_applied_for_site(site_name)
 
+    def apply_force_to_body(
+        self,
+        body_name: str,
+        force: np.ndarray,
+        torque: np.ndarray,
+    ) -> None:
+        """
+        在刚体上施加世界系外力/外力矩（写入 MuJoCo mjData.xfrc_applied，供 mj_step 使用）。
+
+        OrcaLink force_position 模式下 SPH 经 Ch1 下发的流体力通过此方法写入 MuJoCo。
+        self.data 为 OrcaGymData 状态副本，不含 xfrc_applied；须写 gym._mjData。
+        """
+        body_id = self.model.body_name2id(body_name)
+        f = np.asarray(force, dtype=np.float64).reshape(3)
+        tau = np.asarray(torque, dtype=np.float64).reshape(3)
+        mjd = self.gym._mjData
+        mjd.xfrc_applied[body_id, :3] = f
+        mjd.xfrc_applied[body_id, 3:] = tau
+
     def _step_orca_sim_simulation(self, ctrl, n_frames):
         """执行仿真步进：设置控制并步进 n_frames 次"""
         self.set_ctrl(ctrl)
@@ -552,7 +594,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         self.time_step = time_step
         self.realtime_step = time_step * self.frame_skip
         self.gym.set_time_step(time_step)
-        self.loop.run_until_complete(self.gym.set_timestep_remote(time_step))
+        if not self._skip_grpc_load:
+            self.loop.run_until_complete(self.gym.set_timestep_remote(time_step))
         return
 
     def update_data(self):
@@ -680,6 +723,17 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         xmat = np.array([body_dict[body_name]['Mat'] for body_name in body_name_list]).flat.copy()
         xquat = np.array([body_dict[body_name]['Quat'] for body_name in body_name_list]).flat.copy()
         return xpos, xmat, xquat
+    
+    def get_body_xpos_xmat_xquat_xvel(self, body_name_list):
+        """获取 body 位姿与世界系线速度（COM）。"""
+        body_dict = self.gym.query_body_xpos_xmat_xquat_xvel(body_name_list)
+        if len(body_dict) != len(body_name_list):
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos = np.array([body_dict[n]['Pos'] for n in body_name_list]).flat.copy()
+        xmat = np.array([body_dict[n]['Mat'] for n in body_name_list]).flat.copy()
+        xquat = np.array([body_dict[n]['Quat'] for n in body_name_list]).flat.copy()
+        xvel = np.array([body_dict[n]['LinVel'] for n in body_name_list]).reshape(len(body_name_list), 3)
+        return xpos, xmat, xquat, xvel
     
     def query_sensor_data(self, sensor_names):
         """查询传感器数据"""

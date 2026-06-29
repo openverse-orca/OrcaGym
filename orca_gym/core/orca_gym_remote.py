@@ -9,7 +9,6 @@ import mjc_message_pb2
 import mjc_message_pb2_grpc
 
 import numpy as np
-import scipy.linalg
 from datetime import datetime
 
 from orca_gym.log.orca_log import get_orca_logger
