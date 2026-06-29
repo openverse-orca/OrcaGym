@@ -217,7 +217,8 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
         self._override_ctrls : dict[int, float] = {}
-        
+        self._protected_override_ctrl_ids: set[int] = set()
+
         # 清理可能的僵尸锁文件
         import tempfile
         temp_dir = tempfile.gettempdir()
@@ -1782,10 +1783,20 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         if len(self._override_ctrls) > 0:
-            # 如果有 override 控制，则使用 override 控制
+            protected = self._protected_override_ctrl_ids
             for actuator_id, value in self._override_ctrls.items():
+                if actuator_id in protected:
+                    continue
                 ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
+
+    def clear_override_ctrls(self) -> None:
+        """清空 Studio ``UpdateLocalEnv`` 缓存的 override，避免覆盖遥操 ctrl。"""
+        self._override_ctrls.clear()
+
+    def set_protected_override_ctrl_ids(self, actuator_ids: set[int] | list[int]) -> None:
+        """这些 actuator 索引不受 Studio override_ctrls 覆盖（如 G1 夹爪 pctrl）。"""
+        self._protected_override_ctrl_ids = {int(i) for i in actuator_ids}
 
     def mj_step(self, nstep):
         """

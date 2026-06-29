@@ -18,7 +18,14 @@ def transform_position_to_mujoco(p_unity):
     return np.array([x_mujoco, y_mujoco, z_mujoco])
 
 def transform_quaternion_to_mujoco(q_unity):
-    R_unity = R.from_quat(q_unity).as_matrix()
+    q = np.asarray(q_unity, dtype=np.float64)
+    norm = float(np.linalg.norm(q))
+    if norm < 1e-8:
+        # PICO 偶发零四元数；用单位四元数避免 scipy 抛错并断 TCP（ISSUE-PICO-ZERO-QUAT-01）
+        q = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float64)
+    else:
+        q = q / norm
+    R_unity = R.from_quat(q).as_matrix()
     T = np.array([
         [-1, 0, 0],
         [0, 0, 1],
@@ -133,8 +140,14 @@ class PicoJoystick:
                     line, buffer = buffer.split('\n', 1)
                     message = json.loads(line)
                     with self.mutex:
-                        self.current_transform = self.extract_all_transform(message)
+                        # 扳机/按键与 transform 解耦：transform 解析失败时仍保留 triggerValue
                         self.current_key_state = self.extract_key_state(message)
+                        try:
+                            self.current_transform = self.extract_all_transform(message)
+                        except Exception as exc:
+                            _logger.warning(
+                                "PICO transform parse failed (key_state kept): %s", exc
+                            )
         except Exception as e:
             _logger.info(f"Client disconnected: {e}")
         finally:
