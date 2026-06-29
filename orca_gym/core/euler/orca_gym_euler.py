@@ -124,7 +124,7 @@ class OrcaGymEuler:
     def __dir__(self) -> list[str]:
         """只列出公共 API，不含子组件对象或引擎内部。"""
         result = super().__dir__()
-        blocked = type(self)._BLOCKED_ATTRS
+        blocked = self._BLOCKED_ATTRS
         return [name for name in result if name not in blocked]
 
     # --- 生命周期 ---
@@ -142,8 +142,8 @@ class OrcaGymEuler:
 
         sim.init_simulation(model_xml_path)
         # 绑定 SimConfig/ModelRegistry 到真实 mjModel
-        opt._bind(sim._mjModel)           # 内部访问，不对外
-        registry._bind(sim._mjModel)
+        opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
+        registry._bind(sim._mjModel)      # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
         # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
         object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
         # 首次同步 DataView

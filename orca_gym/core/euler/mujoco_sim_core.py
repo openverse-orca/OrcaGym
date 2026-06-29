@@ -105,7 +105,7 @@ class MuJoCoSimCore:
         Args:
             view: 待填充的 OrcaGymDataView 实例。
         """
-        view._sync_from_mjdata(self._mjData, self._mjModel)
+        view._sync_from_mjdata(self._mjData, self._mjModel)  # noqa: SLF001  core 层组件协作：SimCore 填充 DataView
 
     # --- 力应用方法（待完整 P4）---
 

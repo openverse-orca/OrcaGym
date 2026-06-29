@@ -136,7 +136,9 @@ def reset_model(self):
 | Lesson 1/3 端到端 | sandbox 内 `OrcaFlow_Flow` 解释器 | 离线模式，无 gRPC |
 | Lesson 2 端到端 | 宿主机 + OrcaStudio 运行 | 需要 gRPC 连接，sandbox 内无法访问外部服务 |
 
-> **SB3 依赖**：Lesson 3 需要 `stable_baselines3`，在 `OrcaFlow_Flow` 环境中安装：`pip install stable-baselines3`。PPO 使用 CPU（`--device cpu`），无 CUDA 依赖。
+> **SB3 依赖**：Lesson 3 需要 `stable_baselines3`，在 `OrcaFlow_Flow` 环境中安装：`pip install stable-baselines3`。
+>
+> **GPU 训练策略**：RL 训练默认使用 GPU（`--device cuda`）。虽然 SB3 官方建议 MLP 策略用 CPU（[issue #1245](https://github.com/DLR-RM/stable-baselines3/issues/1245)），但实测 CPU 训练 MLP 较慢，项目统一采用 GPU 训练以提升效率。需 CUDA 环境（sandbox 内 GPU 不可用，需 TRAE 命令白名单旁路，详见 AGENTS.md 规则 3）。
 
 ---
 

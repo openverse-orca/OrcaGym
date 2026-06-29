@@ -1012,24 +1012,35 @@ select = ["SLF001"]
 
 #### 3.3.4 测试：Example 端到端运行
 
-**运行三个 example**（若环境允许）：
+**实际 example 目录结构**（`OrcaPlayground/examples/euler/`）：
+
+```
+examples/euler/
+├── 01_hello_euler/hello_euler.py      # 离线：随机动作驱动倒立摆，验证 API 契约
+├── 02_online_render/online_render.py  # 在线：连接 OrcaStudio 实时渲染（需 gRPC 服务）
+└── 03_rl_ppo/train_ppo.py             # 离线：SB3 PPO 训练倒立摆
+```
+
+**运行离线 example**（01 和 03，无需 OrcaStudio）：
 
 ```bash
-# 01_hello_euler（离线模式）
-<conda-base>/envs/orca/bin/python OrcaPlayground/examples/euler/01_hello_euler.py
+# 01_hello_euler（离线模式，验证 API 契约）
+cd <OrcaPlayground-root> && <conda-base>/envs/orca/bin/python examples/euler/01_hello_euler/hello_euler.py --steps 200
 
-# 03_rl_ppo（离线模式，Gymnasium 契约）
-<conda-base>/envs/orca/bin/python OrcaPlayground/examples/euler/03_rl_ppo.py
+# 03_rl_ppo（离线模式，Gymnasium 契约 + SB3 训练）
+cd <OrcaPlayground-root> && <conda-base>/envs/orca/bin/python examples/euler/03_rl_ppo/train_ppo.py --total-timesteps 20000
 ```
 
 **验收标准**：
 
 | 验收项 | 验证方式 |
 |--------|---------|
-| 01_hello_euler 运行无异常 | 脚本退出码 0 |
-| 03_rl_ppo 训练启动正常 | 脚本退出码 0（或 Ctrl+C 中断后无 AttributeError） |
+| 01_hello_euler 运行无异常 | 脚本退出码 0，输出含「第 1 课验证通过」 |
+| 01_hello_euler API 契约正确 | 输出含 nq/nv/nu、qpos.shape、sim_config.timestep |
+| 03_rl_ppo 训练启动正常 | 脚本退出码 0，输出含 reward 训练曲线 |
+| 03_rl_ppo Gymnasium 契约 | step 返回 5 元组，reset 返回 2 元组，无 AttributeError |
 
-> 注：02_online_render 需要 OrcaStudio gRPC 服务，若环境不可用可跳过。
+> 注：02_online_render 需要 OrcaStudio gRPC 服务，CI/沙盒环境无法运行，阶段 3 跳过。
 
 ---
 
