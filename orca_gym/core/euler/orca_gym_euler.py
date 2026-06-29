@@ -25,7 +25,7 @@ OrcaGymModel。
 import numpy as np
 
 from orca_gym.core.euler.mujoco_sim_core import MuJoCoSimCore
-from orca_gym.core.euler.orca_studio_bridge import OrcaStudioBridge
+from orca_gym.core.euler.orca_studio_bridge import AnchorType, OrcaStudioBridge
 from orca_gym.core.euler.model_registry import ModelRegistry
 from orca_gym.core.euler.sim_config import SimConfig
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
@@ -272,6 +272,81 @@ class OrcaGymEuler:
         """通知 OrcaStudio 暂停仿真。"""
         await object.__getattribute__(self, "_studio").pause_simulation()
 
+    # --- Studio 委托（阶段三 3.4.4，委托 _studio bridge）---
+
+    async def begin_save_video(self, file_path: str, capture_mode) -> None:
+        """开始录制视频（委托 bridge）。"""
+        await object.__getattribute__(self, "_studio").begin_save_video(
+            file_path, capture_mode
+        )
+
+    async def stop_save_video(self) -> None:
+        """停止录制视频（委托 bridge）。"""
+        await object.__getattribute__(self, "_studio").stop_save_video()
+
+    async def get_current_frame(self) -> int:
+        """获取当前帧号（委托 bridge）。"""
+        return await object.__getattribute__(self, "_studio").get_current_frame()
+
+    async def get_camera_time_stamp(self, last_frame_index: int) -> dict:
+        """获取相机时间戳（委托 bridge）。"""
+        return await object.__getattribute__(
+            self, "_studio"
+        ).get_camera_time_stamp(last_frame_index)
+
+    async def get_frame_png(self, image_path: str) -> None:
+        """获取帧 PNG（委托 bridge）。"""
+        await object.__getattribute__(self, "_studio").get_frame_png(image_path)
+
+    async def load_content_file(
+        self,
+        content_file_name: str,
+        remote_file_dir: str = "",
+        local_file_dir: str = "",
+        temp_file_path: str | None = None,
+    ) -> None:
+        """加载内容文件（委托 bridge）。"""
+        await object.__getattribute__(self, "_studio").load_content_file(
+            content_file_name,
+            remote_file_dir=remote_file_dir,
+            local_file_dir=local_file_dir,
+            temp_file_path=temp_file_path,
+        )
+
+    # --- Studio 体操作状态查询（阶段三 3.5.6，委托 _studio bridge）---
+
+    async def get_body_manipulation_state(self) -> dict:
+        """查询 Studio 体操作状态（委托 bridge），组装为结构化 dict。
+
+        依赖反转：bridge 返回 (body_name, anchor_type) 与 movement dict，
+        本方法组装为 Env 编排可直接消费的结构。
+
+        Returns:
+            dict 含键：
+                - actor_name: str | None（Studio 当前锚定的 body 名，无则 None）。
+                - anchor_type: str | None（"weld"/"connect"/None）。
+                - mocap_pose: {"pos": np.ndarray(3,), "quat": np.ndarray(4,)}。
+                  UI 拖拽目标位姿（bridge 的 movement 字段为绝对目标位姿）。
+        """
+        studio = object.__getattribute__(self, "_studio")
+        body_name, anchor_type = await studio.get_body_manipulation_anchored()
+        movement = await studio.get_body_manipulation_movement()
+        if anchor_type == AnchorType.WELD:
+            anchor_type_str = "weld"
+        elif anchor_type == AnchorType.BALL:
+            anchor_type_str = "connect"
+        else:
+            anchor_type_str = None
+        actor_name = body_name if body_name else None
+        return {
+            "actor_name": actor_name,
+            "anchor_type": anchor_type_str,
+            "mocap_pose": {
+                "pos": movement["delta_pos"],
+                "quat": movement["delta_quat"],
+            },
+        }
+
     # --- K8: 步进耦合查询（供 do_simulation 使用，不暴露 _euler）---
 
     def has_euler(self) -> bool:
@@ -474,6 +549,44 @@ class OrcaGymEuler:
         """为 body 添加额外重量（委托 SimCore）。"""
         object.__getattribute__(self, "_sim").add_extra_weight(weight_load_dict)
 
+    # --- 雅可比计算方法（阶段三 3.3.3，委托 SimCore）---
+
+    def mj_jacBody(
+        self, jacp: np.ndarray, jacr: np.ndarray, body_id: int
+    ) -> None:
+        """计算 body 雅可比（原地写 jacp/jacr，委托 SimCore）。
+
+        Args:
+            jacp: 平移雅可比矩阵 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵 (3, nv)，调用方预分配。
+            body_id: MuJoCo body id。
+        """
+        object.__getattribute__(self, "_sim").mj_jacBody(jacp, jacr, body_id)
+
+    def mj_jacSite(
+        self, jacp: np.ndarray, jacr: np.ndarray, site_id: int
+    ) -> None:
+        """计算 site 雅可比（原地写 jacp/jacr，委托 SimCore）。
+
+        Args:
+            jacp: 平移雅可比矩阵 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵 (3, nv)，调用方预分配。
+            site_id: MuJoCo site id。
+        """
+        object.__getattribute__(self, "_sim").mj_jacSite(jacp, jacr, site_id)
+
+    def mj_jac_site(self, site_names: list[str]) -> dict[str, dict]:
+        """批量计算 site 雅可比（委托 SimCore）。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> {"jacp": np.ndarray(3, nv),
+                               "jacr": np.ndarray(3, nv)}]。
+        """
+        return object.__getattribute__(self, "_sim").mj_jac_site(site_names)
+
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_data_width()
@@ -481,3 +594,38 @@ class OrcaGymEuler:
     def equality_object_ids(self, eq_idx: int) -> tuple[int, int]:
         """查询等式约束关联对象 id（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_object_ids(eq_idx)
+
+    def n_equality(self) -> int:
+        """查询等式约束数量（委托 ModelRegistry）。"""
+        return object.__getattribute__(self, "_registry").n_equality()
+
+    def mocap_body_names(self) -> list[str]:
+        """查询所有 mocap body 名称（委托 ModelRegistry）。"""
+        return object.__getattribute__(self, "_registry").mocap_body_names()
+
+    # --- 等式约束委托（阶段三 3.5.3，委托 SimCore）---
+
+    def update_equality_constraints(self, eq_list: list[dict]) -> None:
+        """更新等式约束（委托 SimCore，写 _mjModel.eq_*）。
+
+        Args:
+            eq_list: 等式约束列表，每项含 type/obj1_id/obj2_id/data。
+        """
+        object.__getattribute__(self, "_sim").update_equality_constraints(eq_list)
+
+    def modify_equality_objects(
+        self,
+        eq_ids: list[int],
+        obj1_ids=None,
+        obj2_ids=None,
+    ) -> None:
+        """修改等式约束关联对象（委托 SimCore）。
+
+        Args:
+            eq_ids: 等式约束索引列表。
+            obj1_ids: 新的 obj1 id 列表（None 不修改）。
+            obj2_ids: 新的 obj2 id 列表（None 不修改）。
+        """
+        object.__getattribute__(self, "_sim").modify_equality_objects(
+            eq_ids, obj1_ids, obj2_ids
+        )

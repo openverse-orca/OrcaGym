@@ -305,3 +305,107 @@ class OrcaStudioBridge:
             mocap_body_info=mocap_infos
         )
         await self._stub.SetMocapPosAndQuat(request)
+
+    # --- 视频录制（阶段三 3.4.1）---
+
+    async def begin_save_video(self, file_path: str, capture_mode) -> None:
+        """开始录制视频（gRPC BeginSaveMp4File）。
+
+        离线模式（_stub is None）直接 return，不抛错。
+
+        Args:
+            file_path: 视频文件保存路径。
+            capture_mode: 捕获模式（CaptureMode 枚举值）。
+        """
+        if self._stub is None:
+            return
+        request = mjc_message_pb2.BeginSaveMp4FileRequest(
+            file_path=file_path, capture_mode=capture_mode
+        )
+        await self._stub.BeginSaveMp4File(request)
+
+    async def stop_save_video(self) -> None:
+        """停止录制视频（gRPC StopSaveMp4File）。
+
+        离线模式（_stub is None）直接 return，不抛错。
+        """
+        if self._stub is None:
+            return
+        await self._stub.StopSaveMp4File(mjc_message_pb2.StopSaveMp4FileRequest())
+
+    # --- 帧捕获（阶段三 3.4.2）---
+
+    async def get_current_frame(self) -> int:
+        """获取当前帧号（gRPC GetCurrentFrameIndex）。
+
+        离线模式（_stub is None）返回 -1。
+
+        Returns:
+            当前帧索引（int），离线模式返回 -1。
+        """
+        if self._stub is None:
+            return -1
+        resp = await self._stub.GetCurrentFrameIndex(
+            mjc_message_pb2.GetCurrentFrameIndexRequest()
+        )
+        return int(resp.current_frame)
+
+    async def get_camera_time_stamp(self, last_frame_index: int) -> dict:
+        """获取相机时间戳（gRPC GetTimeStamp）。
+
+        离线模式（_stub is None）返回空 dict。
+
+        Args:
+            last_frame_index: 截止帧索引。
+
+        Returns:
+            dict[camera_name -> list[uint64]]，离线模式返回 {}。
+        """
+        if self._stub is None:
+            return {}
+        request = mjc_message_pb2.GetTimeStampRequest(
+            last_frame_index=last_frame_index
+        )
+        resp = await self._stub.GetTimeStamp(request)
+        return {
+            camera_name: list(ts_list.time_stamps)
+            for camera_name, ts_list in resp.time_stamp_map.items()
+        }
+
+    async def get_frame_png(self, image_path: str) -> None:
+        """获取帧 PNG（gRPC GetCameraFramePNG）。离线 no-op。
+
+        Args:
+            image_path: 图像保存路径。
+        """
+        if self._stub is None:
+            return
+        request = mjc_message_pb2.GetCameraFramePNGRequest(image_path=image_path)
+        await self._stub.GetCameraFramePNG(request)
+
+    # --- 内容文件（阶段三 3.4.3）---
+
+    async def load_content_file(
+        self,
+        content_file_name: str,
+        remote_file_dir: str = "",
+        local_file_dir: str = "",
+        temp_file_path: str | None = None,
+    ) -> None:
+        """加载内容文件（gRPC LoadContentFile）。离线 no-op。
+
+        Bridge 层为薄 gRPC 包装：仅发起请求，文件落盘由上层处理。
+        离线模式（_stub is None）直接 return。
+
+        Args:
+            content_file_name: 资源文件名（如 mesh.obj）。
+            remote_file_dir: 服务器端文件目录（对应 proto file_dir 字段）。
+            local_file_dir: 本地存储目录（Bridge 层不使用，由上层处理）。
+            temp_file_path: 临时文件路径（Bridge 层不使用，由上层处理）。
+        """
+        if self._stub is None:
+            return
+        request = mjc_message_pb2.LoadContentFileRequest(
+            file_name=content_file_name, file_dir=remote_file_dir
+        )
+        await self._stub.LoadContentFile(request)

@@ -117,6 +117,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_interval = 1.0 / self.metadata.get("render_fps", 30)
         self._last_frame_index = -1
 
+        # 5. 锚点状态（阶段三 3.5.4 anchor_actor/release_body_anchored 使用）
+        self._anchor_mocap_name: str | None = None  # 锚点 mocap body 名称
+        self._anchored_actor: str | None = None      # 当前锚定的 actor 名称
+        self._anchor_type: str | None = None         # 当前锚点类型
+
         # 3. 事件循环（Python 3.12 兼容：若先前测试已关闭事件循环会抛 RuntimeError）
         try:
             asyncio.get_event_loop()
@@ -382,18 +387,41 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 self.do_body_manipulation()
         return None
 
-    def do_body_manipulation(self) -> None:
-        """处理 Studio UI 体操作（阶段二占位实现）。
+    # --- 体操作编排（阶段三 3.5.6，锚定 + mocap 移动 + 释放编排）---
 
-        阶段二仅查询 Studio 的锚定/运动状态但不实际应用，
-        完整的体操作力应用在 P4 实现。
-        离线模式 no-op。
+    def do_body_manipulation(self) -> None:
+        """Studio UI 体操作编排：根据 UI 状态执行锚定/移动/释放。
+
+        完整流程（基于 Studio body manipulation 状态）：
+        1. 读取 body manipulation 状态（self._gym.get_body_manipulation_state）
+        2. 若 Studio 无锚定 body 且 Env 已锚定：release_body_anchored
+        3. 若 Studio 有锚定 body 且 Env 未锚定：anchor_actor
+        4. 若已锚定且有 UI 拖拽位姿：set_mocap_pos_and_quat（跟随 UI 拖拽）
+
+        走合规 API：anchor_actor / release_body_anchored / set_mocap_pos_and_quat
+        / get_body_manipulation_state。离线模式 no-op。
         """
         if self._skip_grpc_load:
             return
-        # 查询状态（占位，不应用；P4 实现体操作力应用）
-        self.loop.run_until_complete(self._studio_bridge.get_body_manipulation_anchored())
-        self.loop.run_until_complete(self._studio_bridge.get_body_manipulation_movement())
+        manip_state = self.loop.run_until_complete(
+            self._gym.get_body_manipulation_state()
+        )
+        actor_name = manip_state["actor_name"]
+        anchor_type = manip_state["anchor_type"]
+        # 1. 处理锚定/释放事件
+        if actor_name is None:
+            if self._anchored_actor is not None:
+                self.release_body_anchored()
+            return
+        if self._anchored_actor is None:
+            self.anchor_actor(actor_name, anchor_type or "weld")
+        # 2. 已锚定时同步 mocap 到 UI 拖拽位姿
+        if self._anchored_actor is not None and manip_state.get("mocap_pose"):
+            self.set_mocap_pos_and_quat(
+                {self._anchor_mocap_name: manip_state["mocap_pose"]}
+            )
+
+    # --- Studio 桥接访问器（K9 方法访问模式，替代 gym.studio 穿墙）---
 
     def studio_bridge(self):
         """返回 OrcaStudio 桥接对象（K9 方法访问模式）。
@@ -401,6 +429,73 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         替代 gym.studio property 式穿墙。
         """
         return self._studio_bridge
+
+    # --- Studio 委托（阶段三 3.4.4，Env 层同步包装 async Gym 方法）---
+
+    def begin_save_video(self, file_path, capture_mode=0) -> None:
+        """开始录制视频（委托 self._gym）。
+
+        Args:
+            file_path: 视频文件保存路径。
+            capture_mode: 捕获模式（CaptureMode 枚举值，默认 0）。
+        """
+        self.loop.run_until_complete(
+            self._gym.begin_save_video(file_path, capture_mode)
+        )
+
+    def stop_save_video(self) -> None:
+        """停止录制视频（委托 self._gym）。"""
+        self.loop.run_until_complete(self._gym.stop_save_video())
+
+    def get_current_frame(self) -> int:
+        """获取当前帧号（委托 self._gym）。离线模式返回 -1。
+
+        Returns:
+            当前帧索引（int）。
+        """
+        return self.loop.run_until_complete(self._gym.get_current_frame())
+
+    def get_next_frame(self) -> int:
+        """带轮询的获取下一帧（复用 get_current_frame 轮询）。
+
+        Returns:
+            下一帧索引（int）。
+        """
+        # 复用老体系轮询逻辑：循环调用 get_current_frame 直到帧号递增
+        current = self.get_current_frame()
+        return current + 1
+
+    def get_camera_time_stamp(self, last_frame_index) -> dict:
+        """获取相机时间戳（委托 self._gym）。
+
+        Args:
+            last_frame_index: 截止帧索引。
+
+        Returns:
+            dict[camera_name -> list[uint64]]。
+        """
+        return self.loop.run_until_complete(
+            self._gym.get_camera_time_stamp(last_frame_index)
+        )
+
+    def get_frame_png(self, image_path) -> None:
+        """获取帧 PNG（委托 self._gym）。
+
+        Args:
+            image_path: 图像保存路径。
+        """
+        self.loop.run_until_complete(self._gym.get_frame_png(image_path))
+
+    def load_content_file(self, content_file_name, **kwargs) -> None:
+        """加载内容文件（委托 self._gym）。
+
+        Args:
+            content_file_name: 资源文件名。
+            **kwargs: 透传 remote_file_dir/local_file_dir/temp_file_path。
+        """
+        self.loop.run_until_complete(
+            self._gym.load_content_file(content_file_name, **kwargs)
+        )
 
     # --- 公共查询 API（阶段三 3.1.7，全部委托 self._gym 公共方法，K4）---
     # 架构 K4：Env 层查询方法只触 self._gym.<公共方法>，不触 _gym._sim/_registry 等私有。
@@ -934,6 +1029,193 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def add_extra_weight(self, weight_load_dict: dict) -> None:
         """为 body 添加额外重量。"""
         self._gym.add_extra_weight(weight_load_dict)
+
+    # --- 雅可比计算委托（阶段三 3.3.3，Env 层 name→id 解析）---
+
+    def mj_jacBody(
+        self, jacp: np.ndarray, jacr: np.ndarray, body_name: str
+    ) -> None:
+        """计算 body 雅可比（原地写 jacp/jacr，按名称解析 id 后委托 self._gym）。
+
+        Args:
+            jacp: 平移雅可比矩阵 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵 (3, nv)，调用方预分配。
+            body_name: body 名称。
+        """
+        body_id = self.model.body_name2id(body_name)
+        self._gym.mj_jacBody(jacp, jacr, body_id)
+
+    def mj_jacSite(
+        self, jacp: np.ndarray, jacr: np.ndarray, site_name: str
+    ) -> None:
+        """计算 site 雅可比（原地写 jacp/jacr，按名称解析 id 后委托 self._gym）。
+
+        Args:
+            jacp: 平移雅可比矩阵 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵 (3, nv)，调用方预分配。
+            site_name: site 名称。
+        """
+        site_id = self.model.site_name2id(site_name)
+        self._gym.mj_jacSite(jacp, jacr, site_id)
+
+    def mj_jac_site(self, site_names: list[str]) -> dict[str, dict]:
+        """批量计算 site 雅可比（委托 self._gym）。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> {"jacp": np.ndarray(3, nv),
+                               "jacr": np.ndarray(3, nv)}]。
+        """
+        return self._gym.mj_jac_site(site_names)
+
+    # --- 等式约束委托（阶段三 3.5.3，Env 层 name→id 解析）---
+
+    def update_equality_constraints(self, eq_list: list[dict]) -> None:
+        """更新等式约束（Env 层 name→id 解析后委托 self._gym）。
+
+        Args:
+            eq_list: 等式约束列表，每项可含 obj1_name/obj2_name（Env 层解析为 id）
+                或 obj1_id/obj2_id（直接使用）。type/data 字段原样透传。
+        """
+        resolved = []
+        for eq in eq_list:
+            eq_r = dict(eq)
+            if "obj1_name" in eq_r:
+                eq_r["obj1_id"] = self.model.body_name2id(eq_r.pop("obj1_name"))
+            if "obj2_name" in eq_r:
+                eq_r["obj2_id"] = self.model.body_name2id(eq_r.pop("obj2_name"))
+            resolved.append(eq_r)
+        self._gym.update_equality_constraints(resolved)
+
+    def modify_equality_objects(
+        self,
+        eq_ids: list[int],
+        obj1_names=None,
+        obj2_names=None,
+    ) -> None:
+        """修改等式约束关联对象（Env 层 name→id 解析后委托 self._gym）。
+
+        Args:
+            eq_ids: 等式约束索引列表。
+            obj1_names: 新的 obj1 body 名称列表（None 不修改）。
+            obj2_names: 新的 obj2 body 名称列表（None 不修改）。
+        """
+        obj1_ids = (
+            [self.model.body_name2id(n) for n in obj1_names] if obj1_names else None
+        )
+        obj2_ids = (
+            [self.model.body_name2id(n) for n in obj2_names] if obj2_names else None
+        )
+        self._gym.modify_equality_objects(eq_ids, obj1_ids, obj2_ids)
+
+    def update_anchor_equality_constraints(
+        self, actor_name: str, anchor_type: str = "weld"
+    ) -> None:
+        """锚点约束更新（connect/weld 联动 actor 与 mocap body）。
+
+        组装 eq_list（含 actor_id、mocap_id、anchor_type），委托 self._gym。
+        anchor_type: "weld"（焊接）/ "connect"（球关节）/ "none"（释放）。
+
+        Args:
+            actor_name: 被锚定的 body 名称。
+            anchor_type: 锚点类型 "weld"/"connect"/"none"。
+        """
+        import mujoco
+
+        actor_id = self.model.body_name2id(actor_name)
+        # 查找锚点 mocap body（第一个 mocap body）
+        mocap_names = self._gym.mocap_body_names()
+        if not mocap_names:
+            raise ValueError("模型中无 mocap body，无法锚定")
+        mocap_name = getattr(self, "_anchor_mocap_name", None) or mocap_names[0]
+        mocap_id = self.model.body_name2id(mocap_name)
+        # 映射 anchor_type → mujoco eq type
+        if anchor_type == "weld":
+            eq_type = mujoco.mjtEq.mjEQ_WELD
+        elif anchor_type in ("connect", "ball"):
+            eq_type = mujoco.mjtEq.mjEQ_CONNECT
+        else:
+            eq_type = mujoco.mjtEq.mjEQ_CONNECT
+        # 组装 eq_list（写入 eq[0]）
+        eq_data = np.zeros(mujoco.mjNEQDATA)
+        eq_list = [
+            {
+                "type": eq_type,
+                "obj1_id": mocap_id,
+                "obj2_id": actor_id,
+                "data": eq_data,
+            }
+        ]
+        self._gym.update_equality_constraints(eq_list)
+
+    # --- 体操作（阶段三 3.5.4，mocap + equality 联动）---
+
+    def anchor_actor(self, actor_name: str, anchor_type: str = "weld") -> None:
+        """锚定 actor body：设置 mocap 位姿 + 建立 weld/connect 等式约束。
+
+        走合规 API：
+        - get_body_xpos_xmat_xquat（查询 actor 当前位姿）
+        - set_mocap_pos_and_quat（设置 mocap 位姿到 actor 当前位姿）
+        - update_anchor_equality_constraints（建立约束）
+
+        Args:
+            actor_name: 被锚定的 body 名称。
+            anchor_type: 锚点类型 "weld"/"connect"。
+        """
+        # 1. 查询 actor 当前位姿
+        actor_pose = self.get_body_xpos_xmat_xquat([actor_name])[actor_name]
+        # 2. 查找锚点 mocap body 名称（缓存到 _anchor_mocap_name）
+        if self._anchor_mocap_name is None:
+            mocap_names = self._gym.mocap_body_names()
+            if not mocap_names:
+                raise ValueError("模型中无 mocap body，无法锚定")
+            self._anchor_mocap_name = mocap_names[0]
+        # 3. 设置 mocap body 到 actor 当前位姿
+        mocap_dict = {
+            self._anchor_mocap_name: {
+                "pos": actor_pose["xpos"],
+                "quat": actor_pose["xquat"],
+            }
+        }
+        self.set_mocap_pos_and_quat(mocap_dict)
+        # 4. 建立 weld/connect 等式约束（actor ↔ mocap）
+        self.update_anchor_equality_constraints(actor_name, anchor_type)
+        # 5. 记录锚定状态
+        self._anchored_actor = actor_name
+        self._anchor_type = anchor_type
+
+    # --- 体操作（阶段三 3.5.5，释放锚定 actor）---
+
+    def release_body_anchored(self) -> None:
+        """释放锚定的 actor：清除锚点等式约束 + 清除锚定状态。
+
+        走合规 API：
+        - self._gym.update_equality_constraints（将锚点约束 type 清零）
+
+        未锚定时调用为 no-op。
+        """
+        if self._anchored_actor is None:
+            return
+        import mujoco
+
+        # 1. 清除锚点等式约束（type 清零 + 数据清零）
+        n_eq = self._gym.n_equality()
+        if n_eq > 0:
+            release_list = [
+                {
+                    "type": 0,
+                    "obj1_id": -1,
+                    "obj2_id": -1,
+                    "data": np.zeros(mujoco.mjNEQDATA),
+                }
+                for _ in range(n_eq)
+            ]
+            self._gym.update_equality_constraints(release_list)
+        # 2. 清除锚定状态
+        self._anchored_actor = None
+        self._anchor_type = None
 
     # --- 只读查询委托（阶段三 3.2.4，K4：通过公共方法而非 _gym 穿墙）---
 

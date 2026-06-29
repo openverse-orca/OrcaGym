@@ -416,8 +416,7 @@ class MuJoCoSimCore:
     ) -> dict[str, dict]:
         """查询 body 位姿 + 世界系线速度（mj_jacBody @ qvel）。
 
-        依赖 ``mj_jacBody``（原生 ``mujoco.mj_jacBody``，3.3 子步骤将提供 SimCore
-        jac 封装后可改用封装）。当前直接调用原生函数计算世界系线速度。
+        通过 SimCore ``mj_jacBody`` 封装（阶段三 3.3.1 已实现）计算世界系线速度。
 
         Args:
             body_name_list: body 名称列表。
@@ -437,7 +436,7 @@ class MuJoCoSimCore:
             # 世界系线速度 = jacp @ qvel（body 原点平移雅可比）
             jacp = np.zeros((3, nv))
             jacr = np.zeros((3, nv))
-            mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, jacr, bid)
+            self.mj_jacBody(jacp, jacr, bid)
             xvel = jacp @ self._mjData.qvel
             result[name] = {
                 "xpos": self._mjData.xpos[bid],
@@ -613,6 +612,94 @@ class MuJoCoSimCore:
         gid = self._geom_id(geom_name)
         size = self._mjModel.geom_size[gid]
         return size
+
+    # --- 雅可比计算（阶段三 3.3.1）---
+
+    def mj_jacBody(
+        self, jacp: np.ndarray, jacr: np.ndarray, body_id: int
+    ) -> None:
+        """计算 body 雅可比（mujoco.mj_jacBody，原地写 jacp/jacr）。
+
+        Args:
+            jacp: 平移雅可比矩阵，形状 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵，形状 (3, nv)，调用方预分配。
+            body_id: MuJoCo body id。
+        """
+        mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, jacr, body_id)
+
+    def mj_jacSite(
+        self, jacp: np.ndarray, jacr: np.ndarray, site_id: int
+    ) -> None:
+        """计算 site 雅可比（mujoco.mj_jacSite，原地写 jacp/jacr）。
+
+        Args:
+            jacp: 平移雅可比矩阵，形状 (3, nv)，调用方预分配。
+            jacr: 旋转雅可比矩阵，形状 (3, nv)，调用方预分配。
+            site_id: MuJoCo site id。
+        """
+        mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, site_id)
+
+    def mj_jac_site(self, site_names: list[str]) -> dict[str, dict]:
+        """批量计算 site 雅可比（循环 mj_jacSite）。
+
+        Args:
+            site_names: site 名称列表。
+
+        Returns:
+            dict[site_name -> {"jacp": np.ndarray(3, nv),
+                               "jacr": np.ndarray(3, nv)}]。
+            jacp/jacr 为新建数组（每 site 独立分配，非视图）。
+        """
+        result: dict[str, dict] = {}
+        nv = self._mjModel.nv
+        for site_name in site_names:
+            sid = self._site_id(site_name)
+            jacp = np.zeros((3, nv))
+            jacr = np.zeros((3, nv))
+            mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, sid)
+            result[site_name] = {"jacp": jacp, "jacr": jacr}
+        return result
+
+    # --- 等式约束（阶段三 3.5.1）---
+
+    def update_equality_constraints(self, eq_list: list[dict]) -> None:
+        """更新等式约束（写 _mjModel.eq_type/eq_obj1id/eq_obj2id/eq_data）。
+
+        按 eq_list 顺序写入 model.eq_* 字段，调用方需保证 eq_list 长度 <= neq。
+
+        Args:
+            eq_list: 等式约束列表，每项为 dict，含键：
+                - type: mjtEq 类型常量（如 mjEQ_CONNECT/WELD）。
+                - obj1_id: 关联对象 1 的 id。
+                - obj2_id: 关联对象 2 的 id。
+                - data: 约束数据 np.ndarray（形状 (mjNEQDATA,)）。
+        """
+        model = self._mjModel
+        for i, eq in enumerate(eq_list):
+            model.eq_type[i] = eq["type"]
+            model.eq_obj1id[i] = eq["obj1_id"]
+            model.eq_obj2id[i] = eq["obj2_id"]
+            model.eq_data[i] = eq["data"]
+
+    def modify_equality_objects(
+        self,
+        eq_ids: list[int],
+        obj1_ids=None,
+        obj2_ids=None,
+    ) -> None:
+        """修改等式约束关联对象（改 eq_obj1id/eq_obj2id）。
+
+        Args:
+            eq_ids: 等式约束索引列表。
+            obj1_ids: 新的 obj1 id 列表（None 表示不修改）。
+            obj2_ids: 新的 obj2 id 列表（None 表示不修改）。
+        """
+        model = self._mjModel
+        for i, eq_id in enumerate(eq_ids):
+            if obj1_ids is not None:
+                model.eq_obj1id[eq_id] = obj1_ids[i]
+            if obj2_ids is not None:
+                model.eq_obj2id[eq_id] = obj2_ids[i]
 
     # --- 维度 property ---
 

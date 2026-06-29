@@ -26,6 +26,10 @@ _ENV_SOURCE_PATH = (
     pathlib.Path(__file__).resolve().parents[4]
     / "orca_gym" / "environment" / "euler" / "orca_gym_euler_env.py"
 )
+_GYM_SOURCE_PATH = (
+    pathlib.Path(__file__).resolve().parents[4]
+    / "orca_gym" / "core" / "euler" / "orca_gym_euler.py"
+)
 
 
 def _exec_source_without_docstrings() -> str:
@@ -1197,6 +1201,783 @@ class TestDataViewXfrcReadOnlyFunctional(unittest.TestCase):
         np.testing.assert_allclose(
             self.env.data.xfrc_applied[self.pelvis_id, :6], 0.0, atol=1e-6
         )
+
+
+# =============================================================================
+# 阶段三 3.3.3：OrcaGymEuler/Env 雅可比委托
+# =============================================================================
+
+
+class TestEnvJacArchCompliance(unittest.TestCase):
+    """子步骤 3.3.3 架构遵从性测试（K1/K3/K4/K11）。
+
+    对应文档 §7.4 架构遵从性测试表。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_env_jac_no_gym_private_access(self):
+        """K4: grep 断言雅可比方法不触 self._gym._sim/_mjData。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 雅可比计算委托（阶段三 3.3.3")
+        self.assertGreater(start, 0, "未找到 3.3.3 雅可比委托区块")
+        block = source[start:]
+        end = block.find("# --- 只读查询委托")
+        self.assertGreater(end, 0)
+        block = block[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_env_jac_uses_self_gym_and_model(self):
+        """K1/K4: grep 断言走 self._gym.<方法> + self.model.*_name2id。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 雅可比计算委托（阶段三 3.3.3")
+        block = source[start:]
+        end = block.find("# --- 只读查询委托")
+        block = block[:end]
+        self.assertIn("self._gym.mj_jacBody", block)
+        self.assertIn("self._gym.mj_jacSite", block)
+        self.assertIn("self._gym.mj_jac_site", block)
+        self.assertIn("self.model.body_name2id", block)
+        self.assertIn("self.model.site_name2id", block)
+
+    def test_gym_jac_delegates_use_getattribute(self):
+        """K3: grep 断言 Gym 委托用 object.__getattribute__。"""
+        source = _GYM_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 雅可比计算方法（阶段三 3.3.3")
+        self.assertGreater(start, 0, "未找到 Gym 3.3.3 雅可比委托区块")
+        block = source[start:]
+        end = block.find("def equality_data_width")
+        self.assertGreater(end, 0)
+        block = block[:end]
+        self.assertIn("object.__getattribute__(self, \"_sim\").mj_jacBody", block)
+        self.assertIn("object.__getattribute__(self, \"_sim\").mj_jacSite", block)
+        self.assertIn("object.__getattribute__(self, \"_sim\").mj_jac_site", block)
+
+    def test_env_jac_returns_none_or_typed(self):
+        """K11: mj_jacBody/mj_jacSite 返回 None，mj_jac_site 返回 dict。"""
+        nv = self.env.data.qvel.shape[0]
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        ret = self.env.mj_jacBody(jacp, jacr, "pelvis")
+        self.assertIsNone(ret)
+        ret = self.env.mj_jacSite(jacp, jacr, "imu")
+        self.assertIsNone(ret)
+        ret = self.env.mj_jac_site(["imu"])
+        self.assertIsInstance(ret, dict)
+
+
+class TestEnvJacFunctional(unittest.TestCase):
+    """子步骤 3.3.3 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §7.4 功能单元测试表。验证 name 解析 + 数值正确。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_env_mj_jacBody_by_name(self):
+        """env.mj_jacBody(jacp, jacr, "pelvis") 写入正确雅可比。"""
+        nv = self.env.data.qvel.shape[0]
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        self.env.mj_jacBody(jacp, jacr, "pelvis")
+        # 对照 SimCore 直调（经 model body_name2id 解析 id）
+        body_id = self.env.model.body_name2id("pelvis")
+        expected_jacp = np.zeros((3, nv))
+        expected_jacr = np.zeros((3, nv))
+        # 用 Gym 委托到 SimCore 单点方法对照
+        self.env._gym.mj_jacBody(expected_jacp, expected_jacr, body_id)
+        np.testing.assert_array_equal(jacp, expected_jacp)
+        np.testing.assert_array_equal(jacr, expected_jacr)
+
+    def test_env_mj_jacSite_by_name(self):
+        """env.mj_jacSite(jacp, jacr, "imu") 写入正确。"""
+        nv = self.env.data.qvel.shape[0]
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        self.env.mj_jacSite(jacp, jacr, "imu")
+        site_id = self.env.model.site_name2id("imu")
+        expected_jacp = np.zeros((3, nv))
+        expected_jacr = np.zeros((3, nv))
+        self.env._gym.mj_jacSite(expected_jacp, expected_jacr, site_id)
+        np.testing.assert_array_equal(jacp, expected_jacp)
+        np.testing.assert_array_equal(jacr, expected_jacr)
+
+    def test_env_mj_jac_site_batch(self):
+        """批量雅可比正确。"""
+        result = self.env.mj_jac_site(["imu"])
+        self.assertIn("imu", result)
+        nv = self.env.data.qvel.shape[0]
+        self.assertEqual(result["imu"]["jacp"].shape, (3, nv))
+        self.assertEqual(result["imu"]["jacr"].shape, (3, nv))
+
+
+# =============================================================================
+# 阶段三 3.4.4：OrcaGymEuler/Env Studio 委托
+# =============================================================================
+
+
+class TestEnvStudioArchCompliance(unittest.TestCase):
+    """子步骤 3.4.4 架构遵从性测试（K2/K4/K9/K11/K12）。
+
+    对应文档 §8.5 架构遵从性测试表。
+    """
+
+    def test_env_studio_no_gym_private_access(self):
+        """K4: grep 断言 Studio 区块不触 self._gym._sim/_studio/_mjData/_mjModel。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- Studio 委托（阶段三 3.4.4")
+        self.assertGreater(start, 0, "未找到 3.4.4 Studio 委托区块")
+        block_source = source[start:]
+        # 区块到下一个 --- 分隔符结束
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("self._gym._studio", block)
+        self.assertNotIn("self._gym._registry", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_env_studio_uses_gym_not_gym_studio(self):
+        """K9: grep 断言走 self._gym / self._studio_bridge，不走 gym.studio。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- Studio 委托（阶段三 3.4.4")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("gym.studio", block)
+        # 应走 self._gym 或 self._studio_bridge
+        self.assertTrue(
+            "self._gym." in block or "self._studio_bridge" in block,
+            "Studio 方法应委托 self._gym 或 self._studio_bridge",
+        )
+
+    def test_env_studio_dir_includes_methods(self):
+        """K2: dir(env) 含 begin_save_video/get_current_frame 等。"""
+        env = _make_g1_env()
+        d = dir(env)
+        for name in [
+            "begin_save_video",
+            "stop_save_video",
+            "get_current_frame",
+            "get_camera_time_stamp",
+            "get_frame_png",
+            "load_content_file",
+        ]:
+            self.assertIn(name, d, f"dir(env) 缺少 {name}")
+
+    def test_env_studio_returns_typed(self):
+        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。"""
+        env = _make_g1_env()
+        ret = env.get_current_frame()
+        self.assertIsInstance(ret, int)
+        ret = env.get_camera_time_stamp(0)
+        self.assertIsInstance(ret, dict)
+
+    def test_env_studio_docstrings_present(self):
+        """K12: 新增 Studio 委托方法有 docstring。"""
+        env = _make_g1_env()
+        import inspect
+
+        for name in [
+            "begin_save_video",
+            "stop_save_video",
+            "get_current_frame",
+            "get_camera_time_stamp",
+            "get_frame_png",
+            "load_content_file",
+        ]:
+            method = getattr(env, name)
+            doc = inspect.getdoc(method)
+            self.assertIsNotNone(doc, f"{name} 缺少 docstring")
+            self.assertGreater(len(doc), 0, f"{name} docstring 为空")
+
+
+class TestEnvStudioFunctional(unittest.TestCase):
+    """子步骤 3.4.4 功能单元测试。
+
+    对应文档 §8.5 功能单元测试表。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+
+    def test_env_begin_stop_save_video_offline_noop(self):
+        """离线模式 no-op 不抛错。"""
+        self.env.begin_save_video("/tmp/test.mp4")
+        self.env.stop_save_video()
+
+    def test_env_get_current_frame_offline_returns_neg1(self):
+        """离线模式返回 -1。"""
+        self.assertEqual(self.env.get_current_frame(), -1)
+
+    def test_env_get_camera_time_stamp_offline_returns_empty(self):
+        """离线模式返回空 dict。"""
+        self.assertEqual(self.env.get_camera_time_stamp(0), {})
+
+    def test_env_get_frame_png_offline_noop(self):
+        """离线模式 no-op。"""
+        self.env.get_frame_png("/tmp/test.png")
+
+    def test_env_load_content_file_offline_noop(self):
+        """离线模式 no-op。"""
+        self.env.load_content_file("mesh.obj")
+
+    def test_env_video_methods_delegate_to_bridge(self):
+        """在线模式委托链路：Env -> Gym -> bridge（mock stub）。"""
+        # 构造 mock bridge 替换 Gym 的 _studio
+        captured = {}
+
+        class MockBridge:
+            async def begin_save_video(self, file_path, capture_mode):
+                captured["begin"] = (file_path, capture_mode)
+
+            async def stop_save_video(self):
+                captured["stop"] = True
+
+            async def get_current_frame(self):
+                captured["frame"] = True
+                return 99
+
+            async def get_camera_time_stamp(self, last_frame_index):
+                captured["ts"] = last_frame_index
+                return {"cam0": [1, 2, 3]}
+
+            async def get_frame_png(self, image_path):
+                captured["png"] = image_path
+
+            async def load_content_file(self, *args, **kwargs):
+                captured["load"] = (args, kwargs)
+
+        # 替换 Gym 的 _studio（用 object.__setattr__ 绕过 __setattr__ 拦截）
+        object.__setattr__(self.env._gym, "_studio", MockBridge())
+        self.env.begin_save_video("/tmp/x.mp4", capture_mode=1)
+        self.assertEqual(captured["begin"], ("/tmp/x.mp4", 1))
+        self.env.stop_save_video()
+        self.assertTrue(captured["stop"])
+        self.assertEqual(self.env.get_current_frame(), 99)
+        self.assertTrue(captured["frame"])
+        self.assertEqual(self.env.get_camera_time_stamp(5), {"cam0": [1, 2, 3]})
+        self.assertEqual(captured["ts"], 5)
+        self.env.get_frame_png("/tmp/x.png")
+        self.assertEqual(captured["png"], "/tmp/x.png")
+        self.env.load_content_file("mesh.obj", remote_file_dir="/r")
+        self.assertIn("load", captured)
+
+
+# =============================================================================
+# 阶段三 3.5.3：OrcaGymEuler/Env 约束委托
+# =============================================================================
+
+
+class TestEnvEqualityArchCompliance(unittest.TestCase):
+    """子步骤 3.5.3 架构遵从性测试（K1/K2/K3/K4/K11）。
+
+    对应文档 §9.4 架构遵从性测试表。
+    """
+
+    def test_env_eq_no_gym_private_access(self):
+        """K4: grep 断言约束区块不触 self._gym._sim/_mjModel/_mjData。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 等式约束委托（阶段三 3.5.3")
+        self.assertGreater(start, 0, "未找到 3.5.3 等式约束区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("self._gym._studio", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_env_eq_uses_self_gym_and_model(self):
+        """K1/K4: grep 断言走 self._gym.<方法> + self.model.body_name2id。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 等式约束委托（阶段三 3.5.3")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertIn("self._gym.update_equality_constraints", block)
+        self.assertIn("self._gym.modify_equality_objects", block)
+        self.assertIn("self.model.body_name2id", block)
+
+    def test_gym_eq_delegates_use_getattribute(self):
+        """K3: grep 断言 Gym 委托用 object.__getattribute__。"""
+        source = _GYM_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 等式约束委托（阶段三 3.5.3")
+        self.assertGreater(start, 0, "未找到 Gym 3.5.3 等式约束区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertIn("object.__getattribute__(self, \"_sim\")", block)
+
+    def test_env_eq_returns_none(self):
+        """K11: 约束方法返回 None（写操作）。"""
+        env = _make_g1_env()
+        import mujoco
+
+        eq_data = np.zeros(mujoco.mjNEQDATA)
+        eq_list = [
+            {
+                "type": mujoco.mjtEq.mjEQ_WELD,
+                "obj1_id": 1,
+                "obj2_id": 2,
+                "data": eq_data,
+            }
+        ]
+        ret = env.update_equality_constraints(eq_list)
+        self.assertIsNone(ret)
+        ret = env.modify_equality_objects([0], obj1_names=["pelvis"])
+        self.assertIsNone(ret)
+
+    def test_env_eq_dir_includes_methods(self):
+        """K2: dir(env) 含 update_equality_constraints 等。"""
+        env = _make_g1_env()
+        d = dir(env)
+        for name in [
+            "update_equality_constraints",
+            "modify_equality_objects",
+            "update_anchor_equality_constraints",
+        ]:
+            self.assertIn(name, d, f"dir(env) 缺少 {name}")
+
+
+class TestEnvEqualityFunctional(unittest.TestCase):
+    """子步骤 3.5.3 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §9.4 功能单元测试表。验证 name 解析 + eq_* 写入。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_env_update_equality_constraints_by_name(self):
+        """用 body name 调用后 eq_* 字段正确写入。"""
+        import mujoco
+
+        eq_data = np.zeros(mujoco.mjNEQDATA)
+        eq_data[0:3] = [0.1, 0.2, 0.3]
+        eq_list = [
+            {
+                "type": mujoco.mjtEq.mjEQ_WELD,
+                "obj1_name": "pelvis",
+                "obj2_name": "torso_link",
+                "data": eq_data,
+            }
+        ]
+        self.env.update_equality_constraints(eq_list)
+        # 验证写入：通过 model 查询
+        model = self.env.model
+        # pelvis 和 torso_link 的 body id
+        pelvis_id = model.body_name2id("pelvis")
+        torso_id = model.body_name2id("torso_link")
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        self.assertEqual(obj1, pelvis_id)
+        self.assertEqual(obj2, torso_id)
+
+    def test_env_modify_equality_objects_by_name(self):
+        """obj id 更新正确。"""
+        import mujoco
+
+        # 先写入初值
+        eq_data = np.zeros(mujoco.mjNEQDATA)
+        self.env.update_equality_constraints(
+            [
+                {
+                    "type": mujoco.mjtEq.mjEQ_CONNECT,
+                    "obj1_id": 1,
+                    "obj2_id": 2,
+                    "data": eq_data,
+                }
+            ]
+        )
+        # 用 name 修改
+        self.env.modify_equality_objects(
+            [0], obj1_names=["pelvis"], obj2_names=["torso_link"]
+        )
+        pelvis_id = self.env.model.body_name2id("pelvis")
+        torso_id = self.env.model.body_name2id("torso_link")
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        self.assertEqual(obj1, pelvis_id)
+        self.assertEqual(obj2, torso_id)
+
+    def test_env_update_anchor_equality_constraints(self):
+        """锚点约束组装正确（actor_id + mocap_id）。"""
+        self.env.update_anchor_equality_constraints("pelvis", "weld")
+        # 验证 eq[0] 写入：obj1 = mocap_id, obj2 = pelvis_id
+        mocap_names = self.env._gym.mocap_body_names()
+        self.assertGreater(len(mocap_names), 0)
+        mocap_id = self.env.model.body_name2id(mocap_names[0])
+        pelvis_id = self.env.model.body_name2id("pelvis")
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        self.assertEqual(obj1, mocap_id)
+        self.assertEqual(obj2, pelvis_id)
+
+
+class TestEnvAnchorActorArchCompliance(unittest.TestCase):
+    """子步骤 3.5.4 架构遵从性测试（K1/K4/K11/K12）。
+
+    对应文档 §9.5 架构遵从性测试表。
+    """
+
+    def test_env_anchor_actor_no_private_access(self):
+        """K4: grep 断言 anchor_actor 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作（阶段三 3.5.4")
+        self.assertGreater(start, 0, "未找到 3.5.4 anchor_actor 区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("self._gym._studio", block)
+        self.assertNotIn("self._gym._registry", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_env_anchor_actor_uses_compliance_api(self):
+        """K1/K4: grep 断言走 set_mocap_pos_and_quat/update_anchor_equality_constraints/get_body_xpos_xmat_xquat 公共方法。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作（阶段三 3.5.4")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertIn("self.get_body_xpos_xmat_xquat", block)
+        self.assertIn("self.set_mocap_pos_and_quat", block)
+        self.assertIn("self.update_anchor_equality_constraints", block)
+
+    def test_env_anchor_actor_returns_none(self):
+        """K11: anchor_actor 返回 None（写操作）。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        ret = env.anchor_actor("pelvis", "weld")
+        self.assertIsNone(ret)
+
+    def test_env_anchor_actor_docstring_present(self):
+        """K12: anchor_actor 有 docstring。"""
+        import inspect
+
+        env = _make_g1_env()
+        doc = inspect.getdoc(env.anchor_actor)
+        self.assertIsNotNone(doc)
+        self.assertGreater(len(doc), 0)
+
+
+class TestEnvAnchorActorFunctional(unittest.TestCase):
+    """子步骤 3.5.4 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §9.5 功能单元测试表。验证 mocap 位姿 + weld 约束 + 状态记录。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_anchor_actor_sets_mocap_to_actor_pose(self):
+        """锚定后 mocap 位姿 = actor 初始位姿。"""
+        actor_pose_before = self.env.get_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
+        self.env.anchor_actor("pelvis", "weld")
+        # 查询 mocap body 当前的 pos/quat（通过 DataView 零拷贝视图）
+        mocap_names = self.env._gym.mocap_body_names()
+        self.assertGreater(len(mocap_names), 0)
+        mocap_name = mocap_names[0]
+        mocap_pos = self.env.data.mocap_pos(mocap_name)
+        mocap_quat = self.env.data.mocap_quat(mocap_name)
+        np.testing.assert_array_almost_equal(
+            mocap_pos, actor_pose_before["xpos"]
+        )
+        np.testing.assert_array_almost_equal(
+            mocap_quat, actor_pose_before["xquat"]
+        )
+
+    def test_anchor_actor_creates_weld_constraint(self):
+        """锚定后 eq_type 为 weld，obj1/obj2 关联 actor 与 mocap。"""
+        self.env.anchor_actor("pelvis", "weld")
+        mocap_names = self.env._gym.mocap_body_names()
+        mocap_id = self.env.model.body_name2id(mocap_names[0])
+        pelvis_id = self.env.model.body_name2id("pelvis")
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        self.assertEqual(obj1, mocap_id)
+        self.assertEqual(obj2, pelvis_id)
+
+    def test_anchor_actor_records_state(self):
+        """_anchored_actor/_anchor_type 正确记录。"""
+        self.env.anchor_actor("pelvis", "weld")
+        self.assertEqual(self.env._anchored_actor, "pelvis")
+        self.assertEqual(self.env._anchor_type, "weld")
+
+
+class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
+    """子步骤 3.5.5 架构遵从性测试（K1/K4/K11/K12）。
+
+    对应文档 §9.6 架构遵从性测试表。
+    """
+
+    def test_env_release_no_private_access(self):
+        """K4: grep 断言 release_body_anchored 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作（阶段三 3.5.5")
+        self.assertGreater(start, 0, "未找到 3.5.5 release_body_anchored 区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("self._gym._studio", block)
+        self.assertNotIn("self._gym._registry", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_env_release_uses_compliance_api(self):
+        """K1/K4: grep 断言走 self._gym.update_equality_constraints 公共方法。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作（阶段三 3.5.5")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertIn("self._gym.update_equality_constraints", block)
+        self.assertIn("self._gym.n_equality", block)
+
+    def test_env_release_returns_none(self):
+        """K11: release_body_anchored 返回 None。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        # 未锚定时 no-op
+        ret = env.release_body_anchored()
+        self.assertIsNone(ret)
+        # 锚定后释放
+        env.anchor_actor("pelvis", "weld")
+        ret = env.release_body_anchored()
+        self.assertIsNone(ret)
+
+    def test_env_release_docstring_present(self):
+        """K12: release_body_anchored 有 docstring。"""
+        env = _make_g1_env()
+        doc = env.release_body_anchored.__doc__
+        self.assertIsNotNone(doc)
+        self.assertGreater(len(doc), 0)
+
+
+class TestEnvReleaseBodyAnchoredFunctional(unittest.TestCase):
+    """子步骤 3.5.5 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §9.6 功能单元测试表。验证约束清除 + 状态清除。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+
+    def test_release_body_anchored_clears_constraint(self):
+        """释放后锚点 eq_type 清零。"""
+        self.env.anchor_actor("pelvis", "weld")
+        # 锚定后 eq_obj1id/obj2id 应为 mocap_id/pelvis_id
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        # 释放
+        self.env.release_body_anchored()
+        # 验证 eq_type 已清零（通过 update_equality_constraints 写入）
+        # 重新读取 eq_obj1id/obj2id 应为 -1（释放写入）
+        obj1_after, obj2_after = self.env._gym.equality_object_ids(0)
+        self.assertEqual(obj1_after, -1)
+        self.assertEqual(obj2_after, -1)
+
+    def test_release_body_anchored_clears_state(self):
+        """_anchored_actor/_anchor_type 为 None。"""
+        self.env.anchor_actor("pelvis", "weld")
+        self.env.release_body_anchored()
+        self.assertIsNone(self.env._anchored_actor)
+        self.assertIsNone(self.env._anchor_type)
+
+    def test_release_without_anchor_noop(self):
+        """未锚定时调用 no-op 不抛错。"""
+        # 未锚定状态
+        self.assertIsNone(self.env._anchored_actor)
+        # 调用不应抛异常
+        self.env.release_body_anchored()
+        self.assertIsNone(self.env._anchored_actor)
+
+
+class TestEnvDoBodyManipulationArchCompliance(unittest.TestCase):
+    """子步骤 3.5.6 架构遵从性测试（K1/K4/K9/K11/K12）。
+
+    对应文档 §9.7 架构遵从性测试表。
+    """
+
+    def test_env_do_body_manipulation_no_private_access(self):
+        """K4: grep 断言 do_body_manipulation 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作编排（阶段三 3.5.6")
+        self.assertGreater(start, 0, "未找到 3.5.6 do_body_manipulation 区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("self._gym._sim", block)
+        self.assertNotIn("self._gym._studio", block)
+        self.assertNotIn("self._gym._registry", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+        self.assertNotIn("self._studio_bridge", block)
+
+    def test_env_do_body_manipulation_uses_compliance_api(self):
+        """K1/K4/K9: grep 断言走 anchor_actor/release_body_anchored/set_mocap_pos_and_quat 等公共方法。"""
+        source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
+        start = source.find("# --- 体操作编排（阶段三 3.5.6")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertIn("self._gym.get_body_manipulation_state", block)
+        self.assertIn("self.anchor_actor", block)
+        self.assertIn("self.release_body_anchored", block)
+        self.assertIn("self.set_mocap_pos_and_quat", block)
+
+    def test_env_do_body_manipulation_returns_none(self):
+        """K11: do_body_manipulation 返回 None。"""
+        env = _make_g1_env()
+        env.mj_forward()
+        ret = env.do_body_manipulation()
+        self.assertIsNone(ret)
+
+    def test_env_do_body_manipulation_docstring_present(self):
+        """K12: do_body_manipulation 有 docstring（含编排流程说明）。"""
+        env = _make_g1_env()
+        doc = env.do_body_manipulation.__doc__
+        self.assertIsNotNone(doc)
+        self.assertGreater(len(doc), 0)
+
+
+class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
+    """子步骤 3.5.6 功能单元测试（G1 XML 真实数据 + bridge monkeypatch）。
+
+    对应文档 §9.7 功能单元测试表。离线 no-op + 三动作编排 + 完整循环。
+    """
+
+    def setUp(self):
+        self.env = _make_g1_env()
+        self.env.mj_forward()
+        # 离线 env 默认 _skip_grpc_load=True；编排方法需在线路径，
+        # 测试中临时翻转标志 + monkeypatch bridge 返回 canned 状态。
+        self._original_skip = self.env._skip_grpc_load
+
+    def tearDown(self):
+        self.env._skip_grpc_load = self._original_skip
+
+    def _patch_bridge(self, anchored=None, anchor_type=0, pos=None, quat=None):
+        """注入 bridge 体操作状态（async 桩）。"""
+        if pos is None:
+            pos = np.zeros(3)
+        if quat is None:
+            quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+        async def fake_anchored():
+            return (anchored, anchor_type)
+
+        async def fake_movement():
+            return {"delta_pos": pos, "delta_quat": quat}
+
+        bridge = self.env._gym.studio_bridge()
+        bridge.get_body_manipulation_anchored = fake_anchored
+        bridge.get_body_manipulation_movement = fake_movement
+        self.env._skip_grpc_load = False
+
+    def test_do_body_manipulation_offline_noop(self):
+        """离线模式（_skip_grpc_load=True）no-op 不抛错。"""
+        self.env._skip_grpc_load = True
+        self.env.do_body_manipulation()  # 不应抛异常
+        self.assertIsNone(self.env._anchored_actor)
+
+    def test_do_body_manipulation_anchor_flow(self):
+        """锚定请求触发 anchor_actor。"""
+        from orca_gym.core.euler.orca_studio_bridge import AnchorType
+
+        self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
+        self.env.do_body_manipulation()
+        self.assertEqual(self.env._anchored_actor, "pelvis")
+        self.assertEqual(self.env._anchor_type, "weld")
+
+    def test_do_body_manipulation_release_flow(self):
+        """释放请求触发 release_body_anchored。"""
+        from orca_gym.core.euler.orca_studio_bridge import AnchorType
+
+        # 先锚定
+        self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
+        self.env.do_body_manipulation()
+        self.assertIsNotNone(self.env._anchored_actor)
+        # 再注入释放（Studio 无锚定 body）
+        self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
+        self.env.do_body_manipulation()
+        self.assertIsNone(self.env._anchored_actor)
+
+    def test_do_body_manipulation_mocap_sync_flow(self):
+        """已锚定时同步 mocap 位姿（UI 拖拽目标位姿写入）。"""
+        from orca_gym.core.euler.orca_studio_bridge import AnchorType
+
+        # 先锚定
+        self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
+        self.env.do_body_manipulation()
+        # 注入拖拽目标位姿
+        target_pos = np.array([0.5, 0.5, 1.0])
+        target_quat = np.array([0.7071, 0.0, 0.0, 0.7071])
+        self._patch_bridge(
+            anchored="pelvis",
+            anchor_type=AnchorType.WELD,
+            pos=target_pos,
+            quat=target_quat,
+        )
+        self.env.do_body_manipulation()
+        # 验证 mocap 位姿已同步到目标
+        mocap_names = self.env._gym.mocap_body_names()
+        mocap_name = mocap_names[0]
+        np.testing.assert_array_almost_equal(
+            self.env.data.mocap_pos(mocap_name), target_pos
+        )
+        np.testing.assert_array_almost_equal(
+            self.env.data.mocap_quat(mocap_name), target_quat
+        )
+
+    def test_do_body_manipulation_full_cycle(self):
+        """锚定 → 移动 → 释放完整循环不抛错。"""
+        from orca_gym.core.euler.orca_studio_bridge import AnchorType
+
+        # 1. 锚定
+        self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
+        self.env.do_body_manipulation()
+        self.assertEqual(self.env._anchored_actor, "pelvis")
+        # 2. 移动
+        self._patch_bridge(
+            anchored="pelvis",
+            anchor_type=AnchorType.WELD,
+            pos=np.array([0.3, 0.3, 0.8]),
+        )
+        self.env.do_body_manipulation()
+        # 3. 释放
+        self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
+        self.env.do_body_manipulation()
+        self.assertIsNone(self.env._anchored_actor)
 
 
 if __name__ == "__main__":

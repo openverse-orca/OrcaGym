@@ -870,5 +870,341 @@ class TestSimCoreSensorActuatorContactGeomFunctional(unittest.TestCase):
         self.assertEqual(result.shape, (3,))
 
 
+# =============================================================================
+# 阶段三 3.3.1：MuJoCoSimCore mj_jacBody / mj_jacSite
+# =============================================================================
+
+
+class TestSimCoreJacArchCompliance(unittest.TestCase):
+    """子步骤 3.3.1 架构遵从性测试（K11 返回 None + P2 不泄漏）。
+
+    对应文档 §7.2 架构遵从性测试表。
+    """
+
+    def test_simcore_jac_methods_write_inplace(self):
+        """K11: grep 断言 mj_jacBody/mj_jacSite 原地写 jacp/jacr，不返回新数组。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("# --- 雅可比计算（阶段三 3.3.1）---")
+        self.assertGreater(start, 0, "未找到 3.3.1 雅可比计算区块")
+        block = source[start:]
+        end = block.find("# --- 维度 property ---")
+        self.assertGreater(end, 0, "未找到维度 property 标记")
+        block = block[:end]
+        # 不返回新数组（无 return 语句返回 jacp/jacr）
+        self.assertNotIn("return jacp", block)
+        self.assertNotIn("return jacr", block)
+        self.assertNotIn("return self._mjData", block)
+        self.assertNotIn("return self._mjModel", block)
+
+    def test_simcore_jac_methods_return_none(self):
+        """K11: mj_jacBody/mj_jacSite 返回 None（原地写操作）。"""
+        sim = MuJoCoSimCore()
+        sim.init_simulation(_G1_XML)
+        sim.forward()
+        nv = sim._mjModel.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        pelvis_id = mujoco.mj_name2id(
+            sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "pelvis"
+        )
+        ret = sim.mj_jacBody(jacp, jacr, pelvis_id)
+        self.assertIsNone(ret)
+        imu_id = mujoco.mj_name2id(
+            sim._mjModel, mujoco.mjtObj.mjOBJ_SITE, "imu"
+        )
+        ret = sim.mj_jacSite(jacp, jacr, imu_id)
+        self.assertIsNone(ret)
+
+    def test_simcore_jac_no_mjdata_leak(self):
+        """P2/K11: grep 断言不 return self._mjData/_mjModel。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("# --- 雅可比计算（阶段三 3.3.1）---")
+        self.assertGreater(start, 0)
+        block = source[start:]
+        end = block.find("# --- 维度 property ---")
+        if end > 0:
+            block = block[:end]
+        self.assertNotIn("return self._mjData", block)
+        self.assertNotIn("return self._mjModel", block)
+
+
+class TestSimCoreJacFunctional(unittest.TestCase):
+    """子步骤 3.3.1 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §7.2 功能单元测试表。验证雅可比形状与数值与原生 mujoco 一致。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+
+    def test_mj_jacBody_writes_correct_shape(self):
+        """jacp 形状 (3, nv)，jacr 形状 (3, nv)。"""
+        nv = self.sim._mjModel.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        pelvis_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "pelvis"
+        )
+        self.sim.mj_jacBody(jacp, jacr, pelvis_id)
+        self.assertEqual(jacp.shape, (3, nv))
+        self.assertEqual(jacr.shape, (3, nv))
+        # 写入后应有非零元素（pelvis 为 floating base，雅可比非零）
+        self.assertTrue(np.any(jacp != 0.0))
+
+    def test_mj_jacBody_matches_mujoco(self):
+        """与直接调 mujoco.mj_jacBody 结果一致。"""
+        nv = self.sim._mjModel.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        pelvis_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_BODY, "pelvis"
+        )
+        self.sim.mj_jacBody(jacp, jacr, pelvis_id)
+        # 直接调原生 mujoco.mj_jacBody 对照
+        expected_jacp = np.zeros((3, nv))
+        expected_jacr = np.zeros((3, nv))
+        mujoco.mj_jacBody(
+            self.sim._mjModel, self.sim._mjData, expected_jacp, expected_jacr, pelvis_id
+        )
+        np.testing.assert_array_equal(jacp, expected_jacp)
+        np.testing.assert_array_equal(jacr, expected_jacr)
+
+    def test_mj_jacSite_writes_correct_shape(self):
+        """site 雅可比形状正确 (3, nv)。"""
+        nv = self.sim._mjModel.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        imu_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_SITE, "imu"
+        )
+        self.sim.mj_jacSite(jacp, jacr, imu_id)
+        self.assertEqual(jacp.shape, (3, nv))
+        self.assertEqual(jacr.shape, (3, nv))
+        self.assertTrue(np.any(jacp != 0.0))
+
+    def test_mj_jacSite_matches_mujoco(self):
+        """与直接调 mujoco.mj_jacSite 结果一致。"""
+        nv = self.sim._mjModel.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        imu_id = mujoco.mj_name2id(
+            self.sim._mjModel, mujoco.mjtObj.mjOBJ_SITE, "imu"
+        )
+        self.sim.mj_jacSite(jacp, jacr, imu_id)
+        expected_jacp = np.zeros((3, nv))
+        expected_jacr = np.zeros((3, nv))
+        mujoco.mj_jacSite(
+            self.sim._mjModel, self.sim._mjData, expected_jacp, expected_jacr, imu_id
+        )
+        np.testing.assert_array_equal(jacp, expected_jacp)
+        np.testing.assert_array_equal(jacr, expected_jacr)
+
+
+# =============================================================================
+# 阶段三 3.3.2：MuJoCoSimCore mj_jac_site 批量
+# =============================================================================
+
+
+class TestSimCoreJacSiteBatchArchCompliance(unittest.TestCase):
+    """子步骤 3.3.2 架构遵从性测试（K11 typed 返回 + P2 不泄漏）。
+
+    对应文档 §7.3 架构遵从性测试表。
+    """
+
+    def test_simcore_jac_site_batch_returns_dict(self):
+        """K11: 返回 dict[str, dict]，内层含 jacp/jacr 键，值为 np.ndarray。"""
+        sim = MuJoCoSimCore()
+        sim.init_simulation(_G1_XML)
+        sim.forward()
+        result = sim.mj_jac_site(["imu"])
+        self.assertIsInstance(result, dict)
+        self.assertIn("imu", result)
+        entry = result["imu"]
+        self.assertIsInstance(entry, dict)
+        self.assertIn("jacp", entry)
+        self.assertIn("jacr", entry)
+        self.assertIsInstance(entry["jacp"], np.ndarray)
+        self.assertIsInstance(entry["jacr"], np.ndarray)
+
+    def test_simcore_jac_site_batch_no_mjdata_leak(self):
+        """P2/K11: grep 断言不 return self._mjData/_mjModel。"""
+        source = inspect.getsource(MuJoCoSimCore.mj_jac_site)
+        self.assertNotIn("return self._mjData", source)
+        self.assertNotIn("return self._mjModel", source)
+
+
+class TestSimCoreJacSiteBatchFunctional(unittest.TestCase):
+    """子步骤 3.3.2 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §7.3 功能单元测试表。验证批量与单点一致。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+
+    def test_mj_jac_site_batch_returns_all_sites(self):
+        """每个 site_name 都有对应 entry。"""
+        names = ["imu"]
+        result = self.sim.mj_jac_site(names)
+        for name in names:
+            self.assertIn(name, result)
+
+    def test_mj_jac_site_batch_matches_single(self):
+        """批量结果与单点 mj_jacSite 逐 site 一致。"""
+        names = ["imu"]
+        result = self.sim.mj_jac_site(names)
+        nv = self.sim._mjModel.nv
+        for name in names:
+            sid = mujoco.mj_name2id(
+                self.sim._mjModel, mujoco.mjtObj.mjOBJ_SITE, name
+            )
+            expected_jacp = np.zeros((3, nv))
+            expected_jacr = np.zeros((3, nv))
+            self.sim.mj_jacSite(expected_jacp, expected_jacr, sid)
+            np.testing.assert_array_equal(result[name]["jacp"], expected_jacp)
+            np.testing.assert_array_equal(result[name]["jacr"], expected_jacr)
+
+
+# =============================================================================
+# 阶段三 3.5.1：MuJoCoSimCore 等式约束方法
+# =============================================================================
+
+
+class TestSimCoreEqualityArchCompliance(unittest.TestCase):
+    """子步骤 3.5.1 架构遵从性测试（K11 返回 None + P2 只写 model）。
+
+    对应文档 §9.2 架构遵从性测试表。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+
+    def test_simcore_eq_methods_return_none(self):
+        """K11: 2 个约束方法返回 None（写操作无返回值）。"""
+        data = np.zeros(mujoco.mjNEQDATA)
+        eq_list = [
+            {
+                "type": mujoco.mjtEq.mjEQ_CONNECT,
+                "obj1_id": 1,
+                "obj2_id": 2,
+                "data": data,
+            }
+        ]
+        ret = self.sim.update_equality_constraints(eq_list)
+        self.assertIsNone(ret)
+        ret = self.sim.modify_equality_objects([0], obj1_ids=[3])
+        self.assertIsNone(ret)
+
+    def test_simcore_eq_methods_write_model_only(self):
+        """P2/K11: grep 断言只写 _mjModel.eq_*，不返回 MjModel/MjData。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("# --- 等式约束（阶段三 3.5.1）---")
+        self.assertGreater(start, 0, "未找到 3.5.1 等式约束区块")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        # 只写 _mjModel.eq_*，不触 _mjData
+        self.assertNotIn("_mjData", block)
+        self.assertIn("model.eq_type", block)
+        self.assertIn("model.eq_obj1id", block)
+        self.assertIn("model.eq_obj2id", block)
+        self.assertIn("model.eq_data", block)
+
+    def test_simcore_eq_no_mjmodel_leak(self):
+        """P2/K11: grep 断言不 return self._mjModel / self._mjData。"""
+        source = inspect.getsource(MuJoCoSimCore)
+        start = source.find("# --- 等式约束（阶段三 3.5.1）---")
+        block_source = source[start:]
+        end = block_source.find("\n    # ---", 1)
+        if end < 0:
+            end = len(block_source)
+        block = block_source[:end]
+        self.assertNotIn("return self._mjModel", block)
+        self.assertNotIn("return self._mjData", block)
+
+
+class TestSimCoreEqualityFunctional(unittest.TestCase):
+    """子步骤 3.5.1 功能单元测试（G1 XML 真实数据）。
+
+    对应文档 §9.2 功能单元测试表。验证 eq_* 字段正确写入。
+    """
+
+    def setUp(self):
+        self.sim = MuJoCoSimCore()
+        self.sim.init_simulation(_G1_XML)
+        self.sim.forward()
+
+    def test_update_equality_constraints_writes_eq_fields(self):
+        """调用后 eq_type/eq_obj1id/eq_obj2id/eq_data 正确写入。"""
+        data = np.zeros(mujoco.mjNEQDATA)
+        data[0:3] = [0.1, 0.2, 0.3]
+        eq_list = [
+            {
+                "type": mujoco.mjtEq.mjEQ_WELD,
+                "obj1_id": 5,
+                "obj2_id": 7,
+                "data": data,
+            }
+        ]
+        self.sim.update_equality_constraints(eq_list)
+        model = self.sim._mjModel
+        self.assertEqual(model.eq_type[0], mujoco.mjtEq.mjEQ_WELD)
+        self.assertEqual(model.eq_obj1id[0], 5)
+        self.assertEqual(model.eq_obj2id[0], 7)
+        np.testing.assert_array_equal(model.eq_data[0], data)
+
+    def test_modify_equality_objects_updates_obj_ids(self):
+        """eq_obj1id/eq_obj2id 更新正确。"""
+        # 先写入初值
+        data = np.zeros(mujoco.mjNEQDATA)
+        self.sim.update_equality_constraints(
+            [
+                {
+                    "type": mujoco.mjtEq.mjEQ_CONNECT,
+                    "obj1_id": 1,
+                    "obj2_id": 2,
+                    "data": data,
+                }
+            ]
+        )
+        # 修改 obj1/obj2
+        self.sim.modify_equality_objects([0], obj1_ids=[10], obj2_ids=[20])
+        model = self.sim._mjModel
+        self.assertEqual(model.eq_obj1id[0], 10)
+        self.assertEqual(model.eq_obj2id[0], 20)
+
+    def test_update_equality_constraints_idempotent(self):
+        """重复调用结果一致。"""
+        data = np.zeros(mujoco.mjNEQDATA)
+        data[0] = 0.5
+        eq_list = [
+            {
+                "type": mujoco.mjtEq.mjEQ_CONNECT,
+                "obj1_id": 3,
+                "obj2_id": 4,
+                "data": data,
+            }
+        ]
+        self.sim.update_equality_constraints(eq_list)
+        first_type = int(self.sim._mjModel.eq_type[0])
+        first_obj1 = int(self.sim._mjModel.eq_obj1id[0])
+        first_obj2 = int(self.sim._mjModel.eq_obj2id[0])
+        first_data = self.sim._mjModel.eq_data[0].copy()
+
+        self.sim.update_equality_constraints(eq_list)
+        self.assertEqual(int(self.sim._mjModel.eq_type[0]), first_type)
+        self.assertEqual(int(self.sim._mjModel.eq_obj1id[0]), first_obj1)
+        self.assertEqual(int(self.sim._mjModel.eq_obj2id[0]), first_obj2)
+        np.testing.assert_array_equal(self.sim._mjModel.eq_data[0], first_data)
+
+
 if __name__ == "__main__":
     unittest.main()

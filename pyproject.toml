@@ -59,3 +59,13 @@ exclude = []
 "tests/**" = ["SLF001"]
 # __init__.py 允许 re-export
 "**/__init__.py" = ["SLF001", "F401"]
+# 自动生成的 protobuf 代码不应手改
+"orca_gym/protos/**" = ["SLF001"]
+# 第三方 fork 代码（robosuite adapters）遵循上游风格，不强制 SLF001
+"orca_gym/adapters/**" = ["SLF001"]
+# 旧体系 orca_gym_local_env（被 Euler 体系替代），不强制 SLF001
+"orca_gym/environment/orca_gym_local_env.py" = ["SLF001"]
+"orca_gym/environment/orca_gym_local.py" = ["SLF001"]
+# 旧体系脚本/工具（使用 orca_gym_local 穿墙访问），不强制 SLF001
+"orca_gym/scripts/**" = ["SLF001"]
+"orca_gym/tools/**" = ["SLF001"]

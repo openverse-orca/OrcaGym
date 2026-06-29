@@ -289,5 +289,287 @@ class TestBridgeMocapFunctional(unittest.TestCase):
         self.assertEqual(called["count"], 0)
 
 
+# =============================================================================
+# 阶段三 3.4.1：OrcaStudioBridge 视频录制方法
+# =============================================================================
+
+
+class TestBridgeVideoArchCompliance(unittest.TestCase):
+    """子步骤 3.4.1 架构遵从性测试（K9 走 bridge + 离线 no-op）。
+
+    对应文档 §8.2 架构遵从性测试表。
+    """
+
+    def test_bridge_video_offline_noop(self):
+        """K9: 离线模式（_stub is None）不抛错，直接 return。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        # 离线模式调用不抛错
+        asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
+        asyncio.run(bridge.stop_save_video())
+
+    def test_bridge_video_no_mjdata_dependency(self):
+        """K9/P2: grep 断言视频方法不触 MjData/MjModel/_mjData/_mjModel。"""
+        import inspect
+
+        source = inspect.getsource(OrcaStudioBridge)
+        start = source.find("# --- 视频录制（阶段三 3.4.1）---")
+        self.assertGreater(start, 0, "未找到 3.4.1 视频录制区块")
+        block = source[start:]
+        # 视频方法块内不应出现 MjData/MjModel 的访问
+        self.assertNotIn("MjData", block)
+        self.assertNotIn("MjModel", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_bridge_video_async_signature(self):
+        """K9: 方法为 async def，返回 None。"""
+        import asyncio
+        import inspect
+
+        self.assertTrue(inspect.iscoroutinefunction(OrcaStudioBridge.begin_save_video))
+        self.assertTrue(inspect.iscoroutinefunction(OrcaStudioBridge.stop_save_video))
+        # 离线模式返回 None
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
+        self.assertIsNone(ret)
+        ret = asyncio.run(bridge.stop_save_video())
+        self.assertIsNone(ret)
+
+
+class TestBridgeVideoFunctional(unittest.TestCase):
+    """子步骤 3.4.1 功能单元测试。
+
+    对应文档 §8.2 功能单元测试表。
+    """
+
+    def test_begin_save_video_offline_noop(self):
+        """离线模式返回 None 不抛错。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(
+            bridge.begin_save_video("/tmp/test.mp4", capture_mode=0)
+        )
+        self.assertIsNone(ret)
+
+    def test_stop_save_video_offline_noop(self):
+        """离线模式返回 None 不抛错。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(bridge.stop_save_video())
+        self.assertIsNone(ret)
+
+    def test_begin_save_video_online_calls_stub(self):
+        """在线模式（mock stub）调用 BeginSaveMp4File。"""
+        import asyncio
+
+        captured = {}
+
+        class MockStub:
+            async def BeginSaveMp4File(self, request):
+                captured["request"] = request
+                from orca_gym.protos import mjc_message_pb2
+                return mjc_message_pb2.BeginSaveMp4FileResponse()
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        asyncio.run(
+            bridge.begin_save_video("/tmp/test.mp4", capture_mode=1)
+        )
+        self.assertIn("request", captured)
+        req = captured["request"]
+        self.assertEqual(req.file_path, "/tmp/test.mp4")
+        self.assertEqual(req.capture_mode, 1)
+
+    def test_stop_save_video_online_calls_stub(self):
+        """在线模式调用 StopSaveMp4File。"""
+        import asyncio
+
+        called = {"count": 0}
+
+        class MockStub:
+            async def StopSaveMp4File(self, request):
+                called["count"] += 1
+                from orca_gym.protos import mjc_message_pb2
+                return mjc_message_pb2.StopSaveMp4FileResponse()
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        asyncio.run(bridge.stop_save_video())
+        self.assertEqual(called["count"], 1)
+
+
+# =============================================================================
+# 阶段三 3.4.2：OrcaStudioBridge 帧捕获方法
+# =============================================================================
+
+
+class TestBridgeFrameArchCompliance(unittest.TestCase):
+    """子步骤 3.4.2 架构遵从性测试（K9 走 bridge + K11 typed 返回）。
+
+    对应文档 §8.3 架构遵从性测试表。
+    """
+
+    def test_bridge_frame_offline_returns_default(self):
+        """K9: 离线模式返回默认值（-1/空 dict）不抛错。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
+        self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
+        # get_frame_png 离线 no-op
+        asyncio.run(bridge.get_frame_png("/tmp/test.png"))
+
+    def test_bridge_frame_no_mjdata_dependency(self):
+        """K9/P2: grep 断言帧方法不触 MjData/MjModel/_mjData/_mjModel。"""
+        import inspect
+
+        source = inspect.getsource(OrcaStudioBridge)
+        start = source.find("# --- 帧捕获（阶段三 3.4.2）---")
+        self.assertGreater(start, 0, "未找到 3.4.2 帧捕获区块")
+        block = source[start:]
+        self.assertNotIn("MjData", block)
+        self.assertNotIn("MjModel", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_bridge_frame_returns_typed(self):
+        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(bridge.get_current_frame())
+        self.assertIsInstance(ret, int)
+        ret = asyncio.run(bridge.get_camera_time_stamp(0))
+        self.assertIsInstance(ret, dict)
+
+
+class TestBridgeFrameFunctional(unittest.TestCase):
+    """子步骤 3.4.2 功能单元测试。
+
+    对应文档 §8.3 功能单元测试表。
+    """
+
+    def test_get_current_frame_offline_returns_neg1(self):
+        """离线模式返回 -1。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
+
+    def test_get_camera_time_stamp_offline_returns_empty(self):
+        """离线模式返回空 dict。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
+
+    def test_get_frame_png_offline_noop(self):
+        """离线模式 no-op。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(bridge.get_frame_png("/tmp/test.png"))
+        self.assertIsNone(ret)
+
+    def test_get_current_frame_online_calls_stub(self):
+        """在线模式委托 stub。"""
+        import asyncio
+
+        captured = {}
+
+        class MockStub:
+            async def GetCurrentFrameIndex(self, request):
+                captured["called"] = True
+                from orca_gym.protos import mjc_message_pb2
+                resp = mjc_message_pb2.GetCurrentFrameIndexResponse()
+                resp.current_frame = 42
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        ret = asyncio.run(bridge.get_current_frame())
+        self.assertTrue(captured.get("called"))
+        self.assertEqual(ret, 42)
+
+
+# =============================================================================
+# 阶段三 3.4.3：OrcaStudioBridge 内容文件方法
+# =============================================================================
+
+
+class TestBridgeContentFileArchCompliance(unittest.TestCase):
+    """子步骤 3.4.3 架构遵从性测试（K9 走 bridge + 离线 no-op）。
+
+    对应文档 §8.4 架构遵从性测试表。
+    """
+
+    def test_bridge_content_file_offline_noop(self):
+        """K9: 离线模式 no-op 不抛错。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        asyncio.run(bridge.load_content_file("mesh.obj"))
+
+    def test_bridge_content_file_no_mjdata_dependency(self):
+        """K9/P2: grep 断言内容文件方法不触 MjData/MjModel/_mjData/_mjModel。"""
+        import inspect
+
+        source = inspect.getsource(OrcaStudioBridge)
+        start = source.find("# --- 内容文件（阶段三 3.4.3）---")
+        self.assertGreater(start, 0, "未找到 3.4.3 内容文件区块")
+        block = source[start:]
+        self.assertNotIn("MjData", block)
+        self.assertNotIn("MjModel", block)
+        self.assertNotIn("_mjData", block)
+        self.assertNotIn("_mjModel", block)
+
+    def test_bridge_content_file_async_signature(self):
+        """K9: 方法为 async def。"""
+        import inspect
+
+        self.assertTrue(
+            inspect.iscoroutinefunction(OrcaStudioBridge.load_content_file)
+        )
+
+
+class TestBridgeContentFileFunctional(unittest.TestCase):
+    """子步骤 3.4.3 功能单元测试。
+
+    对应文档 §8.4 功能单元测试表。
+    """
+
+    def test_load_content_file_offline_noop(self):
+        """离线模式 no-op。"""
+        import asyncio
+
+        bridge = OrcaStudioBridge()
+        ret = asyncio.run(bridge.load_content_file("mesh.obj"))
+        self.assertIsNone(ret)
+
+    def test_load_content_file_online_calls_stub(self):
+        """在线模式委托 stub。"""
+        import asyncio
+
+        captured = {}
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                captured["request"] = request
+                from orca_gym.protos import mjc_message_pb2
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.SUCCESS
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        asyncio.run(
+            bridge.load_content_file("mesh.obj", remote_file_dir="/remote")
+        )
+        self.assertIn("request", captured)
+        req = captured["request"]
+        self.assertEqual(req.file_name, "mesh.obj")
+        self.assertEqual(req.file_dir, "/remote")
+
+
 if __name__ == "__main__":
     unittest.main()

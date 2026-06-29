@@ -411,3 +411,31 @@ class ModelRegistry:
         obj1 = int(self._mj_model.eq_obj1id[eq_idx])
         obj2 = int(self._mj_model.eq_obj2id[eq_idx])
         return (obj1, obj2)
+
+    def n_equality(self) -> int:
+        """查询等式约束数量。
+
+        替代直接访问 _mjModel.neq。
+
+        Returns:
+            等式约束数量（Python int）。
+        """
+        return int(self._mj_model.neq)
+
+    def mocap_body_names(self) -> list[str]:
+        """查询所有 mocap body 名称。
+
+        替代直接访问 _mjModel.body_mocapid 遍历。
+
+        Returns:
+            mocap body 名称列表（list[str]）。
+        """
+        names: list[str] = []
+        for i in range(self._mj_model.nbody):
+            if self._mj_model.body_mocapid[i] != -1:
+                name = mujoco.mj_id2name(
+                    self._mj_model, mujoco.mjtObj.mjOBJ_BODY, i
+                )
+                if name:
+                    names.append(name)
+        return names
