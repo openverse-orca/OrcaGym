@@ -1,4 +1,0 @@
-Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
-Requirement already satisfied: setuptools in /home/hjadmin/miniconda3/envs/orca-apr24/lib/python3.12/site-packages (82.0.1)
-Requirement already satisfied: wheel in /home/hjadmin/miniconda3/envs/orca-apr24/lib/python3.12/site-packages (0.46.3)
-Requirement already satisfied: packaging>=24.0 in /home/hjadmin/miniconda3/envs/orca-apr24/lib/python3.12/site-packages (from wheel) (26.0)
