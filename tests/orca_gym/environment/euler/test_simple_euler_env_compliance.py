@@ -76,6 +76,25 @@ class TestSimpleEnvK3K5NoTunnelAccess(unittest.TestCase):
         self.assertNotIn("self.gym.mj_forward", body)
         self.assertNotIn("self.gym.sync_to_view", body)
 
+    def test_no_self_gym_access(self):
+        """源码不含 self.gym 访问（M0: env.gym 不存在）。
+
+        旧文档违规点 self.gym._sim._mjData 在 M0 下不可达,
+        但仍需确认源码无 self.gym 残留（会在运行时抛 AttributeError）。
+        """
+        source = _read_simple_env_source()
+        # 排除注释和 docstring
+        exec_source = re.sub(r'"""[\s\S]*?"""', '', source)
+        exec_source = re.sub(r'#.*', '', exec_source)
+        self.assertNotIn("self.gym", exec_source,
+                         "M0 违规: simple_env.py 含 self.gym 访问（env.gym 不存在）")
+
+    def test_no_xfrc_applied_direct_write(self):
+        """源码不含直接写 _mjData.xfrc_applied（W2 应走 apply_body_force）。"""
+        source = _read_simple_env_source()
+        for pattern in ["xfrc_applied", "_mjData.xfrc", "_mjData.qpos"]:
+            self.assertNotIn(pattern, source)
+
 
 class TestSimpleEnvResetModelFunctional(unittest.TestCase):
     """功能验证: reset_model 正确写入随机扰动后的状态。"""
@@ -165,6 +184,35 @@ class TestSimpleEnvResetModelFunctional(unittest.TestCase):
         time_after = float(env.data.time)
         expected_dt = env.frame_skip * env.sim_config.timestep
         self.assertAlmostEqual(time_after - time_before, expected_dt, places=5)
+
+    def test_env_gym_raises_attribute_error(self):
+        """M0: SimpleEulerEnv 继承 Env，env.gym 抛原生 AttributeError。"""
+        env = self.env
+        with self.assertRaises(AttributeError):
+            _ = env.gym
+
+    def test_step_returns_gymnasium_tuple(self):
+        """step 返回 Gymnasium 5-tuple (obs, reward, terminated, truncated, info)。"""
+        env = self.env
+        env.reset_simulation()
+        env.init_qpos_qvel()
+        env.np_random = np.random.RandomState(42)
+        env.reset_model()
+        result = env.step(np.array([0.0], dtype=np.float32))
+        self.assertEqual(len(result), 5)
+        obs, reward, terminated, truncated, info = result
+        self.assertEqual(obs.shape, (3,))   # [cos, sin, theta_dot]
+        self.assertIsInstance(reward, float)
+        self.assertIsInstance(terminated, bool)
+        self.assertIsInstance(truncated, bool)
+        self.assertIsInstance(info, dict)
+
+    def test_observation_space_box(self):
+        """observation_space 是 Box,形状 (3,)。"""
+        from gymnasium import spaces
+        env = self.env
+        self.assertIsInstance(env.observation_space, spaces.Box)
+        self.assertEqual(env.observation_space.shape, (3,))
 
 
 if __name__ == "__main__":

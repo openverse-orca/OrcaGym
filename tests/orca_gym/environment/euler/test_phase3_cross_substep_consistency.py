@@ -18,11 +18,7 @@ import unittest
 
 import numpy as np
 
-import gymnasium as gym
-
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.environment.orca_gym_env_mixin import OrcaGymEnvMixin
 
 _ENV_SOURCE_PATH = (
     pathlib.Path(__file__).resolve().parents[4]
@@ -71,75 +67,11 @@ def _exec_source_without_docstrings(path: pathlib.Path) -> str:
 
 
 class TestGlobalArchCompliance(unittest.TestCase):
-    """§10.1 全局架构遵从性（K1/K2/K6/K9/K14 + ruff SLF001）。"""
+    """§10.1 全局架构遵从性（ruff SLF001）。
 
-    def test_k1_k4_env_no_global_private_access(self):
-        """K1/K4: Env 可执行代码全局无 _gym._sim/_studio/_registry/_mjData/_mjModel。"""
-        exec_source = _exec_source_without_docstrings(_ENV_SOURCE_PATH)
-        forbidden = [
-            "_gym._sim", "_gym._studio", "_gym._registry",
-            "_gym._mjData", "_gym._mjModel",
-        ]
-        for pattern in forbidden:
-            with self.subTest(pattern=pattern):
-                self.assertNotIn(pattern, exec_source)
-
-    def test_k2_env_dir_no_internal_leak(self):
-        """K2: dir(env) 不含 _sim/_studio/_registry/_mjData/_mjModel。"""
-        env = _make_g1_env()
-        d = dir(env)
-        forbidden = ["_sim", "_studio", "_registry", "_mjData", "_mjModel"]
-        for name in forbidden:
-            with self.subTest(attr=name):
-                self.assertNotIn(name, d)
-
-    def test_k2_env_dir_contains_phase3_public_api(self):
-        """K2: dir(env) 含阶段三新增公共方法。"""
-        env = _make_g1_env()
-        d = dir(env)
-        expected = [
-            # 查询 API (3.1)
-            "query_joint_qpos", "query_joint_qvel", "query_sensor_data",
-            "get_body_xpos_xmat_xquat", "query_site_pos_and_mat",
-            # 力应用/状态设置 (3.2)
-            "apply_body_force", "set_joint_qpos", "set_joint_qvel",
-            "set_mocap_pos_and_quat",
-            # 雅可比 (3.3)
-            "mj_jacBody", "mj_jacSite", "mj_jac_site",
-            # Studio 委托 (3.4)
-            "begin_save_video", "stop_save_video", "get_current_frame",
-            "load_content_file",
-            # 等式约束/体操作 (3.5)
-            "update_equality_constraints", "anchor_actor",
-            "release_body_anchored", "do_body_manipulation",
-            # 基座变换 (3.1.8)
-            "query_site_pos_and_quat_B", "query_robot_velocity_odom",
-        ]
-        for name in expected:
-            with self.subTest(attr=name):
-                self.assertIn(name, d, f"dir(env) 缺少阶段三公共方法 '{name}'")
-
-    def test_k6_env_data_is_dataview(self):
-        """K6: env.data 类型为 OrcaGymDataView。"""
-        env = _make_g1_env()
-        self.assertIsInstance(env.data, OrcaGymDataView)
-
-    def test_k9_studio_methods_via_bridge_not_gym_studio(self):
-        """K9: Env 可执行代码不走 gym.studio 属性（走 studio_bridge() 方法）。"""
-        exec_source = _exec_source_without_docstrings(_ENV_SOURCE_PATH)
-        # gym.studio 作为 property 访问（非 studio_bridge 方法调用）
-        # 匹配 _gym.studio 不紧跟 _bridge
-        matches = re.findall(r"_gym\.studio(?!_bridge)", exec_source)
-        self.assertEqual(matches, [], f"K9 违规: Env 代码含 gym.studio 属性访问: {matches}")
-
-    def test_k14_mro_stable(self):
-        """K14: OrcaGymEulerEnv.__mro__ 含 gym.Env + OrcaGymEnvMixin，不含 OrcaGymBaseEnv。"""
-        mro = OrcaGymEulerEnv.__mro__
-        self.assertIn(gym.Env, mro)
-        self.assertIn(OrcaGymEnvMixin, mro)
-        # 不应继承 OrcaGymBaseEnv
-        base_env_names = [c.__name__ for c in mro]
-        self.assertNotIn("OrcaGymBaseEnv", base_env_names)
+    K1/K2/K6/K9/K14 约束已迁移至 test_orca_gym_euler_env_skeleton.py 各 K 约束类，
+    本类仅保留 ruff SLF001 全局零报警检查（扫描范围 orca_gym/，是各处 ruff 检查的超集）。
+    """
 
     def test_ruff_slf001_global_zero(self):
         """M0-M7: ruff check --select SLF001 orca_gym/ 零报警。"""
