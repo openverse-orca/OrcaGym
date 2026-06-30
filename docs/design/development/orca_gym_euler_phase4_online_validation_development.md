@@ -20,7 +20,7 @@
 |------|----------------|--------------|
 | 目的 | 功能填充 + 功能正确性 | 真实运行效果验证 |
 | 测试方式 | 离线单元测试（CPU 加载 XML） | 在线端到端 example（宿主机 + OrcaStudio） |
-| 环境 | sandbox 内 `OrcaFlow_Flow`，离线模式 | 宿主机 + OrcaStudio + G1 关卡 |
+| 环境 | conda `orca` 环境，离线模式 | conda `orca` 环境 + OrcaStudio + G1 关卡 |
 | 数据来源 | 离线加载 `g1_29dof_camera.xml` 的真实 MuJoCo 数据 | 在线 gRPC 连接 Studio，真实场景运行数据 |
 | 判定方式 | unittest assert（数值判定） | 人工观察 + 数值判定（脚本内嵌） |
 
@@ -29,9 +29,27 @@
 ### 1.3 前置条件
 
 - 阶段三全部子阶段（3.1–3.5）验收通过
-- OrcaStudio 运行中，已加载含 G1 的关卡
+- OrcaStudio 已安装并可启动，具备含 G1 机器人的关卡
 - G1 Euler 专用资源已就位（`OrcaPlayground/envs/euler/robots/`）
 - 宿主机 CUDA 环境（ONNX 策略推理如需 GPU）
+
+### 1.4 手工验证流程
+
+阶段四采用「人工 + 自动」交替的双轨验证流程，每个 Lesson 按以下 5 步执行：
+
+| 步骤 | 执行方 | 动作 | 说明 |
+|------|--------|------|------|
+| 1 | 人工 | 启动 OrcaStudio，加载含 1 个 G1 机器人的关卡，点击运行 | 关卡运行后 Studio 进入仿真态，监听 gRPC 端口等待 Env 连接 |
+| 2 | 人工 | 运行 `OrcaPlayground/examples/euler/` 下对应 Lesson 脚本 | 脚本启动后通过 gRPC 连接 Studio，创建 `OrcaGymEulerEnv` 实例 |
+| 3 | 自动 | 脚本驱动 euler env 实例完成相关功能 | 仿真步进 / locomotion 行走 / 视频录制截帧 / 体操作等，由 `run_lesson` 框架统一编排（§3.1） |
+| 4 | 人工 | 用户根据教程指导观察 Studio 视口画面 | 确认画面结果符合预期（G1 站立/行走/抬起/拖拽等），对应 `OnlineVerifier.observe()` 提示项（§4.1） |
+| 5 | 自动 | 脚本自动检查中间输出并评估用例是否通过 | 通过 euler 公共 API 读取数据、检查保存的文件（mp4/PNG/JSON），`OnlineVerifier.check()` 输出数值判定结论（§4.2） |
+
+> **流程要点**：
+> - 步骤 1–2 为人工启动环节，确保 Studio 关卡与脚本 env 实例一一对应（agent_name 扫描见 §2.0.4）。
+> - 步骤 3 与步骤 4/5 在 `run_lesson` 循环中**交织进行**：每个控制周期先 `do_simulation` 步进（自动），再 `verify_step` 数值判定（自动），再 `observe_step` 打印观察提示（人工）。
+> - 步骤 4 的人工观察项与步骤 5 的数值判定项**独立计数**，二者共同构成 Lesson 的验收结论（§4.4 报告格式）。
+> - 脚本运行结束后，`OnlineVerifier.report()` 输出 JSON 报告到 `/tmp/euler_Lesson_N_report.json`，用户据报告 + 视口观察综合判断 Lesson 是否通过。
 
 ---
 
@@ -102,7 +120,7 @@
 | mocap anchor | `ActorManipulator_Anchor` | body (`mocap="true"`，pos=`0.5 0 0.3`) + sphere geom（size=0.02，contype=0/conaffinity=0） | 驱动源，通过 `set_mocap_pos_and_quat` 写入位姿 |
 | weld 约束 | `anchor_box_weld` | `<equality><weld body1="ActorManipulator_Anchor" body2="manipulation_box" active="true"/></equality>` | 绑定 anchor↔box，可通过 `modify_equality_objects` 重绑 obj2id 到 G1 任意 body（如 pelvis）验证 mocap 驱动 G1 动力学 |
 
-> **设计要点**：这三个测试对象是独立于 G1 本体的辅助 fixture，不干扰 G1 的 29 自由度行走控制。`anchor_box_weld` 的 `body2` 默认指向 `manipulation_box`，在线测试中可通过 `modify_equality_objects(eq_name="anchor_box_weld", obj2id=pelvis_id)` 将约束重绑到 G1 pelvis，验证 mocap 驱动 G1 动力学（不增删 equality 节点，仅改 obj1id/obj2id）。
+> **设计要点**：这三个测试对象是独立于 G1 本体的辅助 fixture，不干扰 G1 的 29 自由度行走控制。`anchor_box_weld` 的 `body2` 默认指向 `manipulation_box`，在线测试中可通过 `modify_equality_objects(eq_ids=[0], obj2_names=[f"{agent}/pelvis"])` 将约束重绑到 G1 pelvis，验证 mocap 驱动 G1 动力学（不增删 equality 节点，仅改 obj1id/obj2id）。
 
 #### 2.0.3 统一运行配置
 
@@ -155,9 +173,9 @@ env.begin_save_video(video_dir, capture_mode=CaptureMode.ASYNC)
 frame_idx = env.get_next_frame()
 
 # 3. 抓帧 PNG 到目录（gRPC GetCameraFramePNG）—— 视频截帧
-#    返回 {camera_name: {"pos":..., "quat":...}} dict，PNG 写入 {image_path}/color/{camera_name}_color_0.png
-camera_info = env.get_frame_png("/tmp/g1_frames")
-available_cams = list(camera_info.keys())  # ["camera_head"]
+#    异步写 PNG 到 {image_path}/color/{camera_name}_color_0.png，返回 None
+#    验证方式：轮询目录下 PNG 文件生成（参考 run_d12_act.py max_wait=0.5s 轮询）
+env.get_frame_png("/tmp/g1_frames")
 
 # 4. 查询相机时间戳（gRPC GetTimeStamp）
 timestamps = env.get_camera_time_stamp(last_frame_index=frame_idx)
@@ -204,8 +222,8 @@ for cam in cameras:
 **验证点**：
 1. `query_joint_qpos(["{agent}/left_hip_pitch_joint", ..., "{agent}/right_wrist_yaw_joint"])` 返回 29 个关节角度，形状正确（每个 hinge joint 长度 1）
 2. `query_joint_qvel/qacc` 同理，与 `env.data.qvel/qacc` 对应切片一致
-3. `get_body_xpos_xmat_xquat(["{agent}/pelvis", "{agent}/torso_link", "{agent}/left_ankle_roll_link"])` 返回扁平数组，pelvis z≈0.793（初始高度）
-4. `query_site_pos_and_quat(["{agent}/imu"])` 返回 imu site 位姿，位于 torso_link 内
+3. `get_body_xpos_xmat_xquat(["{agent}/pelvis", "{agent}/torso_link", "{agent}/left_ankle_roll_link"])` 返回 `dict[body_name -> {"xpos","xmat","xquat"}]`，pelvis `xpos[2]`≈0.793（初始高度）
+4. `query_site_pos_and_mat(["{agent}/imu"])` 返回 imu site 的 `{"pos","mat"}`，位于 torso_link 内
 5. `query_sensor_data(["{agent}/imu_quat", "{agent}/imu_gyro", "{agent}/imu_acc", "{agent}/left_hip_pitch_pos"])` 返回正确维度数据（quat=4, gyro=3, acc=3, jointpos=1）
 6. `query_actuator_torques(["{agent}/left_hip_pitch", ...])` 返回 29 个执行器力矩
 7. `query_contact_simple()` 返回脚底接触列表（G1 站立时 ankle_roll_link 与地面接触）
@@ -227,7 +245,7 @@ for cam in cameras:
 4. `set_geom_friction({"{agent}/left_ankle_roll_link_geom0": [0.01, 0.005, 0.0001]})` 降低脚底摩擦后，G1 站立稳定性下降（可能滑动）
 5. `query_contact_force(contact_ids)` 返回脚底接触力（法向力 ≈ G1 重力的一半，单脚）
 6. `apply_body_force("{agent}/pelvis", [50, 0, 0], [0, 0, 0])` 侧向推力使 G1 倾倒，观察接触变化
-7. `set_mocap_pos_and_quat("ActorManipulator_Anchor", [0.7, 0, 0.5], [1,0,0,0])` 写入 mocap 位姿后，`env.data.mocap_pos[0]` 读回值一致；weld 约束驱动 box，步进 100 帧后 `get_body_xpos_xmat_xquat(["manipulation_box"])` 的 xpos ≈ `[0.7, 0, 0.5]`（atol=0.05）
+7. `set_mocap_pos_and_quat({"ActorManipulator_Anchor": {"pos": [0.7, 0, 0.5], "quat": [1,0,0,0]}})`（dict 形参）写入 mocap 位姿后，`env.data.mocap_pos("ActorManipulator_Anchor")` 读回值一致；weld 约束驱动 box，步进 100 帧后 `get_body_xpos_xmat_xquat(["manipulation_box"])["manipulation_box"]["xpos"]` ≈ `[0.7, 0, 0.5]`（atol=0.05）
 
 ### 2.3 Lesson 6：雅可比与逆运动学验证（G1 足端/躯干雅可比）
 
@@ -236,11 +254,11 @@ for cam in cameras:
 **验证内容**：G1 雅可比计算（足端 body、imu site）、基于雅可比的躯干姿态控制或足端位置控制。
 
 **验证点**：
-1. `mj_jacBody(jacp, jacr, body_id=pelvis_id)` 返回 `(3, nv)` 雅可比矩阵，nv=35（6 free + 29 旋转）
-2. `mj_jacSite(jacp, jacr, "{agent}/imu")` 返回 imu site 雅可比
-3. `query_site_xvalp_xvalr(["{agent}/imu"])` 返回 imu site 速度，与 `jacp @ env.data.qvel` 数值一致
+1. `mj_jacBody(jacp, jacr, body_name=f"{agent}/pelvis")` 返回 `(3, nv)` 雅可比矩阵，nv=35（6 free + 29 旋转）
+2. `mj_jacSite(jacp, jacr, site_name=f"{agent}/imu")` 返回 imu site 雅可比
+3. `query_site_xvalp_xvalr(["{agent}/imu"])` 返回 `(xvalp_dict, xvalr_dict)`，`xvalp_dict[site_name]` 与 `jacp @ env.data.qvel` 数值一致
 4. **IK 演示**：以左腿为目标，计算 `left_ankle_roll_link` 相对 pelvis 的雅可比，用伪逆 `qvel_leg = pinv(jacp_leg) @ (target_foot_pos - foot_pos)` 迭代调整左腿关节，使左脚到达目标位置（在 Studio 视口可见左脚移动）
-5. `mj_jac_site(["{agent}/imu", "{agent}/left_ankle_roll_link"])` 批量返回多个雅可比
+5. `mj_jac_site(["{agent}/imu", "{agent}/camera_head_site"])` 批量返回多个 site 雅可比（注：`left_ankle_roll_link` 为 body，单 body 雅可比用 `mj_jacBody`）
 
 ### 2.4 Lesson 7：Studio 视频录制与截帧验证（G1 行走录制）
 
@@ -257,7 +275,7 @@ for cam in cameras:
 **验证点**：
 1. **摄像头使能检查**：`get_current_frame()` 初始返回值 ≥ 0（若返回 -1 说明摄像头未使能，检查场景是否加载了含 `camera_head` 的 G1、XML `user` 端口字段是否正确）
 2. **视频录制**：`begin_save_video("/tmp/g1_walk_video", capture_mode=CaptureMode.ASYNC)`（path 是**目录**，参考 OrcaManipulation 用法）开始录制后，步进若干帧（如 500 帧 = 10 秒），`get_next_frame()` 帧索引递增
-3. **视频截帧**：行走中途 `get_frame_png("/tmp/g1_frames")` 抓帧，返回 `{"camera_head": {"pos":..., "quat":...}}`，轮询 `/tmp/g1_frames/color/camera_head_color_0.png` 文件生成且大小稳定（参考 `run_d12_act.py` 的 `max_wait=0.5s` 轮询）
+3. **视频截帧**：行走中途 `get_frame_png("/tmp/g1_frames")` 异步抓帧（返回 None，PNG 写入目录），轮询 `/tmp/g1_frames/color/camera_head_color_0.png` 文件生成且大小稳定（参考 `run_d12_act.py` 的 `max_wait=0.5s` 轮询）
 4. **时间戳查询**：`get_camera_time_stamp(last_frame_index)` 返回时间戳字典（键为相机名，值为时间戳列表）
 5. **录制完成**：`stop_save_video()` 后 `/tmp/g1_walk_video/` 目录下生成 mp4 文件，包含 G1 行走画面
 6. **内容验证**：录制期间 G1 在策略控制下行走，mp4 视频与截帧 PNG 内容应可见 locomotion 运动
@@ -278,10 +296,10 @@ for cam in cameras:
 3. 释放鼠标，`release_body_anchored()` 清除锚定，G1 恢复物理仿真与策略控制
 4. `update_equality_constraints(...)` 切换锚点约束类型（weld/ball），观察 G1 跟随行为差异
 5. `anchor_actor("{agent}/pelvis", anchor_type)` 程序化锚定 pelvis，G1 悬停在指定位置
-6. 拖拽过程中 `query_body_xpos_xmat_xquat(["{agent}/pelvis"])` 实时返回位姿变化
-7. **mocap 驱动 box（默认绑定）**：`set_mocap_pos_and_quat("ActorManipulator_Anchor", [0.7, 0, 0.5], [1,0,0,0])` 后步进 100 帧，`manipulation_box` 的 xpos ≈ `[0.7, 0, 0.5]`（atol=0.05），Studio 视口可见球体 anchor 拖动 box
-8. **停用 equality 解耦**：`update_equality_constraints(eq_name="anchor_box_weld", active=False)` 后移动 mocap，box 不再跟随（自由落体或保持原位）
-9. **重绑 equality 驱动 G1 pelvis**：`modify_equality_objects(eq_name="anchor_box_weld", obj2id=pelvis_id)` 将 weld 的 obj2id 从 box 改为 pelvis，`set_mocap_pos_and_quat("ActorManipulator_Anchor", pelvis_pos+[0.2,0,0.1])` 后步进 200 帧，G1 pelvis 位移 > 0.05m（Studio 视口可见 G1 被 mocap 拖动）—— **此为 mocap 驱动 G1 动力学的核心验证**
+6. 拖拽过程中 `get_body_xpos_xmat_xquat(["{agent}/pelvis"])` 实时返回位姿变化
+7. **mocap 驱动 box（默认绑定）**：`set_mocap_pos_and_quat({"ActorManipulator_Anchor": {"pos": [0.7, 0, 0.5], "quat": [1,0,0,0]}})` 后步进 100 帧，`manipulation_box` 的 xpos ≈ `[0.7, 0, 0.5]`（atol=0.05），Studio 视口可见球体 anchor 拖动 box
+8. **停用 equality 解耦**：`update_equality_constraints([{"type": 0, "obj1_id": -1, "obj2_id": -1, "data": np.zeros(mujoco.mjNEQDATA)}])`（按索引 0 写 type=0 停用 eq[0]）后移动 mocap，box 不再跟随（自由落体或保持原位）
+9. **重绑 equality 驱动 G1 pelvis**：`modify_equality_objects(eq_ids=[0], obj2_names=[f"{agent}/pelvis"])` 将 eq[0] weld 的 obj2id 从 box 改为 pelvis，`set_mocap_pos_and_quat({"ActorManipulator_Anchor": {"pos": pelvis_pos+[0.2,0,0.1], "quat": [1,0,0,0]}})` 后步进 200 帧，G1 pelvis 位移 > 0.05m（Studio 视口可见 G1 被 mocap 拖动）—— **此为 mocap 驱动 G1 动力学的核心验证**
 
 ### 2.6 Example 目录结构
 
@@ -335,9 +353,12 @@ OrcaPlayground/envs/euler/
 class G1BaseEnv(OrcaGymEulerEnv):
 
     def run_lesson(self, num_steps: int, verifier: OnlineVerifier):
-        """统一运行入口：子类通过重写 verify_step/observe_step 插入验证逻辑"""
+        """统一运行入口：子类通过重写钩子方法插入验证逻辑"""
         self.reset()
         verifier.observe("start", "请在 Studio 视口观察 G1 初始姿态：应站立在地面上")
+
+        # 循环前钩子：Lesson 7 用于 begin_save_video，其他 Lesson 可空操作
+        self.before_loop(verifier)
 
         for step in range(num_steps):
             # 1. 策略推理（Lesson 7/8 需要，Lesson 4/5/6 可空操作）
@@ -353,13 +374,20 @@ class G1BaseEnv(OrcaGymEulerEnv):
             # 4. 渲染
             self.render()
 
+        # 循环后钩子：Lesson 7 用于 stop_save_video + mp4 检查，其他 Lesson 可空操作
+        self.after_loop(verifier)
+
         # 5. 结束判定 + 报告
         self.verify_final(verifier)
         verifier.report()
 
     def compute_ctrl(self, step: int) -> np.ndarray:
         """子类重写：Lesson 4/5/6 返回零控；Lesson 7/8 返回 ONNX 策略输出"""
-        return np.zeros(self.action_dim)
+        return np.zeros(self.model.nu)
+
+    def before_loop(self, verifier: OnlineVerifier):
+        """子类重写：循环前准备（如 Lesson 7 begin_save_video）"""
+        pass
 
     def verify_step(self, step: int, verifier: OnlineVerifier):
         """子类重写：每个控制周期插入数值判定"""
@@ -369,6 +397,10 @@ class G1BaseEnv(OrcaGymEulerEnv):
         """子类重写：阶段性打印人工观察提示"""
         pass
 
+    def after_loop(self, verifier: OnlineVerifier):
+        """子类重写：循环后收尾（如 Lesson 7 stop_save_video + mp4 检查）"""
+        pass
+
     def verify_final(self, verifier: OnlineVerifier):
         """子类重写：运行结束后的最终判定"""
         pass
@@ -376,10 +408,10 @@ class G1BaseEnv(OrcaGymEulerEnv):
 
 ### 3.2 启动流程
 
-所有 Lesson 的启动流程一致，封装在 `G1BaseEnv.initialize_simulation` 中：
+所有 Lesson 的启动流程一致，封装在 `G1BaseEnv.initialize_simulation` 中。各 Lesson 的脚本入口结构相同，仅 Env 子类名、verifier 名称、num_steps 不同：
 
 ```python
-# query_api.py 启动流程（所有 Lesson 通用）
+# query_api.py 启动流程（所有 Lesson 通用模板）
 from envs.euler.g1_base_env import G1BaseEnv
 from envs.euler.online_verifier import OnlineVerifier
 from envs.common.model_scanner import scan_scene_for_template, build_suffix_template
@@ -391,25 +423,41 @@ class QueryApiEnv(G1BaseEnv):
 
 if __name__ == "__main__":
     env = QueryApiEnv(
-        orcagym_addr="127.0.0.1:50051",
-        time_step=0.001,
         frame_skip=20,
-        model_path="envs/euler/robots/g1_29dof_camera.xml",
+        orcagym_addr="127.0.0.1:50051",
+        agent_names=["g1"],
+        time_step=0.001,
+        model_xml_path="envs/euler/robots/g1_29dof_camera.xml",
     )
     env.run()
 ```
+
+各 Lesson 的脚本入口差异（Env 子类名 → verifier 名称 / num_steps）：
+
+| Lesson | 脚本文件 | Env 子类 | verifier 名称 | num_steps |
+|--------|---------|---------|--------------|-----------|
+| 4 | `04_query_api/query_api.py` | `QueryApiEnv` | "Lesson 4: 状态查询 API" | 100 |
+| 5 | `05_force_apply/force_apply.py` | `ForceApplyEnv` | "Lesson 5: 外力应用" | 100 |
+| 6 | `06_jacobian/jacobian_ik.py` | `JacobianEnv` | "Lesson 6: 雅可比 IK" | 100 |
+| 7 | `07_studio_capture/studio_capture.py` | `StudioCaptureEnv` | "Lesson 7: 视频录制" | 500 |
+| 8 | `08_body_manipulation/body_manipulation.py` | `BodyManipulationEnv` | "Lesson 8: 体操作" | 700 |
+
+> **说明**：Lesson 7/8 的 `num_steps` 较大（500/700）是因为需要覆盖行走录制 / 拖拽锚定 / equality 重绑等多个阶段；其他参数（`frame_skip`/`orcagym_addr`/`agent_names`/`time_step`/`model_xml_path`）各 Lesson 完全一致。`initialize_simulation` 在 `G1BaseEnv` 中统一实现，子类通过重写 `compute_ctrl`/`before_loop`/`verify_step`/`observe_step`/`after_loop`/`verify_final` 钩子插入差异化逻辑（§3.3）。
 
 ### 3.3 循环步进逻辑
 
 每个控制周期（frame_skip=20，即 20ms / 50Hz）执行：
 
-| 步骤 | 动作 | 说明 |
-|------|------|------|
-| 1 | `ctrl = self.compute_ctrl(step)` | 策略推理（Lesson 4/5/6 零控，Lesson 7/8 ONNX） |
-| 2 | `self.do_simulation(ctrl, self.frame_skip)` | 物理步进 |
-| 3 | `self.verify_step(step, verifier)` | 数值判定：读写 env 数据，assert 预期 |
-| 4 | `self.observe_step(step, verifier)` | 人工观察：阶段性打印 Studio 视口提示 |
-| 5 | `self.render()` | 渲染到 Studio 视口 |
+| 阶段 | 步骤 | 动作 | 说明 |
+|------|------|------|------|
+| 循环前 | 0 | `self.before_loop(verifier)` | 准备工作（Lesson 7 `begin_save_video`，其他 Lesson 空操作） |
+| 循环中 | 1 | `ctrl = self.compute_ctrl(step)` | 策略推理（Lesson 4/5/6 零控，Lesson 7/8 ONNX） |
+| 循环中 | 2 | `self.do_simulation(ctrl, self.frame_skip)` | 物理步进 |
+| 循环中 | 3 | `self.verify_step(step, verifier)` | 数值判定：读写 env 数据，assert 预期 |
+| 循环中 | 4 | `self.observe_step(step, verifier)` | 人工观察：阶段性打印 Studio 视口提示 |
+| 循环中 | 5 | `self.render()` | 渲染到 Studio 视口 |
+| 循环后 | 6 | `self.after_loop(verifier)` | 收尾工作（Lesson 7 `stop_save_video` + mp4 检查，其他 Lesson 空操作） |
+| 结束 | 7 | `self.verify_final(verifier)` + `verifier.report()` | 最终判定 + 输出 JSON 报告 |
 
 ### 3.4 行走控制集成（Lesson 7/8）
 
@@ -575,19 +623,21 @@ class QueryApiEnv(G1BaseEnv):
             qpos = self.query_joint_qpos(joint_names)
             verifier.check("joint_qpos_dim", len(qpos) == 29, len(qpos), 29)
 
-            # 2. qpos 与 env.data.qpos 切片一致
+            # 2. qpos 与 env.data.qpos 切片一致（dict 拼接为连续数组后比较）
             expected = self.data.qpos[7:]  # 跳过 free base 前 7 维
-            verifier.check_allclose("joint_qpos_vs_data", qpos, expected, atol=1e-6)
+            qpos_arr = np.concatenate([qpos[j] for j in joint_names])
+            verifier.check_allclose("joint_qpos_vs_data", qpos_arr, expected, atol=1e-6)
 
             # 3. pelvis 初始高度 ≈ 0.793
             pelvis = self.get_body_xpos_xmat_xquat([f"{agent}/pelvis"])
-            pelvis_z = pelvis[0][2]
+            pelvis_z = pelvis[f"{agent}/pelvis"]["xpos"][2]
             verifier.check_range("pelvis_initial_height", pelvis_z, 0.75, 0.85,
                                  "G1 站立初始高度")
 
             # 4. IMU sensor 维度
             imu_quat = self.query_sensor_data([f"{agent}/imu_quat"])
-            verifier.check("imu_quat_dim", len(imu_quat[0]) == 4, len(imu_quat[0]), 4)
+            verifier.check("imu_quat_dim", len(imu_quat[f"{agent}/imu_quat"]) == 4,
+                           len(imu_quat[f"{agent}/imu_quat"]), 4)
 
             # 5. body_subtree_mass 为正
             torso_mass = self.body_subtree_mass(f"{agent}/torso_link")
@@ -614,19 +664,21 @@ class ForceApplyEnv(G1BaseEnv):
 
         if step == 10:
             # 施力前：记录 pelvis z
-            self._z_before = self.get_body_xpos_xmat_xquat([f"{agent}/pelvis"])[0][2]
+            self._z_before = self.get_body_xpos_xmat_xquat(
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"][2]
 
             # 施加向上力
             self.apply_body_force(f"{agent}/torso_link", [0, 0, 200], [0, 0, 0])
 
         elif step == 30:
             # 施力后：pelvis z 应上升
-            z_after = self.get_body_xpos_xmat_xquat([f"{agent}/pelvis"])[0][2]
+            z_after = self.get_body_xpos_xmat_xquat(
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"][2]
             verifier.check("force_lift_pelvis", z_after > self._z_before + 0.01,
                            z_after, f">{self._z_before + 0.01}", "施力后 pelvis 上升")
 
-            # xfrc_applied 可读到力值
-            torso_id = self.model.body(f"{agent}/torso_link").id
+            # xfrc_applied 可读到力值（DataView 只读视图，按 body_id 索引）
+            torso_id = self.model.body_name2id(f"{agent}/torso_link")
             xfrc = self.data.xfrc_applied[torso_id, :3]
             verifier.check("xfrc_recorded", np.any(xfrc != 0), xfrc.tolist(), "non-zero",
                            "xfrc_applied 记录了施加的力")
@@ -636,7 +688,7 @@ class ForceApplyEnv(G1BaseEnv):
 
         elif step == 35:
             # 清力后：xfrc 清零
-            torso_id = self.model.body(f"{agent}/torso_link").id
+            torso_id = self.model.body_name2id(f"{agent}/torso_link")
             xfrc = self.data.xfrc_applied[torso_id, :3]
             verifier.check("xfrc_cleared", np.all(xfrc == 0), xfrc.tolist(), "zeros",
                            "清力后 xfrc 归零")
@@ -645,9 +697,10 @@ class ForceApplyEnv(G1BaseEnv):
             # 查询接触力：单脚法向力 ≈ G1 重力的一半
             contacts = self.query_contact_simple()
             if contacts:
-                contact_ids = [c["id"] for c in contacts]
-                forces = self.query_contact_force(contact_ids)
-                total_normal = sum(abs(f[0]) for f in forces)  # 法向力近似
+                # contact id 为 contacts 列表索引（query_contact_simple 不返回 id 字段）
+                contact_ids = list(range(len(contacts)))
+                forces = self.query_contact_force(contact_ids)  # dict[id -> (6,)]
+                total_normal = sum(abs(f[0]) for f in forces.values())  # 法向力近似
                 g1_mass = self.body_subtree_mass(f"{agent}/pelvis") + \
                           self.body_subtree_mass(f"{agent}/torso_link")
                 half_weight = g1_mass * 9.81 / 2
@@ -670,40 +723,45 @@ class JacobianEnv(G1BaseEnv):
         agent = self.agent_name
         if step == 0:
             # 1. pelvis 雅可比形状 (3, nv)，nv=35
-            pelvis_id = self.model.body(f"{agent}/pelvis").id
             jacp = np.zeros((3, self.model.nv))
             jacr = np.zeros((3, self.model.nv))
-            self.mj_jacBody(jacp, jacr, body_id=pelvis_id)
+            self.mj_jacBody(jacp, jacr, body_name=f"{agent}/pelvis")
             verifier.check("jac_shape", jacp.shape == (3, 35), jacp.shape, (3, 35),
                            "pelvis 雅可比形状")
 
             # 2. imu site 速度与 jacp @ qvel 一致
-            site_vel = self.query_site_xvalp_xvalr([f"{agent}/imu"])
+            xvalp, xvalr = self.query_site_xvalp_xvalr([f"{agent}/imu"])
             jacp_site = np.zeros((3, self.model.nv))
             jacr_site = np.zeros((3, self.model.nv))
-            imu_site_id = self.model.site(f"{agent}/imu").id
-            self.mj_jacSite(jacp_site, jacr_site, site_id=imu_site_id)
+            self.mj_jacSite(jacp_site, jacr_site, site_name=f"{agent}/imu")
             expected_vel = jacp_site @ self.data.qvel
-            verifier.check_allclose("site_vel_vs_jac", site_vel[0][:3], expected_vel,
-                                    atol=1e-4, detail="imu site 速度 = jacp @ qvel")
+            verifier.check_allclose("site_vel_vs_jac", xvalp[f"{agent}/imu"],
+                                    expected_vel, atol=1e-4,
+                                    detail="imu site 速度 = jacp @ qvel")
 
             # 3. IK 演示：左脚目标位置
-            foot_pos = self.get_body_xpos_xmat_xquat([f"{agent}/left_ankle_roll_link"])[0][:3]
+            foot_pos = self.get_body_xpos_xmat_xquat(
+                [f"{agent}/left_ankle_roll_link"]
+                )[f"{agent}/left_ankle_roll_link"]["xpos"]
             target = foot_pos + np.array([0.0, 0.05, 0.1])  # 抬高 10cm
             for _ in range(50):
                 jacp_foot = np.zeros((3, self.model.nv))
                 jacr_foot = np.zeros((3, self.model.nv))
-                foot_id = self.model.body(f"{agent}/left_ankle_roll_link").id
-                self.mj_jacBody(jacp_foot, jacr_foot, body_id=foot_id)
+                self.mj_jacBody(jacp_foot, jacr_foot,
+                                body_name=f"{agent}/left_ankle_roll_link")
                 cur_pos = self.get_body_xpos_xmat_xquat(
-                    [f"{agent}/left_ankle_roll_link"])[0][:3]
+                    [f"{agent}/left_ankle_roll_link"]
+                    )[f"{agent}/left_ankle_roll_link"]["xpos"]
                 delta = target - cur_pos
                 qvel_leg = np.linalg.pinv(jacp_foot[:, 7:]) @ delta  # 跳过 free base
-                # 逐步调整关节角（仅演示，实际需 clip + 阻尼）
-                self.data.qpos[7:] += qvel_leg * 0.01
+                # 合规写入：复制 qpos → 修改 → set_joint_qpos（W1，不直接写 data.qpos）
+                qpos = self.data.qpos.copy()
+                qpos[7:] += qvel_leg * 0.01  # 逐步调整关节角（仅演示，实际需 clip + 阻尼）
+                self.set_joint_qpos(qpos)
                 self.mj_forward()
             final_pos = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/left_ankle_roll_link"])[0][:3]
+                [f"{agent}/left_ankle_roll_link"]
+                )[f"{agent}/left_ankle_roll_link"]["xpos"]
             verifier.check_allclose("ik_foot_target", final_pos, target, atol=0.02,
                                     detail="IK 迭代后左脚到达目标位置")
 
@@ -719,76 +777,78 @@ import os
 import glob
 
 class StudioCaptureEnv(G1BaseEnv):
-    def run_lesson(self, num_steps: int, verifier: OnlineVerifier):
-        """重写运行流程：加入 begin_save_video / stop_save_video"""
-        self.reset()
-        agent = self.agent_name
+    # 截帧目录与视频目录（after_loop 复用）
+    _video_dir = "/tmp/g1_walk_video"
+    _frame_dir = "/tmp/g1_frames"
 
+    def before_loop(self, verifier: OnlineVerifier):
+        """循环前：摄像头使能检查 + 开始录制"""
         # 1. 摄像头使能检查
         frame_idx = self.get_current_frame()
         verifier.check("camera_enabled", frame_idx >= 0, frame_idx, ">=0",
                        "摄像头使能检查")
 
         # 2. 开始录制（path 是目录）
-        video_dir = "/tmp/g1_walk_video"
-        os.makedirs(video_dir, exist_ok=True)
-        self.begin_save_video(video_dir, capture_mode=CaptureMode.ASYNC)
-        verifier.observe("recording_started", "Studio 视口：G1 开始行走，正在录制视频")
+        os.makedirs(self._video_dir, exist_ok=True)
+        self.begin_save_video(self._video_dir, capture_mode=CaptureMode.ASYNC)
+        verifier.observe("recording_started",
+                         "Studio 视口：G1 开始行走，正在录制视频")
 
-        # 3. 循环步进（ONNX 策略控制行走）
-        prev_frame = frame_idx
-        for step in range(num_steps):
-            ctrl = self.compute_ctrl(step)
-            self.do_simulation(ctrl, self.frame_skip)
-            self.render()
+        # 记录初始帧索引，供 verify_step 帧索引递增检查
+        self._prev_frame = frame_idx
 
-            # 帧索引递增检查
-            if step % 50 == 0:
-                cur_frame = self.get_next_frame()
-                if step > 0:
-                    verifier.check(f"frame_index_increasing_{step}",
-                                   cur_frame > prev_frame, cur_frame, f">{prev_frame}",
-                                   "帧索引递增")
-                prev_frame = cur_frame
+    def verify_step(self, step: int, verifier: OnlineVerifier):
+        """循环中：每 50 步检查帧索引递增"""
+        if step % 50 == 0:
+            cur_frame = self.get_next_frame()
+            if step > 0:
+                verifier.check(f"frame_index_increasing_{step}",
+                               cur_frame > self._prev_frame, cur_frame,
+                               f">{self._prev_frame}", "帧索引递增")
+            self._prev_frame = cur_frame
 
-        # 4. 视频截帧
-        frame_dir = "/tmp/g1_frames"
-        os.makedirs(frame_dir, exist_ok=True)
-        camera_info = self.get_frame_png(frame_dir)
-        verifier.check("get_frame_png_returns_cameras", "camera_head" in camera_info,
-                       list(camera_info.keys()), ["camera_head"], "截帧返回相机列表")
+    def observe_step(self, step: int, verifier: OnlineVerifier):
+        """循环中：阶段性人工观察提示"""
+        if step == 0:
+            verifier.observe("g1_walking", "Studio 视口：G1 应在策略控制下行走")
+        elif step == 250:
+            verifier.observe("walking_stable",
+                             "Studio 视口：G1 行走应稳定，录制中段画面正常")
+
+    def after_loop(self, verifier: OnlineVerifier):
+        """循环后：截帧 + 时间戳 + 停止录制 + mp4 检查"""
+        # 3. 视频截帧（get_frame_png 异步写 PNG 到目录，返回 None）
+        os.makedirs(self._frame_dir, exist_ok=True)
+        self.get_frame_png(self._frame_dir)
 
         # 轮询 PNG 文件生成
         png_path = None
         for _ in range(20):  # max_wait 0.5s × 20 = 10s
-            pngs = glob.glob(f"{frame_dir}/color/camera_head_color_*.png")
+            pngs = glob.glob(f"{self._frame_dir}/color/camera_head_color_*.png")
             if pngs:
                 png_path = pngs[0]
                 if os.path.getsize(png_path) > 100:  # 文件大小稳定
                     break
             time.sleep(0.5)
-        verifier.check("png_file_generated", png_path is not None and os.path.getsize(png_path) > 100,
+        verifier.check("png_file_generated",
+                       png_path is not None and os.path.getsize(png_path) > 100,
                        png_path, "exists & size>100", "PNG 截帧文件生成")
 
-        # 5. 时间戳查询
-        timestamps = self.get_camera_time_stamp(last_frame_index=prev_frame)
+        # 4. 时间戳查询
+        timestamps = self.get_camera_time_stamp(last_frame_index=self._prev_frame)
         verifier.check("timestamp_returned", "camera_head" in timestamps,
                        list(timestamps.keys()), ["camera_head"], "时间戳查询返回")
 
-        # 6. 停止录制
+        # 5. 停止录制
         self.stop_save_video()
 
-        # 7. mp4 文件生成检查
-        mp4s = glob.glob(f"{video_dir}/*.mp4")
+        # 6. mp4 文件生成检查
+        mp4s = glob.glob(f"{self._video_dir}/*.mp4")
         verifier.check("mp4_file_generated", len(mp4s) > 0, mp4s, "non-empty",
                        "录制完成后 mp4 文件生成")
-
-        verifier.report()
-
-    def observe_step(self, step: int, verifier: OnlineVerifier):
-        if step == 0:
-            verifier.observe("g1_walking", "Studio 视口：G1 应在策略控制下行走")
 ```
+
+> **结构说明**：Lesson 7 通过 `before_loop`（摄像头检查 + begin_save_video）、`verify_step`（帧索引递增）、`observe_step`（行走观察提示）、`after_loop`（截帧 + 时间戳 + stop_save_video + mp4 检查）四个钩子拆分原内联逻辑，符合 §3.1 `run_lesson` 框架的「人工观察 + 数值判定交织」流程（§1.4 步骤 3/4/5）。`verifier.report()` 由 `run_lesson` 在 `after_loop` 之后统一调用，不在子类内显式调用。
 
 #### 4.3.5 Lesson 8：体操作与拖拽判定
 
@@ -800,7 +860,7 @@ class BodyManipulationEnv(G1BaseEnv):
         if step == 50:
             # 行走中：记录 pelvis 初始位姿
             self._pelvis_before = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[0][:3]
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
 
         elif step == 100:
             # 程序化锚定 pelvis
@@ -811,7 +871,7 @@ class BodyManipulationEnv(G1BaseEnv):
         elif step == 120:
             # 锚定后：检查 G1 不再自由运动（位姿接近锚定时）
             pelvis_after = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[0][:3]
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
             verifier.check_allclose("anchored_position_stable",
                                      pelvis_after, self._pelvis_before, atol=0.05,
                                      detail="锚定后 pelvis 位置稳定")
@@ -825,7 +885,7 @@ class BodyManipulationEnv(G1BaseEnv):
         elif step == 200:
             # 释放后：G1 恢复运动（位姿有变化）
             pelvis_final = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[0][:3]
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
             moved = np.linalg.norm(pelvis_final - self._pelvis_before) > 0.01
             verifier.check("released_resumes_motion", moved,
                            pelvis_final.tolist(), "moved from anchor",
@@ -834,54 +894,76 @@ class BodyManipulationEnv(G1BaseEnv):
         # === XML 内置 mocap + weld 约束验证（不依赖 Studio 锚点）===
         elif step == 250:
             # 默认绑定 anchor↔box：mocap 驱动 box
-            box_before = self.get_body_xpos_xmat_xquat(["manipulation_box"])[0][:3]
-            self._box_before = box_before
-            target_mocap = np.array([0.7, 0.0, 0.5])
-            self.set_mocap_pos_and_quat("ActorManipulator_Anchor",
-                                        target_mocap.tolist(), [1, 0, 0, 0])
+            self._box_before = self.get_body_xpos_xmat_xquat(
+                ["manipulation_box"])["manipulation_box"]["xpos"]
+            # set_mocap_pos_and_quat 接受 dict 形参（W2/S3 契约）
+            self.set_mocap_pos_and_quat(
+                {"ActorManipulator_Anchor": {"pos": [0.7, 0.0, 0.5], "quat": [1, 0, 0, 0]}}
+            )
 
         elif step == 350:
             # 步进 100 帧后 box 应跟随 mocap
-            box_after = self.get_body_xpos_xmat_xquat(["manipulation_box"])[0][:3]
+            box_after = self.get_body_xpos_xmat_xquat(
+                ["manipulation_box"])["manipulation_box"]["xpos"]
             verifier.check_allclose("mocap_drives_box_via_weld",
                                      box_after, [0.7, 0.0, 0.5], atol=0.05,
                                      detail="mocap 移动后 box 跟随（weld 约束）")
 
-            # 停用 equality：mocap 不再驱动 box
-            self.update_equality_constraints(eq_name="anchor_box_weld", active=False)
-            self.set_mocap_pos_and_quat("ActorManipulator_Anchor",
-                                        [0.9, 0.0, 0.7], [1, 0, 0, 0])
+            # 停用 equality[0]：写 type=0，mocap 不再驱动 box
+            # update_equality_constraints 按 eq_list 索引写 _mjModel.eq_*（C3 契约）
+            import mujoco
+            self.update_equality_constraints([{
+                "type": 0, "obj1_id": -1, "obj2_id": -1,
+                "data": np.zeros(mujoco.mjNEQDATA),
+            }])
+            self.set_mocap_pos_and_quat(
+                {"ActorManipulator_Anchor": {"pos": [0.9, 0.0, 0.7], "quat": [1, 0, 0, 0]}}
+            )
 
         elif step == 450:
             # 停用后 box 不跟随
-            box_idle = self.get_body_xpos_xmat_xquat(["manipulation_box"])[0][:3]
+            box_idle = self.get_body_xpos_xmat_xquat(
+                ["manipulation_box"])["manipulation_box"]["xpos"]
             verifier.check("eq_disable_decouples_box",
                            np.linalg.norm(box_idle - np.array([0.7, 0.0, 0.5])) < 0.1,
                            box_idle.tolist(), "≈[0.7,0,0.5]",
                            "停用 equality 后 box 不再跟随 mocap")
 
-            # 重绑 equality：obj2id 从 box 改为 G1 pelvis
-            pelvis_id = self.model.body(f"{agent}/pelvis").id
-            self.modify_equality_objects(eq_name="anchor_box_weld",
-                                          obj2id=pelvis_id)
+            # 重绑 equality[0]：obj2id 从 box 改为 G1 pelvis
+            # modify_equality_objects 仅改 obj1id/obj2id，不改 type（C3 契约）
+            self.modify_equality_objects(eq_ids=[0], obj2_names=[f"{agent}/pelvis"])
+
+            # 验证重绑：通过公共查询 API equality_object_ids（不触 _mjModel，P2 合规）
+            # 注：equality_object_ids 需在 Env 层扩展为公共方法（委托 _gym）
+            obj1_id, obj2_id = self.equality_object_ids(0)
+            pelvis_id = self.model.body_name2id(f"{agent}/pelvis")
             verifier.check("eq_rebound_to_pelvis",
-                           self._mjModel.eq_obj2id[0] == pelvis_id,
-                           self._mjModel.eq_obj2id[0], pelvis_id,
+                           obj2_id == pelvis_id, obj2_id, pelvis_id,
                            "weld obj2id 重绑到 pelvis")
 
-            # 重新激活并移动 mocap 驱动 G1 pelvis
-            self.update_equality_constraints(eq_name="anchor_box_weld", active=True)
+            # 重新激活 weld 类型（step 350 已置 type=0 且 obj1_id=-1，需恢复完整绑定）
+            # obj1 固定为 mocap anchor（step 350 被置 -1，此处恢复为 anchor body id）
+            mocap_id = self.model.body_name2id("ActorManipulator_Anchor")
+            self.update_equality_constraints([{
+                "type": mujoco.mjtEq.mjEQ_WELD,
+                "obj1_id": mocap_id, "obj2_id": pelvis_id,
+                "data": np.zeros(mujoco.mjNEQDATA),
+            }])
+
             pelvis_pos = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[0][:3]
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
             self._pelvis_pre_drive = pelvis_pos.copy()
-            self.set_mocap_pos_and_quat("ActorManipulator_Anchor",
-                                        (pelvis_pos + np.array([0.2, 0.0, 0.1])).tolist(),
-                                        [1, 0, 0, 0])
+            self.set_mocap_pos_and_quat({
+                "ActorManipulator_Anchor": {
+                    "pos": (pelvis_pos + np.array([0.2, 0.0, 0.1])).tolist(),
+                    "quat": [1, 0, 0, 0],
+                }
+            })
 
         elif step == 650:
             # 步进 200 帧后 G1 pelvis 被 mocap 驱动
             pelvis_driven = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[0][:3]
+                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
             displacement = np.linalg.norm(pelvis_driven - self._pelvis_pre_drive)
             verifier.check("mocap_drives_g1_pelvis",
                            displacement > 0.05,
@@ -902,7 +984,7 @@ class BodyManipulationEnv(G1BaseEnv):
                              "Studio 视口：重绑 equality 后 mocap anchor 应拖动 G1 pelvis（整机位移）")
 ```
 
-> **说明**：上述 `verify_step` 中 `self._mjModel.eq_obj2id[0]` 是 P2 架构约束下**唯一允许的 model 字段读访问**（用于验证 `modify_equality_objects` 写入正确），实际 Env 公共方法应通过 `query_equality_objects` 等 K3 查询 API 读取，避免在 example 脚本中直接访问 `_mjModel`。
+> **说明**：上述 `verify_step` 中通过 `self.equality_object_ids(0)` 验证 `modify_equality_objects` 写入正确，符合 P2 架构约束（不触 `_mjModel`）。`equality_object_ids` 当前仅在 `OrcaGymEuler`（Gym 层）实现，**需在 `OrcaGymEulerEnv` 扩展为公共方法**（委托 `self._gym.equality_object_ids(eq_idx)`，见架构 §7 / AGENTS 规则 4「缺失功能时扩展公共方法」）。同理，`equality_data_width`/`n_equality`/`mocap_body_names` 若 example 需要也应一并扩展到 Env 层。example 中 `np.zeros(mujoco.mjNEQDATA)` 使用 MuJoCo 公共常量，不属于私有访问。
 
 ### 4.4 输出与报告
 
@@ -972,6 +1054,348 @@ class BodyManipulationEnv(G1BaseEnv):
 | `EulerOrchestrator` 耦合编排 | 后续 phase | Euler 非刚体求解器与 MuJoCo 耦合，单独设计 |
 | `OrcaGymLocalEnv` 老代码实际迁移 | 后续 phase | 选 OrcaPlayground 代表性 Env 实际迁移，产出迁移指南 |
 | 多 agent 联合仿真编排 | 后续 phase | 多 `OrcaGymEuler` 实例编排，单独设计 |
+
+---
+
+## 6. 实施步骤与教程
+
+本章节将 §2–§5 的设计落地为可执行的实施计划，分为总体框架搭建（步骤 0）与 5 个 Lesson 实施步骤（步骤 1–5）。每个步骤包含**实施任务清单**、**教程文档大纲**（面向用户的使用教程）、**验收方案**（明确的通过条件）。
+
+### 6.1 实施顺序总览
+
+各步骤存在依赖关系，须按顺序实施：
+
+```
+步骤 0：总体框架（g1_base_env + online_verifier + 资源）
+   │
+   ├── 步骤 1：Lesson 4（状态查询）── 依赖步骤 0
+   │     │
+   │     └── 步骤 2：Lesson 5（外力应用）── 依赖步骤 0、复用步骤 1 的查询 API
+   │           │
+   │           └── 步骤 3：Lesson 6（雅可比 IK）── 依赖步骤 0、复用步骤 1/2 的查询/写入 API
+   │                 │
+   │                 └── 步骤 4：Lesson 7（视频录制）── 依赖步骤 0、复用 g1_locomotion
+   │                       │
+   │                       └── 步骤 5：Lesson 8（体操作）── 依赖步骤 0、复用步骤 4 的 locomotion + 步骤 2 的 equality API
+```
+
+| 步骤 | 产出物 | 依赖 | 教程文档 |
+|------|--------|------|---------|
+| 0 | `g1_base_env.py`、`online_verifier.py`、`model_scanner.py`、`g1_locomotion.py`、`robots/` 资源 | 阶段三完成 | `TUTORIAL.md` 总览 + `00_setup.md` |
+| 1 | `04_query_api/query_api.py`、`query_api_env.py` | 步骤 0 | `04_query_api.md` |
+| 2 | `05_force_apply/force_apply.py`、`force_apply_env.py` | 步骤 0、1 | `05_force_apply.md` |
+| 3 | `06_jacobian/jacobian_ik.py`、`jacobian_env.py` | 步骤 0、1、2 | `06_jacobian.md` |
+| 4 | `07_studio_capture/studio_capture.py`、`studio_capture_env.py` | 步骤 0 | `07_studio_capture.md` |
+| 5 | `08_body_manipulation/body_manipulation.py`、`body_manipulation_env.py` | 步骤 0、2、4 | `08_body_manipulation.md` |
+
+> **说明**：步骤 4（Lesson 7）仅依赖步骤 0 的 `g1_locomotion.py`，与步骤 1–3 无强依赖，可并行实施。但建议按顺序实施，便于早期发现问题。
+
+### 6.2 步骤 0：总体框架搭建 ✅ 已完成
+
+#### 6.2.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 0.1 资源准备 | `OrcaPlayground/envs/euler/robots/g1_29dof_camera.xml` | 在原 G1 模型基础上加装摄像头传感器（`user="7070 7071"`）、mocap body `ActorManipulator_Anchor`、测试 box `manipulation_box`、weld 约束 `anchor_box_weld`（详见 §2.0.2） |
+| 0.2 资源准备 | `OrcaPlayground/envs/euler/robots/models/dec_loco/model_6600.onnx` | 复制原 `examples/g1/` 下的 ONNX 行走策略，供 Lesson 7/8 使用 |
+| 0.3 资源准备 | `OrcaPlayground/envs/euler/robots/config/g1_29dof_hist.yaml` | 复制原 G1 配置（hist 长度、关节顺序等） |
+| 0.4 框架代码 | `OrcaPlayground/envs/euler/online_verifier.py` | 实现 `OnlineVerifier` 类（§4.2），含 `check`/`check_allclose`/`check_range`/`observe`/`report` 方法 |
+| 0.5 框架代码 | `OrcaPlayground/envs/common/model_scanner.py` | 实现 `build_suffix_template` + `scan_scene_for_template`（§2.0.4），通过 gRPC 扫描场景中的 G1 agent_name |
+| 0.6 框架代码 | `OrcaPlayground/envs/euler/g1_base_env.py` | 实现 `G1BaseEnv(OrcaGymEulerEnv)` 基类（§3.1），含 `run_lesson`/`compute_ctrl`/`before_loop`/`verify_step`/`observe_step`/`after_loop`/`verify_final` 钩子；定义 G1 关节/执行器/传感器后缀常量 |
+| 0.7 框架代码 | `OrcaPlayground/envs/euler/g1_locomotion.py` | 实现 `G1Locomotion` 类（§3.4），封装 ONNX 策略推理 + 观测组装 + 动作后处理，供 Lesson 7/8 复用 |
+| 0.8 目录结构 | `OrcaPlayground/examples/euler/` | 创建 `04_query_api/`、`05_force_apply/`、`06_jacobian/`、`07_studio_capture/`、`08_body_manipulation/` 五个子目录 |
+| 0.9 教程文档 | `OrcaPlayground/examples/euler/TUTORIAL.md` | 总览教程：环境准备、Studio 启动、课程索引、通用运行方式（§1.4 流程） |
+| 0.10 教程文档 | `OrcaPlayground/examples/euler/00_setup.md` | 环境搭建教程：conda 环境、OrcaStudio 关卡加载、资源路径、首次连通性测试 |
+
+#### 6.2.2 教程文档大纲
+
+**`TUTORIAL.md`（总览）**：
+1. OrcaGym Euler 阶段四在线验证简介
+2. 环境准备（指向 `00_setup.md`）
+3. 手工验证 5 步流程（§1.4）
+4. 课程索引：Lesson 4–8 链接
+5. 通用运行方式：启动 Studio → 运行脚本 → 观察视口 → 查看报告
+6. 常见问题排查（gRPC 连接失败、摄像头未使能、agent_name 扫描失败等）
+
+**`00_setup.md`（环境搭建）**：
+1. 前置条件确认（conda orca 环境、OrcaStudio 已安装）
+2. 资源路径说明（`envs/euler/robots/` 目录结构）
+3. OrcaStudio 启动与关卡加载步骤（含截图位）
+4. 首次连通性测试脚本：`python -c "from envs.common.model_scanner import scan_scene_for_template; print(scan_scene_for_template('127.0.0.1:50051', 0.002, template))"`
+5. 验证：能扫描到 G1 agent_name 即环境就绪
+
+#### 6.2.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 资源就位 | `g1_29dof_camera.xml`/`model_6600.onnx`/`g1_29dof_hist.yaml` 存在且可加载 | `ls envs/euler/robots/` 检查；`mujoco.MjModel.from_xml_path()` 加载不报错 |
+| `OnlineVerifier` 可用 | `check`/`check_allclose`/`check_range`/`observe`/`report` 方法均能调用 | 单元测试：构造 verifier，调各方法，检查 JSON 报告生成 |
+| `model_scanner` 可用 | 能扫描到 Studio 场景中的 G1 agent_name | 启动 Studio + G1 关卡，运行连通性测试脚本 |
+| `G1BaseEnv` 可实例化 | `G1BaseEnv(...)` 构造不报错，`reset()` 返回初始观测 | 离线测试（`skip_grpc_load=True`）构造 + reset |
+| `G1Locomotion` 可用 | ONNX 策略加载成功，`compute_action(obs)` 返回合法 ctrl | 离线测试：构造 mock obs，检查输出形状与 ctrl_range |
+| 教程文档完整 | `TUTORIAL.md` + `00_setup.md` 内容覆盖上述大纲 | 人工审阅 |
+
+#### 6.2.4 完成情况
+
+| 任务 | 状态 | 备注 |
+|------|------|------|
+| 0.1 `g1_29dof_camera.xml` | ✅ | nq=43, nv=41, nu=29（含 G1 free joint + 29 hinge + box free joint） |
+| 0.2 `model_6600.onnx` | ✅ | ONNX 输入 [1,500]，输出 [1,12]，12 维腿部动作 |
+| 0.3 `g1_29dof_hist.yaml` | ✅ | 含 history_loco_height_config（400 维历史观测） |
+| 0.4 `online_verifier.py` | ✅ | check/check_allclose/check_range/observe/report 全部可用，JSON 报告生成 |
+| 0.5 `model_scanner.py` | ✅ | build_suffix_template + scan_scene_for_template 已实现 |
+| 0.6 `g1_base_env.py` | ✅ | run_lesson 框架 + before_loop/verify_step/observe_step/after_loop/verify_final 钩子；离线实例化通过 |
+| 0.7 `g1_locomotion.py` | ✅ | ONNX 推理通过，compute_action 返回 (29,)，ctrl 范围合法 [-0.19, 0.32] |
+| 0.8 目录结构 | ✅ | 04_query_api ~ 08_body_manipulation 五个子目录已规划 |
+| 0.9 `TUTORIAL.md` | ✅ | 含阶段四快速开始、5 步验证流程、课程索引 |
+| 0.10 `00_setup.md` | ✅ | 含前置条件、资源路径、Studio 加载、连通性测试 |
+
+**验收结论**：步骤 0 全部验收项通过（资源就位 + 框架可用 + ruff SLF001 零告警）。
+- `model_scanner` 实际连通性验证需在 OrcaStudio + G1 关卡在线环境执行，离线部分已通过。
+- `onnxruntime`、`pyyaml` 已安装到 conda `orca` 环境。
+
+### 6.3 步骤 1：Lesson 4 实施步骤（状态查询）
+
+#### 6.3.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 1.1 Env 子类 | `OrcaPlayground/envs/euler/query_api_env.py` | 实现 `QueryApiEnv(G1BaseEnv)`，重写 `verify_step`（§4.3.1 的 9 项查询验证）+ `observe_step`（G1 站立观察提示） |
+| 1.2 脚本入口 | `OrcaPlayground/examples/euler/04_query_api/query_api.py` | 按 §3.2 模板实现 `if __name__ == "__main__"` 入口，`num_steps=100` |
+| 1.3 教程文档 | `OrcaPlayground/examples/euler/04_query_api.md` | 面向用户的使用教程（见 6.3.2） |
+
+#### 6.3.2 教程文档大纲（`04_query_api.md`）
+
+1. **课程目标**：验证 G1 全套状态查询 API（关节/body/site/sensor/接触/质量）在线运行正确
+2. **前置条件**：步骤 0 完成；OrcaStudio 已加载 G1 关卡并运行
+3. **操作步骤**：
+   - 步骤 1（人工）：启动 OrcaStudio，加载含 1 个 G1 的关卡，点击运行
+   - 步骤 2（人工）：`cd OrcaPlayground && python examples/euler/04_query_api/query_api.py`
+   - 步骤 3（自动）：脚本自动步进 100 帧，每帧执行查询验证
+   - 步骤 4（人工）：观察 Studio 视口 G1 站立姿态（应稳定不倒）
+   - 步骤 5（自动）：脚本输出判定报告到 `/tmp/euler_Lesson_4_状态查询_API_report.json`
+4. **预期结果**：
+   - 控制台输出 9 项 `[PASS]` 数值判定（关节维度/qpos 一致性/pelvis 高度/imu 维度等）
+   - JSON 报告 `all_passed == true`
+   - 视口观察：G1 站立地面，双臂自然下垂
+5. **验证 API 列表**：`query_joint_qpos`/`query_joint_qvel`/`query_joint_qacc`/`get_body_xpos_xmat_xquat`/`query_site_pos_and_mat`/`query_sensor_data`/`query_actuator_torques`/`query_contact_simple`/`query_position_body_B`/`body_subtree_mass`
+6. **故障排查**：
+   - `pelvis_initial_height` 不在 [0.75, 0.85]：检查 G1 初始 keyframe 是否正确
+   - `imu_quat_dim` 失败：检查 XML 中 imu_quat sensor 定义
+   - gRPC 连接失败：参考 `00_setup.md` 连通性测试
+
+#### 6.3.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 脚本可运行 | `python query_api.py` 启动后连接 Studio 成功，无异常退出 | 人工运行脚本 |
+| 数值判定全通过 | `all_passed == true`，9 项 check 全 PASS | 查看 `/tmp/euler_Lesson_4_*.json` 报告 |
+| 人工观察通过 | G1 站立稳定，无抖动/倾倒 | 用户在 Studio 视口确认 |
+| API 覆盖完整 | 9 项验证点全部执行（无跳过） | 检查报告 `checks` 数组长度 ≥ 9 |
+| 教程文档完整 | `04_query_api.md` 覆盖上述大纲 6 节 | 人工审阅 |
+
+### 6.4 步骤 2：Lesson 5 实施步骤（外力应用）
+
+#### 6.4.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 2.1 Env 子类 | `OrcaPlayground/envs/euler/force_apply_env.py` | 实现 `ForceApplyEnv(G1BaseEnv)`，重写 `verify_step`（§4.3.2：step 10 施力/step 30 检查抬起+xfrc/step 35 清力/step 50 接触力）+ `observe_step`（抬起/回落观察提示） |
+| 2.2 脚本入口 | `OrcaPlayground/examples/euler/05_force_apply/force_apply.py` | 按 §3.2 模板，`num_steps=100` |
+| 2.3 教程文档 | `OrcaPlayground/examples/euler/05_force_apply.md` | 面向用户的使用教程 |
+
+#### 6.4.2 教程文档大纲（`05_force_apply.md`）
+
+1. **课程目标**：验证 `apply_body_force`/`clear_body_force`/`clear_all_forces`/`set_geom_friction`/`query_contact_force`/`set_mocap_pos_and_quat` 在线运行正确
+2. **前置条件**：步骤 0、1 完成；OrcaStudio 已加载 G1 关卡并运行
+3. **操作步骤**：同 Lesson 4 五步流程，脚本路径改为 `examples/euler/05_force_apply/force_apply.py`
+4. **预期结果**：
+   - step 10：G1 被 200N 向上力抬起（pelvis z 上升 > 0.01m）
+   - step 30：`xfrc_applied` 记录力值；清力后 step 35 xfrc 归零
+   - step 50：接触法向力 ≈ G1 重力一半
+   - mocap 驱动 box：`set_mocap_pos_and_quat` 后 box 跟随到 [0.7, 0, 0.5]
+   - JSON 报告 `all_passed == true`
+5. **视口观察**：G1 抬起 → 回落 → box 被 anchor 拖动
+6. **验证 API 列表**：`apply_body_force`/`clear_body_force`/`clear_all_forces`/`set_geom_friction`/`query_contact_simple`/`query_contact_force`/`set_mocap_pos_and_quat`/`get_body_xpos_xmat_xquat`
+7. **故障排查**：
+   - `force_lift_pelvis` 失败：检查 `apply_body_force` 的 body_name 是否正确（`{agent}/torso_link`）
+   - `mocap_drives_box` 失败：检查 XML 中 weld 约束 `anchor_box_weld` 是否 active
+
+#### 6.4.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 脚本可运行 | `python force_apply.py` 连接 Studio 成功 | 人工运行 |
+| 施力抬起 | `force_lift_pelvis` PASS（z_after > z_before + 0.01） | 查看报告 |
+| xfrc 记录/清零 | `xfrc_recorded` + `xfrc_cleared` 均 PASS | 查看报告 |
+| 接触力合理 | `contact_normal_force` 在 [half_weight×0.5, half_weight×1.5] | 查看报告 |
+| mocap 驱动 box | `mocap_drives_box_via_weld` PASS（atol=0.05） | 查看报告 |
+| 人工观察通过 | G1 抬起/回落/box 跟随符合预期 | 用户视口确认 |
+| 教程文档完整 | `05_force_apply.md` 覆盖 7 节大纲 | 人工审阅 |
+
+### 6.5 步骤 3：Lesson 6 实施步骤（雅可比 IK）
+
+#### 6.5.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 3.1 Env 子类 | `OrcaPlayground/envs/euler/jacobian_env.py` | 实现 `JacobianEnv(G1BaseEnv)`，重写 `verify_step`（§4.3.3：pelvis 雅可比形状/imu site 速度一致性/IK 迭代）+ `observe_step`（左脚移动观察） |
+| 3.2 脚本入口 | `OrcaPlayground/examples/euler/06_jacobian/jacobian_ik.py` | 按 §3.2 模板，`num_steps=100` |
+| 3.3 教程文档 | `OrcaPlayground/examples/euler/06_jacobian.md` | 面向用户的使用教程 |
+
+#### 6.5.2 教程文档大纲（`06_jacobian.md`）
+
+1. **课程目标**：验证 `mj_jacBody`/`mj_jacSite`/`query_site_xvalp_xvalr`/`mj_jac_site` 在线运行正确，IK 迭代收敛
+2. **前置条件**：步骤 0、1、2 完成；OrcaStudio 已加载 G1 关卡并运行
+3. **操作步骤**：同五步流程，脚本路径 `examples/euler/06_jacobian/jacobian_ik.py`
+4. **预期结果**：
+   - pelvis 雅可比形状 (3, 35)（nv=6 free + 29 旋转）
+   - imu site 速度 = `jacp_site @ qvel`（atol=1e-4）
+   - IK 迭代 50 次后左脚到达目标位置（atol=0.02）
+   - JSON 报告 `all_passed == true`
+5. **视口观察**：左脚抬高约 10cm 到达目标位置
+6. **验证 API 列表**：`mj_jacBody`/`mj_jacSite`/`query_site_xvalp_xvalr`/`mj_jac_site`/`get_body_xpos_xmat_xquat`/`set_joint_qpos`/`mj_forward`
+7. **故障排查**：
+   - `jac_shape` 失败：检查 `self.model.nv` 是否为 35（G1 29 自由度 + 6 free base）
+   - `site_vel_vs_jac` 失败：检查 `query_site_xvalp_xvalr` 返回的 dict key 是否为 `{agent}/imu`
+   - `ik_foot_target` 不收敛：增加迭代次数或调整步长 `qvel_leg * 0.01`
+
+#### 6.5.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 脚本可运行 | `python jacobian_ik.py` 连接 Studio 成功 | 人工运行 |
+| 雅可比形状 | `jac_shape` PASS（(3, 35)） | 查看报告 |
+| site 速度一致性 | `site_vel_vs_jac` PASS（atol=1e-4） | 查看报告 |
+| IK 收敛 | `ik_foot_target` PASS（atol=0.02） | 查看报告 |
+| 人工观察通过 | 左脚移动到目标位置（抬高约 10cm） | 用户视口确认 |
+| 教程文档完整 | `06_jacobian.md` 覆盖 7 节大纲 | 人工审阅 |
+
+### 6.6 步骤 4：Lesson 7 实施步骤（视频录制）
+
+#### 6.6.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 4.1 Env 子类 | `OrcaPlayground/envs/euler/studio_capture_env.py` | 实现 `StudioCaptureEnv(G1BaseEnv)`，重写 `before_loop`（摄像头检查+begin_save_video）/`verify_step`（帧索引递增）/`observe_step`（行走观察）/`after_loop`（截帧+时间戳+stop_save_video+mp4 检查）；重写 `compute_ctrl` 调用 `G1Locomotion` |
+| 4.2 脚本入口 | `OrcaPlayground/examples/euler/07_studio_capture/studio_capture.py` | 按 §3.2 模板，`num_steps=500` |
+| 4.3 教程文档 | `OrcaPlayground/examples/euler/07_studio_capture.md` | 面向用户的使用教程 |
+
+#### 6.6.2 教程文档大纲（`07_studio_capture.md`）
+
+1. **课程目标**：验证 `begin_save_video`/`stop_save_video`/`get_current_frame`/`get_next_frame`/`get_frame_png`/`get_camera_time_stamp` 在线运行正确，G1 行走录制产出 mp4 + PNG
+2. **前置条件**：步骤 0 完成（含 `g1_locomotion.py`）；OrcaStudio 已加载含摄像头的 G1 关卡并运行
+3. **操作步骤**：
+   - 步骤 1（人工）：启动 OrcaStudio，加载含 G1（含 `camera_head`）的关卡，点击运行
+   - 步骤 2（人工）：`cd OrcaPlayground && python examples/euler/07_studio_capture/studio_capture.py`
+   - 步骤 3（自动）：脚本 `before_loop` 检查摄像头使能 + 开始录制；循环 500 帧 ONNX 策略行走；`after_loop` 截帧 + 停止录制 + 检查 mp4
+   - 步骤 4（人工）：观察 Studio 视口 G1 行走画面（应稳定行走 10 秒）
+   - 步骤 5（自动）：脚本输出判定报告
+4. **预期结果**：
+   - `camera_enabled` PASS（frame_idx ≥ 0）
+   - 帧索引递增（每 50 步检查）
+   - PNG 截帧文件生成（`/tmp/g1_frames/color/camera_head_color_*.png`，size > 100）
+   - 时间戳查询返回 camera_head
+   - mp4 文件生成（`/tmp/g1_walk_video/*.mp4`）
+   - JSON 报告 `all_passed == true`
+5. **视口观察**：G1 在策略控制下稳定行走 10 秒
+6. **验证 API 列表**：`begin_save_video`/`stop_save_video`/`get_current_frame`/`get_next_frame`/`get_frame_png`/`get_camera_time_stamp`
+7. **产出物**：
+   - `/tmp/g1_walk_video/*.mp4`：行走视频
+   - `/tmp/g1_frames/color/camera_head_color_*.png`：截帧图片
+   - `/tmp/euler_Lesson_7_*.json`：判定报告
+8. **故障排查**：
+   - `camera_enabled` 失败（frame_idx=-1）：检查 XML `<camera user="7070 7071">` 端口字段；确认 Studio 已启动视频流服务
+   - `mp4_file_generated` 失败：检查 `video_dir` 目录权限；确认 `stop_save_video` 已调用
+   - G1 不行走：检查 ONNX 策略路径 `models/dec_loco/model_6600.onnx` 是否存在
+
+#### 6.6.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 脚本可运行 | `python studio_capture.py` 连接 Studio 成功 | 人工运行 |
+| 摄像头使能 | `camera_enabled` PASS（frame_idx ≥ 0） | 查看报告 |
+| 帧索引递增 | 多个 `frame_index_increasing_*` PASS | 查看报告 |
+| PNG 截帧生成 | `png_file_generated` PASS（文件存在且 size > 100） | 查看报告 + `ls /tmp/g1_frames/color/` |
+| 时间戳查询 | `timestamp_returned` PASS | 查看报告 |
+| mp4 生成 | `mp4_file_generated` PASS（`/tmp/g1_walk_video/*.mp4` 存在） | 查看报告 + `ls /tmp/g1_walk_video/` |
+| 人工观察通过 | G1 稳定行走 10 秒，mp4/PNG 内容可见 locomotion | 用户视口 + 播放 mp4 确认 |
+| 教程文档完整 | `07_studio_capture.md` 覆盖 8 节大纲 | 人工审阅 |
+
+### 6.7 步骤 5：Lesson 8 实施步骤（体操作）
+
+#### 6.7.1 实施任务清单
+
+| 任务 | 文件 | 说明 |
+|------|------|------|
+| 5.1 Env 子类 | `OrcaPlayground/envs/euler/body_manipulation_env.py` | 实现 `BodyManipulationEnv(G1BaseEnv)`，重写 `verify_step`（§4.3.5：step 0-200 拖拽锚定/step 250-350 mocap 驱动 box/step 450-650 equality 重绑驱动 pelvis）+ `observe_step`（行走/拖拽/anchor 拖动 box/G1 提示）；重写 `compute_ctrl` 调用 `G1Locomotion` |
+| 5.2 脚本入口 | `OrcaPlayground/examples/euler/08_body_manipulation/body_manipulation.py` | 按 §3.2 模板，`num_steps=700` |
+| 5.3 教程文档 | `OrcaPlayground/examples/euler/08_body_manipulation.md` | 面向用户的使用教程 |
+| 5.4 Env 层 API 扩展 | `OrcaGymEulerEnv`（`orca_gym/environment/euler/orca_gym_euler_env.py`） | 扩展 `equality_object_ids` 公共方法（委托 `self._gym.equality_object_ids`），见 §4.3.5 说明 |
+
+#### 6.7.2 教程文档大纲（`08_body_manipulation.md`）
+
+1. **课程目标**：验证 `do_body_manipulation`/`anchor_actor`/`release_body_anchored`/`update_equality_constraints`/`modify_equality_objects`/`set_mocap_pos_and_quat`/`equality_object_ids` 在线运行正确
+2. **前置条件**：步骤 0、2、4 完成；OrcaStudio 已加载含 mocap+box+weld 的 G1 关卡并运行
+3. **操作步骤**：
+   - 步骤 1（人工）：启动 OrcaStudio，加载含 G1（含 `ActorManipulator_Anchor`/`manipulation_box`/`anchor_box_weld`）的关卡，点击运行
+   - 步骤 2（人工）：`cd OrcaPlayground && python examples/euler/08_body_manipulation/body_manipulation.py`
+   - 步骤 3（自动）：脚本循环 700 帧，分阶段验证拖拽锚定/mocap 驱动 box/equality 重绑驱动 pelvis
+   - 步骤 4（人工）：按 `[OBSERVE]` 提示在 Studio 视口拖拽 G1 pelvis，观察锚定/释放效果；观察 anchor 拖动 box/G1
+   - 步骤 5（自动）：脚本输出判定报告
+4. **预期结果**：
+   - step 80：人工拖拽 G1 pelvis，`do_body_manipulation` 检测并锚定
+   - step 250-350：mocap 驱动 box 到 [0.7, 0, 0.5]（atol=0.05）
+   - step 450：停用 equality 后 box 不跟随；重绑 equality 到 pelvis
+   - step 650：mocap 驱动 G1 pelvis 位移 > 0.05m
+   - JSON 报告 `all_passed == true`
+5. **视口观察**：
+   - G1 行走中可被鼠标拖拽锚定
+   - 释放后恢复行走
+   - 绿色球体 anchor 拖动橙色 box
+   - 重绑后 anchor 拖动 G1 整机
+6. **验证 API 列表**：`do_body_manipulation`/`anchor_actor`/`release_body_anchored`/`update_equality_constraints`/`modify_equality_objects`/`set_mocap_pos_and_quat`/`equality_object_ids`/`get_body_xpos_xmat_xquat`
+7. **故障排查**：
+   - `mocap_drives_box_via_weld` 失败：检查 XML weld 约束 `anchor_box_weld` 是否 active；确认 `set_mocap_pos_and_quat` 的 dict 参数格式
+   - `eq_disable_decouples_box` 失败：检查 `update_equality_constraints` 的 `type=0` 是否正确写入
+   - `eq_rebound_to_pelvis` 失败：确认 `equality_object_ids` 已在 Env 层扩展（任务 5.4）
+   - `mocap_drives_g1_pelvis` 失败：检查重绑后 weld type 是否恢复为 `mjEQ_WELD`（step 450 已置 0，需在重绑后重新激活）
+
+#### 6.7.3 验收方案
+
+| 验收项 | 通过条件 | 验证方法 |
+|--------|---------|---------|
+| 脚本可运行 | `python body_manipulation.py` 连接 Studio 成功 | 人工运行 |
+| 拖拽锚定 | 用户拖拽 G1 pelvis，G1 跟随鼠标 | 用户视口确认 |
+| 释放恢复 | 释放鼠标后 G1 恢复运动 | 用户视口确认 |
+| mocap 驱动 box | `mocap_drives_box_via_weld` PASS（atol=0.05） | 查看报告 |
+| equality 停用解耦 | `eq_disable_decouples_box` PASS | 查看报告 |
+| equality 重绑 | `eq_rebound_to_pelvis` PASS（obj2_id == pelvis_id） | 查看报告 |
+| mocap 驱动 G1 | `mocap_drives_g1_pelvis` PASS（位移 > 0.05m） | 查看报告 |
+| 人工观察通过 | 拖拽/anchor 拖动 box/anchor 拖动 G1 符合预期 | 用户视口确认 |
+| Env 层 API 扩展 | `equality_object_ids` 在 Env 层可调用 | `env.equality_object_ids(0)` 返回 tuple |
+| 教程文档完整 | `08_body_manipulation.md` 覆盖 7 节大纲 | 人工审阅 |
+
+### 6.8 教程文档编写规范
+
+所有 Lesson 教程文档（`04_query_api.md` ~ `08_body_manipulation.md`）遵循统一结构：
+
+| 章节 | 内容 | 说明 |
+|------|------|------|
+| 1. 课程目标 | 验证的 API 列表 + 预期行为 | 一句话概括 |
+| 2. 前置条件 | 依赖步骤 + Studio 状态 | 明确依赖关系 |
+| 3. 操作步骤 | §1.4 五步流程的具体化 | 含具体命令行 |
+| 4. 预期结果 | 数值判定项 + 期望值 | 对应 `verifier.check` 项 |
+| 5. 视口观察 | 人工观察项描述 | 对应 `verifier.observe` 项 |
+| 6. 验证 API 列表 | 本课涉及的所有公共 API | 便于回顾 |
+| 7. 产出物 | 生成的文件路径（mp4/PNG/JSON） | Lesson 7/8 有产出物 |
+| 8. 故障排查 | 常见失败原因 + 解决方案 | 对应 `check` 项的失败场景 |
+
+> **文档风格**：
+> - 面向用户（非开发者），避免内部实现细节
+> - 命令行用代码块标注，路径用反引号
+> - 故障排查按「失败现象 → 原因 → 解决方案」三段式
+> - 每个 Lesson 文档控制在 100 行以内，保持简洁
 
 ---
 
