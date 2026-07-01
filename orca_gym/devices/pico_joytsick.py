@@ -28,6 +28,19 @@ def transform_quaternion_to_mujoco(q_unity):
     v = R.from_matrix(R_mujoco).as_rotvec()
     return R.from_rotvec(v).as_quat()
 
+
+def _safe_transform_quaternion_to_mujoco(q_unity: list[float]) -> np.ndarray:
+    """
+    Unity 四元数 (x,y,z,w) → MuJoCo；零范数时回退单位四元数，避免断连。
+
+    PICO 追踪未就绪时可能发送 (0,0,0,0)，scipy 会抛错并导致 TCP handler 退出。
+    """
+    q = np.asarray(q_unity, dtype=np.float64).reshape(4)
+    norm = float(np.linalg.norm(q))
+    if norm < 1e-8:
+        return np.array([0.0, 0.0, 0.0, 1.0])
+    return transform_quaternion_to_mujoco((q / norm).tolist())
+
 class PicoJoystickKey(enum.Enum):
     X = 0
     Y = 1
@@ -122,7 +135,7 @@ class PicoJoystick:
 
     async def _handle_client(self, reader, writer):
         try:
-            self.clients.add(writer)  # 添加客户端 writer
+            self.clients.add(writer)
             buffer = ""
             while self.running:
                 data = await reader.read(1024)
@@ -131,16 +144,31 @@ class PicoJoystick:
                 buffer += data.decode('utf-8')
                 while '\n' in buffer:
                     line, buffer = buffer.split('\n', 1)
-                    message = json.loads(line)
-                    with self.mutex:
-                        self.current_transform = self.extract_all_transform(message)
-                        self.current_key_state = self.extract_key_state(message)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        message = json.loads(line)
+                        self._apply_pico_message(message)
+                    except json.JSONDecodeError as e:
+                        _logger.warning(f"PICO JSON parse error: {e}")
+                    except Exception as e:
+                        _logger.warning(f"PICO frame skipped: {e}")
         except Exception as e:
             _logger.info(f"Client disconnected: {e}")
         finally:
-            self.clients.discard(writer)  # 移除客户端 writer
+            self.clients.discard(writer)
             writer.close()
             await writer.wait_closed()
+
+    def _apply_pico_message(self, message: dict) -> None:
+        """先更新扳机/按键（key_state），再尽力更新姿态；单帧坏数据不断连。"""
+        with self.mutex:
+            self.current_key_state = self.extract_key_state(message)
+            try:
+                self.current_transform = self.extract_all_transform(message)
+            except Exception as e:
+                _logger.warning(f"PICO transform update failed (keys kept): {e}")
 
     def send_force_message(self, l_hand_force, r_hand_force):
         message = json.dumps({"l_hand_force": l_hand_force, "r_hand_force": r_hand_force})
@@ -206,7 +234,7 @@ class PicoJoystick:
         r_y = rotation["y"]
         r_z = rotation["z"]
         r_w = rotation["w"]
-        quat = transform_quaternion_to_mujoco([r_x, r_y, r_z, r_w])
+        quat = _safe_transform_quaternion_to_mujoco([r_x, r_y, r_z, r_w])
 
         return [np.array([pos[0], pos[1], pos[2]]), np.array([quat[3], quat[0], quat[1], quat[2]])]
 
@@ -216,7 +244,10 @@ class PicoJoystick:
         motion_trackers_transform = []
         if "motionTrackers" in message:
             for motionTracker in message["motionTrackers"]:
-                motion_trackers_transform.append(self.extract_single_transform(motionTracker))
+                try:
+                    motion_trackers_transform.append(self.extract_single_transform(motionTracker))
+                except Exception as e:
+                    _logger.warning(f"PICO motionTracker transform skipped: {e}")
         return [left_hand_transform, right_hand_transform, motion_trackers_transform]
 
     def extract_key_state(self, message) -> dict:
