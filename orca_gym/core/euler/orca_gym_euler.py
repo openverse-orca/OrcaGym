@@ -637,6 +637,14 @@ class OrcaGymEuler:
         """查询等式约束关联对象 id（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_object_ids(eq_idx)
 
+    def equality_constraint(self, eq_idx: int) -> dict:
+        """读取单个等式约束完整数据（委托 ModelRegistry）。
+
+        返回 type/obj1_id/obj2_id/active/solref/solimp/data 完整字段，
+        用于体操作时读取 XML 预定义约束的原始值，修改后回写。
+        """
+        return object.__getattribute__(self, "_registry").equality_constraint(eq_idx)
+
     def n_equality(self) -> int:
         """查询等式约束数量（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").n_equality()

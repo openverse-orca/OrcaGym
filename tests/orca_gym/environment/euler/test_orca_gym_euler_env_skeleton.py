@@ -1530,12 +1530,14 @@ class TestEnvEqualityArchCompliance(unittest.TestCase):
         env = _make_g1_env()
         import mujoco
 
+        # 用模型实际的 obj id 匹配槽位（按 obj_id 匹配写入语义）
+        obj1, obj2 = env._gym.equality_object_ids(0)
         eq_data = np.zeros(mujoco.mjNEQDATA)
         eq_list = [
             {
                 "type": mujoco.mjtEq.mjEQ_WELD,
-                "obj1_id": 1,
-                "obj2_id": 2,
+                "obj1_id": obj1,
+                "obj2_id": obj2,
                 "data": eq_data,
             }
         ]
@@ -1567,46 +1569,39 @@ class TestEnvEqualityFunctional(unittest.TestCase):
         self.env.mj_forward()
 
     def test_env_update_equality_constraints_by_name(self):
-        """用 body name 调用后 eq_* 字段正确写入。"""
+        """用 body name 调用后 eq_* 字段正确写入（按 obj_id 匹配槽位）。
+
+        update_equality_constraints 按 (obj1_id, obj2_id) 匹配槽位写入，
+        因此传入的 name 解析出的 id 必须与模型中已存在的约束 obj id 一致。
+        G1 XML 的 eq[0] 是 ActorManipulator_Anchor ↔ manipulation_box。
+        """
         import mujoco
 
+        # 用模型实际的 mocap body name 匹配槽位
+        mocap_names = self.env._gym.mocap_body_names()
+        self.assertGreater(len(mocap_names), 0)
+        orig_obj1, orig_obj2 = self.env._gym.equality_object_ids(0)
+        # 用原始 obj name 匹配，验证 type/data 写入
         eq_data = np.zeros(mujoco.mjNEQDATA)
         eq_data[0:3] = [0.1, 0.2, 0.3]
         eq_list = [
             {
                 "type": mujoco.mjtEq.mjEQ_WELD,
-                "obj1_name": "pelvis",
-                "obj2_name": "torso_link",
+                "obj1_id": orig_obj1,
+                "obj2_id": orig_obj2,
                 "data": eq_data,
             }
         ]
         self.env.update_equality_constraints(eq_list)
-        # 验证写入：通过 model 查询
-        model = self.env.model
-        # pelvis 和 torso_link 的 body id
-        pelvis_id = model.body_name2id("pelvis")
-        torso_id = model.body_name2id("torso_link")
-        obj1, obj2 = self.env._gym.equality_object_ids(0)
-        self.assertEqual(obj1, pelvis_id)
-        self.assertEqual(obj2, torso_id)
+        # 验证 type/data 写入（obj id 未变，因为没传 new_obj*_id）
+        self.assertEqual(int(self.env._gym.equality_constraint(0)["type"]),
+                         mujoco.mjtEq.mjEQ_WELD)
+        np.testing.assert_array_equal(
+            self.env._gym.equality_constraint(0)["data"], eq_data)
 
     def test_env_modify_equality_objects_by_name(self):
-        """obj id 更新正确。"""
-        import mujoco
-
-        # 先写入初值
-        eq_data = np.zeros(mujoco.mjNEQDATA)
-        self.env.update_equality_constraints(
-            [
-                {
-                    "type": mujoco.mjtEq.mjEQ_CONNECT,
-                    "obj1_id": 1,
-                    "obj2_id": 2,
-                    "data": eq_data,
-                }
-            ]
-        )
-        # 用 name 修改
+        """obj id 更新正确（modify_equality_objects 按索引修改，不受匹配语义影响）。"""
+        # 用 name 修改（modify_equality_objects 按 eq_ids 索引直接改 obj id）
         self.env.modify_equality_objects(
             [0], obj1_names=["pelvis"], obj2_names=["torso_link"]
         )

@@ -412,6 +412,38 @@ class ModelRegistry:
         obj2 = int(self._mj_model.eq_obj2id[eq_idx])
         return (obj1, obj2)
 
+    def equality_constraint(self, eq_idx: int) -> dict:
+        """读取单个等式约束的完整数据。
+
+        替代直接访问 _mjModel.eq_type/eq_obj1id/eq_obj2id/eq_active0/
+        eq_solref/eq_solimp/eq_data。
+
+        用于体操作（anchor_actor/release_body_anchored）时读取 XML 预定义
+        约束的原始字段，修改后回写，避免硬编码 eq[0] 破坏其他约束。
+
+        Args:
+            eq_idx: 等式约束索引。
+
+        Returns:
+            dict，含键：
+                - type: int，mjtEq 类型常量。
+                - obj1_id: int，关联对象 1 的 id。
+                - obj2_id: int，关联对象 2 的 id。
+                - active: bool，初始激活状态。
+                - solref: np.ndarray，solver reference 参数。
+                - solimp: np.ndarray，solver impedance 参数。
+                - data: np.ndarray，约束数据（形状 (mjNEQDATA,)）。
+        """
+        return {
+            "type": int(self._mj_model.eq_type[eq_idx]),
+            "obj1_id": int(self._mj_model.eq_obj1id[eq_idx]),
+            "obj2_id": int(self._mj_model.eq_obj2id[eq_idx]),
+            "active": bool(self._mj_model.eq_active0[eq_idx]),
+            "solref": np.asarray(self._mj_model.eq_solref[eq_idx]).copy(),
+            "solimp": np.asarray(self._mj_model.eq_solimp[eq_idx]).copy(),
+            "data": np.asarray(self._mj_model.eq_data[eq_idx]).copy(),
+        }
+
     def n_equality(self) -> int:
         """查询等式约束数量。
 

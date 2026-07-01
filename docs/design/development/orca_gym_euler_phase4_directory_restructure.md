@@ -477,6 +477,7 @@ python examples/euler/08_video_capture/video_capture.py
 | 06_jacobian | 06_jacobian/ | 3 | 1 | 同上 | ✅ 已通过 |
 | 07_locomotion | 07_locomotion/ | 5 | 2 | + `HistoryHandler` 内联 + PD 控制器 + 行走稳定性 | ⏳ 待实施 |
 | 08_video_capture | 08_video_capture/ | 5 | 1 | 拆分自原 studio_capture | ⏳ 待实施 |
+| 09_body_manipulation | 09_body_manipulation/ | 6 | 5 | + Env 层 `equality_object_ids`/`n_equality`/`mocap_body_names`/`equality_data_width` 扩展 | ⏳ 待实施 |
 
 ---
 
