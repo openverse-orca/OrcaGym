@@ -22,18 +22,18 @@ from orca_gym.core.orca_gym_model import OrcaGymModel
 
 
 # 测试用 XML 模型：单铰链倒立摆（nq=1, nv=1, nu=1, nbody=2, njnt=1, nsite=1, ngeom=1）
+# 使用本仓 fixtures 目录，无外部依赖（见 AGENTS.md 测试独立性要求）
 _PENDULUM_XML = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "..", "..", "..",
-    "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
+    "..", "..", "environment", "euler", "fixtures", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
 
 # G1 模型 XML（阶段三 3.1.5 功能测试用，含 pelvis body + equality 约束）
+# 简化版：mesh 替换为基础几何体，无外部 mesh 依赖
 _G1_XML = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "..", "..", "..",
-    "OrcaPlayground", "envs", "euler", "robots", "g1_29dof_camera.xml",
+    "..", "..", "environment", "euler", "fixtures", "g1_29dof_camera_simplified.xml",
 )
 _G1_XML = os.path.abspath(_G1_XML)
 

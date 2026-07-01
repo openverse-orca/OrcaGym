@@ -19,10 +19,10 @@ from orca_gym.core.euler.sim_config import SimConfig
 
 
 # 测试用 XML 模型：单铰链倒立摆（timestep=0.002, integrator=RK4, gravity=0 0 -9.81）
+# 使用本仓 fixtures 目录，无外部依赖（见 AGENTS.md 测试独立性要求）
 _PENDULUM_XML = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "..", "..", "..",
-    "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
+    "..", "..", "environment", "euler", "fixtures", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
 

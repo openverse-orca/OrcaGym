@@ -31,10 +31,14 @@ _GYM_SOURCE_PATH = (
 
 
 def _make_g1_env() -> OrcaGymEulerEnv:
-    """构造加载 G1 XML 的离线 Env。"""
+    """构造加载 G1 XML 的离线 Env。
+
+    使用本仓 fixtures 目录下的简化版 G1 XML（mesh 替换为基础几何体），
+    无外部 mesh 依赖，确保 OrcaGym 仓可独立运行测试。
+    """
     _g1_xml = (
-        pathlib.Path(__file__).resolve().parents[4].parent
-        / "OrcaPlayground" / "envs" / "euler" / "robots" / "g1_29dof_camera.xml"
+        pathlib.Path(__file__).resolve().parents[0]
+        / "fixtures" / "g1_29dof_camera_simplified.xml"
     )
     return OrcaGymEulerEnv(
         frame_skip=4,
@@ -387,8 +391,10 @@ class TestKConstraintRegression(unittest.TestCase):
         methods = [
             "query_joint_qpos", "apply_body_force", "set_mocap_pos_and_quat",
             "mj_jacBody", "mj_jacSite", "begin_save_video",
-            "update_equality_constraints", "anchor_actor",
-            "release_body_anchored", "do_body_manipulation",
+            "update_equality_constraints",
+            "equality_snapshot", "equality_find_slot_by_body",
+            "equality_constraint", "equality_update",
+            "equality_bind_mocap", "equality_release",
             "query_site_pos_and_quat_B", "query_robot_velocity_odom",
         ]
         for name in methods:

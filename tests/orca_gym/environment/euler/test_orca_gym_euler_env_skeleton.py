@@ -57,12 +57,12 @@ def _exec_source_without_docstrings() -> str:
 
 def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) -> OrcaGymEulerEnv:
     """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
-    # OrcaPlayground 是 OrcaGym 的同级目录
-    # __file__ = OrcaGym/tests/orca_gym/environment/euler/test_*.py
-    # parents[4] = OrcaGym，再向上一级到 repo 根，再到 OrcaPlayground
+    # 测试 fixture 位于本仓 tests/orca_gym/environment/euler/fixtures/
+    # __file__ = tests/orca_gym/environment/euler/test_*.py
+    # parents[0] = tests/orca_gym/environment/euler
     _pendulum_xml = (
-        pathlib.Path(__file__).resolve().parents[4].parent
-        / "OrcaPlayground" / "envs" / "euler" / "scenes" / "simple_pendulum.xml"
+        pathlib.Path(__file__).resolve().parents[0]
+        / "fixtures" / "simple_pendulum.xml"
     )
     return OrcaGymEulerEnv(
         frame_skip=4,
@@ -373,9 +373,9 @@ class TestEnvLifecycleAndStepping(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_do_body_manipulation_offline_noop(self):
-        """离线模式 do_body_manipulation no-op 不抛异常（Step 3）。"""
+        """离线模式 _do_body_manipulation no-op 不抛异常（Step 3）。"""
         env = _make_skeleton_env()
-        env.do_body_manipulation()   # 不应抛异常
+        env._do_body_manipulation()   # 不应抛异常
 
     def test_gymnasium_methods_raise_not_implemented(self):
         """step/reset_model/_get_obs 仍 raise NotImplementedError（待子类实现）。"""
@@ -574,10 +574,14 @@ class TestEnvK9ComplianceSourceAudit(unittest.TestCase):
 
 
 def _make_g1_env() -> OrcaGymEulerEnv:
-    """构造加载 G1 XML 的离线 Env（用于 sensor/contact 等需要丰富场景的测试）。"""
+    """构造加载 G1 XML 的离线 Env（用于 sensor/contact 等需要丰富场景的测试）。
+
+    使用本仓 fixtures 目录下的简化版 G1 XML（mesh 替换为基础几何体），
+    无外部 mesh 依赖，确保 OrcaGym 仓可独立运行测试。
+    """
     _g1_xml = (
-        pathlib.Path(__file__).resolve().parents[4].parent
-        / "OrcaPlayground" / "envs" / "euler" / "robots" / "g1_29dof_camera.xml"
+        pathlib.Path(__file__).resolve().parents[0]
+        / "fixtures" / "g1_29dof_camera_simplified.xml"
     )
     return OrcaGymEulerEnv(
         frame_skip=4,
@@ -1219,12 +1223,13 @@ class TestEnvJacArchCompliance(unittest.TestCase):
         self.env.mj_forward()
 
     def test_env_jac_no_gym_private_access(self):
-        """K4: grep 断言雅可比方法不触 self._gym._sim/_mjData。"""
+        """K4: grep 断言雅可比方法不触 self._gym._sim/_mjData/_mjModel。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
         start = source.find("# --- 雅可比计算委托（阶段三 3.3.3")
         self.assertGreater(start, 0, "未找到 3.3.3 雅可比委托区块")
         block = source[start:]
-        end = block.find("# --- 只读查询委托")
+        # 雅可比区块到等式约束委托区块为止（避免 equality API docstring 误报）
+        end = block.find("# --- 等式约束委托")
         self.assertGreater(end, 0)
         block = block[:end]
         self.assertNotIn("self._gym._sim", block)
@@ -1547,13 +1552,18 @@ class TestEnvEqualityArchCompliance(unittest.TestCase):
         self.assertIsNone(ret)
 
     def test_env_eq_dir_includes_methods(self):
-        """K2: dir(env) 含 update_equality_constraints 等。"""
+        """K2: dir(env) 含通用 equality API + 底层委托方法。"""
         env = _make_g1_env()
         d = dir(env)
         for name in [
             "update_equality_constraints",
             "modify_equality_objects",
-            "update_anchor_equality_constraints",
+            "equality_snapshot",
+            "equality_find_slot_by_body",
+            "equality_constraint",
+            "equality_update",
+            "equality_bind_mocap",
+            "equality_release",
         ]:
             self.assertIn(name, d, f"dir(env) 缺少 {name}")
 
@@ -1611,17 +1621,17 @@ class TestEnvEqualityFunctional(unittest.TestCase):
         self.assertEqual(obj1, pelvis_id)
         self.assertEqual(obj2, torso_id)
 
-    def test_env_update_anchor_equality_constraints(self):
-        """锚点约束组装正确（actor_id + mocap_id）。"""
-        self.env.update_anchor_equality_constraints("pelvis", "weld")
-        # 验证 eq[0] 写入：obj1 = mocap_id, obj2 = pelvis_id
+    def test_env_equality_bind_mocap(self):
+        """通用 equality_bind_mocap 绑定后约束 obj 关联 mocap 与 body。"""
         mocap_names = self.env._gym.mocap_body_names()
         self.assertGreater(len(mocap_names), 0)
-        mocap_id = self.env.model.body_name2id(mocap_names[0])
+        mocap_name = mocap_names[0]
+        slot = self.env.equality_bind_mocap(mocap_name, "pelvis", "weld")
+        # 验证槽位约束 obj1/obj2 关联 mocap 与 pelvis
         pelvis_id = self.env.model.body_name2id("pelvis")
-        obj1, obj2 = self.env._gym.equality_object_ids(0)
-        self.assertEqual(obj1, mocap_id)
-        self.assertEqual(obj2, pelvis_id)
+        mocap_id = self.env.model.body_name2id(mocap_name)
+        obj1, obj2 = self.env._gym.equality_object_ids(slot)
+        self.assertEqual({obj1, obj2}, {mocap_id, pelvis_id})
 
 
 class TestEnvAnchorActorArchCompliance(unittest.TestCase):
@@ -1631,12 +1641,12 @@ class TestEnvAnchorActorArchCompliance(unittest.TestCase):
     """
 
     def test_env_anchor_actor_no_private_access(self):
-        """K4: grep 断言 anchor_actor 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        """K4: grep 断言 _anchor_actor 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作（阶段三 3.5.4")
-        self.assertGreater(start, 0, "未找到 3.5.4 anchor_actor 区块")
+        start = source.find("    def _anchor_actor(")
+        self.assertGreater(start, 0, "未找到 _anchor_actor 方法定义")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
@@ -1647,31 +1657,31 @@ class TestEnvAnchorActorArchCompliance(unittest.TestCase):
         self.assertNotIn("_mjModel", block)
 
     def test_env_anchor_actor_uses_compliance_api(self):
-        """K1/K4: grep 断言走 set_mocap_pos_and_quat/update_anchor_equality_constraints/get_body_xpos_xmat_xquat 公共方法。"""
+        """K1/K4: grep 断言走 equality_bind_mocap/equality_find_slot_by_body/equality_constraint 公共方法。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作（阶段三 3.5.4")
+        start = source.find("    def _anchor_actor(")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
-        self.assertIn("self.get_body_xpos_xmat_xquat", block)
-        self.assertIn("self.set_mocap_pos_and_quat", block)
-        self.assertIn("self.update_anchor_equality_constraints", block)
+        self.assertIn("self.equality_find_slot_by_body", block)
+        self.assertIn("self.equality_constraint", block)
+        self.assertIn("self.equality_bind_mocap", block)
 
     def test_env_anchor_actor_returns_none(self):
-        """K11: anchor_actor 返回 None（写操作）。"""
+        """K11: _anchor_actor 返回 None（写操作）。"""
         env = _make_g1_env()
         env.mj_forward()
-        ret = env.anchor_actor("pelvis", "weld")
+        ret = env._anchor_actor("pelvis", "weld")
         self.assertIsNone(ret)
 
     def test_env_anchor_actor_docstring_present(self):
-        """K12: anchor_actor 有 docstring。"""
+        """K12: _anchor_actor 有 docstring。"""
         import inspect
 
         env = _make_g1_env()
-        doc = inspect.getdoc(env.anchor_actor)
+        doc = inspect.getdoc(env._anchor_actor)
         self.assertIsNotNone(doc)
         self.assertGreater(len(doc), 0)
 
@@ -1689,7 +1699,7 @@ class TestEnvAnchorActorFunctional(unittest.TestCase):
     def test_anchor_actor_sets_mocap_to_actor_pose(self):
         """锚定后 mocap 位姿 = actor 初始位姿。"""
         actor_pose_before = self.env.get_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
-        self.env.anchor_actor("pelvis", "weld")
+        self.env._anchor_actor("pelvis", "weld")
         # 查询 mocap body 当前的 pos/quat（通过 DataView 零拷贝视图）
         mocap_names = self.env._gym.mocap_body_names()
         self.assertGreater(len(mocap_names), 0)
@@ -1704,18 +1714,20 @@ class TestEnvAnchorActorFunctional(unittest.TestCase):
         )
 
     def test_anchor_actor_creates_weld_constraint(self):
-        """锚定后 eq_type 为 weld，obj1/obj2 关联 actor 与 mocap。"""
-        self.env.anchor_actor("pelvis", "weld")
+        """锚定后约束 obj1/obj2 关联 actor 与 mocap。"""
+        self.env._anchor_actor("pelvis", "weld")
         mocap_names = self.env._gym.mocap_body_names()
         mocap_id = self.env.model.body_name2id(mocap_names[0])
         pelvis_id = self.env.model.body_name2id("pelvis")
-        obj1, obj2 = self.env._gym.equality_object_ids(0)
-        self.assertEqual(obj1, mocap_id)
-        self.assertEqual(obj2, pelvis_id)
+        # 通过 equality_find_slot_by_body 查找含 mocap 的槽位（不硬编码索引）
+        slot = self.env.equality_find_slot_by_body(mocap_names[0])
+        self.assertGreaterEqual(slot, 0)
+        obj1, obj2 = self.env._gym.equality_object_ids(slot)
+        self.assertEqual({obj1, obj2}, {mocap_id, pelvis_id})
 
     def test_anchor_actor_records_state(self):
         """_anchored_actor/_anchor_type 正确记录。"""
-        self.env.anchor_actor("pelvis", "weld")
+        self.env._anchor_actor("pelvis", "weld")
         self.assertEqual(self.env._anchored_actor, "pelvis")
         self.assertEqual(self.env._anchor_type, "weld")
 
@@ -1727,12 +1739,12 @@ class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
     """
 
     def test_env_release_no_private_access(self):
-        """K4: grep 断言 release_body_anchored 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        """K4: grep 断言 _release_body_anchored 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作（阶段三 3.5.5")
-        self.assertGreater(start, 0, "未找到 3.5.5 release_body_anchored 区块")
+        start = source.find("    def _release_body_anchored(")
+        self.assertGreater(start, 0, "未找到 _release_body_anchored 方法定义")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
@@ -1743,33 +1755,33 @@ class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
         self.assertNotIn("_mjModel", block)
 
     def test_env_release_uses_compliance_api(self):
-        """K1/K4: grep 断言走 self._gym.update_equality_constraints 公共方法。"""
+        """K1/K4: grep 断言走 equality_find_slot_by_body/equality_release 公共方法。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作（阶段三 3.5.5")
+        start = source.find("    def _release_body_anchored(")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
-        self.assertIn("self._gym.update_equality_constraints", block)
-        self.assertIn("self._gym.n_equality", block)
+        self.assertIn("self.equality_find_slot_by_body", block)
+        self.assertIn("self.equality_release", block)
 
     def test_env_release_returns_none(self):
-        """K11: release_body_anchored 返回 None。"""
+        """K11: _release_body_anchored 返回 None。"""
         env = _make_g1_env()
         env.mj_forward()
         # 未锚定时 no-op
-        ret = env.release_body_anchored()
+        ret = env._release_body_anchored()
         self.assertIsNone(ret)
         # 锚定后释放
-        env.anchor_actor("pelvis", "weld")
-        ret = env.release_body_anchored()
+        env._anchor_actor("pelvis", "weld")
+        ret = env._release_body_anchored()
         self.assertIsNone(ret)
 
     def test_env_release_docstring_present(self):
-        """K12: release_body_anchored 有 docstring。"""
+        """K12: _release_body_anchored 有 docstring。"""
         env = _make_g1_env()
-        doc = env.release_body_anchored.__doc__
+        doc = env._release_body_anchored.__doc__
         self.assertIsNotNone(doc)
         self.assertGreater(len(doc), 0)
 
@@ -1777,30 +1789,36 @@ class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
 class TestEnvReleaseBodyAnchoredFunctional(unittest.TestCase):
     """子步骤 3.5.5 功能单元测试（G1 XML 真实数据）。
 
-    对应文档 §9.6 功能单元测试表。验证约束清除 + 状态清除。
+    对应文档 §9.6 功能单元测试表。验证约束恢复 + 状态清除。
     """
 
     def setUp(self):
         self.env = _make_g1_env()
         self.env.mj_forward()
 
-    def test_release_body_anchored_clears_constraint(self):
-        """释放后锚点 eq_type 清零。"""
-        self.env.anchor_actor("pelvis", "weld")
-        # 锚定后 eq_obj1id/obj2id 应为 mocap_id/pelvis_id
-        obj1, obj2 = self.env._gym.equality_object_ids(0)
+    def test_release_body_anchored_restores_constraint(self):
+        """释放后约束 obj id 恢复到锚定前的原始值（对齐 Local dummy body 机制）。"""
+        mocap_names = self.env._gym.mocap_body_names()
+        mocap_name = mocap_names[0]
+        # 记录锚定前的原始约束快照
+        slot_before = self.env.equality_find_slot_by_body(mocap_name)
+        self.assertGreaterEqual(slot_before, 0)
+        orig_eq = self.env.equality_constraint(slot_before)
+        # 锚定
+        self.env._anchor_actor("pelvis", "weld")
         # 释放
-        self.env.release_body_anchored()
-        # 验证 eq_type 已清零（通过 update_equality_constraints 写入）
-        # 重新读取 eq_obj1id/obj2id 应为 -1（释放写入）
-        obj1_after, obj2_after = self.env._gym.equality_object_ids(0)
-        self.assertEqual(obj1_after, -1)
-        self.assertEqual(obj2_after, -1)
+        self.env._release_body_anchored()
+        # 验证约束 obj id 恢复到原始值
+        slot_after = self.env.equality_find_slot_by_body(mocap_name)
+        self.assertGreaterEqual(slot_after, 0)
+        restored_eq = self.env.equality_constraint(slot_after)
+        self.assertEqual(restored_eq["obj1_id"], orig_eq["obj1_id"])
+        self.assertEqual(restored_eq["obj2_id"], orig_eq["obj2_id"])
 
     def test_release_body_anchored_clears_state(self):
         """_anchored_actor/_anchor_type 为 None。"""
-        self.env.anchor_actor("pelvis", "weld")
-        self.env.release_body_anchored()
+        self.env._anchor_actor("pelvis", "weld")
+        self.env._release_body_anchored()
         self.assertIsNone(self.env._anchored_actor)
         self.assertIsNone(self.env._anchor_type)
 
@@ -1809,7 +1827,7 @@ class TestEnvReleaseBodyAnchoredFunctional(unittest.TestCase):
         # 未锚定状态
         self.assertIsNone(self.env._anchored_actor)
         # 调用不应抛异常
-        self.env.release_body_anchored()
+        self.env._release_body_anchored()
         self.assertIsNone(self.env._anchored_actor)
 
 
@@ -1820,12 +1838,12 @@ class TestEnvDoBodyManipulationArchCompliance(unittest.TestCase):
     """
 
     def test_env_do_body_manipulation_no_private_access(self):
-        """K4: grep 断言 do_body_manipulation 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
+        """K4: grep 断言 _do_body_manipulation 区块不触 self._gym._sim/_mjData/_mjModel/_studio。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作编排（阶段三 3.5.6")
-        self.assertGreater(start, 0, "未找到 3.5.6 do_body_manipulation 区块")
+        start = source.find("    def _do_body_manipulation(")
+        self.assertGreater(start, 0, "未找到 _do_body_manipulation 方法定义")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
@@ -1837,30 +1855,30 @@ class TestEnvDoBodyManipulationArchCompliance(unittest.TestCase):
         self.assertNotIn("self._studio_bridge", block)
 
     def test_env_do_body_manipulation_uses_compliance_api(self):
-        """K1/K4/K9: grep 断言走 anchor_actor/release_body_anchored/set_mocap_pos_and_quat 等公共方法。"""
+        """K1/K4/K9: grep 断言走 _anchor_actor/_release_body_anchored/set_mocap_pos_and_quat 公共方法。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 体操作编排（阶段三 3.5.6")
+        start = source.find("    def _do_body_manipulation(")
         block_source = source[start:]
-        end = block_source.find("\n    # ---", 1)
+        end = block_source.find("\n    def ", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
         self.assertIn("self._gym.get_body_manipulation_state", block)
-        self.assertIn("self.anchor_actor", block)
-        self.assertIn("self.release_body_anchored", block)
+        self.assertIn("self._anchor_actor", block)
+        self.assertIn("self._release_body_anchored", block)
         self.assertIn("self.set_mocap_pos_and_quat", block)
 
     def test_env_do_body_manipulation_returns_none(self):
-        """K11: do_body_manipulation 返回 None。"""
+        """K11: _do_body_manipulation 返回 None。"""
         env = _make_g1_env()
         env.mj_forward()
-        ret = env.do_body_manipulation()
+        ret = env._do_body_manipulation()
         self.assertIsNone(ret)
 
     def test_env_do_body_manipulation_docstring_present(self):
-        """K12: do_body_manipulation 有 docstring（含编排流程说明）。"""
+        """K12: _do_body_manipulation 有 docstring（含编排流程说明）。"""
         env = _make_g1_env()
-        doc = env.do_body_manipulation.__doc__
+        doc = env._do_body_manipulation.__doc__
         self.assertIsNotNone(doc)
         self.assertGreater(len(doc), 0)
 
@@ -1902,29 +1920,29 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
     def test_do_body_manipulation_offline_noop(self):
         """离线模式（_skip_grpc_load=True）no-op 不抛错。"""
         self.env._skip_grpc_load = True
-        self.env.do_body_manipulation()  # 不应抛异常
+        self.env._do_body_manipulation()  # 不应抛异常
         self.assertIsNone(self.env._anchored_actor)
 
     def test_do_body_manipulation_anchor_flow(self):
-        """锚定请求触发 anchor_actor。"""
+        """锚定请求触发 _anchor_actor。"""
         from orca_gym.core.euler.orca_studio_bridge import AnchorType
 
         self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         self.assertEqual(self.env._anchored_actor, "pelvis")
         self.assertEqual(self.env._anchor_type, "weld")
 
     def test_do_body_manipulation_release_flow(self):
-        """释放请求触发 release_body_anchored。"""
+        """释放请求触发 _release_body_anchored。"""
         from orca_gym.core.euler.orca_studio_bridge import AnchorType
 
         # 先锚定
         self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         self.assertIsNotNone(self.env._anchored_actor)
         # 再注入释放（Studio 无锚定 body）
         self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         self.assertIsNone(self.env._anchored_actor)
 
     def test_do_body_manipulation_mocap_sync_flow(self):
@@ -1933,7 +1951,7 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
 
         # 先锚定
         self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         # 注入拖拽目标位姿
         target_pos = np.array([0.5, 0.5, 1.0])
         target_quat = np.array([0.7071, 0.0, 0.0, 0.7071])
@@ -1943,7 +1961,7 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
             pos=target_pos,
             quat=target_quat,
         )
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         # 验证 mocap 位姿已同步到目标
         mocap_names = self.env._gym.mocap_body_names()
         mocap_name = mocap_names[0]
@@ -1960,7 +1978,7 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
 
         # 1. 锚定
         self._patch_bridge(anchored="pelvis", anchor_type=AnchorType.WELD)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         self.assertEqual(self.env._anchored_actor, "pelvis")
         # 2. 移动
         self._patch_bridge(
@@ -1968,10 +1986,10 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
             anchor_type=AnchorType.WELD,
             pos=np.array([0.3, 0.3, 0.8]),
         )
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         # 3. 释放
         self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
-        self.env.do_body_manipulation()
+        self.env._do_body_manipulation()
         self.assertIsNone(self.env._anchored_actor)
 
 

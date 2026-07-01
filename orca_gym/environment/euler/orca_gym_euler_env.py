@@ -117,13 +117,12 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_interval = 1.0 / self.metadata.get("render_fps", 30)
         self._last_frame_index = -1
 
-        # 5. 锚点状态（阶段三 3.5.4 anchor_actor/release_body_anchored 使用）
-        self._anchor_mocap_name: str | None = None  # 锚点 mocap body 名称
+        # 5. 锚点状态（UI 抓取内部方法 _anchor_actor/_release_body_anchored 使用）
+        self._anchor_mocap_name: str = "ActorManipulator_Anchor"  # 固定，对齐 Local
         self._anchored_actor: str | None = None      # 当前锚定的 actor 名称
         self._anchor_type: str | None = None         # 当前锚点类型
         # 锚定前 XML 原始约束数据（释放时恢复，对齐 Local 的 dummy body 机制）
         self._anchor_original_eq: dict | None = None  # 原始约束快照
-        self._anchor_original_mocap_in_obj1: bool | None = None  # mocap 原在 obj1 还是 obj2
 
         # 3. 事件循环（Python 3.12 兼容：若先前测试已关闭事件循环会抛 RuntimeError）
         try:
@@ -380,32 +379,37 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self._render_count += self._render_count_interval
             if self._render_count >= 1.0:
                 self.loop.run_until_complete(self._gym.render())
-                self.do_body_manipulation()
+                self._do_body_manipulation()
                 self._render_count -= 1.0
         else:
             time_diff = time.perf_counter() - self._render_time_step
             if time_diff > self._render_interval:
                 self._render_time_step = time.perf_counter()
                 self.loop.run_until_complete(self._gym.render())
-                self.do_body_manipulation()
+                self._do_body_manipulation()
         return None
 
-    # --- 体操作编排（阶段三 3.5.6，锚定 + mocap 移动 + 释放编排）---
+    # --- 体操作编排（UI 抓取内部，_ 前缀，由 render() 驱动）---
 
-    def do_body_manipulation(self) -> None:
-        """Studio UI 体操作编排：根据 UI 状态执行锚定/移动/释放。
+    def _do_body_manipulation(self) -> None:
+        """【内部 API】Studio UI 抓取状态机。
 
-        完整流程（基于 Studio body manipulation 状态）：
-        1. 读取 body manipulation 状态（self._gym.get_body_manipulation_state）
-        2. 若 Studio 无锚定 body 且 Env 已锚定：release_body_anchored
-        3. 若 Studio 有锚定 body 且 Env 未锚定：anchor_actor
-        4. 若已锚定且有 UI 拖拽位姿：set_mocap_pos_and_quat（跟随 UI 拖拽）
+        .. warning::
+            此方法是 Studio UI 抓取的内部实现，由 ``render()`` 内部调用。
+            AI 和用户代码**不应直接调用**此方法。
 
-        走合规 API：anchor_actor / release_body_anchored / set_mocap_pos_and_quat
-        / get_body_manipulation_state。离线模式 no-op。
+        流程：
+        1. 读取 Studio body manipulation 状态（gRPC，UI 抓取特有输入源）
+        2. 若 Studio 无锚定 body 且本地已锚定：_release_body_anchored
+        3. 若 Studio 有锚定 body 且本地未锚定：_anchor_actor
+        4. 已锚定时同步 mocap 到 UI 拖拽位姿（走 set_mocap_pos_and_quat 公共方法）
+
+        约束操作完全基于通用 equality API；离线模式 no-op。
         """
         if self._skip_grpc_load:
             return
+        # get_body_manipulation_state 是 Studio Bridge 的 gRPC 状态查询，
+        # 属于 UI 抓取特有输入源（非 equality 通用能力），Env 内部委托 self._gym
         manip_state = self.loop.run_until_complete(
             self._gym.get_body_manipulation_state()
         )
@@ -414,17 +418,17 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 1. 处理锚定/释放事件
         if actor_name is None:
             if self._anchored_actor is not None:
-                self.release_body_anchored()
+                self._release_body_anchored()
             return
         if self._anchored_actor is None:
-            self.anchor_actor(actor_name, anchor_type or "weld")
+            self._anchor_actor(actor_name, anchor_type or "weld")
         # 2. 已锚定时同步 mocap 到 UI 拖拽位姿
         if self._anchored_actor is not None and manip_state.get("mocap_pose"):
             self.set_mocap_pos_and_quat(
                 {self._anchor_mocap_name: manip_state["mocap_pose"]}
             )
-            # 即时求解约束（确保 actor 紧跟 UI 拖拽位姿，减少渲染帧间旋转漂移）
-            self._gym.mj_forward()
+            # 即时求解约束（走 Env 公共方法，不穿墙 self._gym.mj_forward）
+            self.mj_forward()
 
     # --- Studio 桥接访问器（K9 方法访问模式，替代 gym.studio 穿墙）---
 
@@ -1175,188 +1179,244 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         )
         self._gym.modify_equality_objects(eq_ids, obj1_ids, obj2_ids)
 
-    def update_anchor_equality_constraints(
-        self, actor_name: str, anchor_type: str = "weld"
-    ) -> None:
-        """锚点约束更新（connect/weld 联动 actor 与 mocap body）。
+    # --- 通用 equality API（L1 公共，无 Env 级缓存状态）---
+    # 这组方法不依赖任何 UI 抓取状态字段（_anchored_actor 等），
+    # 调用方自管快照与恢复。UI 抓取内部方法基于本组方法实现。
 
-        对齐 OrcaGymLocal 的查找槽位 + 保留原始 eq_data 机制：
-        1. 遍历所有等式约束，查找含 mocap_id 的槽位（obj1 或 obj2）
-        2. 读取该槽位的完整约束数据（保留 XML 编译器推导的 eq_data/solref/solimp）
-        3. 只修改目标 body id 和 eq_type，回写
+    def equality_snapshot(self) -> list[dict]:
+        """读取所有等式约束的完整数据快照。
 
-        这样避免了硬编码 eq[0] 破坏其他约束（如关节耦合、tendon 约束），
-        也保留了 MuJoCo 编译器在 qpos0 下自动推导的 anchor/relpose。
+        返回 list[dict]，每项含 type/obj1_id/obj2_id/active/solref/solimp/data。
+        用于保存约束原始状态，便于后续恢复（配合 equality_release）。
+
+        替代直接访问 _mjModel.eq_*。
+        """
+        return [
+            self.equality_constraint(i)
+            for i in range(self._gym.n_equality())
+        ]
+
+    def equality_find_slot_by_body(self, body_name: str) -> int:
+        """查找含指定 body 的等式约束槽位索引。
+
+        遍历所有等式约束，返回第一个 obj1_id 或 obj2_id 等于该 body id 的槽位。
+        未找到返回 -1。
 
         Args:
-            actor_name: 被锚定的 body 名称。
-            anchor_type: 锚点类型 "weld"/"connect"/"none"。
+            body_name: body 名称（已含 agent 前缀）。
+        """
+        body_id = self.model.body_name2id(body_name)
+        for i in range(self._gym.n_equality()):
+            obj1, obj2 = self._gym.equality_object_ids(i)
+            if obj1 == body_id or obj2 == body_id:
+                return i
+        return -1
+
+    def equality_constraint(self, slot: int) -> dict:
+        """读取单个等式约束完整数据（委托 self._gym）。
+
+        返回 type/obj1_id/obj2_id/active/solref/solimp/data。
+        """
+        return self._gym.equality_constraint(slot)
+
+    def equality_update(
+        self,
+        slot: int,
+        *,
+        eq_type: int | None = None,
+        obj1_name: str | None = None,
+        obj2_name: str | None = None,
+        data: np.ndarray | None = None,
+    ) -> None:
+        """更新指定槽位的等式约束字段。
+
+        只修改显式传入的字段，未传入的字段保留原值。按当前 (obj1_id, obj2_id)
+        匹配槽位写入，保留 XML 原始 solref/solimp（底层只改 type/obj/data）。
+
+        Args:
+            slot: 等式约束槽位索引。
+            eq_type: mjtEq 类型常量（可选）。
+            obj1_name: 新的 obj1 body 名称（可选，内部解析为 id）。
+            obj2_name: 新的 obj2 body 名称（可选，内部解析为 id）。
+            data: 约束数据 np.ndarray（可选，形状 (mjNEQDATA,)）。
+
+        写入后自动调用 mj_forward()，保证 env.data 一致。
+        """
+        eq = self.equality_constraint(slot)
+        new_type = eq_type if eq_type is not None else eq["type"]
+        new_obj1_id = (
+            self.model.body_name2id(obj1_name) if obj1_name is not None else eq["obj1_id"]
+        )
+        new_obj2_id = (
+            self.model.body_name2id(obj2_name) if obj2_name is not None else eq["obj2_id"]
+        )
+        new_data = data if data is not None else eq["data"]
+        self._gym.update_equality_constraints([{
+            "type": new_type,
+            "obj1_id": eq["obj1_id"],      # 用于匹配（当前值）
+            "obj2_id": eq["obj2_id"],      # 用于匹配（当前值）
+            "new_obj1_id": new_obj1_id,
+            "new_obj2_id": new_obj2_id,
+            "data": new_data,
+        }])
+        self.mj_forward()
+
+    def equality_bind_mocap(
+        self,
+        mocap_name: str,
+        body_name: str,
+        eq_type: str = "weld",
+    ) -> int:
+        """把 mocap body 与指定 body 通过 equality 绑定。
+
+        语义：
+        1. 查找含 mocap_name 的 equality 槽位
+        2. 将 mocap 位姿对齐到 body 当前位姿（避免下一帧拉扯）
+        3. 把槽位的另一端 obj 改为 body，eq_type 改为指定类型
+        4. 保留 XML 原始 eq_data/solref/solimp（MuJoCo 编译器推导值）
+
+        Args:
+            mocap_name: mocap body 名称（已含 agent 前缀）。
+            body_name: 被绑定的 body 名称（已含 agent 前缀）。
+            eq_type: "weld" 或 "connect"（"ball" 等价 "connect"）。
+
+        Returns:
+            绑定的等式约束槽位索引。
+
+        Raises:
+            ValueError: 模型无 equality 槽位，或未找到含 mocap_name 的槽位。
         """
         import mujoco
 
-        actor_id = self.model.body_name2id(actor_name)
-        # 查找锚点 mocap body（第一个 mocap body）
-        mocap_names = self._gym.mocap_body_names()
-        if not mocap_names:
-            raise ValueError("模型中无 mocap body，无法锚定")
-        mocap_name = getattr(self, "_anchor_mocap_name", None) or mocap_names[0]
+        slot = self.equality_find_slot_by_body(mocap_name)
+        if slot == -1:
+            raise ValueError(
+                f"未在等式约束中找到含 mocap body '{mocap_name}' 的槽位，"
+                f"请在 XML 中预定义 <equality><weld body1='{mocap_name}' "
+                f"body2='...'/></equality>"
+            )
+        eq = self.equality_constraint(slot)
         mocap_id = self.model.body_name2id(mocap_name)
-        # 映射 anchor_type → mujoco eq type
-        if anchor_type == "weld":
-            eq_type = mujoco.mjtEq.mjEQ_WELD
-        elif anchor_type in ("connect", "ball"):
-            eq_type = mujoco.mjtEq.mjEQ_CONNECT
-        else:
-            eq_type = mujoco.mjtEq.mjEQ_CONNECT
-        # 安全检查：模型必须有预定义的 equality 约束槽位
-        n_eq = self._gym.n_equality()
-        if n_eq == 0:
-            raise ValueError(
-                "模型中无 equality 约束槽位（neq=0），"
-                "请在 XML 中预定义 <equality><weld .../></equality>"
-            )
-        # 遍历查找含 mocap_id 的槽位（对齐 Local 的查找逻辑）
-        target_idx = -1
-        for i in range(n_eq):
-            obj1, obj2 = self._gym.equality_object_ids(i)
-            if obj1 == mocap_id or obj2 == mocap_id:
-                target_idx = i
-                break
-        if target_idx == -1:
-            raise ValueError(
-                f"未在等式约束中找到含 mocap body '{mocap_name}' (id={mocap_id}) "
-                f"的槽位，请在 XML 中预定义 "
-                f"<equality><weld body1='{mocap_name}' body2='...'/></equality>"
-            )
-        # 读取该槽位的完整约束数据（保留 XML 编译器推导的 eq_data/solref/solimp）
-        eq = self._gym.equality_constraint(target_idx)
-        # 保存原始约束快照（释放时恢复 XML 原始 obj id，对齐 Local dummy body 机制）
-        self._anchor_original_eq = eq
-        # 确定原 mocap 在 obj1 还是 obj2，决定改哪个字段
-        if eq["obj1_id"] == mocap_id:
-            # mocap 是 obj1，改 obj2 指向 actor
-            self._anchor_original_mocap_in_obj1 = True
-            new_obj1_id = eq["obj1_id"]
-            new_obj2_id = actor_id
-        else:
-            # mocap 是 obj2，改 obj1 指向 actor
-            self._anchor_original_mocap_in_obj1 = False
-            new_obj1_id = actor_id
-            new_obj2_id = eq["obj2_id"]
-        # 组装 eq_list（按 (obj1_id, obj2_id) 匹配槽位写入）
-        # 保留原始 eq_data（XML 编译器推导的 anchor/relpose），
-        # 保留原始 solref/solimp（solver 参数），
-        # 只改 eq_type（WELD/CONNECT 切换）
-        eq_list = [
-            {
-                "type": eq_type,
-                "obj1_id": eq["obj1_id"],   # 用于匹配槽位
-                "obj2_id": eq["obj2_id"],   # 用于匹配槽位
-                "new_obj1_id": new_obj1_id,
-                "new_obj2_id": new_obj2_id,
-                "data": eq["data"],         # 保留 XML 原始数据
+        # 对齐 mocap 位姿到 body 当前位姿（避免下一帧拉扯）
+        body_pose = self.get_body_xpos_xmat_xquat([body_name])[body_name]
+        self.set_mocap_pos_and_quat({
+            mocap_name: {
+                "pos": body_pose["xpos"],
+                "quat": body_pose["xquat"],
             }
-        ]
-        self._gym.update_equality_constraints(eq_list)
-        # 即时求解约束（确保 actor 立即被锁定到 mocap 位姿）
-        self._gym.mj_forward()
+        })
+        # 确定改 obj1 还是 obj2（mocap 一端保持，另一端改为 body）
+        if eq["obj1_id"] == mocap_id:
+            new_obj1_name = mocap_name
+            new_obj2_name = body_name
+        else:
+            new_obj1_name = body_name
+            new_obj2_name = mocap_name
+        type_map = {
+            "weld": mujoco.mjtEq.mjEQ_WELD,
+            "connect": mujoco.mjtEq.mjEQ_CONNECT,
+            "ball": mujoco.mjtEq.mjEQ_CONNECT,
+        }
+        mujoco_eq_type = type_map.get(eq_type, mujoco.mjtEq.mjEQ_CONNECT)
+        self.equality_update(
+            slot,
+            eq_type=mujoco_eq_type,
+            obj1_name=new_obj1_name,
+            obj2_name=new_obj2_name,
+        )
+        return slot
 
-    # --- 体操作（阶段三 3.5.4，mocap + equality 联动）---
+    def equality_release(
+        self,
+        slot: int,
+        original_snapshot: dict,
+    ) -> None:
+        """从快照恢复指定槽位的等式约束。
 
-    def anchor_actor(
+        用于释放绑定：把槽位的 obj id / eq_type / data 恢复到绑定前的原始值
+        （对齐 Local 的 dummy body 机制——约束不再作用于被锚定 actor）。
+
+        Args:
+            slot: 等式约束槽位索引。
+            original_snapshot: equality_snapshot()[slot] 或 equality_constraint(slot)
+                              返回的 dict，含 type/obj1_id/obj2_id/data 等字段。
+        """
+        cur_eq = self.equality_constraint(slot)
+        # 用当前 obj id 匹配，写入原始值
+        self._gym.update_equality_constraints([{
+            "type": original_snapshot["type"],
+            "obj1_id": cur_eq["obj1_id"],             # 用于匹配（当前值）
+            "obj2_id": cur_eq["obj2_id"],             # 用于匹配（当前值）
+            "new_obj1_id": original_snapshot["obj1_id"],  # 恢复原始
+            "new_obj2_id": original_snapshot["obj2_id"],  # 恢复原始
+            "data": original_snapshot["data"],
+        }])
+        self.mj_forward()
+
+    def _anchor_actor(
         self,
         actor_name: str,
         anchor_type: str = "weld",
     ) -> None:
-        """锚定 actor body：设置 mocap 位姿 + 建立 weld/connect 等式约束。
+        """【内部 API】UI 抓取专用：锚定 actor body。
 
-        走合规 API：
-        - get_body_xpos_xmat_xquat（查询 actor 当前位姿）
-        - set_mocap_pos_and_quat（设置 mocap 位姿到 actor 当前位姿）
-        - update_anchor_equality_constraints（建立约束）
+        .. warning::
+            此方法是 Studio UI 抓取的内部实现，由 ``_do_body_manipulation``
+            调用。AI 和用户代码**不应直接调用**此方法。
+            程序化体操作请使用公共 API :meth:`equality_bind_mocap`。
 
-        使用 Studio 系统自带的 ActorManipulator 锚点 mocap body，
+        使用 Studio 系统自带的 ActorManipulator_Anchor mocap body，
         对齐 OrcaGymLocalEnv 的 anchor_actor 语义。
+
+        实现完全基于通用 equality API：
+        - equality_find_slot_by_body 查找槽位
+        - equality_constraint 保存原始快照
+        - equality_bind_mocap 完成绑定（含 mocap 对齐 + mj_forward）
 
         Args:
             actor_name: 被锚定的 body 名称。
             anchor_type: 锚点类型 "weld"/"connect"。
         """
-        # 1. 查询 actor 当前位姿
-        actor_pose = self.get_body_xpos_xmat_xquat([actor_name])[actor_name]
-        # 2. 查找系统自带锚点 mocap body（固定名，对齐 OrcaGymLocalEnv）
-        if self._anchor_mocap_name is None:
-            self._anchor_mocap_name = "ActorManipulator_Anchor"
-        # 3. 设置 mocap body 到 actor 当前位姿
-        mocap_dict = {
-            self._anchor_mocap_name: {
-                "pos": actor_pose["xpos"],
-                "quat": actor_pose["xquat"],
-            }
-        }
-        self.set_mocap_pos_and_quat(mocap_dict)
-        # 4. 建立 weld/connect 等式约束（actor ↔ mocap）
-        self.update_anchor_equality_constraints(actor_name, anchor_type)
-        # 5. 记录锚定状态
+        # 1. 查找 UI 抓取专用 mocap 的 equality 槽位
+        slot = self.equality_find_slot_by_body(self._anchor_mocap_name)
+        if slot == -1:
+            raise ValueError(
+                f"模型中无含 {self._anchor_mocap_name} 的 equality 槽位，"
+                f"请检查关卡 XML"
+            )
+        # 2. 保存原始约束快照（释放时恢复，走通用 equality_constraint 公共方法）
+        self._anchor_original_eq = self.equality_constraint(slot)
+        # 3. 绑定（通用 API 内部完成 mocap 对齐 + 约束写入 + mj_forward）
+        self.equality_bind_mocap(
+            self._anchor_mocap_name, actor_name, anchor_type
+        )
         self._anchored_actor = actor_name
         self._anchor_type = anchor_type
 
-    # --- 体操作（阶段三 3.5.5，释放锚定 actor）---
+    def _release_body_anchored(self) -> None:
+        """【内部 API】UI 抓取专用：释放锚定的 actor。
 
-    def release_body_anchored(self) -> None:
-        """释放锚定的 actor：清除锚点等式约束 + 清除锚定状态。
+        .. warning::
+            此方法是 Studio UI 抓取的内部实现，由 ``_do_body_manipulation``
+            调用。AI 和用户代码**不应直接调用**此方法。
+            程序化体操作请使用公共 API :meth:`equality_release`。
 
-        走合规 API：
-        - self._gym.update_equality_constraints（恢复 XML 原始 obj id 和 eq_data）
+        通过恢复 XML 原始 obj id 实现，对齐 Local 的 dummy body 机制：
+        约束不再作用于被锚定 actor，actor 恢复自由动力学。未锚定时 no-op。
 
-        对齐 OrcaGymLocal 的 dummy body 释放机制：
-        Local 通过将约束 obj 改回 dummy body 实现"释放"，
-        Euler 通过恢复 XML 原始 obj id 实现，效果等价。
-
-        未锚定时调用为 no-op。
+        实现完全基于通用 equality API：
+        - equality_find_slot_by_body 查找当前绑定槽位
+        - equality_release 从快照恢复原始约束
         """
         if self._anchored_actor is None:
             return
-
-        # 1. 恢复锚点等式约束的 XML 原始 obj id（对齐 Local dummy body 机制）
-        #    Local 通过将约束 obj 改回 dummy body 实现"释放"，
-        #    Euler 通过恢复 XML 原始 obj id 实现，效果等价：
-        #    约束不再作用于被锚定的 actor，actor 恢复自由动力学。
-        if (self._anchor_original_eq is not None
-                and self._anchor_original_mocap_in_obj1 is not None):
-            orig = self._anchor_original_eq
-            # 当前约束的 obj id（锚定后改为 actor）
-            # 用当前 obj id 匹配槽位，恢复为 XML 原始 obj id
-            if self._anchor_original_mocap_in_obj1:
-                # 锚定时 mocap 在 obj1，actor 在 obj2 → 当前 obj2 是 actor
-                cur_obj1_id = orig["obj1_id"]
-                cur_obj2_id = self.model.body_name2id(self._anchored_actor)
-            else:
-                # 锚定时 mocap 在 obj2，actor 在 obj1 → 当前 obj1 是 actor
-                cur_obj1_id = self.model.body_name2id(self._anchored_actor)
-                cur_obj2_id = orig["obj2_id"]
-            restore_list = [
-                {
-                    "type": orig["type"],
-                    "obj1_id": cur_obj1_id,          # 用于匹配当前槽位
-                    "obj2_id": cur_obj2_id,          # 用于匹配当前槽位
-                    "new_obj1_id": orig["obj1_id"],  # 恢复 XML 原始 obj1
-                    "new_obj2_id": orig["obj2_id"],  # 恢复 XML 原始 obj2
-                    "data": orig["data"],            # 恢复 XML 原始 eq_data
-                }
-            ]
-            self._gym.update_equality_constraints(restore_list)
-            self._gym.mj_forward()
-        # 2. 清除锚定状态
+        if self._anchor_original_eq is not None:
+            slot = self.equality_find_slot_by_body(self._anchored_actor)
+            if slot != -1:
+                self.equality_release(slot, self._anchor_original_eq)
         self._anchored_actor = None
         self._anchor_type = None
         self._anchor_original_eq = None
-        self._anchor_original_mocap_in_obj1 = None
-
-    @property
-    def anchored_actor(self) -> str | None:
-        """当前锚定的 actor body 名称（None 表示未锚定，只读）。"""
-        return self._anchored_actor
 
     # --- 只读查询委托（阶段三 3.2.4，K4：通过公共方法而非 _gym 穿墙）---
 
