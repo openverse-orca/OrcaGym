@@ -40,11 +40,11 @@ dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy", "ruff",]
 rl = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard",]
 imitation = [ "h5py", "opencv-python", "tqdm",]
 devices = [ "pygame>=2.6.0",]
-sensors = [ "websockets", "av", "opencv-python", "matplotlib",]
+sensors = [ "websockets", "av", "opencv-python", "matplotlib", "pillow",]
 tools = [ "pyyaml", "trimesh", "requests", "tqdm",]
 robomimic = [ "h5py", "termcolor", "opencv-python",]
 robosuite = [ "numba",]
-all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask",]
+all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask", "pillow",]
 
 [project.scripts]
 orcagym-loop = "orca_gym.scripts.run_sim_loop:main"

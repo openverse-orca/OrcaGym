@@ -298,6 +298,48 @@ class OrcaGymEuler:
         """获取帧 PNG（委托 bridge）。"""
         await object.__getattribute__(self, "_studio").get_frame_png(image_path)
 
+    # --- 摄像头传感器激活（阶段四补遗，委托 _studio bridge）---
+
+    async def set_camera_sensor_info(
+        self,
+        actor_name: str,
+        capture_rgb: bool,
+        capture_depth: bool,
+        save_mp4_file: bool = False,
+        use_dds: bool = False,
+        **kwargs,
+    ) -> None:
+        """激活/配置摄像头传感器流（委托 bridge）。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            capture_rgb: 是否激活 RGB 视频流。
+            capture_depth: 是否激活深度视频流。
+            save_mp4_file: 是否同时保存 MP4 文件。
+            use_dds: 是否使用 DDS 传输。
+            **kwargs: 扩展 optional 参数（capture_normal/capture_object_color/
+                is_recording/use_nvenc/nvenc_gpu_index/random_object_color/
+                width/height/vertical_fov/near_clip/far_clip/gamma/
+                color_port/depth_port/dds_topic/dds_stream_id），
+                None 表示不修改现有值。
+        """
+        await object.__getattribute__(self, "_studio").set_camera_sensor_info(
+            actor_name, capture_rgb, capture_depth, save_mp4_file, use_dds, **kwargs
+        )
+
+    async def make_camera_viewport_active(
+        self, actor_name: str, entity_name: str
+    ) -> None:
+        """将指定摄像头设为 Studio 视口激活相机（委托 bridge）。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            entity_name: 摄像头实体名。
+        """
+        await object.__getattribute__(
+            self, "_studio"
+        ).make_camera_viewport_active(actor_name, entity_name)
+
     async def load_content_file(
         self,
         content_file_name: str,

@@ -60,17 +60,32 @@ class LightInfo:
 class CameraSensorInfo:
     """
     A class to represent camera sensor information in the ORCA Gym environment.
+
+    基础 4 参数为必填（对应老接口）。扩展参数为 optional（None 表示不修改现有值），
+    对应 proto3 optional 语义，兼容老客户端。
     """
+
+    # 扩展 optional 字段名列表（None 表示不修改 server 现有值）
+    _OPTIONAL_FIELDS = [
+        "capture_normal", "capture_object_color", "is_recording",
+        "use_nvenc", "nvenc_gpu_index", "random_object_color",
+        "width", "height", "vertical_fov", "near_clip", "far_clip",
+        "gamma", "color_port", "depth_port", "dds_topic", "dds_stream_id",
+    ]
 
     def __init__(self,
                  capture_rgb : bool,
                  capture_depth : bool,
                  save_mp4_file : bool,
-                 use_dds : bool,):
+                 use_dds : bool,
+                 **kwargs):
         self.capture_rgb = capture_rgb
         self.capture_depth = capture_depth
         self.save_mp4_file = save_mp4_file
         self.use_dds = use_dds
+        # 扩展 optional 字段：仅当显式传参时设置，否则为 None（不修改 server 现有值）
+        for fname in self._OPTIONAL_FIELDS:
+            setattr(self, fname, kwargs.get(fname, None))
         self._check_camera_sensor_info()
 
     def _check_camera_sensor_info(self):
@@ -206,13 +221,19 @@ class OrcaGymScene:
 
     async def _set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
         async with self.lock:
-            request = mjc_message_pb2.SetCameraSensorInfoRequest(
+            kwargs = dict(
                 actor_name = actor_name,
                 capture_rgb = camera_sensor_info.capture_rgb,
                 capture_depth = camera_sensor_info.capture_depth,
                 save_mp4_file = camera_sensor_info.save_mp4_file,
                 use_dds = camera_sensor_info.use_dds,)
-            
+            # 扩展 optional 字段：仅当非 None 时才设置（proto optional 语义）
+            for fname in CameraSensorInfo.OPTIONAL_FIELDS:
+                val = getattr(camera_sensor_info, fname, None)
+                if val is not None:
+                    kwargs[fname] = val
+            request = mjc_message_pb2.SetCameraSensorInfoRequest(**kwargs)
+
             response = await self.stub.SetCameraSensorInfo(request)
             if response.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
                 _logger.error(f"Set camera sensor info failed:  {response.error_message}")

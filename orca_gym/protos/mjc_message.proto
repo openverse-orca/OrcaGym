@@ -987,7 +987,14 @@ message UpdateLocalEnvResponse{
         int32 index = 1; // 控制输入索引
         double value = 2; // 控制输入值
     }
+    message BodyWrenchInfo {
+        int32 body_id = 1;       // MuJoCo body id
+        repeated double force = 2;  // [fx, fy, fz] world frame
+        repeated double torque = 3; // [tx, ty, tz] world frame
+        repeated double point = 4;  // [px, py, pz] application point (world frame)
+    }
     repeated OverrideCtrlInfo override_ctrls = 1; // 覆盖的控制输入列表
+    repeated BodyWrenchInfo body_wrenches = 2;    // 外力/力矩 (e.g. buoyancy from shallow water)
 }
 
 message LoadLocalEnvRequest {
@@ -1070,6 +1077,25 @@ message SetCameraSensorInfoRequest {
     bool capture_depth = 3;                 // 是否捕获深度图像
     bool save_mp4_file = 4;                // 是否保存为 MP4 文件
     bool use_dds = 5;                     // 是否使用 DDS
+
+    // 扩展字段（optional: 未设置时 server 保持现有值，兼容老客户端）
+    // 对应 CameraSensorConfiguration / VideoStreamingConfiguration / DDSConfiguration
+    optional bool capture_normal = 6;            // 是否捕获法线图
+    optional bool capture_object_color = 7;      // 是否捕获实例分割色标图
+    optional bool is_recording = 8;              // 是否正在录制
+    optional bool use_nvenc = 9;                 // 是否使用 NvEnc 硬件编码
+    optional int32 nvenc_gpu_index = 10;         // NvEnc GPU 适配器索引
+    optional bool random_object_color = 11;      // 是否随机分配物体颜色
+    optional int32 width = 12;                   // 图像宽度（像素）
+    optional int32 height = 13;                  // 图像高度（像素）
+    optional float vertical_fov = 14;            // 垂直视场角（度）
+    optional float near_clip = 15;               // 近裁剪面距离
+    optional float far_clip = 16;                // 远裁剪面距离
+    optional float gamma = 17;                   // 深度相机 gamma 校正
+    optional int32 color_port = 18;              // RGB 流 WebSocket 端口
+    optional int32 depth_port = 19;              // 深度流 WebSocket 端口
+    optional string dds_topic = 20;              // DDS 主题
+    optional string dds_stream_id = 21;          // DDS 流 ID
 }
 
 message SetCameraSensorInfoResponse {

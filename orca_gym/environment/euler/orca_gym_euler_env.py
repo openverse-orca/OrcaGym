@@ -486,6 +486,66 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         self.loop.run_until_complete(self._gym.get_frame_png(image_path))
 
+    # --- 摄像头传感器激活（阶段四补遗：激活 Studio 端摄像头流）---
+
+    def set_camera_sensor_info(
+        self,
+        actor_name: str,
+        capture_rgb: bool,
+        capture_depth: bool,
+        save_mp4_file: bool = False,
+        use_dds: bool = False,
+        **kwargs,
+    ) -> None:
+        """激活/配置摄像头传感器流（委托 self._gym）。
+
+        Studio 端 MuJoCo <camera> 默认不推送 WebSocket RGB/Depth 流，
+        必须通过本方法显式激活后，对应端口（如 7070/7071）才会监听并推流。
+        `begin_save_video` 只控制 MP4 文件录制，与本方法正交。
+
+        Args:
+            actor_name: 摄像头所属 actor 名（Euler 体系下即 agent_name 前缀，如 "g1"）。
+            capture_rgb: 是否激活 RGB 视频流。
+            capture_depth: 是否激活深度视频流。
+            save_mp4_file: 是否同时保存 MP4 文件。
+            use_dds: 是否使用 DDS 传输。
+            **kwargs: 扩展 optional 参数（None 表示不修改现有值）：
+                capture_normal (bool): 是否捕获法线图。
+                capture_object_color (bool): 是否捕获实例分割色标图。
+                is_recording (bool): 是否正在录制。
+                use_nvenc (bool): 是否使用 NvEnc 硬件编码。
+                nvenc_gpu_index (int): NvEnc GPU 适配器索引。
+                random_object_color (bool): 是否随机分配物体颜色。
+                width (int): 图像宽度（像素）。
+                height (int): 图像高度（像素）。
+                vertical_fov (float): 垂直视场角（度）。
+                near_clip (float): 近裁剪面距离。
+                far_clip (float): 远裁剪面距离。
+                gamma (float): 深度相机 gamma 校正。
+                color_port (int): RGB 流 WebSocket 端口。
+                depth_port (int): 深度流 WebSocket 端口。
+                dds_topic (str): DDS 主题。
+                dds_stream_id (str): DDS 流 ID。
+        """
+        self.loop.run_until_complete(
+            self._gym.set_camera_sensor_info(
+                actor_name, capture_rgb, capture_depth, save_mp4_file, use_dds, **kwargs
+            )
+        )
+
+    def make_camera_viewport_active(
+        self, actor_name: str, entity_name: str
+    ) -> None:
+        """将指定摄像头设为 Studio 视口激活相机（委托 self._gym）。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            entity_name: 摄像头实体名（如 "camera_head"）。
+        """
+        self.loop.run_until_complete(
+            self._gym.make_camera_viewport_active(actor_name, entity_name)
+        )
+
     def load_content_file(self, content_file_name, **kwargs) -> None:
         """加载内容文件（委托 self._gym）。
 
