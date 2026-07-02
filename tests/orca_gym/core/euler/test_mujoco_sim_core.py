@@ -23,18 +23,18 @@ from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 
 
 # 测试用 XML 模型：单铰链倒立摆（nq=1, nv=1, nu=1）
+# 使用本仓 fixtures 目录，无外部依赖（见 AGENTS.md 测试独立性要求）
 _PENDULUM_XML = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "..", "..", "..",
-    "OrcaPlayground", "envs", "euler", "scenes", "simple_pendulum.xml",
+    "..", "..", "environment", "euler", "fixtures", "simple_pendulum.xml",
 )
 _PENDULUM_XML = os.path.abspath(_PENDULUM_XML)
 
 # G1 模型 XML（阶段三 3.1.1 功能测试用，含 free joint + 29 hinge joint）
+# 简化版：mesh 替换为基础几何体，无外部 mesh 依赖
 _G1_XML = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "..", "..", "..",
-    "OrcaPlayground", "envs", "euler", "robots", "g1_29dof_camera.xml",
+    "..", "..", "environment", "euler", "fixtures", "g1_29dof_camera_simplified.xml",
 )
 _G1_XML = os.path.abspath(_G1_XML)
 
@@ -1087,12 +1087,16 @@ class TestSimCoreEqualityArchCompliance(unittest.TestCase):
 
     def test_simcore_eq_methods_return_none(self):
         """K11: 2 个约束方法返回 None（写操作无返回值）。"""
+        # 用模型实际的 obj id 匹配槽位（按 obj_id 匹配写入语义）
+        model = self.sim._mjModel
+        orig_obj1 = int(model.eq_obj1id[0])
+        orig_obj2 = int(model.eq_obj2id[0])
         data = np.zeros(mujoco.mjNEQDATA)
         eq_list = [
             {
                 "type": mujoco.mjtEq.mjEQ_CONNECT,
-                "obj1_id": 1,
-                "obj2_id": 2,
+                "obj1_id": orig_obj1,
+                "obj2_id": orig_obj2,
                 "data": data,
             }
         ]
@@ -1143,67 +1147,76 @@ class TestSimCoreEqualityFunctional(unittest.TestCase):
         self.sim.forward()
 
     def test_update_equality_constraints_writes_eq_fields(self):
-        """调用后 eq_type/eq_obj1id/eq_obj2id/eq_data 正确写入。"""
+        """调用后 eq_type/eq_data 正确写入（按 obj_id 匹配槽位）。"""
+        model = self.sim._mjModel
+        orig_obj1 = int(model.eq_obj1id[0])
+        orig_obj2 = int(model.eq_obj2id[0])
         data = np.zeros(mujoco.mjNEQDATA)
         data[0:3] = [0.1, 0.2, 0.3]
         eq_list = [
             {
                 "type": mujoco.mjtEq.mjEQ_WELD,
-                "obj1_id": 5,
-                "obj2_id": 7,
+                "obj1_id": orig_obj1,
+                "obj2_id": orig_obj2,
                 "data": data,
             }
         ]
         self.sim.update_equality_constraints(eq_list)
-        model = self.sim._mjModel
         self.assertEqual(model.eq_type[0], mujoco.mjtEq.mjEQ_WELD)
-        self.assertEqual(model.eq_obj1id[0], 5)
-        self.assertEqual(model.eq_obj2id[0], 7)
         np.testing.assert_array_equal(model.eq_data[0], data)
 
     def test_modify_equality_objects_updates_obj_ids(self):
         """eq_obj1id/eq_obj2id 更新正确。"""
-        # 先写入初值
-        data = np.zeros(mujoco.mjNEQDATA)
-        self.sim.update_equality_constraints(
-            [
-                {
-                    "type": mujoco.mjtEq.mjEQ_CONNECT,
-                    "obj1_id": 1,
-                    "obj2_id": 2,
-                    "data": data,
-                }
-            ]
-        )
-        # 修改 obj1/obj2
+        # modify_equality_objects 按索引直接修改，不受按 obj_id 匹配影响
         self.sim.modify_equality_objects([0], obj1_ids=[10], obj2_ids=[20])
         model = self.sim._mjModel
         self.assertEqual(model.eq_obj1id[0], 10)
         self.assertEqual(model.eq_obj2id[0], 20)
 
     def test_update_equality_constraints_idempotent(self):
-        """重复调用结果一致。"""
+        """重复调用结果一致（按 obj_id 匹配槽位）。"""
+        model = self.sim._mjModel
+        orig_obj1 = int(model.eq_obj1id[0])
+        orig_obj2 = int(model.eq_obj2id[0])
         data = np.zeros(mujoco.mjNEQDATA)
         data[0] = 0.5
         eq_list = [
             {
                 "type": mujoco.mjtEq.mjEQ_CONNECT,
-                "obj1_id": 3,
-                "obj2_id": 4,
+                "obj1_id": orig_obj1,
+                "obj2_id": orig_obj2,
                 "data": data,
             }
         ]
         self.sim.update_equality_constraints(eq_list)
         first_type = int(self.sim._mjModel.eq_type[0])
-        first_obj1 = int(self.sim._mjModel.eq_obj1id[0])
-        first_obj2 = int(self.sim._mjModel.eq_obj2id[0])
         first_data = self.sim._mjModel.eq_data[0].copy()
 
         self.sim.update_equality_constraints(eq_list)
         self.assertEqual(int(self.sim._mjModel.eq_type[0]), first_type)
-        self.assertEqual(int(self.sim._mjModel.eq_obj1id[0]), first_obj1)
-        self.assertEqual(int(self.sim._mjModel.eq_obj2id[0]), first_obj2)
         np.testing.assert_array_equal(self.sim._mjModel.eq_data[0], first_data)
+
+    def test_set_equality_active_writes_eq_active0(self):
+        """set_equality_active 写 _mjModel.eq_active0（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        self.sim.set_equality_active(0, False)
+        self.assertFalse(bool(model.eq_active0[0]))
+        self.sim.set_equality_active(0, True)
+        self.assertTrue(bool(model.eq_active0[0]))
+
+    def test_set_equality_solref_writes_eq_solref(self):
+        """set_equality_solref 写 _mjModel.eq_solref（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        new_solref = np.array([0.02, 1.0])
+        self.sim.set_equality_solref(0, new_solref)
+        np.testing.assert_array_equal(model.eq_solref[0], new_solref)
+
+    def test_set_equality_solimp_writes_eq_solimp(self):
+        """set_equality_solimp 写 _mjModel.eq_solimp（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        new_solimp = np.array([0.9, 0.95, 0.5, 0.9, 0.001])
+        self.sim.set_equality_solimp(0, new_solimp)
+        np.testing.assert_array_equal(model.eq_solimp[0], new_solimp)
 
 
 if __name__ == "__main__":

@@ -298,6 +298,48 @@ class OrcaGymEuler:
         """获取帧 PNG（委托 bridge）。"""
         await object.__getattribute__(self, "_studio").get_frame_png(image_path)
 
+    # --- 摄像头传感器激活（阶段四补遗，委托 _studio bridge）---
+
+    async def set_camera_sensor_info(
+        self,
+        actor_name: str,
+        capture_rgb: bool,
+        capture_depth: bool,
+        save_mp4_file: bool = False,
+        use_dds: bool = False,
+        **kwargs,
+    ) -> None:
+        """激活/配置摄像头传感器流（委托 bridge）。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            capture_rgb: 是否激活 RGB 视频流。
+            capture_depth: 是否激活深度视频流。
+            save_mp4_file: 是否同时保存 MP4 文件。
+            use_dds: 是否使用 DDS 传输。
+            **kwargs: 扩展 optional 参数（capture_normal/capture_object_color/
+                is_recording/use_nvenc/nvenc_gpu_index/random_object_color/
+                width/height/vertical_fov/near_clip/far_clip/gamma/
+                color_port/depth_port/dds_topic/dds_stream_id），
+                None 表示不修改现有值。
+        """
+        await object.__getattribute__(self, "_studio").set_camera_sensor_info(
+            actor_name, capture_rgb, capture_depth, save_mp4_file, use_dds, **kwargs
+        )
+
+    async def make_camera_viewport_active(
+        self, actor_name: str, entity_name: str
+    ) -> None:
+        """将指定摄像头设为 Studio 视口激活相机（委托 bridge）。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            entity_name: 摄像头实体名。
+        """
+        await object.__getattribute__(
+            self, "_studio"
+        ).make_camera_viewport_active(actor_name, entity_name)
+
     async def load_content_file(
         self,
         content_file_name: str,
@@ -595,6 +637,14 @@ class OrcaGymEuler:
         """查询等式约束关联对象 id（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_object_ids(eq_idx)
 
+    def equality_constraint(self, eq_idx: int) -> dict:
+        """读取单个等式约束完整数据（委托 ModelRegistry）。
+
+        返回 type/obj1_id/obj2_id/active/solref/solimp/data 完整字段，
+        用于体操作时读取 XML 预定义约束的原始值，修改后回写。
+        """
+        return object.__getattribute__(self, "_registry").equality_constraint(eq_idx)
+
     def n_equality(self) -> int:
         """查询等式约束数量（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").n_equality()
@@ -629,3 +679,18 @@ class OrcaGymEuler:
         object.__getattribute__(self, "_sim").modify_equality_objects(
             eq_ids, obj1_ids, obj2_ids
         )
+
+    def set_equality_active(self, eq_idx: int, active: bool) -> None:
+        """设置等式约束激活状态（委托 SimCore，写 _mjModel.eq_active0）。
+
+        作为 Env.equality_update 的实现细节，不进入 Env 公共 API。
+        """
+        object.__getattribute__(self, "_sim").set_equality_active(eq_idx, active)
+
+    def set_equality_solref(self, eq_idx: int, solref) -> None:
+        """设置等式约束 solver reference 参数（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").set_equality_solref(eq_idx, solref)
+
+    def set_equality_solimp(self, eq_idx: int, solimp) -> None:
+        """设置等式约束 solver impedance 参数（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").set_equality_solimp(eq_idx, solimp)

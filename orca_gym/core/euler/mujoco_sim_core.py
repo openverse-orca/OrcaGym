@@ -665,21 +665,41 @@ class MuJoCoSimCore:
     def update_equality_constraints(self, eq_list: list[dict]) -> None:
         """更新等式约束（写 _mjModel.eq_type/eq_obj1id/eq_obj2id/eq_data）。
 
-        按 eq_list 顺序写入 model.eq_* 字段，调用方需保证 eq_list 长度 <= neq。
+        按 (obj1_id, obj2_id) 匹配槽位写入，对齐 OrcaGymLocal 语义。
+        匹配失败时抛出 ValueError，避免硬编码索引破坏其他约束。
 
         Args:
             eq_list: 等式约束列表，每项为 dict，含键：
                 - type: mjtEq 类型常量（如 mjEQ_CONNECT/WELD）。
-                - obj1_id: 关联对象 1 的 id。
-                - obj2_id: 关联对象 2 的 id。
+                - obj1_id: 关联对象 1 的 id（用于匹配槽位）。
+                - obj2_id: 关联对象 2 的 id（用于匹配槽位）。
                 - data: 约束数据 np.ndarray（形状 (mjNEQDATA,)）。
+                - new_obj1_id: 可选，匹配成功后写入的新 obj1 id。
+                - new_obj2_id: 可选，匹配成功后写入的新 obj2 id。
         """
         model = self._mjModel
-        for i, eq in enumerate(eq_list):
-            model.eq_type[i] = eq["type"]
-            model.eq_obj1id[i] = eq["obj1_id"]
-            model.eq_obj2id[i] = eq["obj2_id"]
-            model.eq_data[i] = eq["data"]
+        for eq in eq_list:
+            obj1_id = eq["obj1_id"]
+            obj2_id = eq["obj2_id"]
+            matched = False
+            for i in range(model.neq):
+                if (int(model.eq_obj1id[i]) == obj1_id and
+                        int(model.eq_obj2id[i]) == obj2_id):
+                    model.eq_type[i] = eq["type"]
+                    # 支持可选的 obj id 变更（anchor 时改 obj2_id 指向 actor）
+                    if "new_obj1_id" in eq:
+                        model.eq_obj1id[i] = eq["new_obj1_id"]
+                    if "new_obj2_id" in eq:
+                        model.eq_obj2id[i] = eq["new_obj2_id"]
+                    model.eq_data[i] = eq["data"]
+                    matched = True
+                    break
+            if not matched:
+                raise ValueError(
+                    f"未找到 (obj1_id={obj1_id}, obj2_id={obj2_id}) "
+                    f"匹配的等式约束槽位，请检查 XML 中是否预定义了对应的 "
+                    f"<equality><weld/connect body1=... body2=.../></equality>"
+                )
 
     def modify_equality_objects(
         self,
@@ -700,6 +720,37 @@ class MuJoCoSimCore:
                 model.eq_obj1id[eq_id] = obj1_ids[i]
             if obj2_ids is not None:
                 model.eq_obj2id[eq_id] = obj2_ids[i]
+
+    def set_equality_active(self, eq_idx: int, active: bool) -> None:
+        """设置等式约束初始激活状态（写 _mjModel.eq_active0）。
+
+        active/solref/solimp 无"按 (obj1_id, obj2_id) 匹配"语义，按 slot 索引
+        直接写入，与 update_equality_constraints 的匹配写入区分。
+
+        Args:
+            eq_idx: 等式约束索引。
+            active: 是否激活。
+        """
+        self._mjModel.eq_active0[eq_idx] = bool(active)
+
+    def set_equality_solref(self, eq_idx: int, solref: np.ndarray) -> None:
+        """设置等式约束 solver reference 参数（写 _mjModel.eq_solref）。
+
+        Args:
+            eq_idx: 等式约束索引。
+            solref: solver reference 参数，形状 (2,)。
+        """
+        self._mjModel.eq_solref[eq_idx] = solref
+
+    def set_equality_solimp(self, eq_idx: int, solimp: np.ndarray) -> None:
+        """设置等式约束 solver impedance 参数（写 _mjModel.eq_solimp）。
+
+        Args:
+            eq_idx: 等式约束索引。
+            solimp: solver impedance 参数，形状 (mjNEQIMP,) = (5,)，
+                即 [d0, dWidth, dMid, dEnd, width]。
+        """
+        self._mjModel.eq_solimp[eq_idx] = solimp
 
     # --- 维度 property ---
 

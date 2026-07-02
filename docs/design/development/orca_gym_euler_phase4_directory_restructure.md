@@ -1,4 +1,4 @@
-# OrcaGym Euler 阶段四目录重组与 Lesson 4–8 重新验收方案
+# OrcaGym Euler 阶段四目录重组与 Lesson 4–9 重新验收方案
 
 ## 1. 文档定位
 
@@ -25,12 +25,14 @@ OrcaPlayground/
 └── examples/euler/0X_xxx/      ← 脚本入口 + 教程文档
 ```
 
-该布局存在两个问题：
+该布局存在三个问题：
 
 1. **example 不独立**：每个 example 通过 `from envs.euler.xxx import ...` 依赖 `envs/euler/`
    共享目录，无法单独拷出运行。
 2. **资产与代码混杂**：G1 mesh/ONNX/config 埋在 `envs/euler/robots/` 下，与 Env 代码同级，
    不便于资产单独管理与版本化。
+3. **Lesson 7 职责耦合**：原 Lesson 7（studio_capture）把"行走控制验证"和"视频采集验证"
+   耦合在一起，导致行走问题（瘫倒/乱踹）与视频采集问题难以独立定位。
 
 ### 1.2 重组目标
 
@@ -43,11 +45,20 @@ OrcaPlayground/
    `envs/g1`、`envs/fluid` 等原有目录不动（但其功能被提取后 example 不再依赖它们）。
 6. **Euler 体系纯净**：example 仅依赖 `orca_gym.environment.euler.*`，不引入老 `OrcaGymLocalEnv`
    体系（Local 老主路径将被 Euler 替代，禁止 Euler 教程反向依赖）。
+7. **Lesson 7 拆分**：原 Lesson 7（studio_capture）拆为 Lesson 7（locomotion，专注行走控制）
+   + Lesson 8（video_capture，专注视频采集），原 Lesson 8（body_manipulation）顺延为 Lesson 9。
 
 ### 1.3 适用范围
 
-- **重新验收**：Lesson 4–7（已实施，需迁移到新结构并重新跑通）。
-- **新设计**：Lesson 8（未实施，按新结构从零设计）。
+- **重新验收**：Lesson 4–6（已实施并迁移到新结构，已通过验收）。
+- **课程拆分**：原 Lesson 7（studio_capture）拆分为 Lesson 7（locomotion）+ Lesson 8（video_capture），
+  需重新实施与验收。
+- **新设计**：Lesson 9（原 Lesson 8 body_manipulation 顺延，未实施，按新结构从零设计）。
+
+> **拆分动机**：原 Lesson 7 把行走控制与视频采集耦合，行走链路（ONNX 推理 → PD 控制 →
+> motor 力矩）出问题时（瘫倒/乱踹），难以在视频采集的噪声中独立定位。拆分后：
+> - Lesson 7 locomotion 先把行走控制链路跑通（纯行走，无视频），便于聚焦定位行走问题。
+> - Lesson 8 video_capture 在行走已验证的基础上，再叠加视频/帧/时间戳采集 API 验证。
 
 ---
 
@@ -57,7 +68,7 @@ OrcaPlayground/
 
 ```
 OrcaPlayground/
-├── assets/                                   ← 新建：资产集中（§2.2）
+├── assets/                                   ← 资产集中（§2.2）
 │   ├── g1/
 │   │   ├── g1_29dof_camera.xml
 │   │   ├── config/g1_29dof_hist.yaml
@@ -101,16 +112,24 @@ OrcaPlayground/
 │   │   ├── scene_scanner.py
 │   │   ├── online_verifier.py
 │   │   └── jacobian_env.py
-│   ├── 07_studio_capture/
-│   │   ├── 07_studio_capture.md
-│   │   ├── studio_capture.py
+│   ├── 07_locomotion/                        ← 拆分自原 studio_capture：专注行走控制
+│   │   ├── 07_locomotion.md
+│   │   ├── locomotion.py
 │   │   ├── g1_base_env.py
 │   │   ├── scene_scanner.py
-│   │   ├── g1_locomotion.py                  ← 含内联 HistoryHandler（§2.4）
+│   │   ├── g1_locomotion.py                  ← 含内联 HistoryHandler + PD 控制器（§2.4）
 │   │   ├── online_verifier.py
-│   │   └── studio_capture_env.py
-│   └── 08_body_manipulation/                 ← 新建（Lesson 8，§4）
-│       ├── 08_body_manipulation.md
+│   │   └── locomotion_env.py
+│   ├── 08_video_capture/                     ← 拆分自原 studio_capture：专注视频采集
+│   │   ├── 08_video_capture.md
+│   │   ├── video_capture.py
+│   │   ├── g1_base_env.py
+│   │   ├── scene_scanner.py
+│   │   ├── g1_locomotion.py                  ← 复用 07 的行走控制
+│   │   ├── online_verifier.py
+│   │   └── video_capture_env.py
+│   └── 09_body_manipulation/                 ← 原 Lesson 8 顺延（§4）
+│       ├── 09_body_manipulation.md
 │       ├── body_manipulation.py
 │       ├── g1_base_env.py
 │       ├── scene_scanner.py
@@ -167,11 +186,29 @@ OrcaPlayground/
 **依赖**：`orca_gym.environment.euler.orca_gym_euler_env`（Euler）+ `numpy` + stdlib。
 **零 `envs.*` 项目内 import**。
 
-### 2.4 `HistoryHandler` 内联到 `g1_locomotion.py`
+### 2.4 `HistoryHandler` 内联 + PD 控制器加入 `g1_locomotion.py`
 
 `g1_locomotion.py` 原依赖 `envs.g1.utils.history_handler.HistoryHandler`（43 行，仅依赖
 `numpy` + `orca_gym.log` 已安装包）。因仅 `g1_locomotion` 一处使用且代码极短，**直接内联**
 到 `g1_locomotion.py` 中作为模块级类，消除 `envs.g1` 依赖。
+
+**PD 控制器**：G1 执行器是 `motor`（力矩控制，`ctrlrange` 为 N·m），而 ONNX 策略输出的是
+**位置目标** `q_target`（弧度量级）。需在 `g1_locomotion.py` 的 `compute_action` 末尾加 PD
+转换，返回力矩而非位置目标（与 `envs/g1/g1_env.py` 的 PD 实现一致）：
+
+```python
+# tau = Kp*(q_target - q) + Kd*(0 - qd)
+tau = self.joint_kp * (q_target - dof_pos[0]) - self.joint_kd * dof_vel[0]
+tau = np.clip(tau, -self.motor_effort_limit, self.motor_effort_limit)
+return tau
+```
+
+PD 参数（`JOINT_KP`/`JOINT_KD`/`motor_effort_limit_list`）从 `g1_29dof_hist.yaml` 加载。
+此修复使 `compute_action` 返回力矩（量级 ~50 N·m），传给 motor 执行器足以支撑站立。
+
+> ** Lesson 7 拆分背景**：原 studio_capture 把行走控制与视频采集耦合，行走链路出问题时
+> （如缺 PD 控制器导致瘫倒/乱踹）难以独立定位。拆分后 Lesson 7 locomotion 专注行走控制链路，
+> Lesson 8 video_capture 在行走已验证基础上再叠加视频采集。
 
 ### 2.5 每个 example 的依赖清单（重组后）
 
@@ -181,8 +218,9 @@ OrcaPlayground/
 | 04 | `g1_base_env` + `scene_scanner` + `online_verifier` + `query_api_env` | 同上 |
 | 05 | `g1_base_env` + `scene_scanner` + `online_verifier` + `force_apply_env` | 同上 |
 | 06 | `g1_base_env` + `scene_scanner` + `online_verifier` + `jacobian_env` | 同上 |
-| 07 | `g1_base_env` + `scene_scanner` + `g1_locomotion` + `online_verifier` + `studio_capture_env` | 同上 |
-| 08 | `g1_base_env` + `scene_scanner` + `g1_locomotion` + `online_verifier` + `body_manipulation_env` | 同上 |
+| 07 | `g1_base_env` + `scene_scanner` + `g1_locomotion` + `online_verifier` + `locomotion_env` | 同上 |
+| 08 | `g1_base_env` + `scene_scanner` + `g1_locomotion` + `online_verifier` + `video_capture_env` | 同上 |
+| 09 | `g1_base_env` + `scene_scanner` + `g1_locomotion` + `online_verifier` + `body_manipulation_env` | 同上 |
 
 **`OrcaGymEulerEnv` 传递依赖全在 `orca_gym.core.euler.*` + `orca_gym.utils/protos/log`
 （通用基础设施），零 Local 体系引用。**
@@ -196,11 +234,12 @@ OrcaPlayground/
 
 #### 步骤 2：提取 `scene_scanner.py`
 - 从 `envs/common/model_scanner.py` 提取（§2.3），探针改 `OrcaGymEulerEnv`。
-- 放入 04/05/06/07/08 各一份。
+- 放入 04/05/06/07/08/09 各一份。
 
-#### 步骤 3：内联 `HistoryHandler`
+#### 步骤 3：内联 `HistoryHandler` + 加入 PD 控制器
 - 将 `envs/g1/utils/history_handler.py` 的 `HistoryHandler` 类内联到 `g1_locomotion.py`。
-- 放入 07/08 各一份（仅这两个 lesson 用 ONNX 行走）。
+- 在 `compute_action` 末尾加 PD 转换（§2.4），返回力矩。
+- 放入 07/08/09 各一份（这三个 lesson 用 ONNX 行走）。
 
 #### 步骤 4：复制 .py 到各 example
 - 按 §2.5 表，把 `envs/euler/*.py` 复制到各 example 目录。
@@ -213,7 +252,7 @@ OrcaPlayground/
 | `from envs.euler.query_api_env import ...` | `from query_api_env import ...` |
 | `from envs.euler.simple_env import ...` | `from simple_env import ...` |
 | `from envs.euler.g1_locomotion import ...` | `from g1_locomotion import ...` |
-| `from envs.euler.studio_capture_env import ...` | `from studio_capture_env import ...` |
+| `from envs.euler.studio_capture_env import ...` | 拆分：`from locomotion_env import ...` / `from video_capture_env import ...` |
 | `from envs.euler.force_apply_env import ...` | `from force_apply_env import ...` |
 | `from envs.euler.jacobian_env import ...` | `from jacobian_env import ...` |
 | `from envs.common.model_scanner import ...` | `from scene_scanner import ...` |
@@ -245,9 +284,18 @@ _SCENE_XML = os.path.join(_PROJECT_ROOT, "assets", "scenes", "simple_pendulum.xm
 
 #### 步骤 7：删除 `envs/euler/` 整个目录
 
+#### 步骤 8：原 Lesson 7 拆分为 Lesson 7 + Lesson 8
+- 将原 `07_studio_capture/` 拆为 `07_locomotion/`（行走控制）+ `08_video_capture/`（视频采集）。
+- `07_locomotion/`：从原 `studio_capture_env.py` 提取行走控制逻辑为 `locomotion_env.py`，
+  移除视频采集（begin/stop_save_video、get_frame_png、get_camera_time_stamp），新增行走
+  稳定性数值判定（基座高度、未摔倒、关节力矩范围）。
+- `08_video_capture/`：保留原视频采集逻辑为 `video_capture_env.py`，复用 07 的 `g1_locomotion.py`
+  驱动行走，在行走过程中录制视频/截帧/查询时间戳。
+- 原 `08_body_manipulation/` 规划顺延为 `09_body_manipulation/`。
+
 ---
 
-## 3. Lesson 4–7 重新验收方案
+## 3. Lesson 4–8 重新验收方案
 
 ### 3.1 通用验收流程（每个 Lesson）
 
@@ -297,6 +345,8 @@ query_contact_simple、query_position_body_B、body_subtree_mass。
 
 **验收通过条件**：§3.2 全部满足 + 9 项数值判定 PASS。
 
+**状态**：✅ 已通过验收。
+
 ### 3.4 Lesson 5 重新验收（05_force_apply）
 
 **验证内容**：外力应用 + 摩擦修改 + 接触力查询 + mocap 位姿写入（XML 内置 anchor↔box weld）。
@@ -314,6 +364,8 @@ set_mocap_pos_and_quat 驱动 box（atol=0.05）。
 
 **验收通过条件**：§3.2 全部满足 + 数值判定 PASS。
 
+**状态**：✅ 已通过验收。
+
 ### 3.5 Lesson 6 重新验收（06_jacobian）
 
 **验证内容**：雅可比计算 + 阻尼最小二乘 IK。
@@ -330,47 +382,106 @@ IK 迭代收敛（atol=0.02）。
 
 **验收通过条件**：§3.2 全部满足 + 数值判定 PASS。
 
-### 3.6 Lesson 7 重新验收（07_studio_capture）
+**状态**：✅ 已通过验收。
+
+### 3.6 Lesson 7 重新验收（07_locomotion）
+
+> **拆分背景**：原 Lesson 7（studio_capture）把行走控制与视频采集耦合。拆分后本课专注
+> 行走控制链路验证，不含视频采集，便于聚焦定位行走问题（瘫倒/乱踹等）。
+
+**验证内容**：G1 ONNX 行走控制链路（ONNX 推理 + PD 控制器 + 行走稳定性）。
+
+**执行命令**：
+```bash
+python examples/euler/07_locomotion/locomotion.py
+```
+
+**目录自查**（07 含 `g1_locomotion.py`，且其内已内联 `HistoryHandler` + PD 控制器）：
+- `examples/euler/07_locomotion/` 含 `locomotion.py` / `g1_base_env.py` /
+  `scene_scanner.py` / `g1_locomotion.py` / `online_verifier.py` / `locomotion_env.py` /
+  `07_locomotion.md`。
+- `grep -r "from envs\." examples/euler/07_locomotion/` 零命中。
+- `grep -r "HistoryHandler" examples/euler/07_locomotion/g1_locomotion.py` 命中（内联确认）。
+- `grep -r "joint_kp\|PD" examples/euler/07_locomotion/g1_locomotion.py` 命中（PD 控制器确认）。
+
+**教程文档更新点（`07_locomotion.md`）**：
+- 路径/命令/目录结构更新。
+- ONNX 策略路径说明改为 `assets/g1/models/dec_loco/model_6600.onnx`。
+- 配置文件路径改为 `assets/g1/config/g1_29dof_hist.yaml`。
+- 说明 PD 控制器：策略输出位置目标 `q_target`，经 `tau = Kp*(q_target-q) + Kd*(0-qd)` 转力矩
+  后传给 motor 执行器（G1 执行器是力矩控制）。
+- 删除视频采集相关内容（移至 Lesson 8）。
+
+**数值判定项**（行走稳定性，5 项）：
+1. `base_height_stable`：基座高度维持在合理范围（0.6-0.9m，DEFAULT_BASE_HEIGHT=0.78 附近）。
+2. `not_fallen`：基座俯仰/横滚角未超过阈值（< 0.8 rad，约 45°，判定未摔倒）。
+3. `joint_torque_within_limit`：关节力矩未持续触限（clip 比例 < 50%）。
+4. `standing_at_start`：前 50 步 G1 保持站立（基座高度 > 0.6m）。
+5. `policy_action_finite`：ONNX 输出无 NaN/Inf。
+
+**人工观察项**（2 项）：
+- `g1_standing`：Studio 视口 G1 应站立，不瘫倒。
+- `g1_walking_stable`：Studio 视口 G1 行走应稳定，不乱踹（双腿交替迈步，非剧烈抖动）。
+
+**验收通过条件**：§3.2 全部满足 + 5 项数值判定 PASS + 2 项人工观察确认。
+
+**状态**：⏳ 待实施（原 studio_capture 拆分 + 行走问题修复）。
+
+> **当前已知问题**：行走链路缺 PD 控制器导致瘫倒（已修复，加 PD 后返回力矩），但加 PD 后
+> 出现"乱踹"现象，需进一步定位（见 §6 待定位问题）。
+
+### 3.7 Lesson 8 重新验收（08_video_capture）
+
+> **拆分背景**：原 Lesson 7 视频采集部分独立成课。在 Lesson 7 行走已验证的基础上，
+> 叠加 Studio 视频/帧/时间戳采集 API 验证。
 
 **验证内容**：G1 行走录制 + 视频截帧 + 帧索引/时间戳查询。
 
 **执行命令**：
 ```bash
-python examples/euler/07_studio_capture/studio_capture.py
+python examples/euler/08_video_capture/video_capture.py
 ```
 
-**目录自查**（07 额外含 `g1_locomotion.py`，且其内已内联 `HistoryHandler`）：
-- `examples/euler/07_studio_capture/` 含 `studio_capture.py` / `g1_base_env.py` /
-  `scene_scanner.py` / `g1_locomotion.py` / `online_verifier.py` / `studio_capture_env.py` /
-  `07_studio_capture.md`。
-- `grep -r "from envs\." examples/euler/07_studio_capture/` 零命中。
-- `grep -r "HistoryHandler" examples/euler/07_studio_capture/g1_locomotion.py` 命中（内联确认）。
+**目录自查**（08 复用 07 的 `g1_locomotion.py` 驱动行走）：
+- `examples/euler/08_video_capture/` 含 `video_capture.py` / `g1_base_env.py` /
+  `scene_scanner.py` / `g1_locomotion.py` / `online_verifier.py` / `video_capture_env.py` /
+  `08_video_capture.md`。
+- `grep -r "from envs\." examples/euler/08_video_capture/` 零命中。
 
-**教程文档更新点（`07_studio_capture.md`）**：
+**教程文档更新点（`08_video_capture.md`）**：
 - 路径/命令/目录结构更新。
+- 说明本课依赖 Lesson 7 行走控制已验证（复用 `g1_locomotion.py`）。
 - ONNX 策略路径说明改为 `assets/g1/models/dec_loco/model_6600.onnx`。
-- 配置文件路径改为 `assets/g1/config/g1_29dof_hist.yaml`。
-- 删除"依赖 `envs/euler/g1_locomotion`"说明，改为"本目录内 `g1_locomotion.py`"。
 
-**数值判定项**（与原 phase4 §4.3.4 一致，5 项）：camera_enabled、frame_index_increasing、
-png_file_generated、timestamp_returned、mp4_file_generated。
+**数值判定项**（视频采集 API，5 项，沿用原 studio_capture）：
+1. `camera_enabled`：`get_current_frame() >= 0`（摄像头使能）。
+2. `frame_index_increasing_{step}`：每 50 步帧索引递增。
+3. `png_file_generated`：`get_frame_png` 生成 PNG 文件（size > 100）。
+4. `timestamp_returned`：`get_camera_time_stamp` 返回 `camera_head` 键。
+5. `mp4_file_generated`：`stop_save_video` 后 mp4 文件生成。
 
-**人工观察项**：g1_walking、walking_stable。
+**人工观察项**（1 项）：
+- `g1_walking_in_video`：录制视频中 G1 行走画面正常（依赖 Lesson 7 行走已跑通）。
 
-**验收通过条件**：§3.2 全部满足 + 5 项数值判定 PASS + 2 项人工观察确认。
+**验收通过条件**：§3.2 全部满足 + 5 项数值判定 PASS + 1 项人工观察确认 + **Lesson 7 已通过**
+（行走链路前置依赖）。
 
-### 3.7 重新验收总览表
+**状态**：⏳ 待实施（原 studio_capture 拆分）。
 
-| Lesson | 目录 | 数值判定数 | 人工观察数 | 关键独立性问题 |
-|--------|------|-----------|-----------|--------------|
-| 04_query_api | 04_query_api/ | 9 | — | `scene_scanner` 探针改 Euler |
-| 05_force_apply | 05_force_apply/ | 7 | — | 同上 |
-| 06_jacobian | 06_jacobian/ | 3 | 1 | 同上 |
-| 07_studio_capture | 07_studio_capture/ | 5 | 2 | + `HistoryHandler` 内联确认 |
+### 3.8 重新验收总览表
+
+| Lesson | 目录 | 数值判定数 | 人工观察数 | 关键独立性问题 | 状态 |
+|--------|------|-----------|-----------|--------------|------|
+| 04_query_api | 04_query_api/ | 9 | — | `scene_scanner` 探针改 Euler | ✅ 已通过 |
+| 05_force_apply | 05_force_apply/ | 7 | — | 同上 | ✅ 已通过 |
+| 06_jacobian | 06_jacobian/ | 3 | 1 | 同上 | ✅ 已通过 |
+| 07_locomotion | 07_locomotion/ | 5 | 2 | + `HistoryHandler` 内联 + PD 控制器 + 行走稳定性 | ⏳ 待实施 |
+| 08_video_capture | 08_video_capture/ | 5 | 1 | 拆分自原 studio_capture | ⏳ 待实施 |
+| 09_body_manipulation | 09_body_manipulation/ | 6 | 5 | + Env 层 `equality_object_ids`/`n_equality`/`mocap_body_names`/`equality_data_width` 扩展 | ⏳ 待实施 |
 
 ---
 
-## 4. Lesson 8 实施方案（新结构）
+## 4. Lesson 9 实施方案（新结构，原 Lesson 8 顺延）
 
 ### 4.1 验证内容
 
@@ -380,19 +491,19 @@ XML 内置的 mocap+weld 验证 `modify_equality_objects` 重绑定驱动 G1 动
 > **依赖**：`assets/g1/g1_29dof_camera.xml` 已内置 mocap body `ActorManipulator_Anchor` +
 > weld 等式约束 `anchor_box_weld`（默认绑定 anchor↔box，详见原 phase4 §2.0.2）。
 >
-> **行走控制**：复用 07 的 `g1_locomotion.py`（含内联 `HistoryHandler`），ONNX 策略路径
-> `assets/g1/models/dec_loco/model_6600.onnx`。
+> **行走控制**：复用 07 的 `g1_locomotion.py`（含内联 `HistoryHandler` + PD 控制器），
+> ONNX 策略路径 `assets/g1/models/dec_loco/model_6600.onnx`。
 
 ### 4.2 目录结构
 
 ```
-examples/euler/08_body_manipulation/
-├── 08_body_manipulation.md          ← 教程文档（§4.6）
+examples/euler/09_body_manipulation/
+├── 09_body_manipulation.md          ← 教程文档（§4.6）
 ├── body_manipulation.py             ← 脚本入口（§4.4）
 ├── body_manipulation_env.py         ← Env 子类（§4.3）
 ├── g1_base_env.py                   ← 复制（资产路径改指向 assets/g1）
 ├── scene_scanner.py                 ← 复制（探针 OrcaGymEulerEnv）
-├── g1_locomotion.py                 ← 复制（含内联 HistoryHandler）
+├── g1_locomotion.py                 ← 复制（含内联 HistoryHandler + PD 控制器）
 └── online_verifier.py               ← 复制
 ```
 
@@ -437,118 +548,44 @@ class BodyManipulationEnv(G1BaseEnv):
             pelvis_final = self.get_body_xpos_xmat_xquat(
                 [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
             moved = np.linalg.norm(pelvis_final - self._pelvis_before) > 0.01
-            verifier.check("released_resumes_motion", moved,
-                           pelvis_final.tolist(), "moved from anchor",
-                           "释放后 G1 恢复运动")
-        # === mocap + weld 约束验证（不依赖 Studio 锚点）===
-        elif step == 250:
-            # 默认绑定 anchor↔box：mocap 驱动 box
-            self._box_before = self.get_body_xpos_xmat_xquat(
-                ["manipulation_box"])["manipulation_box"]["xpos"]
-            self.set_mocap_pos_and_quat(
-                {"ActorManipulator_Anchor": {"pos": [0.7, 0.0, 0.5], "quat": [1, 0, 0, 0]}})
-        elif step == 350:
-            # 步进 100 帧后 box 跟随 mocap（atol=0.05）
-            box_after = self.get_body_xpos_xmat_xquat(
-                ["manipulation_box"])["manipulation_box"]["xpos"]
-            verifier.check_allclose("mocap_drives_box_via_weld",
-                                     box_after, [0.7, 0.0, 0.5], atol=0.05,
-                                     detail="mocap 驱动 box 到目标位姿")
-        elif step == 450:
-            # 停用 equality[0]：box 不再跟随
-            self.update_equality_constraints([{
-                "type": 0, "obj1_id": -1, "obj2_id": -1,
-                "data": np.zeros(mujoco.mjNEQDATA)}])
-            verifier.observe("eq_disabled",
-                             "Studio 视口：equality 停用，box 不再跟随 anchor")
-        elif step == 500:
-            # 重绑 equality[0] weld 的 obj2 到 G1 pelvis
-            self.modify_equality_objects(eq_ids=[0], obj2_names=[f"{agent}/pelvis"])
-            # 校验 obj2_id 已改为 pelvis
-            obj1_id, obj2_id = self.equality_object_ids(0)
-            pelvis_id = self.model.body_name2id(f"{agent}/pelvis")
-            verifier.check("eq_rebound_to_pelvis",
-                           obj2_id == pelvis_id, obj2_id, pelvis_id,
-                           "equality 重绑到 pelvis")
-        elif step == 550:
-            # mocap 驱动 G1 pelvis：写入位姿偏移
-            self._pelvis_pre_drive = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
-            self.set_mocap_pos_and_quat({
-                "ActorManipulator_Anchor": {
-                    "pos": (self._pelvis_pre_drive + np.array([0.2, 0, 0.1])).tolist(),
-                    "quat": [1, 0, 0, 0]}})
-        elif step == 650:
-            # 步进 100 帧后 G1 pelvis 位移 > 0.05m
-            pelvis_driven = self.get_body_xpos_xmat_xquat(
-                [f"{agent}/pelvis"])[f"{agent}/pelvis"]["xpos"]
-            moved = np.linalg.norm(pelvis_driven - self._pelvis_pre_drive) > 0.05
-            verifier.check("mocap_drives_g1_pelvis", moved,
-                           pelvis_driven.tolist(), "moved > 0.05m",
-                           "mocap 驱动 G1 pelvis")
-
-    def observe_step(self, step: int, verifier: OnlineVerifier):
-        if step == 0:
-            verifier.observe("g1_walking", "Studio 视口：G1 应在策略控制下行走")
-        elif step == 80:
-            verifier.observe("manual_drag_hint",
-                             "可在 Studio 视口用鼠标拖拽 G1 pelvis，观察锚定效果")
-
-    def after_loop(self, verifier: OnlineVerifier):
-        # 恢复 equality 默认绑定，避免影响后续测试
-        try:
-            self.modify_equality_objects(eq_ids=[0], obj2_names=["manipulation_box"])
-        except Exception:
-            pass
+            verifier.check("released_resumes_motion", moved, moved, True,
+                           detail="释放后 G1 恢复运动")
+        # ...（mocap 驱动 box / equality 重绑 / mocap 驱动 G1 pelvis，见原 phase4 §4.3.4）
 ```
 
-### 4.4 脚本入口（`body_manipulation.py`）
-
-按原 phase4 §3.2 模板，`num_steps=700`。
+### 4.4 `body_manipulation.py` 脚本入口
 
 ```python
-def main() -> None:
-    args = parse_args()
-    env = BodyManipulationEnv(
-        frame_skip=G1_FRAME_SKIP,
-        orcagym_addr=args.addr,
-        agent_names=["g1"],
-        time_step=G1_TIME_STEP,
-        model_xml_path=G1_MODEL_XML,
-    )
-    verifier = OnlineVerifier("Lesson 8: 体操作")
-    try:
-        report = env.run_lesson(num_steps=700, verifier=verifier)
-    finally:
-        env.close()
-    if not report["summary"]["all_passed"]:
-        sys.exit(1)
+env = BodyManipulationEnv(
+    frame_skip=G1_FRAME_SKIP,
+    orcagym_addr=args.addr,
+    agent_names=["g1"],
+    time_step=G1_TIME_STEP,
+    model_xml_path=G1_MODEL_XML,
+)
+verifier = OnlineVerifier("Lesson 9: 体操作与 equality")
+report = env.run_lesson(num_steps=700, verifier=verifier)
 ```
 
-### 4.5 Env 层 API 扩展（`orca_gym` 包）
+### 4.5 Env 层 API 扩展（`equality_object_ids`）
 
-`equality_object_ids` 需在 `OrcaGymEulerEnv` 扩展（委托 `self._gym`）：
+原 phase4 §4.5 要求在 `OrcaGymEulerEnv` 扩展 `equality_object_ids` 公共方法（读取等式约束
+绑定的 object id），供 Lesson 9 验证 `modify_equality_objects` 重绑结果。此扩展仍需执行，
+详见原 phase4 文档。
 
-```python
-def equality_object_ids(self, eq_id: int) -> tuple[int, int]:
-    """返回 equality[eq_id] 的 (obj1id, obj2id)（委托 self._gym）。"""
-    return self.loop.run_until_complete(self._gym.equality_object_ids(eq_id))
-```
-
-> **架构合规**：通过 Env 层公共方法委托，不穿墙访问 `_mjModel.eq_obj1id`。
-
-### 4.6 教程文档大纲（`08_body_manipulation.md`）
+### 4.6 教程文档大纲（`09_body_manipulation.md`）
 
 1. **课程目标**：验证 `do_body_manipulation`/`anchor_actor`/`release_body_anchored`/
    `update_equality_constraints`/`modify_equality_objects`/`set_mocap_pos_and_quat`/
    `equality_object_ids` 在线运行正确。
 2. **前置条件**：OrcaStudio 已加载含 G1（含 `ActorManipulator_Anchor`/`manipulation_box`/
-   `anchor_box_weld`）的关卡并运行；`assets/g1/g1_29dof_camera.xml` 就位。
+   `anchor_box_weld`）的关卡并运行；`assets/g1/g1_29dof_camera.xml` 就位；
+   **Lesson 7 行走控制已通过**（本课行走中叠加体操作）。
 3. **目录结构**：本目录自包含，含 `body_manipulation.py`/`body_manipulation_env.py`/
    `g1_base_env.py`/`scene_scanner.py`/`g1_locomotion.py`/`online_verifier.py`。
 4. **运行步骤**：
    - 步骤 1（人工）：启动 OrcaStudio，加载含 G1（含 mocap+box+weld）的关卡，点击运行。
-   - 步骤 2（人工）：`cd OrcaPlayground && python examples/euler/08_body_manipulation/body_manipulation.py`
+   - 步骤 2（人工）：`cd OrcaPlayground && python examples/euler/09_body_manipulation/body_manipulation.py`
    - 步骤 3（自动）：脚本循环 700 帧，分阶段验证拖拽锚定/mocap 驱动 box/equality 重绑驱动 pelvis。
    - 步骤 4（人工）：按 `[OBSERVE]` 提示在 Studio 视口拖拽 G1 pelvis，观察锚定/释放效果；
      观察 anchor 拖动 box/G1。
@@ -573,12 +610,12 @@ def equality_object_ids(self, eq_id: int) -> tuple[int, int]:
    - `mocap_drives_g1_pelvis` 失败：检查重绑后 weld type 是否恢复为 `mjEQ_WELD`（step 450 已置 0，
      需在重绑后重新激活）。
 
-### 4.7 Lesson 8 验收方案
+### 4.7 Lesson 9 验收方案
 
 | 验收项 | 通过条件 | 验证方法 |
 |--------|---------|---------|
 | 脚本可运行 | `python body_manipulation.py` 连接 Studio 成功 | 人工运行 |
-| 独立性 | `grep -r "from envs\." examples/euler/08_body_manipulation/` 零命中 | grep |
+| 独立性 | `grep -r "from envs\." examples/euler/09_body_manipulation/` 零命中 | grep |
 | ruff SLF001 | 零报警 | `ruff check --select SLF001` |
 | 锚定稳定 | `anchored_position_stable` PASS（atol=0.05） | 查看报告 |
 | 释放恢复 | `released_resumes_motion` PASS（位移 > 0.01m） | 查看报告 |
@@ -588,7 +625,8 @@ def equality_object_ids(self, eq_id: int) -> tuple[int, int]:
 | mocap 驱动 G1 | `mocap_drives_g1_pelvis` PASS（位移 > 0.05m） | 查看报告 |
 | 人工观察通过 | 拖拽/anchor 拖动 box/anchor 拖动 G1 符合预期 | 用户视口确认 |
 | Env 层 API 扩展 | `equality_object_ids` 在 Env 层可调用 | `env.equality_object_ids(0)` 返回 tuple |
-| 教程文档完整 | `08_body_manipulation.md` 覆盖 8 节大纲 | 人工审阅 |
+| 教程文档完整 | `09_body_manipulation.md` 覆盖 8 节大纲 | 人工审阅 |
+| 前置依赖 | Lesson 7 locomotion 已通过 | 查看历史验收记录 |
 
 ---
 
@@ -599,6 +637,8 @@ def equality_object_ids(self, eq_id: int) -> tuple[int, int]:
 - [ ] `assets/g1/` 含 XML/config/meshes/models，路径与 §2.2 一致。
 - [ ] `assets/scenes/simple_pendulum.xml` 就位。
 - [ ] 每个 example 目录含 §2.1 表所列全部 `.py` + `.md`。
+- [ ] 原 `07_studio_capture/` 已拆分为 `07_locomotion/` + `08_video_capture/`。
+- [ ] 原 `08_body_manipulation/` 规划已顺延为 `09_body_manipulation/`。
 
 ### 5.2 独立性验收（硬指标）
 - [ ] `grep -r "from envs\." examples/euler/` 零命中。
@@ -617,28 +657,65 @@ def equality_object_ids(self, eq_id: int) -> tuple[int, int]:
 - [ ] `python -m ruff check --select SLF001 examples/euler/` 零报警。
 
 ### 5.6 功能验收（需 OrcaStudio 在线）
-- [ ] Lesson 4：9 项数值判定 PASS。
-- [ ] Lesson 5：数值判定 PASS。
-- [ ] Lesson 6：3 项数值判定 + 1 项人工观察 PASS。
-- [ ] Lesson 7：5 项数值判定 + 2 项人工观察 PASS。
-- [ ] Lesson 8：§4.7 全部验收项 PASS。
+- [ ] Lesson 4：9 项数值判定 PASS。✅
+- [ ] Lesson 5：数值判定 PASS。✅
+- [ ] Lesson 6：3 项数值判定 + 1 项人工观察 PASS。✅
+- [ ] Lesson 7：5 项数值判定 + 2 项人工观察 PASS（行走稳定性）。
+- [ ] Lesson 8：5 项数值判定 + 1 项人工观察 PASS（视频采集，前置依赖 Lesson 7）。
+- [ ] Lesson 9：§4.7 全部验收项 PASS（前置依赖 Lesson 7）。
 
 ### 5.7 教程文档验收
-- [ ] Lesson 4–7 的 `.md` 路径/命令/目录结构已更新为新结构。
-- [ ] Lesson 8 的 `.md` 覆盖 §4.6 八节大纲。
+- [ ] Lesson 4–6 的 `.md` 路径/命令/目录结构已更新为新结构。✅
+- [ ] Lesson 7 `07_locomotion.md` 覆盖行走控制链路 + PD 控制器说明。
+- [ ] Lesson 8 `08_video_capture.md` 覆盖视频采集 API + 行走前置依赖说明。
+- [ ] Lesson 9 `09_body_manipulation.md` 覆盖 §4.6 八节大纲。
+- [ ] `TUTORIAL.md` 总纲已更新课程编号（7=locomotion, 8=video_capture, 9=body_manipulation）。
 
 ---
 
-## 6. 风险与回滚
+## 6. 待定位问题与风险
 
-### 6.1 风险
-- **代码重复**：`g1_base_env.py` 有 5 份副本（04/05/06/07/08），`online_verifier.py` 5 份，
-  `scene_scanner.py` 5 份，`g1_locomotion.py` 2 份。后续改基类需同步多份。
+### 6.1 Lesson 7 行走"乱踹"问题（待定位）
+
+**现象**：加 PD 控制器后（修复瘫倒），G1 不再瘫倒，但出现"腿乱踹"现象（双腿剧烈抖动/乱踢，
+非正常交替迈步）。
+
+**已排除**：
+- ✅ PD 控制器缺失（已加，不再瘫倒）。
+- ✅ 资产路径（已验证 `True`）。
+- ✅ import 自洽（已验证 OK）。
+
+**待排查方向**（按优先级）：
+1. **观测布局不匹配**：`g1_locomotion.py` 的 `_build_obs` 拼接顺序是否与 ONNX 模型
+   `model_6600.onnx` 训练时的观测布局一致（参考 `envs/g1/rl_policy/decoupled_locomotion_stand_height.py`）。
+   维度错位会导致策略输出错误动作。
+2. **history 初始化/更新顺序**：`compute_action` 中 `_update_history` 在 ONNX 推理之后调用，
+   首帧 history 全零是否合理；`history_loco_height_config` 的 key 顺序与 `_get_obs_history` 的
+   sorted key 拼接是否一致。
+3. **PD 参数/力矩限位**：`JOINT_KP`/`JOINT_KD` 是否与原 `envs/g1` 实际使用的一致；
+   `motor_effort_limit_list` clip 是否过紧导致力矩饱和。
+4. **frame_skip/time_step**：`G1_FRAME_SKIP=20`、`G1_TIME_STEP=0.001`（控制频率 50Hz，
+   物理步长 1ms），与原 `envs/g1` 配置是否一致。
+5. **phase_time 用墙钟时间**：`_get_phase_time` 用 `time.time() - self._start_time`，而
+   `run_lesson` 的 RTF 限速会导致墙钟与仿真时间不同步，步态相位可能漂移。原体系可能用仿真时间。
+6. **初始姿态/重置**：`reset_model` 是否将 G1 重置到正确的站立 keyframe。
+
+**定位方法**：
+- 对照 `envs/g1/rl_policy/decoupled_locomotion_stand_height.py` 的 `prepare_obs` 逐步比对
+  观测拼接顺序与缩放。
+- 打印 ONNX 输入 obs 的 shape 与各分段数值范围，与原策略对比。
+- 单步调试：固定 q_target=default_dof_angles（无策略），仅 PD 保持站立，验证 PD 本身正确。
+
+### 6.2 代码重复风险
+- `g1_base_env.py` 有 6 份副本（04/05/06/07/08/09），`online_verifier.py` 6 份，
+  `scene_scanner.py` 6 份，`g1_locomotion.py` 3 份。后续改基类需同步多份。
   - **缓解**：用户已确认接受此代价以换取独立性；改动时用 `diff` 跨目录核对。
-- **资产路径硬编码**：依赖 `__file__` 上溯 4 层定位项目根，若 example 被移出项目会失效。
+
+### 6.3 资产路径硬编码
+- 依赖 `__file__` 上溯 4 层定位项目根，若 example 被移出项目会失效。
   - **缓解**：当前不可接受 example 移出项目的场景；路径计算有单元覆盖（§5.4）。
 
-### 6.2 回滚
+### 6.4 回滚
 迁移前用 git 对 `envs/euler/` 与 `examples/euler/` 打标签（如 `pre-restructure`）。
 若验收失败，`git checkout pre-restructure -- envs/euler examples/euler` 即可恢复原结构。
 

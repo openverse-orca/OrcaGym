@@ -383,6 +383,114 @@ class OrcaStudioBridge:
         request = mjc_message_pb2.GetCameraFramePNGRequest(image_path=image_path)
         await self._stub.GetCameraFramePNG(request)
 
+    # --- 摄像头传感器激活（阶段四补遗：激活 Studio 端摄像头流）---
+
+    async def set_camera_sensor_info(
+        self,
+        actor_name: str,
+        capture_rgb: bool,
+        capture_depth: bool,
+        save_mp4_file: bool = False,
+        use_dds: bool = False,
+        *,
+        capture_normal: bool | None = None,
+        capture_object_color: bool | None = None,
+        is_recording: bool | None = None,
+        use_nvenc: bool | None = None,
+        nvenc_gpu_index: int | None = None,
+        random_object_color: bool | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        vertical_fov: float | None = None,
+        near_clip: float | None = None,
+        far_clip: float | None = None,
+        gamma: float | None = None,
+        color_port: int | None = None,
+        depth_port: int | None = None,
+        dds_topic: str | None = None,
+        dds_stream_id: str | None = None,
+    ) -> None:
+        """激活/配置摄像头传感器流（gRPC SetCameraSensorInfo）。离线 no-op。
+
+        Studio 端 MuJoCo <camera> 默认不推送 WebSocket RGB/Depth 流，
+        必须通过本方法显式激活后，7070/7071 等端口才会监听并推流。
+        `begin_save_video` 只控制 MP4 文件录制，与本方法正交。
+
+        Args:
+            actor_name: 摄像头所属 actor 名（Euler 体系下即 agent_name 前缀，
+                如 "g1"；对应 Studio 端 add_actor 时的 actor 名）。
+            capture_rgb: 是否激活 RGB 视频流（开启 XML 中 user 属性第一个端口）。
+            capture_depth: 是否激活深度视频流（开启 user 属性第二个端口）。
+            save_mp4_file: 是否同时保存 MP4 文件。
+            use_dds: 是否使用 DDS 传输。
+
+        扩展参数（keyword-only，None 表示不修改现有值，对应 proto optional 语义）:
+            capture_normal: 是否捕获法线图。
+            capture_object_color: 是否捕获实例分割色标图。
+            is_recording: 是否正在录制。
+            use_nvenc: 是否使用 NvEnc 硬件编码。
+            nvenc_gpu_index: NvEnc GPU 适配器索引。
+            random_object_color: 是否随机分配物体颜色。
+            width: 图像宽度（像素）。
+            height: 图像高度（像素）。
+            vertical_fov: 垂直视场角（度）。
+            near_clip: 近裁剪面距离。
+            far_clip: 远裁剪面距离。
+            gamma: 深度相机 gamma 校正。
+            color_port: RGB 流 WebSocket 端口。
+            depth_port: 深度流 WebSocket 端口。
+            dds_topic: DDS 主题。
+            dds_stream_id: DDS 流 ID。
+        """
+        if self._stub is None:
+            return
+        kwargs: dict = dict(
+            actor_name=actor_name,
+            capture_rgb=capture_rgb,
+            capture_depth=capture_depth,
+            save_mp4_file=save_mp4_file,
+            use_dds=use_dds,
+        )
+        # optional 字段：仅当显式传参（非 None）时才设置，对应 proto optional 语义
+        _optional_fields = [
+            "capture_normal", "capture_object_color", "is_recording",
+            "use_nvenc", "nvenc_gpu_index", "random_object_color",
+            "width", "height", "vertical_fov", "near_clip", "far_clip",
+            "gamma", "color_port", "depth_port", "dds_topic", "dds_stream_id",
+        ]
+        for fname in _optional_fields:
+            val = locals()[fname]
+            if val is not None:
+                kwargs[fname] = val
+        request = mjc_message_pb2.SetCameraSensorInfoRequest(**kwargs)
+        resp = await self._stub.SetCameraSensorInfo(request)
+        if resp.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
+            raise RuntimeError(
+                f"SetCameraSensorInfo failed: {resp.error_message}"
+            )
+
+    async def make_camera_viewport_active(
+        self, actor_name: str, entity_name: str
+    ) -> None:
+        """将指定摄像头设为 Studio 视口激活相机（gRPC MakeCameraViewportActive）。
+
+        离线 no-op。用于让 Studio 3D 视口以指定相机视角渲染。
+
+        Args:
+            actor_name: 摄像头所属 actor 名。
+            entity_name: 摄像头实体名（如 "camera_head"）。
+        """
+        if self._stub is None:
+            return
+        request = mjc_message_pb2.MakeCameraViewportActiveRequest(
+            actor_name=actor_name, entity_name=entity_name
+        )
+        resp = await self._stub.MakeCameraViewportActive(request)
+        if resp.status != mjc_message_pb2.MakeCameraViewportActiveResponse.SUCCESS:
+            raise RuntimeError(
+                f"MakeCameraViewportActive failed: {resp.error_message}"
+            )
+
     # --- 内容文件（阶段三 3.4.3）---
 
     async def load_content_file(

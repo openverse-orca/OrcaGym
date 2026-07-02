@@ -53,7 +53,7 @@
 
 ## 3. 核心设计原则
 
-### 3.1 五大原则
+### 3.1 六大原则
 
 | 原则 | 含义 | 对比 OrcaGymLocalEnv |
 |------|------|---------------------|
@@ -62,6 +62,26 @@
 | **P3 状态一致性契约** | 任何写操作后，`self.data` 保证一致；任何读操作都走 `self.data` 或显式查询 | `self.data` 与 `_mjData` 双轨制 |
 | **P4 力应用可追踪** | 外力注入通过显式方法，未来 Euler 耦合器可感知 | `xfrc_applied` 直接写，无感知 |
 | **P5 职责内聚** | 按职责内聚划分模块，一组方法因同一原因变化、共享同一组数据 | 上帝类 |
+| **P6 框架无状态、业务自编排** | **框架只提供无状态原语，业务编排（含状态）归业务所有者实现。** 框架公共 API 必须是单次原子读写（不跨调用持有快照/绑定标记等业务状态）；多步编排流程（如绑定/释放/抓取等含语义意图的 save/restore 模式）由消费者自行组合原语实现并自管状态 | 框架混杂原语与业务编排，调用方误用诱导 bug（如重复绑定覆盖快照） |
+
+#### P6 详细说明
+
+**无状态原语（框架公共 API）的判定标准**：
+- 单次调用完成单一数据读写，不依赖前后调用的顺序状态
+- 不持有跨调用的快照、绑定标记等业务状态
+- 例：`equality_find_slot_by_body`（按 body 查槽位）、`equality_constraint(slot)`（读单槽位）、`equality_update(slot, **fields)`（写单槽位）、`set_mocap_pos_and_quat`（写 mocap 位姿）
+
+**业务编排（消费者实现）的判定标准**：
+- 编排多个原语完成有语义意图的流程（如"绑定"/"释放"/"抓取"）
+- 持有跨调用的业务状态（如快照、绑定标记、当前锚定对象）
+- 例：bind_mocap（find_slot + read_constraint + align_mocap + update_constraint）、release（read_current + restore_from_snapshot）
+
+**约束**：
+- 框架内部确需业务编排时（如 Studio UI 抓取），编排方法以 `_` 前缀作为 L2 内部 API，不进入 `__dir__`，docstring 标注"内部 API"并提示消费者仿照其编排模式自行实现。
+- 消费者（如课程示例、OrcaManipulation）**不调用** 框架内部编排方法，而是自行组合公共原语实现业务流程，业务状态自管，不存放在框架 Env 中。
+- 批量便利方法（如 `equality_snapshot()` 仅是 `equality_constraint(i)` 的循环）若仅服务于特定业务模式，不纳入公共 API；消费者需要时自行循环调用原语。
+
+**设计动机**：业务状态归业务所有者管理，比框架代管更易审查、更不易诱导误用（如消费者在绑定入口自然加幂等检查，避免重复绑定覆盖快照）。
 
 ### 3.2 设计模式选型
 
@@ -557,11 +577,16 @@ body_name = env.body("object")
 | **状态读取** | `data`（OrcaGymDataView）, `model`（OrcaGymModel）, `ctrl`, `frame_skip`, `dt`, `realtime_step` |
 | **仿真控制** | `do_simulation(ctrl, n)`, `mj_step(n)`, `mj_forward()` |
 | **状态查询** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_quat/mat/xvalp_xvalr()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
-| **状态设置** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `update_equality_constraints()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
+| **状态设置** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
+| **等式约束原语（无状态，L1）** | `equality_find_slot_by_body(body_name)`, `equality_constraint(slot)`, `equality_update(slot, **fields, forward=True)` |
 | **求解器配置** | `sim_config`（SimConfig） |
 | **名称空间** | `joint()`, `body()`, `site()`, `actuator()`, `sensor()` |
-| **Studio 交互** | `render()`, `begin_save_video()`, `stop_save_video()`, `get_current_frame()`, `get_frame_png()`, `anchor_actor()`, `release_body_anchored()` |
+| **Studio 交互** | `render()`, `begin_save_video()`, `stop_save_video()`, `get_current_frame()`, `get_frame_png()` |
 | **生命周期** | `initialize_simulation()`, `initialize_grpc()`, `pause_simulation()`, `close()` |
+
+> **Studio UI 抓取为 L2 内部 API**：原 `anchor_actor()` / `release_body_anchored()` / `do_body_manipulation()` 按 P6 原则改为 `_` 前缀内部方法（`_anchor_actor` / `_release_body_anchored` / `_do_body_manipulation`），由 `render()` 内部驱动，不进入公共 API 清单。程序化体操作应仿照其编排模式，使用等式约束无状态原语自行实现（见开发文档 `orca_gym_euler_anchor_equality_refactor_development.md`）。
+
+> **等式约束 API 收敛**：原 `OrcaGymEulerEnv.update_equality_constraints()` / `modify_equality_objects()` 不再在 Env 层暴露——前者是 `equality_update` 的底层实现（按 (obj1_id, obj2_id) 匹配槽位批量写入），后者功能被 `equality_update(slot, obj1_name=..., obj2_name=...)` 覆盖。`MuJoCoSimCore.update_equality_constraints` 作为 `equality_update` 的实现细节保留在 SimCore 层，不进入 Env 公共 API。`equality_update` 支持全字段写入（`eq_type` / `obj1_name` / `obj2_name` / `data` / `active` / `solref` / `solimp`）+ 可选 `forward` 开关（默认 True 调用 `mj_forward`，False 时调用方自行补 `mj_forward` 用于批量写入性能优化）。
 
 ---
 
