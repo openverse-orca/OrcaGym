@@ -161,15 +161,30 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     使用契约:
         读取状态:   env.data.qpos / env.data.body_xpos(name) / env.query_*()
         写入状态:   env.set_joint_qpos() / env.apply_body_force()
-        仿真步进:   env.do_simulation(ctrl, n_frames)
+        仿真步进:   env.do_simulation(ctrl, n_frames)  # 在 step() 内部调用
         求解器配置: env.sim_config.timestep = 0.002
+
+    继承自 OrcaGymEnvMixin 的公共方法（无需子类复写）:
+        reset(seed, options)        — Gymnasium 标准接口，编排 reset_simulation + reset_model + render
+        set_seed_value(seed)        — 设置随机数种子
+        generate_action_space(bounds)
+        generate_observation_space(obs)
+        body/joint/actuator/site/mocap/sensor(name) — 名称空间解析
+
+    子类应复写的 Gymnasium MuJoCo 标准 hook（与 Gym MujocoEnv 对齐）:
+        step(action)               — 必须复写，内部调用 do_simulation，组织 obs/reward/terminated/truncated/info
+        reset_model()              — 必须复写，重置 qpos/qvel，返回 (obs, info)
+        _get_obs()                 — 必须复写，返回观测（step 与 reset_model 共用）
 
     禁止:
         不要访问 env._gym._sim._mjData 或任何内部 MuJoCo 对象。
         env.gym/env.stub/env.channel 不存在，直接继承 gym.Env 不创建这些属性。
         缺少功能时，扩展本类的公共方法。
+        不要绕过 step() 在外部循环里直接调用 do_simulation 作为主步进路径（见 §6.4 S5）。
     """
 ```
+
+> **关于 hook 命名约定**：`reset_model` / `_get_obs` 是 Gymnasium `MujocoEnv` 沿用十年的公开 hook 约定，任何用过 Gym MuJoCo 的用户都熟悉这两个名字。`_get_obs` 的 `_` 前缀表示"protected（类族内部）"，子类复写父类的 `_method` 是 Python 常规操作，并非"私有"。OrcaGym 保持这一命名以与 Gym 生态对齐，**不**改名为 `get_obs`，避免迁移用户认知断裂。
 
 **关键属性**：
 
@@ -410,6 +425,10 @@ class EulerOrchestrator:
 - **无引擎依赖**：方法仅依赖 `self._agent_names`/`self.frame_skip` 等基础字段，不访问 `self.gym`/`self._gym`/`self._mjData`
 - **Euler 和 Local 共用**：两个 Env 体系都继承此 Mixin，方法签名一致
 
+> **关于 `reset` 的归属**：`reset` 是 Gymnasium `Env` 的标准接口（五元组返回 `(obs, info)`）。Mixin 提供 `reset` 的**编排实现**（`super().reset(seed)` → `reset_simulation()` → `reset_model()` → `render()`），子类**不应**直接复写 `reset`，而应复写 `reset_model` hook。这与 Gymnasium `MujocoEnv` 的设计完全一致——`MujocoEnv.reset` 内部调用 `self.reset_model()`，用户只复写 `reset_model`。若用户直接复写 `reset`，将丢失种子播种、`reset_simulation`、`render` 等编排逻辑，且 `np_random` 不被正确初始化，导致 SB3 复现性测试失败。
+>
+> **继承链可读性**：由于 `reset` 在 Mixin 而 `step`/`reset_model`/`_get_obs` 在 EulerEnv，新用户读 EulerEnv 时可能找不到 `reset` 的实现。EulerEnv 类 docstring 已在 §5.1 显式列出"继承自 Mixin 的公共方法"清单，消除这一困惑。
+
 ```python
 class OrcaGymEnvMixin:
     """OrcaGym 环境公共方法 Mixin。
@@ -521,25 +540,50 @@ env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # ruff SLF001 报警
 
 ### 6.4 仿真步进契约
 
-**规则 S1**：`do_simulation(ctrl, n_frames)` 是标准步进入口，含 Euler 耦合（未来）。
+**规则 S1**：`do_simulation(ctrl, n_frames)` 是标准仿真原语，含 Euler 耦合（未来）。它是 `step()` 内部调用的**构建块**，不是对外主入口。
 
 **规则 S2**：`mj_step(n)` 是纯 MuJoCo 步进，不含 Euler 耦合。
 
-**规则 S3**：两种步进模式必须兼容：
-- 模式 A（委托式）：`env.do_simulation(ctrl, self.frame_skip)`
-- 模式 B（手动循环）：`env.set_ctrl(torques); env.mj_step(1); env._update_data()`
+**规则 S3**：两种仿真原语使用模式必须兼容：
+- 模式 A（委托式，推荐）：在 `step()` 内部 `self.do_simulation(ctrl, self.frame_skip)`
+- 模式 B（手动循环式，**高级逃生通道，默认不推荐**）：`env.set_ctrl(torques); env.mj_step(1); env._update_data()`。适用于接触富优化、变步长积分等需要绕开 `do_simulation` 耦合逻辑的场景。
 
 **规则 S4**：模式 B 用户若需 Euler 耦合，必须改用 `do_simulation()`。
 
-```python
-# 模式 A（推荐，含 Euler 耦合）
-env.do_simulation(ctrl, self.frame_skip)
+**规则 S5（重要）**：`step()` 是 Gymnasium 标准接口，也是 RL 训练（SB3/RLlib/CleanRL）唯一可用的步进入口。**所有需要被 RL 算法训练或与 Gymnasium 生态交互的环境，必须实现 `step()` 并在其中组织 `obs/reward/terminated/truncated/info` 五元组返回**。外部运行循环（如课程验证 `run_lesson`、演示脚本）应调用 `step()`，**不应**绕过 `step()` 直接调用 `do_simulation()` 作为主步进路径——这会破坏与 RL 训练框架的兼容性，且无法获取 reward/terminated 信号。
 
-# 模式 B（纯 MuJoCo，无耦合）
-for _ in range(self.frame_skip):
-    env.set_ctrl(torques)
-    env.mj_step(1)
-    env._update_data()
+**规则 S6（Locomotion PD 控制）**：足式机器人等需要精细 PD 控制循环的场景，应在 `step()` 内部以 `frame_skip=1` 多次调用 `do_simulation`，而非复写 `do_simulation` 或在 `step` 外部循环：
+
+```python
+# ✅ 正确：Locomotion PD 控制在 step() 内部组织
+def step(self, action):
+    target = self._action_to_target(action)   # 动作 → PD 目标
+    for _ in range(self.frame_skip):
+        ctrl = self._pd_controller(self.data.qpos, self.data.qvel, target)
+        self.do_simulation(ctrl, 1)            # 精细步进，含 Euler 耦合
+    obs = self._get_obs()
+    reward = self._compute_reward(obs)
+    terminated = self._is_terminated(obs)
+    truncated = self._step_count >= self.MAX_EPISODE_STEPS
+    info = {"time": float(self.data.time)}
+    return obs, reward, terminated, truncated, info
+```
+
+```python
+# 模式 A（推荐，在 step() 内部）
+def step(self, action):
+    self.do_simulation(action, self.frame_skip)
+    obs = self._get_obs()
+    return obs, reward, terminated, truncated, info
+
+# 模式 B（高级逃生通道，仅纯 MuJoCo 无耦合需求时使用）
+def step(self, action):
+    for _ in range(self.frame_skip):
+        self.set_ctrl(torques)
+        self.mj_step(1)
+        self._update_data()
+    obs = self._get_obs()
+    return obs, reward, terminated, truncated, info
 ```
 
 ### 6.5 求解器配置契约
@@ -729,19 +773,21 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._update_data()
 ```
 
-### 8.3 两种用户步进模式
+### 8.3 两种仿真原语使用模式
 
-**模式 A（委托式，推荐）**：
+> **与 §6.4 的关系**：本节补充模式 A/B 的实现细节。两者都是在 `step()` **内部**使用的仿真原语，不是 `step()` 的替代品。`step()` 本身是 Gymnasium 标准接口，是 RL 训练与外部运行循环的唯一入口（见 §6.4 S5）。
+
+**模式 A（委托式，默认推荐）**：
 
 ```python
 def step(self, action):
     torque = self._compute_torque(action)
-    self.do_simulation(torque, self.frame_skip)
+    self.do_simulation(torque, self.frame_skip)   # 一次步进 frame_skip 帧
     obs = self._get_obs()
     return obs, reward, terminated, truncated, info
 ```
 
-**模式 B（手动循环式）**：
+**模式 B（手动循环式，高级逃生通道）**：
 
 ```python
 def step(self, action):
@@ -754,7 +800,21 @@ def step(self, action):
     return obs, reward, terminated, truncated, info
 ```
 
-**契约**：模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。
+**Locomotion PD 控制模式（在 step 内多帧 do_simulation，见 §6.4 S6）**：
+
+```python
+def step(self, action):
+    target = self._action_to_target(action)
+    for _ in range(self.frame_skip):
+        ctrl = self._pd_controller(self.data.qpos, self.data.qvel, target)
+        self.do_simulation(ctrl, 1)            # frame_skip=1，精细 PD 步进
+    obs = self._get_obs()
+    return obs, reward, terminated, truncated, info
+```
+
+**契约**：
+- 模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。
+- **三种模式都必须封装在 `step()` 内部**，由 `step()` 统一返回五元组。外部运行循环（课程验证、演示脚本）调用 `step()`，不直接调 `do_simulation`/`mj_step` 作为主步进路径。
 
 ---
 
@@ -1084,9 +1144,55 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def do_body_manipulation(self) -> None: ...   # 占位，P4 填充
 
     # --- Gymnasium 接口（子类实现）---
-    def step(self, action) -> tuple: ...
-    def reset_model(self) -> tuple[dict, dict]: ...
-    def _get_obs(self) -> dict: ...
+    def step(self, action) -> tuple:
+        """Gymnasium 标准步进接口（子类必须复写）。
+
+        标准实现模板:
+            self.do_simulation(action, self.frame_skip)   # 或 PD 循环见 §6.4 S6
+            obs = self._get_obs()
+            reward = ...
+            terminated = ...
+            truncated = self._step_count >= self.MAX_EPISODE_STEPS
+            info = {"time": float(self.data.time)}
+            return obs, reward, terminated, truncated, info
+
+        禁止:
+            不要在外部运行循环里绕过 step() 直接调 do_simulation（§6.4 S5）。
+            不要复写 do_simulation 作为步进主路径，应在 step() 内调用它。
+        """
+        raise NotImplementedError("step 待子类实现")
+
+    def reset_model(self) -> tuple[dict, dict]:
+        """Gymnasium MuJoCo 标准 hook（子类必须复写，由 reset() 调用）。
+
+        标准实现模板:
+            qpos = self.init_qpos + self.np_random.uniform(-0.1, 0.1, self.model.nq)
+            qvel = self.init_qvel + self.np_random.uniform(-0.1, 0.1, self.model.nv)
+            self.set_joint_qpos(qpos)
+            self.set_joint_qvel(qvel)
+            self.mj_forward()       # 更新派生量
+            self._sync_view()       # 同步到 DataView
+            return self._get_obs(), {}
+
+        说明:
+            - 这是 Gym MujocoEnv 十年公开 hook 约定，不要直接复写 reset()。
+            - reset() 由 OrcaGymEnvMixin 编排（seed + reset_simulation + reset_model + render）。
+        """
+        raise NotImplementedError("reset_model 待子类实现")
+
+    def _get_obs(self) -> dict:
+        """Gymnasium MuJoCo 标准 hook（子类必须复写，step 与 reset_model 共用）。
+
+        标准实现模板:
+            theta = float(self.data.qpos[0])
+            theta_dot = float(self.data.qvel[0])
+            return np.array([np.cos(theta), np.sin(theta), theta_dot], dtype=np.float32)
+
+        说明:
+            - `_` 前缀表示 protected（类族内部），子类复写是 Python 常规操作。
+            - 不要改名为 get_obs，保持与 Gym MujocoEnv 命名一致。
+        """
+        raise NotImplementedError("_get_obs 待子类实现")
 
     # 名称空间、空间生成、reset 编排继承自 OrcaGymEnvMixin（见 §5.9）
 ```
