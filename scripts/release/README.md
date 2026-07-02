@@ -118,7 +118,6 @@
 ⚠️ **警告**：此操作不可撤销！发布前请确保：
 - 已在 TestPyPI 测试
 - 版本号正确
-- CHANGELOG 已更新
 - 代码已推送到 GitHub
 
 需要：
@@ -328,11 +327,8 @@ chmod 600 ~/.pypirc
    # 更新版本号
    ./scripts/release/bump_version.sh 25.10.1
    
-   # 更新 CHANGELOG.md
-   vim CHANGELOG.md
-   
    # 提交变更
-   git add pyproject.toml CHANGELOG.md
+   git add pyproject.toml
    git commit -m "Bump version to 25.10.1"
    ```
 
@@ -413,10 +409,9 @@ pip install orca-gym
 
 1. **始终先发布到 TestPyPI** 进行验证
 2. **使用语义化版本号** (MAJOR.MINOR.PATCH)
-3. **维护 CHANGELOG.md** 记录每个版本的变更
-4. **创建 Git tag** 对应每个发布版本
-5. **使用 API Token** 而不是密码，更安全
-6. **自动化 CI/CD** 可以使用 GitHub Actions
+3. **创建 Git tag** 对应每个发布版本
+4. **使用 API Token** 而不是密码，更安全
+5. **自动化 CI/CD** 可以使用 GitHub Actions
 
 ## 🔄 持续集成
 
