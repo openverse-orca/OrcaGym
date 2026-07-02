@@ -679,3 +679,18 @@ class OrcaGymEuler:
         object.__getattribute__(self, "_sim").modify_equality_objects(
             eq_ids, obj1_ids, obj2_ids
         )
+
+    def set_equality_active(self, eq_idx: int, active: bool) -> None:
+        """设置等式约束激活状态（委托 SimCore，写 _mjModel.eq_active0）。
+
+        作为 Env.equality_update 的实现细节，不进入 Env 公共 API。
+        """
+        object.__getattribute__(self, "_sim").set_equality_active(eq_idx, active)
+
+    def set_equality_solref(self, eq_idx: int, solref) -> None:
+        """设置等式约束 solver reference 参数（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").set_equality_solref(eq_idx, solref)
+
+    def set_equality_solimp(self, eq_idx: int, solimp) -> None:
+        """设置等式约束 solver impedance 参数（委托 SimCore）。"""
+        object.__getattribute__(self, "_sim").set_equality_solimp(eq_idx, solimp)

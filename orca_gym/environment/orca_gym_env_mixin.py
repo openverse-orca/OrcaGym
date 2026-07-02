@@ -114,6 +114,14 @@ class OrcaGymEnvMixin:
         low, high = 0.0, 0.0
         if len(bounds.T) > 0:
             low, high = bounds.T
+        # 显式转 float32 并裁剪 ±inf 到 float32 可表示范围。
+        # MuJoCo actuator_ctrlrange 对 ctrllimited=false 的执行器返回 ±inf，
+        # 直接 cast 到 float32 触发 gymnasium 的 overflow-in-cast 与
+        # precision-lowered warning。裁剪后语义为"无实际限幅"（边界为
+        # float32 最大值），对 RL 训练更友好（归一化不会除以 inf）。
+        f32_max = np.finfo(np.float32).max
+        low = np.clip(np.asarray(low, dtype=np.float32), -f32_max, f32_max)
+        high = np.clip(np.asarray(high, dtype=np.float32), -f32_max, f32_max)
         action_space = spaces.Box(low=low, high=high, dtype=np.float32)
         return action_space
 
@@ -157,7 +165,7 @@ class OrcaGymEnvMixin:
                 obs_space_dict[obs_key] = spaces.Box(
                     low=low,
                     high=high,
-                    dtype=obs_data.dtype
+                    dtype=np.float32
                 )
             else:
                 raise ValueError(f"Unsupported observation type: {type(obs_data)}")

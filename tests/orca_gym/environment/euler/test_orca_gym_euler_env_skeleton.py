@@ -1228,8 +1228,8 @@ class TestEnvJacArchCompliance(unittest.TestCase):
         start = source.find("# --- 雅可比计算委托（阶段三 3.3.3")
         self.assertGreater(start, 0, "未找到 3.3.3 雅可比委托区块")
         block = source[start:]
-        # 雅可比区块到等式约束委托区块为止（避免 equality API docstring 误报）
-        end = block.find("# --- 等式约束委托")
+        # 雅可比区块到等式约束原语区块为止（避免 equality API docstring 误报）
+        end = block.find("# --- 等式约束原语")
         self.assertGreater(end, 0)
         block = block[:end]
         self.assertNotIn("self._gym._sim", block)
@@ -1491,10 +1491,16 @@ class TestEnvEqualityArchCompliance(unittest.TestCase):
     """
 
     def test_env_eq_no_gym_private_access(self):
-        """K4: grep 断言约束区块不触 self._gym._sim/_mjModel/_mjData。"""
+        """K4: grep 断言约束区块不触 self._gym._sim/_mjModel/_mjData 实际访问。
+
+        注：区块内 docstring 会以散文形式提到 _mjModel（"替代直接访问
+        _mjModel.eq_*"），属描述性文字而非实际访问。这里按实际访问模式
+        （self._mjModel / self._gym._mjModel / self._gym._mjData / self._gym._sim）
+        断言，避免 docstring 误报。
+        """
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 等式约束委托（阶段三 3.5.3")
-        self.assertGreater(start, 0, "未找到 3.5.3 等式约束区块")
+        start = source.find("# --- 等式约束原语")
+        self.assertGreater(start, 0, "未找到等式约束原语区块")
         block_source = source[start:]
         end = block_source.find("\n    # ---", 1)
         if end < 0:
@@ -1502,20 +1508,26 @@ class TestEnvEqualityArchCompliance(unittest.TestCase):
         block = block_source[:end]
         self.assertNotIn("self._gym._sim", block)
         self.assertNotIn("self._gym._studio", block)
-        self.assertNotIn("_mjData", block)
-        self.assertNotIn("_mjModel", block)
+        self.assertNotIn("self._gym._mjData", block)
+        self.assertNotIn("self._gym._mjModel", block)
+        self.assertNotIn("self._mjModel", block)
+        self.assertNotIn("self._mjData", block)
 
     def test_env_eq_uses_self_gym_and_model(self):
         """K1/K4: grep 断言走 self._gym.<方法> + self.model.body_name2id。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
-        start = source.find("# --- 等式约束委托（阶段三 3.5.3")
+        start = source.find("# --- 等式约束原语")
         block_source = source[start:]
         end = block_source.find("\n    # ---", 1)
         if end < 0:
             end = len(block_source)
         block = block_source[:end]
+        # type/obj/data 仍走底层 update_equality_constraints（按 (obj1_id, obj2_id) 匹配）
         self.assertIn("self._gym.update_equality_constraints", block)
-        self.assertIn("self._gym.modify_equality_objects", block)
+        # active/solref/solimp 走新增 typed 写入器（按 slot 索引直接写）
+        self.assertIn("self._gym.set_equality_active", block)
+        self.assertIn("self._gym.set_equality_solref", block)
+        self.assertIn("self._gym.set_equality_solimp", block)
         self.assertIn("self.model.body_name2id", block)
 
     def test_gym_eq_delegates_use_getattribute(self):
@@ -1531,41 +1543,35 @@ class TestEnvEqualityArchCompliance(unittest.TestCase):
         self.assertIn("object.__getattribute__(self, \"_sim\")", block)
 
     def test_env_eq_returns_none(self):
-        """K11: 约束方法返回 None（写操作）。"""
+        """K11: equality_update 写操作返回 None。"""
         env = _make_g1_env()
         import mujoco
 
-        # 用模型实际的 obj id 匹配槽位（按 obj_id 匹配写入语义）
-        obj1, obj2 = env._gym.equality_object_ids(0)
-        eq_data = np.zeros(mujoco.mjNEQDATA)
-        eq_list = [
-            {
-                "type": mujoco.mjtEq.mjEQ_WELD,
-                "obj1_id": obj1,
-                "obj2_id": obj2,
-                "data": eq_data,
-            }
-        ]
-        ret = env.update_equality_constraints(eq_list)
+        # equality_update 是单次原子写原语，返回 None
+        ret = env.equality_update(0, eq_type=mujoco.mjtEq.mjEQ_WELD)
         self.assertIsNone(ret)
-        ret = env.modify_equality_objects([0], obj1_names=["pelvis"])
+        ret = env.equality_update(0, active=False)
         self.assertIsNone(ret)
 
     def test_env_eq_dir_includes_methods(self):
-        """K2: dir(env) 含通用 equality API + 底层委托方法。"""
+        """K2: dir(env) 含 equality 公共原语；旧 update/modify/snapshot/bind/release 已删除。"""
         env = _make_g1_env()
         d = dir(env)
         for name in [
-            "update_equality_constraints",
-            "modify_equality_objects",
-            "equality_snapshot",
             "equality_find_slot_by_body",
             "equality_constraint",
             "equality_update",
+        ]:
+            self.assertIn(name, d, f"dir(env) 缺少 {name}")
+        # 阶段1/2 已删除的旧 Env 层公共方法不应再出现
+        for removed in [
+            "update_equality_constraints",
+            "modify_equality_objects",
+            "equality_snapshot",
             "equality_bind_mocap",
             "equality_release",
         ]:
-            self.assertIn(name, d, f"dir(env) 缺少 {name}")
+            self.assertNotIn(removed, d, f"dir(env) 仍含已删除的 {removed}")
 
 
 class TestEnvEqualityFunctional(unittest.TestCase):
@@ -1578,42 +1584,31 @@ class TestEnvEqualityFunctional(unittest.TestCase):
         self.env = _make_g1_env()
         self.env.mj_forward()
 
-    def test_env_update_equality_constraints_by_name(self):
-        """用 body name 调用后 eq_* 字段正确写入（按 obj_id 匹配槽位）。
+    def test_env_equality_update_writes_type_and_data(self):
+        """equality_update 写入 type/data（按当前 obj_id 匹配槽位）。
 
-        update_equality_constraints 按 (obj1_id, obj2_id) 匹配槽位写入，
-        因此传入的 name 解析出的 id 必须与模型中已存在的约束 obj id 一致。
         G1 XML 的 eq[0] 是 ActorManipulator_Anchor ↔ manipulation_box。
+        不传 obj1_name/obj2_name 时 obj id 不变，type/data 写入生效。
         """
         import mujoco
 
-        # 用模型实际的 mocap body name 匹配槽位
-        mocap_names = self.env._gym.mocap_body_names()
-        self.assertGreater(len(mocap_names), 0)
         orig_obj1, orig_obj2 = self.env._gym.equality_object_ids(0)
-        # 用原始 obj name 匹配，验证 type/data 写入
         eq_data = np.zeros(mujoco.mjNEQDATA)
         eq_data[0:3] = [0.1, 0.2, 0.3]
-        eq_list = [
-            {
-                "type": mujoco.mjtEq.mjEQ_WELD,
-                "obj1_id": orig_obj1,
-                "obj2_id": orig_obj2,
-                "data": eq_data,
-            }
-        ]
-        self.env.update_equality_constraints(eq_list)
-        # 验证 type/data 写入（obj id 未变，因为没传 new_obj*_id）
+        self.env.equality_update(0, eq_type=mujoco.mjtEq.mjEQ_WELD, data=eq_data)
+        # type/data 写入生效
         self.assertEqual(int(self.env._gym.equality_constraint(0)["type"]),
                          mujoco.mjtEq.mjEQ_WELD)
         np.testing.assert_array_equal(
             self.env._gym.equality_constraint(0)["data"], eq_data)
+        # obj id 未变（未传 obj1_name/obj2_name）
+        obj1, obj2 = self.env._gym.equality_object_ids(0)
+        self.assertEqual((obj1, obj2), (orig_obj1, orig_obj2))
 
-    def test_env_modify_equality_objects_by_name(self):
-        """obj id 更新正确（modify_equality_objects 按索引修改，不受匹配语义影响）。"""
-        # 用 name 修改（modify_equality_objects 按 eq_ids 索引直接改 obj id）
-        self.env.modify_equality_objects(
-            [0], obj1_names=["pelvis"], obj2_names=["torso_link"]
+    def test_env_equality_update_changes_obj_by_name(self):
+        """equality_update 通过 obj1_name/obj2_name 改变关联对象。"""
+        self.env.equality_update(
+            0, obj1_name="pelvis", obj2_name="torso_link"
         )
         pelvis_id = self.env.model.body_name2id("pelvis")
         torso_id = self.env.model.body_name2id("torso_link")
@@ -1621,17 +1616,83 @@ class TestEnvEqualityFunctional(unittest.TestCase):
         self.assertEqual(obj1, pelvis_id)
         self.assertEqual(obj2, torso_id)
 
-    def test_env_equality_bind_mocap(self):
-        """通用 equality_bind_mocap 绑定后约束 obj 关联 mocap 与 body。"""
+    def test_env_equality_update_active_solref_solimp(self):
+        """equality_update 写入 active/solref/solimp（按 slot 索引直接写）。"""
+        new_solref = np.array([0.02, 1.0])
+        new_solimp = np.array([0.9, 0.95, 0.5, 0.9, 0.001])
+        self.env.equality_update(
+            0,
+            active=False,
+            solref=new_solref,
+            solimp=new_solimp,
+        )
+        eq = self.env._gym.equality_constraint(0)
+        self.assertFalse(bool(eq["active"]))
+        np.testing.assert_array_equal(np.asarray(eq["solref"]), new_solref)
+        np.testing.assert_array_equal(np.asarray(eq["solimp"]), new_solimp)
+        # 只传 active 时不影响 solref/solimp
+        self.env.equality_update(0, active=True)
+        eq2 = self.env._gym.equality_constraint(0)
+        self.assertTrue(bool(eq2["active"]))
+        np.testing.assert_array_equal(np.asarray(eq2["solref"]), new_solref)
+        np.testing.assert_array_equal(np.asarray(eq2["solimp"]), new_solimp)
+
+    def test_env_equality_update_forward_false_skips_mj_forward(self):
+        """forward=False 时不调用 mj_forward，但写入已生效于 _mjModel。"""
+        import mujoco
+
+        self.env.mj_forward()
+        call_count = {"n": 0}
+        orig_forward = self.env.mj_forward
+
+        def counting_forward():
+            call_count["n"] += 1
+            orig_forward()
+
+        self.env.mj_forward = counting_forward
+        # forward=False：不调用 mj_forward
+        self.env.equality_update(
+            0, eq_type=mujoco.mjtEq.mjEQ_CONNECT, forward=False
+        )
+        self.assertEqual(call_count["n"], 0)
+        # 写入已生效于 _mjModel（type 改为 CONNECT）
+        self.assertEqual(int(self.env._gym.equality_constraint(0)["type"]),
+                         mujoco.mjtEq.mjEQ_CONNECT)
+        # forward=True：调用 mj_forward 一次
+        self.env.equality_update(
+            0, eq_type=mujoco.mjtEq.mjEQ_WELD, forward=True
+        )
+        self.assertEqual(call_count["n"], 1)
+
+    def test_env_equality_update_forward_false_defers_data_refresh(self):
+        """forward=False 时 env.data 派生量为旧值，补 mj_forward() 后一致。
+
+        验证设计文档 V3.2：写入 _mjModel 后 env.data 未同步，需补 mj_forward。
+        用 mocap body 的 xpos（由 mj_forward/mj_kinematics 从 mocap_pos 推导）
+        作为派生量探针：set_mocap_pos_and_quat 改 mocap_pos 后，
+        forward=False 的 equality_update 不刷新 body_xpos，补 forward 后刷新。
+        """
         mocap_names = self.env._gym.mocap_body_names()
         self.assertGreater(len(mocap_names), 0)
         mocap_name = mocap_names[0]
-        slot = self.env.equality_bind_mocap(mocap_name, "pelvis", "weld")
-        # 验证槽位约束 obj1/obj2 关联 mocap 与 pelvis
-        pelvis_id = self.env.model.body_name2id("pelvis")
-        mocap_id = self.env.model.body_name2id(mocap_name)
-        obj1, obj2 = self.env._gym.equality_object_ids(slot)
-        self.assertEqual({obj1, obj2}, {mocap_id, pelvis_id})
+        self.env.mj_forward()
+        orig_xpos = self.env.data.body_xpos(mocap_name).copy()
+        new_pos = orig_xpos + np.array([1.0, 0.0, 0.0])
+        # set_mocap_pos_and_quat 写 _mjData.mocap_pos 但不 forward
+        self.env.set_mocap_pos_and_quat({
+            mocap_name: {"pos": new_pos, "quat": np.array([1.0, 0.0, 0.0, 0.0])}
+        })
+        # equality_update(forward=False)：写 _mjModel，但不刷新派生量
+        self.env.equality_update(0, active=False, forward=False)
+        # body_xpos 仍为旧值（mj_forward 未调用）
+        np.testing.assert_array_equal(
+            self.env.data.body_xpos(mocap_name), orig_xpos
+        )
+        # 补 mj_forward() 后 body_xpos 刷新为新值
+        self.env.mj_forward()
+        np.testing.assert_allclose(
+            self.env.data.body_xpos(mocap_name), new_pos, atol=1e-9
+        )
 
 
 class TestEnvAnchorActorArchCompliance(unittest.TestCase):
@@ -1657,7 +1718,8 @@ class TestEnvAnchorActorArchCompliance(unittest.TestCase):
         self.assertNotIn("_mjModel", block)
 
     def test_env_anchor_actor_uses_compliance_api(self):
-        """K1/K4: grep 断言走 equality_bind_mocap/equality_find_slot_by_body/equality_constraint 公共方法。"""
+        """K1/K4: grep 断言走 equality_find_slot_by_body/equality_constraint/
+        equality_update/set_mocap_pos_and_quat 公共原语。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
         start = source.find("    def _anchor_actor(")
         block_source = source[start:]
@@ -1667,7 +1729,10 @@ class TestEnvAnchorActorArchCompliance(unittest.TestCase):
         block = block_source[:end]
         self.assertIn("self.equality_find_slot_by_body", block)
         self.assertIn("self.equality_constraint", block)
-        self.assertIn("self.equality_bind_mocap", block)
+        self.assertIn("self.set_mocap_pos_and_quat", block)
+        self.assertIn("self.equality_update", block)
+        # 阶段2：已删除的 equality_bind_mocap 不应再被调用
+        self.assertNotIn("self.equality_bind_mocap", block)
 
     def test_env_anchor_actor_returns_none(self):
         """K11: _anchor_actor 返回 None（写操作）。"""
@@ -1755,7 +1820,7 @@ class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
         self.assertNotIn("_mjModel", block)
 
     def test_env_release_uses_compliance_api(self):
-        """K1/K4: grep 断言走 equality_find_slot_by_body/equality_release 公共方法。"""
+        """K1/K4: grep 断言走 equality_find_slot_by_body/equality_update 公共原语。"""
         source = _ENV_SOURCE_PATH.read_text(encoding="utf-8")
         start = source.find("    def _release_body_anchored(")
         block_source = source[start:]
@@ -1764,7 +1829,11 @@ class TestEnvReleaseBodyAnchoredArchCompliance(unittest.TestCase):
             end = len(block_source)
         block = block_source[:end]
         self.assertIn("self.equality_find_slot_by_body", block)
-        self.assertIn("self.equality_release", block)
+        self.assertIn("self.equality_update", block)
+        # 阶段2：已删除的 equality_release 不应再被调用；
+        # 也不应穿墙 self._gym.update_equality_constraints
+        self.assertNotIn("self.equality_release", block)
+        self.assertNotIn("self._gym.update_equality_constraints", block)
 
     def test_env_release_returns_none(self):
         """K11: _release_body_anchored 返回 None。"""

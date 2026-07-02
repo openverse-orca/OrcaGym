@@ -391,10 +391,8 @@ class TestKConstraintRegression(unittest.TestCase):
         methods = [
             "query_joint_qpos", "apply_body_force", "set_mocap_pos_and_quat",
             "mj_jacBody", "mj_jacSite", "begin_save_video",
-            "update_equality_constraints",
-            "equality_snapshot", "equality_find_slot_by_body",
+            "equality_find_slot_by_body",
             "equality_constraint", "equality_update",
-            "equality_bind_mocap", "equality_release",
             "query_site_pos_and_quat_B", "query_robot_velocity_odom",
         ]
         for name in methods:

@@ -1196,6 +1196,28 @@ class TestSimCoreEqualityFunctional(unittest.TestCase):
         self.assertEqual(int(self.sim._mjModel.eq_type[0]), first_type)
         np.testing.assert_array_equal(self.sim._mjModel.eq_data[0], first_data)
 
+    def test_set_equality_active_writes_eq_active0(self):
+        """set_equality_active 写 _mjModel.eq_active0（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        self.sim.set_equality_active(0, False)
+        self.assertFalse(bool(model.eq_active0[0]))
+        self.sim.set_equality_active(0, True)
+        self.assertTrue(bool(model.eq_active0[0]))
+
+    def test_set_equality_solref_writes_eq_solref(self):
+        """set_equality_solref 写 _mjModel.eq_solref（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        new_solref = np.array([0.02, 1.0])
+        self.sim.set_equality_solref(0, new_solref)
+        np.testing.assert_array_equal(model.eq_solref[0], new_solref)
+
+    def test_set_equality_solimp_writes_eq_solimp(self):
+        """set_equality_solimp 写 _mjModel.eq_solimp（按 slot 索引直接写）。"""
+        model = self.sim._mjModel
+        new_solimp = np.array([0.9, 0.95, 0.5, 0.9, 0.001])
+        self.sim.set_equality_solimp(0, new_solimp)
+        np.testing.assert_array_equal(model.eq_solimp[0], new_solimp)
+
 
 if __name__ == "__main__":
     unittest.main()

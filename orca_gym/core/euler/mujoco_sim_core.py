@@ -721,6 +721,37 @@ class MuJoCoSimCore:
             if obj2_ids is not None:
                 model.eq_obj2id[eq_id] = obj2_ids[i]
 
+    def set_equality_active(self, eq_idx: int, active: bool) -> None:
+        """设置等式约束初始激活状态（写 _mjModel.eq_active0）。
+
+        active/solref/solimp 无"按 (obj1_id, obj2_id) 匹配"语义，按 slot 索引
+        直接写入，与 update_equality_constraints 的匹配写入区分。
+
+        Args:
+            eq_idx: 等式约束索引。
+            active: 是否激活。
+        """
+        self._mjModel.eq_active0[eq_idx] = bool(active)
+
+    def set_equality_solref(self, eq_idx: int, solref: np.ndarray) -> None:
+        """设置等式约束 solver reference 参数（写 _mjModel.eq_solref）。
+
+        Args:
+            eq_idx: 等式约束索引。
+            solref: solver reference 参数，形状 (2,)。
+        """
+        self._mjModel.eq_solref[eq_idx] = solref
+
+    def set_equality_solimp(self, eq_idx: int, solimp: np.ndarray) -> None:
+        """设置等式约束 solver impedance 参数（写 _mjModel.eq_solimp）。
+
+        Args:
+            eq_idx: 等式约束索引。
+            solimp: solver impedance 参数，形状 (mjNEQIMP,) = (5,)，
+                即 [d0, dWidth, dMid, dEnd, width]。
+        """
+        self._mjModel.eq_solimp[eq_idx] = solimp
+
     # --- 维度 property ---
 
     @property

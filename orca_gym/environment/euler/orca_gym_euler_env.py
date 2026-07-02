@@ -1139,62 +1139,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         return self._gym.mj_jac_site(site_names)
 
-    # --- 等式约束委托（阶段三 3.5.3，Env 层 name→id 解析）---
-
-    def update_equality_constraints(self, eq_list: list[dict]) -> None:
-        """更新等式约束（Env 层 name→id 解析后委托 self._gym）。
-
-        Args:
-            eq_list: 等式约束列表，每项可含 obj1_name/obj2_name（Env 层解析为 id）
-                或 obj1_id/obj2_id（直接使用）。type/data 字段原样透传。
-        """
-        resolved = []
-        for eq in eq_list:
-            eq_r = dict(eq)
-            if "obj1_name" in eq_r:
-                eq_r["obj1_id"] = self.model.body_name2id(eq_r.pop("obj1_name"))
-            if "obj2_name" in eq_r:
-                eq_r["obj2_id"] = self.model.body_name2id(eq_r.pop("obj2_name"))
-            resolved.append(eq_r)
-        self._gym.update_equality_constraints(resolved)
-
-    def modify_equality_objects(
-        self,
-        eq_ids: list[int],
-        obj1_names=None,
-        obj2_names=None,
-    ) -> None:
-        """修改等式约束关联对象（Env 层 name→id 解析后委托 self._gym）。
-
-        Args:
-            eq_ids: 等式约束索引列表。
-            obj1_names: 新的 obj1 body 名称列表（None 不修改）。
-            obj2_names: 新的 obj2 body 名称列表（None 不修改）。
-        """
-        obj1_ids = (
-            [self.model.body_name2id(n) for n in obj1_names] if obj1_names else None
-        )
-        obj2_ids = (
-            [self.model.body_name2id(n) for n in obj2_names] if obj2_names else None
-        )
-        self._gym.modify_equality_objects(eq_ids, obj1_ids, obj2_ids)
-
-    # --- 通用 equality API（L1 公共，无 Env 级缓存状态）---
-    # 这组方法不依赖任何 UI 抓取状态字段（_anchored_actor 等），
+    # --- 等式约束原语（L1 公共，单次原子读写）---
+    # 这组方法不依赖任何 UI 抓取状态字段（_anchored_actor 等），单次原子读写，
     # 调用方自管快照与恢复。UI 抓取内部方法基于本组方法实现。
-
-    def equality_snapshot(self) -> list[dict]:
-        """读取所有等式约束的完整数据快照。
-
-        返回 list[dict]，每项含 type/obj1_id/obj2_id/active/solref/solimp/data。
-        用于保存约束原始状态，便于后续恢复（配合 equality_release）。
-
-        替代直接访问 _mjModel.eq_*。
-        """
-        return [
-            self.equality_constraint(i)
-            for i in range(self._gym.n_equality())
-        ]
+    # 注：原 update_equality_constraints / modify_equality_objects Env 层公共方法
+    # 已删除——前者是 equality_update 的底层实现（SimCore 层保留），后者功能被
+    # equality_update(slot, obj1_name=..., obj2_name=...) 覆盖。
+    # 阶段2：原 equality_snapshot / equality_bind_mocap / equality_release 公共方法
+    # 已删除——编排归消费者（UI 抓取内部方法 _anchor_actor/_release_body_anchored
+    # 内联使用本组原语；程序化操作仿照其编排模式）。
 
     def equality_find_slot_by_body(self, body_name: str) -> int:
         """查找含指定 body 的等式约束槽位索引。
@@ -1204,6 +1157,13 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
         Args:
             body_name: body 名称（已含 agent 前缀）。
+
+        .. note::
+            本原语不做名称空间解析（对齐架构 §6.6 N1 的分工）。
+            调用方应先用 ``env.body("pelvis")`` 解析出带 agent 前缀的完整名称，
+            再传入本方法。示例::
+
+                slot = env.equality_find_slot_by_body(env.body("pelvis"))
         """
         body_id = self.model.body_name2id(body_name)
         for i in range(self._gym.n_equality()):
@@ -1216,6 +1176,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """读取单个等式约束完整数据（委托 self._gym）。
 
         返回 type/obj1_id/obj2_id/active/solref/solimp/data。
+        单次原子读，不持有状态。消费者需批量读取时自行循环调用本方法。
         """
         return self._gym.equality_constraint(slot)
 
@@ -1227,11 +1188,17 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         obj1_name: str | None = None,
         obj2_name: str | None = None,
         data: np.ndarray | None = None,
+        active: bool | None = None,
+        solref: np.ndarray | None = None,
+        solimp: np.ndarray | None = None,
+        forward: bool = True,
     ) -> None:
-        """更新指定槽位的等式约束字段。
+        """更新指定槽位的等式约束字段（单次原子写 + 可选 mj_forward）。
 
-        只修改显式传入的字段，未传入的字段保留原值。按当前 (obj1_id, obj2_id)
-        匹配槽位写入，保留 XML 原始 solref/solimp（底层只改 type/obj/data）。
+        只修改显式传入的字段，未传入的字段保留原值。type/obj/data 按当前
+        (obj1_id, obj2_id) 匹配槽位写入（底层 SimCore.update_equality_constraints）；
+        active/solref/solimp 无匹配语义，按 slot 索引直接写入（SimCore typed
+        写入器）。
 
         Args:
             slot: 等式约束槽位索引。
@@ -1239,8 +1206,24 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             obj1_name: 新的 obj1 body 名称（可选，内部解析为 id）。
             obj2_name: 新的 obj2 body 名称（可选，内部解析为 id）。
             data: 约束数据 np.ndarray（可选，形状 (mjNEQDATA,)）。
+            active: 是否激活（可选，写入 eq_active0）。
+            solref: 求解器参考参数 (2,)（可选，写入 eq_solref）。
+            solimp: 求解器 impedance 参数 (5,)（可选，写入 eq_solimp）。
+            forward: 是否在写入后调用 mj_forward()。默认 True，保证 env.data
+                一致。若设为 False，调用方需自行调用 env.mj_forward() 才能读取
+                一致的状态——这是高级用法，仅用于批量写入多个槽位时避免重复
+                forward 的性能优化场景。
 
-        写入后自动调用 mj_forward()，保证 env.data 一致。
+        .. warning::
+            ``forward=False`` 时写入已生效于 _mjModel，但 ``env.data``
+            （OrcaGymDataView）未同步。此时若读取 ``env.data.body_xpos`` 等
+            派生量将得到旧值，可能误导后续决策。仅在确认不读取派生量、或
+            调用方将立即补 mj_forward() 时使用。
+
+        .. note::
+            本原语不做名称空间解析（对齐架构 §6.6 N1 的分工）。
+            ``obj1_name`` / ``obj2_name`` 应为已含 agent 前缀的完整名称，
+            调用方应先用 ``env.body("pelvis")`` 解析后再传入。
         """
         eq = self.equality_constraint(slot)
         new_type = eq_type if eq_type is not None else eq["type"]
@@ -1251,6 +1234,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self.model.body_name2id(obj2_name) if obj2_name is not None else eq["obj2_id"]
         )
         new_data = data if data is not None else eq["data"]
+        # type/obj/data 走底层 SimCore.update_equality_constraints（按 (obj1_id, obj2_id) 匹配槽位写入）
         self._gym.update_equality_constraints([{
             "type": new_type,
             "obj1_id": eq["obj1_id"],      # 用于匹配（当前值）
@@ -1259,99 +1243,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             "new_obj2_id": new_obj2_id,
             "data": new_data,
         }])
-        self.mj_forward()
-
-    def equality_bind_mocap(
-        self,
-        mocap_name: str,
-        body_name: str,
-        eq_type: str = "weld",
-    ) -> int:
-        """把 mocap body 与指定 body 通过 equality 绑定。
-
-        语义：
-        1. 查找含 mocap_name 的 equality 槽位
-        2. 将 mocap 位姿对齐到 body 当前位姿（避免下一帧拉扯）
-        3. 把槽位的另一端 obj 改为 body，eq_type 改为指定类型
-        4. 保留 XML 原始 eq_data/solref/solimp（MuJoCo 编译器推导值）
-
-        Args:
-            mocap_name: mocap body 名称（已含 agent 前缀）。
-            body_name: 被绑定的 body 名称（已含 agent 前缀）。
-            eq_type: "weld" 或 "connect"（"ball" 等价 "connect"）。
-
-        Returns:
-            绑定的等式约束槽位索引。
-
-        Raises:
-            ValueError: 模型无 equality 槽位，或未找到含 mocap_name 的槽位。
-        """
-        import mujoco
-
-        slot = self.equality_find_slot_by_body(mocap_name)
-        if slot == -1:
-            raise ValueError(
-                f"未在等式约束中找到含 mocap body '{mocap_name}' 的槽位，"
-                f"请在 XML 中预定义 <equality><weld body1='{mocap_name}' "
-                f"body2='...'/></equality>"
-            )
-        eq = self.equality_constraint(slot)
-        mocap_id = self.model.body_name2id(mocap_name)
-        # 对齐 mocap 位姿到 body 当前位姿（避免下一帧拉扯）
-        body_pose = self.get_body_xpos_xmat_xquat([body_name])[body_name]
-        self.set_mocap_pos_and_quat({
-            mocap_name: {
-                "pos": body_pose["xpos"],
-                "quat": body_pose["xquat"],
-            }
-        })
-        # 确定改 obj1 还是 obj2（mocap 一端保持，另一端改为 body）
-        if eq["obj1_id"] == mocap_id:
-            new_obj1_name = mocap_name
-            new_obj2_name = body_name
-        else:
-            new_obj1_name = body_name
-            new_obj2_name = mocap_name
-        type_map = {
-            "weld": mujoco.mjtEq.mjEQ_WELD,
-            "connect": mujoco.mjtEq.mjEQ_CONNECT,
-            "ball": mujoco.mjtEq.mjEQ_CONNECT,
-        }
-        mujoco_eq_type = type_map.get(eq_type, mujoco.mjtEq.mjEQ_CONNECT)
-        self.equality_update(
-            slot,
-            eq_type=mujoco_eq_type,
-            obj1_name=new_obj1_name,
-            obj2_name=new_obj2_name,
-        )
-        return slot
-
-    def equality_release(
-        self,
-        slot: int,
-        original_snapshot: dict,
-    ) -> None:
-        """从快照恢复指定槽位的等式约束。
-
-        用于释放绑定：把槽位的 obj id / eq_type / data 恢复到绑定前的原始值
-        （对齐 Local 的 dummy body 机制——约束不再作用于被锚定 actor）。
-
-        Args:
-            slot: 等式约束槽位索引。
-            original_snapshot: equality_snapshot()[slot] 或 equality_constraint(slot)
-                              返回的 dict，含 type/obj1_id/obj2_id/data 等字段。
-        """
-        cur_eq = self.equality_constraint(slot)
-        # 用当前 obj id 匹配，写入原始值
-        self._gym.update_equality_constraints([{
-            "type": original_snapshot["type"],
-            "obj1_id": cur_eq["obj1_id"],             # 用于匹配（当前值）
-            "obj2_id": cur_eq["obj2_id"],             # 用于匹配（当前值）
-            "new_obj1_id": original_snapshot["obj1_id"],  # 恢复原始
-            "new_obj2_id": original_snapshot["obj2_id"],  # 恢复原始
-            "data": original_snapshot["data"],
-        }])
-        self.mj_forward()
+        # active/solref/solimp 无匹配语义，按 slot 索引直接写
+        # （通过 SimCore typed 写入器委托，避免 Env 穿墙 _mjModel）
+        if active is not None:
+            self._gym.set_equality_active(slot, active)
+        if solref is not None:
+            self._gym.set_equality_solref(slot, solref)
+        if solimp is not None:
+            self._gym.set_equality_solimp(slot, solimp)
+        if forward:
+            self.mj_forward()
 
     def _anchor_actor(
         self,
@@ -1363,20 +1264,25 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         .. warning::
             此方法是 Studio UI 抓取的内部实现，由 ``_do_body_manipulation``
             调用。AI 和用户代码**不应直接调用**此方法。
-            程序化体操作请使用公共 API :meth:`equality_bind_mocap`。
+            程序化操作请仿照本方法编排模式使用公共原语
+            (:meth:`equality_find_slot_by_body` / :meth:`equality_constraint` /
+            :meth:`equality_update` / :meth:`set_mocap_pos_and_quat`)。
 
         使用 Studio 系统自带的 ActorManipulator_Anchor mocap body，
         对齐 OrcaGymLocalEnv 的 anchor_actor 语义。
 
-        实现完全基于通用 equality API：
+        编排完全基于公共无状态原语（不依赖已删除的 equality_bind_mocap）：
         - equality_find_slot_by_body 查找槽位
         - equality_constraint 保存原始快照
-        - equality_bind_mocap 完成绑定（含 mocap 对齐 + mj_forward）
+        - set_mocap_pos_and_quat 对齐 mocap 位姿到 actor
+        - equality_update 写入约束（type/obj，内部 mj_forward）
 
         Args:
             actor_name: 被锚定的 body 名称。
-            anchor_type: 锚点类型 "weld"/"connect"。
+            anchor_type: 锚点类型 "weld"/"connect"（"ball" 等价 "connect"）。
         """
+        import mujoco
+
         # 1. 查找 UI 抓取专用 mocap 的 equality 槽位
         slot = self.equality_find_slot_by_body(self._anchor_mocap_name)
         if slot == -1:
@@ -1384,11 +1290,37 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 f"模型中无含 {self._anchor_mocap_name} 的 equality 槽位，"
                 f"请检查关卡 XML"
             )
-        # 2. 保存原始约束快照（释放时恢复，走通用 equality_constraint 公共方法）
+        # 2. 保存原始约束快照（释放时恢复）
         self._anchor_original_eq = self.equality_constraint(slot)
-        # 3. 绑定（通用 API 内部完成 mocap 对齐 + 约束写入 + mj_forward）
-        self.equality_bind_mocap(
-            self._anchor_mocap_name, actor_name, anchor_type
+        # 3. 对齐 mocap 位姿到 actor 当前位姿（避免下一帧拉扯）
+        mocap_id = self.model.body_name2id(self._anchor_mocap_name)
+        actor_pose = self.get_body_xpos_xmat_xquat([actor_name])[actor_name]
+        self.set_mocap_pos_and_quat({
+            self._anchor_mocap_name: {
+                "pos": actor_pose["xpos"],
+                "quat": actor_pose["xquat"],
+            }
+        })
+        # 4. 确定改 obj1 还是 obj2（mocap 一端保持，另一端改为 actor）
+        if self._anchor_original_eq["obj1_id"] == mocap_id:
+            new_obj1_name = self._anchor_mocap_name
+            new_obj2_name = actor_name
+        else:
+            new_obj1_name = actor_name
+            new_obj2_name = self._anchor_mocap_name
+        # 5. eq_type 字符串 → mjtEq 常量
+        type_map = {
+            "weld": mujoco.mjtEq.mjEQ_WELD,
+            "connect": mujoco.mjtEq.mjEQ_CONNECT,
+            "ball": mujoco.mjtEq.mjEQ_CONNECT,
+        }
+        mujoco_eq_type = type_map.get(anchor_type, mujoco.mjtEq.mjEQ_CONNECT)
+        # 6. 写入约束（公共原语，内部 mj_forward）
+        self.equality_update(
+            slot,
+            eq_type=mujoco_eq_type,
+            obj1_name=new_obj1_name,
+            obj2_name=new_obj2_name,
         )
         self._anchored_actor = actor_name
         self._anchor_type = anchor_type
@@ -1399,21 +1331,34 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         .. warning::
             此方法是 Studio UI 抓取的内部实现，由 ``_do_body_manipulation``
             调用。AI 和用户代码**不应直接调用**此方法。
-            程序化体操作请使用公共 API :meth:`equality_release`。
+            程序化操作请仿照本方法编排模式使用公共原语
+            (:meth:`equality_find_slot_by_body` / :meth:`equality_update`)。
 
         通过恢复 XML 原始 obj id 实现，对齐 Local 的 dummy body 机制：
         约束不再作用于被锚定 actor，actor 恢复自由动力学。未锚定时 no-op。
 
-        实现完全基于通用 equality API：
+        编排完全基于公共无状态原语（不依赖已删除的 equality_release，
+        不穿墙底层 update_equality_constraints）：
         - equality_find_slot_by_body 查找当前绑定槽位
-        - equality_release 从快照恢复原始约束
+        - equality_update 从快照恢复原始约束（id→name 反查）
         """
         if self._anchored_actor is None:
             return
         if self._anchor_original_eq is not None:
             slot = self.equality_find_slot_by_body(self._anchored_actor)
             if slot != -1:
-                self.equality_release(slot, self._anchor_original_eq)
+                # 从快照恢复原始约束（id→name 反查 + equality_update，不穿墙）
+                self.equality_update(
+                    slot,
+                    eq_type=self._anchor_original_eq["type"],
+                    obj1_name=self.model.body_id2name(
+                        self._anchor_original_eq["obj1_id"]
+                    ),
+                    obj2_name=self.model.body_id2name(
+                        self._anchor_original_eq["obj2_id"]
+                    ),
+                    data=self._anchor_original_eq["data"],
+                )
         self._anchored_actor = None
         self._anchor_type = None
         self._anchor_original_eq = None
