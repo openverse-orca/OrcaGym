@@ -632,6 +632,85 @@ body_name = env.body("object")
 
 > **等式约束 API 收敛**：原 `OrcaGymEulerEnv.update_equality_constraints()` / `modify_equality_objects()` 不再在 Env 层暴露——前者是 `equality_update` 的底层实现（按 (obj1_id, obj2_id) 匹配槽位批量写入），后者功能被 `equality_update(slot, obj1_name=..., obj2_name=...)` 覆盖。`MuJoCoSimCore.update_equality_constraints` 作为 `equality_update` 的实现细节保留在 SimCore 层，不进入 Env 公共 API。`equality_update` 支持全字段写入（`eq_type` / `obj1_name` / `obj2_name` / `data` / `active` / `solref` / `solimp`）+ 可选 `forward` 开关（默认 True 调用 `mj_forward`，False 时调用方自行补 `mj_forward` 用于批量写入性能优化）。
 
+### 6.8 Env 实例化与生命周期契约
+
+本节定义 `OrcaGymEulerEnv` 子类在外部代码中的**实例化方式、生命周期、与 RL 框架集成**契约，补齐 §6.1–6.7 之外的"Env 使用面"规范。上手指引见开发速查手册 `orca_gym_euler_dev_quickstart.md`，可运行示例见 `OrcaPlayground/examples/euler/01~09`。
+
+#### 6.8.1 实例化方式
+
+| 方式 | 适用场景 | 契约 |
+|------|----------|------|
+| **A. 直接实例化** `env = MyEnv(...)` | 验证/演示脚本、单进程交互 | 构造参数通过 `__init__` 显式传入，不依赖全局状态；`skip_grpc_load` 控制是否启动 gRPC |
+| **B. `make_env` 工厂函数** | RL 训练（SB3 `PPO`/`SAC`）、VecEnv 多进程 | 工厂返回无状态闭包，可被 `SubprocVecEnv` 序列化；配置参数闭包捕获 |
+| **C. `gym.make("MyEnv-v0")` 注册** | 发布为可复用包、第三方调用 | 通过 `gym.envs.register` 注册 entry_point + 默认参数 |
+
+**契约 E1**：无论哪种方式，`__init__` 必须接受 `frame_skip` / `orcagym_addr` / `agent_names` / `time_step` / `model_xml_path` / `skip_grpc_load` / `render_mode` 等显式参数，不读取环境变量或全局配置作为隐式默认。
+
+**契约 E2**：`make_env` 工厂必须返回**新实例**（非单例），保证 VecEnv 各子进程 env 相互隔离。
+
+#### 6.8.2 生命周期契约
+
+```
+env = MyEnv(...)          # 实例化（方式 A/B/C）
+obs, info = env.reset()   # 重置：reset_simulation + reset_model + render
+for _ in range(N):
+    action = policy(obs)
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        obs, info = env.reset()
+env.close()               # 释放 gRPC 连接 / Studio 资源（必须调用）
+```
+
+**契约 L1**：`reset()` 由 `OrcaGymEnvMixin` 提供标准实现（编排 `reset_simulation` + `reset_model` + `render`），子类只需复写 `reset_model()`。
+
+**契约 L2**：`step(action)` 是唯一对外步进入口（§6.4 S5），内部通过 `do_simulation` 编排物理步进；PD 控制应在 `step` 内部以 `frame_skip=1` 闭环实现（§6.4 S6）。
+
+**契约 L3**：`close()` 必须由调用方显式调用（推荐 `try/finally`），释放 gRPC channel、Studio 视频编码器等资源；`OrcaGymEulerEnv` 不依赖 GC 自动清理。
+
+#### 6.8.3 与 SB3 / Gymnasium 生态集成契约
+
+**RL 训练**（参考 `examples/euler/03_rl_ppo/train_ppo.py`）：
+
+```python
+def make_env(args, rank=0, seed=0):
+    """返回 thunk（契约 E2，SubprocVecEnv 要求 callable）。"""
+    def _init():
+        env = MyEnv(orcagym_addr=args.addr, skip_grpc_load=not args.online, ...)
+        env.reset(seed=seed + rank)
+        return env
+    return _init
+
+# 单 env 训练
+env = make_env(args)()
+env = Monitor(env)                  # SB3 奖励/Episode 监控
+model = PPO("MlpPolicy", env=env, ...)
+model.learn(total_timesteps=N)
+env.close()
+```
+
+**VecEnv 多进程**：
+
+```python
+env = SubprocVecEnv([make_env(args, rank=i, seed=seed) for i in range(n_envs)])
+env = VecMonitor(env)               # VecEnv 版 Monitor
+```
+
+**评估**：
+
+```python
+env = make_env(args)()
+env = Monitor(env)
+model = PPO.load(path, env=env)
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=E)
+env.close()
+```
+
+**契约 G1**：Env 必须实现完整 Gymnasium 五元组接口（`step` 返回 `obs, reward, terminated, truncated, info`），`observation_space` / `action_space` 在 `__init__` 中完成注册，方可被 SB3 `PPO`/`SAC`/`evaluate_policy` 接受。
+
+**契约 G2**：`render_mode` 通过 `__init__` 传入（`"human"` / `"none"`），SB3 `Monitor` 与 `evaluate_policy` 依赖此参数控制渲染。
+
+**契约 G3**：验证/演示脚本（非 RL）可使用 `run_lesson` 等自定义循环（参考 `examples/euler/04~09`），但循环内部必须通过 `step()` 步进，不得绕过 `step` 直接调用 `do_simulation` 作为主路径（§6.4 S5）。
+
 ---
 
 ## 7. 封装与隔离机制
