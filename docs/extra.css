@@ -1,0 +1,251 @@
+/* ============================================
+   Sci-Fi / Cyberpunk 暗色主题定制
+   ============================================ */
+
+/* -------- 暗色模式颜色覆写 -------- */
+[data-md-color-scheme="slate"] {
+  /* 背景色 - 深空蓝黑 */
+  --md-default-bg-color: #070b19;
+  --md-default-bg-color--light: #0d1128;
+  --md-default-bg-color--lighter: #141838;
+  --md-default-bg-color--lightest: #1b1f48;
+
+  /* 前景文字 */
+  --md-default-fg-color: #d0d4f0;
+  --md-default-fg-color--light: #989cc8;
+  --md-default-fg-color--lighter: #6468a0;
+
+  /* 主色 - 霓虹紫 */
+  --md-primary-fg-color: #6d28d9;
+  --md-primary-fg-color--light: #8b5cf6;
+  --md-primary-fg-color--dark: #5b21b6;
+
+  /* 强调色 - 电光青 */
+  --md-accent-fg-color: #06b6d4;
+  --md-accent-fg-color--transparent: rgba(6, 182, 212, 0.15);
+  --md-accent-bg-color: #06b6d4;
+
+  /* 代码块 - 终端绿 */
+  --md-code-fg-color: #c0ffc0;
+  --md-code-bg-color: #0c1021;
+  --md-code-hl-color: rgba(139, 92, 246, 0.25);
+
+  /* 链接 */
+  --md-typeset-a-color: #a78bfa;
+
+  /* 表格 */
+  --md-table-header-bg-color: #5b21b6;
+  --md-table-header-fg-color: #e0e0ff;
+  --md-table-border-color: rgba(139, 92, 246, 0.2);
+}
+
+/* -------- 代码块发光边框 -------- */
+[data-md-color-scheme="slate"] .md-typeset pre > code {
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+}
+
+/* -------- 链接霓虹光效 -------- */
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  text-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
+}
+
+/* -------- 扫描线纹理叠加（微弱 CRT 效果）-------- */
+[data-md-color-scheme="slate"] body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.02) 2px,
+    rgba(0, 0, 0, 0.02) 4px
+  );
+  z-index: 1;
+}
+
+/* -------- 自定义滚动条 -------- */
+[data-md-color-scheme="slate"] ::-webkit-scrollbar {
+  width: 6px;
+}
+[data-md-color-scheme="slate"] ::-webkit-scrollbar-track {
+  background: #070b19;
+}
+[data-md-color-scheme="slate"] ::-webkit-scrollbar-thumb {
+  background: #6d28d9;
+  border-radius: 3px;
+}
+[data-md-color-scheme="slate"] ::-webkit-scrollbar-thumb:hover {
+  background: #8b5cf6;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+/* -------- 导航栏微光 -------- */
+[data-md-color-scheme="slate"] .md-header {
+  box-shadow: 0 2px 15px rgba(139, 92, 246, 0.15);
+}
+
+/* -------- 侧边栏选中项光效 -------- */
+[data-md-color-scheme="slate"] .md-nav__item--active > .md-nav__link {
+  text-shadow: 0 0 6px rgba(167, 139, 250, 0.3);
+}
+
+/* -------- 表格斑马纹 -------- */
+[data-md-color-scheme="slate"] .md-typeset table tbody tr:nth-child(even) {
+  background-color: rgba(139, 92, 246, 0.06);
+}
+
+/* ============================================
+   搜索弹层 z-index 修复
+   ============================================
+   问题根因: .md-search 设置了 position: relative 但没有显式 z-index,
+   而 .md-tabs 有 z-index: 2, 二者都是 .md-header 的子元素.
+   在同一个层叠上下文中, z-index: auto < z-index: 2,
+   因此 .md-search 及其子元素(搜索面板/结果)被 .md-tabs 遮挡.             */
+
+/* 搜索容器: 提升 z-index 使其高于标签栏 */
+.md-search {
+  z-index: 5 !important;
+}
+
+/* ============================================
+   Header 常驻 + 标签栏随页面滚走
+   ============================================ */
+
+/* 顶部标题栏始终可见 */
+.md-header {
+  position: sticky !important;
+  top: 0 !important;
+}
+
+/* 标签栏随页面内容自然滚走（不加 sticky） */
+
+/* Header 阴影效果 */
+.md-header--shadow {
+  box-shadow: 0 0 0.4rem rgba(0,0,0,.1), 0 0.4rem 0.8rem rgba(0,0,0,.2) !important;
+}
+
+/* ============================================
+   侧边栏导航：大标题加粗加重，与小标题明显区分
+   ============================================ */
+
+/*
+ * 目标：教程目录中的 section header（如"🎓 新手入门"、"物理仿真"等）
+ * 这些是 .md-nav__item--nested 或 .md-nav__item--section 下的 .md-nav__link
+ * 需要让它们比子页面链接（小标题）更醒目
+ */
+
+/* 有子项的导航节点（即 section 大标题）—— 全局基础加粗 */
+.md-nav__item--nested > .md-nav__link,
+.md-nav__item--section > .md-nav__link {
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+}
+
+/* 大标题文字容器也强制加粗 */
+.md-nav__item--nested > .md-nav__link .md-ellipsis,
+.md-nav__item--section > .md-nav__link .md-ellipsis {
+  font-weight: 800 !important;
+}
+
+/* ===== 暗色模式 ===== */
+[data-md-color-scheme="slate"] .md-nav__item--nested > .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav__item--section > .md-nav__link {
+  color: #c4b5fd !important;
+  text-shadow: 0 0 4px rgba(139, 92, 246, 0.3);
+}
+
+/* 大标题下方加微弱的底部分隔线，增强层次感 */
+[data-md-color-scheme="slate"] .md-nav__item--nested > .md-nav__link {
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+}
+
+/* ===== 亮色模式 ===== */
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link,
+[data-md-color-scheme="default"] .md-nav__item--section > .md-nav__link {
+  color: #4c1d95 !important;
+  font-weight: 800 !important;
+}
+
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link {
+  border-bottom: 1px solid rgba(109, 40, 217, 0.2);
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+}
+
+/* ============================================
+   Footer 底部栏样式
+   ============================================ */
+
+/* ---------- 版权区域与社交图标对齐 ---------- */
+.md-footer-meta__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* 社交图标 hover 效果 */
+.md-footer-social__link:hover {
+  opacity: 0.85;
+  transform: scale(1.1);
+  transition: transform 0.15s ease;
+}
+
+/* ---------- 底部导航 (上一页/下一页) ---------- */
+.md-footer-nav__direction {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* 暗色模式下 footer 导航微调 */
+[data-md-color-scheme="slate"] .md-footer {
+  background-color: #0c1021;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+[data-md-color-scheme="slate"] .md-footer-meta {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- 底部导航 hover 颜色 ---------- */
+[data-md-color-scheme="slate"] .md-footer-nav__link:hover {
+  color: #a78bfa;
+}
+
+/* ---------- Git 最后更新日期样式 ---------- */
+.md-source-date {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+/* ============================================
+   Header Logo 样式微调
+   ============================================ */
+
+/* logo 图标与站点名称对齐 */
+.md-header__button.md-logo {
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+  padding: 0.2rem;
+}
+
+.md-header__button.md-logo svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+/* ============================================
+   隐藏 GitHub 仓库的 fork/star 统计数字
+   ============================================ */
+.md-source__facts {
+  display: none !important;
+}
