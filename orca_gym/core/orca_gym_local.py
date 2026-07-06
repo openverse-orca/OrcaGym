@@ -400,6 +400,112 @@ class OrcaGymLocal(OrcaGymBase):
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
 
+        body_wrenches = response.body_wrenches
+        self._mjData.qfrc_applied[:] = 0
+        if body_wrenches is not None and len(body_wrenches) > 0:
+            for bw in body_wrenches:
+                if bw.body_id <= 0 or bw.body_id >= self._mjModel.nbody:
+                    _logger.warning(f"Invalid body_id: {bw.body_id}, skipping.")
+                    continue
+                if len(bw.force) < 3 or len(bw.torque) < 3 or len(bw.point) < 3:
+                    _logger.warning(f"Invalid wrench data for body_id: {bw.body_id}, skipping.")
+                    continue
+                force = np.array([bw.force[0], bw.force[1], bw.force[2]], dtype=np.float64)
+                torque = np.array([bw.torque[0], bw.torque[1], bw.torque[2]], dtype=np.float64)
+                point = np.array([bw.point[0], bw.point[1], bw.point[2]], dtype=np.float64)
+
+                body_idx = bw.body_id
+
+                # --- Horizontal wave push damping ---
+                # Linear mass-proportional damper to prevent numerical oscillation from large
+                # horizontal forces (especially τ_z from the per-cell lever-arm summation).
+                # cvel[body_id] = [ωx, ωy, ωz, vx, vy, vz] (world-frame linear velocity).
+                # Damping coefficient: N·s/(m·kg), tuned so a 1 kg body at 1 m/s experiences
+                # `damp_coeff` N of opposing force. The torque damping has an additional 0.2x
+                # factor because yaw inertia is much larger than the effective lever-arm torque.
+                _damp_coeff = 0.1
+                body_mass = self._mjModel.body_mass[body_idx]
+                cvel = self._mjData.cvel[body_idx]
+                force[0] -= _damp_coeff * body_mass * cvel[3]  # vx
+                force[1] -= _damp_coeff * body_mass * cvel[4]  # vy
+                torque[2] -= _damp_coeff * 0.2 * body_mass * cvel[2]  # wz
+
+                mujoco.mj_applyFT(self._mjModel, self._mjData, force, torque, point, bw.body_id, self._mjData.qfrc_applied)
+
+                # Vertical damping: F_damping = -b_eff * v_z
+                # Uses proportional damping: b_eff = 2 * ζ * sqrt(k_eff * m)
+                # where k_eff = ρgA ≈ |Fz| / L_char (stiffness from buoyancy variation with depth)
+                # vz from cvel[body_id] = [ωx, ωy, ωz, vx, vy, vz] (linear = world frame)
+                body_idx = bw.body_id
+                fz = force[2]
+                if fz > 0.0:
+                    # Vertical damping
+                    vz = self._mjData.cvel[body_idx][5]
+                    body_mass = self._mjModel.body_mass[body_idx]
+                    body_inertia = self._mjModel.body_inertia[body_idx]  # [Ixx, Iyy, Izz]
+                    damping_force, damping_torque = self._compute_buoyancy_damping(
+                        fz, vz, body_mass, body_inertia,
+                        self._mjData.cvel[body_idx][0:3]
+                    )
+                    if abs(damping_force) > 0.0 or np.any(np.abs(damping_torque) > 0.0):
+                        mujoco.mj_applyFT(self._mjModel, self._mjData,
+                                          np.array([0.0, 0.0, damping_force], dtype=np.float64),
+                                          damping_torque,
+                                          point, body_idx, self._mjData.qfrc_applied)
+                gravity = self._mjModel.body_mass[bw.body_id] * self._mjModel.opt.gravity[2]
+                _logger.info(
+                    f"Body {bw.body_id}: buoyancy_z={force[2]:.4f}, gravity_z={gravity:.4f}, "
+                    f"net_z={force[2] + gravity:.4f}, force={force}, torque={torque}, point={point}"
+                )
+
+    @staticmethod
+    def _compute_buoyancy_damping(
+        fz: float, vz: float, body_mass: float, body_inertia: np.ndarray,
+        angular_vel: np.ndarray, zeta: float = 0.5, zeta_rot: float = 0.4
+    ) -> tuple:
+        """
+        Vertical + rotational damping — stiffness estimated from body mass/inertia
+        rather than fz, so the damping coefficient does not jump when the GPU
+        readback delivers a stale buoyancy force.
+        """
+        if fz <= 0.0:
+            return 0.0, np.zeros(3, dtype=np.float64)
+
+        g = 9.81
+
+        # Estimate characteristic length from pitch inertia I_yy.
+        # For a slender body: I_yy ≈ m · L² / 12  →  L = √(12 · I_yy / m)
+        Iyy = body_inertia[1]
+        if Iyy > 0.0 and body_mass > 0.0:
+            L_char = np.sqrt(12.0 * Iyy / body_mass)
+        else:
+            # Fallback: displaced-volume estimate (may be stale, but not used for stiffness)
+            vol = fz / (1000.0 * g)
+            L_char = max(0.5, vol ** (1.0 / 3.0) * 2.0)
+
+        # Vertical stiffness from mass and assumed draft (0.15 m typical hull).
+        # No dependence on fz → damping coefficient is frame-rate stable.
+        draft_est = 0.15
+        k_vert = body_mass * g / draft_est
+        b_z = 2.0 * zeta * np.sqrt(k_vert * body_mass)
+        force = -b_z * vz if abs(vz) >= 1e-8 else 0.0
+
+        # Rotational stiffness from k_vert and characteristic length.
+        I_avg = np.mean(body_inertia[0:2]) if body_inertia[0] > 0 and body_inertia[1] > 0 else body_mass * L_char**2
+        k_rot = k_vert * (L_char**2) / 12.0
+        b_rot = 2.0 * zeta_rot * np.sqrt(k_rot * I_avg)
+        torque = np.zeros(3, dtype=np.float64)
+        if np.any(np.abs(angular_vel[0:2]) >= 1e-8):
+            torque[0] = -b_rot * angular_vel[0]
+            torque[1] = -b_rot * angular_vel[1]
+
+        # Z-axis: no buoyancy restoring, add a small viscous drag to suppress numerical noise
+        # (e.g. grid discretization asymmetry from the SWE buoyancy computation)
+        if abs(angular_vel[2]) >= 1e-8:
+            torque[2] = -b_rot * 0.3 * angular_vel[2]
+
+        return force, torque
+
     async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
         """
         从服务器下载并缓存模型资源文件（mesh、hfield 等）。
