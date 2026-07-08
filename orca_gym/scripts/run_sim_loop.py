@@ -122,13 +122,6 @@ def run_simulation(orcagym_addr : str,
             action = env.action_space.sample()
     
             obs, reward, terminated, truncated, info = env.step(action)
-            lidar_cloud = env.unwrapped.query_lidar_point_cloud("LiDAR")
-            if lidar_cloud is not None:
-                ranges = lidar_cloud['ranges']
-                points = lidar_cloud['points']
-                valid_mask = ranges > 0
-                valid_points = points[valid_mask]
-                print(f"Valid points size: {valid_points.shape[0]}")
 
             env.render()
 
