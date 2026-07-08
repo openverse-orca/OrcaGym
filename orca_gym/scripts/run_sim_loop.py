@@ -1,5 +1,4 @@
 import sys
-sys.path.append("/home/orca/Projects/OrcaGym")
 
 from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
