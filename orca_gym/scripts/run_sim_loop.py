@@ -145,8 +145,28 @@ def run_simulation(orcagym_addr : str,
 
 def main():
     """命令行入口函数"""
-    orcagym_addr = "localhost:50051"
-    agent_name = "NoRobot"
+    import argparse
+
+    parser = argparse.ArgumentParser(description="OrcaGym 仿真循环")
+    parser.add_argument(
+        "--euler",
+        action="store_true",
+        help="使用 Euler 架构（OrcaGymEulerEnv）启动空白仿真循环",
+    )
+    parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
+    parser.add_argument("--agent", default="NoRobot", help="智能体名称")
+    args, _ = parser.parse_known_args()
+
+    if args.euler:
+        # 转发到 Euler loop（agent 名称默认对齐 Euler 约定）
+        from orca_gym.scripts.run_euler_loop import main as euler_main
+
+        euler_argv = ["--addr", args.addr, "--agent", args.agent if args.agent != "NoRobot" else "NoAgent"]
+        euler_main(euler_argv)
+        return
+
+    orcagym_addr = args.addr
+    agent_name = args.agent
     env_name = "SimulationLoop"
     run_simulation(orcagym_addr, agent_name, env_name)
 
