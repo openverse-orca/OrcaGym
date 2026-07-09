@@ -135,3 +135,28 @@ bash -c "<conda-base>/envs/orca/bin/python some_script.py"
 - 在 `OrcaGymEulerEnv` 增加公共方法（委托到 `_gym` 公共 API）
 - 在 `OrcaGymEuler` 增加公共方法（委托到 `_sim` 公共 API）
 - 在 `OrcaGymDataView` 增加字段访问器
+
+## 规则 5：Protobuf 代码生成
+
+### 必须使用 orca 环境
+
+Python 侧的 proto 生成脚本 `orca_gym/protos/generate_proto.py` **必须在 `orca` conda 环境中执行**。
+
+`orca` 环境安装的 `protobuf` 和 `grpc-tools` 版本与 OrcaStudio C++ 侧（gRPC 1.51.1）严格匹配。使用其他环境（如 `base`）会导致生成的 `mjc_message_pb2.py` / `mjc_message_pb2_grpc.py` 版本不兼容，引发运行时序列化错误或 gRPC 调用失败。
+
+```bash
+# 正确 — 使用 orca 环境的 python 解释器
+<conda-base>/envs/orca/bin/python orca_gym/protos/generate_proto.py
+
+# 错误 — 使用 base 或系统 python
+python orca_gym/protos/generate_proto.py
+```
+
+> `<conda-base>` 可通过 `conda info --base` 解析。具体解释器路径见 `~/.trae-cn/memory/user_profile.md` 的 `${ORCA_PYTHON}`。
+
+### 同步规则
+
+- proto 文件是**手动生成**的，不是自动编译的
+- 修改 `orca_gym/protos/mjc_message.proto` 后，必须运行 `generate_proto.py` 重新生成 pb 文件
+- **C++ 侧与 Python 侧的 proto 文件必须保持一致**：修改一处后必须同步修改另一侧（C++ 侧 proto 在 OrcaEngine2409 仓库 `Gems/Mujoco/Code/Source/GrpcService/protos/mjc_message.proto`）并各自重新生成
+- C++ 侧生成脚本与配置指引见 OrcaEngine2409 仓库根目录 `AGENTS.md`

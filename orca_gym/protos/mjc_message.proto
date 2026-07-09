@@ -119,6 +119,14 @@ service GrpcService {
   rpc MJ_Jac(MJ_JacRequest) returns (MJ_JacResponse);
   rpc CalcFullMassMatrix(CalcFullMassMatrixRequest) returns (CalcFullMassMatrixResponse);
   rpc QueryLiDARPointCloud(LiDARPointCloudRequest) returns (LiDARPointCloudResponse);
+
+  // === DebugMesh (路径 A：Python 发起) ===
+  rpc DrawDebugMeshBatch(DrawDebugMeshBatchRequest) returns (DrawDebugMeshBatchResponse);
+  rpc ClearDebugMesh(ClearDebugMeshRequest) returns (ClearDebugMeshResponse);
+  rpc CreateDebugMeshObjects(CreateDebugMeshObjectsRequest) returns (CreateDebugMeshObjectsResponse);
+  rpc UpdateDebugMeshTransforms(UpdateDebugMeshTransformsRequest) returns (UpdateDebugMeshTransformsResponse);
+  rpc DestroyDebugMeshObjects(DestroyDebugMeshObjectsRequest) returns (DestroyDebugMeshObjectsResponse);
+  rpc QueryDebugMeshCount(QueryDebugMeshCountRequest) returns (QueryDebugMeshCountResponse);
 }
 
 enum SimulationState {
@@ -1340,4 +1348,86 @@ message LiDARPointCloudResponse {
     bytes range_data = 11;
     bytes point_data = 12;
     bytes intensity_data = 13;
+}
+
+// ============= DebugMesh 公共类型 =============
+
+// 与 OrcaDebugMeshTypes.h MeshType 枚举严格对应，顺序不可变
+enum DebugMeshType {
+    DEBUG_MESH_SPHERE   = 0;
+    DEBUG_MESH_CYLINDER = 1;
+    DEBUG_MESH_CONE     = 2;
+    DEBUG_MESH_BOX      = 3;
+    DEBUG_MESH_QUAD     = 4;  // double-sided
+    DEBUG_MESH_ARROW    = 5;
+}
+
+// 单个实例数据，与 C++ MeshInstance 结构严格对应
+// 使用分解变换（pos/quat/scale）而非矩阵，便于 Python 侧构造
+message DebugMeshInstance {
+    repeated float position = 1;  // [x, y, z]
+    repeated float rotation = 2;  // [x, y, z, w] quaternion
+    repeated float scale    = 3;  // [sx, sy, sz]
+    repeated float color    = 4;  // [r, g, b, a] 0..1
+    uint32 flags            = 5;  // InstanceFlags bitmask (1 = EdgeHighlight)
+}
+
+// 持久化对象句柄，与 C++ ObjectHandle (index + generation) 对应
+message DebugMeshHandle {
+    uint32 index      = 1;
+    uint32 generation = 2;  // 0 = invalid
+}
+
+// ============= Immediate 模式（单帧） =============
+
+message DrawDebugMeshBatchRequest {
+    DebugMeshType mesh_type        = 1;
+    repeated DebugMeshInstance instances = 2;  // 同类型实例列表
+}
+message DrawDebugMeshBatchResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    uint32 drawn_count   = 3;  // 实际入队数量
+}
+
+message ClearDebugMeshRequest {}
+message ClearDebugMeshResponse {
+    bool success = 1;
+}
+
+// ============= Retained 模式（跨帧持久） =============
+
+message CreateDebugMeshObjectsRequest {
+    DebugMeshType mesh_type        = 1;
+    repeated DebugMeshInstance instances = 2;
+}
+message CreateDebugMeshObjectsResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    repeated DebugMeshHandle handles = 3;  // 与 instances 顺序一致，失败项为 invalid
+}
+
+message UpdateDebugMeshTransformsRequest {
+    repeated DebugMeshHandle handles    = 1;
+    repeated DebugMeshInstance instances = 2;  // 与 handles 顺序一致，全量替换实例数据
+}
+message UpdateDebugMeshTransformsResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    uint32 updated_count = 3;
+}
+
+message DestroyDebugMeshObjectsRequest {
+    repeated DebugMeshHandle handles = 1;
+}
+message DestroyDebugMeshObjectsResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    uint32 destroyed_count = 3;
+}
+
+message QueryDebugMeshCountRequest {}
+message QueryDebugMeshCountResponse {
+    uint32 retained_count  = 1;
+    uint32 immediate_count = 2;
 }
