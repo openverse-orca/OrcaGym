@@ -778,6 +778,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def get_cfrc_ext(self) -> np.ndarray:
         """查询外部约束力 cfrc_ext（委托 self._gym）。
 
+        MuJoCo spatial vector 布局为 [torque(3), force(3)]，即
+        ``[mx, my, mz, fx, fy, fz]``。线性力在 ``cfrc[bid, 3:]``。
+
         Returns:
             np.ndarray，形状 (nbody, 6)。
         """

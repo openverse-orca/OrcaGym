@@ -593,6 +593,13 @@ class MuJoCoSimCore:
     def get_cfrc_ext(self) -> np.ndarray:
         """查询外部约束力（cfrc_ext）。
 
+        MuJoCo spatial vector 布局为 [torque(3), force(3)]，即
+        ``[mx, my, mz, fx, fy, fz]``。线性力在 ``cfrc[bid, 3:]``，
+        力矩在 ``cfrc[bid, :3]``。力/力矩均在以 subtree com 为原点的
+        全局坐标系中（坐标轴与世界系对齐）。
+
+        注意：需调用 ``mj_rnePostConstraint`` 后才有效（mj_step 默认不计算）。
+
         Returns:
             np.ndarray，形状 (nbody, 6)，为 _mjData.cfrc_ext 的零拷贝视图。
         """

@@ -80,7 +80,22 @@ def _make_instance(
     color: Sequence[float],
     flags: int = InstanceFlags.NONE,
 ) -> mjc_message_pb2.DebugMeshInstance:
-    """构造 DebugMeshInstance proto。position/rotation/scale/color 支持 list/ndarray。"""
+    """构造 DebugMeshInstance proto。position/rotation/scale/color 支持 list/ndarray。
+
+    Args:
+        position: [x, y, z] Z-up 世界坐标锚点（单位米）。锚点含义随图形而异，
+            详见 DebugDraw 类 docstring 的 "Position 锚点约定" 表。
+        rotation: [x, y, z, w] O3DE 四元数（非 MuJoCo 的 [w,x,y,z]）。
+            作用于模型空间基元：
+              - 无方向性基元（Sphere/Box/Quad）旋转不改变外观对称性
+              - 方向性基元（Cylinder/Cone/Arrow）默认沿 +Y，rotation 旋转 +Y 到目标方向
+            从 MuJoCo 取四元数需先 quat_mujoco_to_grpc() 重排。
+            要将方向性基元对齐到任意方向 d，可用 _direction_to_quat(d) 生成。
+        scale:    [sx, sy, sz] per-axis 缩放（米）。方向性基元的 sy 为长度，
+            sx/sz 为半径；Arrow 的 sx/sz 需除以 baked-in shaft radius，见 _make_arrow_instance。
+        color:    [r, g, b, a] 0..1
+        flags:    InstanceFlags bitmask
+    """
     inst = mjc_message_pb2.DebugMeshInstance()
     inst.position.extend(np.asarray(position, dtype=np.float32).tolist())
     inst.rotation.extend(np.asarray(rotation, dtype=np.float32).tolist())
@@ -93,9 +108,13 @@ def _make_instance(
 def _direction_to_quat(direction: np.ndarray) -> np.ndarray:
     """单位方向向量 → 四元数 [x,y,z,w]。
 
-    将 +Y 轴对齐到给定方向（圆柱/圆锥/箭头沿 +Y 建模，见
-    OrcaDebugMeshGeometryGenerator.h：Cylinder/Cone/Arrow 均 along +Y）。
-    direction 会被归一化；零向量返回单位四元数（无旋转）。
+    语义：将方向性基元的模型空间 +Y 轴对齐到 ``direction``。
+      - Cylinder/Cone/Arrow 沿 +Y 建模（见 OrcaDebugMeshGeometryGenerator.h）
+      - direction = (to - from)，结果四元数使基元从 from 指向 to
+    direction 会被归一化；零向量返回单位四元数（无旋转，保持 +Y 朝向）。
+
+    注意：O3DE/AZ::Quaternion 使用 Hamilton 共轭形式 (q*·v·q)，旋转方向与
+    标准约定 (q·v·q*) 相反，故内部使用 ``cross(d, y)`` 而非 ``cross(y, d)``。
     """
     d = np.asarray(direction, dtype=np.float64)
     norm = np.linalg.norm(d)
@@ -104,8 +123,10 @@ def _direction_to_quat(direction: np.ndarray) -> np.ndarray:
     d = d / norm
 
     y = np.array([0.0, 1.0, 0.0], dtype=np.float64)
-    # 旋转轴 = y × d，旋转角 = arccos(y·d)
-    axis = np.cross(y, d)
+    # 旋转轴 = d × y（非 y × d）。O3DE/AZ::Quaternion 使用 Hamilton 约定的
+    # 共轭形式 (q*·v·q)，与标准数学约定 (q·v·q*) 相比旋转方向相反。
+    # 故此处用 reversed cross 使最终视觉效果为 "将 +Y 轴对齐到 direction"。
+    axis = np.cross(d, y)
     cos_angle = float(np.clip(np.dot(y, d), -1.0, 1.0))
     # 当 d ≈ +y 时无旋转；当 d ≈ -y 时绕任意垂直轴转 180°
     if np.linalg.norm(axis) < 1e-12:
@@ -133,19 +154,25 @@ def _make_cylinder_instance(
 ) -> mjc_message_pb2.DebugMeshInstance:
     """从 from→to 构造圆柱实例的 transform。
 
-    坐标系约定（见设计文档 §2.3）：
-        p_from / p_to 为 Z-up 右手系世界坐标，单位米。
-        圆柱沿 +Y 轴建模（见 OrcaDebugMeshGeometryGenerator.h），高度 = |to - from|，半径 = radius。
-        位置取中点，旋转将 +Y 对齐到 (to - from) 方向，scale = [radius, height, radius]。
+    方向语义：圆柱底面中心贴 p_from，顶面中心贴 p_to，轴向 = (p_to - p_from)。
+
+    实现细节（与 C++ 锚点一致）：
+        C++ 侧 Cylinder 模型空间原点在底面中心（y=0，见
+        OrcaDebugMeshGeometryGenerator.h），shader 执行
+        worldPos = rot(modelPos * scale) + position。
+        故 position = p_from（底面中心），旋转将 +Y 对齐到 (to-from)，
+        scale.y = height 使顶面落在 p_to。
+        scale = [radius, height, radius]，height = |to - from|。
+
+    坐标系：p_from / p_to 为 Z-up 右手系世界坐标，单位米。
     """
     a = np.asarray(p_from, dtype=np.float64)
     b = np.asarray(p_to, dtype=np.float64)
     delta = b - a
     height = float(np.linalg.norm(delta))
-    center = (a + b) * 0.5
     quat = _direction_to_quat(delta)
     scale = np.array([radius, height, radius], dtype=np.float32)
-    return _make_instance(center.tolist(), quat.tolist(), scale.tolist(), color, flags)
+    return _make_instance(a.tolist(), quat.tolist(), scale.tolist(), color, flags)
 
 
 def _make_arrow_instance(
@@ -157,22 +184,28 @@ def _make_arrow_instance(
 ) -> mjc_message_pb2.DebugMeshInstance:
     """从 from→to 构造箭头实例的 transform。
 
-    坐标系约定（见设计文档 §2.3）：
-        p_from / p_to 为 Z-up 右手系世界坐标，单位米。
-        箭头沿 +Y 轴建模（见 OrcaDebugMeshGeometryGenerator.h），总长 = |to - from|。
+    方向语义：箭头杆底（尾部）贴 p_from，箭尖贴 p_to，方向 = (p_to - p_from)。
+
+    实现细节（与 C++ 锚点一致，同 _make_cylinder_instance）：
+        C++ 侧 Arrow 模型空间原点在杆底（y=0，见
+        OrcaDebugMeshGeometryGenerator.h），shader 执行
+        worldPos = rot(modelPos * scale) + position。
+        故 position = p_from（杆底），旋转将 +Y 对齐到 (to-from)，
+        scale.y = length 使箭尖落在 p_to。
         Arrow 网格 baked-in shaft radius=0.05 / tip radius=0.15（非单位半径），
         故 scale.x/z = shaft_radius / 0.05 使 shaft_radius 为绝对米值；
-        tip 半径自动按 3:1 比例缩放。scale.y = 总长度，方向旋转同圆柱。
+        tip 半径自动按 3:1 比例缩放。scale.y = 总长度。
+
+    坐标系：p_from / p_to 为 Z-up 右手系世界坐标，单位米。
     """
     a = np.asarray(p_from, dtype=np.float64)
     b = np.asarray(p_to, dtype=np.float64)
     delta = b - a
     length = float(np.linalg.norm(delta))
-    center = (a + b) * 0.5
     quat = _direction_to_quat(delta)
     r_scale = shaft_radius / _ARROW_BAKED_SHAFT_RADIUS
     scale = np.array([r_scale, length, r_scale], dtype=np.float32)
-    return _make_instance(center.tolist(), quat.tolist(), scale.tolist(), color, flags)
+    return _make_instance(a.tolist(), quat.tolist(), scale.tolist(), color, flags)
 
 
 def _handle_to_dict(handle: Any) -> Dict[str, Any]:
@@ -194,7 +227,44 @@ class DebugDraw:
         - 所有 position / center / p_from / p_to 参数均为 Z-up 右手系世界坐标，单位米
         - 所有 rotation 参数为 [x, y, z, w] 四元数（O3DE 原生，非 MuJoCo 的 [w,x,y,z]）
         - 从 MuJoCo 获取的位姿需用 quat_mujoco_to_grpc() 重排四元数顺序
-        - 方向性基元（cylinder/cone/arrow）模型空间沿 +Y，draw_cylinder/draw_arrow 自动处理旋转
+
+    方向性基元约定（Cylinder/Cone/Arrow）：
+        模型空间沿 +Y（见 OrcaDebugMeshGeometryGenerator.h）：
+          - Cylinder：底面 y=0，顶面 y=1（position 锚点=底面中心）
+          - Cone    ：底面 y=0，apex y=1（position 锚点=底面中心）
+          - Arrow   ：杆底 y=0，箭尖 y=1（position 锚点=杆底）
+
+        旋转 API 语义（rotation 字段 / _make_instance / create_objects / update_transforms）：
+          rotation 为 O3DE [x,y,z,w] 四元数，将模型空间 +Y 轴旋转到目标方向。
+          position 直接作为 C++ 锚点（底面/杆底），无偏移补偿。
+          要将方向性基元对齐到任意方向 d，用 _direction_to_quat(d) 生成四元数。
+          例：圆锥朝上(+Z) → _direction_to_quat([0,0,1])；
+              圆锥朝 -Y → _direction_to_quat([0,-1,0])。
+          若希望视觉上从 from 到 to：
+              position = from，rotation = _direction_to_quat(to - from)，scale.y = |to - from|。
+          O3DE/AZ::Quaternion 使用 Hamilton 共轭形式，旋转方向与标准约定相反，
+          _direction_to_quat 内部已用 cross(d, y) 补偿。
+
+        指向 API 语义（draw_cylinder/draw_arrow 的 p_from→p_to）：
+          方向 = (p_to - p_from)，_direction_to_quat 自动生成旋转。
+          position = p_from（底面/杆底），与 C++ 锚点一致，
+          底面/杆底贴 p_from，顶面/箭尖贴 p_to。
+          （immediate 和 retained 语义完全一致）
+
+    Position 锚点约定（C++ 侧 OrcaDebugMeshGeometryGenerator 模型空间原点）：
+        无方向性基元的 position = 几何中心；方向性基元的 position = 底部/尾部。
+        immediate（draw_*）和 retained（create_objects/update_transforms）共用此约定。
+
+        ┌──────────┬─────────────────────┬────────────────────┐
+        │ 图形     │ position 含义       │ 模型空间描述         │
+        ├──────────┼─────────────────────┼────────────────────┤
+        │ Sphere   │ 球心（几何中心）    │ 半径 1，原点在球心   │
+        │ Box      │ 盒心（几何中心）    │ 半宽 0.5，原点在盒心 │
+        │ Quad     │ 四边形中心          │ 半宽 0.5，XY 平面    │
+        │ Cylinder │ **底面中心**        │ 沿 +Y，底面在原点   │
+        │ Cone     │ **底面中心**        │ 沿 +Y，底面在原点   │
+        │ Arrow    │ **尾部（杆底）**    │ 沿 +Y，总长 1       │
+        └──────────┴─────────────────────┴────────────────────┘
 
     stub 约定：
         OrcaStudio 生产环境使用 grpc.aio.insecure_channel 构造的 GrpcServiceStub，
@@ -226,7 +296,7 @@ class DebugDraw:
         """绘制球体（immediate）。
 
         Args:
-            center: [x, y, z] Z-up 世界坐标，单位米
+            center: [x, y, z] 球心位置（Z-up 世界坐标，单位米）
             radius: 球体半径，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
@@ -246,7 +316,7 @@ class DebugDraw:
         """绘制立方体（immediate）。
 
         Args:
-            center: [x, y, z] Z-up 世界坐标，单位米
+            center: [x, y, z] 盒心位置（Z-up 世界坐标，单位米）
             size:   [sx, sy, sz] 三轴边长，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
@@ -267,7 +337,7 @@ class DebugDraw:
         """绘制圆柱（immediate）。圆柱从 p_from 延伸到 p_to。
 
         Args:
-            p_from: [x, y, z] 起点，Z-up 世界坐标，米
+            p_from: [x, y, z] 起点（对应模型空间底面），Z-up 世界坐标，米
             p_to:   [x, y, z] 终点，Z-up 世界坐标，米
             radius: 圆柱半径，米
             color:  [r, g, b, a] 0..1
@@ -289,8 +359,8 @@ class DebugDraw:
         """绘制箭头（immediate）。箭头从 p_from 指向 p_to。
 
         Args:
-            p_from: [x, y, z] 起点，Z-up 世界坐标，米
-            p_to:   [x, y, z] 终点，Z-up 世界坐标，米
+            p_from: [x, y, z] 尾部位置（对应模型空间杆底），Z-up 世界坐标，米
+            p_to:   [x, y, z] 头部（箭尖）位置，Z-up 世界坐标，米
             shaft_radius: 箭杆半径，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
@@ -310,7 +380,7 @@ class DebugDraw:
         """绘制双面 Quad（immediate）。Quad 在 XY 平面，法线沿 +Z。
 
         Args:
-            center: [x, y, z] Z-up 世界坐标，单位米
+            center: [x, y, z] 四边形中心位置（Z-up 世界坐标，单位米）
             size:   [sx, sy, sz] 三轴缩放，米（sz 通常不影响扁平 quad）
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
@@ -361,6 +431,13 @@ class DebugDraw:
         {'index': int, 'generation': int, 'valid': bool}，
         generation==0 表示 C++ 侧分配失败（slot 已满等），调用方应忽略。
 
+        方向性基元（Cylinder/Cone/Arrow）：
+            instances 中的 rotation 直接用于旋转模型空间 +Y 到目标方向，
+            position 直接作为 C++ 锚点（底面/杆底），与 draw_cylinder/draw_arrow 语义一致。
+            要对齐到方向 d，用 _direction_to_quat(d) 生成 rotation。
+            若希望视觉上从 from 到 to，position = from，
+            rotation=_direction_to_quat(to-from)，scale.y=|to-from|。
+
         Args:
             mesh_type:  DebugMeshType 枚举值
             instances:  DebugMeshInstance proto 列表
@@ -384,6 +461,8 @@ class DebugDraw:
         """更新持久对象的 transform（全量替换 instance 数据）。离线模式 no-op。
 
         handles 与 instances 须等长且顺序对应。
+        方向性基元的 rotation/position 语义同 create_objects。
+        每次调用自动刷新 keepalive 计时器（C++ UpdateInstance 传入当前 sim time）。
         """
         if self._stub is None:
             return
