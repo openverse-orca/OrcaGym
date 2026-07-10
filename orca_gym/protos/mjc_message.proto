@@ -125,6 +125,7 @@ service GrpcService {
   rpc ClearDebugMesh(ClearDebugMeshRequest) returns (ClearDebugMeshResponse);
   rpc CreateDebugMeshObjects(CreateDebugMeshObjectsRequest) returns (CreateDebugMeshObjectsResponse);
   rpc UpdateDebugMeshTransforms(UpdateDebugMeshTransformsRequest) returns (UpdateDebugMeshTransformsResponse);
+  rpc KeepAliveDebugMeshObjects(KeepAliveDebugMeshObjectsRequest) returns (KeepAliveDebugMeshObjectsResponse);
   rpc DestroyDebugMeshObjects(DestroyDebugMeshObjectsRequest) returns (DestroyDebugMeshObjectsResponse);
   rpc QueryDebugMeshCount(QueryDebugMeshCountRequest) returns (QueryDebugMeshCountResponse);
 }
@@ -1364,10 +1365,14 @@ enum DebugMeshType {
 
 // 单个实例数据，与 C++ MeshInstance 结构严格对应
 // 使用分解变换（pos/quat/scale）而非矩阵，便于 Python 侧构造
+// 坐标系规范见设计文档 §2.3：Z-up 右手系，单位米，四元数 [x,y,z,w]
+//   - position/rotation 与 MuJoCo/O3DE 一致，各层 API 之间零转换直通
+//   - rotation 用 [x,y,z,w]（O3DE 原生），非 MuJoCo 的 [w,x,y,z]
+//     Python 侧从 MuJoCo data.xquat 取值时需用 quat_mujoco_to_grpc() 重排
 message DebugMeshInstance {
-    repeated float position = 1;  // [x, y, z]
-    repeated float rotation = 2;  // [x, y, z, w] quaternion
-    repeated float scale    = 3;  // [sx, sy, sz]
+    repeated float position = 1;  // [x, y, z] Z-up 世界坐标，单位米
+    repeated float rotation = 2;  // [x, y, z, w] 四元数（非 MuJoCo 的 [w,x,y,z]）
+    repeated float scale    = 3;  // [sx, sy, sz] 各轴缩放
     repeated float color    = 4;  // [r, g, b, a] 0..1
     uint32 flags            = 5;  // InstanceFlags bitmask (1 = EdgeHighlight)
 }
@@ -1378,11 +1383,15 @@ message DebugMeshHandle {
     uint32 generation = 2;  // 0 = invalid
 }
 
-// ============= Immediate 模式（单帧） =============
+// ============= Immediate 模式（单帧 + TTL） =============
 
+// duration_seconds = 0：单帧（默认，本帧渲染后自动清除）
+// duration_seconds > 0：TTL 持续时长（秒），实例跨帧存活至仿真时间到期，
+//   避免高频重提交导致的闪烁。详见 OrcaDebugMesh 架构设计 §4.3.1。
 message DrawDebugMeshBatchRequest {
     DebugMeshType mesh_type        = 1;
     repeated DebugMeshInstance instances = 2;  // 同类型实例列表
+    float duration_seconds         = 3;  // 持续时长（秒，fp32，默认 0=单帧）
 }
 message DrawDebugMeshBatchResponse {
     bool   success       = 1;
@@ -1395,11 +1404,15 @@ message ClearDebugMeshResponse {
     bool success = 1;
 }
 
-// ============= Retained 模式（跨帧持久） =============
+// ============= Retained 模式（跨帧持久 + Keepalive） =============
 
+// keepalive_seconds：保活时长（秒，默认 1.0）。对象在此时长内未收到任何
+//   Update*/KeepAlive 则自动销毁。用于断连/崩溃等异常场景的残留清理。
+//   详见 OrcaDebugMesh 架构设计 §11.9。
 message CreateDebugMeshObjectsRequest {
     DebugMeshType mesh_type        = 1;
     repeated DebugMeshInstance instances = 2;
+    float keepalive_seconds        = 3;  // 保活时长（秒，fp32，默认 1.0）
 }
 message CreateDebugMeshObjectsResponse {
     bool   success       = 1;
@@ -1410,11 +1423,25 @@ message CreateDebugMeshObjectsResponse {
 message UpdateDebugMeshTransformsRequest {
     repeated DebugMeshHandle handles    = 1;
     repeated DebugMeshInstance instances = 2;  // 与 handles 顺序一致，全量替换实例数据
+    // ⚠️ Update 同时刷新保活计时器（隐式保活），高频更新对象无需额外心跳。
 }
 message UpdateDebugMeshTransformsResponse {
     bool   success       = 1;
     string error_message = 2;
     uint32 updated_count = 3;
+}
+
+// 保活心跳：刷新指定 handle 的保活计时器，不修改 transform。
+// 用于"对象位置不变但仍需保活"的场景（如静态标注点）。开销极低（无 GPU 操作）。
+// 返回 alive/expired 双列表，调用方据此修剪本地 handle 列表。
+message KeepAliveDebugMeshObjectsRequest {
+    repeated DebugMeshHandle handles = 1;
+}
+message KeepAliveDebugMeshObjectsResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    repeated DebugMeshHandle alive_handles   = 3;  // 仍存活（已刷新）
+    repeated DebugMeshHandle expired_handles = 4;  // 已过期/无效
 }
 
 message DestroyDebugMeshObjectsRequest {

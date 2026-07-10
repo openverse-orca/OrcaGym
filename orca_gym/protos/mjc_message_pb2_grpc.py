@@ -504,6 +504,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.UpdateDebugMeshTransformsRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.UpdateDebugMeshTransformsResponse.FromString,
                 _registered_method=True)
+        self.KeepAliveDebugMeshObjects = channel.unary_unary(
+                '/MujocoMessage.GrpcService/KeepAliveDebugMeshObjects',
+                request_serializer=mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.FromString,
+                _registered_method=True)
         self.DestroyDebugMeshObjects = channel.unary_unary(
                 '/MujocoMessage.GrpcService/DestroyDebugMeshObjects',
                 request_serializer=mjc__message__pb2.DestroyDebugMeshObjectsRequest.SerializeToString,
@@ -1097,6 +1102,12 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def KeepAliveDebugMeshObjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DestroyDebugMeshObjects(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1581,6 +1592,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.UpdateDebugMeshTransforms,
                     request_deserializer=mjc__message__pb2.UpdateDebugMeshTransformsRequest.FromString,
                     response_serializer=mjc__message__pb2.UpdateDebugMeshTransformsResponse.SerializeToString,
+            ),
+            'KeepAliveDebugMeshObjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.KeepAliveDebugMeshObjects,
+                    request_deserializer=mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.FromString,
+                    response_serializer=mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.SerializeToString,
             ),
             'DestroyDebugMeshObjects': grpc.unary_unary_rpc_method_handler(
                     servicer.DestroyDebugMeshObjects,
@@ -4131,6 +4147,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/UpdateDebugMeshTransforms',
             mjc__message__pb2.UpdateDebugMeshTransformsRequest.SerializeToString,
             mjc__message__pb2.UpdateDebugMeshTransformsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def KeepAliveDebugMeshObjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/KeepAliveDebugMeshObjects',
+            mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.SerializeToString,
+            mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.FromString,
             options,
             channel_credentials,
             insecure,

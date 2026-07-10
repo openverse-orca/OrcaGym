@@ -1,0 +1,732 @@
+"""OrcaDebugMesh 路径 A 端到端视觉验收脚本（人工运行）。
+
+前置条件：
+    1. OrcaStudio 已启动并加载含 Mujoco 场景的关卡
+    2. OrcaDebugMesh Gem 已编译并加载
+    3. 仿真已进入“运行”状态（Editor 仿真播放）
+    4. 使用 orca conda 环境运行（${ORCA_PYTHON}）
+
+运行：
+    ${ORCA_PYTHON} tests/orca_gym/utils/test_debug_draw_e2e.py [--addr localhost:50051]
+    ${ORCA_PYTHON} tests/orca_gym/utils/test_debug_draw_e2e.py --phase 1 3 5   # 只跑指定阶段
+
+交互方式：
+    本脚本连接在线 OrcaStudio，分阶段调用 debug_draw() 接口绘制
+    OrcaDebugMesh 支持的全部图形，供人工在视口中观察验收。
+    每个阶段/子步骤绘制完成后持续渲染，**按空格键进入下一步**，
+    无超时限制，方便仔细观察。按 Ctrl+C 中断退出。
+
+    Immediate（单帧）图形在等待期间每帧重新提交；Retained（持久）
+    图形创建一次即跨帧存在。EulerSimEnv 内部使用零控制，不会让场景
+    机器人乱动，可放心 step + render。
+
+验收清单（对照 orca_debug_mesh_path_a_implementation_guide.md）：
+    [Phase 1] Immediate 模式 6 种网格类型（Sphere/Cylinder/Cone/Box/Quad/Arrow）
+    [Phase 2] InstanceFlags.EdgeHighlight 边缘高亮
+    [Phase 3] 透明度（alpha < 1）混合
+    [Phase 4] clear() 清空 immediate 队列
+    [Phase 5] Retained create_objects + query_count 持久化
+    [Phase 6] Retained update_transforms 动画
+    [Phase 7] Retained destroy_objects 销毁
+    [Phase 8] 坐标系与单位规范目视验收（设计文档 §2.3）：
+             Z-up 轴向、单位米、+Y 模型空间、非均匀缩放、箭头方向
+    [Phase 9] Immediate TTL（duration>0）跨帧存活 + 到期自动消失
+    [Phase 10] Retained keepalive 保活心跳：过期销毁、心跳续期、断连自清
+    [Phase 11] TTL=0 闪烁效果演示（为何 immediate 推荐 TTL>=0.1）
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+import threading
+import time
+import tty
+import termios
+from typing import Callable, List
+
+import gymnasium as gym
+import numpy as np
+
+from orca_gym.scripts.sim_euler_env import EulerSimEnv  # noqa: F401  (确保 entry_point 可导入)
+from orca_gym.utils.orca_debug_draw import (
+    DebugMeshType,
+    InstanceFlags,
+    _direction_to_quat,
+    _make_instance,
+)
+
+# ============================================================
+# 常量
+# ============================================================
+TIME_STEP = 0.001
+FRAME_SKIP = 20
+REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 0.02s，单帧墙钟步长
+
+# Immediate 模式默认 TTL（秒）。>=0.1 跨帧存活，规避渲染节流（30Hz render
+# vs 50Hz step）导致的闪烁。TTL=0 为单帧，仅用于 Phase 11 闪烁效果演示。
+IMMEDIATE_TTL = 0.5
+
+# 颜色 RGBA，范围 0..1
+RED = [1.0, 0.0, 0.0, 1.0]
+GREEN = [0.0, 1.0, 0.0, 1.0]
+BLUE = [0.0, 0.2, 1.0, 1.0]
+YELLOW = [1.0, 1.0, 0.0, 1.0]
+MAGENTA = [1.0, 0.0, 1.0, 1.0]
+CYAN = [0.0, 1.0, 1.0, 1.0]
+
+Z_ROW = 1.0  # 一排图形的统一高度
+
+
+# ============================================================
+# 按键监听（后台线程，空格键触发下一步）
+# ============================================================
+class KeyListener:
+    """后台线程监听空格键。主线程在 wait_for_space() 中等待事件。
+
+    仅在终端（TTY）下工作；非 TTY 环境（如 IDE 输出重定向）会退化为
+    行输入（按回车继续）。
+
+    实现要点（控制台模式管理）：
+      - 使用 ``tty.setcbreak`` 而非 ``tty.setraw``。cbreak 保留 OPOST
+        （\n → \r\n 输出后处理，保证 print 格式正常）和 ISIG
+        （Ctrl+C 产生 SIGINT 正常中断）；只关闭 ICANON（行缓冲）和 ECHO
+        （按键不回显，适合空格监听）。setraw 会关闭这两者，导致输出呈
+        阶梯状且 Ctrl+C 失效。
+      - termios 的保存/恢复由主线程在 start()/stop() 完成，不依赖子线程
+        的 finally。子线程阻塞在 read(1) 上，进程退出时被强杀，其 finally
+        未必执行 → 终端停留在 cbreak → 退出后输入不回显。主线程 stop()
+        一定执行，确保恢复。
+    """
+
+    def __init__(self):
+        self._event = threading.Event()
+        self._stop_flag = False
+        self._thread: threading.Thread | None = None
+        self._is_tty = sys.stdin.isatty()
+        self._old_settings = None
+
+    def start(self) -> None:
+        if not self._is_tty:
+            return
+        self._old_settings = termios.tcgetattr(sys.stdin)
+        tty.setcbreak(sys.stdin.fileno())
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_flag = True
+        self._event.set()  # 唤醒可能阻塞的等待
+        # 主线程恢复 termios：不依赖子线程的 finally（子线程可能阻塞在
+        # read(1) 上，进程退出时被强杀，finally 未必执行 → 终端停留在
+        # cbreak 模式 → 退出后输入不回显）。
+        if self._old_settings is not None:
+            try:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._old_settings)
+            except OSError:
+                pass
+            self._old_settings = None
+
+    def wait_for_space(self, prompt: str = "按空格键继续...") -> None:
+        """阻塞直到空格键被按下。期间打印提示。"""
+        print(f"\n  >>> {prompt}")
+        self._event.wait()
+        self._event.clear()
+
+    def was_pressed(self) -> bool:
+        """非阻塞检查空格键是否已被按下。若已按下则清除事件并返回 True。"""
+        if self._event.is_set():
+            self._event.clear()
+            return True
+        return False
+
+    def _loop(self) -> None:
+        """后台读取按键，空格触发事件。"""
+        try:
+            while not self._stop_flag:
+                ch = sys.stdin.read(1)
+                if ch == " ":
+                    self._event.set()
+                elif ch == "\x03":  # Ctrl+C（cbreak 下 ISIG 保留，通常已由 SIGINT 处理）
+                    self._stop_flag = True
+                    self._event.set()
+                    break
+        except (OSError, ValueError):
+            # stdin 关闭或被中断时退出
+            self._event.set()
+
+
+# ============================================================
+# 辅助
+# ============================================================
+def run(env, coro):
+    """在 env 的事件循环上同步执行 async 协程。"""
+    return env.loop.run_until_complete(coro)
+
+
+def force_render(env) -> None:
+    """绕过 env.render() 的 30Hz 墙钟节流，强制立即刷新一帧到 OrcaStudio。
+
+    immediate 模式下，绘制的图形在 Studio 端每次 Simulate 后被清空。
+    若 env.render() 节流跳过本帧（render_fps=30，而 hold 节拍为 50Hz），
+    则提交的 immediate 图形不会触发刷新就被下次 Simulate 清掉 → 闪烁。
+    immediate 阶段每帧用 force_render 保证提交与刷新严格 1:1。
+    """
+    env.loop.run_until_complete(env._gym.render())
+
+
+def render_until_key(env, key_listener: KeyListener, redraw: Callable[[], None] | None = None,
+                     prompt: str = "按空格键继续...", force: bool = True) -> None:
+    """持续渲染直到空格键被按下。redraw 非 None 时每帧重新提交（immediate 模式）。
+
+    每帧：[redraw] -> step(零控制) -> render -> sleep(剩余时间)。
+    计时对齐墙钟（扣除 step/render/gRPC 耗时），保证物理 time_step=0.001
+    即 1000 Hz 子步进、Gym step 以 50 Hz (REALTIME_STEP=0.02s) 节流，
+    使仿真进度与实时 1:1。EulerSimEnv.step 内部用零控制，场景不会乱动。
+
+    immediate 模式（redraw 非 None）：默认用 force_render 绕过 env.render() 的
+    30Hz 节流，确保每帧提交的图形都触发刷新（否则被节流跳过的帧图形会被
+    下次 Simulate 清空 → 闪烁）。设 force=False 可保留 30Hz 节流，用于
+    Phase 11 演示 TTL=0 的闪烁效果（TTL>=0.1 则节流下仍稳定）。
+
+    与旧 hold() 的区别：不再按固定秒数退出，而是等待空格键。
+    """
+    action = env.action_space.sample()
+    print(f"\n  >>> {prompt}")
+    while not key_listener.was_pressed():  # 非阻塞检查，未按键则继续渲染
+        frame_start = time.time()
+        if redraw is not None:
+            redraw()
+        env.step(action)
+        # immediate 模式需每帧刷新；retained 模式普通 render 即可
+        if redraw is not None and force:
+            force_render(env)
+        else:
+            env.render()
+        elapsed = time.time() - frame_start
+        if elapsed < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed)
+
+
+def hold(env, seconds: float, redraw: Callable[[], None] | None = None) -> None:
+    """持续渲染 `seconds` 秒（保留给 Phase 6 动画用，基于墙钟计时）。
+
+    Phase 6 的圆周动画需要基于时间连续更新 transform，不适合按键切换，
+    故保留此基于时间的版本。
+    """
+    action = env.action_space.sample()
+    end = time.time() + seconds
+    while time.time() < end:
+        frame_start = time.time()
+        if redraw is not None:
+            redraw()
+        env.step(action)
+        if redraw is not None:
+            force_render(env)
+        else:
+            env.render()
+        elapsed = time.time() - frame_start
+        if elapsed < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed)
+
+
+def make_env(orcagym_addr: str):
+    """注册并构造 EulerSimEnv（在线模式，连接 OrcaStudio）。"""
+    env_id = "DebugDrawE2E-OrcaGym-" + orcagym_addr.replace(":", "-") + "-000"
+    gym.register(
+        id=env_id,
+        entry_point="orca_gym.scripts.sim_euler_env:EulerSimEnv",
+        kwargs={
+            "frame_skip": FRAME_SKIP,
+            "orcagym_addr": orcagym_addr,
+            "agent_names": ["NoAgent"],
+            "time_step": TIME_STEP,
+        },
+        max_episode_steps=sys.maxsize,
+    )
+    return gym.make(env_id)
+
+
+# ============================================================
+# Phase 1：Immediate 模式 6 种网格类型
+# ============================================================
+def phase1_all_mesh_types(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 1] Immediate 模式：6 种网格类型")
+    print("  预期（从左到右一排，高度 z=%.1f）：" % Z_ROW)
+    print("    红球 | 绿圆柱(竖) | 蓝圆锥(朝上) | 黄方块 | 品红双面 Quad | 青箭头(斜向上)")
+    z = Z_ROW
+
+    def redraw():
+        run(env, dd.draw_sphere([-2.5, 0, z], 0.3, RED, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_cylinder([-1.5, 0, z - 0.3], [-1.5, 0, z + 0.3], 0.2, GREEN, duration=IMMEDIATE_TTL))
+        # Cone 沿 +Y 建模，scale=[r, h, r]；旋转 +Y→+Z 使尖端朝上
+        cone_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0]))
+        cone_inst = _make_instance([-0.5, 0, z], cone_quat.tolist(), [0.25, 0.6, 0.25], BLUE)
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_inst], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([0.5, 0, z], [0.4, 0.4, 0.4], YELLOW, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_quad([1.5, 0, z], [0.5, 0.5, 1.0], MAGENTA, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_arrow([2.3, 0, z - 0.3], [2.7, 0, z + 0.3], 0.05, CYAN, duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw, "观察 6 种网格类型，按空格键进入 Phase 2")
+
+
+# ============================================================
+# Phase 2：EdgeHighlight 边缘高亮
+# ============================================================
+def phase2_edge_highlight(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 2] InstanceFlags.EdgeHighlight 边缘高亮")
+    print("  预期：每对图形中，左侧无高亮、右侧带高亮（轮廓/边缘发亮）")
+    z = Z_ROW
+
+    def redraw():
+        # 球：左无 / 右高亮
+        run(env, dd.draw_sphere([-1.5, 0, z], 0.3, RED, flags=InstanceFlags.NONE, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([-0.5, 0, z], 0.3, RED, flags=InstanceFlags.EDGE_HIGHLIGHT, duration=IMMEDIATE_TTL))
+        # 盒：左无 / 右高亮（盒子边缘最明显）
+        run(env, dd.draw_box([0.5, 0, z], [0.4, 0.4, 0.4], YELLOW,
+                             flags=InstanceFlags.NONE, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([1.5, 0, z], [0.4, 0.4, 0.4], YELLOW,
+                             flags=InstanceFlags.EDGE_HIGHLIGHT, duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw, "观察边缘高亮对比，按空格键进入 Phase 3")
+
+
+# ============================================================
+# Phase 3：透明度（alpha < 1）混合
+# ============================================================
+def phase3_transparency(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 3] 透明度（alpha=0.5）混合")
+    print("  预期：三个半透明球相互重叠，透过前面可见后面（SrcAlpha/InvSrcAlpha blend）")
+    z = Z_ROW
+
+    def redraw():
+        run(env, dd.draw_sphere([-0.3, -0.3, z], 0.4, [1.0, 0.0, 0.0, 0.5], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([0.3, -0.3, z], 0.4, [0.0, 1.0, 0.0, 0.5], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([0.0, 0.3, z], 0.4, [0.0, 0.2, 1.0, 0.5], duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw, "观察半透明混合，按空格键进入 Phase 4")
+
+
+# ============================================================
+# Phase 4：clear() 清空 immediate 队列（两步：显示 → 清空）
+# ============================================================
+def phase4_clear(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 4] clear() 清空 immediate 队列")
+    print("  预期：先显示一球一盒，按空格键后调用 clear()，图形消失")
+    z = Z_ROW
+
+    def draw_shapes():
+        run(env, dd.draw_sphere([-1.0, 0, z], 0.3, RED, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([1.0, 0, z], [0.4, 0.4, 0.4], GREEN, duration=IMMEDIATE_TTL))
+
+    # 步骤 1：显示图形
+    render_until_key(env, key_listener, draw_shapes, "观察图形显示，按空格键触发 clear()")
+
+    # 步骤 2：调用 clear() 后持续渲染（无提交，应消失）
+    print("  >> 调用 clear()")
+    run(env, dd.clear())
+    # clear 后立即强制刷新一帧，确保清空效果可见
+    env.step(env.action_space.sample())
+    force_render(env)
+    render_until_key(env, key_listener, None, "观察图形已消失，按空格键进入 Phase 5")
+
+
+# ============================================================
+# Phase 5：Retained create_objects + query_count 持久化
+# ============================================================
+def phase5_retained_create(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 5] Retained create_objects + query_count")
+    print("  预期：创建 6 个持久对象（每种类型一个），按空格键前跨帧持续显示（无需重提交）")
+    z = Z_ROW
+    # Cylinder/Cone/Arrow 沿 +Y 建模，scale=[r, h, r]；旋转 +Y→+Z 使其朝上
+    up_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0])).tolist()
+    specs = [
+        (DebugMeshType.SPHERE,   _make_instance([-2.5, 0, z], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED),          "Sphere"),
+        (DebugMeshType.CYLINDER, _make_instance([-1.5, 0, z], up_quat, [0.2, 0.6, 0.2], GREEN),   "Cylinder"),
+        (DebugMeshType.CONE,     _make_instance([-0.5, 0, z], up_quat,       [0.25, 0.6, 0.25], BLUE),       "Cone"),
+        (DebugMeshType.BOX,      _make_instance([0.5, 0, z],  [0, 0, 0, 1], [0.4, 0.4, 0.4], YELLOW),       "Box"),
+        (DebugMeshType.QUAD,     _make_instance([1.5, 0, z],  [0, 0, 0, 1], [0.5, 0.5, 1.0], MAGENTA),      "Quad"),
+        (DebugMeshType.ARROW,    _make_instance([2.5, 0, z],  up_quat,       [0.05, 0.6, 0.05], CYAN),       "Arrow"),
+    ]
+    handles: List[dict] = []
+    for mtype, inst, name in specs:
+        hs = run(env, dd.create_objects(mtype, [inst]))
+        valid = [h for h in hs if h["valid"]]
+        handles.extend(valid)
+        print(f"  create {name}: {hs}")
+    count = run(env, dd.query_count())
+    print(f"  query_count = {count}（retained 应 >= {len(handles)}）")
+
+    render_until_key(env, key_listener, None, "观察 6 个持久对象跨帧显示，按空格键销毁并进入 Phase 6")
+
+    run(env, dd.destroy_objects(handles))
+    count2 = run(env, dd.query_count())
+    print(f"  销毁 {len(handles)} 个对象后 query_count = {count2}")
+
+
+# ============================================================
+# Phase 6：Retained update_transforms 动画（基于时间，动画连续）
+# ============================================================
+def phase6_retained_animate(env, key_listener: KeyListener, duration: float = 6.0) -> None:  # noqa: ARG001
+    dd = env.debug_draw()
+    print("\n[Phase 6] Retained update_transforms 动画")
+    print("  预期：4 个球绕中心做圆周运动（验证 update_transforms 实时更新）")
+    print(f"  动画运行 {duration:.0f} 秒后自动进入下一步（动画需基于时间连续更新）")
+    n = 4
+    radius = 1.0
+    init_insts = [
+        _make_instance([radius, 0, Z_ROW], [0, 0, 0, 1], [0.2, 0.2, 0.2], CYAN)
+        for _ in range(n)
+    ]
+    hs = run(env, dd.create_objects(DebugMeshType.SPHERE, init_insts))
+    handles = [h for h in hs if h["valid"]]
+    print(f"  创建 {len(handles)} 个球用于动画")
+
+    action = env.action_space.sample()
+    end = time.time() + duration
+    t = 0.0
+    while time.time() < end:
+        new_insts = []
+        for i in range(len(handles)):
+            angle = t * 1.5 + i * (2 * np.pi / max(len(handles), 1))
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            new_insts.append(
+                _make_instance([x, y, Z_ROW], [0, 0, 0, 1], [0.2, 0.2, 0.2], CYAN)
+            )
+        run(env, dd.update_transforms(handles, new_insts))
+        env.step(action)
+        env.render()
+        t += REALTIME_STEP
+        time.sleep(REALTIME_STEP)
+
+    run(env, dd.destroy_objects(handles))
+    print("  动画球已销毁")
+
+
+# ============================================================
+# Phase 7：Retained destroy_objects 销毁（两步：显示 → 销毁）
+# ============================================================
+def phase7_retained_destroy(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 7] Retained destroy_objects 销毁")
+    print("  预期：先显示 3 个球，按空格键后调用 destroy，球消失，query_count retained 减少")
+    z = Z_ROW
+    insts = [
+        _make_instance([-1.0, 0, z], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED),
+        _make_instance([0.0, 0, z],  [0, 0, 0, 1], [0.3, 0.3, 0.3], GREEN),
+        _make_instance([1.0, 0, z],  [0, 0, 0, 1], [0.3, 0.3, 0.3], BLUE),
+    ]
+    hs = run(env, dd.create_objects(DebugMeshType.SPHERE, insts))
+    handles = [h for h in hs if h["valid"]]
+    before = run(env, dd.query_count())
+    print(f"  创建 {len(handles)} 个球，query_count={before}")
+
+    render_until_key(env, key_listener, None, "观察 3 个球显示，按空格键触发 destroy_objects()")
+
+    print("  >> 调用 destroy_objects()")
+    run(env, dd.destroy_objects(handles))
+    after = run(env, dd.query_count())
+    print(f"  销毁后 query_count={after}（retained 应减少）")
+    render_until_key(env, key_listener, None, "观察球已消失，按空格键进入 Phase 8")
+
+
+# ============================================================
+# Phase 8：坐标系与单位规范目视验收（对应设计文档 §2.3）
+# 逐项验证 Z-up 右手系、单位米、+Y 模型空间约定、四元数顺序。
+# 每个子阶段绘制已知几何，按空格键切换到下一个子阶段，
+# 人工对照检查清单核对方向/尺寸/缩放。
+# ============================================================
+def phase8_coordinate_system(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 8] 坐标系与单位规范目视验收（设计文档 §2.3）")
+    print("  本阶段分 5 组，每组绘制已知几何并打印检查清单，按空格键切换下一组。")
+    print("  坐标系：Z-up 右手系（X=右，Y=前，Z=上），单位米。")
+
+    # ---------- 8.1 Z-up 轴向验证：球体在三个轴上 ----------
+    print("\n  [8.1] Z-up 轴向验证：三球分别在 X/Y/Z 轴 1 米处")
+    print("    预期：红球在右(+X)、绿球在前(+Y)、蓝球在上(+Z)")
+    print("    若红/绿球出现在高度方向，说明坐标系被误转为 Y-up")
+
+    def redraw_81():
+        run(env, dd.draw_sphere([1.0, 0, 0], 0.15, RED, duration=IMMEDIATE_TTL))    # +X 右
+        run(env, dd.draw_sphere([0.0, 1.0, 0], 0.15, GREEN, duration=IMMEDIATE_TTL))  # +Y 前
+        run(env, dd.draw_sphere([0.0, 0, 1.0], 0.15, BLUE, duration=IMMEDIATE_TTL))   # +Z 上
+    render_until_key(env, key_listener, redraw_81, "[8.1] 观察三球轴向，按空格键进入 8.2")
+
+    # ---------- 8.2 单位验证：1 米参考立方体 ----------
+    print("\n  [8.2] 单位验证：1×1×1 米立方体在原点")
+    print("    预期：立方体边长 1 米，底面贴地（z=0..1），居中在 [0,0,0.5]")
+    print("    size=[1,1,1] 对应三轴各 1 米（非半边长）")
+
+    def redraw_82():
+        run(env, dd.draw_box([0, 0, 0.5], [1.0, 1.0, 1.0], YELLOW, duration=IMMEDIATE_TTL))
+    render_until_key(env, key_listener, redraw_82, "[8.2] 观察 1 米参考立方体，按空格键进入 8.3")
+
+    # ---------- 8.3 方向性基元 +Y 模型空间：圆柱三轴方向 ----------
+    print("\n  [8.3] 圆柱 +Y 模型空间验证：三圆柱分别沿 +X/+Y/+Z")
+    print("    预期：")
+    print("      红圆柱水平向右(+X)，长 2 米，中点 [1,0,1]")
+    print("      绿圆柱水平向前(+Y)，长 2 米，中点 [0,1,1]")
+    print("      蓝圆柱竖直向上(+Z)，长 2 米，中点 [0,0,2]")
+    print("    若蓝圆柱水平而非竖直，说明 +Y→+Z 旋转方向错误")
+
+    z0 = 1.0
+
+    def redraw_83():
+        run(env, dd.draw_cylinder([0, 0, z0], [2.0, 0, z0], 0.08, RED, duration=IMMEDIATE_TTL))    # +X
+        run(env, dd.draw_cylinder([0, 0, z0], [0.0, 2.0, z0], 0.08, GREEN, duration=IMMEDIATE_TTL))  # +Y
+        run(env, dd.draw_cylinder([0, 0, z0], [0.0, 0.0, 2.0 + z0], 0.08, BLUE, duration=IMMEDIATE_TTL))  # +Z
+    render_until_key(env, key_listener, redraw_83, "[8.3] 观察圆柱三轴方向，按空格键进入 8.4")
+
+    # ---------- 8.4 箭头方向 + 缩放验证 ----------
+    print("\n  [8.4] 箭头方向与缩放验证")
+    print("    预期：")
+    print("      红箭头：原点→+Z(2米)，竖直向上，杆半径 0.05，长 2 米")
+    print("      绿箭头：原点→+Y(1.5米)，水平向前，杆半径 0.10（更粗），长 1.5 米")
+    print("      蓝箭头：原点→+X(1米)，水平向右，杆半径 0.15（最粗），长 1 米")
+    print("    检查：箭尖方向 = to 方向；杆粗细 = shaft_radius（米）；长度 = |to-from|")
+
+    def redraw_84():
+        run(env, dd.draw_arrow([0, 0, 0], [0, 0, 2.0], 0.05, RED, duration=IMMEDIATE_TTL))    # +Z 竖直
+        run(env, dd.draw_arrow([0, 0, 0], [0, 1.5, 0], 0.10, GREEN, duration=IMMEDIATE_TTL))  # +Y 前
+        run(env, dd.draw_arrow([0, 0, 0], [1.0, 0, 0], 0.15, BLUE, duration=IMMEDIATE_TTL))   # +X 右
+    render_until_key(env, key_listener, redraw_84, "[8.4] 观察箭头方向与缩放，按空格键进入 8.5")
+
+    # ---------- 8.5 非均匀缩放验证 ----------
+    print("\n  [8.5] 非均匀缩放验证：三个立方体不同 xyz 缩放")
+    print("    预期：")
+    print("      红盒 [2,0.5,0.5]：X 方向长 2 米，Y/Z 方向 0.5 米（长条形，沿 X）")
+    print("      绿盒 [0.5,2,0.5]：Y 方向长 2 米，X/Z 方向 0.5 米（长条形，沿 Y）")
+    print("      蓝盒 [0.5,0.5,2]：Z 方向长 2 米，X/Y 方向 0.5 米（长条形，沿 Z/竖直）")
+    print("    若蓝盒非竖直长条，说明 Z 轴缩放被误映射到其他轴")
+
+    def redraw_85():
+        run(env, dd.draw_box([-1.5, 0, 1.0], [2.0, 0.5, 0.5], RED, duration=IMMEDIATE_TTL))    # 沿 X 长条
+        run(env, dd.draw_box([0, 0, 1.0], [0.5, 2.0, 0.5], GREEN, duration=IMMEDIATE_TTL))     # 沿 Y 长条
+        run(env, dd.draw_box([1.5, 0, 1.0], [0.5, 0.5, 2.0], BLUE, duration=IMMEDIATE_TTL))    # 沿 Z 长条（竖直）
+    render_until_key(env, key_listener, redraw_85, "[8.5] 观察非均匀缩放，按空格键完成 Phase 8")
+
+    print("\n  [Phase 8 完成] 请对照上述检查清单逐项确认视口中的几何方向/尺寸/缩放。")
+
+
+# ============================================================
+# Phase 9：Immediate TTL（duration>0）跨帧存活 + 到期自动消失
+# 对照实现指南 §3.2.4 / 设计文档 §3.1。
+# 三步：
+#   9.1 对照：左球 duration=0（单帧，需每帧重提交），右球 duration=2.0（TTL，停止重提交后仍存活）
+#   9.2 停止重提交：左球消失（单帧），右球仍存活（TTL 未到期）—— 验证 TTL 跨帧
+#   9.3 等待到期：2 秒后右球自动消失 —— 验证 TTL 到期清理
+# ============================================================
+def phase9_ttl_duration(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 9] Immediate TTL（duration>0）跨帧存活 + 到期自动消失")
+    print("  机制：duration=0 为单帧（每帧 Simulate 后清空）；duration>0 跨帧存活至仿真时间到期。")
+    print("  本阶段用于防闪烁：低频提交的图形无需每帧重画。")
+
+    ttl = 2.0  # TTL 时长（秒）
+
+    # ---------- 9.1 对照：两球同时绘制（左单帧 / 右 TTL）----------
+    print(f"\n  [9.1] 对照：左球 duration=0（单帧），右球 duration={ttl}s（TTL）")
+    print("    预期：两球均显示（此阶段每帧都重提交，两者都可见）")
+
+    def redraw_91():
+        run(env, dd.draw_sphere([-1.0, 0, Z_ROW], 0.3, RED, duration=0.0))      # 单帧
+        run(env, dd.draw_sphere([1.0, 0, Z_ROW], 0.3, CYAN, duration=ttl))      # TTL
+    render_until_key(env, key_listener, redraw_91, "[9.1] 观察两球均显示，按空格键停止重提交")
+
+    # ---------- 9.2 停止重提交：左球消失，右球存活 ----------
+    print("\n  [9.2] 停止重提交（redraw=None），仅持续渲染")
+    print("    预期：左球（单帧）立即消失；右球（TTL）仍持续显示（跨帧存活）")
+    print("    若右球也消失，说明 duration_seconds 未被 C++ 侧正确写入 m_duration")
+    render_until_key(env, key_listener, None, f"[9.2] 观察左消失/右存活，按空格键等待 TTL 到期（{ttl}s）")
+
+    # ---------- 9.3 等待到期：右球自动消失 ----------
+    print(f"\n  [9.3] 持续渲染等待 TTL 到期（约 {ttl} 秒）")
+    print(f"    预期：{ttl} 秒后右球自动消失（C++ 侧按仿真时间到期清理）")
+    print("    注意：到期基于仿真时间（time_step×step），非墙钟；若仿真暂停则不会到期")
+    hold(env, ttl + 0.5, redraw=None)
+    render_until_key(env, key_listener, None, "[9.3] 观察右球已消失，按空格键完成 Phase 9")
+
+
+# ============================================================
+# Phase 10：Retained keepalive 保活心跳
+# 对照设计文档 §3.2 / 实现指南 §3.3。
+# 三步：
+#   10.1 过期销毁：创建 keepalive=1.0s 对象，不发送心跳，1s 后自动消失
+#   10.2 心跳续期：创建 keepalive=1.0s 对象，每 0.5s 发送 keepalive_objects，持续存活
+#   10.3 断连自清：停止心跳后，1s 内对象自动消失（模拟 Python 崩溃/gRPC 断连）
+# ============================================================
+def phase10_keepalive(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 10] Retained keepalive 保活心跳")
+    print("  机制：create_objects(keepalive=N) 后，对象在 N 秒内未收到 update/keepalive 则自动销毁。")
+    print("  用于断连/崩溃/句柄泄漏等异常场景的残留清理（设计文档 §11.9）。")
+
+    keepalive = 1.0  # 保活时长（秒）
+
+    # ---------- 10.1 过期销毁：不心跳，到期自清 ----------
+    print(f"\n  [10.1] 过期销毁：创建 keepalive={keepalive}s 球，不发送心跳")
+    print(f"    预期：{keepalive} 秒后球自动消失（C++ 侧保活计时器到期）")
+    inst = _make_instance([-1.0, 0, Z_ROW], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED)
+    hs = run(env, dd.create_objects(DebugMeshType.SPHERE, [inst], keepalive=keepalive))
+    handles = [h for h in hs if h["valid"]]
+    print(f"    创建 {len(handles)} 个球，句柄={handles}")
+    print(f"    持续渲染 {keepalive + 0.5}s（不发送 update/keepalive）...")
+    hold(env, keepalive + 0.5, redraw=None)
+    count = run(env, dd.query_count())
+    print(f"    query_count={count}（retained 应为 0，对象已自动销毁）")
+    render_until_key(env, key_listener, None, "[10.1] 观察红球已消失，按空格键进入 10.2")
+
+    # ---------- 10.2 心跳续期：每 0.5s 发送 keepalive，持续存活 ----------
+    print(f"\n  [10.2] 心跳续期：创建 keepalive={keepalive}s 球，每 0.5s 发送 keepalive_objects")
+    print("    预期：球持续显示（心跳刷新保活计时器，不会过期）")
+    print("    建议心跳间隔 = 1/2 保活时长（设计文档 §8）：keepalive=1.0s → 0.5s 心跳")
+    inst2 = _make_instance([0.0, 0, Z_ROW], [0, 0, 0, 1], [0.3, 0.3, 0.3], GREEN)
+    hs2 = run(env, dd.create_objects(DebugMeshType.SPHERE, [inst2], keepalive=keepalive))
+    handles2 = [h for h in hs2 if h["valid"]]
+    print(f"    创建 {len(handles2)} 个球，句柄={handles2}")
+
+    heartbeat_interval = keepalive / 2  # 0.5s
+    heartbeat_duration = 4.0  # 持续 4 秒（远超 keepalive，验证心跳确实在续期）
+    print(f"    持续 {heartbeat_duration}s，每 {heartbeat_interval}s 心跳一次...")
+    action = env.action_space.sample()
+    end = time.time() + heartbeat_duration
+    last_heartbeat = 0.0
+    heartbeat_count = 0
+    while time.time() < end:
+        frame_start = time.time()
+        if time.time() - last_heartbeat >= heartbeat_interval:
+            result = run(env, dd.keepalive_objects(handles2))
+            alive_n = len(result["alive"])
+            expired_n = len(result["expired"])
+            heartbeat_count += 1
+            print(f"    心跳 #{heartbeat_count}: alive={alive_n}, expired={expired_n}")
+            if expired_n > 0:
+                print(f"    ⚠️ 出现过期句柄：{result['expired']}（不应发生）")
+            last_heartbeat = time.time()
+        env.step(action)
+        env.render()
+        elapsed = time.time() - frame_start
+        if elapsed < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed)
+    count2 = run(env, dd.query_count())
+    print(f"    {heartbeat_duration}s 后 query_count={count2}（retained 应 >= 1，心跳续期成功）")
+    render_until_key(env, key_listener, None, "[10.2] 观察绿球持续显示，按空格键进入 10.3")
+
+    # ---------- 10.3 断连自清：停止心跳，1s 内自动消失 ----------
+    print("\n  [10.3] 断连自清：停止心跳，模拟 Python 崩溃/gRPC 断连")
+    print(f"    预期：{keepalive} 秒内绿球自动消失（保活计时器到期，C++ 侧自动清理）")
+    print("    这正是 keepalive 机制的核心价值：调用方异常退出后无残留对象")
+    print(f"    持续渲染 {keepalive + 0.5}s（不发送心跳）...")
+    hold(env, keepalive + 0.5, redraw=None)
+    count3 = run(env, dd.query_count())
+    print(f"    query_count={count3}（retained 应为 0，断连自清成功）")
+    render_until_key(env, key_listener, None, "[10.3] 观察绿球已消失，按空格键完成 Phase 10")
+
+
+# ============================================================
+# Phase 11：TTL=0 闪烁效果演示（为何 immediate 推荐 TTL>=0.1）
+# 对照 force_render 注释 / 设计文档 §3.1。
+# 机制：immediate（TTL=0）图形在 Studio 端每次 Simulate 后被清空。
+#   env.render() 默认 30Hz 节流，而 step 以 50Hz (REALTIME_STEP=0.02s) 运行，
+#   被节流跳过的帧 → 提交的图形未触发刷新即被下次 Simulate 清掉 → 闪烁。
+#   TTL>=0.1 使图形跨帧存活，即使某帧未刷新，下一帧仍可见 → 稳定。
+# 本阶段用 force=False（保留 30Hz 节流）对比 TTL=0（闪烁）与 TTL=0.1（稳定）。
+# ============================================================
+def phase11_flicker_demo(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 11] TTL=0 闪烁效果演示（为何 immediate 推荐 TTL>=0.1）")
+    print("  机制：TTL=0 图形每次 Simulate 后清空；env.render() 默认 30Hz 节流，")
+    print("        而 step 以 50Hz 运行 → 被节流跳过的帧图形未刷新即被清掉 → 闪烁。")
+    print("        TTL>=0.1 跨帧存活，即使某帧未刷新仍可见 → 稳定。")
+    print("  本阶段使用 force=False（保留 30Hz 节流），对比两球：")
+
+    # ---------- 11.1 节流渲染下：左 TTL=0 闪烁 / 右 TTL=0.1 稳定 ----------
+    print("\n  [11.1] 30Hz 节流渲染（force=False）：左球 TTL=0，右球 TTL=0.1")
+    print("    预期：左球闪烁/时隐时现（部分帧未刷新即被清空）；右球稳定显示")
+    print("    这正是其余阶段（Phase 1/2/3/4/8）使用 IMMEDIATE_TTL=0.1 的原因")
+
+    def redraw_111():
+        run(env, dd.draw_sphere([-1.0, 0, Z_ROW], 0.3, RED, duration=0.0))        # TTL=0 → 闪烁
+        run(env, dd.draw_sphere([1.0, 0, Z_ROW], 0.3, CYAN, duration=IMMEDIATE_TTL))  # TTL=0.1 → 稳定
+    render_until_key(env, key_listener, redraw_111,
+                     "[11.1] 观察左闪/右稳，按空格键进入 11.2", force=False)
+
+    # ---------- 11.2 对照：force_render（每帧刷新）下两球均稳定 ----------
+    print("\n  [11.2] force_render（每帧刷新，绕过节流）：左球 TTL=0，右球 TTL=0.1")
+    print("    预期：两球均稳定（每帧都刷新，TTL=0 也不再闪烁）")
+    print("    结论：TTL>=0.1 与 force_render 都能消除闪烁；TTL 更稳健（不依赖渲染节流）")
+    render_until_key(env, key_listener, redraw_111,
+                     "[11.2] 观察两球均稳定，按空格键完成 Phase 11", force=True)
+
+
+# ============================================================
+# 入口
+# ============================================================
+PHASES = {
+    1: phase1_all_mesh_types,
+    2: phase2_edge_highlight,
+    3: phase3_transparency,
+    4: phase4_clear,
+    5: phase5_retained_create,
+    6: phase6_retained_animate,
+    7: phase7_retained_destroy,
+    8: phase8_coordinate_system,
+    9: phase9_ttl_duration,
+    10: phase10_keepalive,
+    11: phase11_flicker_demo,
+}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="OrcaDebugMesh 路径 A 端到端视觉验收")
+    parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
+    parser.add_argument("--phase", type=int, nargs="*", default=None,
+                        help="只运行指定阶段（1-11），默认全部")
+    args = parser.parse_args()
+
+    env = make_env(args.addr)
+    key_listener = KeyListener()
+    key_listener.start()
+    try:
+        u = env.unwrapped
+        dd = u.debug_draw()
+        print(f"已连接 OrcaStudio: {args.addr}")
+        print(f"frame_skip={u.frame_skip}, time_step={u._time_step}, dt={u.dt}")
+        print(f"debug_draw.is_online = {dd.is_online}")
+        if not dd.is_online:
+            print("ERROR: debug_draw 离线，请确认 OrcaStudio 已启动并进入仿真运行状态")
+            return
+
+        print("\n交互说明：每个阶段绘制完成后持续渲染，按【空格键】进入下一步。")
+        print("Phase 6 动画、Phase 9 TTL 到期、Phase 10 keepalive 过期/心跳部分基于时间自动推进；")
+        print("Phase 11 演示 TTL=0 闪烁（节流渲染下）；其余步骤均按键切换。按 Ctrl+C 可随时中断。")
+
+        selected = sorted(args.phase) if args.phase else sorted(PHASES)
+        for p in selected:
+            if p not in PHASES:
+                print(f"  [跳过] 未知阶段 {p}")
+                continue
+            try:
+                # 传 unwrapped env：phase 函数需访问 .debug_draw() / .loop
+                PHASES[p](u, key_listener)
+            except Exception as e:  # noqa: BLE001  (单阶段出错不影响后续阶段)
+                print(f"  [阶段 {p} 出错] {type(e).__name__}: {e}")
+            # 阶段间清空 immediate 队列，避免残留
+            run(u, dd.clear())
+
+        print("\n全部阶段完成。")
+    except KeyboardInterrupt:
+        print("\n已中断")
+    finally:
+        key_listener.stop()
+        env.close()
+
+
+if __name__ == "__main__":
+    main()
