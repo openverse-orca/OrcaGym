@@ -2740,7 +2740,8 @@ class OrcaGymLocal(OrcaGymBase):
         返回所有 body 受到的外部约束力，包括接触力、等式约束力等。
         
         术语说明:
-            - cfrc_ext: 外部约束力，形状 (nbody, 6)，每行为 [fx, fy, fz, mx, my, mz]
+            - cfrc_ext: 外部约束力，形状 (nbody, 6)，MuJoCo spatial vector 布局为 [mx, my, mz, fx, fy, fz]
+              （力矩在前，力在后；力/力矩在以 subtree com 为原点的全局坐标系中，坐标轴与世界系对齐）
             - 用途: 用于分析物体受力、计算奖励等
         
         Returns:

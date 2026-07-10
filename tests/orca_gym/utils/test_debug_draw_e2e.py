@@ -64,7 +64,7 @@ REALTIME_STEP = TIME_STEP * FRAME_SKIP  # 0.02s，单帧墙钟步长
 
 # Immediate 模式默认 TTL（秒）。>=0.1 跨帧存活，规避渲染节流（30Hz render
 # vs 50Hz step）导致的闪烁。TTL=0 为单帧，仅用于 Phase 11 闪烁效果演示。
-IMMEDIATE_TTL = 0.5
+IMMEDIATE_TTL = 0.1
 
 # 颜色 RGBA，范围 0..1
 RED = [1.0, 0.0, 0.0, 1.0]
@@ -251,23 +251,62 @@ def make_env(orcagym_addr: str):
 # ============================================================
 def phase1_all_mesh_types(env, key_listener: KeyListener) -> None:
     dd = env.debug_draw()
-    print("\n[Phase 1] Immediate 模式：6 种网格类型")
-    print("  预期（从左到右一排，高度 z=%.1f）：" % Z_ROW)
+    print("\n[Phase 1] Immediate 模式：6 种网格类型（3 组对照）")
+    print("  第 1 组（原始方向，z=%.1f, y=0）：所有图形视觉居中于 z" % Z_ROW)
     print("    红球 | 绿圆柱(竖) | 蓝圆锥(朝上) | 黄方块 | 品红双面 Quad | 青箭头(斜向上)")
+    print("  第 2 组（锚点对齐，z=0, y=2）：所有图形 position=[x,2,0]")
+    print("    无方向性基元居中于 z=0；方向性基元底面/杆底在 z=0，向上延伸至 z=0.6")
+    print("  第 3 组（绕 X 轴旋转 90°，z=1, y=-2）：方向性基元指向 -Y")
     z = Z_ROW
 
+    # 朝上四元数（+Y → +Z）
+    up_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0]))
+    # 绕 X 轴旋转 90° 的四元数（+Y → -Y）
+    rot_x90 = _direction_to_quat(np.array([0.0, -1.0, 0.0])).tolist()
+
+    # 方向性基元的半高（scale.y / 2），用于视觉居中补偿
+    H_HALF = 0.3  # scale.y=0.6 → 半高 0.3
+
     def redraw():
+        # ========== 第 1 组：原始方向 (z=Z_ROW, y=0) — 视觉居中 ==========
+        # 无方向性：position = 中心
         run(env, dd.draw_sphere([-2.5, 0, z], 0.3, RED, duration=IMMEDIATE_TTL))
-        run(env, dd.draw_cylinder([-1.5, 0, z - 0.3], [-1.5, 0, z + 0.3], 0.2, GREEN, duration=IMMEDIATE_TTL))
-        # Cone 沿 +Y 建模，scale=[r, h, r]；旋转 +Y→+Z 使尖端朝上
-        cone_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0]))
-        cone_inst = _make_instance([-0.5, 0, z], cone_quat.tolist(), [0.25, 0.6, 0.25], BLUE)
-        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_inst], duration=IMMEDIATE_TTL))
         run(env, dd.draw_box([0.5, 0, z], [0.4, 0.4, 0.4], YELLOW, duration=IMMEDIATE_TTL))
         run(env, dd.draw_quad([1.5, 0, z], [0.5, 0.5, 1.0], MAGENTA, duration=IMMEDIATE_TTL))
-        run(env, dd.draw_arrow([2.3, 0, z - 0.3], [2.7, 0, z + 0.3], 0.05, CYAN, duration=IMMEDIATE_TTL))
+        # 方向性：from=z-H_HALF, to=z+H_HALF 使底面在 z-H_HALF、顶面在 z+H_HALF（视觉居中）
+        run(env, dd.draw_cylinder([-1.5, 0, z - H_HALF], [-1.5, 0, z + H_HALF], 0.2, GREEN, duration=IMMEDIATE_TTL))
+        # Cone：position = 底面中心 = z-H_HALF，rotation +Y→+Z，scale=[r, h, r]
+        cone_inst = _make_instance([-0.5, 0, z - H_HALF], up_quat.tolist(), [0.25, 0.6, 0.25], BLUE)
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_inst], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_arrow([2.3, 0, z - H_HALF], [2.3, 0, z + H_HALF], 0.05, CYAN, duration=IMMEDIATE_TTL))
 
-    render_until_key(env, key_listener, redraw, "观察 6 种网格类型，按空格键进入 Phase 2")
+        # ========== 第 2 组：锚点对齐 (z=0, y=2) — 演示 position 锚点语义 ==========
+        # 所有图形 position = [x, 2, 0]，观察锚点差异：
+        #   无方向性 → 几何中心在 z=0
+        #   方向性   → 底面/杆底在 z=0，向上延伸至 z=0.6
+        run(env, dd.draw_sphere([-2.5, 2, 0.0], 0.3, RED, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([0.5, 2, 0.0], [0.4, 0.4, 0.4], YELLOW, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_quad([1.5, 2, 0.0], [0.5, 0.5, 1.0], MAGENTA, duration=IMMEDIATE_TTL))
+        # 方向性：position = [x, 2, 0]（底面/杆底），延伸方向 +Z
+        run(env, dd.draw_cylinder([-1.5, 2, 0.0], [-1.5, 2, 0.6], 0.2, GREEN, duration=IMMEDIATE_TTL))
+        cone_inst2 = _make_instance([-0.5, 2, 0.0], up_quat.tolist(), [0.25, 0.6, 0.25], BLUE)
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_inst2], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_arrow([2.3, 2, 0.0], [2.3, 2, 0.6], 0.05, CYAN, duration=IMMEDIATE_TTL))
+
+        # ========== 第 3 组：绕 X 轴旋转 90° (z=1, y=-2) — 方向性基元指向 -Y ==========
+        # Sphere/Box/Quad 无方向性，旋转后外观不变
+        run(env, dd.draw_sphere([-2.5, -2, 1.0], 0.3, RED, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([0.5, -2, 1.0], [0.4, 0.4, 0.4], YELLOW, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_quad([1.5, -2, 1.0], [0.5, 0.5, 1.0], MAGENTA, duration=IMMEDIATE_TTL))
+        # 方向性：from = y+H_HALF（底面），to = y-H_HALF（顶面/尖端），方向 = -Y
+        run(env, dd.draw_cylinder([-1.5, -1.7, 1.0], [-1.5, -2.3, 1.0], 0.2, GREEN, duration=IMMEDIATE_TTL))
+        # Cone：position = 底面中心 = [-0.5, -1.7, 1.0]，rotation +Y→-Y
+        cone_inst3 = _make_instance([-0.5, -1.7, 1.0], rot_x90, [0.25, 0.6, 0.25], BLUE)
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_inst3], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_arrow([2.3, -1.7, 1.0], [2.3, -2.3, 1.0], 0.05, CYAN, duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw,
+                     "观察 3 组图形：第1组居中 / 第2组锚点对齐 / 第3组旋转，按空格键进入 Phase 2")
 
 
 # ============================================================
@@ -342,15 +381,19 @@ def phase5_retained_create(env, key_listener: KeyListener) -> None:
     print("\n[Phase 5] Retained create_objects + query_count")
     print("  预期：创建 6 个持久对象（每种类型一个），按空格键前跨帧持续显示（无需重提交）")
     z = Z_ROW
-    # Cylinder/Cone/Arrow 沿 +Y 建模，scale=[r, h, r]；旋转 +Y→+Z 使其朝上
+    # Cylinder/Cone/Arrow 沿 +Y 建模，position = 底面/杆底（C++ 锚点）。
+    # 为视觉居中于 z，position.z = z - scale.y/2（底面在下，顶面在上）
     up_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0])).tolist()
+    z_cyl = z - 0.3  # scale.y=0.6 → 底面在 z-0.3，顶面在 z+0.3
+    z_cone = z - 0.3
+    z_arrow = z - 0.3
     specs = [
-        (DebugMeshType.SPHERE,   _make_instance([-2.5, 0, z], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED),          "Sphere"),
-        (DebugMeshType.CYLINDER, _make_instance([-1.5, 0, z], up_quat, [0.2, 0.6, 0.2], GREEN),   "Cylinder"),
-        (DebugMeshType.CONE,     _make_instance([-0.5, 0, z], up_quat,       [0.25, 0.6, 0.25], BLUE),       "Cone"),
-        (DebugMeshType.BOX,      _make_instance([0.5, 0, z],  [0, 0, 0, 1], [0.4, 0.4, 0.4], YELLOW),       "Box"),
-        (DebugMeshType.QUAD,     _make_instance([1.5, 0, z],  [0, 0, 0, 1], [0.5, 0.5, 1.0], MAGENTA),      "Quad"),
-        (DebugMeshType.ARROW,    _make_instance([2.5, 0, z],  up_quat,       [0.05, 0.6, 0.05], CYAN),       "Arrow"),
+        (DebugMeshType.SPHERE,   _make_instance([-2.5, 0, z], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED),     "Sphere"),
+        (DebugMeshType.CYLINDER, _make_instance([-1.5, 0, z_cyl], up_quat, [0.2, 0.6, 0.2], GREEN),    "Cylinder"),
+        (DebugMeshType.CONE,     _make_instance([-0.5, 0, z_cone], up_quat, [0.25, 0.6, 0.25], BLUE),  "Cone"),
+        (DebugMeshType.BOX,      _make_instance([0.5, 0, z],  [0, 0, 0, 1], [0.4, 0.4, 0.4], YELLOW),  "Box"),
+        (DebugMeshType.QUAD,     _make_instance([1.5, 0, z],  [0, 0, 0, 1], [0.5, 0.5, 1.0], MAGENTA), "Quad"),
+        (DebugMeshType.ARROW,    _make_instance([2.5, 0, z_arrow], up_quat, [0.05, 0.6, 0.05], CYAN),  "Arrow"),
     ]
     handles: List[dict] = []
     for mtype, inst, name in specs:
@@ -469,10 +512,10 @@ def phase8_coordinate_system(env, key_listener: KeyListener) -> None:
 
     # ---------- 8.3 方向性基元 +Y 模型空间：圆柱三轴方向 ----------
     print("\n  [8.3] 圆柱 +Y 模型空间验证：三圆柱分别沿 +X/+Y/+Z")
-    print("    预期：")
-    print("      红圆柱水平向右(+X)，长 2 米，中点 [1,0,1]")
-    print("      绿圆柱水平向前(+Y)，长 2 米，中点 [0,1,1]")
-    print("      蓝圆柱竖直向上(+Z)，长 2 米，中点 [0,0,2]")
+    print("    预期（position=底面中心，from=起点，to=终点）：")
+    print("      红圆柱：from [0,0,1] → to [2,0,1]，沿 +X，底面在原点侧")
+    print("      绿圆柱：from [0,0,1] → to [0,2,1]，沿 +Y，底面在原点侧")
+    print("      蓝圆柱：from [0,0,1] → to [0,0,3]，沿 +Z，底面在 z=1")
     print("    若蓝圆柱水平而非竖直，说明 +Y→+Z 旋转方向错误")
 
     z0 = 1.0
