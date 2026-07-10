@@ -32,6 +32,7 @@ from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 from orca_gym.core.euler.sim_config import SimConfig
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
+from orca_gym.utils.orca_debug_draw import DebugDraw
 from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env_mixin import OrcaGymEnvMixin
 
@@ -119,6 +120,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
+        self._debug_draw = None      # 将在 initialize_grpc 中赋值（stub=None 即离线 no-op）
         # _time_step 缓存：set_time_step 在 initialize_simulation 前调用，
         # 此时 SimConfig 未绑定 mjModel，缓存到 _time_step，
         # 在 initialize_simulation 末尾重新设置。
@@ -181,6 +183,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             if self._local_xml_path:
                 self._studio_bridge.configure_offline(self._local_xml_path)
+            self._debug_draw = DebugDraw(stub=None)   # 离线 no-op
             return
         # 在线模式：创建 gRPC channel + stub
         self._channel = grpc.aio.insecure_channel(
@@ -193,6 +196,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._stub = GrpcServiceStub(self._channel)
         self._gym = OrcaGymEuler(stub=self._stub)
         self._studio_bridge = self._gym.studio_bridge()
+        self._debug_draw = DebugDraw(stub=self._stub)
 
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
         """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
@@ -256,7 +260,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """关闭环境（离线模式 no-op）。"""
         if self._skip_grpc_load:
             return
-        # 在线模式关闭 gRPC channel
+        # 在线模式：清空 immediate 队列避免残留绘制（retained 对象随 FP 销毁自动释放）
+        if self._debug_draw is not None:
+            self.loop.run_until_complete(self._debug_draw.clear())
+        # 关闭 gRPC channel
         if self._channel is not None:
             self.loop.run_until_complete(self._channel.close())
 
@@ -451,6 +458,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         替代 gym.studio property 式穿墙。
         """
         return self._studio_bridge
+
+    def debug_draw(self) -> DebugDraw:
+        """返回 DebugDraw 实例（K9 方法访问模式）。
+
+        离线模式（skip_grpc_load=True）返回 no-op 实例（stub=None），
+        所有绘制方法为 async 但立即 return，调用方用
+        ``loop.run_until_complete(dd.draw_sphere(...))`` 或 ``await``。
+        """
+        return self._debug_draw
 
     # --- Studio 委托（阶段三 3.4.4，Env 层同步包装 async Gym 方法）---
 
@@ -761,6 +777,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
     def get_cfrc_ext(self) -> np.ndarray:
         """查询外部约束力 cfrc_ext（委托 self._gym）。
+
+        MuJoCo spatial vector 布局为 [torque(3), force(3)]，即
+        ``[mx, my, mz, fx, fy, fz]``。线性力在 ``cfrc[bid, 3:]``。
 
         Returns:
             np.ndarray，形状 (nbody, 6)。
