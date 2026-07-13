@@ -8,6 +8,7 @@
     <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
 """
 
+import os
 import unittest
 
 import numpy as np
@@ -569,6 +570,355 @@ class TestBridgeContentFileFunctional(unittest.TestCase):
         req = captured["request"]
         self.assertEqual(req.file_name, "mesh.obj")
         self.assertEqual(req.file_dir, "/remote")
+
+
+# =============================================================================
+# 在线场景 mesh 资源自动下载（process_xml_file / process_xml_node / _download_asset_to_cache）
+# =============================================================================
+
+
+class TestBridgeMeshDownloadProcessNode(unittest.TestCase):
+    """process_xml_node 递归解析与缺失检测测试。"""
+
+    def setUp(self):
+        import tempfile
+        self.tmp_dir = tempfile.mkdtemp(prefix="orcagym_test_mesh_")
+        self.bridge = OrcaStudioBridge()
+        # 通过 configure_offline 设置 xml_file_dir 为临时目录（仅用于定位资源目录，
+        # process_xml_node 本身不依赖 stub）
+        self.bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def test_process_xml_node_downloads_missing_mesh(self):
+        """mesh 节点 file 不存在时调用 _download_asset_to_cache。"""
+        import asyncio
+        import xml.etree.ElementTree as ET
+        called = {"args": []}
+
+        async def fake_download(name):
+            called["args"].append(name)
+
+        self.bridge._download_asset_to_cache = fake_download  # noqa: SLF001 测试白盒
+        node = ET.Element("mesh", {"file": "foot.stl"})
+        asyncio.run(self.bridge.process_xml_node(node))
+        self.assertEqual(called["args"], ["foot.stl"])
+
+    def test_process_xml_node_skips_existing_mesh(self):
+        """mesh 文件已存在时不调用 _download_asset_to_cache。"""
+        import asyncio
+        import xml.etree.ElementTree as ET
+        called = {"count": 0}
+
+        async def fake_download(name):
+            called["count"] += 1
+
+        # 预创建文件
+        with open(os.path.join(self.tmp_dir, "exist.stl"), "wb") as f:
+            f.write(b"data")
+        self.bridge._download_asset_to_cache = fake_download  # noqa: SLF001 测试白盒
+        node = ET.Element("mesh", {"file": "exist.stl"})
+        asyncio.run(self.bridge.process_xml_node(node))
+        self.assertEqual(called["count"], 0)
+
+    def test_process_xml_node_recurses_children(self):
+        """非 mesh/hfield 节点递归处理子节点。"""
+        import asyncio
+        import xml.etree.ElementTree as ET
+        called = {"args": []}
+
+        async def fake_download(name):
+            called["args"].append(name)
+
+        self.bridge._download_asset_to_cache = fake_download  # noqa: SLF001 测试白盒
+        # asset 节点下嵌套两个 mesh
+        root = ET.Element("asset")
+        ET.SubElement(root, "mesh", {"file": "a.stl"})
+        ET.SubElement(root, "mesh", {"file": "b.stl"})
+        asyncio.run(self.bridge.process_xml_node(root))
+        self.assertEqual(called["args"], ["a.stl", "b.stl"])
+
+    def test_process_xml_node_ignores_node_without_file_attr(self):
+        """mesh 节点无 file 属性时不调用下载。"""
+        import asyncio
+        import xml.etree.ElementTree as ET
+        called = {"count": 0}
+
+        async def fake_download(name):
+            called["count"] += 1
+
+        self.bridge._download_asset_to_cache = fake_download  # noqa: SLF001 测试白盒
+        node = ET.Element("mesh")
+        asyncio.run(self.bridge.process_xml_node(node))
+        self.assertEqual(called["count"], 0)
+
+    def test_process_xml_node_handles_hfield(self):
+        """hfield 节点同样触发下载。"""
+        import asyncio
+        import xml.etree.ElementTree as ET
+        called = {"args": []}
+
+        async def fake_download(name):
+            called["args"].append(name)
+
+        self.bridge._download_asset_to_cache = fake_download  # noqa: SLF001 测试白盒
+        node = ET.Element("hfield", {"file": "terrain.png"})
+        asyncio.run(self.bridge.process_xml_node(node))
+        self.assertEqual(called["args"], ["terrain.png"])
+
+
+class TestBridgeMeshDownloadProcessFile(unittest.TestCase):
+    """process_xml_file 入口测试。"""
+
+    def setUp(self):
+        import tempfile
+        self.tmp_dir = tempfile.mkdtemp(prefix="orcagym_test_xml_")
+        self.bridge = OrcaStudioBridge()
+        self.bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def test_process_xml_file_parses_and_dispatches(self):
+        """process_xml_file 解析 XML 文件并调用 process_xml_node。"""
+        import asyncio
+        called = {"files": []}
+
+        async def fake_process_node(node):
+            # 收集所有 mesh/hfield 的 file 属性
+            if node.tag in ("mesh", "hfield"):
+                f = node.get("file")
+                if f:
+                    called["files"].append(f)
+            else:
+                for child in node:
+                    await fake_process_node(child)
+
+        self.bridge.process_xml_node = fake_process_node
+        xml_path = os.path.join(self.tmp_dir, "scene.xml")
+        with open(xml_path, "w") as f:
+            f.write(
+                '<mujoco><asset>'
+                '<mesh file="foot.stl"/>'
+                '<hfield file="terrain.png"/>'
+                '</asset></mujoco>'
+            )
+        asyncio.run(self.bridge.process_xml_file(xml_path))
+        self.assertEqual(called["files"], ["foot.stl", "terrain.png"])
+
+
+class TestBridgeDownloadAssetOffline(unittest.TestCase):
+    """_download_asset_to_cache 离线模式行为测试。"""
+
+    def test_download_asset_offline_raises_filenotfound(self):
+        """离线模式（_stub is None）抛 FileNotFoundError。"""
+        import asyncio
+        bridge = OrcaStudioBridge()
+        with self.assertRaises(FileNotFoundError) as ctx:
+            asyncio.run(bridge._download_asset_to_cache("foot.stl"))  # noqa: SLF001 测试白盒
+        # 错误消息应含 xml_file_dir 引导
+        self.assertIn("Offline mode", str(ctx.exception))
+
+
+class TestBridgeDownloadAssetOnline(unittest.TestCase):
+    """_download_asset_to_cache 在线模式原子落盘测试。"""
+
+    def setUp(self):
+        import tempfile
+        self.tmp_dir = tempfile.mkdtemp(prefix="orcagym_test_dl_")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def test_download_asset_writes_atomically(self):
+        """在线模式下载资源并原子落盘到 xml_file_dir。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        asset_content = b"STL_BINARY_DATA"
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.SUCCESS
+                resp.content = asset_content
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        result = asyncio.run(bridge._download_asset_to_cache("foot.stl"))  # noqa: SLF001 测试白盒
+        # 返回路径正确
+        self.assertEqual(result, os.path.join(self.tmp_dir, "foot.stl"))
+        # 文件内容正确
+        with open(result, "rb") as f:
+            self.assertEqual(f.read(), asset_content)
+        # 无残留临时文件
+        leftovers = [
+            f for f in os.listdir(self.tmp_dir)
+            if f.endswith(".tmp") and f != "dummy.xml"
+        ]
+        self.assertEqual(leftovers, [])
+
+    def test_download_asset_skips_when_exists(self):
+        """文件已存在时不发起 gRPC 请求。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        # 预创建文件
+        existing_path = os.path.join(self.tmp_dir, "exist.stl")
+        with open(existing_path, "wb") as f:
+            f.write(b"EXISTING")
+
+        grpc_called = {"count": 0}
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                grpc_called["count"] += 1
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.SUCCESS
+                resp.content = b"SHOULD_NOT_BE_USED"
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        result = asyncio.run(bridge._download_asset_to_cache("exist.stl"))  # noqa: SLF001 测试白盒
+        self.assertEqual(result, existing_path)
+        self.assertEqual(grpc_called["count"], 0)
+        # 内容未被覆盖
+        with open(result, "rb") as f:
+            self.assertEqual(f.read(), b"EXISTING")
+
+    def test_download_asset_creates_subdir(self):
+        """file 含子目录时自动创建子目录。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.SUCCESS
+                resp.content = b"DATA"
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        result = asyncio.run(bridge._download_asset_to_cache("g1/foot.stl"))  # noqa: SLF001 测试白盒
+        self.assertTrue(os.path.isfile(result))
+        self.assertIn("g1", result)
+
+    def test_download_asset_raises_on_grpc_failure(self):
+        """gRPC 返回失败状态时抛异常。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.ERROR
+                resp.error_message = "remote not found"
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        with self.assertRaises(Exception):
+            asyncio.run(bridge._download_asset_to_cache("bad.stl"))  # noqa: SLF001 测试白盒
+
+    def test_download_asset_raises_on_empty_content(self):
+        """gRPC 返回空内容时抛异常。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        class MockStub:
+            async def LoadContentFile(self, request):
+                resp = mjc_message_pb2.LoadContentFileResponse()
+                resp.status = mjc_message_pb2.LoadContentFileResponse.SUCCESS
+                resp.content = b""
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        with self.assertRaises(Exception):
+            asyncio.run(bridge._download_asset_to_cache("empty.stl"))  # noqa: SLF001 测试白盒
+
+
+class TestBridgeLoadModelXmlIntegration(unittest.TestCase):
+    """load_model_xml 两分支后统一调用 process_xml_file 集成测试。"""
+
+    def setUp(self):
+        import tempfile
+        self.tmp_dir = tempfile.mkdtemp(prefix="orcagym_test_load_")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def test_load_model_xml_offline_calls_process_xml_file(self):
+        """离线模式 load_model_xml 返回前调用 process_xml_file。"""
+        import asyncio
+        called = {"path": None}
+
+        async def fake_process_xml_file(file_path):
+            called["path"] = file_path
+
+        bridge = OrcaStudioBridge()
+        bridge.process_xml_file = fake_process_xml_file
+        # 创建本地 XML 文件
+        xml_path = os.path.join(self.tmp_dir, "scene.xml")
+        with open(xml_path, "w") as f:
+            f.write("<mujoco/>")
+        bridge.configure_offline(xml_path, assets_dir=self.tmp_dir)
+        result = asyncio.run(bridge.load_model_xml())
+        self.assertEqual(result, xml_path)
+        self.assertEqual(called["path"], xml_path)
+
+    def test_load_model_xml_online_calls_process_xml_file(self):
+        """在线模式 load_model_xml 返回前调用 process_xml_file。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+
+        process_called = {"path": None}
+
+        async def fake_process_xml_file(file_path):
+            process_called["path"] = file_path
+
+        class MockStub:
+            async def LoadLocalEnv(self, request):
+                resp = mjc_message_pb2.LoadLocalEnvResponse()
+                if request.req_type == mjc_message_pb2.LoadLocalEnvRequest.XML_FILE_NAME:
+                    resp.status = mjc_message_pb2.LoadLocalEnvResponse.SUCCESS
+                    resp.file_name = "scene.xml"
+                else:
+                    resp.status = mjc_message_pb2.LoadLocalEnvResponse.SUCCESS
+                    resp.xml_content = b"<mujoco/>"
+                return resp
+
+        bridge = OrcaStudioBridge(stub=MockStub())
+        bridge.process_xml_file = fake_process_xml_file
+        bridge.configure_offline(
+            os.path.join(self.tmp_dir, "dummy.xml"), assets_dir=self.tmp_dir
+        )
+        result = asyncio.run(bridge.load_model_xml())
+        # process_xml_file 被以返回路径调用
+        self.assertIsNotNone(process_called["path"])
+        self.assertEqual(result, process_called["path"])
 
 
 if __name__ == "__main__":

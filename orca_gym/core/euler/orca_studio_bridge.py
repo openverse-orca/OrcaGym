@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import tempfile
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -90,11 +91,16 @@ class OrcaStudioBridge:
     async def load_model_xml(self) -> str:
         """加载模型 XML（离线返回本地路径，在线从 Studio 拉取）。
 
+        两分支返回路径后统一调用 `process_xml_file` 检查并补全 mesh/hfield
+        资源：在线模式自动从 Studio 下载缺失文件，离线模式缺失即抛
+        `FileNotFoundError`（早于 `MjModel.from_xml_path` 的底层错误）。
+
         Returns:
-            模型 XML 文件本地路径。
+            模型 XML 文件本地路径（此时 mesh 资源已就位）。
 
         Raises:
             RuntimeError: 离线模式未配置 local_xml_path。
+            FileNotFoundError: 离线模式 mesh 资源缺失。
         """
         if self._stub is None:
             if self._local_xml_path is None:
@@ -103,8 +109,46 @@ class OrcaStudioBridge:
                 raise FileNotFoundError(
                     f"local_xml_path not found: {self._local_xml_path}"
                 )
-            return self._local_xml_path
-        return await self._load_model_xml_online()
+            xml_path = self._local_xml_path
+        else:
+            xml_path = await self._load_model_xml_online()
+        # 统一在此处检查/补全 mesh 资源（在线下载，离线校验）
+        await self.process_xml_file(xml_path)
+        return xml_path
+
+    async def process_xml_file(self, file_path: str) -> None:
+        """解析 XML 文件，下载缺失的 mesh/hfield 资源。
+
+        读取 XML 文件，解析根节点，递归调用 `process_xml_node` 检查所有
+        `mesh`/`hfield` 节点的 `file` 属性，缺失文件在线模式自动下载，
+        离线模式抛 `FileNotFoundError`。
+
+        Args:
+            file_path: XML 文件路径。
+        """
+        with open(file_path, 'r') as f:
+            xml_content = f.read()
+        root = ET.fromstring(xml_content)
+        await self.process_xml_node(root)
+
+    async def process_xml_node(self, node) -> None:
+        """递归处理 XML 节点，下载缺失的 mesh/hfield 资源。
+
+        遇到 `mesh`/`hfield` 节点时检查 `file` 属性指向的文件是否存在，
+        缺失则调用 `_download_asset_to_cache` 下载。其他节点递归处理子节点。
+
+        Args:
+            node: XML 元素节点（ElementTree.Element）。
+        """
+        if node.tag in ('mesh', 'hfield'):
+            content_file_name = node.get('file')
+            if content_file_name is not None:
+                content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+                if not os.path.exists(content_file_path):
+                    await self._download_asset_to_cache(content_file_name)
+        else:
+            for child in node:
+                await self.process_xml_node(child)
 
     async def _load_model_xml_online(self) -> str:
         """在线模式：从 Studio 拉取模型 XML 文件。"""
@@ -517,3 +561,71 @@ class OrcaStudioBridge:
             file_name=content_file_name, file_dir=remote_file_dir
         )
         await self._stub.LoadContentFile(request)
+
+    async def _download_asset_to_cache(self, content_file_name: str) -> str:
+        """从 Studio 下载资源文件并原子落盘到 xml_file_dir。
+
+        与 `load_content_file`（薄 gRPC 包装）的区别：本方法捕获响应、原子
+        落盘到 `xml_file_dir`，供 `process_xml_node` 在线补全 mesh/hfield
+        资源时调用。离线模式（_stub is None）抛 `FileNotFoundError`。
+
+        多进程安全：`file_lock` + 存在性二次检查，并发调用同一文件时
+        仅首个进程发起 gRPC 请求。
+
+        Args:
+            content_file_name: 资源文件名（可含子目录，如 "g1/foot.stl"）。
+
+        Returns:
+            本地缓存文件绝对路径。
+
+        Raises:
+            FileNotFoundError: 离线模式（_stub is None）资源缺失。
+            Exception: gRPC 请求失败或返回空内容。
+        """
+        if self._stub is None:
+            raise FileNotFoundError(
+                f"Offline mode: missing mesh/asset '{content_file_name}' "
+                f"(place file under xml assets dir: {self.xml_file_dir})"
+            )
+        content_file_path = os.path.join(self.xml_file_dir, content_file_name)
+        # 先确保目标目录存在（file_lock 会在同目录创建 .lock 文件，
+        # 子目录场景如 "g1/foot.stl" 需先 makedirs）
+        os.makedirs(os.path.dirname(content_file_path), exist_ok=True)
+        async with file_lock(content_file_path, timeout=30):
+            # 二次检查：可能在等锁期间已被其他进程创建
+            if os.path.exists(content_file_path):
+                return content_file_path
+            request = mjc_message_pb2.LoadContentFileRequest(
+                file_name=content_file_name, file_dir=""
+            )
+            response = await self._stub.LoadContentFile(request)
+            if response.status != mjc_message_pb2.LoadContentFileResponse.SUCCESS:
+                raise Exception(
+                    f"LoadContentFile failed for '{content_file_name}'"
+                )
+            content = response.content
+            if not content:
+                raise Exception(
+                    f"LoadContentFile returned empty content for '{content_file_name}'"
+                )
+            # 原子化保存：先写临时文件，再 move
+            temp_file = tempfile.NamedTemporaryFile(
+                mode='wb',
+                dir=os.path.dirname(content_file_path),
+                delete=False,
+                prefix=f"{os.path.basename(content_file_name)}_",
+                suffix=".tmp",
+            )
+            try:
+                temp_file.write(content)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+                temp_file.close()
+                shutil.move(temp_file.name, content_file_path)
+            except Exception:
+                try:
+                    os.unlink(temp_file.name)
+                except OSError:
+                    pass
+                raise
+        return content_file_path
