@@ -1,5 +1,7 @@
 import sys
 import os
+import re
+from typing import Optional
 import grpc
 import aiofiles
 import xml.etree.ElementTree as ET
@@ -191,12 +193,22 @@ class OrcaGymLocal(OrcaGymBase):
         qpos = self.gym.data.qpos
         ```
     """
-    def __init__(self, stub):
+    def __init__(
+        self,
+        stub,
+        *,
+        skip_grpc_load: bool = False,
+        local_xml_path: Optional[str] = None,
+        xml_assets_dir: Optional[str] = None,
+    ):
         """
         初始化 OrcaGymLocal 对象
         
         Args:
-            stub: gRPC 服务存根，用于与 OrcaSim 服务器通信
+            stub: gRPC 服务存根，用于与 OrcaSim 服务器通信；离线短链模式下可为 None
+            skip_grpc_load: 为 True 时不经 gRPC 拉取 MJCF/资源（见 local_xml_path）
+            local_xml_path: 本地 MJCF XML 绝对或相对路径（与 skip_grpc_load 联用）
+            xml_assets_dir: mesh/hfield 等资源目录；默认取 local_xml_path 所在目录
         
         术语说明:
             - gRPC Stub: gRPC 客户端存根，用于调用远程服务
@@ -213,6 +225,9 @@ class OrcaGymLocal(OrcaGymBase):
         """
         super().__init__(stub = stub)
 
+        self._skip_grpc_load = bool(skip_grpc_load)
+        self._local_xml_path = local_xml_path
+        self._xml_assets_dir = xml_assets_dir
         self._timestep = 0.001
         self._mjModel = None
         self._mjData = None
@@ -240,6 +255,21 @@ class OrcaGymLocal(OrcaGymBase):
             # 返回: "/path/to/model.xml"
             ```
         """
+        if self._local_xml_path:
+            model_xml_path = os.path.abspath(os.path.expanduser(self._local_xml_path))
+            if not os.path.isfile(model_xml_path):
+                raise FileNotFoundError(
+                    f"local_xml_path not found: {model_xml_path}"
+                )
+            if self._xml_assets_dir is None:
+                self._xml_assets_dir = os.path.dirname(model_xml_path)
+            _logger.info(
+                f"Model XML Path (skip_grpc_load): {model_xml_path}, "
+                f"assets_dir={self._xml_assets_dir}"
+            )
+            await self.process_xml_file(model_xml_path)
+            return model_xml_path
+
         model_xml_path = await self.load_local_env()
 
         _logger.info(f"Model XML Path: {model_xml_path}")
@@ -315,6 +345,12 @@ class OrcaGymLocal(OrcaGymBase):
         self._qacc_cache = np.array(self._mjData.qacc, copy=True)
         self.update_data()
 
+    async def pause_simulation(self):
+        """离线短链模式：无 OrcaStudio 时不调用 gRPC SetSimulationState。"""
+        if self._skip_grpc_load:
+            return None
+        return await super().pause_simulation()
+
     async def render(self):
         """
         渲染当前仿真状态到 OrcaSim 服务器
@@ -386,6 +422,11 @@ class OrcaGymLocal(OrcaGymBase):
         - 异步方法，需要在 `async` 函数中 `await` 调用。
         - 文件锁超时时间为 30 秒。
         """
+        if self._skip_grpc_load or self.stub is None:
+            raise FileNotFoundError(
+                f"Offline mode: content file not on disk and gRPC disabled: {content_file_name}"
+            )
+
         request = mjc_message_pb2.LoadContentFileRequest(file_name=content_file_name, file_dir=remote_file_dir)
         response = await self.stub.LoadContentFile(request)
 
@@ -472,6 +513,11 @@ class OrcaGymLocal(OrcaGymBase):
                 # 使用文件锁防止多进程重复下载
                 async with file_lock(content_file_path):
                     if not os.path.exists(content_file_path):
+                        if self._skip_grpc_load:
+                            raise FileNotFoundError(
+                                f"Offline mode: missing mesh/asset '{content_file_path}' "
+                                f"(place file under xml assets dir)"
+                            )
                         # 下载文件
                         _logger.debug(f"Load content file: {content_file_name}")
                         await self.load_content_file(content_file_name)
@@ -584,6 +630,74 @@ class OrcaGymLocal(OrcaGymBase):
             }
         return result
 
+    async def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        """
+        查询 LiDAR 点云数据
+
+        通过 gRPC 从引擎端获取指定 LiDAR 实体的点云数据，包括距离图像和 3D 点坐标。
+
+        参数：
+        - `entity_name`：LiDAR 实体名称（对应 O3DE 中的 Entity 名称）
+
+        返回：
+        - 成功时返回字典，包含以下字段：
+            - bin_count: 水平方向 bin 数量
+            - vertical_layers: 垂直层数
+            - angular_resolution: 每个 bin 的角分辨率（弧度）
+            - max_h_angle: 水平总视场角（弧度）
+            - min_v_angle: 最小垂直角（弧度）
+            - v_step: 垂直层间步进（弧度）
+            - min_range: 最小探测距离
+            - max_range: 最大探测距离
+            - ranges: 距离数组，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
+            - points: 3D 点数组，形状 (bin_count, vertical_layers, 3)
+        - 失败时返回 None
+
+        注意：
+        - 异步方法，需要在 `async` 函数中 `await` 调用。
+        - ranges 和 points 使用 numpy.frombuffer 零拷贝解析。
+        """
+        request = mjc_message_pb2.LiDARPointCloudRequest(entity_name=entity_name)
+        response = await self.stub.QueryLiDARPointCloud(request)
+
+        if response.status == mjc_message_pb2.LiDARPointCloudResponse.ENTITY_NOT_FOUND:
+            _logger.error(f"LiDAR entity not found: {entity_name}")
+            return None
+        if response.status == mjc_message_pb2.LiDARPointCloudResponse.NO_DATA:
+            _logger.warning(f"LiDAR ring buffer is empty for entity: {entity_name}")
+            return None
+
+        result = {
+            'bin_count': response.bin_count,
+            'vertical_layers': response.vertical_layers,
+            'angular_resolution': response.angular_resolution,
+            'max_h_angle': response.max_h_angle,
+            'min_v_angle': response.min_v_angle,
+            'v_step': response.v_step,
+            'min_range': response.min_range,
+            'max_range': response.max_range,
+        }
+
+        if response.range_data:
+            ranges = np.frombuffer(response.range_data, dtype=np.float32).copy()
+            result['ranges'] = ranges.reshape(response.bin_count, response.vertical_layers)
+        else:
+            result['ranges'] = np.full((response.bin_count, response.vertical_layers), -1.0, dtype=np.float32)
+
+        if response.point_data:
+            points = np.frombuffer(response.point_data, dtype=np.float32).copy()
+            result['points'] = points.reshape(response.bin_count, response.vertical_layers, 3)
+        else:
+            result['points'] = np.zeros((response.bin_count, response.vertical_layers, 3), dtype=np.float32)
+
+        if response.intensity_data:
+            intensities = np.frombuffer(response.intensity_data, dtype=np.float32).copy()
+            result['intensities'] = intensities.reshape(response.bin_count, response.vertical_layers)
+        else:
+            result['intensities'] = np.zeros((response.bin_count, response.vertical_layers), dtype=np.float32)
+
+        return result
+
     @property
     def xml_file_dir(self):
         """
@@ -595,7 +709,12 @@ class OrcaGymLocal(OrcaGymBase):
         说明：
         - 用于存储从服务器下载的 XML 模型文件和资源文件（mesh、hfield 等）。
         - 目录不存在时会自动创建。
+        - 离线短链模式（local_xml_path）下使用 xml_assets_dir，与 MJCF 同目录解析 mesh。
         """
+        if self._xml_assets_dir:
+            assets = os.path.abspath(os.path.expanduser(self._xml_assets_dir))
+            os.makedirs(assets, exist_ok=True)
+            return assets
         user_home = os.path.expanduser('~')  # 自动适配Windows/Linux/Mac
         save_dir = os.path.join(user_home, '.orcagym', 'tmp')
         os.makedirs(save_dir, exist_ok=True)
@@ -624,6 +743,20 @@ class OrcaGymLocal(OrcaGymBase):
         root = ET.fromstring(xml_content)
         await self.process_xml_node(root)
         return
+
+    def _sanitize_local_env_xml_for_newer_mujoco(self, xml_content, file_name):
+        """
+        兼容清洗：移除在新版本 MuJoCo 中已废弃的 XML 属性。
+
+        当前主要处理：
+        - flex/flexcomp contact 的 `vertcollide` 属性（MuJoCo 3.7.0 不再识别）
+        """
+        sanitized = re.sub(rb'\svertcollide="[^"]*"', b'', xml_content)
+        if sanitized != xml_content:
+            _logger.warning(
+                f"Sanitized deprecated XML attribute `vertcollide` for file: {file_name}"
+            )
+        return sanitized
 
     def _build_load_local_env_error(self, status=None, error_message=""):
         parts = ["Load local env failed."]
@@ -698,7 +831,8 @@ class OrcaGymLocal(OrcaGymBase):
                 # print("Load xml from remote: ", file_name)
 
                 xml_content = response.xml_content
-                
+                xml_content = self._sanitize_local_env_xml_for_newer_mujoco(xml_content, file_name)
+
                 # 原子化保存：先写入临时文件，再移动到最终位置
                 temp_file = tempfile.NamedTemporaryFile(
                     mode='wb', 
@@ -722,7 +856,32 @@ class OrcaGymLocal(OrcaGymBase):
                     except OSError:
                         pass
                     raise e
-        
+
+            # 兼容历史缓存：即使文件已存在，也执行一次关键字清洗
+            with open(file_path, 'rb') as f:
+                existing_xml = f.read()
+            sanitized_xml = self._sanitize_local_env_xml_for_newer_mujoco(existing_xml, file_name)
+            if sanitized_xml != existing_xml:
+                temp_file = tempfile.NamedTemporaryFile(
+                    mode='wb',
+                    dir=self.xml_file_dir,
+                    delete=False,
+                    prefix=f"{file_name}_",
+                    suffix=".tmp"
+                )
+                try:
+                    temp_file.write(sanitized_xml)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+                    temp_file.close()
+                    shutil.move(temp_file.name, file_path)
+                except Exception as e:
+                    try:
+                        os.unlink(temp_file.name)
+                    except OSError:
+                        pass
+                    raise e
+
         # 返回绝对路径
         return os.path.abspath(file_path)
 
@@ -829,6 +988,10 @@ class OrcaGymLocal(OrcaGymBase):
             await self.gym.set_timestep_remote(0.001)
             ```
         """
+        if self._skip_grpc_load or self.stub is None:
+            if self._mjModel is not None:
+                self.set_opt_timestep(timestep)
+            return None
         request = mjc_message_pb2.SetOptTimestepRequest(timestep=timestep)
         response = await self.stub.SetOptTimestep(request)
         return response
@@ -1714,6 +1877,29 @@ class OrcaGymLocal(OrcaGymBase):
             body_pos_mat_quat_list[body_name] = body_pos_mat_quat
             
         return body_pos_mat_quat_list
+    
+    def query_body_xpos_xmat_xquat_xvel(self, body_name_list):
+        """
+        查询 body 位姿与世界系线速度（body 原点，m/s）。
+        
+        线速度由 mj_jacBody @ qvel 得到，与 binding_utils.get_body_xvelp 一致。
+        """
+        import mujoco
+        nv = self._mjModel.nv
+        jacp = np.zeros((3, nv), dtype=np.float64)
+        body_pos_mat_quat_vel_list = {}
+        for body_name in body_name_list:
+            body_id = self._mjModel.body(body_name).id
+            mujoco.mj_jacBody(self._mjModel, self._mjData, jacp, None, body_id)
+            lin_vel = jacp @ self._mjData.qvel
+            body_pos_mat_quat_vel = {
+                "Pos": self._mjData.xpos[body_id],
+                "Mat": self._mjData.xmat[body_id],
+                "Quat": self._mjData.xquat[body_id],
+                "LinVel": np.array(lin_vel, dtype=np.float64),
+            }
+            body_pos_mat_quat_vel_list[body_name] = body_pos_mat_quat_vel
+        return body_pos_mat_quat_vel_list
     
     def query_sensor_data(self, sensor_names):
         """

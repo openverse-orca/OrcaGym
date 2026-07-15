@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orca-gym"
-version = "26.5.1"
+version = "26.6.3"
 description = "OrcaGym Core - Cloud-native robotics simulation platform compatible with Gymnasium API"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = [ "robotics", "simulation", "reinforcement-learning", "gymnasium", "mujoco",]
-classifiers = [ "Development Status :: 4 - Beta", "Intended Audience :: Science/Research", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12", "Topic :: Scientific/Engineering :: Artificial Intelligence",]
-dependencies = [ "numpy==2.2.6", "scipy==1.16.2", "scipy-stubs==1.16.2.4", "grpcio==1.66.1", "grpcio-tools==1.66.1", "gymnasium==1.2.1", "mujoco==3.7.0", "aiofiles==25.1.0", "termcolor>=2.4.0",]
+classifiers = [ "Development Status :: 4 - Beta", "Intended Audience :: Science/Research", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12", "Topic :: Scientific/Engineering :: Artificial Intelligence",]
+dependencies = [ "numpy==2.2.6", "scipy==1.15.3; python_version == '3.10'", "scipy==1.16.2; python_version > '3.10'", "scipy-stubs==1.16.2; python_version > '3.10'", "grpcio==1.66.1", "grpcio-tools==1.66.1", "gymnasium==1.2.1", "mujoco==3.7.0", "aiofiles==25.1.0", "termcolor>=2.4.0",]
 [[project.authors]]
 name = "松应科技"
 email = "huangwei@orca3d.cn"

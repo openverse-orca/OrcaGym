@@ -47,7 +47,7 @@ class PicoJoystickKey(enum.Enum):
 
 
 class PicoJoystick:
-    def __init__(self, port=8001):
+    def __init__(self, port=8001, replay_mode=False, replay_data=None):
         self.mutex = threading.Lock()
         self.running = True
         self.current_transform = None
@@ -56,11 +56,24 @@ class PicoJoystick:
         self.suceess_XY = 0 #XY键长按次数
         self.key_event = {}
         self.reset_pos = False
-        self.loop = asyncio.new_event_loop()
-        self.clients = set()  # 初始化 self.clients
+        self.replay_mode = replay_mode
+        self.replay_data = replay_data if replay_data is not None else []
+        self.replay_cursor = 0
+        self.loop = None
+        self.clients = set()
         self.port = port
-        self.thread = threading.Thread(target=self._start_server_thread)
-        self.thread.start()
+        self.thread = None
+
+        if self.replay_mode:
+            _logger.info("PicoJoystick: replay mode enabled, TCP server will NOT start")
+            if len(self.replay_data) > 0:
+                with self.mutex:
+                    self.current_transform = self.extract_all_transform(self.replay_data[0])
+                    self.current_key_state = self.extract_key_state(self.replay_data[0])
+        else:
+            self.loop = asyncio.new_event_loop()
+            self.thread = threading.Thread(target=self._start_server_thread)
+            self.thread.start()
 
     def __enter__(self):
         return self
@@ -70,8 +83,10 @@ class PicoJoystick:
 
     def close(self):
         self.running = False
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        self.thread.join()
+        if self.loop is not None:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.thread is not None:
+            self.thread.join()
 
     def _start_server_thread(self):
         asyncio.set_event_loop(self.loop)
@@ -106,6 +121,8 @@ class PicoJoystick:
             await writer.wait_closed()
 
     def send_force_message(self, l_hand_force, r_hand_force):
+        if self.loop is None:
+            return
         message = json.dumps({"l_hand_force": l_hand_force, "r_hand_force": r_hand_force})
         asyncio.run_coroutine_threadsafe(self._broadcast_message(message), self.loop)
 
@@ -126,11 +143,32 @@ class PicoJoystick:
         self.key_event[key] = event
 
     def update(self, keys: list[PicoJoystickKey]):
+        if self.replay_mode:
+            self._replay_advance()
         transform = self.get_transform_list()
         key_state = self.get_key_state()
         for key in keys:
             if key in self.key_event:
                 self.key_event[key](transform, key_state)
+
+    def _replay_advance(self):
+        if self.replay_cursor < len(self.replay_data):
+            frame = self.replay_data[self.replay_cursor]
+            with self.mutex:
+                self.current_transform = self.extract_all_transform(frame)
+                self.current_key_state = self.extract_key_state(frame)
+            self.replay_cursor += 1
+        else:
+            _logger.info("PicoJoystick: replay data exhausted, holding last frame")
+
+    @staticmethod
+    def load_replay_data(path: str) -> list:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            data = [data]
+        _logger.info(f"PicoJoystick: loaded {len(data)} replay frames from {path}")
+        return data
 
     def is_reset_pos(self):
         return self.reset_pos

@@ -1,3 +1,6 @@
+import sys
+sys.path.append("/home/orca/Projects/OrcaGym")
+
 from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import numpy as np
@@ -88,7 +91,15 @@ def run_simulation(orcagym_addr : str,
                                       sys.maxsize)
         _logger.info(f"Registered environment:  {env_id}")
 
-        env = gym.make(env_id)        
+        env = gym.make(env_id)
+        u = env.unwrapped
+        mj_ts = u.gym._mjModel.opt.timestep if getattr(u.gym, "_mjModel", None) is not None else float("nan")
+        print(
+            f"[MuJoCo] script TIME_STEP={TIME_STEP}, kwarg={kwargs['time_step']}, "
+            f"opt.timestep={u.gym.opt.timestep}, mjModel.timestep={mj_ts}, "
+            f"frame_skip={u.frame_skip}, env.dt={u.dt}, REALTIME_STEP={REALTIME_STEP}",
+            flush=True,
+        )
         _logger.info("Starting simulation...")
 
         if scene_runtime is not None:
@@ -111,6 +122,13 @@ def run_simulation(orcagym_addr : str,
             action = env.action_space.sample()
     
             obs, reward, terminated, truncated, info = env.step(action)
+            lidar_cloud = env.unwrapped.query_lidar_point_cloud("LiDAR")
+            if lidar_cloud is not None:
+                ranges = lidar_cloud['ranges']
+                points = lidar_cloud['points']
+                valid_mask = ranges > 0
+                valid_points = points[valid_mask]
+                print(f"Valid points size: {valid_points.shape[0]}")
 
             env.render()
 

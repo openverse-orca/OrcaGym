@@ -479,6 +479,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.CalcFullMassMatrixRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.CalcFullMassMatrixResponse.FromString,
                 _registered_method=True)
+        self.QueryLiDARPointCloud = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryLiDARPointCloud',
+                request_serializer=mjc__message__pb2.LiDARPointCloudRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.LiDARPointCloudResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -1026,8 +1031,13 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def CalcFullMassMatrix(self, request, context):
-        """计算全局的质量矩阵，不只包含机器人本体，还有其他有关节的物品
-        """
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryLiDARPointCloud(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -1479,6 +1489,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.CalcFullMassMatrix,
                     request_deserializer=mjc__message__pb2.CalcFullMassMatrixRequest.FromString,
                     response_serializer=mjc__message__pb2.CalcFullMassMatrixResponse.SerializeToString,
+            ),
+            'QueryLiDARPointCloud': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryLiDARPointCloud,
+                    request_deserializer=mjc__message__pb2.LiDARPointCloudRequest.FromString,
+                    response_serializer=mjc__message__pb2.LiDARPointCloudResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3884,6 +3899,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/CalcFullMassMatrix',
             mjc__message__pb2.CalcFullMassMatrixRequest.SerializeToString,
             mjc__message__pb2.CalcFullMassMatrixResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryLiDARPointCloud(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryLiDARPointCloud',
+            mjc__message__pb2.LiDARPointCloudRequest.SerializeToString,
+            mjc__message__pb2.LiDARPointCloudResponse.FromString,
             options,
             channel_credentials,
             insecure,
