@@ -1374,7 +1374,7 @@ message DebugMeshInstance {
     repeated float rotation = 2;  // [x, y, z, w] 四元数（非 MuJoCo 的 [w,x,y,z]）
     repeated float scale    = 3;  // [sx, sy, sz] 各轴缩放
     repeated float color    = 4;  // [r, g, b, a] 0..1
-    uint32 flags            = 5;  // InstanceFlags bitmask (1 = EdgeHighlight)
+    uint32 flags            = 5;  // InstanceFlags bitmask (bit0 = EdgeHighlight, bit1 = Wireframe)
 }
 
 // 持久化对象句柄，与 C++ ObjectHandle (index + generation) 对应

@@ -123,6 +123,7 @@ class TestProtoConstruction:
     def test_instance_flags_values(self):
         assert InstanceFlags.NONE == 0
         assert InstanceFlags.EDGE_HIGHLIGHT == 1
+        assert InstanceFlags.WIREFRAME == 2
 
 
 # ============================================================
@@ -271,6 +272,47 @@ class TestOnlineWithMockStub:
         assert list(req.instances[0].position) == [1, 2, 3]
         # sphere scale = [r, r, r]
         np.testing.assert_allclose(list(req.instances[0].scale), [2.0, 2.0, 2.0], atol=1e-6)
+
+    def test_draw_sphere_wireframe_sets_flag(self):
+        # W5: wireframe=True convenience param must OR in InstanceFlags.WIREFRAME
+        stub = MagicMock()
+        stub.DrawDebugMeshBatch = AsyncMock()
+        dd = DebugDraw(stub=stub)
+        asyncio.run(dd.draw_sphere([0, 0, 0], 1.0, [1, 1, 1, 1], wireframe=True))
+        req = stub.DrawDebugMeshBatch.await_args[0][0]
+        assert req.instances[0].flags & InstanceFlags.WIREFRAME
+
+    def test_draw_sphere_wireframe_combines_with_flags(self):
+        # W5: wireframe=True must combine with caller-supplied flags (not overwrite)
+        stub = MagicMock()
+        stub.DrawDebugMeshBatch = AsyncMock()
+        dd = DebugDraw(stub=stub)
+        asyncio.run(
+            dd.draw_sphere(
+                [0, 0, 0], 1.0, [1, 1, 1, 1],
+                flags=InstanceFlags.EDGE_HIGHLIGHT,
+                wireframe=True,
+            )
+        )
+        req = stub.DrawDebugMeshBatch.await_args[0][0]
+        assert req.instances[0].flags == (InstanceFlags.EDGE_HIGHLIGHT | InstanceFlags.WIREFRAME)
+
+    def test_draw_box_wireframe_sets_flag(self):
+        stub = MagicMock()
+        stub.DrawDebugMeshBatch = AsyncMock()
+        dd = DebugDraw(stub=stub)
+        asyncio.run(dd.draw_box([0, 0, 0], [1, 1, 1], [1, 1, 1, 1], wireframe=True))
+        req = stub.DrawDebugMeshBatch.await_args[0][0]
+        assert req.instances[0].flags & InstanceFlags.WIREFRAME
+
+    def test_draw_sphere_wireframe_false_no_flag(self):
+        # W5: wireframe=False (default) must NOT set the WIREFRAME bit
+        stub = MagicMock()
+        stub.DrawDebugMeshBatch = AsyncMock()
+        dd = DebugDraw(stub=stub)
+        asyncio.run(dd.draw_sphere([0, 0, 0], 1.0, [1, 1, 1, 1]))
+        req = stub.DrawDebugMeshBatch.await_args[0][0]
+        assert not (req.instances[0].flags & InstanceFlags.WIREFRAME)
 
     def test_clear_calls_stub(self):
         stub = MagicMock()

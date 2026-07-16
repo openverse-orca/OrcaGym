@@ -33,6 +33,7 @@
     [Phase 9] Immediate TTL（duration>0）跨帧存活 + 到期自动消失
     [Phase 10] Retained keepalive 保活心跳：过期销毁、心跳续期、断连自清
     [Phase 11] TTL=0 闪烁效果演示（为何 immediate 推荐 TTL>=0.1）
+    [Phase 12] Wireframe 线框渲染（W1-W5）：solid/wire 对照、半透明线框、retained 线框
 """
 from __future__ import annotations
 
@@ -709,6 +710,103 @@ def phase11_flicker_demo(env, key_listener: KeyListener) -> None:
 
 
 # ============================================================
+# Phase 12：Wireframe 线框渲染（W1-W5）
+# 对照 wireframe_custom_mesh_implementation_guide.md。
+# 验证 W3/W4：wireframe=True 走 LineList + o_wireframe PSO + 四桶拆分。
+# 三步：
+#   12.1 6 种基元 solid vs wireframe 对照（左 solid / 右 wireframe）
+#   12.2 wireframe + 透明度（WireTransparent 桶）
+#   12.3 retained 线框对象（create_objects + flags=WIREFRAME）
+# ============================================================
+def phase12_wireframe(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 12] Wireframe 线框渲染（W1-W5）")
+    print("  机制：wireframe=True 或 flags|=InstanceFlags.WIREFRAME 的实例被路由到 wire 桶，")
+    print("        走 LineList 拓扑 + o_wireframe PSO（短路光照，直接输出顶点色×1.1）。")
+    print("        W1 边去重 → W2 实例拆分 → W3 wire PSO → W4 四桶渲染。")
+
+    up_quat = _direction_to_quat(np.array([0.0, 0.0, 1.0])).tolist()
+    H_HALF = 0.3  # 方向性基元半高（scale.y=0.6），用于视觉居中
+
+    # ---------- 12.1 6 种基元 solid vs wireframe 对照 ----------
+    print("\n  [12.1] 6 种基元 solid vs wireframe 对照（左排 y=0 solid / 右排 y=2 wireframe）")
+    print("    预期：左排实心着色（带光照），右排仅线框边（去重 LineList，无光照，略亮）")
+    print("    验证 W1（三角形边去重）+ W3（o_wireframe PSO 短路光照/法线）")
+
+    def redraw_121():
+        # Sphere
+        run(env, dd.draw_sphere([-2.5, 0, Z_ROW], 0.3, RED, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([-2.5, 2, Z_ROW], 0.3, RED, wireframe=True, duration=IMMEDIATE_TTL))
+        # Cylinder（竖直，视觉居中）
+        run(env, dd.draw_cylinder([-1.5, 0, Z_ROW - H_HALF], [-1.5, 0, Z_ROW + H_HALF],
+                                  0.2, GREEN, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_cylinder([-1.5, 2, Z_ROW - H_HALF], [-1.5, 2, Z_ROW + H_HALF],
+                                  0.2, GREEN, wireframe=True, duration=IMMEDIATE_TTL))
+        # Cone（朝上）— 无 draw_cone 便捷方法，用 draw_batch + flags
+        cone_solid = _make_instance([-0.5, 0, Z_ROW - H_HALF], up_quat, [0.25, 0.6, 0.25], BLUE)
+        cone_wire = _make_instance([-0.5, 2, Z_ROW - H_HALF], up_quat,
+                                   [0.25, 0.6, 0.25], BLUE, flags=InstanceFlags.WIREFRAME)
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_solid], duration=IMMEDIATE_TTL))
+        run(env, dd.draw_batch(DebugMeshType.CONE, [cone_wire], duration=IMMEDIATE_TTL))
+        # Box
+        run(env, dd.draw_box([0.5, 0, Z_ROW], [0.4, 0.4, 0.4], YELLOW, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_box([0.5, 2, Z_ROW], [0.4, 0.4, 0.4], YELLOW, wireframe=True, duration=IMMEDIATE_TTL))
+        # Quad
+        run(env, dd.draw_quad([1.5, 0, Z_ROW], [0.5, 0.5, 1.0], MAGENTA, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_quad([1.5, 2, Z_ROW], [0.5, 0.5, 1.0], MAGENTA, wireframe=True, duration=IMMEDIATE_TTL))
+        # Arrow（竖直）
+        run(env, dd.draw_arrow([2.5, 0, Z_ROW - H_HALF], [2.5, 0, Z_ROW + H_HALF],
+                               0.05, CYAN, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_arrow([2.5, 2, Z_ROW - H_HALF], [2.5, 2, Z_ROW + H_HALF],
+                               0.05, CYAN, wireframe=True, duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw_121,
+                     "[12.1] 观察左 solid / 右 wireframe，按空格键进入 12.2")
+
+    # ---------- 12.2 wireframe + 透明度（WireTransparent 桶）----------
+    print("\n  [12.2] wireframe + 透明度（alpha=0.5）→ WireTransparent 桶")
+    print("    预期：三个半透明线框球重叠，边缘可见内部结构（SrcAlpha 混合 + DepthWrite=Zero）")
+    print("    验证 W4 四桶拆分：wire + transparent 走独立 PSO + 独立实例缓冲（无 ghosting）")
+
+    def redraw_122():
+        run(env, dd.draw_sphere([-0.3, -0.3, Z_ROW], 0.4, [1.0, 0.0, 0.0, 0.5], wireframe=True, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([0.3, -0.3, Z_ROW], 0.4, [0.0, 1.0, 0.0, 0.5], wireframe=True, duration=IMMEDIATE_TTL))
+        run(env, dd.draw_sphere([0.0, 0.3, Z_ROW], 0.4, [0.0, 0.2, 1.0, 0.5], wireframe=True, duration=IMMEDIATE_TTL))
+
+    render_until_key(env, key_listener, redraw_122,
+                     "[12.2] 观察半透明线框混合，按空格键进入 12.3")
+
+    # ---------- 12.3 retained 线框对象 ----------
+    print("\n  [12.3] Retained 线框对象（create_objects + flags=WIREFRAME）")
+    print("    预期：创建 6 个持久线框对象，跨帧持续显示（无需重提交）")
+    print("    验证 W2 实例拆分（SplitByWireframe）对 retained 路径同样生效")
+
+    z_cyl = Z_ROW - 0.3  # 方向性基元底面位置（视觉居中）
+    wf = InstanceFlags.WIREFRAME
+    specs = [
+        (DebugMeshType.SPHERE,   _make_instance([-2.5, 0, Z_ROW], [0, 0, 0, 1], [0.3, 0.3, 0.3], RED, flags=wf)),
+        (DebugMeshType.CYLINDER, _make_instance([-1.5, 0, z_cyl], up_quat, [0.2, 0.6, 0.2], GREEN, flags=wf)),
+        (DebugMeshType.CONE,     _make_instance([-0.5, 0, z_cyl], up_quat, [0.25, 0.6, 0.25], BLUE, flags=wf)),
+        (DebugMeshType.BOX,      _make_instance([0.5, 0, Z_ROW], [0, 0, 0, 1], [0.4, 0.4, 0.4], YELLOW, flags=wf)),
+        (DebugMeshType.QUAD,     _make_instance([1.5, 0, Z_ROW], [0, 0, 0, 1], [0.5, 0.5, 1.0], MAGENTA, flags=wf)),
+        (DebugMeshType.ARROW,    _make_instance([2.5, 0, z_cyl], up_quat, [0.05, 0.6, 0.05], CYAN, flags=wf)),
+    ]
+    handles: List[dict] = []
+    for mtype, inst in specs:
+        hs = run(env, dd.create_objects(mtype, [inst]))
+        valid = [h for h in hs if h["valid"]]
+        handles.extend(valid)
+    count = run(env, dd.query_count())
+    print(f"  创建 6 个线框对象，query_count={count}（retained 应 >= 6）")
+
+    render_until_key(env, key_listener, None, "观察 6 个持久线框对象，按空格键销毁并完成 Phase 12")
+
+    run(env, dd.destroy_objects(handles))
+    count2 = run(env, dd.query_count())
+    print(f"  销毁后 query_count={count2}")
+
+
+# ============================================================
 # 入口
 # ============================================================
 PHASES = {
@@ -723,6 +821,7 @@ PHASES = {
     9: phase9_ttl_duration,
     10: phase10_keepalive,
     11: phase11_flicker_demo,
+    12: phase12_wireframe,
 }
 
 
