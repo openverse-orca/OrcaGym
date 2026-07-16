@@ -34,6 +34,7 @@
     [Phase 10] Retained keepalive 保活心跳：过期销毁、心跳续期、断连自清
     [Phase 11] TTL=0 闪烁效果演示（为何 immediate 推荐 TTL>=0.1）
     [Phase 12] Wireframe 线框渲染（W1-W5）：solid/wire 对照、半透明线框、retained 线框
+    [Phase 13] Custom Mesh（Phase C/O）：顶点+索引注册、OBJ 加载、批量绘制、注销
 """
 from __future__ import annotations
 
@@ -806,6 +807,194 @@ def phase12_wireframe(env, key_listener: KeyListener) -> None:
     print(f"  销毁后 query_count={count2}")
 
 
+def _make_tetrahedron_positions_indices():
+    """构造一个正四面体的顶点+索引（程序化，不依赖 OBJ 文件）。
+
+    顶点：4 个，边长 sqrt(2)，中心在原点。
+        v0 = ( 1,  1,  1)
+        v1 = (-1, -1,  1)
+        v2 = (-1,  1, -1)
+        v3 = ( 1, -1, -1)
+    面：4 个三角形（CCW 绕序，法线朝外）：
+        (0,1,2) (0,3,1) (0,2,3) (1,3,2)
+
+    返回 (positions_flat, indices_flat)，positions 为 [x,y,z,...]，indices 为 [i0,i1,i2,...]。
+    用于验证 register_custom_mesh（顶点+索引路径）。
+    """
+    positions = [
+        1.0,  1.0,  1.0,
+        -1.0, -1.0,  1.0,
+        -1.0,  1.0, -1.0,
+        1.0, -1.0, -1.0,
+    ]
+    # CCW 从外部观察；若 C++ CullMode=Back 剔除反向，可传 flip_winding
+    indices = [
+        0, 1, 2,
+        0, 3, 1,
+        0, 2, 3,
+        1, 3, 2,
+    ]
+    return positions, indices
+
+
+_MESHS_DIR = "/home/superfhwl/repo/OrcaGym/tests/orca_gym/utils/meshs"
+_OBJ_CUBE = f"{_MESHS_DIR}/simple_mesh/cube.obj"
+_OBJ_TORUS = f"{_MESHS_DIR}/simple_mesh/torus.obj"
+_OBJ_BUNNY = f"{_MESHS_DIR}/bunny/bunny.obj"
+
+
+def phase13_custom_mesh(env, key_listener: KeyListener) -> None:
+    dd = env.debug_draw()
+    print("\n[Phase 13] Custom Mesh（Phase C/O：用户提供的网格）")
+    print("  机制：register_custom_mesh(顶点+索引) 或 register_custom_mesh_from_obj(OBJ 文本)")
+    print("        注册返回句柄，draw_custom_mesh_batch 绘制实例，unregister_custom_mesh 释放。")
+    print("        C++ 侧 GPU 资源延迟到下一帧 Simulate 创建；未就绪时绘制被静默丢弃。")
+
+    # TTL=0 + 每帧 redraw：instance 单帧存活，下一帧 Swap 自动过期。
+    # 之前用 0.5s 规避闪烁（无 TTL 支持），但这导致每帧累积 ~2 个 instance，
+    # 0.5s 内堆积 50+ 个完全重叠的 instance → z-fighting → 视觉"转动"假象。
+    # TTL 支持修复后，duration=0 即可稳定（每帧提交→Swap→渲染→过期）。
+    CUSTOM_TTL = 0.1
+
+    # ---------- 13.1 程序化四面体：solid + wireframe 对照 ----------
+    print("\n  [13.1] 程序化四面体（顶点+索引注册）：左 solid / 右 wireframe")
+    print("    预期：左侧正四面体实心着色，右侧线框（LineList 去重边）")
+    print("    验证 RegisterCustomMesh 路径 + DrawCustomMeshBatch + wireframe flag")
+
+    pos, idx = _make_tetrahedron_positions_indices()
+    # 四面体边长 sqrt(2)≈1.414，缩放 0.25 使视觉尺寸 ~0.35
+    tet_handle = run(env, dd.register_custom_mesh(pos, idx))
+    if not tet_handle["valid"]:
+        print(f"  [警告] 四面体注册失败：{tet_handle.get('error', '')}，跳过 13.1")
+    else:
+        print(f"  四面体注册成功：handle index={tet_handle['index']} "
+              f"gen={tet_handle['generation']} verts={tet_handle['vertex_count']} "
+              f"faces={tet_handle['face_count']}")
+
+        tet_scale = [0.25, 0.25, 0.25]
+        # 等待一帧让 GPU 资源就绪（注册后下一帧 Simulate 才创建 buffer）
+        hold(env, 0.1)
+
+        def redraw_131():
+            run(env, dd.draw_custom_mesh(
+                tet_handle, [-0.6, 0, Z_ROW], [0, 0, 0, 1], tet_scale, RED,
+                duration=CUSTOM_TTL))
+            run(env, dd.draw_custom_mesh(
+                tet_handle, [0.6, 0, Z_ROW], [0, 0, 0, 1], tet_scale, CYAN,
+                wireframe=True, duration=CUSTOM_TTL))
+
+        render_until_key(env, key_listener, redraw_131,
+                         "[13.1] 观察左 solid / 右 wireframe 四面体，按空格键进入 13.2")
+
+    # ---------- 13.2 OBJ 加载：cube + torus + bunny ----------
+    print("\n  [13.2] OBJ 文件加载（RegisterCustomMeshFromObjData）")
+    print("    预期：cube（小）/ torus（环）/ bunny（斯坦福兔）三个网格并排显示")
+    print("    验证 OBJ 解析 + 规范化（y_up→Z-up、recenter、normalize_scale）")
+    print("    注：trimesh 导出的 obj 默认 Z-up，故 y_up=False；recenter+normalize 使尺寸一致")
+
+    obj_specs = [
+        (_OBJ_CUBE,  RED,     [-1.2, 0, Z_ROW]),
+        (_OBJ_TORUS, GREEN,   [0.0, 0, Z_ROW]),
+        (_OBJ_BUNNY, MAGENTA, [1.2, 0, Z_ROW]),
+    ]
+    obj_handles: List[dict] = []
+    for path, color, pos3d in obj_specs:
+        h = run(env, dd.register_custom_mesh_from_obj_file(
+            path, y_up=False, recenter=True, normalize_scale=True))
+        if not h["valid"]:
+            print(f"  [警告] {path} 加载失败：{h.get('error', '')}")
+            continue
+        obj_handles.append(h)
+        print(f"  {path.split('/')[-1]} 注册成功：index={h['index']} gen={h['generation']}")
+
+    if obj_handles:
+        # 等待 GPU 就绪
+        hold(env, 0.1)
+        # normalize_scale 后最长边=1.0，缩放 0.5 使视觉尺寸 ~0.5
+        obj_scale = [0.5, 0.5, 0.5]
+        colors = [RED, GREEN, MAGENTA]
+        # 线框对照：同位置上方 0.7 画 wireframe 版本（实心/线框上下并排）
+        WIRE_Y_OFFSET = 0.7
+
+        def redraw_132():
+            # 下排：solid
+            for h, color, pos3d in zip(obj_handles, colors, [s[2] for s in obj_specs]):
+                run(env, dd.draw_custom_mesh(
+                    h, pos3d, [0, 0, 0, 1], obj_scale, color, duration=CUSTOM_TTL))
+            # 上排：wireframe 对照（同 handle，wireframe=True）
+            for h, color, pos3d in zip(obj_handles, colors, [s[2] for s in obj_specs]):
+                wire_pos = [pos3d[0], pos3d[1] + WIRE_Y_OFFSET, pos3d[2]]
+                run(env, dd.draw_custom_mesh(
+                    h, wire_pos, [0, 0, 0, 1], obj_scale, color,
+                    wireframe=True, duration=CUSTOM_TTL))
+
+        render_until_key(env, key_listener, redraw_132,
+                         "[13.2] 下排 solid / 上排 wireframe 对照（cube/torus/bunny），按空格键进入 13.3")
+
+    # ---------- 13.3 多实例批量绘制 + 透明度 ----------
+    print("\n  [13.3] 多实例批量绘制（DrawCustomMeshBatch）+ 透明度")
+    print("    预期：3x3 网格的 torus 实例，部分半透明，验证批量提交 + 混合桶")
+    if len(obj_handles) >= 2:
+        torus_handle = obj_handles[1]  # torus
+        # 等待 GPU 就绪（13.2 已等待，此处冗余保险）
+        hold(env, 0.1)
+
+        def redraw_133():
+            # 下排：solid（半透明交替）
+            instances_solid = []
+            for ix in range(3):
+                for iy in range(3):
+                    x = (ix - 1) * 0.6
+                    y = (iy - 1) * 0.6
+                    alpha = 0.4 if (ix + iy) % 2 == 0 else 1.0
+                    color = [0.2, 0.8, 1.0, alpha]
+                    inst = _make_instance(
+                        [x, y, Z_ROW], [0, 0, 0, 1], [0.2, 0.2, 0.2], color)
+                    instances_solid.append(inst)
+            run(env, dd.draw_custom_mesh_batch(
+                torus_handle, instances_solid, duration=CUSTOM_TTL))
+            # 上排：wireframe 对照（同一批量 API，wireframe flag）
+            instances_wire = []
+            for ix in range(3):
+                for iy in range(3):
+                    x = (ix - 1) * 0.6
+                    y = (iy - 1) * 0.6 + 0.8
+                    color = [0.2, 0.8, 1.0, 1.0]
+                    inst = _make_instance(
+                        [x, y, Z_ROW], [0, 0, 0, 1], [0.2, 0.2, 0.2], color,
+                        flags=InstanceFlags.WIREFRAME)
+                    instances_wire.append(inst)
+            run(env, dd.draw_custom_mesh_batch(
+                torus_handle, instances_wire, duration=CUSTOM_TTL))
+
+        render_until_key(env, key_listener, redraw_133,
+                         "[13.3] 下排 solid（半透明交替）/ 上排 wireframe 对照，按空格键进入 13.4")
+
+    # ---------- 13.4 注销 + stale handle 安全验证 ----------
+    print("\n  [13.4] 注销 + stale handle 安全验证")
+    print("    预期：注销后绘制该 handle 不崩溃（静默丢弃），stale handle 安全")
+    all_handles = [tet_handle] if tet_handle.get("valid") else []
+    all_handles.extend(obj_handles)
+
+    for h in all_handles:
+        run(env, dd.unregister_custom_mesh(h))
+    print(f"  已注销 {len(all_handles)} 个 custom mesh")
+
+    # 等待一帧让注销生效（render 线程释放 GPU）
+    hold(env, 0.2)
+
+    # 尝试用 stale handle 绘制（应静默丢弃，不崩溃）
+    if tet_handle.get("valid"):
+        print("  尝试用已注销的四面体 handle 绘制（预期：静默丢弃，不崩溃）...")
+        run(env, dd.draw_custom_mesh(
+            tet_handle, [0, 0, Z_ROW], [0, 0, 0, 1], [0.3, 0.3, 0.3], YELLOW,
+            duration=IMMEDIATE_TTL))
+        hold(env, 0.3)
+        print("  stale handle 绘制完成（未崩溃）")
+
+    print("  Phase 13 完成")
+
+
 # ============================================================
 # 入口
 # ============================================================
@@ -822,6 +1011,7 @@ PHASES = {
     10: phase10_keepalive,
     11: phase11_flicker_demo,
     12: phase12_wireframe,
+    13: phase13_custom_mesh,
 }
 
 
@@ -829,7 +1019,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="OrcaDebugMesh 路径 A 端到端视觉验收")
     parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
     parser.add_argument("--phase", type=int, nargs="*", default=None,
-                        help="只运行指定阶段（1-11），默认全部")
+                        help="只运行指定阶段（1-13），默认全部")
     args = parser.parse_args()
 
     env = make_env(args.addr)
