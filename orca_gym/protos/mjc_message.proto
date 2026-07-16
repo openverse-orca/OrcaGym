@@ -128,6 +128,16 @@ service GrpcService {
   rpc KeepAliveDebugMeshObjects(KeepAliveDebugMeshObjectsRequest) returns (KeepAliveDebugMeshObjectsResponse);
   rpc DestroyDebugMeshObjects(DestroyDebugMeshObjectsRequest) returns (DestroyDebugMeshObjectsResponse);
   rpc QueryDebugMeshCount(QueryDebugMeshCountRequest) returns (QueryDebugMeshCountResponse);
+
+  // === Custom Mesh (Phase C/O：用户提供的顶点/索引或 OBJ 文件) ===
+  // 注册自定义网格（顶点 + 索引），返回 CustomMeshHandle
+  rpc RegisterCustomMesh(RegisterCustomMeshRequest) returns (RegisterCustomMeshResponse);
+  // 注册 OBJ 文本（Python 读取文件后传文本），返回 CustomMeshHandle
+  rpc RegisterCustomMeshFromObj(RegisterCustomMeshFromObjRequest) returns (RegisterCustomMeshFromObjResponse);
+  // 注销自定义网格，释放 GPU 资源
+  rpc UnregisterCustomMesh(UnregisterCustomMeshRequest) returns (UnregisterCustomMeshResponse);
+  // 绘制自定义网格（immediate，单帧/TTL）
+  rpc DrawCustomMeshBatch(DrawCustomMeshBatchRequest) returns (DrawCustomMeshBatchResponse);
 }
 
 enum SimulationState {
@@ -1457,4 +1467,71 @@ message QueryDebugMeshCountRequest {}
 message QueryDebugMeshCountResponse {
     uint32 retained_count  = 1;
     uint32 immediate_count = 2;
+}
+
+// ============= Custom Mesh (Phase C/O) =============
+// 自定义网格句柄，与 OrcaDebugMesh::CustomMeshHandle 严格对应
+message CustomMeshHandle {
+    uint32 index      = 1;
+    uint32 generation = 2;  // 0 表示无效（注册失败等）
+}
+
+// OBJ 加载选项（与 OrcaDebugMesh::ObjLoadOptions 严格对应）
+message ObjLoadOptions {
+    bool   y_up              = 1;  // true: 源数据 Y-up，旋转到 Z-up；false: 已是 Z-up
+    bool   flip_winding      = 2;  // true: 翻转索引绕序（CCW→CW）
+    bool   recenter          = 3;  // true: 平移使 AABB 居中于原点
+    bool   normalize_scale   = 4;  // true: 缩放使最长边 = 1
+}
+
+// RegisterCustomMesh：直接传顶点 + 索引
+message RegisterCustomMeshRequest {
+    // 顶点位置，3 float per vertex，紧密排列
+    repeated float positions = 1;
+    // 索引（三角形列表），3 uint32 per face
+    repeated uint32 indices  = 2;
+    // AABB 包围盒（6 float：min[3] + max[3]），可选；为空则 C++ 侧自动计算
+    repeated float aabb      = 3;
+    // 可选法线，3 float per vertex；为空则 C++ 侧不使用法线
+    repeated float normals   = 4;
+}
+message RegisterCustomMeshResponse {
+    bool           success       = 1;
+    string         error_message = 2;
+    CustomMeshHandle handle      = 3;
+    uint32         vertex_count  = 4;
+    uint32         face_count    = 5;
+}
+
+// RegisterCustomMeshFromObj：传 OBJ 文件文本
+message RegisterCustomMeshFromObjRequest {
+    string          obj_text = 1;  // OBJ 文件全文
+    ObjLoadOptions  options  = 2;
+}
+message RegisterCustomMeshFromObjResponse {
+    bool           success       = 1;
+    string         error_message = 2;
+    CustomMeshHandle handle      = 3;
+    uint32         vertex_count  = 4;
+    uint32         face_count    = 5;
+}
+
+message UnregisterCustomMeshRequest {
+    CustomMeshHandle handle = 1;
+}
+message UnregisterCustomMeshResponse {
+    bool   success       = 1;
+    string error_message = 2;
+}
+
+// DrawCustomMeshBatch：绘制已注册的自定义网格
+message DrawCustomMeshBatchRequest {
+    CustomMeshHandle handle    = 1;  // 已注册的自定义网格句柄
+    repeated DebugMeshInstance instances = 2;  // 实例列表
+    float duration_seconds     = 3;  // TTL：0=单帧，>0 跨帧存活
+}
+message DrawCustomMeshBatchResponse {
+    bool   success       = 1;
+    string error_message = 2;
+    uint32 drawn_count   = 3;
 }

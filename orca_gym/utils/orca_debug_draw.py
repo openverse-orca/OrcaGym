@@ -540,3 +540,186 @@ class DebugDraw:
             return {"retained": 0, "immediate": 0}
         resp = await self._stub.QueryDebugMeshCount(mjc_message_pb2.QueryDebugMeshCountRequest())
         return {"retained": int(resp.retained_count), "immediate": int(resp.immediate_count)}
+
+    # ============= Custom Mesh (Phase C/O) =============
+    # 注册 / 注销 / 绘制用户提供的网格（顶点+索引 或 OBJ 文本）。
+    # 注册返回 custom mesh 句柄 {'index': int, 'generation': int, 'valid': bool}，
+    # 与 retained ObjectHandle 结构一致但语义不同：custom mesh 句柄指向网格资源，
+    # 不携带 transform/color；绘制时需通过 DrawCustomMeshBatch 传实例数据。
+    # 离线模式（stub=None）：注册返回 invalid 句柄，绘制 no-op。
+
+    async def register_custom_mesh(
+        self,
+        positions: Sequence[float],
+        indices: Sequence[int],
+        aabb: Sequence[float] = (),
+        normals: Sequence[float] = (),
+    ) -> Dict[str, Any]:
+        """注册自定义网格（顶点+索引），返回句柄。离线模式返回 invalid 句柄。
+
+        Args:
+            positions: 顶点位置，扁平 [x0,y0,z0, x1,y1,z1, ...]，长度为 3*vertex_count
+            indices:   三角形列表索引，扁平 [i0,i1,i2, i3,i4,i5, ...]，长度为 3*face_count
+                       索引值必须 < vertex_count 且 <= 65535（C++ 侧使用 uint16 索引）
+            aabb:      可选 AABB [min_x,min_y,min_z, max_x,max_y,max_z]，长度 6；
+                       为空则 C++ 侧自动计算
+            normals:   可选法线，扁平 [nx0,ny0,nz0, ...]，长度须等于 positions；
+                       为空则 C++ 侧不使用法线（shader flat shading）
+
+        Returns:
+            {'index': int, 'generation': int, 'valid': bool, 'vertex_count': int, 'face_count': int}
+            valid=False 表示注册失败（场景未找到 / registry 已满 / 索引越界等）
+        """
+        if self._stub is None:
+            return {"index": 0, "generation": 0, "valid": False, "vertex_count": 0, "face_count": 0}
+        req = mjc_message_pb2.RegisterCustomMeshRequest()
+        req.positions.extend(np.asarray(positions, dtype=np.float32).tolist())
+        req.indices.extend([int(i) for i in indices])
+        if len(aabb) == 6:
+            req.aabb.extend([float(v) for v in aabb])
+        if len(normals) > 0:
+            req.normals.extend(np.asarray(normals, dtype=np.float32).tolist())
+        resp = await self._stub.RegisterCustomMesh(req)
+        h = resp.handle
+        return {
+            "index": int(h.index),
+            "generation": int(h.generation),
+            "valid": bool(resp.success) and int(h.generation) != 0,
+            "vertex_count": int(resp.vertex_count),
+            "face_count": int(resp.face_count),
+            "error": str(resp.error_message) if not resp.success else "",
+        }
+
+    async def register_custom_mesh_from_obj(
+        self,
+        obj_text: str,
+        y_up: bool = True,
+        flip_winding: bool = False,
+        recenter: bool = False,
+        normalize_scale: bool = False,
+    ) -> Dict[str, Any]:
+        """从 OBJ 文本注册自定义网格，返回句柄。离线模式返回 invalid 句柄。
+
+        Python 侧负责读取 OBJ 文件内容，通过 obj_text 传给 C++。
+        C++ 侧解析 OBJ 并按 options 规范化（up-axis 旋转、绕序翻转、居中、缩放）。
+        仅提取 positions + indices（三角形列表），不解析 vn/vt/mtl。
+
+        Args:
+            obj_text:        OBJ 文件全文
+            y_up:            True: 源数据 Y-up，旋转到 Z-up；False: 已是 Z-up
+            flip_winding:    True: 翻转索引绕序（CCW→CW）
+            recenter:        True: 平移使 AABB 居中于原点
+            normalize_scale: True: 缩放使最长边 = 1.0
+
+        Returns:
+            {'index': int, 'generation': int, 'valid': bool, 'error': str}
+            valid=False 表示解析失败或顶点数 > 65535（uint16 索引限制）
+        """
+        if self._stub is None:
+            return {"index": 0, "generation": 0, "valid": False, "error": "offline"}
+        req = mjc_message_pb2.RegisterCustomMeshFromObjRequest()
+        req.obj_text = obj_text
+        req.options.y_up = bool(y_up)
+        req.options.flip_winding = bool(flip_winding)
+        req.options.recenter = bool(recenter)
+        req.options.normalize_scale = bool(normalize_scale)
+        resp = await self._stub.RegisterCustomMeshFromObj(req)
+        h = resp.handle
+        return {
+            "index": int(h.index),
+            "generation": int(h.generation),
+            "valid": bool(resp.success) and int(h.generation) != 0,
+            "error": str(resp.error_message) if not resp.success else "",
+        }
+
+    async def register_custom_mesh_from_obj_file(
+        self,
+        obj_path: str,
+        y_up: bool = True,
+        flip_winding: bool = False,
+        recenter: bool = False,
+        normalize_scale: bool = False,
+    ) -> Dict[str, Any]:
+        """从 OBJ 文件路径注册自定义网格（便捷封装）。
+
+        读取文件内容后调用 register_custom_mesh_from_obj。文件需在 Python 侧可访问
+        （不要求在 Editor 机器上，因内容通过 gRPC 传输）。
+
+        Args: 同 register_custom_mesh_from_obj，但第一个参数为文件路径
+        """
+        with open(obj_path, "r", encoding="utf-8", errors="replace") as f:
+            obj_text = f.read()
+        return await self.register_custom_mesh_from_obj(
+            obj_text, y_up=y_up, flip_winding=flip_winding,
+            recenter=recenter, normalize_scale=normalize_scale)
+
+    async def unregister_custom_mesh(self, handle: Dict[str, Any]) -> bool:
+        """注销自定义网格，释放 GPU 资源。离线模式返回 False。
+
+        Args:
+            handle: register_custom_mesh / register_custom_mesh_from_obj 返回的句柄
+
+        Returns:
+            True 表示请求已发送（不代表 C++ 侧一定成功，stale handle 安全 no-op）
+        """
+        if self._stub is None:
+            return False
+        req = mjc_message_pb2.UnregisterCustomMeshRequest()
+        req.handle.index = int(handle["index"])
+        req.handle.generation = int(handle["generation"])
+        resp = await self._stub.UnregisterCustomMesh(req)
+        return bool(resp.success)
+
+    async def draw_custom_mesh_batch(
+        self,
+        handle: Dict[str, Any],
+        instances: Sequence[mjc_message_pb2.DebugMeshInstance],
+        duration: float = 0.0,
+    ) -> int:
+        """批量绘制已注册的自定义网格（immediate 模式）。离线模式返回 0。
+
+        Args:
+            handle:    register_custom_mesh / register_custom_mesh_from_obj 返回的句柄
+            instances: DebugMeshInstance proto 列表
+            duration:  TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期
+
+        Returns:
+            已提交绘制的实例数（离线模式返回 0）
+        """
+        if self._stub is None:
+            return 0
+        req = mjc_message_pb2.DrawCustomMeshBatchRequest()
+        req.handle.index = int(handle["index"])
+        req.handle.generation = int(handle["generation"])
+        req.instances.extend(instances)
+        req.duration_seconds = float(duration)
+        resp = await self._stub.DrawCustomMeshBatch(req)
+        return int(resp.drawn_count)
+
+    async def draw_custom_mesh(
+        self,
+        handle: Dict[str, Any],
+        position: Sequence[float],
+        rotation: Sequence[float],
+        scale: Sequence[float],
+        color: Sequence[float],
+        flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
+        duration: float = 0.0,
+    ) -> None:
+        """绘制单个自定义网格实例（immediate 便捷封装）。离线模式 no-op。
+
+        Args:
+            handle:    register_custom_mesh / register_custom_mesh_from_obj 返回的句柄
+            position:  [x, y, z] Z-up 世界坐标（米）
+            rotation:  [x, y, z, w] O3DE 四元数（非 MuJoCo 的 [w,x,y,z]）
+            scale:     [sx, sy, sz] per-axis 缩放（米）
+            color:     [r, g, b, a] 0..1
+            flags:     InstanceFlags bitmask
+            wireframe: True 时 OR 入 InstanceFlags.WIREFRAME
+            duration:  TTL 持续时长（秒）。0=单帧，>0 跨帧存活
+        """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
+        inst = _make_instance(position, rotation, scale, color, flags)
+        await self.draw_custom_mesh_batch(handle, [inst], duration=duration)
