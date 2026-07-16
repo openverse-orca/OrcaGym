@@ -37,6 +37,7 @@ class InstanceFlags:
 
     NONE = 0
     EDGE_HIGHLIGHT = 1 << 0
+    WIREFRAME = 1 << 1  # W2: render as LineList wireframe (o_wireframe PSO variant)
 
 
 class DebugMeshType:
@@ -291,6 +292,7 @@ class DebugDraw:
         radius: float,
         color: Sequence[float],
         flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
         duration: float = 0.0,
     ) -> None:
         """绘制球体（immediate）。
@@ -300,8 +302,11 @@ class DebugDraw:
             radius: 球体半径，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
+            wireframe: W5 便捷参数，True 时 OR 入 InstanceFlags.WIREFRAME（线框渲染）
             duration: TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期，防闪烁
         """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
         inst = _make_instance(center, [0, 0, 0, 1], [radius, radius, radius], color, flags)
         await self.draw_batch(DebugMeshType.SPHERE, [inst], duration=duration)
 
@@ -311,6 +316,7 @@ class DebugDraw:
         size: Sequence[float],
         color: Sequence[float],
         flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
         duration: float = 0.0,
     ) -> None:
         """绘制立方体（immediate）。
@@ -320,8 +326,11 @@ class DebugDraw:
             size:   [sx, sy, sz] 三轴边长，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
+            wireframe: W5 便捷参数，True 时 OR 入 InstanceFlags.WIREFRAME（线框渲染）
             duration: TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期，防闪烁
         """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
         inst = _make_instance(center, [0, 0, 0, 1], size, color, flags)
         await self.draw_batch(DebugMeshType.BOX, [inst], duration=duration)
 
@@ -332,6 +341,7 @@ class DebugDraw:
         radius: float,
         color: Sequence[float],
         flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
         duration: float = 0.0,
     ) -> None:
         """绘制圆柱（immediate）。圆柱从 p_from 延伸到 p_to。
@@ -342,8 +352,11 @@ class DebugDraw:
             radius: 圆柱半径，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
+            wireframe: W5 便捷参数，True 时 OR 入 InstanceFlags.WIREFRAME（线框渲染）
             duration: TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期，防闪烁
         """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
         inst = _make_cylinder_instance(p_from, p_to, radius, color, flags)
         await self.draw_batch(DebugMeshType.CYLINDER, [inst], duration=duration)
 
@@ -354,6 +367,7 @@ class DebugDraw:
         shaft_radius: float,
         color: Sequence[float],
         flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
         duration: float = 0.0,
     ) -> None:
         """绘制箭头（immediate）。箭头从 p_from 指向 p_to。
@@ -364,8 +378,11 @@ class DebugDraw:
             shaft_radius: 箭杆半径，米
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
+            wireframe: W5 便捷参数，True 时 OR 入 InstanceFlags.WIREFRAME（线框渲染）
             duration: TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期，防闪烁
         """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
         inst = _make_arrow_instance(p_from, p_to, shaft_radius, color, flags)
         await self.draw_batch(DebugMeshType.ARROW, [inst], duration=duration)
 
@@ -375,6 +392,7 @@ class DebugDraw:
         size: Sequence[float],
         color: Sequence[float],
         flags: int = InstanceFlags.NONE,
+        wireframe: bool = False,
         duration: float = 0.0,
     ) -> None:
         """绘制双面 Quad（immediate）。Quad 在 XY 平面，法线沿 +Z。
@@ -384,8 +402,11 @@ class DebugDraw:
             size:   [sx, sy, sz] 三轴缩放，米（sz 通常不影响扁平 quad）
             color:  [r, g, b, a] 0..1
             flags:  InstanceFlags bitmask
+            wireframe: W5 便捷参数，True 时 OR 入 InstanceFlags.WIREFRAME（线框渲染）
             duration: TTL 持续时长（秒）。0=单帧（默认），>0 跨帧存活至仿真时间到期，防闪烁
         """
+        if wireframe:
+            flags |= InstanceFlags.WIREFRAME
         inst = _make_instance(center, [0, 0, 0, 1], size, color, flags)
         await self.draw_batch(DebugMeshType.QUAD, [inst], duration=duration)
 
