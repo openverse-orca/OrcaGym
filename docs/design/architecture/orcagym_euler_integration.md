@@ -565,13 +565,71 @@ class OrcaGymEuler:
 
 ---
 
-## 7. 渲染协作（占位）
+## 7. 渲染协作
 
-> **待补充**：Euler 与 OrcaStudio 的 GPU 零拷贝渲染同步由独立的渲染架构文档论述。本节在 Euler 渲染文档完成后补充：
->
-> 1. Euler 粒子（流体）渲染的 GPU 内存句柄共享机制
-> 2. Euler 可变形体代理 Mesh 顶点动画的渲染同步
-> 3. OrcaGymEuler 在 `render()` 中如何编排 MuJoCo 渲染（通过 OrcaStudio Bridge）和 Euler 渲染（直接 GPU 同步）
+Euler 与 OrcaStudio 的渲染同步由独立的渲染设计文档论述。本节给出 OrcaGymEuler 编排双引擎渲染的契约，详细实现见引用文档。
+
+### 7.1 双引擎渲染链路
+
+OrcaGymEuler 在 `render()` 中编排两条独立的渲染链路，两者落点都是 OrcaStudio，由 OrcaStudio 渲染管线统一合成：
+
+| 链路 | 触发方式 | 数据通道 | 落点 FP |
+|------|---------|---------|---------|
+| MuJoCo 渲染（刚体） | OrcaStudio Bridge gRPC | `qpos` → Mujoco FP | Mujoco Gem FP |
+| Euler 渲染（非刚体） | Euler `RenderClient` gRPC | `state.particle_q` / `state.deformable_vertex_q` → OrcaEulerRender FP | OrcaEulerRender Gem FP |
+
+两条链路**无数据依赖**，可并行触发。MuJoCo 渲染走 OrcaGym 既有的 Bridge gRPC 链路（`qpos` 上报），Euler 渲染走 Euler 自有的 `RenderClient`（直连 OrcaEulerRender Gem 的 gRPC server，端口 50451）。
+
+### 7.2 Euler 粒子（流体）渲染的 GPU 内存句柄共享机制
+
+Euler 粒子渲染有两条数据路径，由 `RegisterChannel` 时的 `transport_mode` 选择：
+
+| 路径 | 数据载体 | 同步原语 | 适用场景 |
+|------|---------|---------|---------|
+| CPU 路径（Phase 2 基线） | 主机内存 `repeated float`（gRPC `UpdateChannelData` 上传） | gRPC unary 天然串行 | 功能验证 / 小规模（< 20K）/ 跨机 |
+| fd 路径（Phase 3 高性能） | GPU RenderBuffer（DMA-BUF fd 共享） | External Semaphore（跨进程 GPU-GPU） | 大规模生产（≥ 100K） |
+
+- **CPU 路径**：每帧 `euler.render()` 触发 `state.particle_q.cpu()` 回读后 gRPC 上传，无 GPU 内存句柄共享。详见 [euler_render_client_design.md](../../../../OrcaEuler/Docs/Design/design/euler_render_client_design.md)
+- **fd 路径**：GPU allocation 通过 `flow.export_memory` 导出为 DMA-BUF fd，经 UDS + SCM_RIGHTS 传给 OrcaStudio，`vkImportMemoryFdKHR` 导入。双缓冲 Ping-Pong + External Semaphore 跨进程同步，全程零拷贝。详见 [render_buffer_design.md](../../../../OrcaEuler/Docs/Design/design/render_buffer_design.md)
+
+### 7.3 Euler 可变形体代理 Mesh 顶点动画的渲染同步
+
+可变形体顶点动画分**两层映射**：
+
+| 层级 | 数据 | 计算方 | 时机 |
+|------|------|--------|------|
+| 物理侧（Euler） | `particle_q → deformable_vertex_q`（MLS 仿射变形） | Euler `apply_skin_binding` | `euler.render()` 每帧（sim_stream，Graph 外） |
+| 渲染侧（OrcaStudio） | `proxy mesh 顶点 → visual mesh 顶点`（LBS 蒙皮） | `EulerDeformableFP` shader | GPU 渲染每帧 |
+
+**关键点**：物理侧的 skinning kernel（MLS 仿射）在 `euler.render()` 中触发，**不在 `solver.step()` 内**。原因是 skinning 是渲染派生量（频率 30Hz），非物理求解（频率 1kHz），若纳入 step Graph 会产生 300× 无谓计算。CPU 路径与 fd 路径都触发 skinning kernel（GPU MLS 比 CPU 快 100×）。详见 [euler_render_client_design.md §3.3](../../../../OrcaEuler/Docs/Design/design/euler_render_client_design.md) 与 [proxy_mesh_skinning_design.md](../../../../OrcaEuler/Docs/Design/design/proxy_mesh_skinning_design.md)。
+
+### 7.4 OrcaGymEuler `render()` 编排
+
+```python
+class OrcaGymEulerEnv:
+    def render(self, mode: str = "human") -> None:
+        """编排 MuJoCo 渲染 + Euler 渲染。
+
+        两条渲染链路独立，无数据依赖，可并行触发。
+        """
+        # 1. MuJoCo 渲染（刚体，通过 OrcaStudio Bridge gRPC）
+        if self._mj_render_client:
+            self._mj_render_client.update_qpos(self._mj_data.qpos)
+
+        # 2. Euler 渲染（非刚体，通过 Euler RenderClient gRPC）
+        if self._euler_render_graph:
+            self._euler_render_graph.render()  # 触发 skinning + 数据输出（CPU 回读或 fd copy）
+```
+
+**时序约束**：
+
+| 约束 | 原因 |
+|------|------|
+| `render` 频率（30Hz）远低于 `step_with_coupling`（1kHz） | `euler.render()` 不在 SyncCycle 内调用，避免拖慢仿真 |
+| `euler.render()` 必须在 `step_with_coupling` 之后 | render 读 `state.particle_q`，需 step 写入完成 |
+| MuJoCo 渲染与 Euler 渲染无依赖 | 两者数据源不同（`qpos` vs `state`），可并行 |
+
+详细时序与 CPU/fd 路径分支见 [euler_render_client_design.md §3.6 / §5](../../../../OrcaEuler/Docs/Design/design/euler_render_client_design.md)。
 
 ---
 
