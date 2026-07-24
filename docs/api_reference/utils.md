@@ -19,16 +19,18 @@
 
 基于雅可比矩阵 + 阻尼最小二乘法的逆运动学求解器。
 
+> ⚠️ **注意**：本控制器依赖 `RobomimicEnv` 适配器（`orca_gym.adapters.robomimic`），不适用于原始的 `OrcaGymEulerEnv`。使用前需通过 Robomimic 适配器封装环境。
+
 ### 构造
 
 ```python
 class InverseKinematicsController:
     def __init__(
         self,
-        env: RobomimicEnv,          # 环境对象
+        env: RobomimicEnv,          # RobomimicEnv 适配器包装的环境
         site_id: int,               # 末端执行器 site 的 ID
         dof_indices: list[int],     # 受控关节的 DOF 索引列表
-        lamba_value: float = 1e-3,  # 阻尼系数
+        lamba_value: float = 1e-3,  # 阻尼系数（注意：代码中实际拼写为 lamba，非 lambda）
         alpha_value: float = 0.2,   # 步长缩放系数
     )
 ```
@@ -198,16 +200,27 @@ class RewardPrinter:
 rotations.quat_mul(q1, q2)              # 四元数乘法 q1 * q2
 rotations.quat_conjugate(q)             # 四元数共轭
 rotations.quat_identity()               # 单位四元数 [1, 0, 0, 0]
-rotations.quat_slerp(q0, q1, fraction)  # 球面线性插值
-rotations.quat_rot_vec(q, v)            # 用四元数旋转向量 v
+rotations.quat_rot_vec(q, v0)           # 四元数旋转向量
 ```
 
-### 角度处理
+### 欧拉角运算
 
 ```python
-rotations.normalize_angles(angles)               # 归一化到 [-π, π]
-rotations.subtract_euler(e1, e2)                 # 欧拉角差值
-rotations.round_to_straight_angles(angles)       # 舍入到最近的 90° 倍数
+rotations.subtract_euler(e1, e2)        # 欧拉角差值
+rotations.euler2point_euler(euler)      # 欧拉角 → point 表示
+rotations.point_euler2euler(pe)         # point 表示 → 欧拉角
+rotations.normalize_angles(angles)      # 归一化角度到 [-pi, pi]
+rotations.round_to_straight_angles(angles)  # 舍入到直角
+```
+
+### 其他工具
+
+```python
+rotations.quat2point_quat(quat)         # 四元数 → point 表示
+rotations.point_quat2quat(pq)           # point 表示 → 四元数
+rotations.get_parallel_rotations()      # 获取平行旋转集合
+rotations.unit_vector(data, axis, out)  # 单位向量
+rotations.quat_slerp(q0, q1, fraction, shortestpath=True)  # 球面线性插值
 ```
 
 ### 使用示例

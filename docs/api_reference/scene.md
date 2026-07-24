@@ -99,6 +99,13 @@ actor_name 映射表：
 def set_image_enabled(actor_name: int, enabled: bool)
 ```
 
+actor_name 映射表：
+
+| actor_name | 对应 UI 元素 |
+|------------|-------------|
+| 0 | Imagemidlebig |
+| 1 | Imagetoplit |
+
 ### 生命周期
 
 ```python
@@ -156,10 +163,27 @@ class LightInfo:
 class CameraSensorInfo:
     def __init__(
         self,
-        capture_rgb: bool,      # 是否捕获 RGB 图像
-        capture_depth: bool,    # 是否捕获深度图
-        save_mp4_file: bool,    # 是否保存 MP4 视频文件
-        use_dds: bool,          # 是否使用 DDS 纹理格式
+        capture_rgb: bool,              # 是否捕获 RGB 图像
+        capture_depth: bool,            # 是否捕获深度图
+        save_mp4_file: bool,            # 是否保存 MP4 视频文件
+        use_dds: bool,                  # 是否使用 DDS 纹理格式
+        # 以下为可选扩展参数（None 表示不修改 server 现有值）
+        capture_normal: bool | None = None,         # 是否捕获法线图
+        capture_object_color: bool | None = None,   # 是否捕获实例分割色标图
+        is_recording: bool | None = None,           # 是否正在录制
+        use_nvenc: bool | None = None,              # 是否使用 NvEnc 硬件编码
+        nvenc_gpu_index: int | None = None,         # NvEnc GPU 适配器索引
+        random_object_color: bool | None = None,    # 是否随机分配物体颜色
+        width: int | None = None,                   # 图像宽度（像素）
+        height: int | None = None,                  # 图像高度（像素）
+        vertical_fov: float | None = None,          # 垂直视场角（度）
+        near_clip: float | None = None,             # 近裁剪面距离
+        far_clip: float | None = None,              # 远裁剪面距离
+        gamma: float | None = None,                 # 深度相机 gamma 校正
+        color_port: int | None = None,              # RGB 流 WebSocket 端口
+        depth_port: int | None = None,              # 深度流 WebSocket 端口
+        dds_topic: str | None = None,               # DDS 主题
+        dds_stream_id: str | None = None,           # DDS 流 ID
     )
 ```
 

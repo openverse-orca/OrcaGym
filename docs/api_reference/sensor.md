@@ -144,7 +144,7 @@ class VideoPlayer:
 class Monitor:
     def __init__(self, name: str, fps: int = 30, port: int = 7070)
     def start()                    # 启动监控窗口（会阻塞当前线程）
-    def stop()                     # 停止
+    def stop()                     # 停止（释放摄像头资源，当前实现为空方法体）
 ```
 
 ---
