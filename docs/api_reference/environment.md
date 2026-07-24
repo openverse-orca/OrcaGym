@@ -58,10 +58,11 @@ def do_simulation(ctrl: np.ndarray, n_frames: int) -> None
 核心步进方法。设置控制 → 步进 n_frames → 自动同步状态。调用后 `self.data` 已为最新状态。ctrl 形状必须为 `(nu,)`。
 
 ```python
+def set_ctrl(ctrl: np.ndarray) -> None
 def mj_step(nstep: int) -> None
 def mj_forward() -> None
 ```
-低级仿真控制，通常不需要直接调用。
+`set_ctrl` 设置控制输入但不步进；`mj_step` / `mj_forward` 为低级仿真控制，通常不需要直接调用。
 
 ### 状态设置
 
@@ -96,6 +97,9 @@ def add_extra_weight(weight_load_dict: dict) -> None
 def query_joint_qpos(joint_names: list[str]) -> dict[str, np.ndarray]
 def query_joint_qvel(joint_names: list[str]) -> dict[str, np.ndarray]
 def query_joint_qacc(joint_names: list[str]) -> dict[str, np.ndarray]
+def query_joint_offsets(joint_names: list[str]) -> dict[str, np.ndarray]   # 关节偏移
+def query_joint_lengths(joint_names: list[str]) -> dict[str, np.ndarray]   # 关节长度
+def query_joint_dofadrs(joint_names: list[str]) -> dict[str, int]           # 关节 dof 起始地址
 def jnt_qposadr(joint_name: str) -> int
 def jnt_dofadr(joint_name: str) -> int
 
@@ -113,6 +117,7 @@ def query_actuator_torques(actuator_names: list[str]) -> dict[str, np.ndarray]
 def query_contact_simple() -> list[dict]
 def query_contact_force(contact_ids: list[int]) -> dict[int, np.ndarray]
 def get_cfrc_ext() -> np.ndarray
+def get_goal_bounding_box(geom_name: str) -> np.ndarray   # geom 包围盒半尺寸 (3,)
 def body_subtree_mass(body_name: str) -> float
 ```
 
@@ -139,20 +144,36 @@ def query_robot_orientation_odom(base_body, initial_base_pos, initial_base_quat)
 ### 雅可比
 
 ```python
-def mj_jacBody(jacp: np.ndarray, jacr: np.ndarray, *, body_name: str) -> None
-def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, *, site_name: str) -> None
+def mj_jacBody(jacp: np.ndarray, jacr: np.ndarray, body_name: str) -> None
+def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
 
-### 等式约束与体操作
+### 等式约束原语（推荐）
+
+> 旧版 `update_equality_constraints` / `anchor_actor` 等已删除，改用以下原子原语：
 
 ```python
-def update_equality_constraints(eq_list: list[dict]) -> None
-def modify_equality_objects(eq_ids: list[int], obj1_names=None, obj2_names=None) -> None
-def update_anchor_equality_constraints(actor_name: str, anchor_type: str = "weld") -> None
-def anchor_actor(actor_name: str, anchor_type: str = "weld") -> None
-def release_body_anchored() -> None
-def do_body_manipulation() -> None
+def equality_find_slot_by_body(body_name: str) -> int          # 查找含指定 body 的等式约束槽位，未找到返回 -1
+def equality_constraint(slot: int) -> dict                     # 读取单个等式约束完整数据
+def equality_update(
+    slot: int,
+    *,
+    eq_type: int | None = None,       # mjtEq 类型常量
+    obj1_name: str | None = None,     # 新的 obj1 body 名称
+    obj2_name: str | None = None,     # 新的 obj2 body 名称
+    data: np.ndarray | None = None,   # 约束数据 (mjNEQDATA,)
+    active: bool | None = None,       # 是否激活
+    solref: np.ndarray | None = None, # 求解器参考参数 (2,)
+    solimp: np.ndarray | None = None, # 求解器 impedance 参数 (5,)
+    forward: bool = True,             # 写入后是否调用 mj_forward
+) -> None
+```
+
+### 只读查询
+
+```python
+def geom_friction(geom_name: str) -> np.ndarray   # geom 摩擦系数 (3,) [sliding, torsion, rolling]
 ```
 
 ### Studio 交互
@@ -167,6 +188,94 @@ def get_camera_time_stamp(last_frame_index) -> dict
 def get_frame_png(image_path) -> None
 def load_content_file(content_file_name, **kwargs) -> None
 ```
+
+### 摄像头传感器配置
+
+```python
+def set_camera_sensor_info(
+    actor_name: str,
+    capture_rgb: bool,
+    capture_depth: bool,
+    save_mp4_file: bool = False,
+    use_dds: bool = False,
+    **kwargs,   # 可选扩展参数：capture_normal, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, ...
+) -> None
+def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+```
+
+### Studio 桥接
+
+```python
+def studio_bridge()   # 返回 OrcaStudio 桥接对象（K9 方法访问模式）
+```
+
+### 名称空间解析（多智能体）
+
+继承自 `OrcaGymEnvMixin`，用于在多智能体环境中自动为实体名称添加智能体前缀。
+
+```python
+@property
+agent_num: int                          # 智能体数量
+
+def body(name: str, agent_id: int | None = None) -> str       # body 名称 → "agent_name_body_name"
+def joint(name: str, agent_id: int | None = None) -> str      # 关节名称
+def actuator(name: str, agent_id: int | None = None) -> str   # 执行器名称
+def site(name: str, agent_id: int | None = None) -> str       # site 名称
+def mocap(name: str, agent_id: int | None = None) -> str      # mocap 名称
+def sensor(name: str, agent_id: int | None = None) -> str     # 传感器名称
+```
+
+> `agent_id=None` 时默认使用第一个智能体（索引 0）。
+
+**示例：**
+```python
+# 单智能体环境（agent_names=["robot_1"]）
+env.body("pelvis")    # → "robot_1_pelvis"
+env.joint("leg_l_1")  # → "robot_1_leg_l_1"
+
+# 多智能体环境（agent_names=["robot_1", "robot_2"]）
+env.body("pelvis", agent_id=1)  # → "robot_2_pelvis"
+```
+
+### 动作/观测空间生成
+
+继承自 `OrcaGymEnvMixin`，用于便捷地生成符合 Gymnasium 规范的动作空间和观测空间。
+
+```python
+def generate_action_space(bounds: np.ndarray) -> gym.Space      # (nu, 2) → Box 动作空间
+def generate_observation_space(obs: np.ndarray | dict) -> gym.Space  # 从观测样例生成观测空间
+```
+
+`generate_action_space` 会自动处理 ±inf 边界（裁剪到 float32 可表示范围），避免 gymnasium 的溢出警告。
+
+**示例：**
+```python
+# 根据执行器控制范围生成动作空间
+ctrlrange = self.model.get_actuator_ctrlrange()  # (nu, 2)
+self.action_space = self.generate_action_space(ctrlrange)
+
+# 根据观测样例生成观测空间
+obs_sample = self._get_obs()
+self.observation_space = self.generate_observation_space(obs_sample)
+```
+
+### 随机种子
+
+```python
+def set_seed_value(seed: int) -> list[int]     # 设置随机数种子，返回种子列表
+```
+
+设置后可通过 `self.np_random` 使用 `RandomState` 实例。
+
+### 重置（Gymnasium 标准接口）
+
+```python
+def reset(*, seed: int | None = None, options: dict | None = None) -> tuple[ObsType, dict]
+```
+
+由 `OrcaGymEnvMixin` 提供，编排顺序：`set_seed_value` → `reset_simulation` → `reset_model` → `render`。
+
+> 子类应复写 `reset_model()` 而非直接复写 `reset()`。
 
 ### 抽象方法（子类必须实现）
 
@@ -259,14 +368,51 @@ if __name__ == "__main__":
 
 ## OrcaGymVectorEnv
 
-向量化环境，并行执行多个环境。
+向量化环境，在单个 MuJoCo 实例中并行运行多个智能体。继承自 Gymnasium `VectorEnv`。
+
+> ⚠️ 注意：`num_envs` 必须是 32 的整数倍（内部按每组 32 个智能体分组）。
+
+### 构造参数
 
 ```python
-class OrcaGymVectorEnv:
-    def __init__(self, env_fns: list[callable])
-    def step(actions) -> tuple   # (obs, rewards, terminated, truncated, infos)
-    def reset() -> tuple         # (obs, infos)
+class OrcaGymVectorEnv(VectorEnv):
+    def __init__(
+        self,
+        num_envs: int,           # 并行环境总数（必须是 32 的倍数）
+        worker_index: int,       # 工作进程索引
+        entry_point: str,        # 环境类的导入路径（如 "my_package.envs:MyEnv"）
+        **kwargs,                # 传递给环境构造函数的其他参数
+    )
 ```
+
+### 公共属性
+
+```python
+num_envs: int                        # 并行环境数量
+observation_space: gym.Space         # 批量观测空间
+single_observation_space: gym.Space  # 单环境观测空间
+action_space: gym.Space              # 批量动作空间
+single_action_space: gym.Space       # 单环境动作空间
+```
+
+### 主要方法
+
+```python
+def reset(*, seed=None, options=None) -> tuple[ObsType, list[dict]]
+def step(actions: ActType) -> tuple[ObsType, np.ndarray, np.ndarray, np.ndarray, list[dict]]
+def render() -> None
+def close() -> None
+```
+
+### 返回值说明
+
+| 返回值 | 形状/类型 | 说明 |
+|--------|-----------|------|
+| `observations` | `(num_envs, *obs_shape)` | 所有环境的观测 |
+| `rewards` | `(num_envs,)` | 所有环境的奖励 |
+| `terminated` | `(num_envs,) bool` | 是否终止 |
+| `truncated` | `(num_envs,) bool` | 是否截断 |
+| `infos` | `list[dict]` | 每个环境的 info 字典 |
 
 ---
 

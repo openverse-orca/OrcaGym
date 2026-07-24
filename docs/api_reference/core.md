@@ -64,6 +64,44 @@ def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
 ```
 
+### 按 ID / 按名称获取实体
+
+```python
+def get_body_byid(id: int) -> dict
+def get_body_byname(name: str) -> dict
+def get_joint_byid(id: int) -> dict
+def get_joint_byname(name: str) -> dict
+def get_actuator_byid(id: int) -> dict
+def get_actuator_byname(name: str) -> dict
+def get_geom_byid(id: int) -> dict
+def get_geom_byname(name: str) -> dict
+def get_sensor(name_or_id: Union[str, int]) -> dict | None
+def get_site(name_or_id: Union[str, int]) -> dict | None
+def get_mesh_byid(id: int) -> dict
+def get_mesh_byname(name: str) -> dict | None
+```
+
+### 等式约束类型常量
+
+```python
+model.mjEQ_CONNECT = 0      # 两个 body 在一点连接（球关节）
+model.mjEQ_WELD = 1         # 焊接约束（固定相对位置和姿态）
+model.mjEQ_JOINT = 2        # 关节耦合
+model.mjEQ_TENDON = 3       # 肌腱耦合
+model.mjEQ_FLEX = 4         # flex 边长约束
+model.mjEQ_DISTANCE = 5     # 距离约束（不推荐使用）
+```
+
+用于 `equality_update()` 的 `eq_type` 参数。
+
+### Flex Body 查询
+
+```python
+def get_flex_info_by_body_id(body_id: int) -> Optional[Tuple[int, int]]   # (flex_id, local_vertex_index)
+def parse_flex_vertex_name(body_name: str) -> Optional[Tuple[str, int]]   # (flex_name, global_vertex_index)
+def resolve_flex_body_name(body_name: str) -> Optional[FlexBodyInfo]      # 统一解析所有 flex 类型
+```
+
 ---
 
 ## OrcaGymDataView — 仿真状态只读视图
@@ -134,7 +172,7 @@ def mocap_quat(body_name: str) -> np.ndarray      # mocap 四元数 [w,x,y,z] (4
 | `timestep` | `float` | 物理时间步长 |
 | `integrator` | `int` | 积分器类型（0=Euler, 1=RK4） |
 | `iterations` | `int` | 求解器迭代次数 |
-| `gravity` | `np.ndarray(3,)` | 重力向量 |
+| `gravity` | `np.ndarray` | 重力向量，形状 (3,) |
 
 ### 方法
 
