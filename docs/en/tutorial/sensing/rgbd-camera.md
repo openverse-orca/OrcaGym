@@ -5,7 +5,7 @@ OrcaGym provides real-time RGB-D camera streaming via WebSocket.
 ## CameraWrapper
 
 ```python
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 # Create a camera wrapper
 camera = CameraWrapper(
@@ -67,15 +67,14 @@ Python Client
 ## Camera Pose
 
 ```python
-# Get camera frames and pose information
-camera_transforms = env.get_frame_png("path/to/save")
-# → {"front_camera": {"pos": [x,y,z], "quat": [w,x,y,z]}, ...}
-
-for camera_name, transform in camera_transforms.items():
-    print(f"{camera_name}:")
-    print(f"  Position: {transform['pos']}")
-    print(f"  Orientation: {transform['quat']}")
+# Under the Euler system, get_frame_png returns None and only saves the current frame PNG
+# to the specified path; it does not return a camera pose dict (only the Local system returns a pose dict).
+env.get_frame_png("path/to/save.png")
 ```
+
+> Note: In the Local system, `get_frame_png` returns a
+> `{"camera_name": {"pos": [...], "quat": [...]}, ...}` dict;
+> under the Euler system (`OrcaGymEulerEnv`), it only saves a PNG to the path and returns `None`.
 
 ## Camera Monitor
 
@@ -83,7 +82,7 @@ OrcaGym includes a camera monitor script:
 
 ```bash
 # Launch the camera monitor
-python -m orca_scripts.camera_monitor
+python -m orca_gym.scripts.camera_monitor
 ```
 
 ## Camera Timestamps
@@ -130,7 +129,9 @@ class VisionEnv(OrcaGymEulerEnv):
 
 ## Performance Tips
 
-1. **Async mode** (CaptureMode.ASYNC) is more friendly for visual RL
+1. **Async mode** (`CaptureMode.ASYNC`) is more friendly for visual RL.
+   `CaptureMode` is defined in the `orca_gym.core.orca_gym_local` module (Local system);
+   under the Euler system you must import it explicitly: `from orca_gym.core.orca_gym_local import CaptureMode`
 2. **Reduce image resolution** to increase frame rate
 3. **Lower the frame rate appropriately** — 30 FPS is usually sufficient
 4. **Decode in multiple threads** — avoid blocking the main simulation thread

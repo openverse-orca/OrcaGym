@@ -367,7 +367,8 @@ def _build_body_index_map(self):
     # 遍历 MuJoCo body（跳过 world id=0），构建映射
     mj_body_list = []
     euler_idx_list = []
-    for mj_body in range(1, mj_model.nbody):
+    nbody = len(mj_model.get_body_names())
+    for mj_body in range(1, nbody):
         mj_name = mj_model.body(mj_body).name
         euler_idx = euler_label_to_idx.get(mj_name)
         if euler_idx is not None:

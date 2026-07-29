@@ -17,7 +17,7 @@ OrcaGym 支持多种输入设备用于遥操作。
 # 需要安装 devices 依赖
 # pip install orca-gym[devices]
 
-from orca_devices import xbox_joystick
+from orca_gym.devices import xbox_joystick
 ```
 
 ## 遥操作数据流

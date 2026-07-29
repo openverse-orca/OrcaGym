@@ -58,7 +58,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_force_apply(self):
         """演示 1：施加外力抬起机器人"""
-        agent = self.agent_name
+        agent = self._agent_names[0]
 
         # 记录初始高度
         pelvis = self.get_body_xpos_xmat_xquat([f"{agent}_pelvis"])
@@ -95,7 +95,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_mocap_drag(self):
         """演示 2：mocap + weld 约束拖拽物体"""
-        agent = self.agent_name
+        agent = self._agent_names[0]
 
         # 设置 mocap 目标位姿
         target_pos = np.array([0.7, 0.0, 0.5])
@@ -128,7 +128,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_ik_lift_foot(self):
         """演示 3：阻尼最小二乘 IK 抬起左脚"""
-        agent = self.agent_name
+        agent = self._agent_names[0]
         foot_body = f"{agent}_left_ankle_roll_link"
 
         # --- 准备 G1 关节信息 ---
@@ -289,11 +289,16 @@ read_pos = env.data.mocap_pos("mocap_name")    # (3,)
 read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 ```
 
-**完整拖拽流程**：
-1. `anchor_actor("object", "weld")` — 建立 WELD 约束连接 mocap 和物体
-2. `set_mocap_pos_and_quat(...)` — 移动 mocap → 物体跟随
-3. `do_simulation(...)` — 步进让约束生效
-4. `release_body_anchored()` — 释放
+**完整拖拽流程**（Euler 路径下 `anchor_actor`/`release_body_anchored` 不在 Env 公共 API；程序化操作应仿照 UI 抓取内部方法的编排模式，使用以下公共原语）：
+1. `equality_find_slot_by_body(env.body("mocap_anchor"))` — 查找含 mocap 的等式约束槽位
+2. `equality_constraint(slot)` — 保存原始约束快照（释放时恢复）
+3. `set_mocap_pos_and_quat({...})` — 对齐 mocap 位姿到物体当前位姿
+4. `equality_update(slot, eq_type=mjtEq.mjEQ_WELD, obj1_name=..., obj2_name=...)` — 建立 WELD 约束
+5. `set_mocap_pos_and_quat({...})` — 移动 mocap → 物体跟随
+6. `do_simulation(...)` — 步进让约束生效
+7. `equality_update(slot, ...)` — 从快照恢复原始约束（释放）
+
+> 注：`anchor_actor` / `release_body_anchored` 仅在 Local 体系（`OrcaGymLocalEnv`）为公共方法，Euler 体系下为 UI 抓取内部方法（`_anchor_actor` / `_release_body_anchored`），不应直接调用。
 
 ### 3. 状态写入
 
@@ -334,6 +339,7 @@ env.mj_jacBody(jacp, jacr, body_name="g1_pelvis")
 
 ```python
 jacp_site = np.zeros((3, env.model.nv))
+jacr_site = np.zeros((3, env.model.nv))   # 必须预分配，mj_jacSite 原地写入
 env.mj_jacSite(jacp_site, jacr_site, site_name="g1_imu")
 
 # 验证一致性

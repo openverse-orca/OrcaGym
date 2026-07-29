@@ -22,7 +22,7 @@ Understanding how simulation data flows through OrcaGym is key to using the envi
     │           │            │
     │   ┌───────▼────────┐  │
     │   │ _get_obs()     │──┼──▶ obs
-    │   │ compute_reward()│──┼──▶ reward
+    │   │ subclass step() │──┼──▶ reward / terminated / truncated
     │   └────────────────┘  │
     └──────────────────────┘
                │
@@ -41,10 +41,12 @@ env.step(action)
   │     └─▶ Execute n_frames physics simulation steps
   │
   ├─▶ _get_obs()          # Build observation
-  ├─▶ compute_reward()    # Compute reward
+  ├─▶ Compute reward / terminated / truncated  # Implemented by subclass within its own step() logic
   │
   └─▶ Return (obs, reward, terminated, truncated, info)
 ```
+
+> Note: `compute_reward()` is not a public method of `OrcaGymEulerEnv`. The computation of reward and termination conditions is done by subclasses within their own `step()` implementation (`OrcaGymEulerEnv.step` is an abstract method that subclasses must override).
 
 ## State Synchronization Rules
 

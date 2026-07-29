@@ -5,10 +5,10 @@ OrcaGym 提供地形生成工具，用于创建复杂的地面环境。
 ## 地形生成器
 
 ```python
-from orca_tools.terrains import terrain_generater
+from orca_gym.tools.terrains import terrain_generater
 
 # 高度图生成器
-from orca_tools.terrains import height_map_generater
+from orca_gym.tools.terrains import height_map_generater
 ```
 
 ## 地形类型

@@ -5,20 +5,20 @@ Used to view datasets collected from OrcaManipulation.
 ## HDF5Viewer
 
 ```python
-from orca_tools.hdf5_viewer import hdf5Viewer
+from orca_gym.tools.hdf5_viewer import hdf5Viewer
 ```
 
 ## VideoPlayer
 
 ```python
-from orca_tools.hdf5_viewer import videoPlayer
+from orca_gym.tools.hdf5_viewer import videoPlayer
 ```
 
 ## Usage
 
 ```bash
 # Launch the HDF5 dataset viewer
-python -m orca_tools.hdf5_viewer.hdf5Viewer
+python -m orca_gym.tools.hdf5_viewer.hdf5Viewer
 ```
 
 The HDF5 viewer is used to visualize:

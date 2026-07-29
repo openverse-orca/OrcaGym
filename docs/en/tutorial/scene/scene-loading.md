@@ -16,21 +16,21 @@ Scene loading involves creating a MuJoCo model from an XML file and initializing
 ## OrcaGymScene Utilities
 
 ```python
-from orca_scene import OrcaGymScene
+from orca_gym.scene.orca_gym_scene import OrcaGymScene
 
 # Connect to a scene
 scene = OrcaGymScene("localhost:50051")
 
 # Retrieve runtime data
-scene.get_rundata(script_name="my_script", stage="beginscene")
+scene.get_rundata(scriptname="my_script", stepname="beginscene")
 
 # Display UI text
 scene.set_ui_text(
- actor_name=1,
- message="Simulation started!",
- showtime=5,
- color="0xff0000",
- size=32,
+	actor_name=1,
+	message="Simulation started!",
+	showtime=5,
+	color="0xff0000",
+	size=32,
 )
 
 scene.close()
@@ -39,7 +39,7 @@ scene.close()
 ## OrcaGymSceneRuntime
 
 ```python
-from orca_scene import OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 
 # Inject the scene runtime into the environment
 scene_runtime = OrcaGymSceneRuntime(...)

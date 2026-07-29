@@ -19,16 +19,16 @@ def _get_obs(self):
 def _get_obs(self):
     qpos = self.data.qpos.copy()
     qvel = self.data.qvel.copy()
-    
+
     # IMU data
     imu = self.query_sensor_data(["imu_acc", "imu_gyro"])
-    
-    # End-effector pose (returns flat arrays: xpos, xmat, xquat)
-    xpos, xmat, xquat = self.get_body_xpos_xmat_xquat(["ee_link"])
-    ee_pos = xpos[:3]  # First 3 elements are ee_link position
-    
+
+    # End-effector pose (returns a nested dict: body_name -> {"xpos", "xmat", "xquat"})
+    result = self.get_body_xpos_xmat_xquat(["ee_link"])
+    ee_pos = result["ee_link"]["xpos"]  # (3,) end-effector position
+
     return np.concatenate([
-        qpos, qvel, 
+        qpos, qvel,
         imu["imu_acc"], imu["imu_gyro"],
         ee_pos
     ]).astype(np.float32)

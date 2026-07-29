@@ -11,25 +11,29 @@ Mocap (Motion Capture) bodies are special bodies in MuJoCo that can be controlle
 
 ## Finding Mocap Bodies
 
-```python
-# View all mocap bodies in the model
-mocap_dict = env.model.get_mocap_dict()
-for name, mocap_id in mocap_dict.items():
- print(f"Mocap: {name} (id={mocap_id})")
+Under the Euler system, `OrcaGymEulerEnv` does not directly expose a public method to list mocap names.
+You can verify whether a given mocap body exists via `env.data.mocap_pos(name)`
+(it raises `KeyError` if the name does not exist), or traverse via `env.model.get_body_names()`
+(mocap bodies usually carry suffixes like `Anchor`).
 
-# Can also query via _gym
-mocap_names = env._mocap_body_names()
+```python
+# Read the pose of a known mocap body via env.data (raises if the name does not exist)
+mocap_pos = env.data.mocap_pos("ActorManipulator_Anchor")  # (3,)
+mocap_quat = env.data.mocap_quat("ActorManipulator_Anchor")  # (4,)
 ```
+
+> Note: the UI-grasp dedicated mocap body name is `ORCA_MANIPULATOR_<uuid>_Anchor` in default levels,
+> and `ActorManipulator_Anchor` in legacy levels.
 
 ## Setting Mocap Pose
 
 ```python
 # Directly set the world-frame pose of a mocap body
 env.set_mocap_pos_and_quat({
- "ActorManipulator_Anchor": {
- "pos": np.array([0.5, 0.0, 0.8], dtype=np.float64),
- "quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64),
- }
+	"ActorManipulator_Anchor": {
+		"pos": np.array([0.5, 0.0, 0.8], dtype=np.float64),
+		"quat": np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64),
+	}
 })
 
 # Must forward
@@ -46,36 +50,80 @@ mocap_quat = env.data.mocap_quat("ActorManipulator_Anchor") # (4,)
 
 ## Mocap + Equality Constraints = Object Manipulation
 
-```python
-# Use the high-level API
-# 1. Anchor an object — auto-query pose + set mocap + create constraint
-env.anchor_actor("target_object", "weld")
+Under the Euler system, `OrcaGymEulerEnv` does not provide `anchor_actor` / `release_body_anchored`
+high-level public methods (these exist only in the Local system). Programmatic operations must be
+orchestrated with **public equality-constraint primitives**, consistent with the UI-grasp internal
+methods `_anchor_actor` / `_release_body_anchored`:
 
-# 2. Move anchor → object follows
+- `equality_find_slot_by_body(body_name)` — find the equality constraint slot containing the specified body
+- `equality_constraint(slot)` — read the full data of the slot (for snapshot/restore)
+- `equality_update(slot, ...)` — atomically write slot fields (type/obj1/obj2/data/active...)
+- `set_mocap_pos_and_quat(...)` — align the mocap pose to the target body
+
+```python
+import mujoco
+
+# ── 1. Anchor an object ──
+anchor_mocap_name = "ActorManipulator_Anchor"  # or ORCA_MANIPULATOR_<uuid>_Anchor
+actor_name = "target_object"
+
+# Find the equality constraint slot containing the anchor mocap
+slot = env.equality_find_slot_by_body(anchor_mocap_name)
+if slot == -1:
+    raise ValueError(f"No equality slot containing {anchor_mocap_name} in the model")
+
+# Save the original constraint snapshot (restore on release)
+original_eq = env.equality_constraint(slot)
+
+# Align the mocap pose to the actor's current pose (avoid yanking on the next frame)
+actor_pose = env.get_body_xpos_xmat_xquat([actor_name])[actor_name]
 env.set_mocap_pos_and_quat({
- "ActorManipulator_Anchor": {
- "pos": new_target_pos,
- "quat": new_target_quat,
- }
+    anchor_mocap_name: {
+        "pos": actor_pose["xpos"],
+        "quat": actor_pose["xquat"],
+    }
+})
+
+# Decide whether to change obj1 or obj2 (keep the mocap end, change the other end to actor)
+mocap_id = env.model.body_name2id(anchor_mocap_name)
+if original_eq["obj1_id"] == mocap_id:
+    new_obj1_name = anchor_mocap_name
+    new_obj2_name = actor_name
+else:
+    new_obj1_name = actor_name
+    new_obj2_name = anchor_mocap_name
+
+# Write the constraint (type/obj, internal mj_forward)
+env.equality_update(
+    slot,
+    eq_type=mujoco.mjtEq.mjEQ_WELD,
+    obj1_name=new_obj1_name,
+    obj2_name=new_obj2_name,
+)
+
+# ── 2. Move the anchor → object follows ──
+env.set_mocap_pos_and_quat({
+    anchor_mocap_name: {
+        "pos": new_target_pos,
+        "quat": new_target_quat,
+    }
 })
 env.mj_forward()
 
-# 3. Release
-env.release_body_anchored()
+# ── 3. Release (restore the original constraint from the snapshot) ──
+slot = env.equality_find_slot_by_body(actor_name)
+if slot != -1:
+    env.equality_update(
+        slot,
+        eq_type=original_eq["type"],
+        obj1_name=env.model.body_id2name(original_eq["obj1_id"]),
+        obj2_name=env.model.body_id2name(original_eq["obj2_id"]),
+        data=original_eq["data"],
+    )
 ```
 
-### Low-Level Control (When Needed)
-
-```python
-# Modify the associated object of an equality constraint
-env.modify_equality_objects(
- eq_ids=[0],
- obj2_names=["target_object"], # Change obj2 from old body to target body
-)
-
-# Update constraints
-env.update_equality_constraints(eq_list)
-```
+> Note: `obj1_name` / `obj2_name` of `equality_update` must be **full body names including the agent prefix**
+> (this primitive does not perform namespace resolution).
 
 ## Trajectory Tracking Example
 

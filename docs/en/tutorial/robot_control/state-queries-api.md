@@ -253,7 +253,7 @@ pelvis = env.get_body_xpos_xmat_xquat(["g1_pelvis", "g1_torso_link"])
 # {
 #   "g1_pelvis": {
 #     "xpos": np.array([0.0, 0.0, 0.78]),   # World position (3,)
-#     "xmat": np.array([...]),                # Rotation matrix (9,) row-major
+#     "xmat": np.array([...]),                # Rotation matrix (3, 3) (already reshaped)
 #     "xquat": np.array([1.0, 0, 0, 0]),     # Quaternion [w,x,y,z] (4,)
 #   },
 #   "g1_torso_link": { ... }

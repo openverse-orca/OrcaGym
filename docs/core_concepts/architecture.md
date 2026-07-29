@@ -1,6 +1,6 @@
 # ⚙️ OrcaGym Euler 架构
 
-> 📌 **前置阅读**：如果你是第一次接触 OrcaGym 架构，建议先阅读 [架构总览](architecture-overview.md) 了解整体分层与 API 边界，再回到本文查看组件设计细节。
+> 📌 **前置阅读**：本文档同时覆盖整体分层、API 边界与组件设计细节。如果你是第一次接触 OrcaGym 架构，建议先阅读 [Model / Data / Config](model-data-opt.md) 和 [Gymnasium 接口](gym-interface.md) 建立基本概念，再回到本文查看架构设计。
 
 ## 1. 为什么需要新架构
 
@@ -64,7 +64,7 @@
 |------|---------|-----------|
 | **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | 组合多个子组件，提供统一 API，避免上帝类 |
 | **组合优于继承** | Env 持有 Gym，Gym 持有子组件 | 避免继承链腐化，职责可独立演进 |
-| **策略模式** | `EulerOrchestrator`（可选） | 通过 None 检查切换有无 Euler 的策略 |
+| **策略模式** | `OrcaGymEuler._euler` 字段（占位） | 当前恒为 None，通过 `has_euler()` / `step_with_coupling()` 封装切换有无 Euler 的策略（Euler 编排器后续设计） |
 | **依赖反转** | `OrcaStudioBridge` 不持有 mjData，通过接收数据参数实现解耦 | Studio 集成与仿真核心解耦 |
 | **只读视图** | `OrcaGymDataView` | 提供完整状态读取，禁止写入 |
 
@@ -85,7 +85,7 @@ gym.Env
         │     ├── _studio: OrcaStudioBridge  # gRPC 集成
         │     ├── _registry: ModelRegistry  # 模型信息
         │     ├── _opt: SimConfig        # 求解器配置（typed）
-        │     └── _euler: EulerOrchestrator | None  # Euler 耦合（占位，后续设计）
+        │     └── _euler: None  # Euler 耦合占位（当前未实现，后续设计）
         │
         │   公共 API（你面向的接口）
         ├── .data → OrcaGymDataView      # 完整状态视图
@@ -149,11 +149,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 | `sim_config` | `SimConfig` | 求解器参数配置，替代 `opt.*` 直接访问 |
 | `ctrl` | `np.ndarray` | 控制数组 |
 | `frame_skip` | `int` | 每次 `step()` 的物理步进数 |
-| `dt` | `float` | 单步物理时间 |
+| `dt` | `float` | 环境时间步长 = timestep × frame_skip（`timestep` 才是单步物理时间） |
 
 ### 4.2 OrcaGymEuler — 仿真核心 Facade
 
-组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`、`EulerOrchestrator`。**不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀约定 + ruff SLF001 静态检查，通过 `__dir__` 控制 IDE 自动补全只显示公共 API。
+组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 耦合编排器后续设计）。**不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀约定 + ruff SLF001 静态检查，通过 `__dir__` 控制 IDE 自动补全只显示公共 API。
 
 ```python
 class OrcaGymEuler:
@@ -193,10 +193,10 @@ class MuJoCoSimCore:
 
 ```python
 class OrcaStudioBridge:
-    def __init__(self, stub: GrpcServiceStub | None): ...
+    def __init__(self, stub=None) -> None: ...
     async def render(self, qpos: np.ndarray, sim_time: float) -> None: ...
     async def load_model_xml(self) -> str: ...
-    async def begin_save_video(self, path: str, mode: CaptureMode) -> None: ...
+    async def begin_save_video(self, file_path: str, capture_mode) -> None: ...
     async def stop_save_video(self) -> None: ...
     async def get_current_frame(self) -> int: ...
     async def get_body_manipulation_anchored(self) -> tuple: ...
@@ -209,9 +209,9 @@ class OrcaStudioBridge:
 
 ```python
 class ModelRegistry:
-    def __init__(self, mj_model: mujoco.MjModel): ...
+    def __init__(self, mj_model=None) -> None: ...   # None 时需 _bind(mj_model) 后再使用
     def build_orca_gym_model(self) -> OrcaGymModel: ...
-    def build_orca_gym_data(self) -> OrcaGymData: ...
+    def build_orca_gym_data(self): ...   # 抛 NotImplementedError：Euler 体系使用 OrcaGymDataView 替代
     def body_subtree_mass(self, body_name: str) -> float: ...
     def equality_data_width(self) -> int: ...
     def equality_object_ids(self, eq_idx: int) -> tuple[int, int]: ...
@@ -306,26 +306,26 @@ class OrcaGymDataView:
 | `gym._mjData.xpos[body_id, 2]` | `env.data.body_xpos(name)[2]` |
 | `gym._mjData.time` | `env.data.time` |
 
-### 4.8 EulerOrchestrator — Euler 耦合（占位）
+### 4.8 Euler 耦合 — 占位（当前未实现）
 
-编排 Euler 非刚体求解器与 MuJoCo 刚体求解器的耦合步进。当前为占位组件，`OrcaGymEuler` 的 `_euler` 字段为 `None`，`OrcaGymEulerEnv` 表现为纯 MuJoCo 环境。具体设计后续单独文档论述。
+编排 Euler 非刚体求解器与 MuJoCo 刚体求解器的耦合步进。**当前为设计占位，代码中不存在 `EulerOrchestrator` 类**：`OrcaGymEuler._euler` 字段恒为 `None`，`OrcaGymEulerEnv` 表现为纯 MuJoCo 环境。Euler 耦合的开关通过 `OrcaGymEuler.has_euler()` 查询、步进通过 `OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)` 封装（`has_euler()` 为 `False` 时等价于纯 MuJoCo 步进）。具体编排器设计后续单独文档论述。
 
 ```python
-class EulerOrchestrator:
-    """Euler 非刚体求解器编排（占位，后续设计）。"""
+# 当前代码中的实际封装（OrcaGymEuler 公共 API）
+def has_euler(self) -> bool:
+    """查询是否存在 Euler 耦合编排器。骨架阶段恒返回 False。"""
+    return self._euler is not None
 
-    def euler_step(self, dt: float) -> None:
-        """Euler 非刚体求解器步进。"""
-        raise NotImplementedError("Euler 耦合编排待后续设计")
-
-    def notify_external_force(self, body_name: str, force: np.ndarray, torque: np.ndarray) -> None:
-        """通知 Euler 有外力注入（用于耦合一致性）。"""
-        raise NotImplementedError
+def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
+    """带 Euler 耦合的步进。has_euler()=False 时等价于 set_ctrl + step。"""
+    # 骨架阶段：set_ctrl + step（无 Euler 耦合）
+    self._sim.set_ctrl(ctrl)
+    self._sim.step(n_frames)
 ```
 
 ### 4.9 OrcaGymEnvMixin — 环境公共方法混入
 
-抽取 `OrcaGymLocalEnv`/`OrcaGymBaseEnv` 中与仿真引擎无关的公共方法，供 `OrcaGymEulerEnv` 和 `OrcaGymLocalEnv` 共享。
+抽取 `OrcaGymLocalEnv`/`OrcaGymBaseEnv` 中与仿真引擎无关的公共方法，供 `OrcaGymEulerEnv` 使用。当前 `OrcaGymLocalEnv` 仍直接继承 `OrcaGymBaseEnv`，未接入 `OrcaGymEnvMixin`（可选重构，不强制）。
 
 ```python
 class OrcaGymEnvMixin:
@@ -362,7 +362,7 @@ class OrcaGymEnvMixin:
 **使用方式**：
 
 ```python
-# Euler 体系
+# Euler 体系（当前实际使用）
 class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def __init__(self, ...):
         self._agent_names = agent_names
@@ -370,8 +370,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # Mixin 方法可直接使用
         ...
 
-# Local 体系（可选重构，不强制）
-class OrcaGymLocalEnv(OrcaGymEnvMixin, gym.Env):
+# Local 体系（当前实际继承 OrcaGymBaseEnv，未接入 Mixin）
+class OrcaGymLocalEnv(OrcaGymBaseEnv):
     ...
 ```
 
@@ -427,12 +427,13 @@ env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # ruff SLF001 报警
 ```python
 # 模式 A（推荐，含 Euler 耦合）
 env.do_simulation(ctrl, self.frame_skip)
+# do_simulation 返回后 env.data 已自动同步（内部调用 sync_to_view）
 
 # 模式 B（纯 MuJoCo，无耦合）
 for _ in range(self.frame_skip):
     env.set_ctrl(torques)
     env.mj_step(1)
-    env._update_data()
+# 循环结束后需调用 env.mj_forward() 刷新派生量，再通过 env.data 读取
 ```
 
 > 模式 B 当前与 OrcaGymLocalEnv 行为一致。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。
@@ -466,7 +467,7 @@ body_name = env.body("object")
 |------|-----|
 | **状态读取** | `data`（OrcaGymDataView）, `model`（OrcaGymModel）, `ctrl`, `frame_skip`, `dt`, `realtime_step` |
 | **仿真控制** | `do_simulation(ctrl, n)`, `mj_step(n)`, `mj_forward()` |
-| **状态查询** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_quat/mat/xvalp_xvalr()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
+| **状态查询** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_mat()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
 | **状态设置** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
 | **等式约束原语（无状态，L1）** | `equality_find_slot_by_body(body_name)`, `equality_constraint(slot)`, `equality_update(slot, **fields, forward=True)` |
 | **求解器配置** | `sim_config`（SimConfig） |
@@ -486,7 +487,7 @@ body_name = env.body("object")
 
 | 机制 | 实现 | 效果 |
 |------|------|------|
-| **Python 原生属性不存在** | `OrcaGymEulerEnv` 直接继承 `gym.Env`，`__init__` 中只赋值 `_gym`/`_stub`/`_channel` | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError` |
+| **Python 原生属性不存在** | `OrcaGymEulerEnv` 直接继承 `gym.Env`，`__init__` 中赋值的内部组件均带下划线前缀（如 `_gym`/`_stub`/`_channel`/`_studio_bridge` 等），不创建无前缀的 `gym`/`stub`/`channel` 属性 | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError` |
 | **ruff SLF001 静态检查** | 配置 `ruff check --select SLF001`，扫描外部访问 `_` 前缀属性的代码 | 提交前/CI 阶段检测穿墙访问 |
 | **AGENTS.md AI 约束** | 每个自研仓库根目录配置 `AGENTS.md`，明文禁止 AI 使用 `_` 前缀属性 | 从输入端约束 AI 代码生成行为 |
 | **`__dir__` 控制** | Env/Gym/DataView 实现 `__dir__`，只暴露公共 API | IDE 自动补全引导正确路径 |
@@ -525,18 +526,15 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
 
     契约:
     - 设置控制输入 → 步进 n_frames 次 → 同步状态
-    - 若 Euler 激活，每步刚体解算后插入 Euler 非刚体耦合
+    - Euler 耦合通过 step_with_coupling 封装（不写 if self._gym._euler is not None）
     - 步进完成后 self.data 保证一致
     """
-    self._gym.set_ctrl(ctrl)
-    if self._gym._euler is not None:
-        for _ in range(n_frames):
-            self._gym.mj_step(1)
-            self._gym.euler_step(self._dt)
-    else:
-        self._gym.mj_step(n_frames)
-    self._update_data()
+    # K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装
+    self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+    self._gym.sync_to_view()
 ```
+
+> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。`step_with_coupling` 在 `has_euler()=False`（当前骨架阶段）时等价于 `set_ctrl + step`，后续 Euler 耦合实现时扩展。
 
 ### 7.2 两种使用模式
 
@@ -558,7 +556,8 @@ def step(self, action):
         torque = self._compute_torque(action)
         self.set_ctrl(torque)
         self.mj_step(nstep=1)
-        self._update_data()
+    # 循环结束后刷新派生量，再读取 env.data
+    self.mj_forward()
     obs = self._get_obs()
     return obs, reward, terminated, truncated, info
 ```
@@ -603,7 +602,7 @@ def step(self, action):
 |--------|--------|
 | `gym._mjData.xfrc_applied[id, :3] = f` | `env.apply_body_force(name, f, tau)` |
 | `gym._mjData.xfrc_applied[id].fill(0)` | `env.clear_body_force(name)` |
-| `gym._mjData.eq_active[gi] = bool` | `env.set_equality_active(idx, active)` |
+| `gym._mjData.eq_active[gi] = bool` | `env.equality_update(slot, active=bool)` |
 
 #### 配置类（→ SimConfig）
 
@@ -615,15 +614,15 @@ def step(self, action):
 | `gym._mjModel.opt.gravity = ...` | `env.sim_config.gravity = ...` |
 | 30 行 `opt.*` 设置 | `env.sim_config.load_from_dict({...})` |
 
-#### 模型结构类（→ OrcaGymModel 扩展）
+#### 模型结构类（→ env 公共方法 / OrcaGymModel）
 
 | 旧代码 | 新 API |
 |--------|--------|
-| `gym._mjModel.body_subtreemass[id]` | `env.model.body_subtree_mass(name)` |
-| `gym._mjModel.eq_data.shape[1]` | `env.model.equality_data_width()` |
-| `gym._mjModel.eq_obj1id[gi]` | `env.model.equality_object_ids(idx)` |
-| `gym._mjModel.joint(i).name` | `env.model.joint_name_by_id(i)` |
-| `gym._mjModel.njnt` | `env.model.njnt` |
+| `gym._mjModel.body_subtreemass[id]` | `env.body_subtree_mass(name)` 或 `env.data.body_subtree_mass(name)` |
+| `gym._mjModel.eq_data.shape[1]` | 当前 `env.model` 无此公共 API，需通过 `env._gym.equality_data_width()` 或扩展 `env.model` 公共方法 |
+| `gym._mjModel.eq_obj1id[gi]` | 当前 `env.model` 无此公共 API，需通过 `env._gym.equality_object_ids(idx)` 或扩展 `env.model` 公共方法 |
+| `gym._mjModel.joint(i).name` | `env.model.joint_id2name(i)` |
+| `gym._mjModel.njnt` | `len(env.model.get_joint_dict())` |
 
 ### 8.3 迁移分类示例
 
@@ -644,13 +643,14 @@ self.apply_body_force(body_name, force, torque)
 **第三类：设计调整（少数情况）**
 
 ```python
-# 迁移前：手动循环步进
+# 迁移前（Local 体系）：手动循环步进
 for _ in range(self.frame_skip):
     self.set_ctrl(torques)
     self.mj_step(nstep=1)
-    self.gym.update_data()
+    self.gym.update_data()   # Local 体系的老 API
 
-# 迁移后：若需 Euler 耦合，改用 do_simulation
+# 迁移后（Euler 体系）：若需 Euler 耦合，改用 do_simulation
+# do_simulation 内部已封装 step_with_coupling + sync_to_view，数据自动同步
 self.do_simulation(torques, self.frame_skip)
 ```
 
@@ -699,7 +699,7 @@ self.do_simulation(torques, self.frame_skip)
 
 本文档的核心要点：
 
-1. **Facade + 职责内聚分解**替代上帝类，组件按职责划分为 `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig`/`EulerOrchestrator`
+1. **Facade + 职责内聚分解**替代上帝类，组件按职责划分为 `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig`（`_euler` 字段为占位，当前未实现）
 2. **直接继承 `gym.Env` + `OrcaGymEnvMixin`**：不继承 `OrcaGymBaseEnv`，公共方法通过 Mixin 共享
 3. **完备的公共 API 契约**覆盖所有合法 MuJoCo 操作需求，消除绕道理由
 4. **多层封装隔离**（ruff SLF001 + AGENTS.md + Python 原生属性不存在 + `__dir__` + DataView 兜底 + 类型标注 + docstring）引导你和 AI 走正确路径

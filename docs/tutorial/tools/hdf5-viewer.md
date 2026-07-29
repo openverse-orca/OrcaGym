@@ -5,20 +5,20 @@
 ## HDF5Viewer
 
 ```python
-from orca_tools.hdf5_viewer import hdf5Viewer
+from orca_gym.tools.hdf5_viewer import hdf5Viewer
 ```
 
 ## VideoPlayer
 
 ```python
-from orca_tools.hdf5_viewer import videoPlayer
+from orca_gym.tools.hdf5_viewer import videoPlayer
 ```
 
 ## 使用
 
 ```bash
 # 启动 HDF5 数据集查看器
-python -m orca_tools.hdf5_viewer.hdf5Viewer
+python -m orca_gym.tools.hdf5_viewer.hdf5Viewer
 ```
 
 HDF5 查看器用于可视化：

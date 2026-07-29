@@ -289,11 +289,16 @@ read_pos = env.data.mocap_pos("mocap_name")    # (3,)
 read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 ```
 
-**Complete Dragging Workflow**:
-1. `anchor_actor("object", "weld")` — establish WELD constraint connecting mocap and object
-2. `set_mocap_pos_and_quat(...)` — move mocap → object follows
-3. `do_simulation(...)` — step to let the constraint take effect
-4. `release_body_anchored()` — release
+**Complete Dragging Workflow** (under the Euler path, `anchor_actor`/`release_body_anchored` are not public Env API; programmatic operations should follow the UI-grasp internal method orchestration pattern using these public primitives):
+1. `equality_find_slot_by_body(env.body("mocap_anchor"))` — find the equality constraint slot containing the mocap
+2. `equality_constraint(slot)` — save original constraint snapshot (restore on release)
+3. `set_mocap_pos_and_quat(...)` — align mocap pose to the object's current pose
+4. `equality_update(slot, eq_type=mjtEq.mjEQ_WELD, obj1_name=..., obj2_name=...)` — establish WELD constraint
+5. `set_mocap_pos_and_quat(...)` — move mocap → object follows
+6. `do_simulation(...)` — step to let the constraint take effect
+7. `equality_update(slot, ...)` — restore original constraint from snapshot (release)
+
+> Note: `anchor_actor` / `release_body_anchored` are public methods only in the Local system (`OrcaGymLocalEnv`). Under the Euler system they are UI-grasp internal methods (`_anchor_actor` / `_release_body_anchored`) and should not be called directly.
 
 ### 3. State Writing
 

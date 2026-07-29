@@ -160,7 +160,7 @@ class ReachTargetEnv(OrcaGymEulerEnv):
  def _get_obs(self) -> dict:
  """收集当前状态作为观测"""
  ee_site = self.site("end_effector")
- sites = self.query_site_pos_and_quat([ee_site])
+ sites = self.query_site_pos_and_mat([ee_site])
  ee_pos = sites[ee_site]["xpos"].copy()
 
  dist = np.linalg.norm(ee_pos - self._goal_pos)

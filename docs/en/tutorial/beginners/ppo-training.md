@@ -226,7 +226,7 @@ python train_ppo.py --total-timesteps 100000
 python train_ppo.py --total-timesteps 20000
 
 # Evaluate (requires OrcaStudio running with the pendulum scene loaded)
-python train_ppo.py --eval --eval-episodes 5
+python train_ppo.py --eval
 ```
 
 ---

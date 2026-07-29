@@ -21,9 +21,9 @@ OrcaGym 是一个开源的机器人仿真平台，提供与 OpenAI Gym/Gymnasium
 OrcaGym 是一个**云原生机器人仿真平台**，核心特性包括：
 
 - :material-gym: **Gymnasium 兼容** — 与现有 RL 算法无缝集成
-- :material-engine: **多物理后端** — 支持 MuJoCo、PhysX、ODE
+- :material-engine: **多物理后端** — 本地支持 MuJoCo/MuJoCoWarp/Euler，通过 OrcaStudio/OrcaLab 可接入 PhysX、ODE
 - :material-cloud: **分布式部署** — 支持本地开发和远程大规模训练
-- :material-camera: **光线追踪渲染** — 逼真的视觉观察
+- :material-camera: **光线追踪渲染** — 通过 OrcaStudio/OrcaLab 提供逼真视觉观察
 - :material-robot: **多智能体支持** — 原生异构智能体管理
 
 ---

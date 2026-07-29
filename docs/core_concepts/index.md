@@ -93,5 +93,4 @@ dt = 0.001 × 20 = 0.02秒 ← 你的控制指令每隔多久更新一次（50Hz
 1. [Model / Data / Config](model-data-opt.md) — 理解三种核心数据对象
 2. [Gymnasium 接口](gym-interface.md) — 理解标准 RL 接口
 3. [数据流](data-flow.md) — 理解数据如何在仿真中流动
-4. [架构总览](architecture-overview.md) — 理解整体分层设计、API 边界、调用流
-5. [系统架构](architecture.md) — 理解组件设计、API 契约、封装隔离与迁移指南
+4. [系统架构](architecture.md) — 理解整体分层设计、API 边界、组件设计、封装隔离与迁移指南

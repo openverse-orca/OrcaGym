@@ -5,7 +5,7 @@ Asset processing tools are used to manage 3D assets.
 ## USDZ → XML Conversion
 
 ```python
-from orca_tools.assets import usdz_to_xml
+from orca_gym.tools.assets import usdz_to_xml
 ```
 
 Converts 3D assets from Apple USDZ format to MuJoCo MJCF (XML) format.
@@ -13,7 +13,7 @@ Converts 3D assets from Apple USDZ format to MuJoCo MJCF (XML) format.
 ## Texture Processing
 
 ```python
-from orca_tools.assets import texture_processer
+from orca_gym.tools.assets import texture_processer
 ```
 
 Process texture files, including format conversion, resolution adjustment, etc.
@@ -21,7 +21,7 @@ Process texture files, including format conversion, resolution adjustment, etc.
 ## Install Helpers
 
 ```python
-from orca_tools.install_helpers import down_projects
+from orca_gym.tools.install_helpers import down_projects
 ```
 
 Helps download and manage dependent projects.

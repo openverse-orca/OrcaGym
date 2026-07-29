@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
  if args.eval:
  model_path = args.model_path or os.path.join(_MODEL_DIR, "ppo_pendulum.zip")
- evaluate(model_path)
+ evaluate(model_path, episodes=5)
  else:
  train(args.total_timesteps, args.device)
 ```
@@ -225,8 +225,8 @@ python train_ppo.py --total-timesteps 100000
 # 快速验证（20k 步，约 30 秒）
 python train_ppo.py --total-timesteps 20000
 
-# 评估（需要 OrcaStudio 启动并加载 pendulum 场景）
-python train_ppo.py --eval --eval-episodes 5
+# 评估（需要 OrcaStudio 启动并加载 pendulum 场景，默认评估 5 个 episode）
+python train_ppo.py --eval
 ```
 
 ---

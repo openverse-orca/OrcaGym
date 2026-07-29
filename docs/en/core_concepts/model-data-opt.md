@@ -15,8 +15,8 @@ model = env.model
 print(model.nq)          # Number of generalized coordinates
 print(model.nv)          # Number of degrees of freedom
 print(model.nu)          # Number of actuators
-print(model.nbody)       # Total number of bodies
-print(model.njnt)        # Total number of joints
+print(len(model.get_body_names()))    # Total number of bodies
+print(len(model.get_joint_dict()))    # Total number of joints
 
 # Name-to-ID mappings
 body_id = model.body_name2id("base_link")
@@ -80,7 +80,7 @@ do_simulation(ctrl, n_frames)   ← Simulation step
   └─▶ Can directly read env.data.qpos, etc.
 ```
 
-> ⚠️ **Important**: After `do_simulation()` returns, `env.data` is already synchronized automatically. If you manually call `mj_forward()` and then need to read `env.data`, you must call `env._sync_view()` to synchronize.
+> ⚠️ **Important**: After `do_simulation()` returns, `env.data` is already automatically synchronized and can be read directly. If you manually call `mj_forward()` and need to read derived quantities in `env.data` (such as `body_xpos`, `site_xpos`, etc.), it is recommended to use the standard stepping path via `do_simulation()` (which internally encapsulates `sync_to_view`), or use synchronization mechanisms inside subclasses. Directly calling `mj_forward()` does not automatically refresh the derived quantity view of `env.data`.
 
 ---
 

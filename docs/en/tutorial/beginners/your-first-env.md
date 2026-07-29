@@ -141,10 +141,11 @@ self.do_simulation(ctrl, self.frame_skip)
 This single line is equivalent to:
 
 ```python
-# Internally: _step_with_coupling(ctrl, n_frames, dt)
-# -> _sim.set_ctrl(ctrl) + _sim.step(n_frames)
-# Then: _sync_view()
-# data is automatically synced to the latest state
+# Internally delegates to self._gym public methods:
+# _gym.step_with_coupling(ctrl, n_frames, dt)
+#   -> _sim.set_ctrl(ctrl) + _sim.step(n_frames)
+# _gym.sync_to_view()
+#   -> data is automatically synced to the latest state
 ```
 
 > **Key advantage**: After `do_simulation()` returns, `self.data` is already updated automatically — no need to manually `update_data()`.

@@ -16,13 +16,13 @@
 ## OrcaGymScene 工具
 
 ```python
-from orca_scene import OrcaGymScene
+from orca_gym.scene.orca_gym_scene import OrcaGymScene
 
 # 连接场景
 scene = OrcaGymScene("localhost:50051")
 
-# 获取运行数据
-scene.get_rundata(script_name="my_script", stage="beginscene")
+# 获取运行数据（参数名为 scriptname / stepname）
+scene.get_rundata(scriptname="my_script", stepname="beginscene")
 
 # 显示 UI 文本
 scene.set_ui_text(
@@ -39,11 +39,13 @@ scene.close()
 ## OrcaGymSceneRuntime
 
 ```python
-from orca_scene import OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 
-# 在环境中注入场景运行时
-scene_runtime = OrcaGymSceneRuntime(...)
-env.set_scene_runtime(scene_runtime)
+# OrcaGymSceneRuntime 封装 OrcaGymScene 的运行时操作（光源、相机视口等）
+scene_runtime = OrcaGymSceneRuntime(scene)
+
+# 注意：OrcaGymEulerEnv 不提供 set_scene_runtime 方法（该方法仅在 Local 体系存在）。
+# Euler 体系下如需在 Env 中持有 scene_runtime，需扩展 Env 公共方法。
 ```
 
 ## 模型 XML 资源

@@ -20,7 +20,7 @@ OrcaGym 的物理仿真基于 MuJoCo 引擎，提供了高精度的刚体动力�
 | 步进+同步（推荐） | `env.do_simulation(ctrl, n)` | 原子操作，自动同步 data |
 | 推进 n 步物理 | `env.mj_step(n)` | 执行 n 次物理步进 |
 | 前向更新 | `env.mj_forward()` | 刷新派生量（body 位姿、传感器） |
-| 同步视图 | `env._sync_view()` | 同步到 DataView |
+| 同步视图 | `env._sync_view()` | 内部方法，`do_simulation()` 已自动同步，公共用户通常无需手动调用 |
 | 雅可比矩阵 | `env.mj_jacBody(jacp, jacr, name)` | 位置/旋转雅可比 |
 | Site 雅可比 | `env.mj_jacSite(jacp, jacr, name)` | Site 点雅可比 |
 | 施加外力 | `env.apply_body_force(name, f, τ)` | 对 body 施加力/力矩 |
@@ -40,7 +40,6 @@ OrcaGym 的物理仿真基于 MuJoCo 引擎，提供了高精度的刚体动力�
 | `iterations` | 100 | 求解器迭代次数 |
 | `integrator` | 0 (Euler) | 积分器类型（0=Euler, 1=RK4） |
 | `gravity` | `[0, 0, -9.81]` | 重力向量 |
-| `tolerance` | 1e-8 | 求解器容忍度 |
 
 ## G1 人形机器人标准配置
 

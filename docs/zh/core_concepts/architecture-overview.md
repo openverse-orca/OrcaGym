@@ -31,7 +31,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │  仿真核心层：OrcaGymEuler (Facade)                               │
 │  MuJoCoSimCore / OrcaStudioBridge / ModelRegistry /             │
-│  SimConfig / EulerOrchestrator                                  │
+│  SimConfig / _euler 占位（当前未实现）                            │
 └──────┬─────────────────────────────────────────────┬────────────┘
        │                                             │
        │ mj_step / mj_forward                        │ gRPC 通信
@@ -114,7 +114,7 @@ class MyTaskEnv(OrcaGymEulerEnv):
 | 层次 | 维护方 | 维护内容 |
 |------|--------|---------|
 | **环境层** `OrcaGymEulerEnv` | OrcaGym 团队 | gym.Env 实现、公共 API 契约、Mixin 公共方法 |
-| **仿真核心层** `OrcaGymEuler` 及子组件 | OrcaGym 团队 | Facade 编排、`MuJoCoSimCore` / `OrcaStudioBridge` / `ModelRegistry` / `SimConfig` / `EulerOrchestrator` |
+| **仿真核心层** `OrcaGymEuler` 及子组件 | OrcaGym 团队 | Facade 编排、`MuJoCoSimCore` / `OrcaStudioBridge` / `ModelRegistry` / `SimConfig`（`_euler` 为占位，当前未实现） |
 | **刚体运行时** MuJoCo | 上游 | `mujoco` 库 |
 | **非刚体运行时** Euler | Euler 团队 | Model/State/Control、求解器、耦合编排 |
 | **框架层** OrcaFlow | Flow 团队 | GPU kernel 编译、多后端调度 |
@@ -141,7 +141,7 @@ OrcaGymEuler
 MuJoCoSimCore
     │ mj_step × nstep
     ▼
-MuJoCo Runtime  ←── (EulerOrchestrator 启用时) ── Euler Runtime / OrcaFlow
+MuJoCo Runtime  ←── (_euler 占位启用时) ── Euler Runtime / OrcaFlow
     │
     │ _sim.sync_to_view()
     ▼
@@ -180,7 +180,7 @@ MuJoCoSimCore
     │ 写入 xfrc_applied（内部细节，对用户不可见）
 ```
 
-外力注入是**显式且可追踪的**：`EulerOrchestrator` 启用时可感知外力注入，保证 MuJoCo 与 Euler 耦合一致性。
+外力注入是**显式且可追踪的**：`_euler` 占位启用时可感知外力注入，保证 MuJoCo 与 Euler 耦合一致性。
 
 ---
 

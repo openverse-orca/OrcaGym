@@ -59,9 +59,11 @@ def get_body_names()
 def get_actuator_ctrlrange() -> np.ndarray    # (nu, 2) control range
 def get_joint_qposrange(joint_names) -> np.ndarray
 def get_eq_list() -> list
-def get_mocap_dict() -> dict
 def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
+
+# mocap: initialized via init_mocap_dict(mocap_dict),
+# count obtained via the nmocap attribute (no get_mocap_dict method)
 ```
 
 ### Get Entity by ID / by Name
@@ -170,7 +172,7 @@ Accessed via `env.sim_config`. Changes take effect at the next simulation step.
 | Property | Type | Description |
 |------|------|------|
 | `timestep` | `float` | Physics time step |
-| `integrator` | `int` | Integrator type (0=Euler, 1=RK4) |
+| `integrator` | `int` | Integrator type (0=Euler, 1=RK4, 2=IMPLICIT, 3=IMPLICITFAST) |
 | `iterations` | `int` | Solver iteration count |
 | `gravity` | `np.ndarray` | Gravity vector, shape (3,) |
 
@@ -195,6 +197,9 @@ env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 
 ### AnchorType
 
+Module path: in the Euler system, located at `orca_gym.core.euler.orca_studio_bridge`;
+in the Local/Warp system, located at `orca_gym.core.orca_gym_local`.
+
 ```python
 class AnchorType:
     NONE = 0   # No anchoring
@@ -204,6 +209,9 @@ class AnchorType:
 
 ### CaptureMode
 
+Module path: only defined in the Local/Warp system (`orca_gym.core.orca_gym_local`) and
+`orca_gym.core.orca_gym_warp`; the Euler system does not export this enum.
+
 ```python
 class CaptureMode:
     ASYNC = 0  # Asynchronous video capture
@@ -211,6 +219,9 @@ class CaptureMode:
 ```
 
 ### Utility Functions
+
+Module path: `orca_gym.core.orca_gym_local` (Local/Warp system).
+The Euler system does not export these two functions.
 
 ```python
 def get_qpos_size(joint_type: int) -> int  # Number of elements in qpos for a joint

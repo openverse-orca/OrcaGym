@@ -7,10 +7,10 @@ Among the many robot simulation platforms, what are OrcaGym's unique advantages?
 | Feature | OrcaGym | Isaac Gym | MuJoCo (Native) | PyBullet | SAPIEN |
 |---------|---------|-----------|-----------------|----------|--------|
 | Gymnasium API | ✅ Fully compatible | ❌ Custom VecEnv | Requires manual wrapping | ✅ | ❌ |
-| Multi-physics backend | ✅ MuJoCo/PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
+| Multi-physics backend | ✅ Core MuJoCo/MuJoCoWarp/Euler + remote PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
 | Distributed deployment | ✅ Native support | ❌ Single machine | ❌ Single machine | ❌ Single machine | ❌ Single machine |
 | Ray tracing | ✅ | ❌ | ❌ | ❌ | ✅ |
-| GPU acceleration | ✅ (via backend) | ✅ (native) | ❌ (CPU) | ❌ (CPU) | ✅ |
+| GPU acceleration | ✅ MuJoCoWarp (CUDA) / Euler (multi-vendor GPU) | ✅ (native) | ❌ (CPU) | ❌ (CPU) | ✅ |
 | Multi-agent | ✅ Native | ⚠️ Manual setup | ⚠️ Manual setup | ⚠️ Manual setup | ✅ |
 | Visual editor | ✅ OrcaStudio | ❌ | ❌ | ❌ | ❌ |
 | Open source | ✅ MIT | ✅ Non-commercial | ✅ Apache 2.0 | ✅ | ✅ |
@@ -69,6 +69,6 @@ OrcaGym is deeply integrated with OrcaStudio/OrcaLab, providing:
 
 ## Limitations
 
-- The core package is CPU-driven (MuJoCo backend); GPU acceleration requires OrcaStudio/OrcaLab
+- The core package supports MuJoCo (CPU)/MuJoCoWarp (CUDA)/Euler (multi-vendor GPU); PhysX/ODE backends require OrcaStudio/OrcaLab
 - Remote mode depends on the OrcaStudio/OrcaLab server
 - The community is still in its early stages, with fewer third-party examples

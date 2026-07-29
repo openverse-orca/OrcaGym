@@ -5,7 +5,7 @@ OrcaGym 提供 RLlib 适配器，支持分布式 RL 训练。
 ## 集成方式
 
 ```python
-from orca_adapters.rllib import appo_catalog
+from orca_gym.adapters.rllib import appo_catalog
 
 # 使用 APPO 算法训练
 ```
@@ -13,7 +13,7 @@ from orca_adapters.rllib import appo_catalog
 ### 指标回调
 
 ```python
-from orca_adapters.rllib import metrics_callback
+from orca_gym.adapters.rllib import metrics_callback
 ```
 
 ## 配置

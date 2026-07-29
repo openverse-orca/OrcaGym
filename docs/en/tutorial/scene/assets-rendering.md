@@ -15,10 +15,10 @@ OrcaGym implements 3D rendering of scenes through OrcaStudio/OrcaLab.
 
 ```python
 # USDZ to XML conversion
-from orca_tools.assets import usdz_to_xml
+from orca_gym.tools.assets import usdz_to_xml
 
 # Texture processing
-from orca_tools.assets import texture_processer
+from orca_gym.tools.assets import texture_processer
 ```
 
 ## Asset Cache

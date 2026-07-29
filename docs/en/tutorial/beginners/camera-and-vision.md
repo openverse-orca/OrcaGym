@@ -15,7 +15,7 @@ first_camera.py — Get the first image from a simulation camera
 
 import time
 import numpy as np
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 # 1. Create camera wrapper
 # name: camera name (arbitrary)
@@ -63,7 +63,7 @@ import time
 import numpy as np
 from gymnasium import spaces
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 
 class VisionEnv(OrcaGymEulerEnv):
@@ -230,7 +230,7 @@ Each camera's parameters can be configured in OrcaStudio:
 Configure on the Python side via `CameraSensorInfo`:
 
 ```python
-from orca_scene.orca_gym_scene import CameraSensorInfo
+from orca_gym.scene.orca_gym_scene import CameraSensorInfo
 
 # Configure sensor parameters for a specific camera
 camera_config = CameraSensorInfo(

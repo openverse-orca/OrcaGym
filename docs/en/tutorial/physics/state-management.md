@@ -117,7 +117,7 @@ body_mat = env.data.body_xmat("g1_pelvis")    # (9,) 3×3 rotation matrix row-ma
 body_dict = env.get_body_xpos_xmat_xquat(["g1_pelvis", "g1_torso_link"])
 for name, pose in body_dict.items():
     pos = pose["xpos"]    # np.array([x, y, z])
-    mat = pose["xmat"]    # np.array(9) — 3×3 matrix row-major
+    mat = pose["xmat"]    # np.array((3, 3)) — 3×3 rotation matrix (already reshaped)
     quat = pose["xquat"]  # np.array([w, x, y, z])
 
 # Common: get pelvis height

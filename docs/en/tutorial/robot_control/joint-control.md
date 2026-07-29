@@ -21,13 +21,16 @@ env.do_simulation(ctrl, n_frames=env.frame_skip)
 
 ## Joint Position Control
 
+`set_joint_qpos` accepts a **full qpos array** (`np.ndarray`, shape `(nq,)`), not a dict.
+You need to write each joint into the corresponding address of the qpos array, then set it as a whole:
+
 ```python
-# Directly set joint target positions
-env.set_joint_qpos({
- "shoulder_joint": np.array([0.5]),
- "elbow_joint": np.array([-0.3]),
- "wrist_joint": np.array([1.2]),
-})
+# Build the full qpos array and set it as a whole
+qpos = env.data.qpos.copy()
+qpos[env.jnt_qposadr("shoulder_joint")] = 0.5
+qpos[env.jnt_qposadr("elbow_joint")] = -0.3
+qpos[env.jnt_qposadr("wrist_joint")] = 1.2
+env.set_joint_qpos(qpos)
 
 # Must forward
 env.mj_forward()
@@ -35,11 +38,13 @@ env.mj_forward()
 
 ## Joint Velocity Control
 
+`set_joint_qvel` also accepts a **full qvel array** (`np.ndarray`, shape `(nv,)`):
+
 ```python
-env.set_joint_qvel({
- "shoulder_joint": np.array([0.1]),
- "elbow_joint": np.array([-0.05]),
-})
+qvel = env.data.qvel.copy()
+qvel[env.jnt_dofadr("shoulder_joint")] = 0.1
+qvel[env.jnt_dofadr("elbow_joint")] = -0.05
+env.set_joint_qvel(qvel)
 
 env.mj_forward()
 ```
@@ -47,27 +52,37 @@ env.mj_forward()
 ## JointController — PD Control
 
 ```python
-from orca_utils.joint_controller import JointController
+from orca_gym.utils.joint_controller import JointController
 
 # Create a PD controller for each joint
 controllers = {
- "shoulder": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
- "elbow": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
- "wrist": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
+	"shoulder": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
+	"elbow": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
+	"wrist": JointController(Kp=100.0, Ki=0.1, Kd=10.0, Kv=5.0, max_speed=80.0, ctrlrange=(-80, 80)),
 }
 
 # Compute control torque (each joint computed independently)
+# Note: the ctrl array is indexed by actuator, not by joint.
+# joint_name2id returns the joint id, which cannot be used directly as a ctrl index;
+# use actuator_name2id to get the actuator id.
 ctrl = np.zeros(env.model.nu)
-target_angles = {"shoulder": 0.5, "elbow": -0.3, "wrist": 1.2}
-for joint_name, target in target_angles.items():
- joint_id = env.model.joint_name2id(joint_name)
- dof_adr = env.jnt_dofadr(joint_name)
- ctrl[joint_id] = controllers[joint_name].compute_torque(
- target_qpos=target,
- current_qpos=env.data.qpos[dof_adr],
- current_qvel=env.data.qvel[dof_adr],
- dt=env.dt,
- )
+target_angles = {"shoulder_actuator": 0.5, "elbow_actuator": -0.3, "wrist_actuator": 1.2}
+# Assume actuator names correspond one-to-one with joint names (per model XML); joint names are used to look up dof addresses
+joint_of_actuator = {
+	"shoulder_actuator": "shoulder_joint",
+	"elbow_actuator": "elbow_joint",
+	"wrist_actuator": "wrist_joint",
+}
+for actuator_name, target in target_angles.items():
+	actuator_id = env.model.actuator_name2id(actuator_name)
+	joint_name = joint_of_actuator[actuator_name]
+	dof_adr = env.jnt_dofadr(joint_name)
+	ctrl[actuator_id] = controllers[joint_name.replace("_joint", "")].compute_torque(
+		target_qpos=target,
+		current_qpos=env.data.qpos[dof_adr],
+		current_qvel=env.data.qvel[dof_adr],
+		dt=env.dt,
+	)
 
 # Apply (do_simulation auto-syncs data)
 env.do_simulation(ctrl, env.frame_skip)
@@ -88,7 +103,7 @@ env.do_simulation(ctrl, env.frame_skip)
 ## Low-Pass Filtering
 
 ```python
-from orca_utils.low_pass_filter import LowPassFilter
+from orca_gym.utils.low_pass_filter import LowPassFilter
 
 # Create filter
 filter = LowPassFilter(alpha=0.1, initial_output=np.zeros(env.model.nu))

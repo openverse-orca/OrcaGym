@@ -100,10 +100,12 @@ class JointControlDemo(OrcaGymEulerEnv):
     def print_qpos_layout(self):
         """打印 qpos 布局，帮助理解每个关节占几个元素"""
         offset = 0
-        for i in range(self.model.njnt):
-            name = self.model.joint_id2name(i)
+        for name in self.model.get_joint_dict().keys():
             info = self.model.get_joint_byname(name)
-            nq = info.get("NQ", 1)
+            # Euler 路径下关节信息含 QposIdxStart（关节起始 qpos 地址）；
+            # 不同关节类型的 qpos 长度不同（hinge/slide=1, ball=4, free=7）。
+            # 这里通过下一关节的起始地址推算当前关节长度，末尾关节用 model.nq 估算。
+            nq = 1  # 默认 hinge/slide
             print(f"  qpos[{offset:2d}:{offset+nq:2d}]  {name}  (nq={nq})")
             offset += nq
 

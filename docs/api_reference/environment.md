@@ -40,7 +40,7 @@ class OrcaGymEulerEnv:
 data: OrcaGymDataView          # 完整状态只读视图
 model: OrcaGymModel            # 模型结构信息
 sim_config: SimConfig          # 求解器参数配置
-ctrl: np.ndarray               # 当前控制输入数组
+ctrl: np.ndarray               # getter 返回当前 actuator_force；setter 设置控制输入
 init_qpos: np.ndarray          # 缓存的初始广义坐标
 init_qvel: np.ndarray          # 缓存的初始广义速度
 frame_skip: int                # step() 对应的物理步数
@@ -139,26 +139,49 @@ def query_robot_orientation_odom(base_body, initial_base_pos, initial_base_quat)
 ### 雅可比
 
 ```python
-def mj_jacBody(jacp: np.ndarray, jacr: np.ndarray, *, body_name: str) -> None
-def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, *, site_name: str) -> None
+def mj_jacBody(jacp: np.ndarray, jacr: np.ndarray, body_name: str) -> None
+def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
 
 ### 等式约束与体操作
 
+Env 层公共原语（程序化操作应使用以下方法编排）：
+
 ```python
-def update_equality_constraints(eq_list: list[dict]) -> None
-def modify_equality_objects(eq_ids: list[int], obj1_names=None, obj2_names=None) -> None
-def update_anchor_equality_constraints(actor_name: str, anchor_type: str = "weld") -> None
-def anchor_actor(actor_name: str, anchor_type: str = "weld") -> None
-def release_body_anchored() -> None
-def do_body_manipulation() -> None
+def equality_find_slot_by_body(body_name: str) -> int
+def equality_constraint(slot: int) -> dict
+def equality_update(
+    slot: int,
+    *,
+    eq_type: int | None = None,
+    obj1_name: str | None = None,
+    obj2_name: str | None = None,
+    data: np.ndarray | None = None,
+    active: bool | None = None,
+    solref: np.ndarray | None = None,
+    solimp: np.ndarray | None = None,
+    forward: bool = True,
+) -> None
 ```
+
+> ⚠️ **注意**：以下方法在 Env 层不存在：
+> - `update_equality_constraints` / `modify_equality_objects`：仅存在于
+>   `OrcaGymEuler`（gym 层）与 `MuJoCoSimCore`（sim 层）。
+>   `modify_equality_objects` 签名为
+>   `modify_equality_objects(eq_ids: list[int], obj1_ids=None, obj2_ids=None)`，
+>   参数为 int 列表而非 names。
+> - `update_anchor_equality_constraints` / `anchor_actor` /
+>   `release_body_anchored` / `do_body_manipulation`：为 Env 层内部 `_` 前缀
+>   方法（`_anchor_actor` / `_release_body_anchored` / `_do_body_manipulation`），
+>   由 `render()` 内部驱动的 UI 抓取状态机使用，不应直接调用。
+>   程序化操作应使用 `equality_find_slot_by_body` + `equality_constraint` +
+>   `equality_update` + `set_mocap_pos_and_quat` 原语编排。
 
 ### Studio 交互
 
 ```python
-def render() -> np.ndarray | None              # 渲染到 Studio
+def render() -> None                           # 渲染到 Studio（注解为 np.ndarray | None，实际恒返回 None，渲染由 Studio 处理）
 def begin_save_video(file_path, capture_mode=0) -> None
 def stop_save_video() -> None
 def get_current_frame() -> int
@@ -172,7 +195,7 @@ def load_content_file(content_file_name, **kwargs) -> None
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[np.ndarray | dict, dict]
+def reset_model() -> tuple[dict, dict]
 def _get_obs() -> np.ndarray | dict
 ```
 
@@ -262,15 +285,17 @@ if __name__ == "__main__":
 向量化环境，并行执行多个环境。
 
 ```python
-class OrcaGymVectorEnv:
-    def __init__(self, env_fns: list[callable])
-    def step(actions) -> tuple   # (obs, rewards, terminated, truncated, infos)
-    def reset() -> tuple         # (obs, infos)
+class OrcaGymVectorEnv(VectorEnv):
+    def __init__(self, num_envs: int, worker_index: int, entry_point: str, **kwargs)
+    def step(actions) -> tuple[obs, rewards, terminations, truncations, infos]
+    def reset(*, seed=None, options=None) -> tuple[obs, infos]
 ```
 
 ---
 
 ## RewardType
+
+模块路径：`from orca_gym.environment.orca_gym_env import RewardType`
 
 ```python
 class RewardType:

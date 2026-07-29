@@ -21,9 +21,9 @@ OrcaGym is an open-source robot simulation platform that provides a fully compat
 OrcaGym is a **cloud-native robot simulation platform** with the following core features:
 
 - :material-gym: **Gymnasium Compatible** — Seamless integration with existing RL algorithms
-- :material-engine: **Multi-Physics Backend** — Supports MuJoCo, PhysX, and ODE
+- :material-engine: **Multi-Physics Backend** — Locally supports MuJoCo/MuJoCoWarp/Euler; PhysX and ODE can be accessed via OrcaStudio/OrcaLab
 - :material-cloud: **Distributed Deployment** — Supports local development and remote large-scale training
-- :material-camera: **Ray Tracing Rendering** — Realistic visual observations
+- :material-camera: **Ray Tracing Rendering** — Realistic visual observations provided by OrcaStudio/OrcaLab
 - :material-robot: **Multi-Agent Support** — Native heterogeneous agent management
 
 ---

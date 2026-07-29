@@ -40,7 +40,7 @@ class OrcaGymEulerEnv:
 data: OrcaGymDataView          # Complete read-only state view
 model: OrcaGymModel            # Model structure information
 sim_config: SimConfig          # Solver parameter configuration
-ctrl: np.ndarray               # Current control input array
+ctrl: np.ndarray               # getter returns current actuator_force; setter sets control input
 init_qpos: np.ndarray          # Cached initial generalized coordinates
 init_qvel: np.ndarray          # Cached initial generalized velocity
 frame_skip: int                # Number of physics steps per step()
@@ -58,11 +58,10 @@ def do_simulation(ctrl: np.ndarray, n_frames: int) -> None
 Core stepping method. Set control → step n_frames → auto-sync state. After calling, `self.data` is the latest state. ctrl must have shape `(nu,)`.
 
 ```python
-def set_ctrl(ctrl: np.ndarray) -> None
 def mj_step(nstep: int) -> None
 def mj_forward() -> None
 ```
-`set_ctrl` sets the control input without stepping; `mj_step` / `mj_forward` are low-level simulation controls, typically not needed directly.
+Low-level simulation controls, typically not needed directly.
 
 ### State Setting
 
@@ -149,9 +148,11 @@ def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
 
-### Equality Constraint Primitives (Recommended)
+> Note: `mj_jacBody` / `mj_jacSite` signatures are `(jacp, jacr, body_name)` — no `*` separator. The first two parameters are caller-preallocated arrays written in-place.
 
-> The legacy `update_equality_constraints` / `anchor_actor` etc. have been removed. Use the following atomic primitives instead:
+### Equality Constraints and Body Manipulation
+
+Env-layer public primitives (programmatic manipulation should be orchestrated using the following methods):
 
 ```python
 def equality_find_slot_by_body(body_name: str) -> int          # Find equality constraint slot containing the given body, returns -1 if not found
@@ -169,6 +170,19 @@ def equality_update(
     forward: bool = True,             # Whether to call mj_forward after writing
 ) -> None
 ```
+
+> ⚠️ **Note**: The following methods do not exist at the Env layer:
+> - `update_equality_constraints` / `modify_equality_objects`: only exist in
+>   `OrcaGymEuler` (gym layer) and `MuJoCoSimCore` (sim layer).
+>   `modify_equality_objects` signature is
+>   `modify_equality_objects(eq_ids: list[int], obj1_ids=None, obj2_ids=None)`,
+>   parameters are int lists, not names.
+> - `update_anchor_equality_constraints` / `anchor_actor` /
+>   `release_body_anchored` / `do_body_manipulation`: these are Env-layer internal `_`-prefixed
+>   methods (`_anchor_actor` / `_release_body_anchored` / `_do_body_manipulation`),
+>   used by the UI grasping state machine driven internally by `render()`, and should not be called directly.
+>   Programmatic manipulation should use `equality_find_slot_by_body` + `equality_constraint` +
+>   `equality_update` + `set_mocap_pos_and_quat` primitive orchestration.
 
 ### Read-Only Queries
 
@@ -281,7 +295,7 @@ Provided by `OrcaGymEnvMixin`, orchestration order: `set_seed_value` → `reset_
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[np.ndarray | dict, dict]
+def reset_model() -> tuple[dict, dict]
 def _get_obs() -> np.ndarray | dict
 ```
 
@@ -368,55 +382,20 @@ if __name__ == "__main__":
 
 ## OrcaGymVectorEnv
 
-Vectorized environment, running multiple agents in parallel within a single MuJoCo instance. Inherits from Gymnasium `VectorEnv`.
-
-> ⚠️ Note: `num_envs` must be an integer multiple of 32 (internally grouped into sets of 32 agents).
-
-### Constructor Parameters
+Vectorized environment, running multiple environments in parallel.
 
 ```python
 class OrcaGymVectorEnv(VectorEnv):
-    def __init__(
-        self,
-        num_envs: int,           # Total number of parallel environments (must be a multiple of 32)
-        worker_index: int,       # Worker process index
-        entry_point: str,        # Import path for the environment class (e.g. "my_package.envs:MyEnv")
-        **kwargs,                # Additional parameters passed to the environment constructor
-    )
+    def __init__(self, num_envs: int, worker_index: int, entry_point: str, **kwargs)
+    def step(actions) -> tuple[obs, rewards, terminations, truncations, infos]
+    def reset(*, seed=None, options=None) -> tuple[obs, infos]
 ```
-
-### Public Properties
-
-```python
-num_envs: int                        # Number of parallel environments
-observation_space: gym.Space         # Batched observation space
-single_observation_space: gym.Space  # Single-environment observation space
-action_space: gym.Space              # Batched action space
-single_action_space: gym.Space       # Single-environment action space
-```
-
-### Main Methods
-
-```python
-def reset(*, seed=None, options=None) -> tuple[ObsType, list[dict]]
-def step(actions: ActType) -> tuple[ObsType, np.ndarray, np.ndarray, np.ndarray, list[dict]]
-def render() -> None
-def close() -> None
-```
-
-### Return Value Descriptions
-
-| Return Value | Shape/Type | Description |
-|--------|-----------|------|
-| `observations` | `(num_envs, *obs_shape)` | Observations for all environments |
-| `rewards` | `(num_envs,)` | Rewards for all environments |
-| `terminated` | `(num_envs,) bool` | Whether terminated |
-| `truncated` | `(num_envs,) bool` | Whether truncated |
-| `infos` | `list[dict]` | Info dict for each environment |
 
 ---
 
 ## RewardType
+
+Module path: `from orca_gym.environment.orca_gym_env import RewardType`
 
 ```python
 class RewardType:

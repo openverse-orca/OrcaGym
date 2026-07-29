@@ -20,7 +20,7 @@ OrcaGym's physics simulation is based on the MuJoCo engine, providing high-preci
 | Step + sync (recommended) | `env.do_simulation(ctrl, n)` | Atomic operation, auto-syncs data |
 | Advance n physics steps | `env.mj_step(n)` | Execute n physics steps |
 | Forward update | `env.mj_forward()` | Refresh derived quantities (body poses, sensors) |
-| Sync view | `env._sync_view()` | Sync to DataView |
+| Sync view | `env._sync_view()` | Internal method; `do_simulation()` already auto-syncs, public users usually do not need to call this manually |
 | Jacobian matrix | `env.mj_jacBody(jacp, jacr, name)` | Position/rotation Jacobian |
 | Site Jacobian | `env.mj_jacSite(jacp, jacr, name)` | Site point Jacobian |
 | Apply external force | `env.apply_body_force(name, f, τ)` | Apply force/torque to a body |

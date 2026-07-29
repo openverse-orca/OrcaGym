@@ -65,7 +65,7 @@ def damped_least_squares_ik(env, foot_suffix="left_ankle_roll_link",
     Returns:
         最终脚部位置 (3,) np.ndarray
     """
-    agent = env.agent_name
+    agent = env._agent_names[0]
     foot_body = f"{agent}_{foot_suffix}"
 
     # ── 准备 G1 关节信息 ──

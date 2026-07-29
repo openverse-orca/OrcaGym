@@ -11,9 +11,9 @@ OrcaGym is an **open-source, cloud-native robot simulation platform** that provi
 Traditional robot simulation solutions often face trade-offs between fidelity and computational efficiency. OrcaGym bridges this gap through:
 
 1. **Standardized Interface**: Fully compatible with the Gymnasium API, enabling zero-cost migration of existing RL algorithms
-2. **Multiple Physics Backends**: Integrates MuJoCo, PhysX, and ODE via OrcaStudio/OrcaLab
+2. **Multiple Physics Backends**: Core package locally supports MuJoCo/MuJoCoWarp/Euler; PhysX and ODE can be accessed via OrcaStudio/OrcaLab
 3. **Cloud-Native Architecture**: Enables hybrid local/remote deployment
-4. **Realistic Rendering**: Ray tracing provides high-quality observations for visual RL tasks
+4. **Realistic Rendering**: Ray tracing provides high-quality observations for visual RL tasks (provided by OrcaStudio/OrcaLab server)
 
 ## Key Features
 
@@ -32,11 +32,13 @@ Seamlessly integrates with mainstream RL libraries such as Stable-Baselines3, RL
 
 ### ⚡ Multiple Physics Backends
 
-| Backend | Characteristics | Use Case |
-|---------|----------------|----------|
-| **MuJoCo** | High-precision rigid body dynamics | Legged robots, robotic arm manipulation |
-| **PhysX** | GPU accelerated, massively parallel | Swarm simulation, complex scenes |
-| **ODE** | Open-source, general-purpose | Rapid prototyping, educational use |
+| Backend | Availability | Characteristics | Use Case |
+|---------|--------------|-----------------|----------|
+| **MuJoCo** | Core package (local) | High-precision rigid body dynamics (CPU) | Legged robots, robotic arm manipulation |
+| **MuJoCoWarp** | Core package (local) | GPU (CUDA) accelerated parallelism | Large-scale parallel training |
+| **Euler** | Core package (local) | Multi-vendor GPU multi-physics engine | High-fidelity multi-physics simulation |
+| **PhysX** | Remote only (OrcaStudio/OrcaLab) | GPU accelerated, massively parallel | Swarm simulation, complex scenes |
+| **ODE** | Remote only (OrcaStudio/OrcaLab) | Open-source, general-purpose | Rapid prototyping, educational use |
 
 ### 🌐 Distributed Deployment
 

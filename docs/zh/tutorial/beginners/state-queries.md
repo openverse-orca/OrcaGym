@@ -39,7 +39,7 @@ class StateDumper:
         # ── 末端执行器 ──
         try:
             ee_site = env.site("end_effector")
-            sites = env.query_site_pos_and_quat([ee_site])
+            sites = env.query_site_pos_and_mat([ee_site])
             ee_pos = sites[ee_site]["xpos"]
             print(f"\n末端位置: [{ee_pos[0]:.4f}, {ee_pos[1]:.4f}, {ee_pos[2]:.4f}]")
         except Exception:
@@ -113,11 +113,12 @@ class StateQueryDemo(OrcaGymEulerEnv):
     def check_end_effector(self):
         """查询末端执行器的位姿和速度"""
         ee_site = self.site("end_effector")
-        site_data = self.query_site_pos_and_quat([ee_site])
+        site_data = self.query_site_pos_and_mat([ee_site])
         ee = site_data[ee_site]
         print(f"末端执行器 (site: {ee_site}):")
         print(f"  位置: {ee['xpos']}")
-        print(f"  四元数: {ee['xquat']}")
+        print(f"  旋转矩阵: {ee['xmat']}")
+        # 如需四元数，可用 orca_gym.utils.rotations.mat2quat(ee['xmat']) 转换
 
         # 速度
         linear_vel, angular_vel = self.query_site_xvalp_xvalr([ee_site])
@@ -193,7 +194,7 @@ OrcaGym 提供按**名称**查询的 API（无需记 id）：
 | 关节速度 | `query_joint_qvel(names)` | `dict[str, array]` |
 | Body 位姿 | `get_body_xpos_xmat_xquat(names)` | `dict[str, dict]` |
 | Body 位置（单查） | `env.data.body_xpos(name)` | `(3,)` |
-| Site 位姿 | `query_site_pos_and_quat(names)` | `dict[str, dict]` |
+| Site 位姿 | `query_site_pos_and_mat(names)` | `dict[str, dict]` |
 | Site 速度 | `query_site_xvalp_xvalr(names)` | `tuple[dict, dict]` |
 | 传感器 | `query_sensor_data(names)` | `dict[str, array]` |
 | 执行器力矩 | `query_actuator_torques(names)` | `dict[str, array]` |
@@ -237,10 +238,12 @@ quat = env.data.body_xquat("base_link")   # (4,) [w,x,y,z]
 Site 是 MuJoCo 中的标记点，通常标记**末端执行器**、**IMU 位置**等：
 
 ```python
-# 位姿
-sites = env.query_site_pos_and_quat(["robot_0_end_effector"])
+# 位姿（返回 xpos + xmat 旋转矩阵）
+sites = env.query_site_pos_and_mat(["robot_0_end_effector"])
 ee = sites["robot_0_end_effector"]
 print(f"末端位置: {ee['xpos']}")
+print(f"末端旋转矩阵: {ee['xmat']}")  # (3, 3)
+# 如需四元数，可用 orca_gym.utils.rotations.mat2quat(ee['xmat']) 转换
 
 # 速度（线速度 + 角速度）
 lin_vel, ang_vel = env.query_site_xvalp_xvalr(["robot_0_end_effector"])

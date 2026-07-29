@@ -67,13 +67,31 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
         self._body_anchored = None
         self._is_flex_vertex_anchored = False  # 标记当前锚定的是否为 flex vertex
-        self._anchor_body_name = "ActorManipulator_Anchor"
-        self._anchor_dummy_body_name = "ActorManipulator_dummy"
+        # 默认关卡 ActorManipulator 已改名为 UUID 化的 ORCA_MANIPULATOR_<uuid>，旧关卡按需回退。
+        _ORCA_MANIPULATOR_UUID = "a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e"
+        _NEW_ANCHOR_NAME = f"ORCA_MANIPULATOR_{_ORCA_MANIPULATOR_UUID}_Anchor"
+        _NEW_DUMMY_NAME = f"ORCA_MANIPULATOR_{_ORCA_MANIPULATOR_UUID}_dummy"
+        _LEGACY_ANCHOR_NAME = "ActorManipulator_Anchor"
+        _LEGACY_DUMMY_NAME = "ActorManipulator_dummy"
         body_names = self.model.get_body_names()
-        if (self._anchor_body_name in body_names and self._anchor_dummy_body_name in body_names):
+        if _NEW_ANCHOR_NAME in body_names and _NEW_DUMMY_NAME in body_names:
+            self._anchor_body_name = _NEW_ANCHOR_NAME
+            self._anchor_dummy_body_name = _NEW_DUMMY_NAME
             self._anchor_body_id = self.model.body_name2id(self._anchor_body_name)
             self._anchor_dummy_body_id = self.model.body_name2id(self._anchor_dummy_body_name)
+        elif _LEGACY_ANCHOR_NAME in body_names and _LEGACY_DUMMY_NAME in body_names:
+            self._anchor_body_name = _LEGACY_ANCHOR_NAME
+            self._anchor_dummy_body_name = _LEGACY_DUMMY_NAME
+            self._anchor_body_id = self.model.body_name2id(self._anchor_body_name)
+            self._anchor_dummy_body_id = self.model.body_name2id(self._anchor_dummy_body_name)
+            _logger.warning(
+                f"Using legacy anchor body name '{_LEGACY_ANCHOR_NAME}'. "
+                f"Please upgrade the level to use the new UUID-based name "
+                f"'{_NEW_ANCHOR_NAME}' to avoid name conflicts with user-imported XML."
+            )
         else:
+            self._anchor_body_name = _NEW_ANCHOR_NAME
+            self._anchor_dummy_body_name = _NEW_DUMMY_NAME
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
             _logger.warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")

@@ -5,7 +5,7 @@ OrcaGym 通过 WebSocket 提供了实时的 RGB-D 相机流。
 ## CameraWrapper
 
 ```python
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 # 创建相机包装器
 camera = CameraWrapper(
@@ -67,15 +67,14 @@ Python 客户端
 ## 相机位姿
 
 ```python
-# 获取相机帧和位姿信息
-camera_transforms = env.get_frame_png("path/to/save")
-# → {"front_camera": {"pos": [x,y,z], "quat": [w,x,y,z]}, ...}
-
-for camera_name, transform in camera_transforms.items():
- print(f"{camera_name}:")
- print(f" 位置: {transform['pos']}")
- print(f" 姿态: {transform['quat']}")
+# Euler 体系下 get_frame_png 返回 None，仅将当前帧 PNG 保存到指定路径，
+# 不返回相机位姿字典（Local 体系才返回位姿字典）。
+env.get_frame_png("path/to/save.png")
 ```
+
+> 注：Local 体系的 `get_frame_png` 会返回
+> `{"camera_name": {"pos": [...], "quat": [...]}, ...}` 字典；
+> Euler 体系（`OrcaGymEulerEnv`）仅保存 PNG 到路径，返回 `None`。
 
 ## 摄像机监视器
 
@@ -83,7 +82,7 @@ OrcaGym 包含一个相机监视器脚本：
 
 ```bash
 # 启动相机监视器
-python -m orca_scripts.camera_monitor
+python -m orca_gym.scripts.camera_monitor
 ```
 
 ## 相机时间戳
@@ -130,7 +129,9 @@ class VisionEnv(OrcaGymEulerEnv):
 
 ## 性能建议
 
-1. **异步模式** (CaptureMode.ASYNC) 对视觉 RL 更友好
+1. **异步模式** (`CaptureMode.ASYNC`) 对视觉 RL 更友好。
+   `CaptureMode` 定义在 `orca_gym.core.orca_gym_local` 模块中（Local 体系），
+   Euler 体系下使用需显式导入：`from orca_gym.core.orca_gym_local import CaptureMode`
 2. **缩小图像尺寸** 以提高帧率
 3. **适当降低帧率** — 30 FPS 通常足够
 4. **在多线程中解码** — 避免阻塞主仿真线程

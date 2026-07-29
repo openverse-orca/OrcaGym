@@ -4,7 +4,7 @@
 
 | Dependency | Version Requirement |
 |------------|---------------------|
-| Python | >= 3.9 (recommended 3.12) |
+| Python | >= 3.10 (recommended 3.12) |
 | pip | >= 21.0 |
 | Operating System | Ubuntu 20.04+ / Windows 10+ / macOS 12+ |
 
@@ -26,10 +26,11 @@ pip install orca-gym[all]         # All optional dependencies
 
 | Group | Contents | Use Case |
 |-------|----------|----------|
-| `[rl]` | stable-baselines3, torch | RL training |
-| `[imitation]` | robomimic related | Imitation learning |
-| `[devices]` | pygame, inputs | Gamepad/keyboard control |
-| `[sensors]` | opencv-python, av, websockets | Camera vision |
+| `[rl]` | stable-baselines3, sb3_contrib, tensorboard | RL training |
+| `[imitation]` | h5py, opencv-python, tqdm | Imitation learning |
+| `[robomimic]` | h5py, termcolor, opencv-python | robomimic toolchain |
+| `[devices]` | pygame | Gamepad/keyboard control |
+| `[sensors]` | opencv-python, av, websockets, matplotlib, pillow | Camera vision |
 
 ## Configure OrcaStudio / OrcaLab
 
@@ -46,7 +47,7 @@ Download and install [OrcaStudio](http://orca3d.cn/) or OrcaLab to access:
 python -c "import orca_gym; print('OrcaGym installed successfully!')"
 
 # Check version
-python -c "import orca_gym; print(orca_gym.__version__)"
+pip show orca-gym
 ```
 
 ## Common Installation Issues
@@ -54,10 +55,13 @@ python -c "import orca_gym; print(orca_gym.__version__)"
 ### Issue: MuJoCo import failure
 
 ```bash
-# Ensure mujoco is installed
-pip install mujoco>=3.3.0
+# Ensure mujoco is installed (version pinned to match orca-gym)
+pip install mujoco==3.7.0
 
 # Linux users may need to install additional system dependencies
+# Note: libglew package name varies by Ubuntu version
+#   - Ubuntu 22.04+: libglew2.2
+#   - Ubuntu 20.04: libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
 ```
 

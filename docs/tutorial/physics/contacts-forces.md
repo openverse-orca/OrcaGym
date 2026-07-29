@@ -81,7 +81,7 @@ class ContactForceDemo(OrcaGymEulerEnv):
 
     def demo(self):
         self.reset()
-        agent = self.agent_name
+        agent = self._agent_names[0]
         ctrl = np.zeros(self.model.nu)
 
         # 先步进几步让机器人稳定触地
@@ -102,8 +102,9 @@ class ContactForceDemo(OrcaGymEulerEnv):
         print("2. Body 外部约束力")
         print("=" * 50)
         cfrc_ext = self.get_cfrc_ext()
-        max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, :3], axis=1))
-        print(f"  受力最大的 body ID: {max_idx}, 力: {cfrc_ext[max_idx, :3]}")
+        # cfrc_ext 布局为 [torque(3), force(3)]，线性力在 [:, 3:]
+        max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, 3:], axis=1))
+        print(f"  受力最大的 body ID: {max_idx}, 力: {cfrc_ext[max_idx, 3:]}")
 
         # ─── 3. 施加外力抬起 pelvis ───
         print("\n" + "=" * 50)
@@ -223,11 +224,12 @@ max_normal = max(abs(f[0]) for f in forces.values())
 
 ```python
 cfrc_ext = env.get_cfrc_ext()  # shape: (nbody, 6)
-# 每行: [fx, fy, fz, mx, my, mz] — 作用在每个 body 上的外部约束力
+# 每行: [mx, my, mz, fx, fy, fz] — 作用在每个 body 上的外部约束力
+# MuJoCo spatial vector 布局：力矩在前(3)，力在后(3)，线性力在 [:, 3:]
 
-# 找出受力最大的 body
-max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, :3], axis=1))
-print(f"受力最大: body {max_idx}, 力={cfrc_ext[max_idx, :3]}")
+# 找出受力最大的 body（按线性力大小）
+max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, 3:], axis=1))
+print(f"受力最大: body {max_idx}, 力={cfrc_ext[max_idx, 3:]}")
 ```
 
 ### 3. 施加外力
