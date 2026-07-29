@@ -16,7 +16,7 @@ OrcaGym API documentation to help you quickly find the interfaces you need.
 
 ### Getting Started
 
-1. Start with `OrcaGymEulerEnv` in the [Environment API](environment.md) -- this is the main entry point for writing environments
+1. Start with `OrcaGymEulerEnv` in the [Environment API](environment.md) — this is the main entry point for writing environments
 2. Learn about Model, Data, and SimConfig in the [Core API](core.md)
 3. Check out controllers and rotation utilities in the [Utils API](utils.md)
 
@@ -41,16 +41,16 @@ OrcaGym API documentation to help you quickly find the interfaces you need.
 
 | Concept | Description | See |
 |------|------|------|
-| **Body** | Rigid body, basic unit of physics simulation | [Core API](core.md) |
-| **Joint** | Joint, constraint connecting bodies | [Core API](core.md) |
-| **Actuator** | Actuator, element that drives the robot | [Core API](core.md) |
-| **Geom** | Geometry, collision detection shape | [Core API](core.md) |
+| **Body** | Rigid body, the basic unit of physics simulation | [Core API](core.md) |
+| **Joint** | Joint, a constraint connecting bodies | [Core API](core.md) |
+| **Actuator** | Actuator, the element that drives the robot | [Core API](core.md) |
+| **Geom** | Geometry, a collision detection shape | [Core API](core.md) |
 | **Site** | Marker point, does not participate in physics simulation | [Core API](core.md) |
 | **Sensor** | Sensor, measures physical quantities | [Sensor API](sensor.md) |
 | **Mocap Body** | Freely movable virtual body | [Core API](core.md) |
 | **Equality Constraint** | Equality constraint, connects two bodies | [Core API](core.md) |
 | **qpos/qvel/qacc** | Generalized coordinates/velocity/acceleration | [Core API](core.md) |
-| **Frame Skip** | Number of physics steps per step() | [Environment API](environment.md) |
+| **Frame Skip** | Number of physics steps per `step()` | [Environment API](environment.md) |
 
 ## API Usage Conventions
 

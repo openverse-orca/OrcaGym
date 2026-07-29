@@ -1,6 +1,6 @@
 # 🦾 Making the Robot Move — Controlling a Single Joint
 
-So far we have only been "looking". In this section we start **making the robot move**. We begin with the simplest thing: understanding `qpos`/`qvel` and manually controlling joints.
+So far we have only been "looking". In this section, we start **making the robot move**. We begin with the simplest case: understanding `qpos`/`qvel` and manually controlling joints.
 
 > See [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
 
@@ -12,7 +12,7 @@ Below is a **runnable** complete example demonstrating three ways to control and
 We suggest reading through it once, then reviewing the section-by-section explanation that follows.
 
 ```python
-"""Joint control complete demo: torque drive -> direct position set -> set by name"""
+"""Joint control complete demo: torque drive -> direct position set -> set by name."""
 import time
 import numpy as np
 from gymnasium import spaces
@@ -20,7 +20,7 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
 
 class JointControlDemo(OrcaGymEulerEnv):
-    """Joint control demonstration environment"""
+    """Joint control demonstration environment."""
 
     def __init__(self, model_xml_path, **kwargs):
         super().__init__(
@@ -98,7 +98,7 @@ class JointControlDemo(OrcaGymEulerEnv):
 
     # --- Utility: print qpos layout ---
     def print_qpos_layout(self):
-        """Print the qpos layout to understand how many elements each joint occupies"""
+        """Print the qpos layout to understand how many elements each joint occupies."""
         offset = 0
         for i in range(len(self.model.get_joint_dict())):
             name = self.model.joint_id2name(i)
@@ -181,7 +181,7 @@ ctrl[joint_index] = 0.3 * max_torque   # apply 30% of max torque
 env.do_simulation(ctrl, env.frame_skip)
 ```
 
-**Principle**: torque -> acceleration -> velocity -> position. This is the "through physics" approach — the joint moves naturally under gravity, inertia, friction and other physical effects, rather than teleporting to a target position.
+**Principle**: torque -> acceleration -> velocity -> position. This is the "through physics" approach — the joint moves naturally under gravity, inertia, friction, and other physical effects, rather than teleporting to a target position.
 
 **Use case**: Normal simulation control, RL training. This is the **recommended standard approach**.
 
@@ -208,7 +208,7 @@ env.set_joint_qpos(qpos)
 env.mj_forward()
 ```
 
-Use this when you know the joint **name** (rather than index). `jnt_qposadr(name)` returns the starting address of that joint in the qpos array.
+Use this when you know the joint **name** (rather than its index). `jnt_qposadr(name)` returns the starting address of that joint in the qpos array.
 
 ### The Golden Rule of State Writing
 
@@ -226,7 +226,7 @@ Skipping step 4 -> body poses and sensor readings will still hold the old values
 
 - Setting excessively large joint angles may cause **self-collision**
 - Setting excessively large torques may cause simulation **instability** (numerical explosion)
-- It is recommended to test with small amplitudes (within +/-0.5 rad) first
+- Test with small amplitudes first (within +/-0.5 rad)
 - There are no consequences for breaking things in simulation — feel free to experiment!
 
 ---

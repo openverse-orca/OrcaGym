@@ -23,7 +23,7 @@ body_id = model.body_name2id("base_link")
 joint_id = model.joint_name2id("shoulder")
 actuator_id = model.actuator_name2id("shoulder_actuator")
 
-# Get actuator control range (for building action_space)
+# Get the actuator control range (for building action_space)
 ctrl_range = model.get_actuator_ctrlrange()  # shape: (nu, 2)
 
 # List all body names
@@ -63,7 +63,7 @@ xfrc_applied = data.xfrc_applied       # External forces (read-only)
 cfrc_ext = data.cfrc_ext              # External constraint forces (nbody, 6)
 contact = data.contact                 # Contact list
 
-# Query body/site by name (no need to know ID)
+# Query body/site by name (no need to know the ID)
 body_pos = data.body_xpos("torso_link")       # (3,) world coordinates
 body_quat = data.body_xquat("torso_link")    # (4,) [w,x,y,z]
 body_vel = data.body_cvel("torso_link")       # (6,) [ang(3), lin(3)]
@@ -103,7 +103,7 @@ sim_config.load_from_dict({
     "iterations": 100,
 })
 
-# Export configuration
+# Export the configuration
 config_dict = sim_config.to_dict()
 ```
 

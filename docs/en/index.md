@@ -2,7 +2,7 @@
 
 Welcome to the **OrcaGym** documentation!
 
-OrcaGym is an open-source robot simulation platform that provides a fully compatible interface with OpenAI Gym/Gymnasium, supporting multiple physics backends and distributed simulation.
+OrcaGym is an open-source robot simulation platform that provides an interface fully compatible with OpenAI Gym/Gymnasium, supporting multiple physics backends and distributed simulation.
 
 ---
 

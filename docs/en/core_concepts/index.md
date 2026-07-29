@@ -22,9 +22,9 @@ env (Gymnasium Environment)
 | **Model** | Static model information (geometry, joints, actuators, sensors) |
 | **Data** | Dynamic simulation state (position, velocity, acceleration, time) |
 | **SimConfig** | Simulation parameters (time step, solver settings, gravity) |
-| **qpos** | Generalized coordinates (position), length nq |
-| **qvel** | Generalized velocity, length nv |
-| **ctrl** | Control input, length nu |
+| **qpos** | Generalized coordinates (position), length `nq` |
+| **qvel** | Generalized velocity, length `nv` |
+| **ctrl** | Control input, length `nu` |
 | **Equality Constraints** | Connection constraints used for object manipulation |
 | **Mocap Body** | A special body that can be "controlled" by setting its pose |
 
@@ -40,12 +40,12 @@ OrcaGym divides the simulation world into two parts:
 | `env.data` | `OrcaGymDataView` | The robot's **current state** (changes every step) | How many degrees each joint has rotated, what its velocity is |
 
 ```python
-# model — static, describes structure
+# model — static, describes the structure
 print(env.model.nq)            # Number of position variables
 print(env.model.nv)            # Number of velocity variables
 print(env.model.nu)            # Number of control dimensions
 
-# data — dynamic, reflects current state
+# data — dynamic, reflects the current state
 print(env.data.qpos)           # Current position → changes after each simulation step
 print(env.data.qvel)           # Current velocity
 print(env.data.time)           # Simulation time
@@ -93,4 +93,4 @@ Different joint types occupy different numbers of elements in `qpos` and `qvel`:
 1. [Model / Data / Config](model-data-opt.md) — Understand the three core data objects
 2. [Gymnasium Interface](gym-interface.md) — Understand the standard RL interface
 3. [Data Flow](data-flow.md) — Understand how data flows through the simulation
-4. [System Architecture](architecture.md) — Understand the overall layered design, API boundaries, component design, encapsulation isolation, and migration guide
+4. [System Architecture](architecture.md) — Understand the overall layered design, API boundaries, component design, encapsulation isolation, and the migration guide

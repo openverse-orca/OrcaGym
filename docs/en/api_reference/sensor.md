@@ -6,7 +6,7 @@ Sensor interface, providing camera image receiving, caching, parsing, and playba
 
 | Class | Description |
 |----|------|
-| `CameraWrapper` | Receive rendered camera images from simulation in real time |
+| `CameraWrapper` | Receive rendered camera images from the simulation in real time |
 | `CameraCacher` | Save camera streams to local files |
 | `CameraDataParser` | Parse locally cached camera data |
 | `VideoPlayer` | Play back locally cached video frame by frame |
@@ -92,7 +92,7 @@ class CameraCacher:
     def __init__(self, name: str, port: int)
 ```
 - `name`: Camera name (generates `{name}_video.h264` and `{name}_ts.bin`)
-- `port`: WebSocket port
+- `port`: WebSocket port number
 
 ### Lifecycle
 
@@ -131,7 +131,7 @@ Plays locally cached H.264 video frame by frame using OpenCV.
 ```python
 class VideoPlayer:
     def __init__(self, name: str)
-    def play()                     # Play, press q to quit
+    def play()                     # Play; press q to quit
 ```
 
 ---
@@ -168,7 +168,7 @@ from orca_gym.sensor.rgbd_camera import CameraCacher, CameraDataParser, VideoPla
 # === Collection phase ===
 cacher = CameraCacher("my_dataset", port=8765)
 cacher.start()
-# ... run simulation ...
+# ... run the simulation ...
 cacher.stop()
 
 # === Parsing phase ===

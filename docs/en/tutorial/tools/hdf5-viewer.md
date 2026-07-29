@@ -1,6 +1,6 @@
 # 📊 HDF5 Viewer
 
-Used to view datasets collected from OrcaManipulation.
+This tool is used to view datasets collected from OrcaManipulation.
 
 ## HDF5Viewer
 

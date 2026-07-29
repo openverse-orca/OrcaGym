@@ -57,7 +57,7 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 # PD Controller
 # ================================================================
 class PDController:
-    """Simple multi-joint PD controller"""
+    """Simple multi-joint PD controller."""
 
     def __init__(self, nu: int, kp: float = 150.0, kd: float = 15.0):
         self.nu = nu
@@ -65,7 +65,7 @@ class PDController:
         self.kd = np.full(nu, kd, dtype=np.float64)
 
     def compute(self, target_qpos, current_qpos, current_qvel):
-        """Compute PD torques"""
+        """Compute PD torques."""
         pos_error = target_qpos - current_qpos[:self.nu]
         vel_error = np.zeros(self.nu) - current_qvel[:self.nu]
         return (self.kp * pos_error + self.kd * vel_error).astype(np.float64)
@@ -97,12 +97,12 @@ class ReachTargetEnv(OrcaGymEulerEnv):
            - action_penalty      # action penalty (regularization)
 
     ## Termination Conditions
-    - Target reached: dist_to_goal < 1cm -> terminated = True
+    - Target reached: dist_to_goal < 1 cm -> terminated = True
     - Timeout: auto-handled by TimeLimit wrapper -> truncated = True
     """
 
     # Task hyperparameters
-    SUCCESS_THRESHOLD = 0.01      # distance threshold for reaching target (meters), 1cm
+    SUCCESS_THRESHOLD = 0.01      # distance threshold for reaching target (meters), 1 cm
     SUCCESS_BONUS = 100.0         # reward for reaching the target
     ACTION_PENALTY_COEF = 0.01    # action penalty coefficient
     MAX_DELTA_PER_STEP = 0.05     # max joint angle change per step (radians)
@@ -158,7 +158,7 @@ class ReachTargetEnv(OrcaGymEulerEnv):
               f"control frequency={1.0/self.dt:.1f}Hz")
 
     def _get_obs(self) -> dict:
-        """Collect current state as observation"""
+        """Collect current state as observation."""
         ee_site = self.site("end_effector")
         sites = self.query_site_pos_and_mat([ee_site])
         ee_pos = sites[ee_site]["xpos"].copy()
@@ -380,4 +380,4 @@ Congratulations on completing all the content of the beginners' tutorial! Let's 
 
 ---
 
-> 🎉 **Congratulations!** You now have the ability to build custom RL environments with OrcaGym. Now go create your own robot tasks!
+> 🎉 **Congratulations!** You can now build custom RL environments with OrcaGym. Now go and create your own robot tasks!

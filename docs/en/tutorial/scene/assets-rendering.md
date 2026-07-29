@@ -1,6 +1,6 @@
 # 🎨 Assets and Rendering
 
-OrcaGym implements 3D rendering of scenes through OrcaStudio/OrcaLab.
+OrcaGym performs 3D scene rendering through OrcaStudio/OrcaLab.
 
 ## Supported Assets
 
@@ -35,7 +35,7 @@ Asset files are cached at `~/.orcagym/tmp/`:
 
 ## Rendering Configuration
 
-Rendering is controlled by the OrcaStudio/OrcaLab server side, including:
+Rendering is controlled on the OrcaStudio/OrcaLab server side, including:
 
 - Light position and type
 - Camera viewpoint

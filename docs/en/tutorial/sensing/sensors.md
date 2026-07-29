@@ -14,7 +14,7 @@ for name, info in sensor_dict.items():
 ## Querying Sensor Data
 
 ```python
-# Query by name (generic env.query_sensor_data)
+# Query by name (via the generic env.query_sensor_data)
 sensor_data = env.query_sensor_data([
     "imu_accelerometer",
     "imu_gyro", 
@@ -80,13 +80,13 @@ env.do_simulation(ctrl, n_frames)
 sensor = env.query_sensor_data(...)     # read latest values
 
 # ✅ Correct — manual stepping
-env.mj_step(nstep)                      # step includes forward
+env.mj_step(nstep)                      # mj_step includes the forward pass
 env._sync_view()
 sensor = env.query_sensor_data(...)
 
-# ❌ Incorrect — no forward after modifying state
+# ❌ Incorrect — no mj_forward() call after modifying state
 env.set_joint_qpos(...)
-sensor = env.query_sensor_data(...)     # stale data! forward hasn't been called
+sensor = env.query_sensor_data(...)     # stale data! mj_forward() hasn't been called
 ```
 
 ## Sensor Noise

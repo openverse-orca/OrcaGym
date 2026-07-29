@@ -11,13 +11,13 @@ OrcaGym provides comprehensive contact and force querying interfaces for reward 
 Below is a complete contact and force analysis demo, showing contact detection, contact force querying, external force application, collision detection, and standing detection:
 
 ```python
-"""Complete Contacts and Forces Demo"""
+"""Complete Contacts and Forces Demo."""
 import numpy as np
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
 
 class ContactForceDemo(OrcaGymEulerEnv):
-    """Demonstrates contact detection, force querying, and external force application"""
+    """Demonstrates contact detection, force querying, and external force application."""
 
     def __init__(self, model_xml_path, **kwargs):
         super().__init__(
@@ -32,7 +32,7 @@ class ContactForceDemo(OrcaGymEulerEnv):
     # ─── Utility Functions ───
 
     def analyze_contacts(self):
-        """Analyze all current contacts"""
+        """Analyze all current contacts."""
         contacts = self.query_contact_simple()
         if not contacts:
             print("  No active contacts")
@@ -55,7 +55,7 @@ class ContactForceDemo(OrcaGymEulerEnv):
         print(f"  Max normal force: {max_normal:.1f}N")
 
     def detect_collision(self, body_a, body_b):
-        """Check if two bodies are colliding"""
+        """Check if two bodies are colliding."""
         contacts = self.query_contact_simple()
         id_a = self.model.body_name2id(body_a)
         id_b = self.model.body_name2id(body_b)
@@ -68,7 +68,7 @@ class ContactForceDemo(OrcaGymEulerEnv):
         return False
 
     def is_standing(self, min_force=50.0):
-        """Check if the robot is standing (sufficient foot contact force)"""
+        """Check if the robot is standing (sufficient foot contact force)."""
         contacts = self.query_contact_simple()
         if not contacts:
             return False
@@ -266,7 +266,7 @@ This means applying a force at a site produces an additional torque, equivalent 
 
 ```python
 def contact_reward(env):
-    """Reward moderate contact forces"""
+    """Reward moderate contact forces."""
     contacts = env.query_contact_simple()
     if not contacts:
         return -1.0          # No contact = penalty

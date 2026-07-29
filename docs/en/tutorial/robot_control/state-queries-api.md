@@ -1,6 +1,6 @@
 # 📡 State Query API — Reading Joints, Bodies, and Sensors
 
-This section covers how to use OrcaGym's **state query API**, covering joint states, body poses, sensors, actuator torques, contact information, and more.
+This section explains how to use OrcaGym's **state query API**, covering joint states, body poses, sensors, actuator torques, contact information, and more.
 
 > For complete runnable code, see [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground).
 
@@ -163,7 +163,7 @@ class QueryDemoEnv(OrcaGymEulerEnv):
         print(f"  data.time:       {self.data.time:.4f}s")
         print(f"  model.nq={self.model.nq}, nv={self.model.nv}, nu={self.model.nu}")
 
-        print("\n All query API demos complete")
+        print("\n All query API demos completed")
 
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
@@ -242,7 +242,7 @@ for jn in joint_names:
 
 > **Important**: `env.data.qpos` is a **global** array (contains all body DOFs + all joints).
 > In multi-body scenes, you **cannot** use `data.qpos[7:]` to directly get G1 joints; you must
-> concatenate joint by joint using `jnt_qposadr`.
+> slice each joint individually using `jnt_qposadr`.
 
 ### 2. Body Pose Queries
 
@@ -280,7 +280,7 @@ imu_gyro = sensor_data["g1_imu_gyro"]  # (3,) angular velocity
 ```
 
 > Sensor data is only updated after `mj_forward()` or `do_simulation()`.
-> Modifying qpos without calling forward before reading sensors → you will read stale data.
+> If you modify qpos without calling `mj_forward()` before reading sensors, you will read stale data.
 
 ### 4. Contact Queries
 
@@ -289,7 +289,7 @@ imu_gyro = sensor_data["g1_imu_gyro"]  # (3,) angular velocity
 contacts = env.query_contact_simple()
 # → [{"geom1": 12, "geom2": 34, "dist": 0.001, "pos": [...], "frame": [...]}, ...]
 
-# Step 2: Get contact forces (by list index, not by some id field in the contact dict)
+# Step 2: Get contact forces (by list index, not by any ID field in the contact dict)
 contact_ids = list(range(len(contacts)))
 forces = env.query_contact_force(contact_ids)
 # → {0: array([normal, shear1, shear2, torque1, torque2, torque3]), 1: ...}
@@ -311,7 +311,7 @@ torso_in_pelvis = env.query_position_body_B("g1_torso_link", "g1_pelvis")
 
 ### 6. `env.data` Zero-Copy View
 
-`env.data` is an `OrcaGymDataView`, providing a **zero-copy read-only view**. Data is automatically updated as simulation steps:
+`env.data` is an `OrcaGymDataView`, providing a **zero-copy read-only view**. Data is automatically updated as the simulation steps:
 
 ```python
 env.data.qpos          # (nq,) generalized coordinates
@@ -331,9 +331,9 @@ env.data.xfrc_applied  # (nbody, 6) applied external forces (read-only)
 | Problem | Cause | Solution |
 |---------|-------|----------|
 | `KeyError: 'g1_left_knee_joint'` | Joint name missing agent prefix | Use `f"{agent}_{suffix}"` to concatenate |
-| `data.qpos[7:]` gives wrong values | Addresses not contiguous in multi-body scenes | Slice joint by joint using `jnt_qposadr` |
+| `data.qpos[7:]` gives wrong values | Addresses not contiguous in multi-body scenes | Slice each joint individually using `jnt_qposadr` |
 | `query_contact_force` returns empty | No contacts right after loading | Step a few frames first to let the robot touch the ground |
-| Sensor data is stale | Forgot to call `mj_forward()` | Must forward after `set_joint_qpos` |
+| Sensor data is stale | Forgot to call `mj_forward()` | Call `mj_forward()` after `set_joint_qpos` |
 
 ---
 

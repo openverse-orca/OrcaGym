@@ -40,7 +40,7 @@ class OrcaGymEulerEnv:
 data: OrcaGymDataView          # Complete read-only state view
 model: OrcaGymModel            # Model structure information
 sim_config: SimConfig          # Solver parameter configuration
-ctrl: np.ndarray               # getter returns current actuator_force; setter sets control input
+ctrl: np.ndarray               # The getter returns the current actuator_force; the setter sets the control input
 init_qpos: np.ndarray          # Cached initial generalized coordinates
 init_qvel: np.ndarray          # Cached initial generalized velocity
 frame_skip: int                # Number of physics steps per step()
@@ -55,7 +55,7 @@ dt: float                      # Environment time step = sim_config.timestep × 
 ```python
 def do_simulation(ctrl: np.ndarray, n_frames: int) -> None
 ```
-Core stepping method. Set control → step n_frames → auto-sync state. After calling, `self.data` is the latest state. ctrl must have shape `(nu,)`.
+Core stepping method. Set control → step n_frames → auto-sync state. After calling, `self.data` is the latest state. `ctrl` must have shape `(nu,)`.
 
 ```python
 def mj_step(nstep: int) -> None
@@ -98,7 +98,7 @@ def query_joint_qvel(joint_names: list[str]) -> dict[str, np.ndarray]
 def query_joint_qacc(joint_names: list[str]) -> dict[str, np.ndarray]
 def query_joint_offsets(joint_names: list[str]) -> dict[str, np.ndarray]   # Joint offsets
 def query_joint_lengths(joint_names: list[str]) -> dict[str, np.ndarray]   # Joint lengths
-def query_joint_dofadrs(joint_names: list[str]) -> dict[str, int]           # Joint DOF start addresses
+def query_joint_dofadrs(joint_names: list[str]) -> dict[str, int]          # Joint DOF start addresses
 def jnt_qposadr(joint_name: str) -> int
 def jnt_dofadr(joint_name: str) -> int
 
@@ -155,7 +155,7 @@ def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 Env-layer public primitives (programmatic manipulation should be orchestrated using the following methods):
 
 ```python
-def equality_find_slot_by_body(body_name: str) -> int          # Find equality constraint slot containing the given body, returns -1 if not found
+def equality_find_slot_by_body(body_name: str) -> int          # Find the equality constraint slot containing the given body; returns -1 if not found
 def equality_constraint(slot: int) -> dict                     # Read complete data of a single equality constraint
 def equality_update(
     slot: int,
@@ -174,9 +174,9 @@ def equality_update(
 > ⚠️ **Note**: The following methods do not exist at the Env layer:
 > - `update_equality_constraints` / `modify_equality_objects`: only exist in
 >   `OrcaGymEuler` (gym layer) and `MuJoCoSimCore` (sim layer).
->   `modify_equality_objects` signature is
+>   The `modify_equality_objects` signature is
 >   `modify_equality_objects(eq_ids: list[int], obj1_ids=None, obj2_ids=None)`,
->   parameters are int lists, not names.
+>   with parameters being int lists, not names.
 > - `update_anchor_equality_constraints` / `anchor_actor` /
 >   `release_body_anchored` / `do_body_manipulation`: these are Env-layer internal `_`-prefixed
 >   methods (`_anchor_actor` / `_release_body_anchored` / `_do_body_manipulation`),
@@ -239,7 +239,7 @@ def mocap(name: str, agent_id: int | None = None) -> str      # Mocap name
 def sensor(name: str, agent_id: int | None = None) -> str     # Sensor name
 ```
 
-> When `agent_id=None`, defaults to the first agent (index 0).
+> When `agent_id=None`, it defaults to the first agent (index 0).
 
 **Example:**
 ```python
@@ -260,7 +260,7 @@ def generate_action_space(bounds: np.ndarray) -> gym.Space      # (nu, 2) → Bo
 def generate_observation_space(obs: np.ndarray | dict) -> gym.Space  # Generate observation space from a sample observation
 ```
 
-`generate_action_space` automatically handles ±inf bounds (clamped to the float32 representable range) to avoid gymnasium overflow warnings.
+`generate_action_space` automatically handles ±inf bounds (clamped to the float32 representable range) to avoid Gymnasium overflow warnings.
 
 **Example:**
 ```python
@@ -291,7 +291,7 @@ Provided by `OrcaGymEnvMixin`, orchestration order: `set_seed_value` → `reset_
 
 > Subclasses should override `reset_model()` rather than overriding `reset()` directly.
 
-### Abstract Methods (subclasses must implement)
+### Abstract Methods (subclasses must implement these)
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
@@ -303,12 +303,12 @@ def _get_obs() -> np.ndarray | dict
 
 ```python
 def initialize_grpc()
-def initialize_simulation()     # Load model
+def initialize_simulation()     # Load the model
 def reset_simulation()          # Reset state
-def init_qpos_qvel()            # Cache initial state
-def set_time_step(time_step)    # Set time step
+def init_qpos_qvel()            # Cache the initial state
+def set_time_step(time_step)    # Set the time step
 def pause_simulation()
-def close()                     # Close connection
+def close()                     # Close the connection
 ```
 
 ### Usage Example
@@ -356,7 +356,7 @@ class MyRobotEnv(OrcaGymEulerEnv):
         return obs, reward, terminated, truncated, info
 
     def _compute_reward(self, obs: np.ndarray) -> float:
-        return 0.0  # Replace with your reward function
+        return 0.0  # Replace with your own reward function
 
     def reset_model(self):
         qpos = self.init_qpos + self.np_random.uniform(-0.1, 0.1, self.model.nq)

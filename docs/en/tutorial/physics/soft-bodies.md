@@ -63,4 +63,4 @@ env.equality_update(
 
 - Flex support in the current version is experimental
 - Flexible body operations depend on MuJoCo 3.0+ flex features
-- It is recommended to test in OrcaStudio before using for training
+- Test in OrcaStudio before using for training

@@ -66,7 +66,7 @@ env.dt            # Environment time step = timestep × frame_skip
 ### Key Methods
 
 ```python
-# Simulation stepping —— core method
+# Simulation stepping — core method
 env.do_simulation(ctrl, n_frames)
 
 # State setting
@@ -114,7 +114,7 @@ def _get_obs(self):
 | Box Continuous | `spaces.Box` | Observation/action is a numpy array (directly supported by `generate_action_space` / `generate_observation_space`) |
 | Dict Space | `spaces.Dict` | Observation is a dictionary (multimodal) (directly supported by `generate_observation_space`) |
 
-> Note: `generate_action_space` / `generate_observation_space` only directly support `Box` and `Dict`. General Gymnasium capabilities (such as `Discrete` discrete space) are not within OrcaGym's auto-generation scope; if needed, you can manually construct `action_space` / `observation_space` in subclasses.
+> Note: `generate_action_space` / `generate_observation_space` only directly support `Box` and `Dict`. General Gymnasium capabilities (such as the `Discrete` discrete space) are not within OrcaGym's auto-generation scope; if needed, you can manually construct `action_space` / `observation_space` in subclasses.
 
 ## Creating an Environment
 

@@ -1,6 +1,6 @@
 # 🧬 Why Choose OrcaGym
 
-Among the many robot simulation platforms, what are OrcaGym's unique advantages?
+Among the many robot simulation platforms available, what are OrcaGym's unique advantages?
 
 ## Comparison with Mainstream Simulation Platforms
 
@@ -39,7 +39,7 @@ model.learn(total_timesteps=1_000_000)
 Unlike single-machine simulators, OrcaGym natively supports:
 
 - **Local Mode**: Drive MuJoCo directly within the Python process, suitable for development and debugging
-- **Remote Mode**: Python client connects to remote OrcaStudio/OrcaLab, suitable for large-scale training
+- **Remote Mode**: The Python client connects to a remote OrcaStudio/OrcaLab, suitable for large-scale training
 - **Hybrid Mode**: Training on remote, policy execution locally
 
 ```
@@ -69,6 +69,6 @@ OrcaGym is deeply integrated with OrcaStudio/OrcaLab, providing:
 
 ## Limitations
 
-- The core package supports MuJoCo (CPU)/MuJoCoWarp (CUDA)/Euler (multi-vendor GPU); PhysX/ODE backends require OrcaStudio/OrcaLab
+- The core package supports MuJoCo (CPU)/MuJoCoWarp (CUDA)/Euler (multi-vendor GPU); the PhysX/ODE backends require OrcaStudio/OrcaLab
 - Remote mode depends on the OrcaStudio/OrcaLab server
 - The community is still in its early stages, with fewer third-party examples

@@ -1,6 +1,6 @@
 # 👁️ Observation & Action — Designing Observation and Action Spaces
 
-In this tutorial, you will gain a deep understanding of how to design **observation spaces** and **action spaces** for your environment. This is a critical step in building effective RL environments.
+In this tutorial, you will gain an in-depth understanding of how to design **observation spaces** and **action spaces** for your environment. This is a critical step in building effective RL environments.
 
 ---
 
@@ -13,7 +13,7 @@ The observation space defines what information the RL policy can "see" at each t
 Good observation design follows these principles:
 
 1. **Sufficiency**: The observation should contain all information needed to complete the task (joint positions, target positions, etc.)
-2. **Compactness**: Only include necessary information; extra dimensions increase the difficulty of policy learning
+2. **Compactness**: Include only necessary information; extra dimensions increase the difficulty of policy learning
 3. **Reasonable Scaling**: The numerical ranges of different features should be of similar orders of magnitude
 4. **Accessibility**: All observation values must be reliably computable from the simulation state
 
@@ -47,7 +47,7 @@ def _get_obs(self) -> dict:
     # ee_site return format: {site_name: {"xpos": array([x,y,z]), "xmat": array(3,3)}}
     ee_pos = ee_site[ee_site_name]["xpos"]   # end-effector position (3,)
     ee_mat = ee_site[ee_site_name]["xmat"]   # end-effector rotation matrix (3,3)
-    # If you need quaternion, use orca_gym.utils.rotations.mat2quat(ee_mat) to convert
+    # To convert to a quaternion, use orca_gym.utils.rotations.mat2quat(ee_mat)
 
     # 3. End-effector velocity (to capture motion trends)
     ee_linear_vel, ee_angular_vel = self.query_site_xvalp_xvalr([ee_site_name])
@@ -110,10 +110,10 @@ def _get_obs(self) -> dict:
 | Single array | `spaces.Box` | `Box(low=-inf, high=inf, shape=(13,))` |
 
 !!! tip "Dictionary observations are recommended"
-    Dictionary observations are easier than single arrays for:
+    Dictionary observations are easier to use than single arrays for:
     - Debugging (you can inspect each component by name)
     - Extension (adding new observations does not change existing dimensions)
-    - Normalization (you can use different normalization strategies for different keys)
+    - Normalization (different normalization strategies can be applied to different keys)
 
 ---
 
@@ -125,7 +125,7 @@ The action space defines what actions the policy can output to control the robot
 
 #### 1. Torque Control
 
-The lowest-level approach — directly control the torque of each joint:
+The lowest-level approach — directly controlling the torque of each joint:
 
 ```python
 def _set_action_space(self):
@@ -187,10 +187,10 @@ def step(self, action):  # action in [-0.1, 0.1], representing joint angle chang
 | Control Mode | Pros | Cons | Use Case |
 |--------------|------|------|----------|
 | Torque control | Most flexible, highest bandwidth | Hard to train, requires extensive exploration | Fine manipulation, highly dynamic tasks |
-| Position control | Easy to train, smooth behavior | Limited response bandwidth | Pick-and-place, assembly and other quasi-static tasks |
+| Position control | Easy to train, smooth behavior | Limited response bandwidth | Pick-and-place, assembly, and other quasi-static tasks |
 | Delta control | Smooth, safe | Speed limited | Tasks requiring smooth trajectories |
 
-> **Beginner's advice**: Start with **position control** or **delta control**. Torque control, while flexible, is much harder for an RL policy to explore.
+> **Beginner's advice**: Start with **position control** or **delta control**. Torque control, while flexible, is harder for an RL policy to explore.
 
 ---
 
@@ -243,7 +243,7 @@ class ReachEnv(OrcaGymEulerEnv):
         sites = self.query_site_pos_and_mat([ee_site])
 
         ee_pos = sites[ee_site]["xpos"]
-        # If you need quaternion, use orca_gym.utils.rotations.mat2quat(sites[ee_site]["xmat"])
+        # To convert to a quaternion, use orca_gym.utils.rotations.mat2quat(sites[ee_site]["xmat"])
 
         dist = np.linalg.norm(ee_pos - self._goal_pos)
 
@@ -259,7 +259,7 @@ class ReachEnv(OrcaGymEulerEnv):
         # Delta control: current qpos + action offset
         target_qpos = self.data.qpos[:self.model.nu] + action
 
-        # Compute torque using simple PD
+        # Compute torque using a simple PD controller
         pos_error = target_qpos - self.data.qpos[:self.model.nu]
         vel_error = -self.data.qvel[:self.model.nv]
         ctrl = pos_error * 100.0 + vel_error * 10.0
@@ -270,7 +270,7 @@ class ReachEnv(OrcaGymEulerEnv):
         obs = self._get_obs()
         dist = obs["dist_to_goal"].item()
         reward = -dist  # closer = higher reward
-        terminated = dist < 0.01  # distance less than 1cm considered success
+        terminated = dist < 0.01  # distance less than 1 cm is considered success
         truncated = False
 
         return obs, reward, terminated, truncated, {"distance": dist}
@@ -298,7 +298,7 @@ class ReachEnv(OrcaGymEulerEnv):
 
 ```python
 def _validate_obs(obs):
-    """Ensure no NaN or Inf in observations"""
+    """Ensure there is no NaN or Inf in observations"""
     for key, val in obs.items():
         if np.any(np.isnan(val)):
             print(f"⚠️ NaN in obs['{key}']")

@@ -129,7 +129,7 @@ class VisionEnv(OrcaGymEulerEnv):
 
 ## Performance Tips
 
-1. **Async mode** (`CaptureMode.ASYNC`) is more friendly for visual RL.
+1. **Async mode** (`CaptureMode.ASYNC`) is better suited for visual RL.
    `CaptureMode` is defined in the `orca_gym.core.orca_gym_local` module (Local system);
    under the Euler system you must import it explicitly: `from orca_gym.core.orca_gym_local import CaptureMode`
 2. **Reduce image resolution** to increase frame rate

@@ -16,7 +16,7 @@ pip install orca-gym --force-reinstall
 
 ```bash
 # Linux
-# Note: libglew package name varies by Ubuntu version
+# Note: the libglew package name varies by Ubuntu version:
 #   - Ubuntu 22.04+: libglew2.2
 #   - Ubuntu 20.04: libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
@@ -38,12 +38,12 @@ brew install glfw glew
 Common causes:
 1. Scene configuration errors (duplicate joint/body names)
 2. Overlapping initial model poses
-3. Missing mesh/texture resources -- wait a few seconds and retry
+3. Missing mesh/texture resources — wait a few seconds and retry
 4. OrcaStudio/OrcaLab is not running properly
 
 ### Q: Data shows NaN?
 
-This is usually caused by not triggering forward computation after modifying the state. **Recommended: update state via `do_simulation()`** — this method automatically calls `update_data()` after `mj_step` to sync `env.data`, no manual sync needed:
+This is usually caused by not triggering forward computation after modifying the state. **Recommended: update the state via `do_simulation()`** — this method automatically calls `update_data()` after `mj_step` to sync `env.data`, so no manual sync is needed:
 
 ```python
 # Correct: trigger stepping + auto-sync via do_simulation
@@ -51,7 +51,7 @@ env.do_simulation(ctrl, n_frames=1)
 print(env.data.qpos)  # Already the latest state
 ```
 
-If you do need to perform a forward kinematics computation after rearranging state in a subclass, do it **inside the subclass** via public API or in-class sync mechanisms. Do not directly call `mj_forward()` or internal `_sync_view()` and other private methods in user code (violates API isolation).
+If you do need to perform a forward kinematics computation after rearranging the state in a subclass, do it **inside the subclass** via the public API or in-class sync mechanisms. Do not directly call `mj_forward()` or internal `_sync_view()` and other private methods in user code (this violates API isolation).
 
 ### Q: Reading old data after stepping?
 
@@ -71,7 +71,7 @@ If you do need to perform a forward kinematics computation after rearranging sta
 |----------|-----------------|--------|
 | Development & debugging | Local | Direct MuJoCo connection, no network latency |
 | Single-machine training | Local + vectorized | Multi-process parallelism |
-| Large-scale distributed | Remote | Simulation on server side, training on client side |
+| Large-scale distributed | Remote | Simulation on the server side, training on the client side |
 | Requires PhysX backend | Remote | PhysX is only available on the server side |
 
 ## Environment Development
@@ -123,7 +123,7 @@ def _get_obs(self):
 | Isaac Gym | OrcaGym |
 |-----------|---------|
 | `VecEnv` interface | `Gymnasium.Env` interface |
-| PyTorch Tensor batch operations | NumPy Array per-instance operations |
+| PyTorch Tensor batch operations | NumPy array per-instance operations |
 | GPU single-process 4096 envs | Multi-process vectorization |
 | RSL-RL | Stable-Baselines3 / RLlib |
 | PhysX | MuJoCo (local) |

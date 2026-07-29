@@ -85,12 +85,12 @@ User code interacts only with the following two API layers and **must not penetr
 | API | Source | Purpose |
 |-----|------|------|
 | `env.data` | `OrcaGymDataView` | Read state such as `qpos`/`qvel`/`body_xpos(name)` |
-| `env.model` | `OrcaGymModel` | Query model structure (dimensions, name mappings) |
+| `env.model` | `OrcaGymModel` | Query the model structure (dimensions, name mappings) |
 | `env.sim_config` | `SimConfig` | Configure timestep / integrator / iterations / gravity |
-| `env.ctrl` | `np.ndarray` | Set control input |
+| `env.ctrl` | `np.ndarray` | Set the control input |
 | `env.do_simulation(ctrl, n)` | — | Simulation stepping |
 | `env.set_joint_qpos()` / `env.apply_body_force()` / `env.clear_body_force()` | — | State writing, external force injection |
-| `env.body()` / `env.joint()` / `env.actuator()` / `env.site()` | `OrcaGymEnvMixin` | Namespace resolution (automatically adds agent prefix) |
+| `env.body()` / `env.joint()` / `env.actuator()` / `env.site()` | `OrcaGymEnvMixin` | Namespace resolution (automatically adds the agent prefix) |
 | `env.render()` / `env.begin_save_video()` | — | Studio interaction |
 | `gym.Env` standard interface | Gymnasium | `reset()` / `step()` / `observation_space` / `action_space` |
 

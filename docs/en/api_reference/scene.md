@@ -11,7 +11,7 @@ Scene management interface for managing Actors, lights, cameras, materials, and 
 
 ## Architecture
 
-- **OrcaGymScene**: Full scene control capability, including adding Actors, publishing scenes, etc. Suitable for the scene initialization phase.
+- **OrcaGymScene**: Full scene control capability, including adding Actors, publishing the scene, etc. Suitable for the scene initialization phase.
 - **OrcaGymSceneRuntime**: Runtime-safe wrapper. Only allows safe operations (light adjustment, camera switching, animation parameters, etc.).
 
 ---
@@ -30,9 +30,9 @@ class OrcaGymScene:
 ```python
 def publish_scene()
 ```
-Publishes the current scene configuration. Call after all `add_actor()` calls are complete.
+Publishes the current scene configuration. Call this after all `add_actor()` calls are complete.
 
-> ⚠️ **Note**: After calling, the simulation scene will be reloaded and simulation objects will be reconstructed.
+> ⚠️ **Note**: After calling this, the simulation scene will be reloaded and simulation objects will be reconstructed.
 
 ### Actor Management
 
@@ -82,7 +82,7 @@ def set_ui_text(
 )
 ```
 
-actor_name mapping table:
+`actor_name` mapping table:
 
 | actor_name | Corresponding UI Element |
 |------------|-------------|
@@ -99,7 +99,7 @@ actor_name mapping table:
 def set_image_enabled(actor_name: int, enabled: bool)
 ```
 
-actor_name mapping table:
+`actor_name` mapping table:
 
 | actor_name | Corresponding UI Element |
 |------------|-------------|
@@ -222,7 +222,7 @@ scene.set_light_info("main_light", LightInfo(
     intensity=2.5,
 ))
 
-# 5. Cleanup
+# 5. Clean up
 scene.close()
 ```
 
@@ -240,6 +240,6 @@ runtime.set_light_info("main_light", LightInfo(
     intensity=1.5,
 ))
 
-# Switch camera viewport at runtime
+# Switch the camera viewport at runtime
 runtime.make_camera_viewport_active("camera_2", "viewport_1")
 ```

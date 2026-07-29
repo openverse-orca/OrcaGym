@@ -1,6 +1,6 @@
 # 🎮 Simple Controller — PD Control
 
-Previously we drove the robot by manually setting `qpos` or applying constant torque. In this section, you will learn to write a **PD controller** — the most fundamental and commonly used controller in robotics.
+Previously we drove the robot by manually setting `qpos` or applying constant torque. In this section, you will learn how to write a **PD controller** — the most fundamental and commonly used controller in robotics.
 
 ---
 
@@ -30,7 +30,7 @@ current velocity -> [Kd * error] --> +
 
 ```python
 """
-simple_pd_controller.py — PD controller implemented from scratch
+simple_pd_controller.py — PD controller implemented from scratch.
 """
 
 import numpy as np
@@ -52,8 +52,8 @@ class SimplePDController:
         """
         Args:
             nu: number of actuators (joints)
-            kp: proportional gain, typical range 50~500
-            kd: derivative gain, typical range 5~50
+            kp: proportional gain, typical range 50–500
+            kd: derivative gain, typical range 5–50
         """
         self.nu = nu
         self.kp = np.full(nu, kp, dtype=np.float64)  # each joint can have different gains
@@ -66,7 +66,7 @@ class SimplePDController:
         Args:
             target_qpos: target joint positions (nu,) — "where you want to go"
             current_qpos: current joint positions (nq,) — "where you are now"
-            current_qvel: current joint velocities (nv,) — "how fast you are now"
+            current_qvel: current joint velocities (nv,) — "how fast you are moving"
 
         Returns:
             torque: control torques (nu,) — "how much force to apply"
@@ -154,10 +154,10 @@ pd = SimplePDController(nu=nu, kp=150, kd=15)  # a bit sluggish, back off to 12
 
 | Scenario | Kp | Kd | Notes |
 |----------|-----|-----|-------|
-| Lightweight arm (<=2kg) | 80~150 | 8~15 | Low inertia, low gain suffices |
-| Heavy-duty arm (>=10kg) | 200~500 | 20~50 | Needs more force |
-| High-precision tasks | 300~500 | 30~50 | Needs fast response |
-| Human-robot collaboration | 50~100 | 15~30 | Safety first, can't be too "stiff" |
+| Lightweight arm (<=2kg) | 80–150 | 8–15 | Low inertia, low gain suffices |
+| Heavy-duty arm (>=10kg) | 200–500 | 20–50 | Needs more force |
+| High-precision tasks | 300–500 | 30–50 | Needs fast response |
+| Human-robot collaboration | 50–100 | 15–30 | Safety first, can't be too "stiff" |
 
 ---
 

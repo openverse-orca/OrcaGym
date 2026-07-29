@@ -24,7 +24,7 @@ Welcome to the OrcaGym beginners' tutorial! This series starts from **zero** and
 
 ## Learning Path
 
-We have designed a **gradual, progressive** learning path. Each step introduces only one new concept:
+We have designed a **progressive** learning path. Each step introduces only one new concept:
 
 ```
 🔌 Hello World — Understand what a minimal simulation loop looks like
@@ -68,8 +68,8 @@ OrcaGym divides the simulation world into two parts:
 
 | Concept | Type | Analogy | Example |
 |---------|------|---------|---------|
-| `env.model` | `OrcaGymModel` | The robot's **manual** (never changes) | How many joints, what each joint is named |
-| `env.data` | `OrcaGymDataView` | The robot's **current state** (changes every step) | How many degrees a joint has rotated, what its velocity is |
+| `env.model` | `OrcaGymModel` | The robot's **manual** (static) | How many joints, what each joint is named |
+| `env.data` | `OrcaGymDataView` | The robot's **current state** (changes each step) | Joint angle, joint velocity |
 
 ```python
 # model — static, describes structure
@@ -78,7 +78,7 @@ print(env.model.nv) # total number of velocity variables
 print(env.model.nu) # total number of actuators (control dimensions)
 
 # data — dynamic, reflects current state (OrcaGymDataView, zero-copy read-only view)
-print(env.data.qpos) # current position → changes after each simulation step
+print(env.data.qpos) # current position → changes with each simulation step
 print(env.data.qvel) # current velocity
 print(env.data.time) # simulation time
 ```
@@ -87,8 +87,8 @@ print(env.data.time) # simulation time
 
 ```
 time_step = 0.001 seconds ← time per physics engine step (small, for accuracy)
-frame_skip = 20 ← how many physics steps each step() runs
-dt = 0.001 * 20 = 0.02 seconds ← how often your control command updates (50Hz)
+frame_skip = 20 ← number of physics steps per step() call
+dt = 0.001 * 20 = 0.02 seconds ← control command update interval (50Hz)
 ```
 
 ### Environment Class Hierarchy
@@ -105,7 +105,7 @@ gymnasium.Env
  └── OrcaGymLocalEnv # maintenance mode, not recommended for new projects
 ```
 
-> **Recommendation**: `OrcaGymEulerEnv` is the currently recommended new entry point. `OrcaGymLocalEnv` is in maintenance mode and is being phased out.
+> **Recommendation**: `OrcaGymEulerEnv` is the recommended entry point for new projects. `OrcaGymLocalEnv` is in maintenance mode and is being phased out.
 > See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for runnable examples.
 
 ---
