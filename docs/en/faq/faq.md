@@ -16,6 +16,9 @@ pip install orca-gym --force-reinstall
 
 ```bash
 # Linux
+# Note: libglew package name varies by Ubuntu version
+#   - Ubuntu 22.04+: libglew2.2
+#   - Ubuntu 20.04: libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
 
 # macOS
@@ -40,21 +43,19 @@ Common causes:
 
 ### Q: Data shows NaN?
 
+This is usually caused by not triggering forward computation after modifying the state. **Recommended: update state via `do_simulation()`** — this method automatically calls `update_data()` after `mj_step` to sync `env.data`, no manual sync needed:
+
 ```python
-# Check if mj_forward() was called after modifying the state
-env.set_joint_qpos(...)
-env.mj_forward()   # <-- This step is required
-
-# Sync to DataView
-env._sync_view()
-
-# Now reading data will return correct values
-print(env.data.qpos)
+# Correct: trigger stepping + auto-sync via do_simulation
+env.do_simulation(ctrl, n_frames=1)
+print(env.data.qpos)  # Already the latest state
 ```
+
+If you do need to perform a forward kinematics computation after rearranging state in a subclass, do it **inside the subclass** via public API or in-class sync mechanisms. Do not directly call `mj_forward()` or internal `_sync_view()` and other private methods in user code (violates API isolation).
 
 ### Q: Reading old data after stepping?
 
-`do_simulation()` internally auto-syncs data; after it returns, `env.data` contains the latest state. If you manually modified the state, remember to call `mj_forward()` and `_sync_view()`.
+`do_simulation()` internally auto-syncs data; after it returns, `env.data` contains the latest state. If you need to modify state outside `step()`, do so via `do_simulation()` or in-class sync mechanisms; avoid directly calling private methods.
 
 ### Q: How to improve simulation speed?
 
@@ -95,7 +96,7 @@ It comes from the number of actuators in the model (`model.nu`):
 ```python
 print(f"Number of actuators: {env.model.nu}")
 print(f"Action space: {env.action_space}")
-# Box(low=-1.0, high=1.0, shape=(nu,), float32)
+# Box(low=ctrlrange_min, high=ctrlrange_max, shape=(nu,), float32)
 ```
 
 ### Q: How to add sensors to observations?

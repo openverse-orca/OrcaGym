@@ -1,6 +1,6 @@
 # ⚙️ OrcaGym Euler Architecture
 
-> 📌 **Prerequisite Reading**: If this is your first time encountering the OrcaGym architecture, we recommend reading the [Architecture Overview](architecture-overview.md) first to understand the overall layering and API boundaries, then return to this document for component design details.
+> 📌 **Prerequisite Reading**: This document covers overall layering, API boundaries, and component design details. If this is your first time encountering the OrcaGym architecture, we recommend first reading [Model / Data / Config](model-data-opt.md) and [Gymnasium Interface](gym-interface.md) to build a basic understanding, then return to this document for architecture design.
 
 ## 1. Why a New Architecture Is Needed
 
@@ -64,7 +64,7 @@ If your business requires multi-step orchestration flows such as "bind/release/g
 |------|---------|-----------|
 | **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | Combine multiple subcomponents, provide unified API, avoid god class |
 | **Composition over Inheritance** | Env holds Gym, Gym holds subcomponents | Avoid inheritance chain rot, responsibilities can evolve independently |
-| **Strategy Pattern** | `EulerOrchestrator` (optional) | Switch between strategies with/without Euler via None check |
+| **Strategy Pattern** | `OrcaGymEuler._euler` field (placeholder) | Currently always None; switching between with/without Euler strategies is encapsulated via `has_euler()` / `step_with_coupling()` (Euler orchestrator design TBD) |
 | **Dependency Inversion** | `OrcaStudioBridge` does not hold mjData, achieves decoupling by receiving data parameters | Studio integration decoupled from simulation core |
 | **Read-Only View** | `OrcaGymDataView` | Provide complete state reads, prohibit writes |
 
@@ -85,7 +85,7 @@ gym.Env
         │     ├── _studio: OrcaStudioBridge  # gRPC integration
         │     ├── _registry: ModelRegistry  # Model information
         │     ├── _opt: SimConfig        # Solver configuration (typed)
-        │     └── _euler: EulerOrchestrator | None  # Euler coupling (placeholder, design TBD)
+        │     └── _euler: None  # Euler coupling placeholder (currently unimplemented, design TBD)
         │
         │   Public API (the interface you face)
         ├── .data → OrcaGymDataView      # Complete state view
@@ -149,11 +149,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 | `sim_config` | `SimConfig` | Solver parameter configuration, replaces direct `opt.*` access |
 | `ctrl` | `np.ndarray` | Control array |
 | `frame_skip` | `int` | Number of physics steps per `step()` |
-| `dt` | `float` | Single physics step time |
+| `dt` | `float` | Environment timestep = timestep × frame_skip (`timestep` is the single physics step time) |
 
 ### 4.2 OrcaGymEuler — Simulation Core Facade
 
-Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, `EulerOrchestrator`. **Does not expose** `_mjModel`/`_mjData`, relies on `_` prefix convention + ruff SLF001 static checking, controls IDE autocompletion via `__dir__` to show only public API.
+Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, and the `_euler` placeholder field (currently `None`, Euler coupling orchestrator design TBD). **Does not expose** `_mjModel`/`_mjData`, relies on `_` prefix convention + ruff SLF001 static checking, controls IDE autocompletion via `__dir__` to show only public API.
 
 ```python
 class OrcaGymEuler:
@@ -195,10 +195,10 @@ Handles gRPC interaction with OrcaStudio, including rendering, video saving, obj
 
 ```python
 class OrcaStudioBridge:
-    def __init__(self, stub: GrpcServiceStub | None): ...
+    def __init__(self, stub=None) -> None: ...
     async def render(self, qpos: np.ndarray, sim_time: float) -> None: ...
     async def load_model_xml(self) -> str: ...
-    async def begin_save_video(self, path: str, mode: CaptureMode) -> None: ...
+    async def begin_save_video(self, file_path: str, capture_mode) -> None: ...
     async def stop_save_video(self) -> None: ...
     async def get_current_frame(self) -> int: ...
     async def get_body_manipulation_anchored(self) -> tuple: ...
@@ -211,9 +211,9 @@ Builds `OrcaGymModel`/`OrcaGymData`, provides model information queries such as 
 
 ```python
 class ModelRegistry:
-    def __init__(self, mj_model: mujoco.MjModel): ...
+    def __init__(self, mj_model=None) -> None: ...   # When None, must call _bind(mj_model) before use
     def build_orca_gym_model(self) -> OrcaGymModel: ...
-    def build_orca_gym_data(self) -> OrcaGymData: ...
+    def build_orca_gym_data(self): ...   # Raises NotImplementedError: Euler system uses OrcaGymDataView instead
     def body_subtree_mass(self, body_name: str) -> float: ...
     def equality_data_width(self) -> int: ...
     def equality_object_ids(self, eq_idx: int) -> tuple[int, int]: ...
@@ -309,26 +309,26 @@ class OrcaGymDataView:
 | `gym._mjData.xpos[body_id, 2]` | `env.data.body_xpos(name)[2]` |
 | `gym._mjData.time` | `env.data.time` |
 
-### 4.8 EulerOrchestrator — Euler Coupling (Placeholder)
+### 4.8 Euler Coupling — Placeholder (Currently Unimplemented)
 
-Orchestrates the coupled stepping of Euler non-rigid-body solver and MuJoCo rigid-body solver. Currently a placeholder component; `OrcaGymEuler`'s `_euler` field is `None`, and `OrcaGymEulerEnv` behaves as a pure MuJoCo environment. Detailed design to be discussed in a separate document.
+Orchestrates the coupled stepping of Euler non-rigid-body solver and MuJoCo rigid-body solver. **Currently a design placeholder, no `EulerOrchestrator` class exists in the code**: `OrcaGymEuler._euler` field is always `None`, `OrcaGymEulerEnv` behaves as a pure MuJoCo environment. Euler coupling toggling is queried via `OrcaGymEuler.has_euler()` and stepping is encapsulated via `OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)` (when `has_euler()` is `False`, equivalent to pure MuJoCo stepping). Detailed orchestrator design will be discussed in a separate document.
 
 ```python
-class EulerOrchestrator:
-    """Euler non-rigid-body solver orchestration (placeholder, design TBD)."""
+# Actual encapsulation in current code (OrcaGymEuler public API)
+def has_euler(self) -> bool:
+    """Query whether an Euler coupling orchestrator exists. Returns False during skeleton phase."""
+    return self._euler is not None
 
-    def euler_step(self, dt: float) -> None:
-        """Euler non-rigid-body solver step."""
-        raise NotImplementedError("Euler coupling orchestration TBD")
-
-    def notify_external_force(self, body_name: str, force: np.ndarray, torque: np.ndarray) -> None:
-        """Notify Euler of external force injection (for coupling consistency)."""
-        raise NotImplementedError
+def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
+    """Stepping with Euler coupling. When has_euler()=False, equivalent to set_ctrl + step."""
+    # Skeleton phase: set_ctrl + step (no Euler coupling)
+    self._sim.set_ctrl(ctrl)
+    self._sim.step(n_frames)
 ```
 
 ### 4.9 OrcaGymEnvMixin — Environment Public Method Mixin
 
-Extracts public methods from `OrcaGymLocalEnv`/`OrcaGymBaseEnv` that are independent of the simulation engine, shared by `OrcaGymEulerEnv` and `OrcaGymLocalEnv`.
+Extracts public methods from `OrcaGymLocalEnv`/`OrcaGymBaseEnv` that are independent of the simulation engine, for use by `OrcaGymEulerEnv`. Currently `OrcaGymLocalEnv` still directly inherits from `OrcaGymBaseEnv` and does not use `OrcaGymEnvMixin` (optional refactor, not mandatory).
 
 ```python
 class OrcaGymEnvMixin:
@@ -367,7 +367,7 @@ class OrcaGymEnvMixin:
 **Usage**:
 
 ```python
-# Euler system
+# Euler system (currently in use)
 class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def __init__(self, ...):
         self._agent_names = agent_names
@@ -375,8 +375,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # Mixin methods can be used directly
         ...
 
-# Local system (optional refactor, not mandatory)
-class OrcaGymLocalEnv(OrcaGymEnvMixin, gym.Env):
+# Local system (currently actually inherits OrcaGymBaseEnv, does not use Mixin)
+class OrcaGymLocalEnv(OrcaGymBaseEnv):
     ...
 ```
 
@@ -432,12 +432,13 @@ Two usage modes:
 ```python
 # Mode A (recommended, includes Euler coupling)
 env.do_simulation(ctrl, self.frame_skip)
+# After do_simulation returns, env.data is automatically synchronized (sync_to_view called internally)
 
 # Mode B (pure MuJoCo, no coupling)
 for _ in range(self.frame_skip):
     env.set_ctrl(torques)
     env.mj_step(1)
-    env._update_data()
+# After the loop, call env.mj_forward() to refresh derived quantities, then read via env.data
 ```
 
 > Mode B currently behaves identically to OrcaGymLocalEnv. If Euler coupling is needed in the future, Mode B users must switch to Mode A.
@@ -471,7 +472,7 @@ body_name = env.body("object")
 |------|-----|
 | **State Reading** | `data` (OrcaGymDataView), `model` (OrcaGymModel), `ctrl`, `frame_skip`, `dt`, `realtime_step` |
 | **Simulation Control** | `do_simulation(ctrl, n)`, `mj_step(n)`, `mj_forward()` |
-| **State Query** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_quat/mat/xvalp_xvalr()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
+| **State Query** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_mat()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
 | **State Setting** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
 | **Equality Constraint Primitives (Stateless, L1)** | `equality_find_slot_by_body(body_name)`, `equality_constraint(slot)`, `equality_update(slot, **fields, forward=True)` |
 | **Solver Configuration** | `sim_config` (SimConfig) |
@@ -491,7 +492,7 @@ This architecture uses multiple layers of guidance to make the "correct way" the
 
 | Mechanism | Implementation | Effect |
 |------|------|------|
-| **Python Native Attribute Absence** | `OrcaGymEulerEnv` directly inherits `gym.Env`, only assigns `_gym`/`_stub`/`_channel` in `__init__` | `env.gym`/`env.stub`/`env.channel` raise `AttributeError` |
+| **Python Native Attribute Absence** | `OrcaGymEulerEnv` directly inherits `gym.Env`; all internal components assigned in `__init__` are prefixed with underscore (e.g. `_gym`/`_stub`/`_channel`/`_studio_bridge`, etc.), no unprefixed `gym`/`stub`/`channel` attributes are created | `env.gym`/`env.stub`/`env.channel` raise `AttributeError` |
 | **ruff SLF001 Static Check** | Configure `ruff check --select SLF001` to scan code accessing `_`-prefixed attributes externally | Detect wall-bypassing access at pre-commit / CI stage |
 | **AGENTS.md AI Constraints** | Each in-house repo configures `AGENTS.md` at root, explicitly prohibiting AI from using `_`-prefixed attributes | Constrain AI code generation behavior from the input side |
 | **`__dir__` Control** | Env/Gym/DataView implement `__dir__`, only exposing public API | IDE autocompletion guides correct path |
@@ -530,18 +531,15 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
 
     Contract:
     - Set control input → step n_frames times → synchronize state
-    - If Euler is active, insert Euler non-rigid-body coupling after each rigid-body solve
+    - Euler coupling is encapsulated via step_with_coupling (do not write if self._gym._euler is not None)
     - After stepping completes, self.data is guaranteed consistent
     """
-    self._gym.set_ctrl(ctrl)
-    if self._gym._euler is not None:
-        for _ in range(n_frames):
-            self._gym.mj_step(1)
-            self._gym.euler_step(self._dt)
-    else:
-        self._gym.mj_step(n_frames)
-    self._update_data()
+    # K8 compliance: do not write if self._gym._euler is not None, encapsulated via step_with_coupling
+    self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+    self._gym.sync_to_view()
 ```
+
+> See actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. `step_with_coupling` is equivalent to `set_ctrl + step` when `has_euler()=False` (current skeleton phase), and will be extended when Euler coupling is implemented.
 
 ### 7.2 Two Usage Modes
 
@@ -563,7 +561,8 @@ def step(self, action):
         torque = self._compute_torque(action)
         self.set_ctrl(torque)
         self.mj_step(nstep=1)
-        self._update_data()
+    # Refresh derived quantities after loop, then read env.data
+    self.mj_forward()
     obs = self._get_obs()
     return obs, reward, terminated, truncated, info
 ```
@@ -608,7 +607,7 @@ def step(self, action):
 |--------|--------|
 | `gym._mjData.xfrc_applied[id, :3] = f` | `env.apply_body_force(name, f, tau)` |
 | `gym._mjData.xfrc_applied[id].fill(0)` | `env.clear_body_force(name)` |
-| `gym._mjData.eq_active[gi] = bool` | `env.set_equality_active(idx, active)` |
+| `gym._mjData.eq_active[gi] = bool` | `env.equality_update(slot, active=bool)` |
 
 #### Configuration Type (→ SimConfig)
 
@@ -620,15 +619,15 @@ def step(self, action):
 | `gym._mjModel.opt.gravity = ...` | `env.sim_config.gravity = ...` |
 | 30 lines of `opt.*` settings | `env.sim_config.load_from_dict({...})` |
 
-#### Model Structure Type (→ OrcaGymModel Extension)
+#### Model Structure Type (→ env public methods / OrcaGymModel)
 
 | Old Code | New API |
 |--------|--------|
-| `gym._mjModel.body_subtreemass[id]` | `env.model.body_subtree_mass(name)` |
-| `gym._mjModel.eq_data.shape[1]` | `env.model.equality_data_width()` |
-| `gym._mjModel.eq_obj1id[gi]` | `env.model.equality_object_ids(idx)` |
-| `gym._mjModel.joint(i).name` | `env.model.joint_name_by_id(i)` |
-| `gym._mjModel.njnt` | `env.model.njnt` |
+| `gym._mjModel.body_subtreemass[id]` | `env.body_subtree_mass(name)` or `env.data.body_subtree_mass(name)` |
+| `gym._mjModel.eq_data.shape[1]` | Currently `env.model` has no such public API; use `env._gym.equality_data_width()` or extend `env.model` public methods |
+| `gym._mjModel.eq_obj1id[gi]` | Currently `env.model` has no such public API; use `env._gym.equality_object_ids(idx)` or extend `env.model` public methods |
+| `gym._mjModel.joint(i).name` | `env.model.joint_id2name(i)` |
+| `gym._mjModel.njnt` | `len(env.model.get_joint_dict())` |
 
 ### 8.3 Migration Category Examples
 
@@ -649,13 +648,14 @@ self.apply_body_force(body_name, force, torque)
 **Category 3: Design Adjustment (Few Cases)**
 
 ```python
-# Before migration: manual loop stepping
+# Before migration (Local system): manual loop stepping
 for _ in range(self.frame_skip):
     self.set_ctrl(torques)
     self.mj_step(nstep=1)
-    self.gym.update_data()
+    self.gym.update_data()   # Old API of Local system
 
-# After migration: if Euler coupling is needed, switch to do_simulation
+# After migration (Euler system): if Euler coupling is needed, switch to do_simulation
+# do_simulation internally encapsulates step_with_coupling + sync_to_view, data is synchronized automatically
 self.do_simulation(torques, self.frame_skip)
 ```
 
@@ -704,7 +704,7 @@ self.do_simulation(torques, self.frame_skip)
 
 Core points of this document:
 
-1. **Facade + responsibility-cohesive decomposition** replaces the god class; components are divided by responsibility into `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig`/`EulerOrchestrator`
+1. **Facade + responsibility-cohesive decomposition** replaces the god class; components are divided by responsibility into `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig` (the `_euler` field is a placeholder, currently unimplemented)
 2. **Directly inherit `gym.Env` + `OrcaGymEnvMixin`**: does not inherit `OrcaGymBaseEnv`; common methods shared via Mixin
 3. **Complete public API contract** covers all legitimate MuJoCo operation needs, eliminating reasons to bypass
 4. **Multi-layer encapsulation isolation** (ruff SLF001 + AGENTS.md + Python native attribute absence + `__dir__` + DataView fallback + type annotations + docstring) guides you and AI down the correct path

@@ -42,11 +42,12 @@ def _get_obs(self) -> dict:
 
     # 2. End-effector pose
     ee_site_name = self.site("end_effector")  # auto-prepends agent prefix
-    ee_site = self.query_site_pos_and_quat([ee_site_name])
+    ee_site = self.query_site_pos_and_mat([ee_site_name])
 
-    # ee_site return format: {site_name: {"xpos": array([x,y,z]), "xquat": array([w,x,y,z])}}
+    # ee_site return format: {site_name: {"xpos": array([x,y,z]), "xmat": array(3,3)}}
     ee_pos = ee_site[ee_site_name]["xpos"]   # end-effector position (3,)
-    ee_quat = ee_site[ee_site_name]["xquat"] # end-effector orientation quaternion (4,)
+    ee_mat = ee_site[ee_site_name]["xmat"]   # end-effector rotation matrix (3,3)
+    # If you need quaternion, use orca_gym.utils.rotations.mat2quat(ee_mat) to convert
 
     # 3. End-effector velocity (to capture motion trends)
     ee_linear_vel, ee_angular_vel = self.query_site_xvalp_xvalr([ee_site_name])
@@ -239,10 +240,10 @@ class ReachEnv(OrcaGymEulerEnv):
     def _get_obs(self):
         """Collect rich observation information"""
         ee_site = self.site("end_effector")
-        sites = self.query_site_pos_and_quat([ee_site])
+        sites = self.query_site_pos_and_mat([ee_site])
 
         ee_pos = sites[ee_site]["xpos"]
-        ee_quat = sites[ee_site]["xquat"]
+        # If you need quaternion, use orca_gym.utils.rotations.mat2quat(sites[ee_site]["xmat"])
 
         dist = np.linalg.norm(ee_pos - self._goal_pos)
 

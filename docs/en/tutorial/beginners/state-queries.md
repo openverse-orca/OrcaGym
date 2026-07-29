@@ -112,11 +112,11 @@ class StateQueryDemo(OrcaGymEulerEnv):
     def check_end_effector(self):
         """Query end-effector pose and velocity"""
         ee_site = self.site("end_effector")
-        site_data = self.query_site_pos_and_quat([ee_site])
+        site_data = self.query_site_pos_and_mat([ee_site])
         ee = site_data[ee_site]
         print(f"End-effector (site: {ee_site}):")
         print(f"  Position: {ee['xpos']}")
-        print(f"  Quaternion: {ee['xquat']}")
+        print(f"  Rotation matrix: {ee['xmat']}")
 
         # Velocity
         linear_vel, angular_vel = self.query_site_xvalp_xvalr([ee_site])

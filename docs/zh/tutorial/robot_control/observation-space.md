@@ -23,9 +23,9 @@ def _get_obs(self):
     # IMU 数据
     imu = self.query_sensor_data(["imu_acc", "imu_gyro"])
     
-    # 末端位姿（返回 flat 数组: xpos, xmat, xquat）
-    xpos, xmat, xquat = self.get_body_xpos_xmat_xquat(["ee_link"])
-    ee_pos = xpos[:3]  # 前 3 个元素为 ee_link 的位置
+    # 末端位姿（返回嵌套 dict: body_name -> {"xpos", "xmat", "xquat"}）
+    result = self.get_body_xpos_xmat_xquat(["ee_link"])
+    ee_pos = result["ee_link"]["xpos"]  # (3,) 末端位置
     
     return np.concatenate([
         qpos, qvel, 

@@ -40,7 +40,7 @@ class OrcaGymEulerEnv:
 data: OrcaGymDataView          # 完整状态只读视图
 model: OrcaGymModel            # 模型结构信息
 sim_config: SimConfig          # 求解器参数配置
-ctrl: np.ndarray               # 当前控制输入数组
+ctrl: np.ndarray               # getter 返回当前 actuator_force；setter 设置控制输入
 init_qpos: np.ndarray          # 缓存的初始广义坐标
 init_qvel: np.ndarray          # 缓存的初始广义速度
 frame_skip: int                # step() 对应的物理步数
@@ -149,9 +149,9 @@ def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
 
-### 等式约束原语（推荐）
+### 等式约束与体操作
 
-> 旧版 `update_equality_constraints` / `anchor_actor` 等已删除，改用以下原子原语：
+Env 层公共原语（程序化操作应使用以下方法编排）：
 
 ```python
 def equality_find_slot_by_body(body_name: str) -> int          # 查找含指定 body 的等式约束槽位，未找到返回 -1
@@ -169,6 +169,19 @@ def equality_update(
     forward: bool = True,             # 写入后是否调用 mj_forward
 ) -> None
 ```
+
+> ⚠️ **注意**：以下方法在 Env 层不存在：
+> - `update_equality_constraints` / `modify_equality_objects`：仅存在于
+>   `OrcaGymEuler`（gym 层）与 `MuJoCoSimCore`（sim 层）。
+>   `modify_equality_objects` 签名为
+>   `modify_equality_objects(eq_ids: list[int], obj1_ids=None, obj2_ids=None)`，
+>   参数为 int 列表而非 names。
+> - `update_anchor_equality_constraints` / `anchor_actor` /
+>   `release_body_anchored` / `do_body_manipulation`：为 Env 层内部 `_` 前缀
+>   方法（`_anchor_actor` / `_release_body_anchored` / `_do_body_manipulation`），
+>   由 `render()` 内部驱动的 UI 抓取状态机使用，不应直接调用。
+>   程序化操作应使用 `equality_find_slot_by_body` + `equality_constraint` +
+>   `equality_update` + `set_mocap_pos_and_quat` 原语编排。
 
 ### 只读查询
 
@@ -281,7 +294,7 @@ def reset(*, seed: int | None = None, options: dict | None = None) -> tuple[ObsT
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[np.ndarray | dict, dict]
+def reset_model() -> tuple[dict, dict]
 def _get_obs() -> np.ndarray | dict
 ```
 
@@ -368,21 +381,13 @@ if __name__ == "__main__":
 
 ## OrcaGymVectorEnv
 
-向量化环境，在单个 MuJoCo 实例中并行运行多个智能体。继承自 Gymnasium `VectorEnv`。
-
-> ⚠️ 注意：`num_envs` 必须是 32 的整数倍（内部按每组 32 个智能体分组）。
-
-### 构造参数
+向量化环境，并行执行多个环境。继承自 Gymnasium `VectorEnv`。
 
 ```python
 class OrcaGymVectorEnv(VectorEnv):
-    def __init__(
-        self,
-        num_envs: int,           # 并行环境总数（必须是 32 的倍数）
-        worker_index: int,       # 工作进程索引
-        entry_point: str,        # 环境类的导入路径（如 "my_package.envs:MyEnv"）
-        **kwargs,                # 传递给环境构造函数的其他参数
-    )
+    def __init__(self, num_envs: int, worker_index: int, entry_point: str, **kwargs)
+    def step(actions) -> tuple[obs, rewards, terminations, truncations, infos]
+    def reset(*, seed=None, options=None) -> tuple[obs, infos]
 ```
 
 ### 公共属性
@@ -417,6 +422,8 @@ def close() -> None
 ---
 
 ## RewardType
+
+模块路径：`from orca_gym.environment.orca_gym_env import RewardType`
 
 ```python
 class RewardType:

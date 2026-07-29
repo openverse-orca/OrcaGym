@@ -14,7 +14,8 @@ A scene consists of the following elements:
 - **Material** — Materials
 
 ```python
-from orca_scene import OrcaGymScene, OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene import OrcaGymScene
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 ```
 
 ## Chapter Navigation

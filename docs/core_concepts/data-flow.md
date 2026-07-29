@@ -22,7 +22,7 @@
     │           │            │
     │   ┌───────▼────────┐  │
     │   │ _get_obs()     │──┼──▶ obs
-    │   │ compute_reward()│──┼──▶ reward
+    │   │ 子类 step() 逻辑 │──┼──▶ reward / terminated / truncated
     │   └────────────────┘  │
     └──────────────────────┘
                │
@@ -41,10 +41,12 @@ env.step(action)
   │     └─▶ 执行 n_frames 步物理仿真
   │
   ├─▶ _get_obs()          # 构建观测
-  ├─▶ compute_reward()    # 计算奖励
+  ├─▶ 计算 reward / terminated / truncated  # 由子类 step() 内部逻辑实现
   │
   └─▶ 返回 (obs, reward, terminated, truncated, info)
 ```
+
+> 注：`compute_reward()` 并非 `OrcaGymEulerEnv` 的公共方法。奖励、终止条件的计算由子类在自己的 `step()` 实现中完成（`OrcaGymEulerEnv.step` 为抽象方法，子类必须复写）。
 
 ## 状态同步规则
 

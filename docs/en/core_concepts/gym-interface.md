@@ -28,6 +28,7 @@ class MyEnv(OrcaGymEulerEnv):
             model_xml_path: str | None = None,   # Local model path (offline mode)
             skip_grpc_load: bool = False,        # True → offline mode
             render_mode: str = "human",          # "human" / "none"
+            sync_render: bool = False,           # Whether to render synchronously
             **kwargs,
         )
 ```
@@ -110,9 +111,10 @@ def _get_obs(self):
 
 | Type | Python Class | Description |
 |------|-----------|------|
-| Box Continuous | `spaces.Box` | Observation/action is a numpy array |
-| Dict Space | `spaces.Dict` | Observation is a dictionary (multimodal) |
-| Discrete Space | `spaces.Discrete` | Discrete actions |
+| Box Continuous | `spaces.Box` | Observation/action is a numpy array (directly supported by `generate_action_space` / `generate_observation_space`) |
+| Dict Space | `spaces.Dict` | Observation is a dictionary (multimodal) (directly supported by `generate_observation_space`) |
+
+> Note: `generate_action_space` / `generate_observation_space` only directly support `Box` and `Dict`. General Gymnasium capabilities (such as `Discrete` discrete space) are not within OrcaGym's auto-generation scope; if needed, you can manually construct `action_space` / `observation_space` in subclasses.
 
 ## Creating an Environment
 

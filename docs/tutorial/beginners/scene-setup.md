@@ -28,7 +28,7 @@ setup_my_scene.py — 搭建一个简单场景：桌子 + 机械臂 + 方块
 """
 
 import numpy as np
-from orca_scene.orca_gym_scene import (
+from orca_gym.scene.orca_gym_scene import (
  OrcaGymScene, # 场景管理器
  Actor, # 场景中的物体
  LightInfo, # 灯光参数

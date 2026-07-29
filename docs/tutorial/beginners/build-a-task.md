@@ -125,7 +125,7 @@ class ReachTargetTask(OrcaGymEulerEnv):
  def _get_obs(self) -> dict:
  """收集观测：关节状态 + 末端位姿 + 目标位置"""
  ee_site = self.site("end_effector")
- sites = self.query_site_pos_and_quat([ee_site])
+ sites = self.query_site_pos_and_mat([ee_site])
  ee_pos = sites[ee_site]["xpos"].copy()
 
  dist = np.linalg.norm(ee_pos - self._goal_pos)
@@ -229,6 +229,9 @@ if ENV_ID not in gym.envs.registry:
  'orcagym_addr': "localhost:50051",
  'agent_names': ["robot_0"],
  'time_step': 0.001,
+ # model_xml_path 通过 kwargs 传入本地 XML 路径（离线模式必需）
+ # 'model_xml_path': "/path/to/scene.xml",
+ # 'skip_grpc_load': True,
  },
  max_episode_steps=300,
  )
@@ -323,7 +326,7 @@ ReachTargetTask
 │
 └── _get_obs()
  ├── self.data.qpos / qvel ← 关节状态
- ├── query_site_pos_and_quat() ← 末端位姿
+ ├── query_site_pos_and_mat() ← 末端位姿
  └── 计算到目标的距离
 ```
 
@@ -338,7 +341,7 @@ ReachTargetTask
 | Hello World | 环境概念、`step`/`reset` | `gym.register()`、`gym.make()` |
 | 场景搭建 | Actor 摆放、资产添加 | （任务开始前搭建的场景） |
 | 第一个环境 | 继承 `OrcaGymEulerEnv` | `class ReachTargetTask(OrcaGymEulerEnv)` |
-| 读取状态 | 查询关节/Body/Site | `query_site_pos_and_quat()` |
+| 读取状态 | 查询关节/Body/Site | `query_site_pos_and_mat()` |
 | 控制关节 | qpos/qvel 操作 | `self.data.qpos[:nu] + action` |
 | PD 控制器 | 目标角度→力矩 | `self._pd.compute()` |
 | **本任务** | **组合一切** | **完整的 reach 任务** |

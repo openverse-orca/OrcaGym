@@ -5,10 +5,10 @@ OrcaGym provides terrain generation tools for creating complex ground environmen
 ## Terrain Generator
 
 ```python
-from orca_tools.terrains import terrain_generater
+from orca_gym.tools.terrains import terrain_generater
 
 # Height map generator
-from orca_tools.terrains import height_map_generater
+from orca_gym.tools.terrains import height_map_generater
 ```
 
 ## Terrain Types

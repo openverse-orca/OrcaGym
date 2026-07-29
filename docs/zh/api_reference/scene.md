@@ -75,7 +75,7 @@ def set_ui_text(
     self,
     actor_name: int,          # 1-6，对应不同 UI 位置
     message: str = "",        # 显示的文本内容
-    showtime: int = 0,        # 显示时长（秒）
+    showtime: int = 0,        # 显示时长（int，单位由 Studio 解释）
     blinkfreq: int = 0,       # 闪烁频率
     color: str = "",          # 颜色（如 "0x00ff00"）
     size: int = 0,            # 字号
@@ -159,33 +159,26 @@ class LightInfo:
 
 ### CameraSensorInfo
 
+基础 4 参数为必填；扩展参数为 optional（None 表示不修改 server 现有值），
+对应 proto3 optional 语义，兼容老客户端。
+
 ```python
 class CameraSensorInfo:
     def __init__(
         self,
-        capture_rgb: bool,              # 是否捕获 RGB 图像
-        capture_depth: bool,            # 是否捕获深度图
-        save_mp4_file: bool,            # 是否保存 MP4 视频文件
-        use_dds: bool,                  # 是否使用 DDS 纹理格式
-        # 以下为可选扩展参数（None 表示不修改 server 现有值）
-        capture_normal: bool | None = None,         # 是否捕获法线图
-        capture_object_color: bool | None = None,   # 是否捕获实例分割色标图
-        is_recording: bool | None = None,           # 是否正在录制
-        use_nvenc: bool | None = None,              # 是否使用 NvEnc 硬件编码
-        nvenc_gpu_index: int | None = None,         # NvEnc GPU 适配器索引
-        random_object_color: bool | None = None,    # 是否随机分配物体颜色
-        width: int | None = None,                   # 图像宽度（像素）
-        height: int | None = None,                  # 图像高度（像素）
-        vertical_fov: float | None = None,          # 垂直视场角（度）
-        near_clip: float | None = None,             # 近裁剪面距离
-        far_clip: float | None = None,              # 远裁剪面距离
-        gamma: float | None = None,                 # 深度相机 gamma 校正
-        color_port: int | None = None,              # RGB 流 WebSocket 端口
-        depth_port: int | None = None,              # 深度流 WebSocket 端口
-        dds_topic: str | None = None,               # DDS 主题
-        dds_stream_id: str | None = None,           # DDS 流 ID
+        capture_rgb: bool,      # 是否捕获 RGB 图像
+        capture_depth: bool,    # 是否捕获深度图
+        save_mp4_file: bool,    # 是否保存 MP4 视频文件
+        use_dds: bool,          # 是否使用 DDS 纹理格式
+        **kwargs,               # 扩展 optional 字段（None 表示不修改）
     )
 ```
+
+`**kwargs` 支持的扩展字段（共 16 个，对应 proto optional 语义）：
+`capture_normal`、`capture_object_color`、`is_recording`、`use_nvenc`、
+`nvenc_gpu_index`、`random_object_color`、`width`、`height`、`vertical_fov`、
+`near_clip`、`far_clip`、`gamma`、`color_port`、`depth_port`、`dds_topic`、
+`dds_stream_id`。
 
 ### MaterialInfo
 
@@ -204,7 +197,7 @@ class MaterialInfo:
 ### 场景初始化
 
 ```python
-from orca_gym.scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 import numpy as np
 
 # 1. 连接场景
@@ -236,7 +229,8 @@ scene.close()
 ### 运行时操作（通过 Runtime 封装）
 
 ```python
-from orca_gym.scene import OrcaGymSceneRuntime, LightInfo
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene import LightInfo
 
 runtime = OrcaGymSceneRuntime(scene)
 

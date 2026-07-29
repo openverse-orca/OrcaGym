@@ -6,7 +6,7 @@
 
 ## 前提
 
-- 已安装 OrcaGym（能 `from orca_gym.environment.euler import OrcaGymEulerEnv`）
+- 已安装 OrcaGym（能 `from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv`）
 - 有一个简单的 MuJoCo XML 场景文件（本节使用内置示例）
 
 ---

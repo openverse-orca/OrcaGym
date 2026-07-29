@@ -75,7 +75,7 @@ def set_ui_text(
     self,
     actor_name: int,          # 1-6, corresponding to different UI positions
     message: str = "",        # Text content to display
-    showtime: int = 0,        # Display duration (seconds)
+    showtime: int = 0,        # Display duration (int, unit interpreted by Studio)
     blinkfreq: int = 0,       # Blink frequency
     color: str = "",          # Color (e.g. "0x00ff00")
     size: int = 0,            # Font size
@@ -159,33 +159,26 @@ class LightInfo:
 
 ### CameraSensorInfo
 
+The first 4 parameters are required; extension parameters are optional (None means do not modify the server's existing value),
+corresponding to proto3 optional semantics, compatible with old clients.
+
 ```python
 class CameraSensorInfo:
     def __init__(
         self,
-        capture_rgb: bool,              # Whether to capture RGB images
-        capture_depth: bool,            # Whether to capture depth maps
-        save_mp4_file: bool,            # Whether to save MP4 video files
-        use_dds: bool,                  # Whether to use DDS texture format
-        # The following are optional extension parameters (None means do not modify the server's existing value)
-        capture_normal: bool | None = None,         # Whether to capture normal maps
-        capture_object_color: bool | None = None,   # Whether to capture instance segmentation color maps
-        is_recording: bool | None = None,           # Whether currently recording
-        use_nvenc: bool | None = None,              # Whether to use NvEnc hardware encoding
-        nvenc_gpu_index: int | None = None,         # NvEnc GPU adapter index
-        random_object_color: bool | None = None,    # Whether to randomly assign object colors
-        width: int | None = None,                   # Image width (pixels)
-        height: int | None = None,                  # Image height (pixels)
-        vertical_fov: float | None = None,          # Vertical field of view (degrees)
-        near_clip: float | None = None,             # Near clipping plane distance
-        far_clip: float | None = None,              # Far clipping plane distance
-        gamma: float | None = None,                 # Depth camera gamma correction
-        color_port: int | None = None,              # RGB stream WebSocket port
-        depth_port: int | None = None,              # Depth stream WebSocket port
-        dds_topic: str | None = None,               # DDS topic
-        dds_stream_id: str | None = None,           # DDS stream ID
+        capture_rgb: bool,      # Whether to capture RGB images
+        capture_depth: bool,    # Whether to capture depth maps
+        save_mp4_file: bool,    # Whether to save MP4 video files
+        use_dds: bool,          # Whether to use DDS texture format
+        **kwargs,               # Extension optional fields (None means do not modify)
     )
 ```
+
+Extension fields supported by `**kwargs` (16 in total, corresponding to proto optional semantics):
+`capture_normal`, `capture_object_color`, `is_recording`, `use_nvenc`,
+`nvenc_gpu_index`, `random_object_color`, `width`, `height`, `vertical_fov`,
+`near_clip`, `far_clip`, `gamma`, `color_port`, `depth_port`, `dds_topic`,
+`dds_stream_id`.
 
 ### MaterialInfo
 
@@ -204,7 +197,7 @@ class MaterialInfo:
 ### Scene Initialization
 
 ```python
-from orca_gym.scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 import numpy as np
 
 # 1. Connect to the scene
@@ -236,7 +229,8 @@ scene.close()
 ### Runtime Operations (via Runtime Wrapper)
 
 ```python
-from orca_gym.scene import OrcaGymSceneRuntime, LightInfo
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene import LightInfo
 
 runtime = OrcaGymSceneRuntime(scene)
 

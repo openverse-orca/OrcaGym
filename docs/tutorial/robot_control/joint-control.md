@@ -21,13 +21,16 @@ env.do_simulation(ctrl, n_frames=env.frame_skip)
 
 ## 关节位置控制
 
+`set_joint_qpos` 接受**全量 qpos 数组**（`np.ndarray`，形状 `(nq,)`），不接受字典。
+需要按关节逐个写入 qpos 数组的对应地址，再整体设置：
+
 ```python
-# 直接设置关节目标位置
-env.set_joint_qpos({
- "shoulder_joint": np.array([0.5]),
- "elbow_joint": np.array([-0.3]),
- "wrist_joint": np.array([1.2]),
-})
+# 构造完整 qpos 数组后整体设置
+qpos = env.data.qpos.copy()
+qpos[env.jnt_qposadr("shoulder_joint")] = 0.5
+qpos[env.jnt_qposadr("elbow_joint")] = -0.3
+qpos[env.jnt_qposadr("wrist_joint")] = 1.2
+env.set_joint_qpos(qpos)
 
 # 必须 forward
 env.mj_forward()
@@ -35,11 +38,13 @@ env.mj_forward()
 
 ## 关节速度控制
 
+`set_joint_qvel` 同样接受**全量 qvel 数组**（`np.ndarray`，形状 `(nv,)`）：
+
 ```python
-env.set_joint_qvel({
- "shoulder_joint": np.array([0.1]),
- "elbow_joint": np.array([-0.05]),
-})
+qvel = env.data.qvel.copy()
+qvel[env.jnt_dofadr("shoulder_joint")] = 0.1
+qvel[env.jnt_dofadr("elbow_joint")] = -0.05
+env.set_joint_qvel(qvel)
 
 env.mj_forward()
 ```
@@ -47,7 +52,7 @@ env.mj_forward()
 ## JointController — PD 控制
 
 ```python
-from orca_utils.joint_controller import JointController
+from orca_gym.utils.joint_controller import JointController
 
 # 为每个关节创建一个 PD 控制器
 controllers = {
@@ -57,12 +62,22 @@ controllers = {
 }
 
 # 计算控制力矩（每个关节独立计算）
+# 注意：ctrl 数组按执行器（actuator）索引，而非关节索引。
+# joint_name2id 返回关节 id，不能直接用作 ctrl 索引；
+# 需用 actuator_name2id 获取执行器 id。
 ctrl = np.zeros(env.model.nu)
-target_angles = {"shoulder": 0.5, "elbow": -0.3, "wrist": 1.2}
-for joint_name, target in target_angles.items():
- joint_id = env.model.joint_name2id(joint_name)
+target_angles = {"shoulder_actuator": 0.5, "elbow_actuator": -0.3, "wrist_actuator": 1.2}
+# 假设执行器名与关节名一一对应（按模型 XML 定义），关节名用于查 dof 地址
+joint_of_actuator = {
+ "shoulder_actuator": "shoulder_joint",
+ "elbow_actuator": "elbow_joint",
+ "wrist_actuator": "wrist_joint",
+}
+for actuator_name, target in target_angles.items():
+ actuator_id = env.model.actuator_name2id(actuator_name)
+ joint_name = joint_of_actuator[actuator_name]
  dof_adr = env.jnt_dofadr(joint_name)
- ctrl[joint_id] = controllers[joint_name].compute_torque(
+ ctrl[actuator_id] = controllers[joint_name.replace("_joint", "")].compute_torque(
  target_qpos=target,
  current_qpos=env.data.qpos[dof_adr],
  current_qvel=env.data.qvel[dof_adr],
@@ -88,7 +103,7 @@ env.do_simulation(ctrl, env.frame_skip)
 ## 低通滤波
 
 ```python
-from orca_utils.low_pass_filter import LowPassFilter
+from orca_gym.utils.low_pass_filter import LowPassFilter
 
 # 创建滤波器
 filter = LowPassFilter(alpha=0.1, initial_output=np.zeros(env.model.nu))

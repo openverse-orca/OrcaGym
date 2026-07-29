@@ -15,8 +15,8 @@ model = env.model
 print(model.nq)          # 广义坐标数
 print(model.nv)          # 自由度数
 print(model.nu)          # 执行器数
-print(model.nbody)       # body 总数
-print(model.njnt)        # 关节总数
+print(len(model.get_body_names()))    # body 总数
+print(len(model.get_joint_dict()))    # 关节总数
 
 # 名称到 ID 的映射
 body_id = model.body_name2id("base_link")
@@ -80,7 +80,7 @@ do_simulation(ctrl, n_frames)   ← 仿真步进
   └─▶ 可直接读取 env.data.qpos 等
 ```
 
-> ⚠️ **重要**：`do_simulation()` 返回后 `env.data` 已自动同步。手动调用 `mj_forward()` 后如需读取 `env.data`，需要调用 `env._sync_view()` 同步。
+> ⚠️ **重要**：`do_simulation()` 返回后 `env.data` 已自动同步，可直接读取。手动调用 `mj_forward()` 后如需读取 `env.data` 中的派生量（如 `body_xpos`、`site_xpos` 等），建议通过 `do_simulation()` 走标准步进路径（内部已封装 `sync_to_view`），或在子类内部使用同步机制。直接调用 `mj_forward()` 不会自动刷新 `env.data` 的派生量视图。
 
 ---
 

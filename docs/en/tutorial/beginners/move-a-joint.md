@@ -100,7 +100,7 @@ class JointControlDemo(OrcaGymEulerEnv):
     def print_qpos_layout(self):
         """Print the qpos layout to understand how many elements each joint occupies"""
         offset = 0
-        for i in range(self.model.njnt):
+        for i in range(len(self.model.get_joint_dict())):
             name = self.model.joint_id2name(i)
             info = self.model.get_joint_byname(name)
             nq = info.get("NQ", 1)

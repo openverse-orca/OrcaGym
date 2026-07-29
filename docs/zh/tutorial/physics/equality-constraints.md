@@ -31,13 +31,37 @@ class GraspDemo(OrcaGymEulerEnv):
 
     def demo_grasp_and_move(self):
         """完整演示：抓取物体 → 移动到目标 → 释放"""
-        agent = self.agent_name
+        import mujoco
+        agent = self._agent_names[0]
         object_name = f"{agent}_manipulation_box"
+        mocap_name = "ActorManipulator_Anchor"  # 旧关卡；新关卡为 ORCA_MANIPULATOR_<uuid>_Anchor
         ctrl = np.zeros(self.model.nu)
 
-        # ─── 第 1 步：抓取 ───
+        # ─── 第 1 步：抓取（用公共原语编排，等价于 Local 的 anchor_actor）───
         print("第 1 步：抓取物体...")
-        self.anchor_actor(object_name, "weld")
+        # 1.1 查找含 mocap 的等式约束槽位
+        slot = self.equality_find_slot_by_body(mocap_name)
+        if slot == -1:
+            raise ValueError(f"模型中无含 {mocap_name} 的 equality 槽位")
+        # 1.2 保存原始约束快照（释放时恢复）
+        original_eq = self.equality_constraint(slot)
+        # 1.3 对齐 mocap 位姿到物体当前位姿（避免下一帧拉扯）
+        obj_pose = self.get_body_xpos_xmat_xquat([object_name])[object_name]
+        self.set_mocap_pos_and_quat({
+            mocap_name: {"pos": obj_pose["xpos"], "quat": obj_pose["xquat"]}
+        })
+        # 1.4 写入 WELD 约束（type/obj，内部 mj_forward）
+        mocap_id = self.model.body_name2id(mocap_name)
+        if original_eq["obj1_id"] == mocap_id:
+            new_obj1_name, new_obj2_name = mocap_name, object_name
+        else:
+            new_obj1_name, new_obj2_name = object_name, mocap_name
+        self.equality_update(
+            slot,
+            eq_type=mujoco.mjtEq.mjEQ_WELD,
+            obj1_name=new_obj1_name,
+            obj2_name=new_obj2_name,
+        )
         print(f"  ✅ {object_name} 已锚定（WELD 约束）")
 
         # ─── 第 2 步：移动 ───
@@ -46,7 +70,7 @@ class GraspDemo(OrcaGymEulerEnv):
         print(f"\n第 2 步：移动物体到 {target_pos}...")
 
         self.set_mocap_pos_and_quat({
-            "ActorManipulator_Anchor": {
+            mocap_name: {
                 "pos": target_pos,
                 "quat": target_quat,
             }
@@ -65,17 +89,25 @@ class GraspDemo(OrcaGymEulerEnv):
         print(f"  距目标: {dist:.4f}m")
         print(f"  {'✅ 物体已到达目标' if dist < 0.05 else '⚠️ 未到达'}")
 
-        # ─── 第 3 步：释放 ───
+        # ─── 第 3 步：释放（用公共原语恢复原始约束）───
         print(f"\n第 3 步：释放物体...")
-        self.release_body_anchored()
+        slot = self.equality_find_slot_by_body(object_name)
+        if slot != -1:
+            self.equality_update(
+                slot,
+                eq_type=original_eq["type"],
+                obj1_name=self.model.body_id2name(original_eq["obj1_id"]),
+                obj2_name=self.model.body_id2name(original_eq["obj2_id"]),
+                data=original_eq["data"],
+            )
         self.mj_forward()
         print("  ✅ 物体已释放")
 
         # ─── 第 4 步：查看约束信息 ───
         print(f"\n当前等式约束:")
-        eq_list = self.model.get_eq_list()
-        for eq in eq_list:
-            print(f"  type={eq['eq_type']}, obj1={eq['obj1_id']}, "
+        for i in range(self._gym.n_equality()):
+            eq = self.equality_constraint(i)
+            print(f"  type={eq['type']}, obj1={eq['obj1_id']}, "
                   f"obj2={eq['obj2_id']}, active={eq['active']}")
 
     def step(self, action):
@@ -121,25 +153,50 @@ if __name__ == "__main__":
 用户设置 mocap 位姿 → WELD 约束 → 被锚定的物体跟随移动
 ```
 
-### 1. 锚定物体 — `anchor_actor`
+### 1. 锚定物体 — 公共原语编排
+
+> ⚠️ **Euler 路径**：`OrcaGymEulerEnv` **没有** `anchor_actor` / `release_body_anchored` 公共方法（这两个仅在 Local 体系 `OrcaGymLocalEnv` 中提供）。程序化操作应仿照 UI 抓取内部方法 `_anchor_actor` / `_release_body_anchored` 的编排模式，使用以下公共原语组合实现：
 
 ```python
-env.anchor_actor("target_object", "weld")
+# 等价于 Local 体系的 env.anchor_actor("target_object", "weld")
+import mujoco
+
+mocap_name = "ActorManipulator_Anchor"   # 场景中的 mocap body
+object_name = "target_object"
+
+# 1. 查找含 mocap 的等式约束槽位
+slot = env.equality_find_slot_by_body(mocap_name)
+# 2. 读取原始约束（释放时恢复）
+original_eq = env.equality_constraint(slot)
+# 3. 对齐 mocap 位姿到物体当前位姿（避免下一帧拉扯）
+obj_pose = env.get_body_xpos_xmat_xquat([object_name])[object_name]
+env.set_mocap_pos_and_quat({
+    mocap_name: {"pos": obj_pose["xpos"], "quat": obj_pose["xquat"]}
+})
+# 4. 写入 WELD 约束
+env.equality_update(
+    slot,
+    eq_type=mujoco.mjtEq.mjEQ_WELD,
+    obj1_name=mocap_name,
+    obj2_name=object_name,
+)
 ```
 
-这一行做了三件事：
+这一组操作做了三件事：
 1. 读取物体当前的世界位姿
 2. 将 mocap body 移到该位姿
 3. 在 mocap 和物体之间建立 WELD 等式约束
 
-锚定类型：
+约束类型常量（来自 `mujoco.mjtEq`，无需额外导入 `AnchorType`）：
 ```python
-from orca_core.orca_gym_local import AnchorType
+import mujoco
 
-AnchorType.WELD   # 焊接 — 完全固定（位置+姿态）
-AnchorType.BALL   # 球关节 — 固定位置，允许旋转
-AnchorType.NONE   # 无锚定
+mujoco.mjtEq.mjEQ_WELD      # 焊接 — 完全固定（位置+姿态）
+mujoco.mjtEq.mjEQ_CONNECT   # 球关节 — 固定位置，允许旋转
+mujoco.mjtEq.mjEQ_JOINT     # 关节耦合
 ```
+
+> 📝 **Local 体系**：若使用 `OrcaGymLocalEnv`，可直接调用 `env.anchor_actor(name, AnchorType.WELD)`，`AnchorType` 从 `orca_gym.core.orca_gym_local` 导入。Euler 路径不提供此便捷封装，需用上面的原语编排。
 
 ### 2. 移动物体 — Mocap 位姿设置
 
@@ -164,10 +221,21 @@ read_pos = env.data.mocap_pos("mocap_name")    # (3,)
 read_quat = env.data.mocap_quat("mocap_name")  # (4,) [w, x, y, z]
 ```
 
-### 3. 释放物体 — `release_body_anchored`
+### 3. 释放物体 — 恢复原始约束
+
+> ⚠️ **Euler 路径**：`OrcaGymEulerEnv` 没有 `release_body_anchored` 公共方法。释放时用 `equality_update` 恢复抓取前保存的原始约束字段：
 
 ```python
-env.release_body_anchored()
+# 等价于 Local 体系的 env.release_body_anchored()
+slot = env.equality_find_slot_by_body(object_name)
+if slot != -1:
+    env.equality_update(
+        slot,
+        eq_type=original_eq["type"],
+        obj1_name=env.model.body_id2name(original_eq["obj1_id"]),
+        obj2_name=env.model.body_id2name(original_eq["obj2_id"]),
+        data=original_eq["data"],
+    )
 env.mj_forward()
 ```
 
@@ -175,30 +243,42 @@ env.mj_forward()
 
 ### 4. 等式约束管理
 
-**查看约束**：
+**查看约束**（两种等价途径）：
 ```python
+# 途径 A：通过 env.equality_constraint(slot) 逐个读取（返回键为 type）
+for slot in range(env._gym.n_equality()):
+    eq = env.equality_constraint(slot)
+    print(f"type={eq['type']}, obj1={eq['obj1_id']}, "
+          f"obj2={eq['obj2_id']}, active={eq['active']}")
+
+# 途径 B：通过 env.model.get_eq_list() 读取初始快照（返回键为 eq_type）
 eq_list = env.model.get_eq_list()
 for eq in eq_list:
     print(f"type={eq['eq_type']}, obj1={eq['obj1_id']}, "
           f"obj2={eq['obj2_id']}, active={eq['active']}")
 ```
 
-**修改约束关联对象**（按名称，自动解析 id）：
+> ⚠️ **键名差异**：`env.equality_constraint(slot)` 返回的字典键名为 `type`；`env.model.get_eq_list()` 返回的字典键名为 `eq_type`。两者均对应 MuJoCo 的 `eq_type` 字段，只是命名不同。
+
+**修改约束关联对象**（Euler 路径用 `equality_update`，按名称自动解析 id）：
 ```python
-env.modify_equality_objects(
-    eq_ids=[0],                              # 等式约束索引
-    obj1_names=["ActorManipulator_Anchor"],  # 新 obj1
-    obj2_names=["target_object"],            # 新 obj2
+# Euler 路径：env.equality_update(slot, obj1_name=..., obj2_name=...)
+env.equality_update(
+    0,                                        # 等式约束槽位索引
+    obj1_name="ActorManipulator_Anchor",      # 新 obj1（自动解析为 id）
+    obj2_name="target_object",                # 新 obj2（自动解析为 id）
 )
 ```
 
-**停用约束**：
+> 📝 **Local 体系**：`OrcaGymLocalEnv` 提供 `env.modify_equality_objects(eq_ids, obj1_ids, obj2_ids)`（参数为 id 列表，gym 层 API）。Euler 路径已用 `equality_update` 覆盖此功能，且按名称传入更直观。
+
+**停用约束**（通过 `equality_update` 设 `active=False`）：
 ```python
-env.update_equality_constraints([{
-    "type": 0, "obj1_id": -1, "obj2_id": -1,
-    "data": np.zeros(7),
-}])
+env.equality_update(0, active=False)   # 停用槽位 0 的约束
+env.equality_update(0, active=True)    # 重新激活
 ```
+
+> ⚠️ Euler 路径已删除 `env.update_equality_constraints(eq_list)` 公共方法（该方法保留在 gym 层 `OrcaGymEuler` / SimCore 作为 `equality_update` 的底层实现）。Env 层统一用 `equality_update(slot, ...)` 逐槽位更新。
 
 ### 5. UI 交互中的锚定
 
@@ -219,7 +299,8 @@ if body_name is not None:
 ## 完整工作流总结
 
 ```
-抓取:  anchor_actor("object", "weld")
+抓取:  equality_find_slot_by_body(mocap) → equality_constraint(slot) 保存原始
+       → set_mocap_pos_and_quat 对齐位姿 → equality_update(WELD, mocap, object)
          ↓
 移动:  set_mocap_pos_and_quat({mocap: {pos, quat}})
          ↓
@@ -227,7 +308,7 @@ if body_name is not None:
          ↓
       do_simulation(ctrl, n_frames)  ← 约束生效，物体跟随
          ↓
-释放:  release_body_anchored()
+释放:  equality_find_slot_by_body(object) → equality_update 恢复 original_eq 字段
 ```
 
 ---

@@ -7,10 +7,10 @@
 | 特性 | OrcaGym | Isaac Gym | MuJoCo (原生) | PyBullet | SAPIEN |
 |------|---------|-----------|---------------|----------|--------|
 | Gymnasium API | ✅ 完全兼容 | ❌ 自定义 VecEnv | 需手动封装 | ✅ | ❌ |
-| 多物理后端 | ✅ MuJoCo/PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
+| 多物理后端 | ✅ 核心 MuJoCo/MuJoCoWarp/Euler + 远程 PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
 | 分布式部署 | ✅ 原生支持 | ❌ 单机 | ❌ 单机 | ❌ 单机 | ❌ 单机 |
 | 光线追踪 | ✅ | ❌ | ❌ | ❌ | ✅ |
-| GPU 加速 | ✅ (通过后端) | ✅ (原生) | ❌ (CPU) | ❌ (CPU) | ✅ |
+| GPU 加速 | ✅ MuJoCoWarp (CUDA) / Euler (多厂商 GPU) | ✅ (原生) | ❌ (CPU) | ❌ (CPU) | ✅ |
 | 多智能体 | ✅ 原生 | ⚠️ 需手动 | ⚠️ 需手动 | ⚠️ 需手动 | ✅ |
 | 可视化编辑器 | ✅ OrcaStudio | ❌ | ❌ | ❌ | ❌ |
 | 开源 | ✅ MIT | ✅ 非商业 | ✅ Apache 2.0 | ✅ | ✅ |
@@ -69,6 +69,6 @@ OrcaGym 与 OrcaStudio/OrcaLab 深度集成，提供：
 
 ## 局限性
 
-- 核心包为 CPU 驱动（MuJoCo 后端），GPU 加速需借助 OrcaStudio/OrcaLab
+- 核心包支持 MuJoCo（CPU）/MuJoCoWarp（CUDA）/Euler（多厂商 GPU）；PhysX/ODE 后端需借助 OrcaStudio/OrcaLab
 - 远程模式依赖 OrcaStudio/OrcaLab 服务端
 - 社区尚在发展初期，第三方示例较少

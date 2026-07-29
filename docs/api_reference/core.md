@@ -59,9 +59,11 @@ def get_body_names()
 def get_actuator_ctrlrange() -> np.ndarray    # (nu, 2) 控制范围
 def get_joint_qposrange(joint_names) -> np.ndarray
 def get_eq_list() -> list
-def get_mocap_dict() -> dict
 def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
+
+# mocap：通过 init_mocap_dict(mocap_dict) 初始化，
+# 通过 nmocap 属性获取数量（无 get_mocap_dict 方法）
 ```
 
 ---
@@ -132,7 +134,7 @@ def mocap_quat(body_name: str) -> np.ndarray      # mocap 四元数 [w,x,y,z] (4
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `timestep` | `float` | 物理时间步长 |
-| `integrator` | `int` | 积分器类型（0=Euler, 1=RK4） |
+| `integrator` | `int` | 积分器类型（0=Euler, 1=RK4, 2=IMPLICIT, 3=IMPLICITFAST） |
 | `iterations` | `int` | 求解器迭代次数 |
 | `gravity` | `np.ndarray(3,)` | 重力向量 |
 
@@ -157,6 +159,9 @@ env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 
 ### AnchorType
 
+模块路径：Euler 体系下位于 `orca_gym.core.euler.orca_studio_bridge`；
+Local/Warp 体系下位于 `orca_gym.core.orca_gym_local`。
+
 ```python
 class AnchorType:
     NONE = 0   # 无锚定
@@ -166,6 +171,9 @@ class AnchorType:
 
 ### CaptureMode
 
+模块路径：仅在 Local/Warp 体系（`orca_gym.core.orca_gym_local`）和
+`orca_gym.core.orca_gym_warp` 中定义；Euler 体系不导出该枚举。
+
 ```python
 class CaptureMode:
     ASYNC = 0  # 异步视频捕获
@@ -173,6 +181,9 @@ class CaptureMode:
 ```
 
 ### 工具函数
+
+模块路径：`orca_gym.core.orca_gym_local`（Local/Warp 体系）。
+Euler 体系不导出这两个函数。
 
 ```python
 def get_qpos_size(joint_type: int) -> int  # 关节在 qpos 中的元素数

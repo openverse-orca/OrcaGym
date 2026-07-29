@@ -223,11 +223,12 @@ max_normal = max(abs(f[0]) for f in forces.values())
 
 ```python
 cfrc_ext = env.get_cfrc_ext()  # shape: (nbody, 6)
-# Each row: [fx, fy, fz, mx, my, mz] — external constraint force acting on each body
+# Each row: [mx, my, mz, fx, fy, fz] — external constraint force acting on each body
+# (layout is [torque(3), force(3)], linear force is in [:, 3:])
 
 # Find the body with the largest force
-max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, :3], axis=1))
-print(f"Max force: body {max_idx}, force={cfrc_ext[max_idx, :3]}")
+max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, 3:], axis=1))
+print(f"Max force: body {max_idx}, force={cfrc_ext[max_idx, 3:]}")
 ```
 
 ### 3. Applying External Forces

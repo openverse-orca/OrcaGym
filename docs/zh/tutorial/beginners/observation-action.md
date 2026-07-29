@@ -42,11 +42,12 @@ def _get_obs(self) -> dict:
 
  # 2. 末端执行器 (End-Effector) 位姿
  ee_site_name = self.site("end_effector") # 自动加上 agent 前缀
- ee_site = self.query_site_pos_and_quat([ee_site_name])
+ ee_site = self.query_site_pos_and_mat([ee_site_name])
 
- # ee_site 返回格式: {site_name: {"xpos": array([x,y,z]), "xquat": array([w,x,y,z])}}
+ # ee_site 返回格式: {site_name: {"xpos": array([x,y,z]), "xmat": array(3,3)}}
  ee_pos = ee_site[ee_site_name]["xpos"] # 末端位置 (3,)
- ee_quat = ee_site[ee_site_name]["xquat"] # 末端姿态四元数 (4,)
+ ee_mat = ee_site[ee_site_name]["xmat"] # 末端姿态旋转矩阵 (3,3)
+ # 如需四元数，可用 orca_gym.utils.rotations.mat2quat(ee_mat) 转换
 
  # 3. 末端执行器速度（用于捕捉运动趋势）
  ee_linear_vel, ee_angular_vel = self.query_site_xvalp_xvalr([ee_site_name])
@@ -75,7 +76,7 @@ def _get_obs(self) -> dict:
 
  # 末端执行器在世界坐标系中的位姿
  ee_site_name = self.site("end_effector")
- ee_site = self.query_site_pos_and_quat([ee_site_name])
+ ee_site = self.query_site_pos_and_mat([ee_site_name])
 
  # 末端执行器相对于基座的位姿（对固定基座机械臂很有用）
  base_name = self.body("base_link")
@@ -213,12 +214,14 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 class ReachEnv(OrcaGymEulerEnv):
  """机械臂末端到达指定目标点的任务"""
 
- def __init__(self, frame_skip, orcagym_addr, agent_names, time_step, **kwargs):
+ def __init__(self, frame_skip, orcagym_addr, agent_names, time_step,
+ model_xml_path=None, **kwargs):
  super().__init__(
  frame_skip=frame_skip,
  orcagym_addr=orcagym_addr,
  agent_names=agent_names,
  time_step=time_step,
+ model_xml_path=model_xml_path, # 通过 kwargs 传入本地 XML 路径
  **kwargs,
  )
 
@@ -239,10 +242,10 @@ class ReachEnv(OrcaGymEulerEnv):
  def _get_obs(self):
  """收集丰富的观测信息"""
  ee_site = self.site("end_effector")
- sites = self.query_site_pos_and_quat([ee_site])
+ sites = self.query_site_pos_and_mat([ee_site])
 
  ee_pos = sites[ee_site]["xpos"]
- ee_quat = sites[ee_site]["xquat"]
+ # 如需四元数，可用 orca_gym.utils.rotations.mat2quat(sites[ee_site]["xmat"])
 
  dist = np.linalg.norm(ee_pos - self._goal_pos)
 

@@ -122,12 +122,14 @@ The G1 humanoid robot uses the following standard parameters (from Euler example
 ## Debugging and Profiling
 
 ```python
-# View constraint counts
-counts = env.get_constraint_counts()
-print(f"Equality constraints: {counts.get('nefc', 0)}, Contacts: {counts.get('ncon', 0)}")
+# View contact count (Euler path uses query_contact_simple to get the contact list length)
+contacts = env.query_contact_simple()
+print(f"Contact count: {len(contacts)}")
 
-# View model information
+# View model information (under the Euler path, OrcaGymModel does not expose nbody/njnt/nsite;
+# use len() to get dictionary sizes; ngeom/nq/nv/nu are fields in model_info)
 print(f"nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
-print(f"nbody={env.model.nbody}, ngeom={env.model.ngeom}")
-print(f"njnt={env.model.njnt}, nsite={env.model.nsite}")
+print(f"ngeom={env.model.ngeom}")
+print(f"nbody={len(env.model.get_body_names())}")
+print(f"njnt={len(env.model.get_joint_dict())}")
 ```

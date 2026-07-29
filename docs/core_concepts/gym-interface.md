@@ -28,6 +28,7 @@ class MyEnv(OrcaGymEulerEnv):
             model_xml_path: str | None = None,   # 本地模型路径（离线模式）
             skip_grpc_load: bool = False,        # True → 离线模式
             render_mode: str = "human",          # "human" / "none"
+            sync_render: bool = False,           # 是否同步渲染
             **kwargs,
         )
 ```
@@ -110,9 +111,10 @@ def _get_obs(self):
 
 | 类型 | Python 类 | 说明 |
 |------|-----------|------|
-| Box 连续空间 | `spaces.Box` | 观测/动作是 numpy 数组 |
-| Dict 字典空间 | `spaces.Dict` | 观测是字典（多模态） |
-| Discrete 离散空间 | `spaces.Discrete` | 离散动作 |
+| Box 连续空间 | `spaces.Box` | 观测/动作是 numpy 数组（`generate_action_space` / `generate_observation_space` 直接支持） |
+| Dict 字典空间 | `spaces.Dict` | 观测是字典（多模态）（`generate_observation_space` 直接支持） |
+
+> 注：`generate_action_space` / `generate_observation_space` 仅直接支持 `Box` 和 `Dict`。Gymnasium 通用能力（如 `Discrete` 离散空间）不在 OrcaGym 自动生成范围内，如需使用可在子类中手动构造 `action_space` / `observation_space`。
 
 ## 创建环境
 

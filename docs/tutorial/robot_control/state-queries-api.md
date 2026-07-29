@@ -40,7 +40,7 @@ class QueryDemoEnv(OrcaGymEulerEnv):
     def demo_all_queries(self):
         """演示全套查询 API"""
         self.reset()
-        agent = self.agent_name
+        agent = self._agent_names[0]
         print(f"Agent 名称: {agent}\n")
 
         # ─── 1. 关节查询 ───

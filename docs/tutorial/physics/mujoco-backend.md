@@ -76,7 +76,6 @@ env.sim_config.gravity = np.array([0., 0., -9.81])
 env.sim_config.load_from_dict({
     "integrator": 0,
     "iterations": 100,
-    "tolerance": 1e-8,
 })
 
 # 导出配置
@@ -91,7 +90,6 @@ config = env.sim_config.to_dict()
 | `iterations` | int | 100 | 求解器迭代次数 |
 | `integrator` | int | 0 | 0=Euler, 1=RK4 |
 | `gravity` | ndarray | [0,0,-9.81] | 重力加速度 |
-| `tolerance` | float | 1e-8 | 求解器容忍度 |
 
 ## 时间步长 vs 控制频率
 
@@ -122,12 +120,14 @@ G1 人形机器人使用以下标准参数（来自 Euler 示例）：
 ## 调试与性能分析
 
 ```python
-# 查看约束计数
-counts = env.get_constraint_counts()
-print(f"等式约束: {counts.get('nefc', 0)}, 接触: {counts.get('ncon', 0)}")
+# 查看接触数（Euler 路径用 query_contact_simple 获取接触列表长度）
+contacts = env.query_contact_simple()
+print(f"接触数: {len(contacts)}")
 
-# 查看模型信息
+# 查看模型信息（Euler 路径下 OrcaGymModel 不暴露 nbody/njnt/nsite，
+# 改用 len() 获取字典大小；ngeom/nq/nv/nu 为 model_info 中的字段）
 print(f"nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
-print(f"nbody={env.model.nbody}, ngeom={env.model.ngeom}")
-print(f"njnt={env.model.njnt}, nsite={env.model.nsite}")
+print(f"ngeom={env.model.ngeom}")
+print(f"nbody={len(env.model.get_body_names())}")
+print(f"njnt={len(env.model.get_joint_dict())}")
 ```

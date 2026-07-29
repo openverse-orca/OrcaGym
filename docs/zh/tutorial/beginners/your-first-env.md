@@ -138,13 +138,14 @@ if __name__ == "__main__":
 self.do_simulation(ctrl, self.frame_skip)
 ```
 
-这一行在 中等价于：
+这一行在 Euler 体系中等价于：
 
 ```python
-# 内部：_step_with_coupling(ctrl, n_frames, dt)
-# → _sim.set_ctrl(ctrl) + _sim.step(n_frames)
-# 然后：_sync_view()
-# data 自动同步为最新状态
+# 内部委托 self._gym 公共方法：
+# _gym.step_with_coupling(ctrl, n_frames, dt)
+#   → _sim.set_ctrl(ctrl) + _sim.step(n_frames)
+# _gym.sync_to_view()
+#   → data 自动同步为最新状态
 ```
 
 > **关键优势**：`do_simulation()` 返回后 `self.data` 已自动更新，无需手动 `update_data()`。

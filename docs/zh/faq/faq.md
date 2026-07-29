@@ -16,6 +16,9 @@ pip install orca-gym --force-reinstall
 
 ```bash
 # Linux
+# 注意：libglew 的包名随 Ubuntu 版本不同
+#   - Ubuntu 22.04+：libglew2.2
+#   - Ubuntu 20.04：libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
 
 # macOS
@@ -40,21 +43,19 @@ brew install glfw glew
 
 ### Q: 发现数据是 NaN？
 
+通常是修改状态后未触发正向计算导致。**推荐通过 `do_simulation()` 完成状态更新**——该方法在 `mj_step` 后会自动调用 `update_data()` 同步 `env.data`，无需手动调用同步逻辑：
+
 ```python
-# 检查是否在修改状态后调用了 mj_forward()
-env.set_joint_qpos(...)
-env.mj_forward()   # ← 这步必须执行
-
-# 同步到 DataView
-env._sync_view()
-
-# 现在再读数据就是正常的
-print(env.data.qpos)
+# 正确做法：通过 do_simulation 触发步进 + 自动同步
+env.do_simulation(ctrl, n_frames=1)
+print(env.data.qpos)  # 已是最新状态
 ```
+
+若确需在子类中重排状态后做一次正向运动学计算，请在**子类内部**通过公共 API 或类内同步机制完成，不要在用户代码中直接调用 `mj_forward()` 或内部 `_sync_view()` 等私有方法（违反 API 隔离）。
 
 ### Q: 步进后读到的是旧数据？
 
-`do_simulation()` 内部已自动同步数据，返回后 `env.data` 就是最新状态。如果手动操作了状态，记得调用 `mj_forward()` 和 `_sync_view()`。
+`do_simulation()` 内部已自动同步数据，返回后 `env.data` 就是最新状态。如需在 `step()` 之外修改状态，请通过 `do_simulation()` 或子类内部同步机制完成，避免直接调用私有方法。
 
 ### Q: 如何提高仿真速度？
 
@@ -95,7 +96,7 @@ class MyEnv(OrcaGymEulerEnv):
 ```python
 print(f"执行器数: {env.model.nu}")
 print(f"动作空间: {env.action_space}")
-# Box(low=-1.0, high=1.0, shape=(nu,), float32)
+# Box(low=ctrlrange_min, high=ctrlrange_max, shape=(nu,), float32)
 ```
 
 ### Q: 如何添加传感器到观测中？

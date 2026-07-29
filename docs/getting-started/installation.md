@@ -4,7 +4,7 @@
 
 | 依赖 | 版本要求 |
 |------|----------|
-| Python | ≥ 3.9 (推荐 3.12) |
+| Python | ≥ 3.10 (推荐 3.12) |
 | pip | ≥ 21.0 |
 | 操作系统 | Ubuntu 20.04+ / Windows 10+ / macOS 12+ |
 
@@ -26,10 +26,11 @@ pip install orca-gym[all]         # 所有可选依赖
 
 | 组名 | 包含内容 | 适用场景 |
 |------|----------|----------|
-| `[rl]` | stable-baselines3, torch | RL 训练 |
-| `[imitation]` | robomimic 相关 | 模仿学习 |
-| `[devices]` | pygame, inputs | 手柄/键盘控制 |
-| `[sensors]` | opencv-python, av, websockets | 相机视觉 |
+| `[rl]` | stable-baselines3, sb3_contrib, tensorboard | RL 训练 |
+| `[imitation]` | h5py, opencv-python, tqdm | 模仿学习 |
+| `[robomimic]` | h5py, termcolor, opencv-python | robomimic 工具链 |
+| `[devices]` | pygame | 手柄/键盘控制 |
+| `[sensors]` | opencv-python, av, websockets, matplotlib, pillow | 相机视觉 |
 
 ## 配置 OrcaStudio / OrcaLab
 
@@ -46,7 +47,7 @@ pip install orca-gym[all]         # 所有可选依赖
 python -c "import orca_gym; print('OrcaGym 安装成功!')"
 
 # 检查版本
-python -c "import orca_gym; print(orca_gym.__version__)"
+pip show orca-gym
 ```
 
 ## 常见安装问题
@@ -54,10 +55,13 @@ python -c "import orca_gym; print(orca_gym.__version__)"
 ### 问题：MuJoCo 导入失败
 
 ```bash
-# 确保已安装 mujoco
-pip install mujoco>=3.3.0
+# 确保已安装 mujoco（版本与 orca-gym 钉死的版本一致）
+pip install mujoco==3.7.0
 
 # Linux 用户可能需要安装额外的系统依赖
+# 注意：libglew 的包名随 Ubuntu 版本不同
+#   - Ubuntu 22.04+：libglew2.2
+#   - Ubuntu 20.04：libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
 ```
 

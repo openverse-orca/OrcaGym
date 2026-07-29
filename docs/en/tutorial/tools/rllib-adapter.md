@@ -5,7 +5,7 @@ OrcaGym provides an RLlib adapter that supports distributed RL training.
 ## Integration
 
 ```python
-from orca_adapters.rllib import appo_catalog
+from orca_gym.adapters.rllib import appo_catalog
 
 # Train using the APPO algorithm
 ```
@@ -13,7 +13,7 @@ from orca_adapters.rllib import appo_catalog
 ### Metrics Callback
 
 ```python
-from orca_adapters.rllib import metrics_callback
+from orca_gym.adapters.rllib import metrics_callback
 ```
 
 ## Configuration

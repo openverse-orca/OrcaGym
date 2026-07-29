@@ -28,7 +28,7 @@ setup_my_scene.py — Build a simple scene: table + robot arm + cube
 """
 
 import numpy as np
-from orca_scene.orca_gym_scene import (
+from orca_gym.scene.orca_gym_scene import (
     OrcaGymScene,    # scene manager
     Actor,           # objects in the scene
     LightInfo,       # light parameters

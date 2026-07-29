@@ -15,7 +15,7 @@ first_camera.py — 获取仿真相机的第一张图像
 
 import time
 import numpy as np
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 # 1. 创建相机包装器
 # name: 相机名称（任意）
@@ -63,7 +63,7 @@ import time
 import numpy as np
 from gymnasium import spaces
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-from orca_sensor.rgbd_camera import CameraWrapper
+from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 
 class VisionEnv(OrcaGymEulerEnv):
@@ -227,10 +227,13 @@ print(f"可用视角: {list(views.keys())}")
 | RGB | 是否输出彩色图 | `True` |
 | Depth | 是否输出深度图 | `True`（需要时） |
 
-在 Python 侧通过 `CameraSensorInfo` 配置：
+在 Python 侧通过 `CameraSensorInfo` 配置（需先创建 `OrcaGymScene` 实例）：
 
 ```python
-from orca_scene.orca_gym_scene import CameraSensorInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, CameraSensorInfo
+
+# 先创建场景管理器
+scene = OrcaGymScene(grpc_addr="localhost:50051")
 
 # 配置某个相机的传感器参数
 camera_config = CameraSensorInfo(

@@ -14,7 +14,8 @@ OrcaGym 的场景系统提供了对仿真场景的运行时控制。
 - **Material** — 材质
 
 ```python
-from orca_scene import OrcaGymScene, OrcaGymSceneRuntime
+from orca_gym.scene.orca_gym_scene import OrcaGymScene
+from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 ```
 
 ## 章节导航

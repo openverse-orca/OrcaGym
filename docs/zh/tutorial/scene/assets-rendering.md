@@ -15,10 +15,10 @@ OrcaGym 通过 OrcaStudio/OrcaLab 实现场景的 3D 渲染。
 
 ```python
 # USDZ 转 XML
-from orca_tools.assets import usdz_to_xml
+from orca_gym.tools.assets import usdz_to_xml
 
 # 纹理处理
-from orca_tools.assets import texture_processer
+from orca_gym.tools.assets import texture_processer
 ```
 
 ## 资源缓存

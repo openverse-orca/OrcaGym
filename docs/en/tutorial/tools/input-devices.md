@@ -17,7 +17,7 @@ OrcaGym supports a variety of input devices for teleoperation.
 # Requires the devices dependency
 # pip install orca-gym[devices]
 
-from orca_devices import xbox_joystick
+from orca_gym.devices import xbox_joystick
 ```
 
 ## Teleoperation Data Flow
