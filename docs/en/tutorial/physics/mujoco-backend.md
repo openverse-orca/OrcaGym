@@ -12,7 +12,7 @@ Model loading is automatically handled during environment initialization — no 
 # Offline mode: load from a local XML file
 env = MyEnv(
     model_xml_path="path/to/scene.xml",
-    skip_grpc_load=True,   # True = offline mode, load local XML directly
+    skip_grpc_load=True,   # True = offline mode, loads local XML directly
 )
 
 # Online mode: fetch model XML from OrcaStudio via gRPC
@@ -46,7 +46,7 @@ env.set_ctrl(ctrl)
 env.mj_step(nstep=20)
 env._sync_view()           # Sync state view
 
-# Forward computation (refresh derived quantities, does not advance time)
+# Forward computation (refreshes derived quantities, does not advance time)
 env.mj_forward()
 
 # Pure MuJoCo stepping

@@ -13,7 +13,7 @@ Forward Kinematics (FK): joint angles → end-effector pose (unique solution)
 Inverse Kinematics (IK): end-effector pose → joint angles (may have multiple or no solutions)
 ```
 
-Three major challenges of IK:
+IK presents three major challenges:
 1. **Redundancy**: end-effector has 6 DOF, joints may have more → infinitely many solutions
 2. **Singularities**: Jacobian degenerates in certain poses → tiny end-effector displacement requires infinite joint velocity
 3. **Joint Limits**: solutions must satisfy physical limits
@@ -50,7 +50,7 @@ def damped_least_squares_ik(env, foot_suffix="left_ankle_roll_link",
     """Damped least squares IK: move the foot body to a target offset position.
 
     Two phases:
-      1. Preset slight-crouch pose — avoid anti-joint paths from a fully extended state
+      1. Preset slight-crouch pose — avoid paths that violate the joint's natural direction from a fully extended state
       2. IK iteration — damped least squares + joint limit clamping
 
     Args:
@@ -91,9 +91,10 @@ def damped_least_squares_ik(env, foot_suffix="left_ankle_roll_link",
     # ═══════════════════════════════════════════
     # Phase 1: Preset slight-crouch pose
     # ═══════════════════════════════════════════
-    # Starting from a fully extended state, pure DLS may take an anti-joint
-    # path (e.g., knee bending backward). Preset forward knee bend +
-    # hip flexion + ankle dorsiflexion so IK starts from a reasonable pose.
+    # Starting from a fully extended state, pure DLS may take a path that
+    # violates the joint's natural direction (e.g., knee bending backward).
+    # Preset forward knee bend + hip flexion + ankle dorsiflexion so IK
+    # starts from a reasonable pose.
     preset = {
         f"{agent}_left_knee_joint": 0.6,
         f"{agent}_left_hip_pitch_joint": -0.3,
@@ -201,13 +202,13 @@ Each iteration:
 
 At G1's default `qpos=0`, the knees are **fully extended**. Starting from an extended state,
 a pure mathematical DLS solution may cause the knees to **bend backward**
-(anti-joint direction) — this is mathematically correct but physically infeasible.
+(opposite to the joint's natural direction) — this is mathematically correct but physically infeasible.
 
 **Phase 1 — Preset Slight Crouch**:
 - Knee forward bend +0.6 rad (~34 degrees)
 - Hip flexion -0.3 rad
 - Ankle dorsiflexion -0.3 rad (compensates to keep foot sole level)
-- Symmetric on both legs
+- Applied symmetrically to both legs
 
 This way, IK starts from an already-bent state, and the solution naturally continues
 bending forward along the joint's positive direction to lift the foot.
@@ -257,7 +258,7 @@ qpos[qadr] = np.clip(qpos[qadr] + dq * step, lo, hi)
 | Symptom | Cause | Solution |
 |---------|-------|----------|
 | IK does not converge | Damping too small / target too far | Increase damping, reduce offset |
-| Joint bends in wrong direction | Starting from fully extended state | Preset slight-crouch pose |
+| Joint bends in the wrong direction | Starting from fully extended state | Preset slight-crouch pose |
 | Jacobian is all zeros | No forward call / wrong body name | Ensure mj_forward + agent prefix |
 | Multi-body scene anomalies | Wrong DOF column range | Use jnt_dofadr for [min, max] |
 

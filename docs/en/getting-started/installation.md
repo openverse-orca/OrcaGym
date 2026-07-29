@@ -11,7 +11,7 @@
 ## Install from PyPI (Recommended)
 
 ```bash
-# Install core package
+# Install the core package
 pip install orca-gym
 
 # Or install with optional dependencies
@@ -40,13 +40,13 @@ Download and install [OrcaStudio](http://orca3d.cn/) or OrcaLab to access:
 - Remote simulation service
 - Multi-physics backend support
 
-## Verify Installation
+## Verify the Installation
 
 ```bash
 # Check import
 python -c "import orca_gym; print('OrcaGym installed successfully!')"
 
-# Check version
+# Check the version
 pip show orca-gym
 ```
 
@@ -59,7 +59,7 @@ pip show orca-gym
 pip install mujoco==3.7.0
 
 # Linux users may need to install additional system dependencies
-# Note: libglew package name varies by Ubuntu version
+# Note: the libglew package name varies by Ubuntu version:
 #   - Ubuntu 22.04+: libglew2.2
 #   - Ubuntu 20.04: libglew2.1
 sudo apt-get install libglfw3 libglew2.2 libosmesa6
@@ -74,4 +74,4 @@ pip install grpcio grpcio-tools --force-reinstall
 
 ### Issue: mesh/hfield resource download failure
 
-This is normal — mesh and texture files are downloaded on demand when the simulation first starts. Just ensure a stable network connection.
+This is expected behavior — mesh and texture files are downloaded on demand when the simulation first starts. Just ensure a stable network connection.

@@ -22,7 +22,7 @@ from orca_gym.sensor.rgbd_camera import CameraWrapper
 # port: WebSocket port (configured in OrcaStudio)
 camera = CameraWrapper(name="front_camera", port=8765)
 
-# 2. Start camera stream (background thread auto-receives and decodes)
+# 2. Start camera stream (a background thread auto-receives and decodes frames)
 camera.start()
 print("Camera started, waiting for first frame...")
 
@@ -52,7 +52,7 @@ camera.stop()
 
 ## Integrating the Camera into an Environment Class
 
-Make the camera part of the environment, capturing an image at every step:
+Make the camera part of the environment, capturing an image at each step:
 
 ```python
 """
@@ -67,7 +67,7 @@ from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 
 class VisionEnv(OrcaGymEulerEnv):
-    """Environment that includes camera images in observations"""
+    """Environment that includes camera images in observations."""
 
     def __init__(self, frame_skip, orcagym_addr, agent_names, time_step,
                  camera_port: int = 8765, **kwargs):
@@ -154,7 +154,7 @@ def show_camera_live(camera: CameraWrapper, duration: float = 10.0):
     Live display of camera feed (for duration seconds).
 
     Note: This is only a simple display example.
-    Real RL training does not need frame-by-frame display — just use the image array directly.
+    Real RL training does not require frame-by-frame display — just use the image array directly.
     """
     plt.ion()  # interactive mode
     fig, ax = plt.subplots()
@@ -183,7 +183,7 @@ Need multiple viewpoints? Create multiple `CameraWrapper` instances:
 
 ```python
 def setup_multi_camera():
-    """Start multiple cameras simultaneously"""
+    """Start multiple cameras simultaneously."""
 
     cameras = {
         "front": CameraWrapper("front", port=8765),
@@ -249,7 +249,7 @@ scene.set_camera_sensor_info("camera_actor_name", camera_config)
 1. **Do not `imshow` in the main loop** — image display is very CPU-intensive. During training, just process the array directly.
 2. **Downscale images** — if full resolution is not needed, resize in `_get_obs()`.
 3. **Lower the frame rate** — 30 FPS is usually sufficient; higher frame rates waste bandwidth.
-4. **Asynchronous rendering** — the camera decodes in a background thread without blocking the main simulation thread.
+4. **Asynchronous rendering** — the camera decodes frames in a background thread without blocking the main simulation thread.
 
 ```python
 def _get_obs(self):

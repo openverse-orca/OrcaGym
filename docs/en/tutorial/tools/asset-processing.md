@@ -16,7 +16,7 @@ Converts 3D assets from Apple USDZ format to MuJoCo MJCF (XML) format.
 from orca_gym.tools.assets import texture_processer
 ```
 
-Process texture files, including format conversion, resolution adjustment, etc.
+Processes texture files, including format conversion, resolution adjustment, and more.
 
 ## Install Helpers
 

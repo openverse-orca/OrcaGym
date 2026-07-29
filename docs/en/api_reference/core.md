@@ -12,7 +12,7 @@ Core simulation interface, encapsulating the MuJoCo physics engine and model man
 
 ---
 
-## OrcaGymModel -- Static Model Information
+## OrcaGymModel — Static Model Information
 
 Contains all information that does not change during simulation, accessible via `env.model`.
 
@@ -31,12 +31,12 @@ model.nmocap: int    # Number of mocap bodies
 
 | Entity | Description |
 |------|------|
-| **Body** | Rigid body, basic unit of physics simulation. Has mass, inertia, position, orientation. |
-| **Joint** | Joint, constraint connecting bodies. Defines relative motion (rotation/sliding/free). |
-| **Actuator** | Actuator, element that drives the robot (motors, etc.). Corresponds to action space dimension. |
-| **Geom** | Geometry, geometric shape used for collision detection. |
+| **Body** | Rigid body, the basic unit of physics simulation. Has mass, inertia, position, and orientation. |
+| **Joint** | Joint, a constraint connecting bodies. Defines relative motion (rotation/sliding/free). |
+| **Actuator** | Actuator, the element that drives the robot (motors, etc.). Corresponds to the action space dimension. |
+| **Geom** | Geometry, a geometric shape used for collision detection. |
 | **Site** | Marker point, does not participate in physics simulation. Used to mark key positions. |
-| **Sensor** | Sensor, virtual device that measures physical quantities. |
+| **Sensor** | Sensor, a virtual device that measures physical quantities. |
 | **Equality** | Equality constraint, enforces a specific relationship between two bodies. Commonly used for grasping. |
 | **Mocap Body** | Virtual body, freely movable without physics constraints. |
 
@@ -63,7 +63,7 @@ def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
 
 # mocap: initialized via init_mocap_dict(mocap_dict),
-# count obtained via the nmocap attribute (no get_mocap_dict method)
+# count obtained via the nmocap attribute (there is no get_mocap_dict method)
 ```
 
 ### Get Entity by ID / by Name
@@ -106,7 +106,7 @@ def resolve_flex_body_name(body_name: str) -> Optional[FlexBodyInfo]      # Unif
 
 ---
 
-## OrcaGymDataView -- Read-Only View of Simulation State
+## OrcaGymDataView — Read-Only View of Simulation State
 
 Accessed via `env.data`. Automatically updated to the latest state after `do_simulation()`.
 
@@ -134,7 +134,7 @@ cfrc_ext: np.ndarray        # External constraint forces (nbody, 6)
 ```python
 def body_xpos(body_name: str) -> np.ndarray       # World-coordinate position (3,)
 def body_xquat(body_name: str) -> np.ndarray      # Quaternion [w,x,y,z] (4,)
-def body_xmat(body_name: str) -> np.ndarray       # Rotation matrix flat storage (9,)
+def body_xmat(body_name: str) -> np.ndarray       # Rotation matrix in flat storage (9,)
 def body_cvel(body_name: str) -> np.ndarray       # Spatial velocity [ang(3), lin(3)] (6,)
 def body_subtree_mass(body_name: str) -> float    # Total subtree mass
 ```
@@ -143,14 +143,14 @@ def body_subtree_mass(body_name: str) -> float    # Total subtree mass
 
 ```python
 def site_xpos(site_name: str) -> np.ndarray       # World-coordinate position (3,)
-def site_xmat(site_name: str) -> np.ndarray       # Rotation matrix flat storage (9,)
+def site_xmat(site_name: str) -> np.ndarray       # Rotation matrix in flat storage (9,)
 ```
 
 ### Geom Queries
 
 ```python
 def geom_xpos(geom_name: str) -> np.ndarray       # World-coordinate position (3,)
-def geom_xmat(geom_name: str) -> np.ndarray       # Rotation matrix flat storage (9,)
+def geom_xmat(geom_name: str) -> np.ndarray       # Rotation matrix in flat storage (9,)
 def geom_size(geom_name: str) -> np.ndarray       # Size (3,)
 ```
 
@@ -163,7 +163,7 @@ def mocap_quat(body_name: str) -> np.ndarray      # Mocap quaternion [w,x,y,z] (
 
 ---
 
-## SimConfig -- Solver Configuration
+## SimConfig — Solver Configuration
 
 Accessed via `env.sim_config`. Changes take effect at the next simulation step.
 
@@ -179,8 +179,8 @@ Accessed via `env.sim_config`. Changes take effect at the next simulation step.
 ### Methods
 
 ```python
-def load_from_dict(config: dict) -> None    # Batch set parameters
-def to_dict() -> dict                       # Export configuration as a dict
+def load_from_dict(config: dict) -> None    # Set parameters in batch
+def to_dict() -> dict                       # Export the configuration as a dict
 ```
 
 ### Usage Example
@@ -197,8 +197,8 @@ env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 
 ### AnchorType
 
-Module path: in the Euler system, located at `orca_gym.core.euler.orca_studio_bridge`;
-in the Local/Warp system, located at `orca_gym.core.orca_gym_local`.
+Module path: in the Euler system, this is located at `orca_gym.core.euler.orca_studio_bridge`;
+in the Local/Warp system, it is located at `orca_gym.core.orca_gym_local`.
 
 ```python
 class AnchorType:

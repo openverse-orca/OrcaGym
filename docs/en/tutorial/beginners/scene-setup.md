@@ -1,6 +1,6 @@
 # 🎬 Scene Setup — Putting Things in the Scene
 
-In the previous section, we connected directly to an already-built scene. In this section, you will learn to **build a scene yourself**: load robots, place objects, set up lights.
+In the previous section, we connected directly to an already-built scene. In this section, you will learn how to **build a scene yourself**: load robots, place objects, and set up lights.
 
 ---
 
@@ -37,7 +37,7 @@ from orca_gym.scene.orca_gym_scene import (
 
 
 def build_scene():
-    """Build a scene and publish it to the simulation server"""
+    """Build a scene and publish it to the simulation server."""
 
     # 1. Create scene manager — connect to simulation server
     print("Connecting to scene manager...")
@@ -109,7 +109,7 @@ def build_scene():
     # 6. Close scene manager
     # ============================================================
     scene.close()
-    print("\n🎉 Scene setup complete! Now you can load this scene with gym.make().")
+    print("\n🎉 Scene setup complete! You can now load this scene with gym.make().")
 
 
 if __name__ == "__main__":
@@ -161,7 +161,7 @@ quat_wxyz = np.array([quat[3], quat[0], quat[1], quat[2]]) # convert to [w, x, y
 
 !!! warning "`publish_scene()` clears the scene!"
     Each call to `publish_scene()` clears the current scene.
-    If you only want to add objects without clearing, just call `add_actor()` directly.
+    To add objects without clearing the scene, call `add_actor()` directly.
 
 ---
 
@@ -178,7 +178,7 @@ Below are some example asset paths (actual paths depend on the resources importe
 | Sphere | `assets/balls/tennis_ball` |
 | Floor | `assets/floors/checker_floor` |
 
-> The actual available asset paths depend on the resources imported in your OrcaStudio. Contact your OrcaStudio administrator for a complete list.
+> The available asset paths depend on the resources imported in your OrcaStudio. Contact your OrcaStudio administrator for a complete list.
 
 ---
 
@@ -186,7 +186,7 @@ Below are some example asset paths (actual paths depend on the resources importe
 
 ### Exercise 1: Build a Tabletop Scene
 
-Place 3 cubes of different colors on a table at `(0.5, 0.0, 0.0)`, spaced 10cm apart.
+Place 3 cubes of different colors on a table at `(0.5, 0.0, 0.0)`, spaced 10 cm apart.
 
 ### Exercise 2: Adjust Object Pose
 

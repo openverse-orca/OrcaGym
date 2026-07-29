@@ -17,7 +17,7 @@ Utility functions and controllers, providing inverse kinematics, joint control, 
 
 ## InverseKinematicsController
 
-Inverse kinematics solver based on Jacobian matrix + damped least squares method.
+Inverse kinematics solver based on the Jacobian matrix + damped least squares method.
 
 > ⚠️ **Note**: This controller depends on the `RobomimicEnv` adapter (`orca_gym.adapters.robomimic`) and is not applicable to the raw `OrcaGymEulerEnv`. Wrap your environment via the Robomimic adapter before use.
 
@@ -30,7 +30,7 @@ class InverseKinematicsController:
         env: RobomimicEnv,          # Environment wrapped by the RobomimicEnv adapter
         site_id: int,               # ID of the end-effector site
         dof_indices: list[int],     # List of DOF indices for controlled joints
-        lamba_value: float = 1e-3,  # Damping coefficient (note: actual spelling in code is lamba, not lambda)
+        lamba_value: float = 1e-3,  # Damping coefficient (note: the actual spelling in the code is lamba, not lambda)
         alpha_value: float = 0.2,   # Step size scaling factor
     )
 ```
@@ -58,13 +58,13 @@ ik = InverseKinematicsController(
     alpha_value=0.2,
 )
 
-# Set target pose
+# Set the target pose
 ik.set_goal(
     pos=np.array([0.5, 0.0, 0.3]),
     quat=np.array([1.0, 0.0, 0.0, 0.0]),
 )
 
-# Compute inverse kinematics each step
+# Compute inverse kinematics at each step
 dq = ik.compute_inverse_kinematics()
 current_qpos += dq
 ```
@@ -86,7 +86,7 @@ class JointController:
         Kd: float = 2.0,             # Velocity derivative gain
         Kv: float = 5.0,             # Velocity error feedback gain
         max_speed: float = 80.0,     # Maximum allowed target speed (rad/s)
-        ctrlrange: tuple = (-80, 80),# Actuator torque limits (min, max) Nm
+        ctrlrange: tuple = (-80, 80),# Actuator torque limits (min, max), in Nm
     )
 ```
 
@@ -156,7 +156,7 @@ class LowPassFilter:
 
 Formula: `output[t] = alpha × x[t] + (1 - alpha) × output[t-1]`
 
-- `alpha`: Smoothing coefficient (0, 1], 1 = no filtering, near 0 = strong filtering
+- `alpha`: Smoothing coefficient in (0, 1]; 1 = no filtering, near 0 = strong filtering
 
 ---
 

@@ -40,8 +40,8 @@ env.step(action)
   │     ├─▶ Set control input ctrl
   │     └─▶ Execute n_frames physics simulation steps
   │
-  ├─▶ _get_obs()          # Build observation
-  ├─▶ Compute reward / terminated / truncated  # Implemented by subclass within its own step() logic
+  ├─▶ _get_obs()          # Build the observation
+  ├─▶ Compute reward / terminated / truncated  # Implemented by the subclass within its own step() logic
   │
   └─▶ Return (obs, reward, terminated, truncated, info)
 ```
@@ -76,7 +76,7 @@ env.mj_forward()          # Refresh all derived quantities
 # Now it is safe to read
 body_pos = env.data.body_xpos("end_effector")
 
-# ❌ Wrong —— forgot forward
+# ❌ Wrong — forgot forward
 env.set_joint_qpos(...)
 body_pos = env.data.body_xpos("end_effector")  # May be NaN!
 ```
@@ -86,6 +86,6 @@ body_pos = env.data.body_xpos("end_effector")  # May be NaN!
 | Symptom | Possible Cause | Solution |
 |------|----------|----------|
 | Reading stale state | No sync after modifying state | `do_simulation()` auto-syncs; manual operations need `mj_forward()` |
-| Pose NaN | `mj_forward()` not called after modifying qpos | Call `mj_forward()` after modifying state |
+| Pose NaN | `mj_forward()` not called after modifying qpos | Call `mj_forward()` after modifying the state |
 | Sensor values unchanged | sensordata depends on forward | Read sensors after `mj_forward()` |
 | Abnormal contact forces | Contact refreshes after step | Read contact immediately after step |

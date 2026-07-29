@@ -12,7 +12,7 @@ Below is a **directly runnable** complete example demonstrating all core operati
 It is recommended to read through it first, then review the section-by-section explanation.
 
 ```python
-"""Complete Example: External Force + IK Control for G1 Humanoid Robot
+"""Complete Example: External Force + IK Control for G1 Humanoid Robot.
 
 Features:
   1. Apply upward force to pelvis to lift the robot
@@ -21,7 +21,7 @@ Features:
   4. Drag an object using mocap + weld constraint
   5. Lift the left foot using damped least-squares IK
 
-Prerequisites: OrcaStudio must be running online, with a scene containing G1 loaded
+Prerequisites: OrcaStudio must be running online, with a scene containing G1 loaded.
 """
 import numpy as np
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
@@ -44,7 +44,7 @@ G1_ROT_JOINT_SUFFIXES = [
 
 
 class ForceAndIKDemo(OrcaGymEulerEnv):
-    """External Force + IK Demo Environment"""
+    """External Force + IK Demo Environment."""
 
     def __init__(self, model_xml_path, **kwargs):
         super().__init__(
@@ -57,7 +57,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
         )
 
     def demo_force_apply(self):
-        """Demo 1: Apply external force to lift the robot"""
+        """Demo 1: Apply external force to lift the robot."""
         agent = self.agent_name
 
         # Record initial height
@@ -94,7 +94,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
         print("✅ External force cleared")
 
     def demo_mocap_drag(self):
-        """Demo 2: Drag an object using mocap + weld constraint"""
+        """Demo 2: Drag an object using mocap + weld constraint."""
         agent = self.agent_name
 
         # Set mocap target pose
@@ -127,7 +127,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
         print(f"✅ weld constraint drives object to follow mocap")
 
     def demo_ik_lift_foot(self):
-        """Demo 3: Damped least-squares IK to lift the left foot"""
+        """Demo 3: Damped least-squares IK to lift the left foot."""
         agent = self.agent_name
         foot_body = f"{agent}_left_ankle_roll_link"
 
@@ -272,7 +272,7 @@ env.clear_all_forces()              # Clear all external forces
 
 ### 2. Mocap Dragging
 
-**Mocap bodies** are special bodies in MuJoCo (`body_mocapid != -1`) that can have their pose **directly set**,
+**Mocap bodies** are special bodies in MuJoCo (`body_mocapid != -1`) whose pose can be **directly set**,
 unaffected by forces/dynamics. Combined with a **WELD equality constraint**, they can move regular bodies as if "dragged by an invisible hand."
 
 ```python
@@ -349,7 +349,7 @@ assert np.allclose(xvalp["g1_imu"], expected, atol=1e-4)
 
 ### 5. Damped Least-Squares IK
 
-**Why damping is needed?** The standard Jacobian pseudoinverse `J⁺ = J^T(J J^T)^(-1)` diverges near singularities
+**Why is damping needed?** The standard Jacobian pseudoinverse `J⁺ = J^T(J J^T)^(-1)` diverges near singularities
 (`J J^T` becomes nearly singular, pseudoinverse elements tend toward infinity). Damped least-squares adds a regularization term λ²I:
 
 ```
@@ -359,7 +359,7 @@ dq = J^T (J J^T + λ²I)^(-1) Δx
 - **λ too small** → approaches pseudoinverse, unstable at singularities
 - **λ too large** → slow convergence, but stable
 
-**Why two phases are needed?**
+**Why are two phases needed?**
 
 At G1's default `qpos=0`, the knees are fully extended. Starting from the extended pose, a purely mathematical IK solution may cause the knee to **bend backward**
 (anti-joint direction) — mathematically correct but physically infeasible.

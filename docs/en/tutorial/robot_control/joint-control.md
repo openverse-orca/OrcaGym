@@ -1,6 +1,6 @@
 # 🦿 Joint Control
 
-Low-level joint control interface, directly operating MuJoCo actuators.
+The low-level joint control interface directly operates MuJoCo actuators.
 
 ## set_ctrl — Lowest-Level Control
 
@@ -22,23 +22,23 @@ env.do_simulation(ctrl, n_frames=env.frame_skip)
 ## Joint Position Control
 
 `set_joint_qpos` accepts a **full qpos array** (`np.ndarray`, shape `(nq,)`), not a dict.
-You need to write each joint into the corresponding address of the qpos array, then set it as a whole:
+You must write each joint value to its corresponding address in the qpos array, then set the entire array at once:
 
 ```python
-# Build the full qpos array and set it as a whole
+# Build the full qpos array and set it at once
 qpos = env.data.qpos.copy()
 qpos[env.jnt_qposadr("shoulder_joint")] = 0.5
 qpos[env.jnt_qposadr("elbow_joint")] = -0.3
 qpos[env.jnt_qposadr("wrist_joint")] = 1.2
 env.set_joint_qpos(qpos)
 
-# Must forward
+# Must call mj_forward() to refresh derived quantities
 env.mj_forward()
 ```
 
 ## Joint Velocity Control
 
-`set_joint_qvel` also accepts a **full qvel array** (`np.ndarray`, shape `(nv,)`):
+`set_joint_qvel` accepts a **full qvel array** (`np.ndarray`, shape `(nv,)`):
 
 ```python
 qvel = env.data.qvel.copy()

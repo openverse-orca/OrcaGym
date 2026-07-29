@@ -59,7 +59,7 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 # PD Controller
 # ============================================================
 class PDController:
-    """Multi-joint PD controller"""
+    """Multi-joint PD controller."""
 
     def __init__(self, nu: int, kp: float = 150.0, kd: float = 12.0):
         self.nu = nu
@@ -183,8 +183,8 @@ class ReachTargetTask(OrcaGymEulerEnv):
         """
         Reward design:
         - Distance penalty (dense): given every step, closer is better
-        - Success reward (sparse): large bonus when target is reached
-        - Action smoothness penalty: discourage jerky movements
+        - Success reward (sparse): large bonus when the target is reached
+        - Action smoothness penalty: discourages jerky movements
         """
         dist = obs["dist_to_goal"].item()
 
@@ -200,7 +200,7 @@ class ReachTargetTask(OrcaGymEulerEnv):
     # Reset
     # ================================================================
     def reset_model(self):
-        """Reset task: sample a new target position"""
+        """Reset task: sample a new target position."""
         self._step_count = 0
 
         # Randomly sample target position within workspace
@@ -244,7 +244,7 @@ def manual_control_demo():
 
     The strategy logic is very simple:
     1. Move in the direction of the target
-    2. Stop once reached
+    2. Stop once the target is reached
 
     This demonstrates how to complete a simulation task with manual rules,
     without using RL.
@@ -267,7 +267,7 @@ def manual_control_demo():
         dist = np.linalg.norm(direction)
 
         if dist < env.unwrapped.SUCCESS_THRESHOLD:
-            print(f"\n✅ Target reached! Took {step_idx} steps, error {dist*1000:.1f}mm")
+            print(f"\n✅ Target reached! Took {step_idx} steps, error {dist*1000:.1f} mm")
             break
 
         # Simple strategy: random exploration + keep good directions
@@ -278,7 +278,7 @@ def manual_control_demo():
         total_reward += reward
 
         if step_idx % 30 == 0:
-            print(f"  Step {step_idx:3d}: dist={dist*1000:5.1f}mm, "
+            print(f"  Step {step_idx:3d}: dist={dist*1000:5.1f} mm, "
                   f"ee=[{ee_pos[0]:.3f},{ee_pos[1]:.3f},{ee_pos[2]:.3f}], "
                   f"reward={reward:+.3f}")
 
@@ -286,7 +286,7 @@ def manual_control_demo():
             break
 
     if step_idx == 299:
-        print(f"\n⏰ Did not reach target within 300 steps, final error {dist*1000:.1f}mm")
+        print(f"\n⏰ Did not reach target within 300 steps, final error {dist*1000:.1f} mm")
 
     print(f"\nTotal reward: {total_reward:.1f}")
     env.close()
@@ -358,4 +358,4 @@ Now that you have the foundations, you can try:
 
 ---
 
-> 🎉 **Congratulations!** You have learned the core usage of OrcaGym from scratch. Now go create your own robot tasks!
+> 🎉 **Congratulations!** You have learned the core usage of OrcaGym from scratch. Now go and create your own robot tasks!

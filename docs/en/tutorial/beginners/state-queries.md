@@ -11,14 +11,14 @@ In the previous section we only read `self.data.qpos` and `self.data.qvel`. In t
 Below is a **runnable** complete example that constructs a `StateDumper` debugging tool, demonstrating the usage of all state query APIs.
 
 ```python
-"""State reading complete demo: joints, bodies, sites, sensors, actuator torques"""
+"""State reading complete demo: joints, bodies, sites, sensors, actuator torques."""
 import numpy as np
 from gymnasium import spaces
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
 
 class StateDumper:
-    """Debugging tool: one-click dump of all current states of the environment"""
+    """Debugging tool: one-click dump of all current states of the environment."""
 
     def __init__(self, env):
         self.env = env
@@ -52,7 +52,7 @@ class StateDumper:
 
 
 class StateQueryDemo(OrcaGymEulerEnv):
-    """Environment demonstrating all state query APIs"""
+    """Environment demonstrating all state query APIs."""
 
     def __init__(self, model_xml_path, **kwargs):
         super().__init__(
@@ -68,7 +68,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
     # --- Query methods ---
 
     def check_joints(self):
-        """Query positions and velocities of all joints"""
+        """Query positions and velocities of all joints."""
         joint_names = list(self.model.get_joint_dict().keys())
         qpos = self.query_joint_qpos(joint_names)
         qvel = self.query_joint_qvel(joint_names)
@@ -82,7 +82,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         return qpos, qvel
 
     def inspect_joint(self, joint_name):
-        """View detailed info of a single joint"""
+        """View detailed info of a single joint."""
         info = self.model.get_joint_byname(joint_name)
         print(f"Joint: {joint_name}")
         print(f"  Type: {info['Type']}")          # hinge / slide / free / ball
@@ -95,7 +95,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         print(f"  qpos address: {qpos_addr}, qvel address: {dof_addr}")
 
     def check_body_pose(self):
-        """Query positions and orientations of key bodies"""
+        """Query positions and orientations of key bodies."""
         body_names = list(self.model.get_body_names())
         print(f"Total {len(body_names)} bodies (first 10):")
         for name in body_names[:10]:
@@ -110,7 +110,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
                 print(f"  Quaternion: {pose['xquat']}")
 
     def check_end_effector(self):
-        """Query end-effector pose and velocity"""
+        """Query end-effector pose and velocity."""
         ee_site = self.site("end_effector")
         site_data = self.query_site_pos_and_mat([ee_site])
         ee = site_data[ee_site]
@@ -124,7 +124,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         print(f"  Angular velocity: {angular_vel[ee_site]}")
 
     def read_sensors(self):
-        """Read sensor data"""
+        """Read sensor data."""
         sensor_names = list(self.model.gen_sensor_dict().keys())
         print(f"Sensor list ({len(sensor_names)} total):")
         for name in sensor_names:
@@ -137,7 +137,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
                 print(f"  {name}: {data}")
 
     def read_actuator_torques(self):
-        """View actuator torques"""
+        """View actuator torques."""
         names = [self.model.actuator_id2name(i) for i in range(self.model.nu)]
         torques = self.query_actuator_torques(names[:3])
         for name, t in torques.items():
@@ -285,7 +285,7 @@ mj_forward() or do_simulation()
 > 
 > # ❌ Wrong — may read stale data
 > env.set_joint_qpos(...)
-> pos = env.query_joint_qpos(["joint_0"])  # haven't forwarded yet!
+> pos = env.query_joint_qpos(["joint_0"])  # mj_forward() not called yet!
 > ```
 
 ---

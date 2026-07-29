@@ -54,7 +54,7 @@ def scale_action(action, low, high):
     """Scale action from [-1, 1] to [low, high]"""
     return low + (action + 1.0) * 0.5 * (high - low)
 
-# Scale using actuator actual ranges
+# Scale using the actual actuator ranges
 ctrl_range = env.model.get_actuator_ctrlrange()
 low = ctrl_range[:, 0]
 high = ctrl_range[:, 1]

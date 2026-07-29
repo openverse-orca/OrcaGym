@@ -2,7 +2,7 @@
 
 Mocap (Motion Capture) bodies are special bodies in MuJoCo that can be controlled by directly setting their pose.
 
-## What is a Mocap Body
+## What is a Mocap Body?
 
 - A body in MuJoCo with `body_mocapid != -1`
 - Its pose can be **set directly** without being affected by forces/dynamics
@@ -36,7 +36,7 @@ env.set_mocap_pos_and_quat({
 	}
 })
 
-# Must forward
+# Must call mj_forward() to refresh derived quantities
 env.mj_forward()
 ```
 

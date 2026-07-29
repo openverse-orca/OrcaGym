@@ -1,6 +1,6 @@
 # 🧠 PPO Training — Training an Inverted Pendulum with Reinforcement Learning
 
-This section teaches you how to train an inverted pendulum to stay upright in an OrcaGym environment using the Stable Baselines3 PPO algorithm.
+This section shows you how to train an inverted pendulum to stay upright in an OrcaGym environment using the Stable Baselines3 PPO algorithm.
 
 > See [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
 
@@ -20,13 +20,13 @@ We train a **single-hinge inverted pendulum** (Gymnasium Pendulum-v1 style):
 - **Scene**: one hinge joint + one rod (local MuJoCo XML)
 - **Observation**: `[cos(theta), sin(theta), theta_dot]` — 3-dimensional Box
 - **Action**: `[torque]` — 1-dimensional Box, range `[-1, 1]`
-- **Reward**: `-(theta^2 + 0.1*theta_dot^2 + 0.001*action^2)` — the closer to 0 the better
+- **Reward**: `-(theta^2 + 0.1*theta_dot^2 + 0.001*action^2)` — the closer to 0, the better
 - **Termination**: none (continuous control task), truncate after 200 steps
 
 ### Complete Environment Code
 
 ```python
-"""simple_env.py — Single-hinge inverted pendulum environment"""
+"""simple_env.py — Single-hinge inverted pendulum environment."""
 
 import os
 from typing import Any
@@ -115,14 +115,14 @@ class SimpleEulerEnv(OrcaGymEulerEnv):
 | `0.001 * action^2` | Action magnitude penalty (energy saving) | 0.001 |
 
 - When `theta=0`, `cos(theta)=1, sin(theta)=0`, reward is maximum (approaching 0)
-- Under random actions reward is a large negative number; after training it should gradually approach 0
+- Under random actions, the reward is a large negative number; after training it should gradually approach 0
 
 ---
 
 ## PPO Training Code
 
 ```python
-"""train_ppo.py — SB3 PPO training for inverted pendulum"""
+"""train_ppo.py — SB3 PPO training for inverted pendulum."""
 
 import argparse
 import os
@@ -177,7 +177,7 @@ def train(total_timesteps: int = 100000, device: str = "cuda"):
 
 def evaluate(model_path: str, episodes: int = 5):
     """Evaluate: default to online human mode for visualization."""
-    # Use online mode for evaluation to enable rendering and observation
+    # Use online mode for evaluation to enable rendering and observation.
     env = SimpleEulerEnv(
         orcagym_addr="localhost:50051",
         time_step=0.002,
@@ -244,7 +244,7 @@ During training, reward should **gradually rise from large negative numbers towa
 ```
 
 - If reward stays below -100 -> learning rate too high or environment issue
-- If reward quickly reaches around -1 -> training successful, the pendulum can balance upright stably
+- If reward quickly reaches around -1 -> training successful, the pendulum can balance upright
 
 ---
 
@@ -255,7 +255,7 @@ During training, reward should **gradually rise from large negative numbers towa
 Use `[cos(theta), sin(theta)]` rather than raw `theta`, because:
 - `theta=0` and `theta=2*pi` describe the same physical pose
 - With raw angle values, the network would need to learn the 2*pi periodicity -> very difficult
-- cos/sin encoding naturally handles this problem
+- cos/sin encoding naturally handles this issue
 
 ### Offline vs. Online Training
 

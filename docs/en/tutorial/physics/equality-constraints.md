@@ -11,13 +11,13 @@ MuJoCo's equality constraints are the core mechanism in OrcaGym for implementing
 Below is a complete grasp → move → release demo:
 
 ```python
-"""Equality Constraints Complete Demo: Grasp → Move → Release"""
+"""Equality Constraints Complete Demo: Grasp → Move → Release."""
 import numpy as np
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
 
 class GraspDemo(OrcaGymEulerEnv):
-    """Demonstrates mocap + weld constraint object grasping"""
+    """Demonstrates mocap + weld constraint object grasping."""
 
     def __init__(self, model_xml_path, **kwargs):
         super().__init__(
@@ -30,7 +30,7 @@ class GraspDemo(OrcaGymEulerEnv):
         )
 
     def demo_grasp_and_move(self):
-        """Complete demo: grasp object → move to target → release"""
+        """Complete demo: grasp object → move to target → release."""
         agent = self.agent_name
         object_name = f"{agent}_manipulation_box"
         ctrl = np.zeros(self.model.nu)

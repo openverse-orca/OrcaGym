@@ -1,6 +1,6 @@
 # ⚙️ OrcaGym Euler Architecture
 
-> 📌 **Prerequisite Reading**: This document covers overall layering, API boundaries, and component design details. If this is your first time encountering the OrcaGym architecture, we recommend first reading [Model / Data / Config](model-data-opt.md) and [Gymnasium Interface](gym-interface.md) to build a basic understanding, then return to this document for architecture design.
+> 📌 **Prerequisite Reading**: This document covers overall layering, API boundaries, and component design details. If this is your first time encountering the OrcaGym architecture, we recommend first reading [Model / Data / Config](model-data-opt.md) and [Gymnasium Interface](gym-interface.md) to build a basic understanding, then return to this document for the architecture design.
 
 ## 1. Why a New Architecture Is Needed
 
@@ -10,7 +10,7 @@
 
 | Defect Type | Manifestation | Consequence |
 |---------|------|------|
-| **God Class** | `OrcaGymLocal` alone shoulders simulation core, Studio integration, model registration, solver configuration, object manipulation, and all other responsibilities | Hard to maintain, hard to extend, coupled responsibilities |
+| **God Class** | `OrcaGymLocal` alone shoulders the simulation core, Studio integration, model registration, solver configuration, object manipulation, and all other responsibilities | Hard to maintain, hard to extend, coupled responsibilities |
 | **Incomplete API** | `OrcaGymData` only caches 5 fields (qpos/qvel/qacc/qfrc_bias/time), missing xfrc_applied/cvel/contact, etc. | You are forced to bypass through `gym._mjData` for direct access |
 | **Encapsulation Leak** | `_mjModel`/`_mjData` exposed as public attributes, `self.gym` is both an internal component and an external library handle | 83 direct accesses, encapsulation exists in name only |
 
@@ -38,23 +38,23 @@ You bypass not because you do not understand encapsulation, but because **the en
 
 ### 2.1 Six Principles
 
-| Principle | Meaning | Compared to Old System |
+| Principle | Meaning | Compared to the Old System |
 |------|------|-----------|
 | **P1 Completeness** | Public API covers all legitimate MuJoCo operation needs | Many gaps force bypassing |
 | **P2 No Engine Internals Exposed** | `_mjModel`/`_mjData` not exposed as public attributes | Directly exposed |
 | **P3 State Consistency** | After any write operation, `self.data` is guaranteed consistent; all reads go through `self.data` or explicit queries | `self.data` and `_mjData` dual-track system |
-| **P4 Traceable Force Application** | External force injection via explicit methods; future Euler coupler can perceive it | `xfrc_applied` written directly, no perception |
+| **P4 Traceable Force Application** | External force injection via explicit methods; the future Euler coupler can perceive it | `xfrc_applied` written directly, no perception |
 | **P5 Responsibility Cohesion** | Modules divided by cohesive responsibilities; a group of methods change for the same reason and share the same data | God class |
 | **P6 Framework Stateless, Business Self-Orchestrated** | Framework only provides stateless primitives (single atomic reads/writes); multi-step orchestration flows are composed by your business code and you manage your own state | Framework mixes primitives and orchestration, prone to misuse |
 
 #### P6 Supplementary Explanation
 
-All framework public APIs are **stateless primitives** -- a single call completes a single data read/write, does not depend on previous or subsequent call order, and does not hold snapshots or binding markers across calls. For example:
+All framework public APIs are **stateless primitives** — a single call completes a single data read/write, does not depend on previous or subsequent call order, and does not hold snapshots or binding markers across calls. For example:
 
-- `equality_find_slot_by_body` — find slot by body
+- `equality_find_slot_by_body` — find a slot by body
 - `equality_constraint(slot)` — read a single slot
 - `equality_update(slot, **fields)` — write a single slot
-- `set_mocap_pos_and_quat` — write mocap pose
+- `set_mocap_pos_and_quat` — write the mocap pose
 
 If your business requires multi-step orchestration flows such as "bind/release/grasp", compose these primitives yourself and manage your own business state. This is easier to review and less error-prone than framework-managed state.
 
@@ -62,10 +62,10 @@ If your business requires multi-step orchestration flows such as "bind/release/g
 
 | Pattern | Applied At | Problem Solved |
 |------|---------|-----------|
-| **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | Combine multiple subcomponents, provide unified API, avoid god class |
+| **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | Combine multiple subcomponents, provide a unified API, avoid the god class |
 | **Composition over Inheritance** | Env holds Gym, Gym holds subcomponents | Avoid inheritance chain rot, responsibilities can evolve independently |
 | **Strategy Pattern** | `OrcaGymEuler._euler` field (placeholder) | Currently always None; switching between with/without Euler strategies is encapsulated via `has_euler()` / `step_with_coupling()` (Euler orchestrator design TBD) |
-| **Dependency Inversion** | `OrcaStudioBridge` does not hold mjData, achieves decoupling by receiving data parameters | Studio integration decoupled from simulation core |
+| **Dependency Inversion** | `OrcaStudioBridge` does not hold mjData, achieves decoupling by receiving data parameters | Studio integration decoupled from the simulation core |
 | **Read-Only View** | `OrcaGymDataView` | Provide complete state reads, prohibit writes |
 
 ---
@@ -113,7 +113,7 @@ gym.Env
 
 ### 3.3 Coexistence with the Old System
 
-The existing `OrcaGymBase` → Remote / Local / Warp inheritance system remains untouched; existing systems continue to run unaffected. `OrcaGymEulerEnv` is an independent new class that coexists with `OrcaGymLocal` long-term. On the migration path, `OrcaGymLocal` will eventually be deprecated, at which point the old system can simply be deleted.
+The existing `OrcaGymBase` → Remote / Local / Warp inheritance system remains untouched; existing systems continue to run unaffected. `OrcaGymEulerEnv` is an independent new class that coexists with `OrcaGymLocal` long-term. On the migration path, `OrcaGymLocal` will eventually be deprecated, at which point the old system can simply be removed.
 
 ---
 
@@ -153,7 +153,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
 ### 4.2 OrcaGymEuler — Simulation Core Facade
 
-Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, and the `_euler` placeholder field (currently `None`, Euler coupling orchestrator design TBD). **Does not expose** `_mjModel`/`_mjData`, relies on `_` prefix convention + ruff SLF001 static checking, controls IDE autocompletion via `__dir__` to show only public API.
+Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, and the `_euler` placeholder field (currently `None`, Euler coupling orchestrator design TBD). **Does not expose** `_mjModel`/`_mjData`, relies on the `_` prefix convention + ruff SLF001 static checking, controls IDE autocompletion via `__dir__` to show only the public API.
 
 ```python
 class OrcaGymEuler:
@@ -191,7 +191,7 @@ class MuJoCoSimCore:
 
 ### 4.4 OrcaStudioBridge — Studio Integration
 
-Handles gRPC interaction with OrcaStudio, including rendering, video saving, object manipulation, etc. **Dependency inversion** design: does not hold `_mjData`, achieves decoupling by receiving data parameters; does not touch `mj_step`, only handles communication and scene synchronization.
+Handles gRPC interaction with OrcaStudio, including rendering, video saving, object manipulation, etc. **Dependency inversion** design: does not hold `_mjData`, achieves decoupling by receiving data parameters; does not touch `mj_step`, and only handles communication and scene synchronization.
 
 ```python
 class OrcaStudioBridge:
@@ -207,7 +207,7 @@ class OrcaStudioBridge:
 
 ### 4.5 ModelRegistry — Model Registration
 
-Builds `OrcaGymModel`/`OrcaGymData`, provides model information queries such as `query_all_*`. `OrcaGymModel` is a successful abstraction, reused as-is, and extended with missing model structure queries.
+Builds `OrcaGymModel`/`OrcaGymData`, provides model information queries such as `query_all_*`. `OrcaGymModel` is a successful abstraction, reused as-is, and extended with the missing model structure queries.
 
 ```python
 class ModelRegistry:
@@ -264,7 +264,7 @@ class SimConfig:
 
 ### 4.7 OrcaGymDataView — Complete State View
 
-Provides a complete read-only view of the MuJoCo state, replacing direct `_mjData` access. Covers all fields you need to read (not just the 5 from the original `OrcaGymData`). Provides body/site/geom property queries via methods; you access by name without needing to know IDs.
+Provides a complete read-only view of the MuJoCo state, replacing direct `_mjData` access. Covers all fields you need to read (not just the 5 from the original `OrcaGymData`). Provides body/site/geom property queries via methods; you access them by name without needing to know IDs.
 
 ```python
 class OrcaGymDataView:
@@ -311,7 +311,7 @@ class OrcaGymDataView:
 
 ### 4.8 Euler Coupling — Placeholder (Currently Unimplemented)
 
-Orchestrates the coupled stepping of Euler non-rigid-body solver and MuJoCo rigid-body solver. **Currently a design placeholder, no `EulerOrchestrator` class exists in the code**: `OrcaGymEuler._euler` field is always `None`, `OrcaGymEulerEnv` behaves as a pure MuJoCo environment. Euler coupling toggling is queried via `OrcaGymEuler.has_euler()` and stepping is encapsulated via `OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)` (when `has_euler()` is `False`, equivalent to pure MuJoCo stepping). Detailed orchestrator design will be discussed in a separate document.
+Orchestrates the coupled stepping of the Euler non-rigid-body solver and the MuJoCo rigid-body solver. **Currently a design placeholder, no `EulerOrchestrator` class exists in the code**: the `OrcaGymEuler._euler` field is always `None`, and `OrcaGymEulerEnv` behaves as a pure MuJoCo environment. Euler coupling toggling is queried via `OrcaGymEuler.has_euler()` and stepping is encapsulated via `OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)` (when `has_euler()` is `False`, equivalent to pure MuJoCo stepping). The detailed orchestrator design will be discussed in a separate document.
 
 ```python
 # Actual encapsulation in current code (OrcaGymEuler public API)
@@ -407,7 +407,7 @@ qpos = env._gym._sim._mjData.qpos  # ruff SLF001 warning
 
 ### 5.3 State Writing
 
-**Rule**: All state writes go through explicit methods; do not directly manipulate MuJoCo data structures. External force injection goes through `apply_body_force()`, do not directly write `xfrc_applied`. If you need to immediately read consistent state after a write operation, you must call `mj_forward()`.
+**Rule**: All state writes go through explicit methods; do not directly manipulate MuJoCo data structures. External force injection goes through `apply_body_force()`; do not directly write `xfrc_applied`. If you need to immediately read consistent state after a write operation, you must call `mj_forward()`.
 
 ```python
 # ✅ Correct
@@ -432,7 +432,7 @@ Two usage modes:
 ```python
 # Mode A (recommended, includes Euler coupling)
 env.do_simulation(ctrl, self.frame_skip)
-# After do_simulation returns, env.data is automatically synchronized (sync_to_view called internally)
+# After do_simulation returns, env.data is automatically synchronized (sync_to_view is called internally)
 
 # Mode B (pure MuJoCo, no coupling)
 for _ in range(self.frame_skip):
@@ -488,16 +488,16 @@ body_name = env.body("object")
 
 ### 6.1 Mechanism Overview
 
-This architecture uses multiple layers of guidance to make the "correct way" the path of least resistance. `OrcaGymEulerEnv` directly inherits `gym.Env`, does not create `gym`/`stub`/`channel` attributes -- Python natively rejects access; other internal objects rely on `_` prefix convention + ruff SLF001 static checking + AGENTS.md AI behavior constraints:
+This architecture uses multiple layers of guidance to make the "correct way" the path of least resistance. `OrcaGymEulerEnv` directly inherits `gym.Env`, does not create `gym`/`stub`/`channel` attributes — Python natively rejects access; other internal objects rely on the `_` prefix convention + ruff SLF001 static checking + AGENTS.md AI behavior constraints:
 
 | Mechanism | Implementation | Effect |
 |------|------|------|
 | **Python Native Attribute Absence** | `OrcaGymEulerEnv` directly inherits `gym.Env`; all internal components assigned in `__init__` are prefixed with underscore (e.g. `_gym`/`_stub`/`_channel`/`_studio_bridge`, etc.), no unprefixed `gym`/`stub`/`channel` attributes are created | `env.gym`/`env.stub`/`env.channel` raise `AttributeError` |
 | **ruff SLF001 Static Check** | Configure `ruff check --select SLF001` to scan code accessing `_`-prefixed attributes externally | Detect wall-bypassing access at pre-commit / CI stage |
 | **AGENTS.md AI Constraints** | Each in-house repo configures `AGENTS.md` at root, explicitly prohibiting AI from using `_`-prefixed attributes | Constrain AI code generation behavior from the input side |
-| **`__dir__` Control** | Env/Gym/DataView implement `__dir__`, only exposing public API | IDE autocompletion guides correct path |
+| **`__dir__` Control** | Env/Gym/DataView implement `__dir__`, only exposing public API | IDE autocompletion guides the correct path |
 | **DataView Fallback** | `OrcaGymDataView.__getattr__` guides extension when fields are missing | Guides extension rather than bypassing when functionality is missing |
-| **Type Annotations** | Public methods return typed objects, never `mujoco.MjData` | AI code generation follows correct path |
+| **Type Annotations** | Public methods return typed objects, never `mujoco.MjData` | AI code generation follows the correct path |
 | **Docstring Contracts** | Class documentation explicitly lists correct usage and prohibitions | Know the contract just by reading the API |
 | **Path Depth** | `_mjData` is three layers deep at `env._gym._sim._mjData` | Natural barrier |
 
@@ -539,7 +539,7 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._gym.sync_to_view()
 ```
 
-> See actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. `step_with_coupling` is equivalent to `set_ctrl + step` when `has_euler()=False` (current skeleton phase), and will be extended when Euler coupling is implemented.
+> See the actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. `step_with_coupling` is equivalent to `set_ctrl + step` when `has_euler()=False` (current skeleton phase), and will be extended when Euler coupling is implemented.
 
 ### 7.2 Two Usage Modes
 
@@ -561,7 +561,7 @@ def step(self, action):
         torque = self._compute_torque(action)
         self.set_ctrl(torque)
         self.mj_step(nstep=1)
-    # Refresh derived quantities after loop, then read env.data
+    # Refresh derived quantities after the loop, then read env.data
     self.mj_forward()
     obs = self._get_obs()
     return obs, reward, terminated, truncated, info
@@ -633,7 +633,7 @@ def step(self, action):
 
 **Category 1: Zero-Change (Business Logic Preserved)**
 
-Joint queries, state setting, namespace, rendering, stepping -- API signatures are completely identical.
+Joint queries, state setting, namespace, rendering, stepping — API signatures are completely identical.
 
 **Category 2: Mechanical Replacement (`_mjData` → Formal API)**
 
@@ -652,7 +652,7 @@ self.apply_body_force(body_name, force, torque)
 for _ in range(self.frame_skip):
     self.set_ctrl(torques)
     self.mj_step(nstep=1)
-    self.gym.update_data()   # Old API of Local system
+    self.gym.update_data()   # Old API of the Local system
 
 # After migration (Euler system): if Euler coupling is needed, switch to do_simulation
 # do_simulation internally encapsulates step_with_coupling + sync_to_view, data is synchronized automatically
@@ -678,14 +678,14 @@ self.do_simulation(torques, self.frame_skip)
 
 `MuJoCoAdapter` (a controlled MuJoCo handle adapter) is not provided.
 
-**Rationale**: The original need came from external libraries like robosuite controllers requiring direct MuJoCo object manipulation. After deciding not to support robosuite components, this need disappeared. The design is simpler without it -- no "escape hatch"; all needs are met by extending Env/Gym public methods.
+**Rationale**: The original need came from external libraries like robosuite controllers requiring direct MuJoCo object manipulation. After deciding not to support robosuite components, this need disappeared. The design is simpler without it — no "escape hatch"; all needs are met by extending Env/Gym public methods.
 
 ### 9.3 Why `_mjData`/`_mjModel` Are Placed in MuJoCoSimCore
 
 `_mjModel`/`_mjData` exist only inside `MuJoCoSimCore`; `OrcaGymEuler` and `OrcaGymEulerEnv` do not hold references.
 
 **Rationale**:
-- Increases bypass path depth (`env._gym._sim._mjData` -- three layers)
+- Increases bypass path depth (`env._gym._sim._mjData` — three layers)
 - Responsibility cohesion: native MuJoCo operations are concentrated in `MuJoCoSimCore`
 - `OrcaGymEuler` as a Facade only coordinates, does not directly manipulate engine data
 

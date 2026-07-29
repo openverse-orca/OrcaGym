@@ -1,6 +1,6 @@
 # 🏗️ Your First Environment — Writing Your Own Environment Class
 
-In the previous section we ran a simulation loop with a minimal environment. In this section, you will learn how to **write a complete environment class** to control the simulation.
+In the previous section, we ran a simulation loop with a minimal environment. In this section, you will learn how to **write a complete environment class** to control the simulation.
 
 ## Why Write an Environment Class?
 
@@ -32,8 +32,8 @@ Below is a **runnable** complete environment (offline mode, no Studio needed):
 
 ```python
 """
-my_first_env.py — A minimal custom environment
-Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground)
+my_first_env.py — A minimal custom environment.
+Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground).
 """
 
 import numpy as np
@@ -42,7 +42,7 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
 
 class MyFirstEnv(OrcaGymEulerEnv):
-    """Minimal environment: observation = joint position + velocity, action = torque control, reward = 0"""
+    """Minimal environment: observation = joint position + velocity, action = torque control, reward = 0."""
 
     metadata = {"render_modes": ["human", "none"], "version": "0.0.1", "render_fps": 30}
 
@@ -102,7 +102,7 @@ class MyFirstEnv(OrcaGymEulerEnv):
 
     # -- Reset --
     def reset_model(self):
-        """Return to initial state."""
+        """Return to the initial state."""
         # Canonical approach: set state via set_joint_qpos / set_joint_qvel
         self.set_joint_qpos(self.init_qpos)  # restore initial qpos defined in XML
         self.set_joint_qvel(self.init_qvel)  # restore initial qvel defined in XML
@@ -148,7 +148,7 @@ This single line is equivalent to:
 #   -> data is automatically synced to the latest state
 ```
 
-> **Key advantage**: After `do_simulation()` returns, `self.data` is already updated automatically — no need to manually `update_data()`.
+> **Key advantage**: After `do_simulation()` returns, `self.data` is already updated automatically — no need to call `update_data()` manually.
 
 ### `self.data` — Complete State Read-Only View
 
@@ -178,7 +178,7 @@ This single line is equivalent to:
 
 ### State Writing
 
-After modifying state, you **must call `mj_forward()`**, otherwise derived quantities (body poses, sensors, etc.) will not be updated:
+After modifying state, you **must call `mj_forward()`**; otherwise, derived quantities (body poses, sensors, etc.) will not be updated:
 
 ```python
 # ✅ Correct

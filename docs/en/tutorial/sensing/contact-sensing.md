@@ -1,6 +1,6 @@
 # 🤝 Contact Sensing
 
-Use contact force information as the robot's "tactile perception."
+Contact force information can serve as the robot's "tactile perception."
 
 > For the contact query API, see [📡 State Query API](../robot_control/state-queries-api.md).
 
@@ -8,7 +8,7 @@ Use contact force information as the robot's "tactile perception."
 
 Contact forces can provide rich information:
 
-- **Grasp Detection** — whether contact is made
+- **Grasp Detection** — detecting whether contact is made
 - **Force Control** — maintaining a target contact force
 - **Surface Identification** — contact normal direction
 - **Collision Detection** — unexpected collisions

@@ -20,7 +20,7 @@ Below is a **runnable** minimal example. Save it as `hello_orcagym.py`:
 hello_orcagym.py — OrcaGym minimal example
 
 Function: Create an environment -> drive with random actions for 200 steps -> close
-Prerequisite: No OrcaStudio needed (offline mode, skip_grpc_load=True)
+Prerequisite: No OrcaStudio required (offline mode, skip_grpc_load=True)
 """
 import numpy as np
 from gymnasium import spaces
@@ -37,7 +37,7 @@ class HelloEnv(OrcaGymEulerEnv):
             agent_names=kwargs.pop("agent_names", ["agent0"]),
             time_step=kwargs.pop("time_step", 0.002),
             model_xml_path=model_xml_path,
-            skip_grpc_load=True,  # offline mode, no Studio needed
+            skip_grpc_load=True,  # offline mode, no Studio required
             **kwargs,
         )
         # Action space = Box
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     print("Hello OrcaGym — Offline Mode Minimal Example")
     print("=" * 60)
 
-    # 1. Create environment (offline mode, load local XML directly)
+    # 1. Create environment (offline mode, loads local XML directly)
     env = HelloEnv(model_xml_path=SCENE_XML, frame_skip=5, time_step=0.002)
     print(f"[1/4] Environment created: nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
 
@@ -141,8 +141,8 @@ Key parameters:
 ### Three Abstract Methods You Must Implement
 
 ```python
-def step(self, action):       # Execute one simulation step -> return (obs, reward, terminated, truncated, info)
-def reset_model(self):        # Reset to initial state -> return (obs, info)
+def step(self, action):       # Execute one simulation step -> returns (obs, reward, terminated, truncated, info)
+def reset_model(self):        # Reset to initial state -> returns (obs, info)
 def _get_obs(self) -> dict | np.ndarray:  # Collect observation data
 ```
 
@@ -166,7 +166,7 @@ obs, reward, terminated, truncated, info = env.step(action)              # Advan
 | Mode | `skip_grpc_load` | Studio Required | Use Case |
 |------|------------------|-----------------|----------|
 | Offline (recommended for beginners) | `True` | No | Training, quick testing, local development |
-| Online | `False` (default) | Yes | Rendering visualization, human observation, video recording |
+| Online | `False` (default) | Yes | Visualization, human observation, video recording |
 
 ---
 
