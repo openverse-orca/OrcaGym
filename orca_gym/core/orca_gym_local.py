@@ -2600,9 +2600,9 @@ class OrcaGymLocal(OrcaGymBase):
         
         使用示例:
             ```python
-            # 设置锚点位置
+            # 设置锚点位置（body 名为默认关卡自带的 anchor mocap body）
             await self.gym.set_mocap_pos_and_quat({
-                "ActorManipulator_Anchor": {
+                "ORCA_MANIPULATOR_<uuid>_Anchor": {  # 旧关卡为 ActorManipulator_Anchor
                     "pos": np.array([0.5, 0.0, 0.8]),
                     "quat": np.array([1.0, 0.0, 0.0, 0.0])
                 }
@@ -2740,7 +2740,8 @@ class OrcaGymLocal(OrcaGymBase):
         返回所有 body 受到的外部约束力，包括接触力、等式约束力等。
         
         术语说明:
-            - cfrc_ext: 外部约束力，形状 (nbody, 6)，每行为 [fx, fy, fz, mx, my, mz]
+            - cfrc_ext: 外部约束力，形状 (nbody, 6)，MuJoCo spatial vector 布局为 [mx, my, mz, fx, fy, fz]
+              （力矩在前，力在后；力/力矩在以 subtree com 为原点的全局坐标系中，坐标轴与世界系对齐）
             - 用途: 用于分析物体受力、计算奖励等
         
         Returns:

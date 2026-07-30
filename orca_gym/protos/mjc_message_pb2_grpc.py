@@ -484,6 +484,61 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.LiDARPointCloudRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.LiDARPointCloudResponse.FromString,
                 _registered_method=True)
+        self.DrawDebugMeshBatch = channel.unary_unary(
+                '/MujocoMessage.GrpcService/DrawDebugMeshBatch',
+                request_serializer=mjc__message__pb2.DrawDebugMeshBatchRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.DrawDebugMeshBatchResponse.FromString,
+                _registered_method=True)
+        self.ClearDebugMesh = channel.unary_unary(
+                '/MujocoMessage.GrpcService/ClearDebugMesh',
+                request_serializer=mjc__message__pb2.ClearDebugMeshRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.ClearDebugMeshResponse.FromString,
+                _registered_method=True)
+        self.CreateDebugMeshObjects = channel.unary_unary(
+                '/MujocoMessage.GrpcService/CreateDebugMeshObjects',
+                request_serializer=mjc__message__pb2.CreateDebugMeshObjectsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.CreateDebugMeshObjectsResponse.FromString,
+                _registered_method=True)
+        self.UpdateDebugMeshTransforms = channel.unary_unary(
+                '/MujocoMessage.GrpcService/UpdateDebugMeshTransforms',
+                request_serializer=mjc__message__pb2.UpdateDebugMeshTransformsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.UpdateDebugMeshTransformsResponse.FromString,
+                _registered_method=True)
+        self.KeepAliveDebugMeshObjects = channel.unary_unary(
+                '/MujocoMessage.GrpcService/KeepAliveDebugMeshObjects',
+                request_serializer=mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.FromString,
+                _registered_method=True)
+        self.DestroyDebugMeshObjects = channel.unary_unary(
+                '/MujocoMessage.GrpcService/DestroyDebugMeshObjects',
+                request_serializer=mjc__message__pb2.DestroyDebugMeshObjectsRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.DestroyDebugMeshObjectsResponse.FromString,
+                _registered_method=True)
+        self.QueryDebugMeshCount = channel.unary_unary(
+                '/MujocoMessage.GrpcService/QueryDebugMeshCount',
+                request_serializer=mjc__message__pb2.QueryDebugMeshCountRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.QueryDebugMeshCountResponse.FromString,
+                _registered_method=True)
+        self.RegisterCustomMesh = channel.unary_unary(
+                '/MujocoMessage.GrpcService/RegisterCustomMesh',
+                request_serializer=mjc__message__pb2.RegisterCustomMeshRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.RegisterCustomMeshResponse.FromString,
+                _registered_method=True)
+        self.RegisterCustomMeshFromObj = channel.unary_unary(
+                '/MujocoMessage.GrpcService/RegisterCustomMeshFromObj',
+                request_serializer=mjc__message__pb2.RegisterCustomMeshFromObjRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.RegisterCustomMeshFromObjResponse.FromString,
+                _registered_method=True)
+        self.UnregisterCustomMesh = channel.unary_unary(
+                '/MujocoMessage.GrpcService/UnregisterCustomMesh',
+                request_serializer=mjc__message__pb2.UnregisterCustomMeshRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.UnregisterCustomMeshResponse.FromString,
+                _registered_method=True)
+        self.DrawCustomMeshBatch = channel.unary_unary(
+                '/MujocoMessage.GrpcService/DrawCustomMeshBatch',
+                request_serializer=mjc__message__pb2.DrawCustomMeshBatchRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.DrawCustomMeshBatchResponse.FromString,
+                _registered_method=True)
 
 
 class GrpcServiceServicer(object):
@@ -1042,6 +1097,78 @@ class GrpcServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DrawDebugMeshBatch(self, request, context):
+        """=== DebugMesh (路径 A：Python 发起) ===
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ClearDebugMesh(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateDebugMeshObjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateDebugMeshTransforms(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def KeepAliveDebugMeshObjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DestroyDebugMeshObjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QueryDebugMeshCount(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RegisterCustomMesh(self, request, context):
+        """=== Custom Mesh (Phase C/O：用户提供的顶点/索引或 OBJ 文件) ===
+        注册自定义网格（顶点 + 索引），返回 CustomMeshHandle
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RegisterCustomMeshFromObj(self, request, context):
+        """注册 OBJ 文本（Python 读取文件后传文本），返回 CustomMeshHandle
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UnregisterCustomMesh(self, request, context):
+        """注销自定义网格，释放 GPU 资源
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DrawCustomMeshBatch(self, request, context):
+        """绘制自定义网格（immediate，单帧/TTL）
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GrpcServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1494,6 +1621,61 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.QueryLiDARPointCloud,
                     request_deserializer=mjc__message__pb2.LiDARPointCloudRequest.FromString,
                     response_serializer=mjc__message__pb2.LiDARPointCloudResponse.SerializeToString,
+            ),
+            'DrawDebugMeshBatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.DrawDebugMeshBatch,
+                    request_deserializer=mjc__message__pb2.DrawDebugMeshBatchRequest.FromString,
+                    response_serializer=mjc__message__pb2.DrawDebugMeshBatchResponse.SerializeToString,
+            ),
+            'ClearDebugMesh': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClearDebugMesh,
+                    request_deserializer=mjc__message__pb2.ClearDebugMeshRequest.FromString,
+                    response_serializer=mjc__message__pb2.ClearDebugMeshResponse.SerializeToString,
+            ),
+            'CreateDebugMeshObjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateDebugMeshObjects,
+                    request_deserializer=mjc__message__pb2.CreateDebugMeshObjectsRequest.FromString,
+                    response_serializer=mjc__message__pb2.CreateDebugMeshObjectsResponse.SerializeToString,
+            ),
+            'UpdateDebugMeshTransforms': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateDebugMeshTransforms,
+                    request_deserializer=mjc__message__pb2.UpdateDebugMeshTransformsRequest.FromString,
+                    response_serializer=mjc__message__pb2.UpdateDebugMeshTransformsResponse.SerializeToString,
+            ),
+            'KeepAliveDebugMeshObjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.KeepAliveDebugMeshObjects,
+                    request_deserializer=mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.FromString,
+                    response_serializer=mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.SerializeToString,
+            ),
+            'DestroyDebugMeshObjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.DestroyDebugMeshObjects,
+                    request_deserializer=mjc__message__pb2.DestroyDebugMeshObjectsRequest.FromString,
+                    response_serializer=mjc__message__pb2.DestroyDebugMeshObjectsResponse.SerializeToString,
+            ),
+            'QueryDebugMeshCount': grpc.unary_unary_rpc_method_handler(
+                    servicer.QueryDebugMeshCount,
+                    request_deserializer=mjc__message__pb2.QueryDebugMeshCountRequest.FromString,
+                    response_serializer=mjc__message__pb2.QueryDebugMeshCountResponse.SerializeToString,
+            ),
+            'RegisterCustomMesh': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterCustomMesh,
+                    request_deserializer=mjc__message__pb2.RegisterCustomMeshRequest.FromString,
+                    response_serializer=mjc__message__pb2.RegisterCustomMeshResponse.SerializeToString,
+            ),
+            'RegisterCustomMeshFromObj': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterCustomMeshFromObj,
+                    request_deserializer=mjc__message__pb2.RegisterCustomMeshFromObjRequest.FromString,
+                    response_serializer=mjc__message__pb2.RegisterCustomMeshFromObjResponse.SerializeToString,
+            ),
+            'UnregisterCustomMesh': grpc.unary_unary_rpc_method_handler(
+                    servicer.UnregisterCustomMesh,
+                    request_deserializer=mjc__message__pb2.UnregisterCustomMeshRequest.FromString,
+                    response_serializer=mjc__message__pb2.UnregisterCustomMeshResponse.SerializeToString,
+            ),
+            'DrawCustomMeshBatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.DrawCustomMeshBatch,
+                    request_deserializer=mjc__message__pb2.DrawCustomMeshBatchRequest.FromString,
+                    response_serializer=mjc__message__pb2.DrawCustomMeshBatchResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3926,6 +4108,303 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/QueryLiDARPointCloud',
             mjc__message__pb2.LiDARPointCloudRequest.SerializeToString,
             mjc__message__pb2.LiDARPointCloudResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DrawDebugMeshBatch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/DrawDebugMeshBatch',
+            mjc__message__pb2.DrawDebugMeshBatchRequest.SerializeToString,
+            mjc__message__pb2.DrawDebugMeshBatchResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClearDebugMesh(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/ClearDebugMesh',
+            mjc__message__pb2.ClearDebugMeshRequest.SerializeToString,
+            mjc__message__pb2.ClearDebugMeshResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateDebugMeshObjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/CreateDebugMeshObjects',
+            mjc__message__pb2.CreateDebugMeshObjectsRequest.SerializeToString,
+            mjc__message__pb2.CreateDebugMeshObjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateDebugMeshTransforms(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/UpdateDebugMeshTransforms',
+            mjc__message__pb2.UpdateDebugMeshTransformsRequest.SerializeToString,
+            mjc__message__pb2.UpdateDebugMeshTransformsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def KeepAliveDebugMeshObjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/KeepAliveDebugMeshObjects',
+            mjc__message__pb2.KeepAliveDebugMeshObjectsRequest.SerializeToString,
+            mjc__message__pb2.KeepAliveDebugMeshObjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DestroyDebugMeshObjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/DestroyDebugMeshObjects',
+            mjc__message__pb2.DestroyDebugMeshObjectsRequest.SerializeToString,
+            mjc__message__pb2.DestroyDebugMeshObjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QueryDebugMeshCount(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/QueryDebugMeshCount',
+            mjc__message__pb2.QueryDebugMeshCountRequest.SerializeToString,
+            mjc__message__pb2.QueryDebugMeshCountResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RegisterCustomMesh(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/RegisterCustomMesh',
+            mjc__message__pb2.RegisterCustomMeshRequest.SerializeToString,
+            mjc__message__pb2.RegisterCustomMeshResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RegisterCustomMeshFromObj(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/RegisterCustomMeshFromObj',
+            mjc__message__pb2.RegisterCustomMeshFromObjRequest.SerializeToString,
+            mjc__message__pb2.RegisterCustomMeshFromObjResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UnregisterCustomMesh(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/UnregisterCustomMesh',
+            mjc__message__pb2.UnregisterCustomMeshRequest.SerializeToString,
+            mjc__message__pb2.UnregisterCustomMeshResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DrawCustomMeshBatch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/DrawCustomMeshBatch',
+            mjc__message__pb2.DrawCustomMeshBatchRequest.SerializeToString,
+            mjc__message__pb2.DrawCustomMeshBatchResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -87,7 +87,15 @@ class CameraWrapper:
         if not self.enabled:
             return
         self.running = False
-        asyncio.get_event_loop().stop()
+        # 不调用 asyncio.get_event_loop().stop()：
+        # CameraWrapper 在子线程中通过 asyncio.run 创建独立的 event loop，
+        # 而 asyncio.get_event_loop() 在主线程返回的是主线程的 event loop
+        # （EulerEnv 的 self.loop），停掉它会导致后续 render() 抛
+        # RuntimeError: Event loop stopped before Future completed。
+        # 子线程的 websocket.recv() 在连接关闭时会抛 ConnectionClosed，
+        # do_stuff 退出，asyncio.run 结束，线程自然终止。
+        if self.thread.is_alive():
+            self.thread.join(timeout=2.0)
 
     def get_frame(self, format='bgr24', size : tuple = None) -> tuple[np.ndarray, int]:
         if format == 'bgr24':

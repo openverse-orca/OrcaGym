@@ -177,9 +177,9 @@ class OrcaGymModel:
         
         使用示例:
             ```python
-            # 设置 mocap body 位置用于物体操作
+            # 设置 mocap body 位置用于物体操作（body 名为默认关卡自带的 anchor mocap body）
             self.set_mocap_pos_and_quat({
-                "ActorManipulator_Anchor": {
+                "ORCA_MANIPULATOR_<uuid>_Anchor": {  # 旧关卡为 ActorManipulator_Anchor
                     "pos": np.array([0.5, 0.0, 0.8]),
                     "quat": np.array([1.0, 0.0, 0.0, 0.0])
                 }

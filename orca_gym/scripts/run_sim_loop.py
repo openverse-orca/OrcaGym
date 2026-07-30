@@ -1,5 +1,4 @@
 import sys
-sys.path.append("/home/orca/Projects/OrcaGym")
 
 from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
@@ -122,13 +121,6 @@ def run_simulation(orcagym_addr : str,
             action = env.action_space.sample()
     
             obs, reward, terminated, truncated, info = env.step(action)
-            lidar_cloud = env.unwrapped.query_lidar_point_cloud("LiDAR")
-            if lidar_cloud is not None:
-                ranges = lidar_cloud['ranges']
-                points = lidar_cloud['points']
-                valid_mask = ranges > 0
-                valid_points = points[valid_mask]
-                print(f"Valid points size: {valid_points.shape[0]}")
 
             env.render()
 
@@ -145,8 +137,28 @@ def run_simulation(orcagym_addr : str,
 
 def main():
     """命令行入口函数"""
-    orcagym_addr = "localhost:50051"
-    agent_name = "NoRobot"
+    import argparse
+
+    parser = argparse.ArgumentParser(description="OrcaGym 仿真循环")
+    parser.add_argument(
+        "--euler",
+        action="store_true",
+        help="使用 Euler 架构（OrcaGymEulerEnv）启动空白仿真循环",
+    )
+    parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
+    parser.add_argument("--agent", default="NoRobot", help="智能体名称")
+    args, _ = parser.parse_known_args()
+
+    if args.euler:
+        # 转发到 Euler loop（agent 名称默认对齐 Euler 约定）
+        from orca_gym.scripts.run_euler_loop import main as euler_main
+
+        euler_argv = ["--addr", args.addr, "--agent", args.agent if args.agent != "NoRobot" else "NoAgent"]
+        euler_main(euler_argv)
+        return
+
+    orcagym_addr = args.addr
+    agent_name = args.agent
     env_name = "SimulationLoop"
     run_simulation(orcagym_addr, agent_name, env_name)
 

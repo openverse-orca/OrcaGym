@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orca-gym"
-version = "26.6.3"
+version = "26.7.1.15"
 description = "OrcaGym Core - Cloud-native robotics simulation platform compatible with Gymnasium API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,15 +25,15 @@ Repository = "https://github.com/openverse-orca/OrcaGym"
 "Bug Tracker" = "https://github.com/openverse-orca/OrcaGym/issues"
 
 [project.optional-dependencies]
-dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy",]
+dev = [ "pytest", "pytest-cov", "flake8", "black", "mypy", "ruff",]
 rl = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard",]
 imitation = [ "h5py", "opencv-python", "tqdm",]
 devices = [ "pygame>=2.6.0",]
-sensors = [ "websockets", "av", "opencv-python", "matplotlib",]
+sensors = [ "websockets", "av", "opencv-python", "matplotlib", "pillow",]
 tools = [ "pyyaml", "trimesh", "requests", "tqdm",]
 robomimic = [ "h5py", "termcolor", "opencv-python",]
 robosuite = [ "numba",]
-all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask",]
+all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask", "pillow",]
 
 [project.scripts]
 orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
@@ -44,6 +44,20 @@ license-files = []
 [tool.setuptools.package-data]
 orca_gym = [ "*.proto", "py.typed", "**/*.json",]
 
+[tool.ruff.lint]
+select = [ "SLF001",]
+exclude = []
+
 [tool.setuptools.packages.find]
 include = [ "orca_gym*",]
 exclude = [ "doc*", "3rd_party*", "tests*",]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [ "SLF001",]
+"**/__init__.py" = [ "SLF001", "F401",]
+"orca_gym/protos/**" = [ "SLF001",]
+"orca_gym/adapters/**" = [ "SLF001",]
+"orca_gym/environment/orca_gym_local_env.py" = [ "SLF001",]
+"orca_gym/environment/orca_gym_local.py" = [ "SLF001",]
+"orca_gym/scripts/**" = [ "SLF001",]
+"orca_gym/tools/**" = [ "SLF001",]
