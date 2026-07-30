@@ -10,9 +10,9 @@ OrcaGym is an open-source robot simulation platform that provides an interface f
 
 | Section | Description |
 |---------|-------------|
-| [🐋 What is OrcaGym](what-is-orcagym.md) | What OrcaGym is, core features at a glance |
-| [🧬 Why Choose OrcaGym](why-orcagym.md) | Comparison and advantages over other simulation platforms |
-| [🛠️ Installation Guide](installation.md) | Installation and configuration |
+| [🐋 What is OrcaGym](getting-started/what-is-orcagym.md) | What OrcaGym is, core features at a glance |
+| [🧬 Why Choose OrcaGym](getting-started/why-orcagym.md) | Comparison and advantages over other simulation platforms |
+| [🛠️ Installation Guide](getting-started/installation.md) | Installation and configuration |
 
 ---
 
@@ -51,4 +51,4 @@ OrcaGym is part of the robot simulation ecosystem:
 
 ## Next Steps
 
-Start with the [Installation Guide](installation.md), then read the [Beginner's Tutorial](../tutorial/beginners/index.md) to run your first simulation!
+Start with the [Installation Guide](getting-started/installation.md), then read the [Beginner's Tutorial](tutorial/beginners/index.md) to run your first simulation!
