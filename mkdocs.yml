@@ -155,6 +155,7 @@ plugins:
         - locale: en
           name: English
           site_name: OrcaGym Documentation
+          copyright: Copyright &copy; Shanghai Songying Technology Co., Ltd.
           build: true
           nav:
             - Introduction:
