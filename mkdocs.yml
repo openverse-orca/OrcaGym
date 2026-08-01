@@ -1,0 +1,227 @@
+site_name: OrcaGym 文档
+site_url: https://openverse-orca.github.io/OrcaGym/
+repo_name: openverse-orca/orcagym
+repo_url: https://github.com/openverse-orca/OrcaGym
+
+theme:
+  name: material
+  language: zh 
+  icon:
+    logo: material/robot-outline
+    repo: fontawesome/brands/github
+
+  palette:
+    # 亮色模式（默认）
+    - scheme: default
+      primary: deep purple
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 亮色模式
+    # 暗色模式 - 赛博朋克风
+    - scheme: slate
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: 暗色模式
+
+  font:
+    text: Roboto
+    code: JetBrains Mono
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+extra_css:
+  - extra.css
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+copyright: Copyright &copy; 松应科技有限公司 
+  # <a href="https://github.com/pbhu1024/orcagym/issues">反馈问题</a>
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/openverse-orca/OrcaGym
+      name: OrcaGym on GitHub
+
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder          # 推荐用 suffix（也支持 folder）
+      languages:
+        - locale: zh
+          default: true
+          name: 简体中文
+          site_name: OrcaGym 文档
+          build: true
+          nav:
+            - 简介:
+              - 什么是 OrcaGym: getting-started/what-is-orcagym.md
+              - 为什么选择 OrcaGym: getting-started/why-orcagym.md
+              - 安装指南: getting-started/installation.md
+            - 核心概念:
+              - 概览: core_concepts/index.md
+              - 架构概览: core_concepts/architecture-overview.md
+              - 系统架构: core_concepts/architecture.md
+              - Gym 接口: core_concepts/gym-interface.md
+              - 数据流: core_concepts/data-flow.md
+              - 模型-数据优化: core_concepts/model-data-opt.md
+            - 教程:
+              - 🎓 新手入门:
+                - 新手概览: tutorial/beginners/index.md
+                - Hello World: tutorial/beginners/hello-world.md
+                - 场景搭建: tutorial/beginners/scene-setup.md
+                - 第一个环境: tutorial/beginners/your-first-env.md
+                - 读取状态: tutorial/beginners/state-queries.md
+                - 让机器人动起来: tutorial/beginners/move-a-joint.md
+                - 相机与视觉: tutorial/beginners/camera-and-vision.md
+                - 简单控制器: tutorial/beginners/simple-controller.md
+                - 搭建一个任务: tutorial/beginners/build-a-task.md
+              - ⚛️ 物理仿真:
+                - 概览: tutorial/physics/index.md
+                - 接触与力: tutorial/physics/contacts-forces.md
+                - 等式约束: tutorial/physics/equality-constraints.md
+                - MuJoCo 后端: tutorial/physics/mujoco-backend.md
+                - 软体: tutorial/physics/soft-bodies.md
+                - 状态管理: tutorial/physics/state-management.md
+              - 🤖 机器人控制:
+                - 概览: tutorial/robot_control/index.md
+                - 动作空间: tutorial/robot_control/action-space.md
+                - 逆运动学: tutorial/robot_control/inverse-kinematics.md
+                - 关节控制: tutorial/robot_control/joint-control.md
+                - Mocap 控制: tutorial/robot_control/mocap-control.md
+                - 观测空间: tutorial/robot_control/observation-space.md
+              - 🎬 场景:
+                - 概览: tutorial/scene/index.md
+                - 角色操作: tutorial/scene/actor-manipulation.md
+                - 资源渲染: tutorial/scene/assets-rendering.md
+                - 场景加载: tutorial/scene/scene-loading.md
+                - 地形生成: tutorial/scene/terrain-generation.md
+              - 👁️ 感知:
+                - 概览: tutorial/sensing/index.md
+                - 接触感知: tutorial/sensing/contact-sensing.md
+                - RGBD 相机: tutorial/sensing/rgbd-camera.md
+                - 传感器: tutorial/sensing/sensors.md
+              - 🔧 工具:
+                - 概览: tutorial/tools/index.md
+                - 资源处理: tutorial/tools/asset-processing.md
+                - HDF5 查看器: tutorial/tools/hdf5-viewer.md
+                - 输入设备: tutorial/tools/input-devices.md
+                - RLlib 适配器: tutorial/tools/rllib-adapter.md
+                - Robomimic 适配器: tutorial/tools/robomimic-adapter.md
+                - Robosuite 适配器: tutorial/tools/robosuite-adapter.md
+                - 地形工具: tutorial/tools/terrain-tools.md
+            - API 参考:
+              - API 概览: api_reference/index.md
+              - 核心 API: api_reference/core.md
+              - 环境: api_reference/environment.md
+              - 场景: api_reference/scene.md
+              - 传感器: api_reference/sensor.md
+              - 工具函数: api_reference/utils.md
+            - 常见问题:
+              - FAQ: faq/faq.md
+        - locale: en
+          name: English
+          site_name: OrcaGym Documentation
+          build: true
+          nav:
+            - Introduction:
+              - What is OrcaGym: getting-started/what-is-orcagym.md
+              - Why OrcaGym: getting-started/why-orcagym.md
+              - Installation Guide: getting-started/installation.md
+            - Core Concepts:
+              - Overview: core_concepts/index.md
+              - Architecture Overview: core_concepts/architecture-overview.md
+              - System Architecture: core_concepts/architecture.md
+              - Gym Interface: core_concepts/gym-interface.md
+              - Data Flow: core_concepts/data-flow.md
+              - Model-Data Optimization: core_concepts/model-data-opt.md
+            - Tutorials:
+              - 🎓 Beginners:
+                - Overview: tutorial/beginners/index.md
+                - Hello World: tutorial/beginners/hello-world.md
+                - Scene Setup: tutorial/beginners/scene-setup.md
+                - Your First Environment: tutorial/beginners/your-first-env.md
+                - State Queries: tutorial/beginners/state-queries.md
+                - Moving a Joint: tutorial/beginners/move-a-joint.md
+                - Camera and Vision: tutorial/beginners/camera-and-vision.md
+                - Simple Controller: tutorial/beginners/simple-controller.md
+                - Building a Task: tutorial/beginners/build-a-task.md
+              - ⚛️ Physics Simulation:
+                - Overview: tutorial/physics/index.md
+                - Contacts and Forces: tutorial/physics/contacts-forces.md
+                - Equality Constraints: tutorial/physics/equality-constraints.md
+                - MuJoCo Backend: tutorial/physics/mujoco-backend.md
+                - Soft Bodies: tutorial/physics/soft-bodies.md
+                - State Management: tutorial/physics/state-management.md
+              - 🤖 Robot Control:
+                - Overview: tutorial/robot_control/index.md
+                - Action Space: tutorial/robot_control/action-space.md
+                - Inverse Kinematics: tutorial/robot_control/inverse-kinematics.md
+                - Joint Control: tutorial/robot_control/joint-control.md
+                - Mocap Control: tutorial/robot_control/mocap-control.md
+                - Observation Space: tutorial/robot_control/observation-space.md
+              - 🎬 Scene:
+                - Overview: tutorial/scene/index.md
+                - Actor Manipulation: tutorial/scene/actor-manipulation.md
+                - Asset Rendering: tutorial/scene/assets-rendering.md
+                - Scene Loading: tutorial/scene/scene-loading.md
+                - Terrain Generation: tutorial/scene/terrain-generation.md
+              - 👁️ Sensing:
+                - Overview: tutorial/sensing/index.md
+                - Contact Sensing: tutorial/sensing/contact-sensing.md
+                - RGBD Camera: tutorial/sensing/rgbd-camera.md
+                - Sensors: tutorial/sensing/sensors.md
+              - 🔧 Tools:
+                - Overview: tutorial/tools/index.md
+                - Asset Processing: tutorial/tools/asset-processing.md
+                - HDF5 Viewer: tutorial/tools/hdf5-viewer.md
+                - Input Devices: tutorial/tools/input-devices.md
+                - RLlib Adapter: tutorial/tools/rllib-adapter.md
+                - Robomimic Adapter: tutorial/tools/robomimic-adapter.md
+                - Robosuite Adapter: tutorial/tools/robosuite-adapter.md
+                - Terrain Tools: tutorial/tools/terrain-tools.md
+            - API Reference:
+              - API Overview: api_reference/index.md
+              - Core API: api_reference/core.md
+              - Environment: api_reference/environment.md
+              - Scene: api_reference/scene.md
+              - Sensor: api_reference/sensor.md
+              - Utilities: api_reference/utils.md
+            - FAQ:
+              - FAQ: faq/faq.md
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: datetime

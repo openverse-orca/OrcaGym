@@ -20,6 +20,7 @@ reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
 
 import asyncio
 import time
+import warnings
 from typing import Any, Dict, Tuple, Union
 
 import grpc
@@ -31,10 +32,13 @@ from scipy.spatial.transform import Rotation as R
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.utils.orca_debug_draw import DebugDraw
 from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env_mixin import OrcaGymEnvMixin
+
+_logger = get_orca_logger()
 
 
 class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
@@ -133,7 +137,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._last_frame_index = -1
 
         # 5. 锚点状态（UI 抓取内部方法 _anchor_actor/_release_body_anchored 使用）
-        self._anchor_mocap_name: str = "ActorManipulator_Anchor"  # 固定，对齐 Local
+        # 默认关卡 ActorManipulator 已改名为 UUID 化的 ORCA_MANIPULATOR_<uuid>，
+        # 旧关卡在 initialize_simulation 末尾按需回退到 ActorManipulator_Anchor。
+        _ORCA_MANIPULATOR_UUID = "a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e"
+        self._anchor_mocap_name: str = f"ORCA_MANIPULATOR_{_ORCA_MANIPULATOR_UUID}_Anchor"
         self._anchored_actor: str | None = None      # 当前锚定的 actor 名称
         self._anchor_type: str | None = None         # 当前锚点类型
         # 锚定前 XML 原始约束数据（释放时恢复，对齐 Local 的 dummy body 机制）
@@ -216,6 +223,21 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         if not self._skip_grpc_load:
             self._studio_bridge.set_timestep_remote(self._time_step)
         # 5. 返回 (OrcaGymModel, OrcaGymDataView)
+        # 6. 兼容回退：旧关卡用 ActorManipulator_Anchor，新关卡用 ORCA_MANIPULATOR_<uuid>_Anchor
+        try:
+            body_names = self._gym.model.get_body_names()
+            _legacy_anchor = "ActorManipulator_Anchor"
+            if self._anchor_mocap_name not in body_names and _legacy_anchor in body_names:
+                self._anchor_mocap_name = _legacy_anchor
+                warnings.warn(
+                    f"Using legacy anchor mocap body name '{_legacy_anchor}'. "
+                    f"Please upgrade the level to use the new UUID-based name "
+                    f"'ORCA_MANIPULATOR_<uuid>_Anchor' to avoid name conflicts with user-imported XML.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+        except Exception as e:
+            _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
         return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
@@ -1300,7 +1322,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             (:meth:`equality_find_slot_by_body` / :meth:`equality_constraint` /
             :meth:`equality_update` / :meth:`set_mocap_pos_and_quat`)。
 
-        使用 Studio 系统自带的 ActorManipulator_Anchor mocap body，
+        使用 Studio 系统自带的 anchor mocap body
+        （默认 ORCA_MANIPULATOR_<uuid>_Anchor，旧关卡 ActorManipulator_Anchor），
         对齐 OrcaGymLocalEnv 的 anchor_actor 语义。
 
         编排完全基于公共无状态原语（不依赖已删除的 equality_bind_mocap）：
