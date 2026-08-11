@@ -291,7 +291,10 @@ class TestBridgeMocapFunctional(unittest.TestCase):
 
 
 # =============================================================================
-# 阶段三 3.4.1：OrcaStudioBridge 视频录制方法
+# 阶段三 3.4.1 / 3.4.2：OrcaStudioBridge 视频录制 / 帧捕获方法（已废弃）
+# 引擎侧 BeginSaveMp4File / StopSaveMp4File / GetCurrentFrameIndex / GetTimeStamp
+# 四个 RPC 已从 proto 中删除。bridge 层降级为 no-op + DeprecationWarning。
+# 录制能力已迁移到客户端 PyAV remux（orca_gym/recorder/）。
 # =============================================================================
 
 
@@ -299,24 +302,31 @@ class TestBridgeVideoArchCompliance(unittest.TestCase):
     """子步骤 3.4.1 架构遵从性测试（K9 走 bridge + 离线 no-op）。
 
     对应文档 §8.2 架构遵从性测试表。
+
+    .. note::
+        引擎侧 MP4 录制 RPC 已删除，bridge 层降级为 no-op + DeprecationWarning。
+        在线/离线模式行为一致：不调用 stub，直接返回 None 并发出警告。
     """
 
     def test_bridge_video_offline_noop(self):
-        """K9: 离线模式（_stub is None）不抛错，直接 return。"""
+        """K9: 离线模式（_stub is None）不抛错，no-op + DeprecationWarning。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        # 离线模式调用不抛错
-        asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
-        asyncio.run(bridge.stop_save_video())
+        # 离线模式调用不抛错（但发出 DeprecationWarning）
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
+            asyncio.run(bridge.stop_save_video())
 
     def test_bridge_video_no_mjdata_dependency(self):
         """K9/P2: grep 断言视频方法不触 MjData/MjModel/_mjData/_mjModel。"""
         import inspect
 
         source = inspect.getsource(OrcaStudioBridge)
-        start = source.find("# --- 视频录制（阶段三 3.4.1）---")
-        self.assertGreater(start, 0, "未找到 3.4.1 视频录制区块")
+        start = source.find("# --- 视频录制 / 帧捕获（已废弃）---")
+        self.assertGreater(start, 0, "未找到视频录制/帧捕获（已废弃）区块")
         block = source[start:]
         # 视频方法块内不应出现 MjData/MjModel 的访问
         self.assertNotIn("MjData", block)
@@ -328,81 +338,116 @@ class TestBridgeVideoArchCompliance(unittest.TestCase):
         """K9: 方法为 async def，返回 None。"""
         import asyncio
         import inspect
+        import warnings
 
         self.assertTrue(inspect.iscoroutinefunction(OrcaStudioBridge.begin_save_video))
         self.assertTrue(inspect.iscoroutinefunction(OrcaStudioBridge.stop_save_video))
         # 离线模式返回 None
         bridge = OrcaStudioBridge()
-        ret = asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
-        self.assertIsNone(ret)
-        ret = asyncio.run(bridge.stop_save_video())
-        self.assertIsNone(ret)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
+            self.assertIsNone(ret)
+            ret = asyncio.run(bridge.stop_save_video())
+            self.assertIsNone(ret)
+
+    def test_bridge_video_emits_deprecation_warning(self):
+        """新增：所有视频/帧捕获方法应发出 DeprecationWarning。"""
+        import asyncio
+        import warnings
+
+        bridge = OrcaStudioBridge()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            asyncio.run(bridge.begin_save_video("/tmp/test.mp4", capture_mode=0))
+            asyncio.run(bridge.stop_save_video())
+            asyncio.run(bridge.get_current_frame())
+            asyncio.run(bridge.get_camera_time_stamp(0))
+            self.assertEqual(len(w), 4)
+            for warning in w:
+                self.assertIs(warning.category, DeprecationWarning)
 
 
 class TestBridgeVideoFunctional(unittest.TestCase):
     """子步骤 3.4.1 功能单元测试。
 
     对应文档 §8.2 功能单元测试表。
+
+    .. note::
+        引擎侧 MP4 录制 RPC 已删除，在线/离线模式均为 no-op + DeprecationWarning。
+        原 online_calls_stub 测试已废弃（不再调用 stub）。
     """
 
     def test_begin_save_video_offline_noop(self):
         """离线模式返回 None 不抛错。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        ret = asyncio.run(
-            bridge.begin_save_video("/tmp/test.mp4", capture_mode=0)
-        )
-        self.assertIsNone(ret)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = asyncio.run(
+                bridge.begin_save_video("/tmp/test.mp4", capture_mode=0)
+            )
+            self.assertIsNone(ret)
 
     def test_stop_save_video_offline_noop(self):
         """离线模式返回 None 不抛错。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        ret = asyncio.run(bridge.stop_save_video())
-        self.assertIsNone(ret)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = asyncio.run(bridge.stop_save_video())
+            self.assertIsNone(ret)
 
-    def test_begin_save_video_online_calls_stub(self):
-        """在线模式（mock stub）调用 BeginSaveMp4File。"""
+    def test_begin_save_video_online_noop(self):
+        """在线模式（mock stub）不再调用 stub，no-op + DeprecationWarning。
+
+        引擎侧 BeginSaveMp4File RPC 已删除，bridge 层降级为 no-op。
+        """
         import asyncio
+        import warnings
 
-        captured = {}
+        called = {"count": 0}
 
         class MockStub:
             async def BeginSaveMp4File(self, request):
-                captured["request"] = request
-                from orca_gym.protos import mjc_message_pb2
-                return mjc_message_pb2.BeginSaveMp4FileResponse()
+                called["count"] += 1
 
         bridge = OrcaStudioBridge(stub=MockStub())
-        asyncio.run(
-            bridge.begin_save_video("/tmp/test.mp4", capture_mode=1)
-        )
-        self.assertIn("request", captured)
-        req = captured["request"]
-        self.assertEqual(req.file_path, "/tmp/test.mp4")
-        self.assertEqual(req.capture_mode, 1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            asyncio.run(
+                bridge.begin_save_video("/tmp/test.mp4", capture_mode=1)
+            )
+        # stub 不应被调用
+        self.assertEqual(called["count"], 0)
 
-    def test_stop_save_video_online_calls_stub(self):
-        """在线模式调用 StopSaveMp4File。"""
+    def test_stop_save_video_online_noop(self):
+        """在线模式不再调用 stub，no-op + DeprecationWarning。
+
+        引擎侧 StopSaveMp4File RPC 已删除，bridge 层降级为 no-op。
+        """
         import asyncio
+        import warnings
 
         called = {"count": 0}
 
         class MockStub:
             async def StopSaveMp4File(self, request):
                 called["count"] += 1
-                from orca_gym.protos import mjc_message_pb2
-                return mjc_message_pb2.StopSaveMp4FileResponse()
 
         bridge = OrcaStudioBridge(stub=MockStub())
-        asyncio.run(bridge.stop_save_video())
-        self.assertEqual(called["count"], 1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            asyncio.run(bridge.stop_save_video())
+        self.assertEqual(called["count"], 0)
 
 
 # =============================================================================
-# 阶段三 3.4.2：OrcaStudioBridge 帧捕获方法
+# 阶段三 3.4.2：OrcaStudioBridge 帧捕获方法（已废弃）
 # =============================================================================
 
 
@@ -410,25 +455,32 @@ class TestBridgeFrameArchCompliance(unittest.TestCase):
     """子步骤 3.4.2 架构遵从性测试（K9 走 bridge + K11 typed 返回）。
 
     对应文档 §8.3 架构遵从性测试表。
+
+    .. note::
+        引擎侧帧捕获 RPC 已删除，bridge 层降级为 no-op + DeprecationWarning。
+        返回值仍保持 typed（int / dict）。
     """
 
     def test_bridge_frame_offline_returns_default(self):
         """K9: 离线模式返回默认值（-1/空 dict）不抛错。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
-        self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
-        # get_frame_png 离线 no-op
-        asyncio.run(bridge.get_frame_png("/tmp/test.png"))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
+            self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
+            # get_frame_png 离线 no-op（未废弃）
+            asyncio.run(bridge.get_frame_png("/tmp/test.png"))
 
     def test_bridge_frame_no_mjdata_dependency(self):
         """K9/P2: grep 断言帧方法不触 MjData/MjModel/_mjData/_mjModel。"""
         import inspect
 
         source = inspect.getsource(OrcaStudioBridge)
-        start = source.find("# --- 帧捕获（阶段三 3.4.2）---")
-        self.assertGreater(start, 0, "未找到 3.4.2 帧捕获区块")
+        start = source.find("# --- 视频录制 / 帧捕获（已废弃）---")
+        self.assertGreater(start, 0, "未找到视频录制/帧捕获（已废弃）区块")
         block = source[start:]
         self.assertNotIn("MjData", block)
         self.assertNotIn("MjModel", block)
@@ -438,60 +490,80 @@ class TestBridgeFrameArchCompliance(unittest.TestCase):
     def test_bridge_frame_returns_typed(self):
         """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        ret = asyncio.run(bridge.get_current_frame())
-        self.assertIsInstance(ret, int)
-        ret = asyncio.run(bridge.get_camera_time_stamp(0))
-        self.assertIsInstance(ret, dict)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = asyncio.run(bridge.get_current_frame())
+            self.assertIsInstance(ret, int)
+            ret = asyncio.run(bridge.get_camera_time_stamp(0))
+            self.assertIsInstance(ret, dict)
 
 
 class TestBridgeFrameFunctional(unittest.TestCase):
     """子步骤 3.4.2 功能单元测试。
 
     对应文档 §8.3 功能单元测试表。
+
+    .. note::
+        引擎侧帧捕获 RPC 已删除，在线/离线模式均为 no-op + DeprecationWarning。
+        原 online_calls_stub 测试已废弃（不再调用 stub）。
     """
 
     def test_get_current_frame_offline_returns_neg1(self):
         """离线模式返回 -1。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(asyncio.run(bridge.get_current_frame()), -1)
 
     def test_get_camera_time_stamp_offline_returns_empty(self):
         """离线模式返回空 dict。"""
         import asyncio
+        import warnings
 
         bridge = OrcaStudioBridge()
-        self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(asyncio.run(bridge.get_camera_time_stamp(0)), {})
 
     def test_get_frame_png_offline_noop(self):
-        """离线模式 no-op。"""
+        """离线模式 no-op（get_frame_png 未废弃）。"""
         import asyncio
 
         bridge = OrcaStudioBridge()
         ret = asyncio.run(bridge.get_frame_png("/tmp/test.png"))
         self.assertIsNone(ret)
 
-    def test_get_current_frame_online_calls_stub(self):
-        """在线模式委托 stub。"""
-        import asyncio
+    def test_get_current_frame_online_noop(self):
+        """在线模式不再调用 stub，no-op + DeprecationWarning，返回 -1。
 
-        captured = {}
+        引擎侧 GetCurrentFrameIndex RPC 已删除，bridge 层降级为 no-op。
+        """
+        import asyncio
+        import warnings
+
+        called = {"count": 0}
 
         class MockStub:
             async def GetCurrentFrameIndex(self, request):
-                captured["called"] = True
+                called["count"] += 1
                 from orca_gym.protos import mjc_message_pb2
                 resp = mjc_message_pb2.GetCurrentFrameIndexResponse()
                 resp.current_frame = 42
                 return resp
 
         bridge = OrcaStudioBridge(stub=MockStub())
-        ret = asyncio.run(bridge.get_current_frame())
-        self.assertTrue(captured.get("called"))
-        self.assertEqual(ret, 42)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = asyncio.run(bridge.get_current_frame())
+        # stub 不应被调用，返回 -1
+        self.assertEqual(called["count"], 0)
+        self.assertEqual(ret, -1)
 
 
 # =============================================================================

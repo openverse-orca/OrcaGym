@@ -2,6 +2,7 @@ import sys
 import os
 import grpc
 import aiofiles
+import warnings
 import xml.etree.ElementTree as ET
 import tempfile
 import shutil
@@ -213,11 +214,17 @@ class OrcaGymWarp(OrcaGymBase):
         mujoco.mj_forward(self._mjModel, self._mjData)
         self._mjData.qacc[:] = gpu_qacc
 
-    async def render(self):
-        await self.update_local_env(self.data.qpos, self._mjData.time)
+    async def render(self, simulate_index: int = -1, request_idr: bool = False):
+        await self.update_local_env(
+            self.data.qpos, self._mjData.time, simulate_index, request_idr
+        )
 
-    async def update_local_env(self, qpos, time):
-        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+    async def update_local_env(
+        self, qpos, time, simulate_index: int = -1, request_idr: bool = False
+    ):
+        request = mjc_message_pb2.UpdateLocalEnvRequest(
+            qpos=qpos, time=time, simulate_index=simulate_index, request_idr=request_idr
+        )
         response = await self.stub.UpdateLocalEnv(request)
         override_ctrls = response.override_ctrls
         self._override_ctrls.clear()
@@ -299,29 +306,46 @@ class OrcaGymWarp(OrcaGymBase):
         return
 
     async def begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC):
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
-        response = await self.stub.BeginSaveMp4File(request)
-        if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
-            _logger.info(f"Video saving started at {file_path}")
-        else:
-            _logger.error(f"Failed to start video saving: {response.error_message}")
+        """[Deprecated] 引擎侧 MP4 录制 RPC 已删除，no-op + DeprecationWarning。"""
+        warnings.warn(
+            "begin_save_video is deprecated: engine-side MP4 recording RPC "
+            "(BeginSaveMp4File) has been removed from proto. "
+            "Use OrcaGymWarpEnv.save_streaming for client-side PyAV remux.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     async def stop_save_video(self):
-        request =  mjc_message_pb2.StopSaveMp4FileRequest()
-        await self.stub.StopSaveMp4File(request)
+        """[Deprecated] 引擎侧 MP4 录制 RPC 已删除，no-op + DeprecationWarning。"""
+        warnings.warn(
+            "stop_save_video is deprecated: engine-side MP4 recording RPC "
+            "(StopSaveMp4File) has been removed from proto. "
+            "Use OrcaGymWarpEnv.save_streaming instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-    async def get_current_frame(self)-> int:
-        request = mjc_message_pb2.GetCurrentFrameIndexRequest()
-        response = await self.stub.GetCurrentFrameIndex(request)
-        return response.current_frame
+    async def get_current_frame(self) -> int:
+        """[Deprecated] 引擎侧帧索引 RPC 已删除，返回 -1 + DeprecationWarning。"""
+        warnings.warn(
+            "get_current_frame is deprecated: engine-side frame index RPC "
+            "(GetCurrentFrameIndex) has been removed from proto. "
+            "Use simulate_index in render() for frame alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return -1
 
     async def get_camera_time_stamp(self, last_frame) -> dict:
-        request = mjc_message_pb2.GetTimeStampRequest()
-        request.last_frame_index = last_frame
-        response = await self.stub.GetTimeStamp(request)
-        if response.error_message != "":
-            _logger.error(f"Get time stamp failed. error message: {response.error_message}")
-        return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
+        """[Deprecated] 引擎侧时间戳 RPC 已删除，返回 {} + DeprecationWarning。"""
+        warnings.warn(
+            "get_camera_time_stamp is deprecated: engine-side timestamp RPC "
+            "(GetTimeStamp) has been removed from proto. "
+            "WebSocket frame header carries uint64 timestamp for alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return {}
 
     async def get_frame_png(self, image_path):
         request = mjc_message_pb2.GetCameraFramePNGRequest()

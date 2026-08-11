@@ -57,46 +57,50 @@ class LightInfo:
         if self.intensity is None or not isinstance(self.intensity, float):
             raise ValueError("Light intensity must be a float.")
         
-class CameraSensorInfo:
+class CameraProperty:
     """
-    A class to represent camera sensor information in the ORCA Gym environment.
+    相机属性批量更新参数（对应 proto CameraProperty）。
 
-    基础 4 参数为必填（对应老接口）。扩展参数为 optional（None 表示不修改现有值），
-    对应 proto3 optional 语义，兼容老客户端。
+    所有字段均为 optional（None 表示不修改 server 现有值），对应 proto3 optional 语义。
+    状态机约束：属性 Set 仅在 Idle 状态允许（streaming=true 时禁止所有属性设置）。
+    推流状态切换由 set_streaming_enabled 显式控制。MP4 录制已迁移到客户端
+    PyAV remux（环境层 ``save_streaming``），旧的引擎侧 ``begin_save_video`` /
+    ``stop_save_video`` 已废弃为 no-op。
     """
 
-    # 扩展 optional 字段名列表（None 表示不修改 server 现有值）
-    _OPTIONAL_FIELDS = [
-        "capture_normal", "capture_object_color", "is_recording",
-        "use_nvenc", "nvenc_gpu_index", "random_object_color",
-        "width", "height", "vertical_fov", "near_clip", "far_clip",
-        "gamma", "color_port", "depth_port", "dds_topic", "dds_stream_id",
+    # 全部字段均为 optional（None 表示不修改 server 现有值）
+    OPTIONAL_FIELDS = [
+        "capture_rgb", "capture_depth", "capture_normal", "capture_object_color",
+        "random_object_color", "use_nvenc", "nvenc_gpu_index",
+        "width", "height", "vertical_fov", "near_clip", "far_clip", "gamma",
+        "color_port", "depth_port",
+        "use_dds", "dds_topic", "dds_stream_id",
     ]
 
-    def __init__(self,
-                 capture_rgb : bool,
-                 capture_depth : bool,
-                 save_mp4_file : bool,
-                 use_dds : bool,
-                 **kwargs):
-        self.capture_rgb = capture_rgb
-        self.capture_depth = capture_depth
-        self.save_mp4_file = save_mp4_file
-        self.use_dds = use_dds
-        # 扩展 optional 字段：仅当显式传参时设置，否则为 None（不修改 server 现有值）
-        for fname in self._OPTIONAL_FIELDS:
+    def __init__(self, **kwargs):
+        # 所有字段均 optional，仅当显式传参时设置，否则为 None（不修改 server 现有值）
+        for fname in self.OPTIONAL_FIELDS:
             setattr(self, fname, kwargs.get(fname, None))
-        self._check_camera_sensor_info()
+        self._check_camera_property()
 
-    def _check_camera_sensor_info(self):
-        if self.capture_rgb is None or not isinstance(self.capture_rgb, bool):
-            raise ValueError("Capture RGB must be a boolean.")
-        if self.capture_depth is None or not isinstance(self.capture_depth, bool):
-            raise ValueError("Capture depth must be a boolean.")
-        if self.save_mp4_file is None or not isinstance(self.save_mp4_file, bool):
-            raise ValueError("Save MP4 file must be a boolean.")
-        if self.use_dds is None or not isinstance(self.use_dds, bool):
-            raise ValueError("Use DDS must be a boolean.")
+    def _check_camera_property(self):
+        # 已设置的字段做基本类型校验，未设置（None）的跳过
+        type_map = {
+            "capture_rgb": bool, "capture_depth": bool,
+            "capture_normal": bool, "capture_object_color": bool,
+            "random_object_color": bool, "use_nvenc": bool,
+            "nvenc_gpu_index": int, "width": int, "height": int,
+            "vertical_fov": float, "near_clip": float, "far_clip": float,
+            "gamma": float, "color_port": int, "depth_port": int,
+            "use_dds": bool, "dds_topic": str, "dds_stream_id": str,
+        }
+        for fname, expected_type in type_map.items():
+            val = getattr(self, fname, None)
+            if val is not None and not isinstance(val, expected_type):
+                raise ValueError(
+                    f"{fname} must be {expected_type.__name__}, "
+                    f"got {type(val).__name__}."
+                )
         
 class MaterialInfo:
     """
@@ -219,28 +223,63 @@ class OrcaGymScene:
         self.loop.run_until_complete(self._set_light_info(actor_name, light_info))
 
 
-    async def _set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
+    async def _get_camera_names(self) -> list[str]:
         async with self.lock:
-            kwargs = dict(
-                actor_name = actor_name,
-                capture_rgb = camera_sensor_info.capture_rgb,
-                capture_depth = camera_sensor_info.capture_depth,
-                save_mp4_file = camera_sensor_info.save_mp4_file,
-                use_dds = camera_sensor_info.use_dds,)
-            # 扩展 optional 字段：仅当非 None 时才设置（proto optional 语义）
-            for fname in CameraSensorInfo.OPTIONAL_FIELDS:
-                val = getattr(camera_sensor_info, fname, None)
-                if val is not None:
-                    kwargs[fname] = val
-            request = mjc_message_pb2.SetCameraSensorInfoRequest(**kwargs)
+            request = mjc_message_pb2.GetCameraNamesRequest()
+            response = await self.stub.GetCameraNames(request)
+            if response.status != mjc_message_pb2.GetCameraNamesResponse.SUCCESS:
+                _logger.error(f"Get camera names failed:  {response.error_message}")
+                raise RuntimeError("Get camera names failed.")
+            return list(response.camera_names)
 
-            response = await self.stub.SetCameraSensorInfo(request)
-            if response.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
-                _logger.error(f"Set camera sensor info failed:  {response.error_message}")
-                raise Exception("Set camera sensor info failed.")
-            
-    def set_camera_sensor_info(self, actor_name: str, camera_sensor_info: CameraSensorInfo):
-        self.loop.run_until_complete(self._set_camera_sensor_info(actor_name, camera_sensor_info))
+    def get_camera_names(self) -> list[str]:
+        return self.loop.run_until_complete(self._get_camera_names())
+
+    async def _get_camera_properties(self, camera_name: str) -> mjc_message_pb2.GetCameraPropertiesResponse:
+        async with self.lock:
+            request = mjc_message_pb2.GetCameraPropertiesRequest(camera_name=camera_name)
+            response = await self.stub.GetCameraProperties(request)
+            if response.status != mjc_message_pb2.GetCameraPropertiesResponse.SUCCESS:
+                _logger.error(f"Get camera properties failed:  {response.error_message}")
+                raise Exception("Get camera properties failed.")
+            return response
+
+    def get_camera_properties(self, camera_name: str) -> mjc_message_pb2.GetCameraPropertiesResponse:
+        return self.loop.run_until_complete(self._get_camera_properties(camera_name))
+
+    async def _set_camera_properties(self, camera_name: str, camera_property: CameraProperty):
+        async with self.lock:
+            # 仅设置非 None 字段（proto optional 语义），未设置字段保持 server 现有值
+            property_kwargs: dict = {}
+            for fname in CameraProperty.OPTIONAL_FIELDS:
+                val = getattr(camera_property, fname, None)
+                if val is not None:
+                    property_kwargs[fname] = val
+            request = mjc_message_pb2.SetCameraPropertiesRequest(
+                camera_name=camera_name,
+                property=mjc_message_pb2.CameraProperty(**property_kwargs),
+            )
+            response = await self.stub.SetCameraProperties(request)
+            if response.status != mjc_message_pb2.SetCameraPropertiesResponse.SUCCESS:
+                _logger.error(f"Set camera properties failed:  {response.error_message}")
+                raise Exception("Set camera properties failed.")
+
+    def set_camera_properties(self, camera_name: str, camera_property: CameraProperty):
+        self.loop.run_until_complete(self._set_camera_properties(camera_name, camera_property))
+
+    async def _set_streaming_enabled(self, camera_name: str, enabled: bool):
+        async with self.lock:
+            request = mjc_message_pb2.SetStreamingEnabledRequest(
+                camera_name=camera_name,
+                enabled=enabled,
+            )
+            response = await self.stub.SetStreamingEnabled(request)
+            if response.status != mjc_message_pb2.SetStreamingEnabledResponse.SUCCESS:
+                _logger.error(f"Set streaming enabled failed:  {response.error_message}")
+                raise RuntimeError("Set streaming enabled failed.")
+
+    def set_streaming_enabled(self, camera_name: str, enabled: bool):
+        self.loop.run_until_complete(self._set_streaming_enabled(camera_name, enabled))
 
     async def _make_camera_viewport_active(self, actor_name: str, entity_name: str):
         async with self.lock:

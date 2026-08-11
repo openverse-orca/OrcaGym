@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import tempfile
+import warnings
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -213,19 +214,33 @@ class OrcaStudioBridge:
 
     # --- 渲染 ---
 
-    async def render(self, qpos: np.ndarray, sim_time: float) -> None:
+    async def render(
+        self,
+        qpos: np.ndarray,
+        sim_time: float,
+        simulate_index: int = -1,
+        request_idr: bool = False,
+    ) -> None:
         """渲染当前仿真状态到 OrcaStudio（依赖反转：接收 qpos/sim_time）。
 
-        离线模式 no-op；在线模式将 qpos/time 推送到 Studio，接收 override_ctrls。
+        离线模式 no-op；在线模式将 qpos/time/simulate_index 推送到 Studio，
+        接收 override_ctrls。
 
         Args:
             qpos: 广义坐标位置数组。
             sim_time: 仿真时间。
+            simulate_index: 物理仿真步索引，透传到相机管线用于帧对齐。
+                ``-1`` 表示由服务端自增（向后兼容，默认值）。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。
         """
         if self._stub is None:
             return
         request = mjc_message_pb2.UpdateLocalEnvRequest(
-            qpos=qpos.tolist(), time=float(sim_time)
+            qpos=qpos.tolist(),
+            time=float(sim_time),
+            simulate_index=simulate_index,
+            request_idr=request_idr,
         )
         response = await self._stub.UpdateLocalEnv(request)
         # 更新 override_ctrls 缓存
@@ -350,71 +365,94 @@ class OrcaStudioBridge:
         )
         await self._stub.SetMocapPosAndQuat(request)
 
-    # --- 视频录制（阶段三 3.4.1）---
+    # --- 视频录制 / 帧捕获（已废弃）---
+    # 引擎侧 BeginSaveMp4File / StopSaveMp4File / GetCurrentFrameIndex /
+    # GetTimeStamp 四个 RPC 已从 proto 中删除。
+    # 录制能力已迁移到客户端 PyAV remux（见 orca_gym/recorder/），
+    # 通过 OrcaGymEulerEnv.save_streaming 使用。
+    # 以下方法保留为 no-op + DeprecationWarning，向后兼容旧调用方。
 
     async def begin_save_video(self, file_path: str, capture_mode) -> None:
-        """开始录制视频（gRPC BeginSaveMp4File）。
+        """[Deprecated] 开始录制视频（原 gRPC BeginSaveMp4File）。
 
-        离线模式（_stub is None）直接 return，不抛错。
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除。请使用
+            ``OrcaGymEulerEnv.save_streaming(camera_name, file_path,
+            start_simulate_index, end_simulate_index, color_port)``
+            进行客户端 PyAV remux 录制。
+            此方法为 no-op 并发出 ``DeprecationWarning``。
 
         Args:
-            file_path: 视频文件保存路径。
-            capture_mode: 捕获模式（CaptureMode 枚举值）。
+            file_path: 视频文件保存路径（已忽略）。
+            capture_mode: 捕获模式（已忽略）。
         """
-        if self._stub is None:
-            return
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(
-            file_path=file_path, capture_mode=capture_mode
+        warnings.warn(
+            "OrcaStudioBridge.begin_save_video is deprecated. "
+            "Engine-side MP4 recording RPC has been removed. "
+            "Use OrcaGymEulerEnv.save_streaming for client-side PyAV remux recording.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        await self._stub.BeginSaveMp4File(request)
 
     async def stop_save_video(self) -> None:
-        """停止录制视频（gRPC StopSaveMp4File）。
+        """[Deprecated] 停止录制视频（原 gRPC StopSaveMp4File）。
 
-        离线模式（_stub is None）直接 return，不抛错。
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除。请使用
+            ``OrcaGymEulerEnv.save_streaming(camera_name, file_path,
+            start_simulate_index, end_simulate_index, color_port)``。
+            此方法为 no-op 并发出 ``DeprecationWarning``。
         """
-        if self._stub is None:
-            return
-        await self._stub.StopSaveMp4File(mjc_message_pb2.StopSaveMp4FileRequest())
-
-    # --- 帧捕获（阶段三 3.4.2）---
+        warnings.warn(
+            "OrcaStudioBridge.stop_save_video is deprecated. "
+            "Engine-side MP4 recording RPC has been removed. "
+            "Use OrcaGymEulerEnv.save_streaming instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     async def get_current_frame(self) -> int:
-        """获取当前帧号（gRPC GetCurrentFrameIndex）。
+        """[Deprecated] 获取当前帧号（原 gRPC GetCurrentFrameIndex）。
 
-        离线模式（_stub is None）返回 -1。
+        .. deprecated::
+            引擎侧帧索引 RPC 已删除。客户端录制通过 ``simulate_index``
+            在 WebSocket 帧头中对齐，无需查询远端帧号。
+            此方法返回 -1 并发出 ``DeprecationWarning``。
 
         Returns:
-            当前帧索引（int），离线模式返回 -1。
+            -1（始终）。
         """
-        if self._stub is None:
-            return -1
-        resp = await self._stub.GetCurrentFrameIndex(
-            mjc_message_pb2.GetCurrentFrameIndexRequest()
+        warnings.warn(
+            "OrcaStudioBridge.get_current_frame is deprecated. "
+            "Engine-side frame index RPC has been removed. "
+            "Use simulate_index in render() for frame alignment.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        return int(resp.current_frame)
+        return -1
 
     async def get_camera_time_stamp(self, last_frame_index: int) -> dict:
-        """获取相机时间戳（gRPC GetTimeStamp）。
+        """[Deprecated] 获取相机时间戳（原 gRPC GetTimeStamp）。
 
-        离线模式（_stub is None）返回空 dict。
+        .. deprecated::
+            引擎侧时间戳 RPC 已删除。客户端录制通过 WebSocket 帧头
+            携带 timestamp（uint64 LE）对齐，无需查询远端时间戳。
+            此方法返回 ``{}`` 并发出 ``DeprecationWarning``。
 
         Args:
-            last_frame_index: 截止帧索引。
+            last_frame_index: 截止帧索引（已忽略）。
 
         Returns:
-            dict[camera_name -> list[uint64]]，离线模式返回 {}。
+            ``{}``（始终）。
         """
-        if self._stub is None:
-            return {}
-        request = mjc_message_pb2.GetTimeStampRequest(
-            last_frame_index=last_frame_index
+        warnings.warn(
+            "OrcaStudioBridge.get_camera_time_stamp is deprecated. "
+            "Engine-side timestamp RPC has been removed. "
+            "WebSocket frame header carries uint64 timestamp for alignment.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        resp = await self._stub.GetTimeStamp(request)
-        return {
-            camera_name: list(ts_list.time_stamps)
-            for camera_name, ts_list in resp.time_stamp_map.items()
-        }
+        return {}
 
     async def get_frame_png(self, image_path: str) -> None:
         """获取帧 PNG（gRPC GetCameraFramePNG）。离线 no-op。
@@ -427,22 +465,66 @@ class OrcaStudioBridge:
         request = mjc_message_pb2.GetCameraFramePNGRequest(image_path=image_path)
         await self._stub.GetCameraFramePNG(request)
 
-    # --- 摄像头传感器激活（阶段四补遗：激活 Studio 端摄像头流）---
+    # --- 相机属性查询/设置 + 推流状态机（Phase 2 新增）---
+    # 状态机：Idle <-- SetStreamingEnabled(true) --> Streaming（InitCameraSensor）
+    #         Streaming <-- SetStreamingEnabled(false) --> Idle（UninitCameraSensor）
+    #         属性 Set 仅在 Idle 状态允许（streaming=true 时禁止所有属性设置）
+    # MP4 录制由 begin_save_video/stop_save_video 控制，与本组接口正交。
 
-    async def set_camera_sensor_info(
+    async def get_camera_names(self) -> list[str]:
+        """获取所有已注册相机名称列表（gRPC GetCameraNames）。离线返回空列表。
+
+        Returns:
+            已注册相机名称列表（含 uuid 后缀的 registered name）。
+            离线模式返回空列表。
+        """
+        if self._stub is None:
+            return []
+        request = mjc_message_pb2.GetCameraNamesRequest()
+        resp = await self._stub.GetCameraNames(request)
+        if resp.status != mjc_message_pb2.GetCameraNamesResponse.SUCCESS:
+            raise RuntimeError(
+                f"GetCameraNames failed: {resp.error_message}"
+            )
+        return list(resp.camera_names)
+
+    async def get_camera_properties(
         self,
-        actor_name: str,
-        capture_rgb: bool,
-        capture_depth: bool,
-        save_mp4_file: bool = False,
-        use_dds: bool = False,
+        camera_name: str,
+    ) -> mjc_message_pb2.GetCameraPropertiesResponse:
+        """查询相机属性 + 推流状态（gRPC GetCameraProperties）。离线返回空响应。
+
+        一次性获取所有相机属性与 streaming_enabled 状态，适合 UI 渲染。
+
+        Args:
+            camera_name: 相机名称（对应 Studio 端注册的 camera name，
+                可通过 get_camera_names 枚举获取）。
+
+        Returns:
+            GetCameraPropertiesResponse：包含 streaming_enabled、传感器开关、
+            图像参数、编码器、推流端口、DDS 等全部字段。离线模式返回默认实例。
+        """
+        if self._stub is None:
+            return mjc_message_pb2.GetCameraPropertiesResponse()
+        request = mjc_message_pb2.GetCameraPropertiesRequest(camera_name=camera_name)
+        resp = await self._stub.GetCameraProperties(request)
+        if resp.status != mjc_message_pb2.GetCameraPropertiesResponse.SUCCESS:
+            raise RuntimeError(
+                f"GetCameraProperties failed: {resp.error_message}"
+            )
+        return resp
+
+    async def set_camera_properties(
+        self,
+        camera_name: str,
         *,
+        capture_rgb: bool | None = None,
+        capture_depth: bool | None = None,
         capture_normal: bool | None = None,
         capture_object_color: bool | None = None,
-        is_recording: bool | None = None,
+        random_object_color: bool | None = None,
         use_nvenc: bool | None = None,
         nvenc_gpu_index: int | None = None,
-        random_object_color: bool | None = None,
         width: int | None = None,
         height: int | None = None,
         vertical_fov: float | None = None,
@@ -451,30 +533,25 @@ class OrcaStudioBridge:
         gamma: float | None = None,
         color_port: int | None = None,
         depth_port: int | None = None,
+        use_dds: bool | None = None,
         dds_topic: str | None = None,
         dds_stream_id: str | None = None,
     ) -> None:
-        """激活/配置摄像头传感器流（gRPC SetCameraSensorInfo）。离线 no-op。
+        """批量设置相机属性（gRPC SetCameraProperties）。离线 no-op。
 
-        Studio 端 MuJoCo <camera> 默认不推送 WebSocket RGB/Depth 流，
-        必须通过本方法显式激活后，7070/7071 等端口才会监听并推流。
-        `begin_save_video` 只控制 MP4 文件录制，与本方法正交。
+        仅设置显式传参（非 None）的字段，未传字段保持 server 现有值。
+        状态机约束：属性 Set 仅在 Idle 状态允许；若当前为 Streaming 状态，
+        需先调用 set_streaming_enabled(False) 回到 Idle 再设置属性。
 
         Args:
-            actor_name: 摄像头所属 actor 名（Euler 体系下即 agent_name 前缀，
-                如 "g1"；对应 Studio 端 add_actor 时的 actor 名）。
-            capture_rgb: 是否激活 RGB 视频流（开启 XML 中 user 属性第一个端口）。
-            capture_depth: 是否激活深度视频流（开启 user 属性第二个端口）。
-            save_mp4_file: 是否同时保存 MP4 文件。
-            use_dds: 是否使用 DDS 传输。
-
-        扩展参数（keyword-only，None 表示不修改现有值，对应 proto optional 语义）:
+            camera_name: 相机名称。
+            capture_rgb: 是否激活 RGB 视频流。
+            capture_depth: 是否激活深度视频流。
             capture_normal: 是否捕获法线图。
             capture_object_color: 是否捕获实例分割色标图。
-            is_recording: 是否正在录制。
+            random_object_color: 是否随机分配物体颜色。
             use_nvenc: 是否使用 NvEnc 硬件编码。
             nvenc_gpu_index: NvEnc GPU 适配器索引。
-            random_object_color: 是否随机分配物体颜色。
             width: 图像宽度（像素）。
             height: 图像高度（像素）。
             vertical_fov: 垂直视场角（度）。
@@ -483,34 +560,62 @@ class OrcaStudioBridge:
             gamma: 深度相机 gamma 校正。
             color_port: RGB 流 WebSocket 端口。
             depth_port: 深度流 WebSocket 端口。
+            use_dds: 是否启用 DDS。
             dds_topic: DDS 主题。
             dds_stream_id: DDS 流 ID。
         """
         if self._stub is None:
             return
-        kwargs: dict = dict(
-            actor_name=actor_name,
-            capture_rgb=capture_rgb,
-            capture_depth=capture_depth,
-            save_mp4_file=save_mp4_file,
-            use_dds=use_dds,
-        )
         # optional 字段：仅当显式传参（非 None）时才设置，对应 proto optional 语义
+        property_kwargs: dict = {}
         _optional_fields = [
-            "capture_normal", "capture_object_color", "is_recording",
-            "use_nvenc", "nvenc_gpu_index", "random_object_color",
-            "width", "height", "vertical_fov", "near_clip", "far_clip",
-            "gamma", "color_port", "depth_port", "dds_topic", "dds_stream_id",
+            "capture_rgb", "capture_depth", "capture_normal", "capture_object_color",
+            "random_object_color", "use_nvenc", "nvenc_gpu_index",
+            "width", "height", "vertical_fov", "near_clip", "far_clip", "gamma",
+            "color_port", "depth_port",
+            "use_dds", "dds_topic", "dds_stream_id",
         ]
         for fname in _optional_fields:
             val = locals()[fname]
             if val is not None:
-                kwargs[fname] = val
-        request = mjc_message_pb2.SetCameraSensorInfoRequest(**kwargs)
-        resp = await self._stub.SetCameraSensorInfo(request)
-        if resp.status != mjc_message_pb2.SetCameraSensorInfoResponse.SUCCESS:
+                property_kwargs[fname] = val
+        request = mjc_message_pb2.SetCameraPropertiesRequest(
+            camera_name=camera_name,
+            property=mjc_message_pb2.CameraProperty(**property_kwargs),
+        )
+        resp = await self._stub.SetCameraProperties(request)
+        if resp.status != mjc_message_pb2.SetCameraPropertiesResponse.SUCCESS:
             raise RuntimeError(
-                f"SetCameraSensorInfo failed: {resp.error_message}"
+                f"SetCameraProperties failed: {resp.error_message}"
+            )
+
+    async def set_streaming_enabled(
+        self,
+        camera_name: str,
+        enabled: bool,
+    ) -> None:
+        """显式切换推流状态（gRPC SetStreamingEnabled）。离线 no-op。
+
+        状态机：
+            - enabled=True：Idle → Streaming（Studio 端调用 InitCameraSensor，
+              7070/7071 等端口开始监听并推流）
+            - enabled=False：Streaming → Idle（Studio 端调用 UninitCameraSensor，
+              停止推流并释放资源）
+
+        Args:
+            camera_name: 相机名称。
+            enabled: True 启动推流，False 停止推流。
+        """
+        if self._stub is None:
+            return
+        request = mjc_message_pb2.SetStreamingEnabledRequest(
+            camera_name=camera_name,
+            enabled=enabled,
+        )
+        resp = await self._stub.SetStreamingEnabled(request)
+        if resp.status != mjc_message_pb2.SetStreamingEnabledResponse.SUCCESS:
+            raise RuntimeError(
+                f"SetStreamingEnabled failed: {resp.error_message}"
             )
 
     async def make_camera_viewport_active(

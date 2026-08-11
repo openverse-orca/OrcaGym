@@ -1377,16 +1377,27 @@ class TestEnvStudioArchCompliance(unittest.TestCase):
             "get_camera_time_stamp",
             "get_frame_png",
             "load_content_file",
+            # 客户端 PyAV remux 录制 API（start_streaming + save_streaming）
+            "start_streaming",
+            "save_streaming",
         ]:
             self.assertIn(name, d, f"dir(env) 缺少 {name}")
 
     def test_env_studio_returns_typed(self):
-        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。"""
+        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。
+
+        .. note::
+            引擎侧 RPC 已删除，bridge 层降级为 no-op + DeprecationWarning，
+            但返回值仍保持 typed（int / dict）。
+        """
         env = _make_g1_env()
-        ret = env.get_current_frame()
-        self.assertIsInstance(ret, int)
-        ret = env.get_camera_time_stamp(0)
-        self.assertIsInstance(ret, dict)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = env.get_current_frame()
+            self.assertIsInstance(ret, int)
+            ret = env.get_camera_time_stamp(0)
+            self.assertIsInstance(ret, dict)
 
     def test_env_studio_docstrings_present(self):
         """K12: 新增 Studio 委托方法有 docstring。"""
@@ -1400,6 +1411,8 @@ class TestEnvStudioArchCompliance(unittest.TestCase):
             "get_camera_time_stamp",
             "get_frame_png",
             "load_content_file",
+            "start_streaming",
+            "save_streaming",
         ]:
             method = getattr(env, name)
             doc = inspect.getdoc(method)
@@ -1411,72 +1424,113 @@ class TestEnvStudioFunctional(unittest.TestCase):
     """子步骤 3.4.4 功能单元测试。
 
     对应文档 §8.5 功能单元测试表。
+
+    .. note::
+        引擎侧 MP4 录制 / 帧捕获 RPC 已删除，Env 层方法降级为
+        DeprecationWarning + 委托 bridge（bridge 也为 no-op）。
+        新增客户端 PyAV remux 录制 API（save_streaming），但离线模式无法测试
+        WebSocket 连接。
     """
 
     def setUp(self):
         self.env = _make_g1_env()
 
     def test_env_begin_stop_save_video_offline_noop(self):
-        """离线模式 no-op 不抛错。"""
-        self.env.begin_save_video("/tmp/test.mp4")
-        self.env.stop_save_video()
+        """离线模式 no-op 不抛错（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.env.begin_save_video("/tmp/test.mp4")
+            self.env.stop_save_video()
 
     def test_env_get_current_frame_offline_returns_neg1(self):
-        """离线模式返回 -1。"""
-        self.assertEqual(self.env.get_current_frame(), -1)
+        """离线模式返回 -1（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(self.env.get_current_frame(), -1)
 
     def test_env_get_camera_time_stamp_offline_returns_empty(self):
-        """离线模式返回空 dict。"""
-        self.assertEqual(self.env.get_camera_time_stamp(0), {})
+        """离线模式返回空 dict（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(self.env.get_camera_time_stamp(0), {})
 
     def test_env_get_frame_png_offline_noop(self):
-        """离线模式 no-op。"""
+        """离线模式 no-op（get_frame_png 未废弃）。"""
         self.env.get_frame_png("/tmp/test.png")
 
     def test_env_load_content_file_offline_noop(self):
         """离线模式 no-op。"""
         self.env.load_content_file("mesh.obj")
 
+    def test_env_video_methods_emit_deprecation_warning(self):
+        """新增：视频/帧捕获方法应发出 DeprecationWarning。"""
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self.env.begin_save_video("/tmp/test.mp4")
+            self.env.stop_save_video()
+            self.env.get_current_frame()
+            self.env.get_camera_time_stamp(0)
+            self.env.get_next_frame()
+            # 5 个方法都应发出 DeprecationWarning
+            dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertGreaterEqual(len(dep_warnings), 5)
+
     def test_env_video_methods_delegate_to_bridge(self):
-        """在线模式委托链路：Env -> Gym -> bridge（mock stub）。"""
+        """在线模式委托链路：Env -> Gym -> bridge（mock stub）。
+
+        .. note::
+            引擎侧 RPC 已删除，Env 层方法降级为 DeprecationWarning + 委托。
+            本测试验证委托链路仍存在（Env -> Gym -> bridge），Env 层发出
+            DeprecationWarning。bridge 的返回值取决于 mock 实现。
+        """
+        import warnings
+
         # 构造 mock bridge 替换 Gym 的 _studio
-        captured = {}
+        called = {"count": 0}
 
         class MockBridge:
             async def begin_save_video(self, file_path, capture_mode):
-                captured["begin"] = (file_path, capture_mode)
+                called["begin"] = (file_path, capture_mode)
 
             async def stop_save_video(self):
-                captured["stop"] = True
+                called["stop"] = True
 
             async def get_current_frame(self):
-                captured["frame"] = True
+                called["frame"] = True
                 return 99
 
             async def get_camera_time_stamp(self, last_frame_index):
-                captured["ts"] = last_frame_index
+                called["ts"] = last_frame_index
                 return {"cam0": [1, 2, 3]}
 
             async def get_frame_png(self, image_path):
-                captured["png"] = image_path
+                called["png"] = image_path
 
             async def load_content_file(self, *args, **kwargs):
-                captured["load"] = (args, kwargs)
+                called["load"] = (args, kwargs)
 
         # 替换 Gym 的 _studio（用 object.__setattr__ 绕过 __setattr__ 拦截）
         object.__setattr__(self.env._gym, "_studio", MockBridge())
-        self.env.begin_save_video("/tmp/x.mp4", capture_mode=1)
-        self.assertEqual(captured["begin"], ("/tmp/x.mp4", 1))
-        self.env.stop_save_video()
-        self.assertTrue(captured["stop"])
-        self.assertEqual(self.env.get_current_frame(), 99)
-        self.assertTrue(captured["frame"])
-        self.assertEqual(self.env.get_camera_time_stamp(5), {"cam0": [1, 2, 3]})
-        self.assertEqual(captured["ts"], 5)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.env.begin_save_video("/tmp/x.mp4", capture_mode=1)
+            self.assertEqual(called["begin"], ("/tmp/x.mp4", 1))
+            self.env.stop_save_video()
+            self.assertTrue(called["stop"])
+            # 委托链路返回 mock bridge 的值（真实 bridge 会返回 -1）
+            self.assertEqual(self.env.get_current_frame(), 99)
+            self.assertTrue(called["frame"])
+            self.assertEqual(self.env.get_camera_time_stamp(5), {"cam0": [1, 2, 3]})
+            self.assertEqual(called["ts"], 5)
+        # get_frame_png / load_content_file 未废弃，正常委托
         self.env.get_frame_png("/tmp/x.png")
-        self.assertEqual(captured["png"], "/tmp/x.png")
+        self.assertEqual(called["png"], "/tmp/x.png")
         self.env.load_content_file("mesh.obj", remote_file_dir="/r")
-        self.assertIn("load", captured)
+        self.assertIn("load", called)
 
 
 # =============================================================================

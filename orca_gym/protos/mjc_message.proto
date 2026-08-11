@@ -15,14 +15,15 @@ service GrpcService {
   rpc AddActor (AddActorRequest) returns (AddActorResponse);
   rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
   rpc SetLightInfo (SetLightInfoRequest) returns (SetLightInfoResponse);
-  rpc SetCameraSensorInfo (SetCameraSensorInfoRequest) returns (SetCameraSensorInfoResponse);
   rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
   rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
-  rpc BeginSaveMp4File(BeginSaveMp4FileRequest) returns (BeginSaveMp4FileResponse);
-  rpc StopSaveMp4File(StopSaveMp4FileRequest) returns (StopSaveMp4FileResponse);
-  rpc GetCurrentFrameIndex(GetCurrentFrameIndexRequest) returns (GetCurrentFrameIndexResponse);
-  rpc GetTimeStamp(GetTimeStampRequest) returns (GetTimeStampResponse);
   rpc GetCameraFramePNG(GetCameraFramePNGRequest) returns (GetCameraFramePNGResponse);
+
+  // 相机属性查询/设置 + 推流状态机（Phase 2 新增）
+  rpc GetCameraNames(GetCameraNamesRequest) returns (GetCameraNamesResponse);
+  rpc GetCameraProperties(GetCameraPropertiesRequest) returns (GetCameraPropertiesResponse);
+  rpc SetCameraProperties(SetCameraPropertiesRequest) returns (SetCameraPropertiesResponse);
+  rpc SetStreamingEnabled(SetStreamingEnabledRequest) returns (SetStreamingEnabledResponse);
 
   // 键鼠操作
   rpc GetKeyPressedEvents (GetKeyPressedEventsRequest) returns (GetKeyPressedEventsResponse);
@@ -999,6 +1000,8 @@ message QueryAllSitesResponse {
 message UpdateLocalEnvRequest{
     repeated double qpos = 1;
     double time = 2;
+    int32 simulate_index = 3;
+    bool request_idr = 4;
 }
 
 message UpdateLocalEnvResponse{
@@ -1088,97 +1091,6 @@ message SetLightInfoResponse {
     }
     Status status = 1; // 状态码字段
     string error_message = 2; // 错误详情（可选）
-}
-
-message SetCameraSensorInfoRequest {
-    string actor_name = 1;                  // Actor 名字
-    bool capture_rgb = 2;                   // 是否捕获 RGB 图像
-    bool capture_depth = 3;                 // 是否捕获深度图像
-    bool save_mp4_file = 4;                // 是否保存为 MP4 文件
-    bool use_dds = 5;                     // 是否使用 DDS
-
-    // 扩展字段（optional: 未设置时 server 保持现有值，兼容老客户端）
-    // 对应 CameraSensorConfiguration / VideoStreamingConfiguration / DDSConfiguration
-    optional bool capture_normal = 6;            // 是否捕获法线图
-    optional bool capture_object_color = 7;      // 是否捕获实例分割色标图
-    optional bool is_recording = 8;              // 是否正在录制
-    optional bool use_nvenc = 9;                 // 是否使用 NvEnc 硬件编码
-    optional int32 nvenc_gpu_index = 10;         // NvEnc GPU 适配器索引
-    optional bool random_object_color = 11;      // 是否随机分配物体颜色
-    optional int32 width = 12;                   // 图像宽度（像素）
-    optional int32 height = 13;                  // 图像高度（像素）
-    optional float vertical_fov = 14;            // 垂直视场角（度）
-    optional float near_clip = 15;               // 近裁剪面距离
-    optional float far_clip = 16;                // 远裁剪面距离
-    optional float gamma = 17;                   // 深度相机 gamma 校正
-    optional int32 color_port = 18;              // RGB 流 WebSocket 端口
-    optional int32 depth_port = 19;              // 深度流 WebSocket 端口
-    optional string dds_topic = 20;              // DDS 主题
-    optional string dds_stream_id = 21;          // DDS 流 ID
-}
-
-message SetCameraSensorInfoResponse {
-    enum Status {
-        SUCCESS = 0;
-        ERROR = 1;
-    }
-    Status status = 1; // 状态码字段
-    string error_message = 2; // 错误详情（可选）
-}
-
-message BeginSaveMp4FileRequest {
-  string file_path = 1; // 保存 MP4 文件的路径
-  enum CaptureMode { //捕获相机帧的方式
-    ASYNC = 0;
-    SYNC = 1;
-  }
-  CaptureMode capture_mode = 2;
-}
-
-message BeginSaveMp4FileResponse {
-  enum Status {
-    SUCCESS = 0;
-    ERROR = 1;
-  }
-  Status status = 1; // 状态码字段
-  string error_message = 2; // 错误详情（可选）
-}
-
-message StopSaveMp4FileRequest {
-    enum Status {
-        SUCCESS = 0;
-        FAILED = 1;
-    }
-    Status status = 1; // 状态码字段
-}
-
-message StopSaveMp4FileResponse {
-  // 该请求不需要任何参数
-}
-
-message GetCurrentFrameIndexRequest
-{
-  // 该请求不需要任何参数
-}
-
-message GetCurrentFrameIndexResponse {
-  int64 current_frame = 1;
-  string error_message = 2;
-}
-
-message GetTimeStampRequest
-{
-  // 该请求不需要任何参数
-  uint64 last_frame_index = 1; // 截止到哪个帧的时间戳
-}
-
-message TimeStampList {
-  repeated uint64 time_stamps = 1; // 时间戳列表
-}
-
-message GetTimeStampResponse {
-  map<string, TimeStampList> time_stamp_map = 1; // 时间戳，键为 Actor 名字，值为时间戳列表
-  string error_message = 2; // 错误详情（可选）
 }
 
 message GetCameraFramePNGRequest
@@ -1534,4 +1446,122 @@ message DrawCustomMeshBatchResponse {
     bool   success       = 1;
     string error_message = 2;
     uint32 drawn_count   = 3;
+}
+
+// ============= 相机属性查询/设置 + 推流状态机（Phase 2 新增） =============
+//
+// 设计目标：
+//   - GetCameraNames：获取所有已注册相机名称列表，便于客户端枚举后再查询单个相机属性
+//   - GetCameraProperties：一次性获取所有相机属性 + 推流状态，适合 UI 渲染
+//   - SetCameraProperties：批量设置（optional 字段，has_xxx() == true 才应用），支持一次设置多个属性
+//   - SetStreamingEnabled：显式状态转换（Idle <-> Streaming），替代 is_recording 的隐式触发
+//
+// 状态机（严格模式）：
+//   Idle <-- SetStreamingEnabled(true)  --> Streaming（调用 InitCameraSensor）
+//   Streaming <-- SetStreamingEnabled(false) --> Idle（调用 UninitCameraSensor）
+//   属性 Set 仅在 Idle 状态允许（streaming=true 时禁止所有属性设置）
+
+// 相机属性批量更新（所有字段 optional，客户端可一次设置多个）
+// 仅设置的字段（has_xxx() == true）会被应用，未设置的字段保持不变
+message CameraProperty {
+    // 传感器开关（4 路）
+    optional bool   capture_rgb          = 1;  // RGB
+    optional bool   capture_depth        = 2;  // 深度
+    optional bool   capture_normal       = 3;  // 法线
+    optional bool   capture_object_color = 4;  // 实例分割色标
+    optional bool   random_object_color  = 5;  // 是否随机分配物体颜色
+    // 编码器
+    optional bool   use_nvenc            = 6;  // 是否使用 NvEnc 硬件编码
+    optional int32  nvenc_gpu_index      = 7;  // NvEnc GPU 适配器索引
+    // 图像参数
+    optional int32  width                = 8;  // 图像宽度（像素）
+    optional int32  height               = 9;  // 图像高度（像素）
+    optional float  vertical_fov         = 10; // 垂直视场角（度）
+    optional float  near_clip            = 11; // 近裁剪面距离
+    optional float  far_clip             = 12; // 远裁剪面距离
+    optional float  gamma                = 13; // 深度相机 gamma 校正
+    // 推流端口
+    optional int32  color_port           = 14; // RGB 流 WebSocket 端口
+    optional int32  depth_port           = 15; // 深度流 WebSocket 端口
+    // DDS
+    optional bool   use_dds              = 16; // 是否启用 DDS
+    optional string dds_topic            = 17; // DDS 主题
+    optional string dds_stream_id        = 18; // DDS 流 ID
+}
+
+message GetCameraNamesRequest {
+}
+
+message GetCameraNamesResponse {
+    enum Status { SUCCESS = 0; ERROR = 1; }
+    Status status       = 1;
+    string error_message = 2;
+    // 所有已注册相机的名称列表（含 uuid 后缀的 registered name）
+    repeated string camera_names = 3;
+}
+
+message GetCameraPropertiesRequest {
+    string camera_name = 1;
+}
+
+message GetCameraPropertiesResponse {
+    enum Status { SUCCESS = 0; ERROR = 1; }
+    Status status       = 1;
+    string error_message = 2;
+
+    // 推流状态（对应状态机 Idle/Streaming）
+    bool   streaming_enabled = 3;
+
+    // 传感器开关（4 路）
+    bool   capture_rgb          = 4;
+    bool   capture_depth        = 5;
+    bool   capture_normal       = 6;
+    bool   capture_object_color = 7;
+
+    // 图像参数
+    int32  width            = 8;
+    int32  height           = 9;
+    float  vertical_fov     = 10;
+    float  near_clip        = 11;
+    float  far_clip         = 12;
+    float  gamma            = 13;
+    bool   random_object_color = 14;
+
+    // 编码器
+    bool   use_nvenc        = 15;
+    int32  nvenc_gpu_index  = 16;
+
+    // 推流端口
+    int32  color_port       = 17;
+    int32  depth_port       = 18;
+
+    // DDS
+    bool   use_dds          = 19;
+    string dds_topic        = 20;
+    string dds_stream_id    = 21;
+}
+
+message SetCameraPropertiesRequest {
+    string         camera_name = 1;
+    CameraProperty property    = 2;
+}
+
+message SetCameraPropertiesResponse {
+    enum Status { SUCCESS = 0; ERROR = 1; }
+    Status status       = 1;
+    string error_message = 2;
+    // 严格状态机下属性变更只在 Idle 发生，重启推流由客户端显式调用 SetStreamingEnabled
+    // 此字段保留兼容，始终为 false
+    bool   requires_streaming_restart = 3;
+}
+
+message SetStreamingEnabledRequest {
+    string camera_name = 1;
+    bool   enabled     = 2;
+}
+
+message SetStreamingEnabledResponse {
+    enum Status { SUCCESS = 0; ERROR = 1; }
+    Status status       = 1;
+    string error_message = 2;
 }

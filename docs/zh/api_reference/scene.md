@@ -47,12 +47,22 @@ def add_actor(actor: Actor)
 def set_light_info(actor_name: str, light_info: LightInfo)
 ```
 
-### 相机传感器
+### 相机属性查询/设置 + 推流状态机
 
 ```python
-def set_camera_sensor_info(actor_name: str, camera_sensor_info: CameraSensorInfo)
+def get_camera_names() -> list[str]
+def get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+def set_camera_properties(camera_name: str, camera_property: CameraProperty)
+def set_streaming_enabled(camera_name: str, enabled: bool)
 def make_camera_viewport_active(actor_name: str, entity_name: str)
 ```
+
+状态机约束：
+- `Idle --set_streaming_enabled(True)--> Streaming`（Studio 端 InitCameraSensor，端口开始推流）
+- `Streaming --set_streaming_enabled(False)--> Idle`（Studio 端 UninitCameraSensor，停止推流）
+- `set_camera_properties` 仅在 `Idle` 状态允许；`Streaming` 状态下需先停止推流再设置属性
+- `camera_name` 可通过 `get_camera_names()` 枚举获取
+- MP4 录制由环境层的 `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` 控制（客户端 PyAV remux，非阻塞，返回 `Future`），与本组接口正交
 
 ### 材质
 
@@ -157,28 +167,24 @@ class LightInfo:
     )
 ```
 
-### CameraSensorInfo
+### CameraProperty
 
-基础 4 参数为必填；扩展参数为 optional（None 表示不修改 server 现有值），
-对应 proto3 optional 语义，兼容老客户端。
+相机属性批量更新参数。所有字段均为 optional（None 表示不修改 server 现有值），
+对应 proto3 optional 语义。状态机约束：属性 Set 仅在 Idle 状态允许。
 
 ```python
-class CameraSensorInfo:
+class CameraProperty:
     def __init__(
         self,
-        capture_rgb: bool,      # 是否捕获 RGB 图像
-        capture_depth: bool,    # 是否捕获深度图
-        save_mp4_file: bool,    # 是否保存 MP4 视频文件
-        use_dds: bool,          # 是否使用 DDS 纹理格式
-        **kwargs,               # 扩展 optional 字段（None 表示不修改）
+        **kwargs,               # 全部字段 optional（None 表示不修改）
     )
 ```
 
-`**kwargs` 支持的扩展字段（共 16 个，对应 proto optional 语义）：
-`capture_normal`、`capture_object_color`、`is_recording`、`use_nvenc`、
-`nvenc_gpu_index`、`random_object_color`、`width`、`height`、`vertical_fov`、
-`near_clip`、`far_clip`、`gamma`、`color_port`、`depth_port`、`dds_topic`、
-`dds_stream_id`。
+`**kwargs` 支持的字段（共 18 个，对应 proto `CameraProperty` optional 语义）：
+`capture_rgb`、`capture_depth`、`capture_normal`、`capture_object_color`、
+`random_object_color`、`use_nvenc`、`nvenc_gpu_index`、`width`、`height`、
+`vertical_fov`、`near_clip`、`far_clip`、`gamma`、`color_port`、`depth_port`、
+`use_dds`、`dds_topic`、`dds_stream_id`。
 
 ### MaterialInfo
 
@@ -197,7 +203,7 @@ class MaterialInfo:
 ### 场景初始化
 
 ```python
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraProperty, MaterialInfo
 import numpy as np
 
 # 1. 连接场景

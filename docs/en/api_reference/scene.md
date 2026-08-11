@@ -47,12 +47,22 @@ Adds an Actor to the scene. Must be called before `publish_scene()`.
 def set_light_info(actor_name: str, light_info: LightInfo)
 ```
 
-### Camera Sensors
+### Camera Property Query/Set + Streaming State Machine
 
 ```python
-def set_camera_sensor_info(actor_name: str, camera_sensor_info: CameraSensorInfo)
+def get_camera_names() -> list[str]
+def get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+def set_camera_properties(camera_name: str, camera_property: CameraProperty)
+def set_streaming_enabled(camera_name: str, enabled: bool)
 def make_camera_viewport_active(actor_name: str, entity_name: str)
 ```
+
+State machine constraints:
+- `Idle --set_streaming_enabled(True)--> Streaming` (Studio side InitCameraSensor, ports start streaming)
+- `Streaming --set_streaming_enabled(False)--> Idle` (Studio side UninitCameraSensor, stop streaming)
+- `set_camera_properties` is only allowed in `Idle` state; in `Streaming` state, stop streaming first before setting properties
+- `camera_name` can be enumerated via `get_camera_names()`
+- MP4 recording is controlled by the environment-layer `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` (client-side PyAV remux, non-blocking, returns a `Future`), orthogonal to this group of interfaces
 
 ### Materials
 
@@ -157,28 +167,24 @@ class LightInfo:
     )
 ```
 
-### CameraSensorInfo
+### CameraProperty
 
-The first 4 parameters are required; extension parameters are optional (None means do not modify the server's existing value),
-corresponding to proto3 optional semantics, compatible with old clients.
+Camera property batch update parameters. All fields are optional (None means do not modify the server's existing value),
+corresponding to proto3 optional semantics. State machine constraint: property Set is only allowed in Idle state.
 
 ```python
-class CameraSensorInfo:
+class CameraProperty:
     def __init__(
         self,
-        capture_rgb: bool,      # Whether to capture RGB images
-        capture_depth: bool,    # Whether to capture depth maps
-        save_mp4_file: bool,    # Whether to save MP4 video files
-        use_dds: bool,          # Whether to use DDS texture format
-        **kwargs,               # Extension optional fields (None means do not modify)
+        **kwargs,               # All fields optional (None means do not modify)
     )
 ```
 
-Extension fields supported by `**kwargs` (16 in total, corresponding to proto optional semantics):
-`capture_normal`, `capture_object_color`, `is_recording`, `use_nvenc`,
-`nvenc_gpu_index`, `random_object_color`, `width`, `height`, `vertical_fov`,
-`near_clip`, `far_clip`, `gamma`, `color_port`, `depth_port`, `dds_topic`,
-`dds_stream_id`.
+Fields supported by `**kwargs` (18 in total, corresponding to proto `CameraProperty` optional semantics):
+`capture_rgb`, `capture_depth`, `capture_normal`, `capture_object_color`,
+`random_object_color`, `use_nvenc`, `nvenc_gpu_index`, `width`, `height`,
+`vertical_fov`, `near_clip`, `far_clip`, `gamma`, `color_port`, `depth_port`,
+`use_dds`, `dds_topic`, `dds_stream_id`.
 
 ### MaterialInfo
 
@@ -197,7 +203,7 @@ class MaterialInfo:
 ### Scene Initialization
 
 ```python
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraProperty, MaterialInfo
 import numpy as np
 
 # 1. Connect to the scene
