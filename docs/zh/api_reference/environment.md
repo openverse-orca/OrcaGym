@@ -192,29 +192,147 @@ def geom_friction(geom_name: str) -> np.ndarray   # geom 摩擦系数 (3,) [slid
 ### Studio 交互
 
 ```python
-def render() -> np.ndarray | None              # 渲染到 Studio
-def begin_save_video(file_path, capture_mode=0) -> None
-def stop_save_video() -> None
-def get_current_frame() -> int
-def get_next_frame() -> int
-def get_camera_time_stamp(last_frame_index) -> dict
+def render(simulate_index: int = -1, request_idr: bool = False) -> np.ndarray | None
+    # 渲染到 Studio。simulate_index 透传到引擎相机管线用于帧对齐，
+    # -1 表示由服务端自增（默认值）。启用客户端录制时应传入 >=0 的递增值。
+    # request_idr=True 请求引擎在本次渲染输出一个 IDR 关键帧（录制段起点使用，
+    # 配合 save_streaming 内部默认的前向截断使视频从关键帧开始）。
+
+# 以下方法已废弃（引擎侧 MP4 录制 RPC 已删除），调用时发出 DeprecationWarning：
+def begin_save_video(file_path, capture_mode=0) -> None       # [Deprecated] no-op
+def stop_save_video() -> None                                  # [Deprecated] no-op
+def get_current_frame() -> int                                 # [Deprecated] 返回 -1
+def get_next_frame() -> int                                    # [Deprecated] 返回 0
+def get_camera_time_stamp(last_frame_index) -> dict            # [Deprecated] 返回 {}
+
 def get_frame_png(image_path) -> None
 def load_content_file(content_file_name, **kwargs) -> None
 ```
 
-### 摄像头传感器配置
+### 相机录制 API（客户端 PyAV remux）
 
 ```python
-def set_camera_sensor_info(
-    actor_name: str,
-    capture_rgb: bool,
-    capture_depth: bool,
-    save_mp4_file: bool = False,
-    use_dds: bool = False,
-    **kwargs,   # 可选扩展参数：capture_normal, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, ...
+def save_streaming(
+    camera_name: str,
+    camera_type: str,
+    file_path: str,
+    start_simulate_index: int,
+    end_simulate_index: int,
+) -> Future[RemuxResult]
+    # 保存指定相机 [start, end] 区间的视频流为 MP4。**非阻塞**，返回 Future。
+    # 通过 VideoRecorderManager 统一接口操作：幂等启动录制器，并在该相机的
+    # 等待任务队列中注册一个区间保存任务。
+    # 每个区间任务独立携带自己的 start/end，可同时注册多个互不干扰的区间。
+    # 当接收线程收到 simulate_index >= end 的帧时，由保存 worker 线程异步执行
+    # PyAV remux，不阻塞接收线程与上层调用线程。
+    # 因此可容忍「物理仿真步 → 引擎渲染 → 取帧」的延迟（如保存 0-500 时缓存
+    # 可能只有 490 帧，任务会等第 500 帧到达后再保存）。
+    # 内部默认前向截断到区间内第一个关键帧（``truncate_to_keyframe=True``），
+    # 保证输出视频可正常播放（配合录制起点 ``render(request_idr=True)``
+    # 使视频从关键帧开始）。
+    # env.close() 会自动保存未完成的录制任务（阻塞等待 remux 完成）。
+    # 前置条件：已调用 ``start_streaming`` 启动推流。
+    # 内部 remux_range 使用 timestamp_ns 作为 PTS 时间基（非固定 FPS），
+    # 并返回 RemuxResult（含 frame_indices / timestamps_ns 帧号↔物理 index 映射）。
+
+def set_render_fps(fps: int) -> None
+    # 设置渲染帧率（render FPS）。控制 render() 调用引擎渲染的频率：
+    # 同步渲染（sync_render=True）每隔 1/fps 个物理步渲染一帧；
+    # 异步渲染（sync_render=False）每隔 1/fps 秒渲染一帧。
+
+def set_sync_render(enabled: bool) -> None
+    # 设置是否启用同步渲染。启用录制做帧对齐时需开启（enabled=True），
+    # 使 render() 每物理步调用引擎渲染并透传 simulate_index。
+
+def set_video_recorder_manager(manager: VideoRecorderManager | None) -> None
+    # 注入 VideoRecorderManager 实例。环境层相机属性查询/设置与录制统一
+    # 转发到该管理器。为 None 时，后续首次调用相机/录制接口会由
+    # CreateVideoRecorderManager(self.stub, self.loop) 惰性创建。
+```
+
+底层 ``VideoRecorderManager`` 统一接口（``orca_gym.recorder`` 模块）。
+相机属性查询/设置与推流状态机由 ``VideoRecorderManager`` 直接基于 gRPC stub
+（``GrpcServiceStub``）实现（实际执行者），环境层（``OrcaGymLocalEnv`` /
+``OrcaGymEulerEnv``）仅做转发。
+
+```python
+from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult
+from concurrent.futures import Future
+
+# stub 为 gRPC 能力 stub（GrpcServiceStub），提供相机属性查询/设置 + 推流状态
+# 切换的接口；可为 None（仅使用录制能力，不提供相机配置）。
+# loop 为所属环境的事件循环（self.loop），用于同步桥接 stub 异步接口。
+manager = CreateVideoRecorderManager(stub=env.stub, loop=env.loop)
+manager.start_recorder(camera_name, color_port=7070)      # 幂等启动
+future: Future[RemuxResult] = manager.save_streaming(
+    camera_name, file_path, start_idx, end_idx
+)  # 注册区间保存任务，非阻塞返回
+result: RemuxResult = future.result()                    # 等待保存完成（可选）
+# result.file_path / result.frame_count / result.frame_indices / result.timestamps_ns
+manager.stop_all_and_save() -> dict[str, RemuxResult]    # env.close() 自动保存（阻塞等待）
+```
+
+> 任务队列抽象：等待队列中的每个保存任务（``RecordingTask``）独立携带触发回调
+> （``trigger_fn``）与执行逻辑（``execute``）。触发条件是回调函数
+> ``(task, current_simulate_index) -> bool``，接收线程逐帧轮询判断，便于后续扩展
+> 新的任务类型（如按时间戳、按帧数触发）。
+
+### 实时视频可视化（``VideoStreamViewer``）
+
+``VideoRecorderManager`` 提供实时可视化能力，启动**独立子进程**建立
+WebSocket 连接接收 H.264 码流、解码、用 matplotlib 渲染显示。子进程与主
+进程完全解耦，不读取主进程的滚动缓存，不阻塞接收线程、保存 worker 与
+上层仿真主线程。
+
+```python
+from orca_gym.recorder import CreateVideoRecorderManager, VideoStreamViewer
+
+manager = CreateVideoRecorderManager(stub=env.stub, loop=env.loop)
+manager.start_recorder(camera_name, color_port=7070)   # 先确保录制器已启动
+
+# 非阻塞启动可视化窗口（子进程独立建立 WebSocket + matplotlib 显示）
+viewer: VideoStreamViewer = manager.start_viewer(camera_name, window_name=None)
+viewer.is_running
+
+manager.get_viewer(camera_name)        # 获取查看器（未启动返回 None）
+manager.stop_viewer(camera_name)       # 停止某相机窗口
+manager.stop_all_viewers()             # 停止所有窗口
+manager.get_viewer_stats()             # 所有窗口状态统计
+```
+
+独立使用 ``VideoStreamViewer``（不经过管理器）:
+
+```python
+from orca_gym.recorder import VideoStreamViewer
+
+viewer = VideoStreamViewer(recorder, window_name="Camera")
+viewer.start()
+# ... 仿真循环中 ...
+viewer.stop()
+```
+
+依赖 ``matplotlib`` / ``numpy`` / ``av`` / ``websockets`` / ``opencv-python``。
+窗口通过关闭按钮或调用 ``viewer.stop()`` / ``manager.stop_viewer()`` 关闭
+（内部通过 ``stop_event`` 信号通知子进程退出）。
+
+### 相机属性查询/设置 + 推流状态机
+
+```python
+def get_camera_names() -> list[str]
+def get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+def set_camera_properties(
+    camera_name: str,
+    **kwargs,   # 可选参数：capture_rgb, capture_depth, capture_normal, capture_object_color, random_object_color, use_nvenc, nvenc_gpu_index, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, use_dds, dds_topic, dds_stream_id
 ) -> None
+def set_streaming_enabled(camera_name: str, enabled: bool) -> None
 def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
 ```
+
+状态机约束：
+- `camera_name` 可通过 `get_camera_names()` 枚举获取
+- `set_camera_properties` 仅在 `Idle` 状态允许；`Streaming` 状态下需先调用 `set_streaming_enabled(False)` 回到 `Idle` 再设置属性
+- `set_streaming_enabled(True)` 进入 `Streaming` 状态后，对应端口（如 7070/7071）开始监听并推流
+- 客户端 PyAV 录制由 `save_streaming` 控制，与本组接口正交（但需要先 `set_streaming_enabled(True)` 启动推流）
 
 ### Studio 桥接
 
