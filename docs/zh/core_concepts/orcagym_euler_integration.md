@@ -41,6 +41,8 @@ OrcaGym 与 Euler 的集成关系由以下决策定义：
 > **决策 4：力回流走 MuJoCo 的 `xfrc_applied` 通道。**
 > Euler 的 `State.body_f`（COM 世界系 wrench）→ MuJoCo 的 `xfrc_applied`（COM 世界系 wrench），语义一致、零变换、与 Newton 对齐。不走 `qfrc_applied`（广义力通道）。
 
+> **本里程碑边界：** 只做 **CPU 四阶段耦合**（MuJoCo CPU ↔ Euler）。**不做** GPU 刚体后端（方案 Z）、模式 B 零拷贝、跨引擎 `CouplingOrchestrator`、M:N 不等齿比。方案 Z 见 Euler 仓 `solver_mujoco_backend_architecture.md`，不进当前排期。
+
 ---
 
 ## 2. 角色与定位
@@ -92,9 +94,9 @@ OrcaGym 与 Euler 的集成关系由以下决策定义：
 | OrcaGymEuler / OrcaGymEulerEnv 组件骨架 | ✅ 已实现 | [orca_gym_euler.py](../../../../OrcaGym/orca_gym/core/euler/orca_gym_euler.py)、[orca_gym_euler_env.py](../../../../OrcaGym/orca_gym/environment/euler/orca_gym_euler_env.py) |
 | MuJoCoSimCore（纯 MuJoCo 步进、查询、同步） | ✅ 已实现 | [mujoco_sim_core.py](../../../../OrcaGym/orca_gym/core/euler/mujoco_sim_core.py) |
 | `step_with_coupling`（当前等价于纯 MuJoCo 步进） | ✅ 骨架已实现 | [orca_gym_euler.py:step_with_coupling](../../../../OrcaGym/orca_gym/core/euler/orca_gym_euler.py) |
-| Euler Runtime 持有与编排 | ⏳ 待实现 | `_euler` 当前为 None |
-| 跨引擎同步（`_sync_mujoco_to_euler_state` / `_sync_euler_force_to_mujoco`） | ⏳ 待实现 | 本文定义契约 |
-| body 索引映射（基于 `body_label`） | ⏳ 待实现 | 依赖 Euler 实现 `Model.body_label` |
+| Euler Runtime 持有与编排 | ⏳ 待实现 | `_euler` 当前为 None；注入契约见 Euler 侧 §7.3 / §7.6 |
+| 跨引擎同步（`_sync_mujoco_to_euler_state` / `_sync_euler_force_to_mujoco`） | ⏳ 待实现 | 契约见本文 §4.3 / §4.3.1 |
+| body 索引映射（基于 `body_label`） | ⏳ Gym 待接；Euler 已具备 | Euler `Model.body_label` + `add_mjcf` 已可用；用 **basename** 对 mj 名 |
 
 ---
 
@@ -137,15 +139,17 @@ def _step_with_euler_coupling(self, ctrl, n_frames, dt):
     self._sync_mujoco_to_euler_state()
 
     # 阶段 3: Euler 非刚体解算（标准 step 接口）
+    # CPU 路径刚体由 MuJoCo 驱动：必须 rigid_body_mode="external"（勿用默认内部刚体积分）
     for _ in range(euler.steps_per_cycle):
         euler.state_0.clear_forces()
         euler.solver.step(
             euler.state_0, euler.state_1,
-            euler.control, None, euler.dt
+            euler.control, None, euler.dt,
+            rigid_body_mode="external",
         )
         euler.state_0, euler.state_1 = euler.state_1, euler.state_0
 
-    # 阶段 4: Euler 力回流 → MuJoCo（OrcaGymEuler 负责同步）
+    # 阶段 4: Euler 力回流 → MuJoCo（OrcaGymEuler 负责同步；写前清零 xfrc_applied）
     self._sync_euler_force_to_mujoco()
 ```
 
@@ -154,6 +158,7 @@ def _step_with_euler_coupling(self, ctrl, n_frames, dt):
 2. **同步职责在 OrcaGymEuler**：阶段 2 和阶段 4 的跨引擎同步由 OrcaGymEuler 负责
 3. **Euler 的 `State.body_q` / `body_qd` 由 OrcaGymEuler 写入**：Euler 只读
 4. **Euler 的 `State.body_f` 由 Euler 写入**：OrcaGymEuler 读取并回流到 MuJoCo
+5. **CPU 耦合必须 `rigid_body_mode="external"`**：刚体位姿来自阶段 2 注入，Euler 不内部积分刚体
 
 ### 3.3 同步周期（SyncCycle）
 
@@ -193,7 +198,7 @@ T_cycle = rigid_steps_per_cycle × rigid_dt
 - **跨引擎编排**（Euler vs. MuJoCo）→ OrcaGymEuler 负责
 - **Euler 内部多求解器调度**（SPH vs. PBD）→ Euler 的 `CouplingOrchestrator` 负责
 
-OrcaGymEuler 调用 `Euler.Solver.step()` 时，Euler 内部可能由 `CouplingOrchestrator` 编排多个非刚体求解器，但这对 OrcaGymEuler 透明——OrcaGymEuler 只看到一次 `step` 调用。
+OrcaGymEuler 调用 `Euler.Solver.step()` 时，Euler 内部可能由 `CouplingOrchestrator` 编排多个非刚体求解器，但这对 OrcaGymEuler 黑箱——OrcaGymEuler 只看到一次 `step` 调用。
 
 ---
 
@@ -340,7 +345,20 @@ def _sync_euler_force_to_mujoco(self):
     mj_data.xfrc_applied[mj_bodies] = body_f_np[euler_idxs]
 ```
 
-**清零时机**：每个 `mj_step` 前 OrcaGymEuler 必须显式清零 `xfrc_applied`，否则力会累积。这与 Newton 的 `_apply_mjc_control` 行为一致。
+**清零时机（硬约定）**：每个 SyncCycle **阶段 4** 写入 `xfrc_applied` **之前**整表清零；MuJoCo 不会自动清。以「写回流前清零」为准（不要与「每个 `mj_step` 前」混用）。Euler `state.clear_forces()` 只清 Euler 侧 `body_f`，与 `xfrc_applied` 无关。与 Newton `_apply_mjc_control` 一致。
+
+#### 4.3.1 Gym 读取 `body_f` 约定（J3）
+
+与 Euler 侧 [euler_in_orcagym_integration.md §5.3.1](../../../../OrcaEuler/Docs/Design/architecture/euler_in_orcagym_integration.md) 一致，摘要如下：
+
+| 项 | 约定 |
+|----|------|
+| 布局 | `[fx, fy, fz, tx, ty, tz]`（先力后力矩），shape `(body_count, 6)` |
+| 系 / 作用点 | 世界系；body **COM**（对 `xfrc_applied` 1:1，无坐标变换） |
+| 索引 | `body_f[i]` ↔ `model.body_label[i]`；对 MuJoCo 用 **basename**；勿用 ESDF 柔性名 |
+| 清零 | **Gym** 写 `xfrc_applied` 前整表清零；与 Euler `clear_forces()` 无关 |
+| 通道 | 只走 `xfrc_applied`，不走 `qfrc_applied` |
+| 参考 | `OrcaEuler/.../08_dual_file_e2e_validation/03_presser_contact.py` |
 
 ### 4.4 body 索引映射
 
@@ -348,7 +366,7 @@ OrcaGymEuler 在初始化时建立 `body_index_map: dict[int, int]`（`mj_body_i
 
 ```python
 def _build_body_index_map(self):
-    """通过 body_label 建立 MuJoCo ↔ Euler body 索引映射。
+    """通过 body_label 的 basename 建立 MuJoCo ↔ Euler body 索引映射。
 
     同时构建 NumPy 索引数组和预分配缓冲区，供热路径向量化同步使用。
     """
@@ -358,9 +376,9 @@ def _build_body_index_map(self):
     mj_model = sim._mjModel  # noqa: SLF001
     self._body_index_map = {}  # dict 形式，供调试/查询
 
-    # Euler label → idx 反查表
+    # Euler label → idx：用 basename（层级路径取最后一段）
     euler_label_to_idx = {
-        label: idx
+        label.rsplit("/", 1)[-1]: idx
         for idx, label in enumerate(euler.model.body_label)
     }
 
@@ -389,7 +407,7 @@ def _build_body_index_map(self):
     self._body_qd_buf = np.zeros((body_count, 6), dtype=np.float32)
 ```
 
-**依赖**：Euler 实现 `Model.body_label`（与 Newton 对齐）。
+**依赖**：Euler `Model.body_label` 已由 `add_mjcf` 填充；Gym 侧用 basename 建 map（勿假定下标等于 MuJoCo body id）。
 
 ### 4.5 Body→Shape 映射的注意事项
 
@@ -559,6 +577,14 @@ class OrcaGymEuler:
         self._euler: EulerRuntime | None = None  # 未来填充
 ```
 
+**初始化时双注入（硬约定，与 Euler §7.3 一致）**：填充 `_euler` 时，同一 `ModelBuilder` 上必须：
+
+1. `add_mjcf(mjcf_path_or_xml)` — 刚体感知 + `body_label` + shape（**必选**）
+2. `PullEsdf` / 落盘 → `add_esdf_from_string` 或 `add_esdf` — 非刚体（**必选**）
+3. 一次 `finalize()` → 建 `body_index_map`（basename）→ 挂上 `EulerRuntime`
+
+缺一侧则无刚体碰撞几何或无柔性；勿只注入 ESDF。
+
 **设计原则**：
 - `_euler` 仍然被 `_BLOCKED_ATTRS` 拦截，用户不直接访问
 - OrcaGymEuler 通过 `has_euler()` 查询、`step_with_coupling` 编排
@@ -580,6 +606,28 @@ OrcaGymEuler 在 `render()` 中编排两条独立的渲染链路，两者落点�
 | Euler 渲染（非刚体） | Euler `RenderClient` gRPC | `state.particle_q` / `state.deformable_vertex_q` → OrcaEulerRender FP | OrcaEulerRender Gem FP |
 
 两条链路**无数据依赖**，可并行触发。MuJoCo 渲染走 OrcaGym 既有的 Bridge gRPC 链路（`qpos` 上报），Euler 渲染走 Euler 自有的 `RenderClient`（直连 OrcaEulerRender Gem 的 gRPC server，端口 50451）。
+
+### 7.1.1 联调已知坑短表（镜像 Euler §7.6）
+
+权威全文：[euler_in_orcagym_integration.md §7.6](../../../../OrcaEuler/Docs/Design/architecture/euler_in_orcagym_integration.md)。Gym / 渲染各摘一句：
+
+**给唐鑫华（主控）**
+
+| 坑 | 怎么做 |
+|----|--------|
+| 必须 `add_mjcf` + `add_esdf` 再 `finalize` | 缺一侧则无刚体碰撞几何或无柔性 |
+| `Model.body_label` ≠ ESDF 柔性显示名 | map / `body_f` 只用刚体 label 的 basename |
+| Euler dt 可 ≠ MuJoCo dt | 等齿比由 Gym 对齐 `n·dt`；力回流前清零 `xfrc_applied` |
+| `<frame>` / worldbody `<site>` | `add_mjcf` 不支持或跳过；场景避免 |
+
+**给文盼（渲染）**
+
+| 坑 | 怎么做 |
+|----|--------|
+| 无 `proxy_mesh` | 物理仍可跑，渲染降级（见 08.2）；勿当建模型失败 |
+| 推 `particle_q` / `deformable_vertex_q` | 刚体仍走 Bridge；勿与 `body_label` 混名 |
+| fd 零拷贝 | 等 J7 Polyscope 结论；先 CPU `UpdateChannelData` |
+| 端口 | ESDF Pull + 柔性推送：50451；刚体 Bridge：~50051 |
 
 ### 7.2 Euler 粒子（流体）渲染的 GPU 内存句柄共享机制
 
