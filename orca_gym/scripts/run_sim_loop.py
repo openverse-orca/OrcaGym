@@ -115,6 +115,13 @@ def run_simulation(orcagym_addr : str,
 		stage="beginscene",
 		orcagym_address=orcagym_addr,
     	)
+
+        env.unwrapped.begin_save_video("C:/workspace/dev/orca/Record")
+        _logger.info("开始录制视频")
+
+        _t = datetime.now()
+        recording = True
+
         while True:
             start_time = datetime.now()
 
@@ -127,6 +134,11 @@ def run_simulation(orcagym_addr : str,
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() < REALTIME_STEP:
                 time.sleep(REALTIME_STEP - elapsed_time.total_seconds())
+
+            dt = datetime.now() - _t
+            if recording and dt.total_seconds() >= 5.0:
+                env.unwrapped.stop_save_video()
+                recording = False
 
 
     except KeyboardInterrupt:
