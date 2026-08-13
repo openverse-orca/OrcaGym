@@ -20,7 +20,11 @@ from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
 from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode
-from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult, VideoRecorderManager
+from orca_gym.recorder import (
+    CreateVideoRecorderManager,
+    RemuxResult,
+    VideoRecorderManager,
+)
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -281,12 +285,16 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         """
         self._recorder_manager = manager
 
-    def _get_recorder_manager(self) -> VideoRecorderManager:
+    def get_recorder_manager(self) -> VideoRecorderManager:
         """获取或惰性创建录制管理器（以 ``self.stub`` 为 gRPC 后端）。
 
         调用方保证在单一线程中创建管理器，故无需加锁。以 ``self.loop`` 作为
         事件循环桥接 stub 异步接口。相机属性/推流接口由 ``VideoRecorderManager``
         基于 stub 直接实现（实际执行者）。
+
+        外部模块（如 OrcaManipulation 的 LeRobotDataStorage）可通过此方法
+        获取 manager，直接调用 ``submit_task`` / ``get_latest_frame_simulate_index``
+        等接口，避免在 env 层增加过多转发方法。
         """
         if self._recorder_manager is None:
             self._recorder_manager = CreateVideoRecorderManager(self.stub, self.loop)
@@ -298,7 +306,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         Returns:
             已注册相机名称列表。无后端时返回空列表。
         """
-        return self._get_recorder_manager().get_camera_names()
+        return self.get_recorder_manager().get_camera_names()
 
     def set_render_fps(self, fps: int) -> None:
         """设置渲染帧率（render FPS）。
@@ -352,7 +360,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             ValueError: 相机不存在、未注册，或缺少有效端口。
             ConnectionError: WebSocket 连接超时或失败。
         """
-        self._get_recorder_manager().start_recorder(camera_name, **kwargs)
+        self.get_recorder_manager().start_recorder(camera_name, **kwargs)
 
     def save_streaming(
         self,
@@ -384,7 +392,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         Raises:
             ValueError: 相机不存在或未启动对应类型的录制器。
         """
-        manager = self._get_recorder_manager()
+        manager = self.get_recorder_manager()
         return manager.save_streaming(
             camera_name=camera_name,
             file_path=file_path,
@@ -416,7 +424,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         Raises:
             ValueError: 相机未启动对应类型的录制器。
         """
-        self._get_recorder_manager().start_viewer(
+        self.get_recorder_manager().start_viewer(
             camera_name=camera_name,
             window_name=window_name,
             stream_kind=camera_type,

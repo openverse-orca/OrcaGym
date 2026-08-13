@@ -670,7 +670,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         Raises:
             ValueError: 相机不存在或未启动对应类型的录制器。
         """
-        manager = self._get_recorder_manager()
+        manager = self.get_recorder_manager()
         return manager.save_streaming(
             camera_name=camera_name,
             file_path=file_path,
@@ -702,7 +702,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         Raises:
             ValueError: 相机未启动对应类型的录制器。
         """
-        self._get_recorder_manager().start_viewer(
+        self.get_recorder_manager().start_viewer(
             camera_name=camera_name,
             window_name=window_name,
             stream_kind=camera_type,
@@ -720,12 +720,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         self._recorder_manager = manager
 
-    def _get_recorder_manager(self) -> VideoRecorderManager:
+    def get_recorder_manager(self) -> VideoRecorderManager:
         """获取或惰性创建录制管理器（以 ``self._stub`` 为 gRPC 后端）。
 
         调用方保证在单一线程中创建管理器，故无需加锁。以 ``self.loop`` 作为
         事件循环桥接 stub 异步接口。相机属性/推流接口由 ``VideoRecorderManager``
         基于 stub 直接实现（实际执行者）。
+
+        外部模块可通过此方法获取 manager，直接调用 ``submit_task`` /
+        ``get_latest_frame_simulate_index`` 等接口，避免在 env 层增加过多转发方法。
         """
         if self._recorder_manager is None:
             self._recorder_manager = CreateVideoRecorderManager(self._stub, self.loop)
@@ -740,7 +743,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             已注册相机名称列表（含 uuid 后缀的 registered name）。
             离线模式返回空列表。
         """
-        return self._get_recorder_manager().get_camera_names()
+        return self.get_recorder_manager().get_camera_names()
 
     def start_streaming(self, camera_name: str, **kwargs) -> None:
         """开启指定相机的串流（含 color/depth 按传感器开关自动启动）。
@@ -761,7 +764,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             ValueError: 相机不存在、未注册，或缺少有效端口。
             ConnectionError: WebSocket 连接超时或失败。
         """
-        self._get_recorder_manager().start_recorder(camera_name, **kwargs)
+        self.get_recorder_manager().start_recorder(camera_name, **kwargs)
 
     def set_render_fps(self, fps: int) -> None:
         """设置渲染帧率（render FPS）。
