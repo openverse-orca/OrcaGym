@@ -213,6 +213,22 @@ class RollingFrameBuffer:
                     latest_keyframe = entry
             return latest_keyframe
 
+    def get_frame(self, simulate_index: int) -> FrameEntry | None:
+        """获取指定 simulate_index 的单帧。
+
+        供 ``SingleFrameTask.execute`` 调用：当降频采样（控制频率 > 渲染频率）
+        时，目标 ``simulate_index`` 可能没有对应的视频帧（渲染跳号），此时
+        返回 None，由调用方决定是否跳过该帧。
+
+        Args:
+            simulate_index: 目标帧的 simulate_index。
+
+        Returns:
+            ``FrameEntry`` 或 ``None``（不存在或已被滚动淘汰）。
+        """
+        with self._lock:
+            return self._frames.get(simulate_index)
+
     def clear(self) -> None:
         """清空缓存。"""
         with self._lock:

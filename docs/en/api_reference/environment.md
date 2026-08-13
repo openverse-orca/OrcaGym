@@ -245,6 +245,20 @@ def save_streaming(
     # and returns RemuxResult (with frame_indices / timestamps_ns frame-number
     # ↔ physical-index mapping).
 
+def get_recorder_manager() -> VideoRecorderManager
+    # Get or lazily create the recorder manager. **Public method**: external
+    # modules can obtain the manager to call ``submit_task`` /
+    # ``save_streaming`` / ``get_latest_frame_simulate_index`` etc. directly,
+    # avoiding too many forwarding methods at the env layer.
+    # Internally uses ``self.stub`` as gRPC backend, ``self.loop`` as event
+    # loop bridge. The caller guarantees single-threaded creation, so no
+    # locking is needed.
+    #
+    # Advanced per-frame callback usage: the caller obtains the manager via
+    # this method, constructs a ``SingleFrameTask`` (or other RecordingTask
+    # subclass) and submits it via ``manager.submit_task`` — no env-layer
+    # forwarding method is needed (see example below).
+
 def set_render_fps(fps: int) -> None
     # Sets the render frame rate (render FPS), controlling how often render()
     # invokes the engine: with sync_render=True one frame is rendered every
@@ -287,12 +301,50 @@ result: RemuxResult = future.result()                    # wait for save to fini
 manager.stop_all_and_save() -> dict[str, RemuxResult]    # env.close() auto-save (blocking wait)
 ```
 
+```python
+from orca_gym.recorder import SingleFrameTask
+
+# Per-frame callback: when the target frame arrives, the callback runs in the
+# save_worker thread; the main thread is not blocked.
+# The callback receives the FrameEntry and the decoded RGB numpy array
+# (H, W, 3) dtype=uint8 (decoded by the save_worker's persistent CodecContext,
+# no need to rewind to IDR). decoded_frame is None if decoding failed.
+# The callback's return value becomes future.result() (Any type), decided by
+# the callback itself.
+# When downsampling (control freq > render freq), the target sim_idx may have
+# no corresponding video frame (renderer skip); in that case future.result()
+# returns None to indicate a skip.
+def on_frame(frame_entry, decoded_frame):
+    # frame_entry.timestamp_ns / simulate_index / nal_data / is_keyframe
+    # decoded_frame: np.ndarray (H, W, 3) uint8 or None
+    # LeRobot add_frame etc. can be called here (save_worker is serial, thread-safe)
+    return decoded_frame  # return value becomes future.result(), for multi-camera sync
+
+task = SingleFrameTask(simulate_index=100, on_frame=on_frame)
+future = manager.submit_task(camera_name, task)  # non-blocking, returns task.future
+result = future.result()  # None means no video frame at this sim_idx (skipped); otherwise the on_frame return value
+```
+
+```python
+# Obtain manager via get_recorder_manager to call low-level interfaces directly
+# (avoid too many forwarding methods at env layer)
+manager = env.get_recorder_manager()
+
+# Downsample gating: query the latest arrived frame's simulate_index
+latest_idx = manager.get_latest_frame_simulate_index(camera_name, "color")
+# None means no frame arrived; int means the latest frame's simulate_index
+```
+
 > Task queue abstraction: each save task (``RecordingTask``) in the waiting queue
 > independently carries a trigger callback (``trigger_fn``) and execution logic
 > (``execute``). The trigger condition is a callback
 > ``(task, current_simulate_index) -> bool``, polled per-frame by the receiver
 > thread, making it easy to extend new task types (e.g. triggered by timestamp
 > or frame count).
+>
+> Built-in task types:
+> - ``RangeSaveTask``: save a ``[start, end]`` range as MP4 (used internally by ``save_streaming``)
+> - ``SingleFrameTask``: execute a callback when the target frame arrives (per-frame callback use case, e.g. LeRobot streaming frame writes)
 
 ### Real-time video visualization (``VideoStreamViewer``)
 

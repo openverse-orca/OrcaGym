@@ -20,13 +20,18 @@ import queue
 import struct
 import threading
 import time
+import traceback
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import websockets
+
+if TYPE_CHECKING:
+    import numpy as np
 
 try:
     import av
@@ -35,6 +40,8 @@ except ImportError:
 
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.recorder.recording_task import (
+    DecodeTask,
+    FrameCallback,
     RangeSaveTask,
     RecordingTask,
     RecordingTaskQueue,
@@ -183,6 +190,12 @@ class CameraRecorder(ABC):
         self._save_queue: "queue.Queue[RecordingTask | object]" = queue.Queue()
         self._save_worker: threading.Thread | None = None
 
+        # 解码状态（save_worker 线程独占写入；``last_decoded_frame`` property
+        # 通过 ``SingleFrameTask.execute`` 在同一线程读取，FIFO 保证一致）
+        # 持久 CodecContext 保持 DPB 参考帧状态，避免 P 帧回溯解码
+        self._codec_ctx = None  # av.CodecContext，lazy init
+        self._last_decoded_frame: "np.ndarray | None" = None  # 最近一次解码的 RGB 帧
+
         # 线程异常通知主线程
         self._thread_error: BaseException | None = None
         self._error_event = threading.Event()
@@ -324,6 +337,10 @@ class CameraRecorder(ABC):
         else:
             self._save_worker = None
 
+        # 清理解码状态（CodecContext 不可跨 start/stop 复用，DPB 状态可能已失效）
+        self._codec_ctx = None
+        self._last_decoded_frame = None
+
     # ------------------------------------------------------------------
     # 录制任务管理
     # ------------------------------------------------------------------
@@ -342,6 +359,9 @@ class CameraRecorder(ABC):
         ``simulate_index >= end`` 的帧（通过触发回调判断）时，将任务移交
         保存 worker 线程执行 PyAV remux。每个任务独立携带自己的 start/end，
         可同时注册多个互不干扰的区间任务。
+
+        内部构造 ``RangeSaveTask`` 并委托 ``submit_task``，保证立即触发
+        判断与通用任务路径一致。
 
         Args:
             file_path: MP4 输出文件路径
@@ -362,7 +382,6 @@ class CameraRecorder(ABC):
             av.FFmpegError: PyAV mux 失败（同上；PyAV 10+ 已用
                 ``av.FFmpegError`` 替代旧版 ``av.AVError``）
         """
-        self._ensure_save_worker()
         task = RangeSaveTask(
             file_path=file_path,
             start_simulate_index=start_simulate_index,
@@ -370,11 +389,7 @@ class CameraRecorder(ABC):
             trigger_fn=trigger_fn,
             truncate_to_keyframe=truncate_to_keyframe,
         )
-        self._task_queue.add(task)
-        # 若 end 帧已到达（缓存最新 index >= end），立即触发
-        latest = self._buffer.get_latest_simulate_index()
-        if latest >= end_simulate_index:
-            self._dispatch_triggered_tasks(latest)
+        self.submit_task(task)
 
         _logger.info(
             f"[Recorder:{self._camera_name}] save_streaming: "
@@ -382,6 +397,85 @@ class CameraRecorder(ABC):
             f"{end_simulate_index}]"
         )
         return task.future
+
+    def submit_task(self, task: RecordingTask) -> Future:
+        """提交任意录制任务到等待队列。**非阻塞**。
+
+        通用任务提交接口，与 ``save_streaming``（内部创建 ``RangeSaveTask``）
+        解耦：调用方可构造任意 ``RecordingTask`` 子类（如 ``SingleFrameTask``）
+        提交，recorder 只负责轮询触发和移交 save_worker 执行。
+
+        若触发条件已满足（缓存最新 ``simulate_index`` 已达任务目标），
+        立即派发到 save_worker，避免等待下一帧到达。
+
+        Args:
+            task: 录制任务实例（``RangeSaveTask`` / ``SingleFrameTask`` / 自定义）。
+
+        Returns:
+            ``task.future``：任务完成后可获取结果或异常。
+        """
+        self._ensure_save_worker()
+        self._task_queue.add(task)
+        # 若触发条件已满足（缓存最新 index 已达目标），立即派发
+        latest = self._buffer.get_latest_simulate_index()
+        if latest >= 0:
+            self._dispatch_triggered_tasks(latest)
+        return task.future
+
+    def get_frame(self, simulate_index: int) -> FrameEntry | None:
+        """从缓存获取指定 ``simulate_index`` 的单帧。
+
+        供 ``SingleFrameTask.execute`` 调用。若该帧已被滚动淘汰或从未存在
+        （渲染跳号），返回 None。
+
+        Args:
+            simulate_index: 目标帧的 simulate_index。
+
+        Returns:
+            ``FrameEntry`` 或 None。
+        """
+        return self._buffer.get_frame(simulate_index)
+
+    def get_latest_simulate_index(self) -> int | None:
+        """获取缓存中最新已到达帧的 ``simulate_index``。
+
+        用于降频门控：上层判断是否有新视频帧到达，决定是否提交
+        ``SingleFrameTask``。无帧到达时返回 None。
+
+        Returns:
+            最新帧的 ``simulate_index``，或 None。
+        """
+        idx = self._buffer.get_latest_simulate_index()
+        return idx if idx >= 0 else None
+
+    def decode_frame_at(self, simulate_index: int) -> "np.ndarray | None":
+        """解码指定 ``simulate_index`` 的视频帧为 RGB numpy 数组。
+
+        .. deprecated::
+            新方案中 save_worker 维护持久 CodecContext 实时解码，
+            ``SingleFrameTask.on_frame`` 回调直接接收解码帧，无需调用本方法。
+            保留仅供向后兼容或调试使用。
+
+        Args:
+            simulate_index: 目标帧的 simulate_index。
+
+        Returns:
+            RGB numpy 数组 ``(H, W, 3)`` dtype=uint8，或 ``None``。
+        """
+        if av is None:
+            return None
+        target = self._buffer.get_frame(simulate_index)
+        if target is None:
+            return None
+        # 兼容接口：单次解码（无 DPB 状态，P 帧可能解码失败）
+        try:
+            codec = av.CodecContext.create("h264", "r")
+            packet = av.Packet(target.nal_data)
+            for frame in codec.decode(packet):
+                return frame.to_ndarray(format="rgb24")
+        except av.FFmpegError:
+            pass
+        return None
 
     def flush_pending_saves(self) -> list[Future[RemuxResult]]:
         """取出所有未触发任务并加入保存队列，尽力保存。
@@ -423,10 +517,15 @@ class CameraRecorder(ABC):
             self._save_worker.start()
 
     def _save_worker_loop(self) -> None:
-        """保存 worker 线程主循环：从队列取任务并执行 remux。
+        """保存 worker 线程主循环：从队列取任务并执行。
 
-        remux 耗时较长，特意放在独立线程，避免阻塞接收线程（丢帧）或
-        上层调用线程。任务的具体执行逻辑封装在 ``task.execute(self)`` 中。
+        队列内容统一为 ``RecordingTask`` 子类（``DecodeTask`` /
+        ``RangeSaveTask`` / ``SingleFrameTask``），FIFO 保证执行顺序：
+        接收线程先提交 ``DecodeTask``（解码 NAL + 更新 DPB 状态），
+        再触发 ``SingleFrameTask``（回调内从 ``last_decoded_frame`` 取解码结果）。
+
+        ``DecodeTask`` 轻量（~0.1-0.5ms），不阻塞后续任务；``RangeSaveTask``
+        的 remux 较重，但通常在 episode 结束时才触发，与实时解码不冲突。
         """
         while True:
             item = self._save_queue.get()
@@ -437,6 +536,30 @@ class CameraRecorder(ABC):
                 task.execute(self)
             finally:
                 self._save_queue.task_done()
+
+    def _decode_nal(self, nal_data: bytes, simulate_index: int) -> None:
+        """在 save_worker 线程解码一帧 NAL，更新 ``_last_decoded_frame``。
+
+        使用持久 ``CodecContext`` 保持 DPB 参考帧状态，P 帧可直接解码
+        无需回溯到 IDR。解码失败时保留上一帧（``_last_decoded_frame`` 不变）。
+
+        Args:
+            nal_data: H.264 NAL 单元数据（Annex-B 基本流）。
+            simulate_index: 帧的 simulate_index（用于日志）。
+        """
+        if av is None:
+            return
+        try:
+            if self._codec_ctx is None:
+                self._codec_ctx = av.CodecContext.create("h264", "r")
+            packet = av.Packet(nal_data)
+            for frame in self._codec_ctx.decode(packet):
+                self._last_decoded_frame = frame.to_ndarray(format="rgb24")
+        except av.FFmpegError as e:
+            _logger.debug(
+                f"[Recorder:{self._camera_name}] decode error at "
+                f"sim_idx={simulate_index}: {e}"
+            )
 
     def remux_range(
         self,
@@ -632,8 +755,8 @@ class CameraRecorder(ABC):
             self._thread_error = e
             self._error_event.set()
             _logger.error(
-                f"[Recorder:{self._camera_name}] thread error: {e}",
-                exc_info=True,
+                f"[Recorder:{self._camera_name}] thread error: {e}\n"
+                f"{traceback.format_exc()}"
             )
         finally:
             self._running = False
@@ -725,6 +848,13 @@ class CameraRecorder(ABC):
             is_keyframe=is_keyframe,
         )
 
+        # 提交解码任务到 save_worker（维持持久 CodecContext DPB 状态）
+        # DecodeTask 立即触发（提交时帧已到达），放入 _save_queue 后由
+        # worker 解码并更新 _last_decoded_frame。FIFO 保证解码先于后续
+        # SingleFrameTask 回调（同帧的回调任务在下方 _dispatch_triggered_tasks
+        # 提交，排在解码任务之后）。
+        self._save_queue.put(DecodeTask(nal_data, simulate_index))
+
         # 轮询任务队列，触发已满足条件的保存任务（当前 simulate_index 比较）
         self._dispatch_triggered_tasks(simulate_index)
 
@@ -789,6 +919,16 @@ class CameraRecorder(ABC):
     def received_first_idr(self) -> bool:
         """是否已收到首个 IDR 帧。"""
         return self._received_first_idr
+
+    @property
+    def last_decoded_frame(self) -> "np.ndarray | None":
+        """save_worker 最近一次解码的 RGB numpy 数组 ``(H, W, 3)``。
+
+        由持久 ``CodecContext`` 解码（保持 DPB 参考帧状态），FIFO 保证
+        解码任务先于 ``SingleFrameTask`` 回调执行，回调可直接读取本属性
+        获取解码帧，无需回溯到 IDR。
+        """
+        return self._last_decoded_frame
 
     def get_stats(self) -> dict:
         """返回录制器状态统计。"""

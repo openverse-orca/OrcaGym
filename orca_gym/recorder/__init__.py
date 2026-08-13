@@ -30,9 +30,11 @@
 from orca_gym.recorder.camera_recorder import CameraRecorder, RemuxResult
 from orca_gym.recorder.depth_recorder import DepthRecorder
 from orca_gym.recorder.recording_task import (
+    FrameCallback,
     RangeSaveTask,
     RecordingTask,
     RecordingTaskQueue,
+    SingleFrameTask,
     TriggerFn,
 )
 from orca_gym.recorder.rolling_frame_buffer import FrameEntry, RollingFrameBuffer
@@ -48,12 +50,14 @@ __all__ = [
     "CameraRecorder",
     "CreateVideoRecorderManager",
     "DepthRecorder",
+    "FrameCallback",
     "FrameEntry",
     "RangeSaveTask",
     "RecordingTask",
     "RecordingTaskQueue",
     "RemuxResult",
     "RollingFrameBuffer",
+    "SingleFrameTask",
     "TriggerFn",
     "VideoRecorder",
     "VideoRecorderManager",

@@ -9,12 +9,14 @@
 from __future__ import annotations
 
 import asyncio
+import traceback
 from concurrent.futures import Future
 
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos import mjc_message_pb2
 from orca_gym.recorder.camera_recorder import CameraRecorder, RemuxResult
 from orca_gym.recorder.depth_recorder import DepthRecorder
+from orca_gym.recorder.recording_task import RangeSaveTask, RecordingTask
 from orca_gym.recorder.video_stream_viewer import VideoStreamViewer
 
 _logger = get_orca_logger()
@@ -303,6 +305,9 @@ class VideoRecorderManager:
     ) -> Future[RemuxResult]:
         """保存某相机指定流 ``[start, end]`` 区间为 MP4。**非阻塞**。
 
+        内部构造 ``RangeSaveTask`` 并委托 ``submit_task``，保证任务派发
+        路径与通用任务一致（立即触发判断、worker 移交等）。
+
         Args:
             camera_name: 相机名称
             file_path: MP4 输出文件路径
@@ -318,14 +323,120 @@ class VideoRecorderManager:
             ValueError: 录制器不存在。
         """
         recorder = self._require_recorder(camera_name, stream_kind)
-        future = recorder.save_streaming(
+        task = RangeSaveTask(
             file_path=file_path,
             start_simulate_index=start_simulate_index,
             end_simulate_index=end_simulate_index,
             truncate_to_keyframe=truncate_to_keyframe,
         )
+        future = recorder.submit_task(task)
         self._last_results[(camera_name, stream_kind)] = future
         return future
+
+    def submit_task(
+        self,
+        camera_name: str,
+        task: RecordingTask,
+        stream_kind: str = _STREAM_COLOR,
+    ) -> Future:
+        """提交任意录制任务到指定相机的等待队列。**非阻塞**。
+
+        解耦任务构造与 recorder 工作线程：调用方自行构造 ``task``（如
+        ``SingleFrameTask`` 用于逐帧回调），Manager 只负责路由到对应
+        recorder。recorder 在帧到达时触发任务，移交 save_worker 执行。
+
+        与 ``save_streaming`` 的区别：``save_streaming`` 内部创建
+        ``RangeSaveTask`` 并固定返回 ``Future[RemuxResult]``；本方法接受
+        任意 ``RecordingTask`` 子类，返回 ``task.future``（结果类型由
+        具体任务决定）。
+
+        Args:
+            camera_name: 相机名称。
+            task: 录制任务实例。
+            stream_kind: ``"color"``（默认）或 ``"depth"``。
+
+        Returns:
+            ``task.future``：任务完成后可获取结果或异常。
+
+        Raises:
+            ValueError: 录制器不存在。
+        """
+        recorder = self._require_recorder(camera_name, stream_kind)
+        return recorder.submit_task(task)
+
+    def get_latest_frame_simulate_index(
+        self,
+        camera_name: str,
+        stream_kind: str = _STREAM_COLOR,
+    ) -> int | None:
+        """获取指定相机最新已到达帧的 ``simulate_index``。
+
+        用于降频门控：上层（如 OrcaManipulation 的 LeRobotDataStorage）
+        判断是否有新视频帧到达，决定是否提交 ``SingleFrameTask``。
+
+        Args:
+            camera_name: 相机名称。
+            stream_kind: ``"color"``（默认）或 ``"depth"``。
+
+        Returns:
+            最新帧的 ``simulate_index``，或 ``None``（无帧到达/录制器不存在）。
+        """
+        recorder = self._recorders.get((camera_name, stream_kind))
+        if recorder is None:
+            return None
+        return recorder.get_latest_simulate_index()
+
+    def get_last_decoded_frame(
+        self,
+        camera_name: str,
+        stream_kind: str = _STREAM_COLOR,
+    ):
+        """获取指定相机最近一次解码的 RGB numpy 数组。
+
+        .. deprecated::
+            多相机同步采集应改为对每个相机提交 ``SingleFrameTask``（目标
+            sim_idx 相同），通过 ``future.result()`` 收集各相机解码帧。
+            直接读本属性存在跨 recorder 无锁访问 + sim_idx 不可控问题
+            （读到"过新"或"过旧"帧）。保留仅供调试或单相机场景使用。
+
+        Args:
+            camera_name: 相机名称。
+            stream_kind: ``"color"``（默认）或 ``"depth"``。
+
+        Returns:
+            RGB numpy 数组 ``(H, W, 3)`` dtype=uint8，或 ``None``
+            （录制器不存在或尚未解码任何帧）。
+        """
+        recorder = self._recorders.get((camera_name, stream_kind))
+        if recorder is None:
+            return None
+        return recorder.last_decoded_frame
+
+    def decode_frame_at(
+        self,
+        camera_name: str,
+        simulate_index: int,
+        stream_kind: str = _STREAM_COLOR,
+    ):
+        """解码指定相机 ``simulate_index`` 的视频帧为 RGB numpy 数组。
+
+        .. deprecated::
+            新方案中 save_worker 维护持久 CodecContext 实时解码，
+            ``SingleFrameTask.on_frame`` 回调直接接收解码帧，无需调用本方法。
+            保留仅供向后兼容或调试使用。
+
+        Args:
+            camera_name: 相机名称。
+            simulate_index: 目标帧的 simulate_index。
+            stream_kind: ``"color"``（默认）或 ``"depth"``。
+
+        Returns:
+            RGB numpy 数组 ``(H, W, 3)`` dtype=uint8，或 ``None``。
+        """
+        recorder = self._recorders.get((camera_name, stream_kind))
+        if recorder is None:
+            return None
+        return recorder.decode_frame_at(simulate_index)
 
     def get_last_result(
         self, camera_name: str, stream_kind: str = _STREAM_COLOR
@@ -506,8 +617,8 @@ class VideoRecorderManager:
                 saved[key] = future.result(timeout=_SAVE_WAIT_TIMEOUT)
             except Exception as e:
                 _logger.error(
-                    f"[RecorderManager] failed to resolve save for '{key}': {e}",
-                    exc_info=True,
+                    f"[RecorderManager] failed to resolve save for '{key}': {e}\n"
+                    f"{traceback.format_exc()}"
                 )
         return saved
 

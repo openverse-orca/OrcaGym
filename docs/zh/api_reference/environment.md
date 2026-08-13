@@ -235,6 +235,18 @@ def save_streaming(
     # 内部 remux_range 使用 timestamp_ns 作为 PTS 时间基（非固定 FPS），
     # 并返回 RemuxResult（含 frame_indices / timestamps_ns 帧号↔物理 index 映射）。
 
+def get_recorder_manager() -> VideoRecorderManager
+    # 获取或惰性创建录制管理器。**公共方法**，外部模块可通过此方法获取
+    # manager，直接调用 ``submit_task`` / ``save_streaming`` /
+    # ``get_latest_frame_simulate_index`` 等接口，避免在 env 层增加过多
+    # 转发方法。
+    # 内部以 ``self.stub`` 为 gRPC 后端，``self.loop`` 为事件循环桥接。
+    # 调用方保证在单一线程中创建管理器，故无需加锁。
+    #
+    # 逐帧回调等高级用法：调用方通过本方法获取 manager 后，自行构造
+    # ``SingleFrameTask`` 等任务并通过 ``manager.submit_task`` 提交，
+    # 而无需 env 层转发（见下方示例）。
+
 def set_render_fps(fps: int) -> None
     # 设置渲染帧率（render FPS）。控制 render() 调用引擎渲染的频率：
     # 同步渲染（sync_render=True）每隔 1/fps 个物理步渲染一帧；
@@ -272,10 +284,45 @@ result: RemuxResult = future.result()                    # 等待保存完成（
 manager.stop_all_and_save() -> dict[str, RemuxResult]    # env.close() 自动保存（阻塞等待）
 ```
 
+```python
+from orca_gym.recorder import SingleFrameTask
+
+# 逐帧回调：目标帧到达后在 save_worker 线程执行回调，主线程不阻塞。
+# 回调接收 FrameEntry 和解码后的 RGB numpy 数组 (H, W, 3) dtype=uint8
+# （由 save_worker 持久 CodecContext 解码，无需回溯到 IDR）。
+# decoded_frame 为 None 表示解码失败。
+# 回调返回值会作为 future.result() 的结果（Any 类型），由回调自行决定返回什么。
+# 降频采样（控制频率 > 渲染频率）时，目标 sim_idx 可能无对应视频帧
+# （渲染跳号），此时 future.result() 返回 None 表示跳过。
+def on_frame(frame_entry, decoded_frame):
+    # frame_entry.timestamp_ns / simulate_index / nal_data / is_keyframe
+    # decoded_frame: np.ndarray (H, W, 3) uint8 或 None
+    # 可在此调用 LeRobot add_frame 等操作（save_worker 串行执行，线程安全）
+    return decoded_frame  # 返回值作为 future.result()，供多相机同步场景收集
+
+task = SingleFrameTask(simulate_index=100, on_frame=on_frame)
+future = manager.submit_task(camera_name, task)  # 非阻塞，返回 task.future
+result = future.result()  # None 表示该 sim_idx 无视频帧（跳过）；否则为 on_frame 的返回值
+```
+
+```python
+# 通过 get_recorder_manager 获取 manager，直接调用底层接口
+# （避免 env 层转发过多方法）
+manager = env.get_recorder_manager()
+
+# 降频门控：查询最新已到达帧的 simulate_index
+latest_idx = manager.get_latest_frame_simulate_index(camera_name, "color")
+# None 表示无帧到达；int 表示最新帧的 simulate_index
+```
+
 > 任务队列抽象：等待队列中的每个保存任务（``RecordingTask``）独立携带触发回调
 > （``trigger_fn``）与执行逻辑（``execute``）。触发条件是回调函数
 > ``(task, current_simulate_index) -> bool``，接收线程逐帧轮询判断，便于后续扩展
 > 新的任务类型（如按时间戳、按帧数触发）。
+>
+> 内置任务类型：
+> - ``RangeSaveTask``：保存 ``[start, end]`` 区间为 MP4（``save_streaming`` 内部使用）
+> - ``SingleFrameTask``：目标帧到达时执行回调（逐帧回调场景，如 LeRobot 流式写帧）
 
 ### 实时视频可视化（``VideoStreamViewer``）
 

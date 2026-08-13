@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import multiprocessing
 import sys
+import traceback
 from typing import TYPE_CHECKING
 
 from orca_gym.log.orca_log import get_orca_logger
@@ -163,8 +164,8 @@ def _viewer_subprocess(
             asyncio.run(_receive_loop())
         except Exception as e:  # noqa: BLE001
             _logger.error(
-                f"[Viewer:{window_name}] receive thread error: {e}",
-                exc_info=True,
+                f"[Viewer:{window_name}] receive thread error: {e}\n"
+                f"{traceback.format_exc()}"
             )
 
     # 启动接收线程
@@ -244,7 +245,10 @@ def _viewer_subprocess(
         # KeyboardInterrupt。正常退出，不需要报错。
         pass
     except Exception as e:  # noqa: BLE001
-        _logger.error(f"[Viewer:{window_name}] display error: {e}", exc_info=True)
+        _logger.error(
+            f"[Viewer:{window_name}] display error: {e}\n"
+            f"{traceback.format_exc()}"
+        )
     finally:
         running[0] = False
         if render_timer is not None:
