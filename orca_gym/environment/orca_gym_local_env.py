@@ -541,13 +541,13 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
         if self.sync_render:
             self.render_count += self._render_count_interval
-            if (self.render_count >= 1.0):
+            if (self.render_count >= 1.0 or request_idr):
                 self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
                 self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
                 self.render_count -= 1
         else:
             time_diff = time.perf_counter() - self._render_time_step
-            if (time_diff > self._render_interval):
+            if (time_diff > self._render_interval or request_idr):
                 self._render_time_step = time.perf_counter()
                 self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
                 self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为

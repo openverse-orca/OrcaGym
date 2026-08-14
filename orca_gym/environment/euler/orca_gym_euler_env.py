@@ -448,13 +448,13 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 在线模式：节流后委托 gym.render(simulate_index)
         if self._sync_render:
             self._render_count += self._render_count_interval
-            if self._render_count >= 1.0:
+            if self._render_count >= 1.0 or request_idr:
                 self.loop.run_until_complete(self._gym.render(simulate_index, request_idr))
                 self._do_body_manipulation()
                 self._render_count -= 1.0
         else:
             time_diff = time.perf_counter() - self._render_time_step
-            if time_diff > self._render_interval:
+            if time_diff > self._render_interval or request_idr:
                 self._render_time_step = time.perf_counter()
                 self.loop.run_until_complete(self._gym.render(simulate_index, request_idr))
                 self._do_body_manipulation()

@@ -917,7 +917,13 @@ class CameraRecorder(ABC):
 
     @property
     def received_first_idr(self) -> bool:
-        """是否已收到首个 IDR 帧。"""
+        """是否已收到首个 IDR 帧。
+
+        Note:
+            ``_received_first_idr`` 在接收线程写入，本属性无锁。跨线程读取
+            （如从主线程查 ``get_stats``）为最终一致，非强一致——可能短暂
+            返回旧值 False，但不影响功能正确性（状态单调 False→True）。
+        """
         return self._received_first_idr
 
     @property
@@ -927,6 +933,13 @@ class CameraRecorder(ABC):
         由持久 ``CodecContext`` 解码（保持 DPB 参考帧状态），FIFO 保证
         解码任务先于 ``SingleFrameTask`` 回调执行，回调可直接读取本属性
         获取解码帧，无需回溯到 IDR。
+
+        Note:
+            ``_last_decoded_frame`` 在 save_worker 线程写入，本属性无锁。
+            仅限在 save_worker 线程内访问（如 ``SingleFrameTask.execute``
+            回调），同线程 FIFO 保证读取一致。外部跨线程调用（如已废弃的
+            ``VideoRecorderManager.get_last_decoded_frame``）存在无锁访问
+            风险，不应在生产路径使用。
         """
         return self._last_decoded_frame
 
