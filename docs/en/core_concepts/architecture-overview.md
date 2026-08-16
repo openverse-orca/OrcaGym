@@ -31,33 +31,31 @@ For component design details, API contracts, and encapsulation isolation mechani
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Simulation Core Layer: OrcaGymEuler (Facade)                    │
-│  MuJoCoSimCore / OrcaStudioBridge / ModelRegistry /             │
-│  SimConfig / EulerOrchestrator                                  │
-└──────┬─────────────────────────────────────────────┬────────────┘
-       │                                             │
-       │ mj_step / mj_forward                        │ gRPC communication
-       ▼                                             ▼
-┌─────────────────────────────────┐  ┌─────────────────────────────┐
-│  MuJoCo Runtime (rigid-body     │  │  OrcaStudio System           │
-│  solver)                        │  │  Rendering, scene sync,      │
-│  MjModel / MjData / mj_step     │  │  video saving                │
-│  opt.* solver parameters        │  │  Object manipulation,        │
-│                                 │  │  camera control              │
-└─────────────────────────────────┘  └─────────────────────────────┘
-       │
-       │ External force coupling / sync cycle (SyncCycleConfig)
-       ▼
+│  MuJoCoSimCore / ModelRegistry / SimConfig                      │
+│  Selects one of two mutually exclusive backends at runtime       │
+└───────┬───────────────────────────────────────┬─────────────────┘
+        │                                       │
+        │  backend="mujoco"                     │  backend="euler"
+        ▼                                       ▼
+┌───────────────────────────────┐  ┌──────────────────────────────┐
+│  MuJoCo Backend (CPU)          │  │  Euler Backend (GPU)         │
+│  MjModel / MjData / mj_step    │  │  Euler engine (autonomous)   │
+│  opt.* solver parameters       │  │  Exposes MuJoCo-style API    │
+│  Pure MuJoCo, no orchestration │  │  D2H extraction (qpos/xpos)  │
+└───────────────┬───────────────┘  └──────────────┬───────────────┘
+                │                                 │
+                │ sync_to_view()                  │ D2H extraction (qpos/xpos etc.)
+                ▼                                 ▼
+        ┌──────────────────────────────────────────────┐
+        │  OrcaGymDataView (unified state view)        │
+        │  env.data reads are consistent,              │
+        │  backend differences are shielded            │
+        └──────────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│  Engine Layer: Euler Runtime (orca.euler)                        │
-│  Multi-physics simulation, Model / State / Control,              │
-│  solver scheduling, zero-copy coupling                          │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ import orca.flow
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Framework Layer: OrcaFlow (orca.flow)                           │
-│  GPU programming framework, multi-backend compilation,           │
-│  flow.kernel / flow.array                                       │
+│  External Renderer (optional, bypass system)                     │
+│  Consumes qpos / sim_time snapshots,                             │
+│  does not participate in the physics stepping main path          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,13 +64,23 @@ For component design details, API contracts, and encapsulation isolation mechani
 | User Code | Business repo | — | Business environment subclasses, reward functions, observation construction |
 | RL Training Framework | RSL-RL / SB3 | — | Policy training, rollout scheduling |
 | Environment Layer | OrcaGym | `orca_gym` | gym.Env implementation, public API contract, MuJoCo semantic interface |
-| Simulation Core Layer | OrcaGym | `orca_gym` | Simulation core Facade + subcomponent orchestration |
-| Rigid-Body Runtime | MuJoCo | `mujoco` | Rigid-body dynamics solving |
-| Non-Rigid-Body Runtime | Euler | `orca.euler` | Multi-physics simulation, solver scheduling, zero-copy coupling |
-| Studio System | OrcaStudio | — | Rendering, scene sync, interaction (bypass system) |
-| Framework Layer | OrcaFlow | `orca.flow` | GPU programming framework, multi-backend compilation |
+| Simulation Core Layer | OrcaGym | `orca_gym` | Simulation core Facade + backend selection and delegation |
+| MuJoCo Backend | MuJoCo | `mujoco` | CPU rigid-body dynamics solving (open-source standard) |
+| Euler Backend | Euler | — | GPU physics simulation (autonomous engine) |
+| External Renderer | OrcaStudio / OrcaLab | — | Rendering, scene sync, interaction (bypass system, optional) |
 
-> **OrcaStudio is a bypass system**: It communicates with the simulation core via gRPC, does not participate in the `mj_step` main path, and does not affect the physics simulation. The environment can still step normally when Studio is absent.
+### Mutually Exclusive Dual-Backend Selection
+
+OrcaGym, as a simulation framework, integrates two **independent** physics backends and selects one at runtime:
+
+- **MuJoCo Backend** (open-source standard): Pure CPU MuJoCo rigid-body simulation, no orchestration or coupling.
+- **Euler Backend** (Orca team in-house): Euler operates as a complete physics engine autonomously. OrcaGym drives simulation through the MuJoCo-style API provided by Euler, and extracts `qpos`/`xpos` and other data to CPU via the D2H interface for rendering.
+
+The two paths are mutually exclusive: loading one backend does not involve the other. Backend selection is transparent to user code; public APIs such as `env.data` / `env.do_simulation()` behave consistently.
+
+> **Current implementation status**: The `_euler` field is a placeholder (always `None`), `has_euler()` always returns `False`, and only the MuJoCo backend is currently available. Euler backend integration will be implemented in a future version.
+
+> **External renderer is a bypass system**: It only consumes `qpos`/`sim_time` snapshots and does not participate in the physics stepping main path. The environment can still step normally when the renderer is absent.
 
 ---
 
@@ -91,7 +99,7 @@ User code interacts only with the following two API layers and **must not penetr
 | `env.do_simulation(ctrl, n)` | — | Simulation stepping |
 | `env.set_joint_qpos()` / `env.apply_body_force()` / `env.clear_body_force()` | — | State writing, external force injection |
 | `env.body()` / `env.joint()` / `env.actuator()` / `env.site()` | `OrcaGymEnvMixin` | Namespace resolution (automatically adds the agent prefix) |
-| `env.render()` / `env.begin_save_video()` | — | Studio interaction |
+| `env.render()` | — | External renderer interaction |
 | `gym.Env` standard interface | Gymnasium | `reset()` / `step()` / `observation_space` / `action_space` |
 
 **User Development Paradigm**:
@@ -119,11 +127,10 @@ class MyTaskEnv(OrcaGymEulerEnv):
 | Layer | Maintained By | Maintenance Content |
 |------|--------|---------|
 | **Environment Layer** `OrcaGymEulerEnv` | OrcaGym Team | gym.Env implementation, public API contract, Mixin public methods |
-| **Simulation Core Layer** `OrcaGymEuler` and subcomponents | OrcaGym Team | Facade orchestration, `MuJoCoSimCore` / `OrcaStudioBridge` / `ModelRegistry` / `SimConfig` / `EulerOrchestrator` |
-| **Rigid-Body Runtime** MuJoCo | Upstream | `mujoco` library |
-| **Non-Rigid-Body Runtime** Euler | Euler Team | Model/State/Control, solver, coupling orchestration |
-| **Framework Layer** OrcaFlow | Flow Team | GPU kernel compilation, multi-backend scheduling |
-| **Studio System** OrcaStudio | Studio Team | Renderer, gRPC service, interaction logic |
+| **Simulation Core Layer** `OrcaGymEuler` and subcomponents | OrcaGym Team | Facade delegation, `MuJoCoSimCore` / `ModelRegistry` / `SimConfig`, backend selection |
+| **MuJoCo Backend** MuJoCo | Upstream | `mujoco` library |
+| **Euler Backend** Euler | Euler Team | Autonomous physics engine, exposes MuJoCo-style API |
+| **External Renderer** OrcaStudio / OrcaLab | respective teams | Renderer, interaction logic |
 
 **Developer Extension Principle**: When the public API does not meet user needs, add public methods in `OrcaGymEulerEnv` (delegating to `_gym` public API), or add field accessors in `OrcaGymDataView`. **Do not guide users to bypass the wall and access internal objects.**
 
@@ -141,14 +148,16 @@ OrcaGymEulerEnv
     │ delegates _gym.do_simulation()
     ▼
 OrcaGymEuler
-    │ _sim.set_ctrl() → _sim.step(nstep)
+    │ delegates stepping to the selected backend
     ▼
-MuJoCoSimCore
-    │ mj_step × nstep
-    ▼
-MuJoCo Runtime  ←── (when EulerOrchestrator enabled) ── Euler Runtime / OrcaFlow
+┌─────────────────────────────────────────────────────┐
+│  MuJoCo Backend             │  Euler Backend         │
+│  _sim.set_ctrl()            │  Euler-driven stepping │
+│  _sim.step(nstep)           │  (physics autonomous)  │
+│  mj_step × nstep            │                        │
+└─────────────────────────────────────────────────────┘
     │
-    │ _sim.sync_to_view()
+    │ State sync to view (MuJoCo: sync_to_view / Euler: D2H extraction)
     ▼
 OrcaGymDataView  ←── env.data reads are consistent
 ```
@@ -160,13 +169,13 @@ User Code
     │ env.render()
     ▼
 OrcaGymEulerEnv
-    │ delegates _studio.render(qpos, sim_time)
+    │ delegates renderer to consume state snapshot
     ▼
-OrcaStudioBridge  ──gRPC──►  OrcaStudio System (independent process/machine)
-                                    │ Scene sync, rendering, video frame capture
+External renderer (independent process/machine)
+    │ Scene sync, rendering, video frame capture
 ```
 
-The rendering path is **completely decoupled** from the physics stepping path: Studio only consumes `qpos`/`sim_time` snapshots and does not touch `mj_step`.
+The rendering path is **completely decoupled** from the physics stepping path: the renderer only consumes `qpos`/`sim_time` snapshots and does not touch physics stepping.
 
 ### State Writing and External Force Injection
 
@@ -178,14 +187,12 @@ OrcaGymEulerEnv
     │ delegates _gym.apply_body_force()
     ▼
 OrcaGymEuler
-    │ _sim.apply_body_force(body_id, force, torque)
-    │ (optional) _euler.notify_external_force(...)
+    │ writes external force via the selected backend (mechanism is backend-specific)
     ▼
-MuJoCoSimCore
-    │ Write to xfrc_applied (internal detail, invisible to users)
+Backend internal (invisible to users)
 ```
 
-External force injection is **explicit and traceable**: when `EulerOrchestrator` is enabled, it can perceive force injections, ensuring MuJoCo-Euler coupling consistency.
+External force injection is **explicit and traceable**: injected via the public API, with the force application mechanism handled internally by the backend.
 
 ---
 

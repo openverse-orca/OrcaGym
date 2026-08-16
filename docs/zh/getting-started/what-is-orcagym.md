@@ -4,16 +4,16 @@ OrcaGym 是一个**开源、云原生的机器人仿真平台**，提供与 Open
 
 ## 一句话概括
 
-**OrcaGym = Gymnasium API + MuJoCo 物理引擎 + 分布式通信 + OrcaStudio/OrcaLab 云平台**
+**OrcaGym = Gymnasium API + 双物理后端（MuJoCo / Euler）+ 分布式通信**
 
 ## 核心定位
 
 传统机器人仿真方案往往在保真度和计算效率之间面临取舍。OrcaGym 通过以下方式弥合这一差距：
 
 1. **标准化接口**：完全兼容 Gymnasium API，零成本迁移现有 RL 算法
-2. **多物理后端**：核心包本地支持 MuJoCo/MuJoCoWarp/Euler；通过 OrcaStudio/OrcaLab 可接入 PhysX、ODE
+2. **双物理后端**：核心包支持 MuJoCo（开源、CPU、纯刚体）与 Euler（自研、GPU）两条互不隶属的路径，通过 `SimConfig.backend` 选择
 3. **云原生架构**：实现本地/远程混合部署
-4. **逼真渲染**：光线追踪为视觉 RL 任务提供高质量观察（由 OrcaStudio/OrcaLab 服务端提供）
+4. **可扩展渲染**：可通过外部可视化工具（如 OrcaStudio/OrcaLab）接入光线追踪等高质量渲染
 
 ## 主要特性
 
@@ -30,15 +30,16 @@ obs, reward, terminated, truncated, info = env.step(action)
 
 与 Stable-Baselines3、RLlib、CleanRL 等主流 RL 库无缝对接。
 
-### ⚡ 多物理后端
+### ⚡ 双物理后端
 
-| 后端 | 可用范围 | 特点 | 适用场景 |
-|------|----------|------|----------|
-| **MuJoCo** | 核心包（本地） | 高精度刚体动力学（CPU） | 足式机器人、机械臂操控 |
-| **MuJoCoWarp** | 核心包（本地） | GPU (CUDA) 加速并行 | 大规模并行训练 |
-| **Euler** | 核心包（本地） | 多厂商 GPU 多物理场引擎 | 高保真多物理场仿真 |
-| **PhysX** | 仅远程模式（OrcaStudio/OrcaLab） | GPU 加速、大规模并行 | 群体仿真、复杂场景 |
-| **ODE** | 仅远程模式（OrcaStudio/OrcaLab） | 开源通用 | 快速原型、教育用途 |
+OrcaGym 采用双后端架构，两条路径互不隶属，通过 `SimConfig.backend` 选择：
+
+| 后端 | 定位 | 特点 | 适用场景 |
+|------|------|------|----------|
+| **MuJoCo** | 开源标准路径 | 高精度刚体动力学（CPU） | 足式机器人、机械臂操控、快速原型 |
+| **Euler** | Orca 团队自研路径 | GPU 加速 | 大规模并行训练、高保真仿真 |
+
+> **当前实现状态**：MuJoCo 后端已完整可用；Euler 后端为预留接口（`_euler=None`），具体集成方案待定。
 
 ### 🌐 分布式部署
 

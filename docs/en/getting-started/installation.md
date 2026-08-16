@@ -32,13 +32,9 @@ pip install orca-gym[all]         # All optional dependencies
 | `[devices]` | pygame | Gamepad/keyboard control |
 | `[sensors]` | opencv-python, av, websockets, matplotlib, pillow | Camera vision |
 
-## Configure OrcaStudio / OrcaLab
+## Configure External Visualization Tools (Optional)
 
-Download and install [OrcaStudio](http://orca3d.cn/) or OrcaLab to access:
-
-- Visual scene editing
-- Remote simulation service
-- Multi-physics backend support
+OrcaGym's physics simulation does not depend on external tools and can run locally. For scene visualization or remote rendering, download and install [OrcaStudio](http://orca3d.cn/) or OrcaLab; refer to their respective documentation for features and configuration.
 
 ## Verify the Installation
 

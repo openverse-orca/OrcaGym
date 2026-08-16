@@ -30,29 +30,29 @@
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  仿真核心层：OrcaGymEuler (Facade)                               │
-│  MuJoCoSimCore / OrcaStudioBridge / ModelRegistry /             │
-│  SimConfig / _euler 占位（当前未实现）                            │
-└──────┬─────────────────────────────────────────────┬────────────┘
-       │                                             │
-       │ mj_step / mj_forward                        │ gRPC 通信
-       ▼                                             ▼
-┌─────────────────────────────────┐  ┌─────────────────────────────┐
-│  MuJoCo Runtime (刚体求解器)     │  │  OrcaStudio 系统             │
-│  MjModel / MjData / mj_step     │  │  渲染、场景同步、视频保存      │
-│  opt.* 求解器参数                │  │  物体操纵、相机控制            │
-└─────────────────────────────────┘  └─────────────────────────────┘
-       │
-       │ 外力耦合 / 同步周期 (SyncCycleConfig)
-       ▼
+│  MuJoCoSimCore / ModelRegistry / SimConfig                      │
+│  通过后端选择在两条互斥路径之间二选一                              │
+└───────┬───────────────────────────────────────┬─────────────────┘
+        │                                       │
+        │  backend="mujoco"                     │  backend="euler"
+        ▼                                       ▼
+┌───────────────────────────────┐  ┌──────────────────────────────┐
+│  MuJoCo 后端（CPU）            │  │  Euler 后端（GPU）            │
+│  MjModel / MjData / mj_step   │  │  Euler 引擎（自治物理）       │
+│  opt.* 求解器参数              │  │  对外提供 MuJoCo 风格 API     │
+│  纯 MuJoCo，无编排无耦合       │  │  D2H 数据提取（qpos/xpos 等） │
+└───────────────┬───────────────┘  └──────────────┬───────────────┘
+                │                                 │
+                │ sync_to_view()                  │ D2H 数据提取（qpos/xpos 等）
+                ▼                                 ▼
+        ┌──────────────────────────────────────────────┐
+        │  OrcaGymDataView（统一状态视图）              │
+        │  env.data 读取一致，屏蔽后端差异              │
+        └──────────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│  引擎层：Euler Runtime (orca.euler)                              │
-│  多物理场仿真、Model / State / Control、求解器调度、零拷贝耦合     │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ import orca.flow
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  框架层：OrcaFlow (orca.flow)                                    │
-│  GPU 编程框架、多后端编译、flow.kernel / flow.array               │
+│  外部渲染器（可选，旁路系统）                                     │
+│  消费 qpos / sim_time 快照，不参与物理步进主路径                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,13 +61,23 @@
 | 用户代码 | 业务仓库 | — | 业务环境子类、奖励函数、观测构造 |
 | RL 训练框架 | RSL-RL / SB3 | — | 策略训练、rollout 调度 |
 | 环境层 | OrcaGym | `orca_gym` | gym.Env 实现、公共 API 契约、MuJoCo 语义接口 |
-| 仿真核心层 | OrcaGym | `orca_gym` | 仿真核心 Facade + 子组件编排 |
-| 刚体运行时 | MuJoCo | `mujoco` | 刚体动力学求解 |
-| 非刚体运行时 | Euler | `orca.euler` | 多物理场仿真、求解器调度、零拷贝耦合 |
-| Studio 系统 | OrcaStudio | — | 渲染、场景同步、交互（旁路系统） |
-| 框架层 | OrcaFlow | `orca.flow` | GPU 编程框架、多后端编译 |
+| 仿真核心层 | OrcaGym | `orca_gym` | 仿真核心 Facade + 后端选择与委托 |
+| MuJoCo 后端 | MuJoCo | `mujoco` | CPU 刚体动力学求解（开源标准） |
+| Euler 后端 | Euler | — | GPU 物理仿真（自治引擎） |
+| 外部渲染器 | OrcaStudio / OrcaLab | — | 渲染、场景同步、交互（旁路系统，可选） |
 
-> **OrcaStudio 是旁路系统**：通过 gRPC 与仿真核心通信，不参与 `mj_step` 主路径，不影响物理仿真。Studio 缺席时环境仍可正常 step。
+### 双后端互斥选择
+
+OrcaGym 作为仿真框架，接入两个**互不隶属**的物理后端，运行时二选一：
+
+- **MuJoCo 后端**（开源标准）：纯 CPU MuJoCo 刚体仿真，不涉及编排与耦合。
+- **Euler 后端**（Orca 团队自研）：Euler 作为完整物理引擎自治运行。OrcaGym 通过 Euler 提供的 MuJoCo 风格 API 驱动仿真，并通过 D2H 接口提取 `qpos`/`xpos` 等数据到 CPU 供渲染使用。
+
+两条路径互斥：加载一个后端时不涉及另一个。后端选择对用户代码透明，`env.data` / `env.do_simulation()` 等公共 API 行为一致。
+
+> **当前实现状态**：`_euler` 字段为占位（恒为 `None`），`has_euler()` 恒返回 `False`，当前仅 MuJoCo 后端可用。Euler 后端的接入将在后续版本实现。
+
+> **外部渲染器是旁路系统**：仅消费 `qpos`/`sim_time` 快照，不参与物理步进主路径。渲染器缺席时环境仍可正常 step。
 
 ---
 
@@ -86,7 +96,7 @@
 | `env.do_simulation(ctrl, n)` | — | 仿真步进 |
 | `env.set_joint_qpos()` / `env.apply_body_force()` / `env.clear_body_force()` | — | 状态写入、外力注入 |
 | `env.body()` / `env.joint()` / `env.actuator()` / `env.site()` | `OrcaGymEnvMixin` | 名称空间解析（自动添加 agent 前缀） |
-| `env.render()` / `env.begin_save_video()` | — | Studio 交互 |
+| `env.render()` | — | 外部渲染器交互 |
 | `gym.Env` 标准接口 | Gymnasium | `reset()` / `step()` / `observation_space` / `action_space` |
 
 **用户开发范式**：
@@ -114,11 +124,10 @@ class MyTaskEnv(OrcaGymEulerEnv):
 | 层次 | 维护方 | 维护内容 |
 |------|--------|---------|
 | **环境层** `OrcaGymEulerEnv` | OrcaGym 团队 | gym.Env 实现、公共 API 契约、Mixin 公共方法 |
-| **仿真核心层** `OrcaGymEuler` 及子组件 | OrcaGym 团队 | Facade 编排、`MuJoCoSimCore` / `OrcaStudioBridge` / `ModelRegistry` / `SimConfig`（`_euler` 为占位，当前未实现） |
-| **刚体运行时** MuJoCo | 上游 | `mujoco` 库 |
-| **非刚体运行时** Euler | Euler 团队 | Model/State/Control、求解器、耦合编排 |
-| **框架层** OrcaFlow | Flow 团队 | GPU kernel 编译、多后端调度 |
-| **Studio 系统** OrcaStudio | Studio 团队 | 渲染器、gRPC 服务、交互逻辑 |
+| **仿真核心层** `OrcaGymEuler` 及子组件 | OrcaGym 团队 | Facade 委托、`MuJoCoSimCore` / `ModelRegistry` / `SimConfig`、后端选择 |
+| **MuJoCo 后端** MuJoCo | 上游 | `mujoco` 库 |
+| **Euler 后端** Euler | Euler 团队 | 自治物理引擎，对外提供 MuJoCo 风格 API |
+| **外部渲染器** OrcaStudio / OrcaLab | 各自团队 | 渲染器、交互逻辑 |
 
 **开发者扩展原则**：当公共 API 不满足用户需求时，在 `OrcaGymEulerEnv` 增加公共方法（委托到 `_gym` 公共 API），或在 `OrcaGymDataView` 增加字段访问器，**不得引导用户穿墙访问内部对象**。
 
@@ -136,14 +145,16 @@ OrcaGymEulerEnv
     │ 委托 _gym.do_simulation()
     ▼
 OrcaGymEuler
-    │ _sim.set_ctrl() → _sim.step(nstep)
+    │ 按所选后端委托步进
     ▼
-MuJoCoSimCore
-    │ mj_step × nstep
-    ▼
-MuJoCo Runtime  ←── (_euler 占位启用时) ── Euler Runtime / OrcaFlow
+┌─────────────────────────────────────────────────────┐
+│  MuJoCo 后端                │  Euler 后端            │
+│  _sim.set_ctrl()           │  Euler 驱动步进         │
+│  _sim.step(nstep)          │  （内部自治完成物理）    │
+│  mj_step × nstep           │                        │
+└─────────────────────────────────────────────────────┘
     │
-    │ _sim.sync_to_view()
+    │ 状态同步到视图（MuJoCo: sync_to_view / Euler: D2H 提取）
     ▼
 OrcaGymDataView  ←── env.data 读取一致
 ```
@@ -155,13 +166,13 @@ OrcaGymDataView  ←── env.data 读取一致
     │ env.render()
     ▼
 OrcaGymEulerEnv
-    │ 委托 _studio.render(qpos, sim_time)
+    │ 委托渲染器消费状态快照
     ▼
-OrcaStudioBridge  ──gRPC──►  OrcaStudio 系统（独立进程/机器）
-                                    │ 场景同步、渲染、视频帧捕获
+外部渲染器（独立进程/机器）
+    │ 场景同步、渲染、视频帧捕获
 ```
 
-渲染路径与物理步进路径**完全解耦**：Studio 仅消费 `qpos`/`sim_time` 快照，不触碰 `mj_step`。
+渲染路径与物理步进路径**完全解耦**：渲染器仅消费 `qpos`/`sim_time` 快照，不触碰物理步进。
 
 ### 状态写入与外力注入
 
@@ -173,14 +184,12 @@ OrcaGymEulerEnv
     │ 委托 _gym.apply_body_force()
     ▼
 OrcaGymEuler
-    │ _sim.apply_body_force(body_id, force, torque)
-    │ (可选) _euler.notify_external_force(...)
+    │ 按所选后端写入外力（具体机制由后端决定）
     ▼
-MuJoCoSimCore
-    │ 写入 xfrc_applied（内部细节，对用户不可见）
+后端内部（对用户不可见）
 ```
 
-外力注入是**显式且可追踪的**：`_euler` 占位启用时可感知外力注入，保证 MuJoCo 与 Euler 耦合一致性。
+外力注入是**显式且可追踪的**：通过公共 API 注入，后端内部自行处理力的应用机制。
 
 ---
 

@@ -7,12 +7,11 @@
 | 特性 | OrcaGym | Isaac Gym | MuJoCo (原生) | PyBullet | SAPIEN |
 |------|---------|-----------|---------------|----------|--------|
 | Gymnasium API | ✅ 完全兼容 | ❌ 自定义 VecEnv | 需手动封装 | ✅ | ❌ |
-| 多物理后端 | ✅ 核心 MuJoCo/MuJoCoWarp/Euler + 远程 PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
+| 双物理后端 | ✅ MuJoCo (CPU) + Euler (GPU) | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
 | 分布式部署 | ✅ 原生支持 | ❌ 单机 | ❌ 单机 | ❌ 单机 | ❌ 单机 |
-| 光线追踪 | ✅ | ❌ | ❌ | ❌ | ✅ |
-| GPU 加速 | ✅ MuJoCoWarp (CUDA) / Euler (多厂商 GPU) | ✅ (原生) | ❌ (CPU) | ❌ (CPU) | ✅ |
+| 光线追踪 | ✅ 可选接入 | ❌ | ❌ | ❌ | ✅ |
+| GPU 加速 | ✅ Euler 后端 | ✅ (原生) | ❌ (CPU) | ❌ (CPU) | ✅ |
 | 多智能体 | ✅ 原生 | ⚠️ 需手动 | ⚠️ 需手动 | ⚠️ 需手动 | ✅ |
-| 可视化编辑器 | ✅ OrcaStudio | ❌ | ❌ | ❌ | ❌ |
 | 开源 | ✅ MIT | ✅ 非商业 | ✅ Apache 2.0 | ✅ | ✅ |
 
 ## 核心优势详解
@@ -39,7 +38,7 @@ model.learn(total_timesteps=1_000_000)
 与单机仿真器不同，OrcaGym 天然支持：
 
 - **本地模式**：Python 进程内直接驱动 MuJoCo，适合开发调试
-- **远程模式**：Python 客户端连接远程 OrcaStudio/OrcaLab，适合大规模训练
+- **远程模式**：连接远程仿真服务，适合大规模训练
 - **混合模式**：训练在远端，策略执行在本地
 
 ```
@@ -47,14 +46,9 @@ model.learn(total_timesteps=1_000_000)
 部署阶段：远程模式 → 弹性扩展
 ```
 
-### 3. 可视化与调试生态
+### 3. 可扩展的可视化接入
 
-OrcaGym 与 OrcaStudio/OrcaLab 深度集成，提供：
-
-- 实时 3D 场景可视化
-- 交互式物体拖拽操作
-- 关节/传感器数据实时监视
-- 视频录制与回放
+OrcaGym 的状态视图（`env.data`）可被外部可视化工具消费，支持接入 OrcaStudio/OrcaLab 等外部平台进行场景可视化与调试（外部工具为可选项，不影响物理仿真）。
 
 ## 适用场景
 
@@ -69,6 +63,6 @@ OrcaGym 与 OrcaStudio/OrcaLab 深度集成，提供：
 
 ## 局限性
 
-- 核心包支持 MuJoCo（CPU）/MuJoCoWarp（CUDA）/Euler（多厂商 GPU）；PhysX/ODE 后端需借助 OrcaStudio/OrcaLab
-- 远程模式依赖 OrcaStudio/OrcaLab 服务端
+- 核心包支持双后端：MuJoCo（CPU，已完整可用）与 Euler（GPU，预留接口，集成方案待定）
+- 远程可视化/渲染依赖外部工具（如 OrcaStudio/OrcaLab）
 - 社区尚在发展初期，第三方示例较少

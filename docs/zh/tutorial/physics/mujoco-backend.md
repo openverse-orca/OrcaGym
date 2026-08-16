@@ -1,6 +1,6 @@
 # 🔧 MuJoCo 后端
 
-OrcaGym 的 Euler 模式直接使用 MuJoCo 作为物理引擎。环境初始化时自动完成模型加载。
+本文档介绍 OrcaGym 的 **MuJoCo 后端**使用方法。MuJoCo 后端是 OrcaGym 双后端架构中的开源标准路径（CPU、纯刚体），通过 `SimConfig.backend="mujoco"` 选择。环境初始化时自动完成模型加载。
 
 > 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)。
 
@@ -109,7 +109,7 @@ print(f"控制频率: {1.0/env.dt:.1f}Hz")
 
 ### G1 标准配置
 
-G1 人形机器人使用以下标准参数（来自 Euler 示例）：
+G1 人形机器人使用以下标准参数：
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
@@ -120,11 +120,11 @@ G1 人形机器人使用以下标准参数（来自 Euler 示例）：
 ## 调试与性能分析
 
 ```python
-# 查看接触数（Euler 路径用 query_contact_simple 获取接触列表长度）
+# 查看接触数（用 query_contact_simple 获取接触列表长度）
 contacts = env.query_contact_simple()
 print(f"接触数: {len(contacts)}")
 
-# 查看模型信息（Euler 路径下 OrcaGymModel 不暴露 nbody/njnt/nsite，
+# 查看模型信息（OrcaGymModel 不暴露 nbody/njnt/nsite，
 # 改用 len() 获取字典大小；ngeom/nq/nv/nu 为 model_info 中的字段）
 print(f"nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
 print(f"ngeom={env.model.ngeom}")
