@@ -23,7 +23,7 @@ python some_script.py
 
 `OrcaGymEulerEnv` + `OrcaGymEuler` 的开发**必须严格遵照架构文档约束**：
 
-`docs/design/architecture/orca_gym_euler_architecture.md`
+`docs/zh/core_concepts/architecture.md`（中文）/ `docs/en/core_concepts/architecture.md`（英文）
 
 该文档定义了：
 
@@ -48,11 +48,9 @@ python some_script.py
 - 在 `OrcaGymEuler` / `OrcaGymEulerEnv` 中暴露 `_mjModel` / `_mjData`
 - 在 `OrcaGymDataView` 之外提供 `_mjData` 访问通道
 
-配套的开发阶段分解见：`docs/design/development/orca_gym_euler_development.md`
-
 ## 规则 3：GPU 加速与 Sandbox 旁路
 
-Euler 体系使用 GPU 加速时（MuJoCoFlow / Flow 在 GPU 上求解），**无法在 TRAE sandbox 内正确运行**。sandbox 剥离了所有进程能力，导致 `cuInit` 返回 `CUDA_ERROR_304`。AI agent 必须使用 **TRAE 命令白名单** 旁路 sandbox，才能调用 GPU。
+Euler 体系使用 GPU 加速时，**无法在 TRAE sandbox 内正确运行**。sandbox 剥离了所有进程能力，导致 `cuInit` 返回 `CUDA_ERROR_304`。AI agent 必须使用 **TRAE 命令白名单** 旁路 sandbox，才能调用 GPU。
 
 > 用户侧的白名单配置教程见 `DEVELOPER_GUIDE.md`。本规则约束 AI agent 的命令格式。
 
@@ -158,5 +156,5 @@ python orca_gym/protos/generate_proto.py
 
 - proto 文件是**手动生成**的，不是自动编译的
 - 修改 `orca_gym/protos/mjc_message.proto` 后，必须运行 `generate_proto.py` 重新生成 pb 文件
-- **C++ 侧与 Python 侧的 proto 文件必须保持一致**：修改一处后必须同步修改另一侧（C++ 侧 proto 在 OrcaEngine2409 仓库 `Gems/Mujoco/Code/Source/GrpcService/protos/mjc_message.proto`）并各自重新生成
+- **C++ 侧与 Python 侧的 proto 文件必须保持一致**：修改一处后必须同步修改另一侧（C++ 侧 proto 文件位置见内部文档）并各自重新生成
 - C++ 侧生成脚本与配置指引见 OrcaEngine2409 仓库根目录 `AGENTS.md`
