@@ -1,0 +1,871 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/core/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/core/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/core/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/environment/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/environment/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/environment/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/scene/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/scene/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/scene/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/sensor/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/sensor/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/sensor/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/api_reference/utils/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/utils/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/architecture-overview/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/architecture-overview/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture-overview/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/architecture/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/architecture/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/data-flow/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/data-flow/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/data-flow/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/gym-interface/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/gym-interface/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/gym-interface/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/model-data-opt/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/model-data-opt/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/model-data-opt/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/core_concepts/orcagym_euler_integration/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/orcagym_euler_integration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/orcagym_euler_integration/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/faq/faq/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/faq/faq/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/faq/faq/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/getting-started/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/getting-started/installation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/installation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/installation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/getting-started/what-is-orcagym/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/what-is-orcagym/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/what-is-orcagym/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/getting-started/why-orcagym/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/why-orcagym/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/why-orcagym/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/build-a-task/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/build-a-task/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/build-a-task/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/camera-and-vision/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/camera-and-vision/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/camera-and-vision/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/complete-task/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/complete-task/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/complete-task/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/hello-world/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/hello-world/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/hello-world/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/move-a-joint/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/move-a-joint/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/move-a-joint/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/observation-action/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/observation-action/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/observation-action/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/ppo-training/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/ppo-training/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/ppo-training/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/scene-setup/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/scene-setup/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/scene-setup/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/simple-controller/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/simple-controller/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/simple-controller/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/state-queries/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/state-queries/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/state-queries/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/beginners/your-first-env/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/your-first-env/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/your-first-env/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/contacts-forces/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/contacts-forces/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/contacts-forces/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/equality-constraints/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/equality-constraints/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/equality-constraints/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/force-apply/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/force-apply/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/force-apply/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/mujoco-backend/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/mujoco-backend/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/mujoco-backend/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/soft-bodies/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/soft-bodies/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/soft-bodies/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/physics/state-management/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/state-management/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/state-management/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/action-space/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/action-space/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/action-space/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/inverse-kinematics/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/inverse-kinematics/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/inverse-kinematics/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/joint-control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/joint-control/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/joint-control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/mocap-control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/mocap-control/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/mocap-control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/observation-space/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/observation-space/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/observation-space/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/state-queries-api/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/state-queries-api/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/state-queries-api/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/scene/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/scene/actor-manipulation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/actor-manipulation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/actor-manipulation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/scene/assets-rendering/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/assets-rendering/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/assets-rendering/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/scene/scene-loading/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/scene-loading/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/scene-loading/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/scene/terrain-generation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/terrain-generation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/terrain-generation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/sensing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/sensing/contact-sensing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/contact-sensing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/contact-sensing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/sensing/rgbd-camera/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/rgbd-camera/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/rgbd-camera/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/sensing/sensors/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/sensors/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/sensors/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/asset-processing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/asset-processing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/asset-processing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/hdf5-viewer/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/hdf5-viewer/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/hdf5-viewer/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/input-devices/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/input-devices/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/input-devices/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/rllib-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/rllib-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/rllib-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/robomimic-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/robomimic-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robomimic-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/robosuite-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/robosuite-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robosuite-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/tutorial/tools/terrain-tools/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/terrain-tools/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/terrain-tools/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/core/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/core/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/core/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/environment/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/environment/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/environment/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/scene/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/scene/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/scene/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/sensor/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/sensor/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/sensor/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/api_reference/utils/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/api_reference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/api_reference/utils/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture-overview/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture-overview/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/architecture-overview/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/architecture/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/architecture/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/data-flow/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/data-flow/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/data-flow/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/gym-interface/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/gym-interface/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/gym-interface/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/model-data-opt/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/model-data-opt/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/model-data-opt/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/faq/faq/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/faq/faq/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/faq/faq/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/getting-started/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/getting-started/installation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/installation/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/installation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/getting-started/what-is-orcagym/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/what-is-orcagym/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/what-is-orcagym/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/getting-started/why-orcagym/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/getting-started/why-orcagym/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/getting-started/why-orcagym/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/build-a-task/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/build-a-task/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/build-a-task/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/camera-and-vision/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/camera-and-vision/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/camera-and-vision/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/complete-task/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/complete-task/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/complete-task/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/hello-world/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/hello-world/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/hello-world/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/move-a-joint/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/move-a-joint/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/move-a-joint/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/observation-action/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/observation-action/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/observation-action/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/ppo-training/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/ppo-training/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/ppo-training/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/scene-setup/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/scene-setup/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/scene-setup/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/simple-controller/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/simple-controller/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/simple-controller/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/state-queries/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/state-queries/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/state-queries/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/your-first-env/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/beginners/your-first-env/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/beginners/your-first-env/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/contacts-forces/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/contacts-forces/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/contacts-forces/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/equality-constraints/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/equality-constraints/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/equality-constraints/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/force-apply/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/force-apply/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/force-apply/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/mujoco-backend/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/mujoco-backend/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/mujoco-backend/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/soft-bodies/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/soft-bodies/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/soft-bodies/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/state-management/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/physics/state-management/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/physics/state-management/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/action-space/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/action-space/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/action-space/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/inverse-kinematics/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/inverse-kinematics/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/inverse-kinematics/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/joint-control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/joint-control/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/joint-control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/mocap-control/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/mocap-control/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/mocap-control/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/observation-space/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/observation-space/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/observation-space/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/state-queries-api/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/robot_control/state-queries-api/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/robot_control/state-queries-api/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/actor-manipulation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/actor-manipulation/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/actor-manipulation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/assets-rendering/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/assets-rendering/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/assets-rendering/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/scene-loading/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/scene-loading/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/scene-loading/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/terrain-generation/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/scene/terrain-generation/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/scene/terrain-generation/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/contact-sensing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/contact-sensing/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/contact-sensing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/rgbd-camera/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/rgbd-camera/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/rgbd-camera/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/sensors/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/sensing/sensors/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/sensing/sensors/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/asset-processing/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/asset-processing/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/asset-processing/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/hdf5-viewer/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/hdf5-viewer/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/hdf5-viewer/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/input-devices/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/input-devices/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/input-devices/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/rllib-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/rllib-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/rllib-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robomimic-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robomimic-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/robomimic-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robosuite-adapter/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/robosuite-adapter/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/robosuite-adapter/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/terrain-tools/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/tutorial/tools/terrain-tools/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/tutorial/tools/terrain-tools/"/>
+    </url>
+    <url>
+        <loc>https://openverse-orca.github.io/OrcaGym/en/core_concepts/orcagym_euler_integration/</loc>
+        <lastmod>2026-08-18</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://openverse-orca.github.io/OrcaGym/en/core_concepts/orcagym_euler_integration/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://openverse-orca.github.io/OrcaGym/core_concepts/orcagym_euler_integration/"/>
+    </url>
+</urlset>

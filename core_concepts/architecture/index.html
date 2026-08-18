@@ -1,0 +1,5147 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://openverse-orca.github.io/OrcaGym/core_concepts/architecture/">
+      
+      
+        <link rel="prev" href="../architecture-overview/">
+      
+      
+        <link rel="next" href="../gym-interface/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+          <link rel="alternate" href="../../en/core_concepts/architecture/" hreflang="en">
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>系统架构 - OrcaGym 文档</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#orcagym-euler" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="OrcaGym 文档" class="md-header__button md-logo" aria-label="OrcaGym 文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.5 15.5c0 1.11-.89 2-2 2s-2-.89-2-2 .9-2 2-2 2 .9 2 2m-9-2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.89 2-2-.89-2-2-2M23 15v3c0 .55-.45 1-1 1h-1v1c0 1.11-.89 2-2 2H5a2 2 0 0 1-2-2v-1H2c-.55 0-1-.45-1-1v-3c0-.55.45-1 1-1h1c0-3.87 3.13-7 7-7h1V5.73c-.6-.34-1-.99-1-1.73 0-1.1.9-2 2-2s2 .9 2 2c0 .74-.4 1.39-1 1.73V7h1c3.87 0 7 3.13 7 7h1c.55 0 1 .45 1 1m-2 1h-2v-2c0-2.76-2.24-5-5-5h-4c-2.76 0-5 2.24-5 5v2H3v1h2v3h14v-3h2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OrcaGym 文档
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              系统架构
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="亮色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="亮色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="cyan"  aria-label="暗色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="暗色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../en/core_concepts/architecture/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/openverse-orca/OrcaGym" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openverse-orca/orcagym
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/what-is-orcagym/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  简介
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  核心概念
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorial/beginners/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  教程
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api_reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API 参考
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../faq/faq/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  常见问题
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="OrcaGym 文档" class="md-nav__button md-logo" aria-label="OrcaGym 文档" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.5 15.5c0 1.11-.89 2-2 2s-2-.89-2-2 .9-2 2-2 2 .9 2 2m-9-2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.89 2-2-.89-2-2-2M23 15v3c0 .55-.45 1-1 1h-1v1c0 1.11-.89 2-2 2H5a2 2 0 0 1-2-2v-1H2c-.55 0-1-.45-1-1v-3c0-.55.45-1 1-1h1c0-3.87 3.13-7 7-7h1V5.73c-.6-.34-1-.99-1-1.73 0-1.1.9-2 2-2s2 .9 2 2c0 .74-.4 1.39-1 1.73V7h1c3.87 0 7 3.13 7 7h1c.55 0 1 .45 1 1m-2 1h-2v-2c0-2.76-2.24-5-5-5h-4c-2.76 0-5 2.24-5 5v2H3v1h2v3h14v-3h2z"/></svg>
+
+    </a>
+    OrcaGym 文档
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/openverse-orca/OrcaGym" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openverse-orca/orcagym
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    简介
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    简介
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/what-is-orcagym/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    什么是 OrcaGym
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/why-orcagym/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    为什么选择 OrcaGym
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安装指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    核心概念
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    核心概念
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构概览
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    系统架构
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    系统架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 为什么需要新架构
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 为什么需要新架构">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 现有体系的问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 用户代码现状
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 新架构做了什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 核心设计原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 核心设计原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 六大原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 六大原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P6 补充说明
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 设计模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 架构总览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 架构总览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 整体结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 与旧体系的对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 与旧体系的共存
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 组件说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 组件说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-orcagymeulerenv-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 OrcaGymEulerEnv — 环境 Facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-orcagymeuler-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 OrcaGymEuler — 仿真核心 Facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-mujocosimcore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 MuJoCoSimCore — 仿真核心
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-orcastudiobridge-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 OrcaStudioBridge — Studio 集成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-modelregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 ModelRegistry — 模型注册
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-simconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 SimConfig — 求解器配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-orcagymdataview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 OrcaGymDataView — 完整状态视图
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#48-euler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8 Euler 耦合 — 占位（当前未实现）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#49-orcagymenvmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.9 OrcaGymEnvMixin — 环境公共方法混入
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. API 使用契约
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. API 使用契约">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 契约层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 状态读取
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 状态写入
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 仿真步进
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 求解器配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 名称空间
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 完整公共 API 清单
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 封装与隔离
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 封装与隔离">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 机制总览
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 隔离效果对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 与旧体系的隔离强度对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 步进编排
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 步进编排">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-do_simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 do_simulation 内部流程
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 两种使用模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 迁移指南
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 迁移指南">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 迁移代价
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 83 处直接访问的替代方案
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 83 处直接访问的替代方案">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orcagymdataview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        读取类（→ OrcaGymDataView）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        写入类（→ 显式方法）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置类（→ SimConfig）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#env-orcagymmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型结构类（→ env 公共方法 / OrcaGymModel）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 迁移分类示例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 设计决策
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 设计决策">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-gymenv-orcagymenvmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 为何直接继承 gym.Env + OrcaGymEnvMixin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-mujocoadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 为何放弃 MuJoCoAdapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-_mjdata_mjmodel-mujocosimcore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 为何 _mjData/_mjModel 放在 MuJoCoSimCore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-selfgym-_gym" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 为何保留 self.gym 概念但重命名为 _gym
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gym-interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gym 接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    数据流
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-data-opt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型-数据优化
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    教程
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    教程
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/beginners/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🎓 新手入门
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🎓 新手入门
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/hello-world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hello World
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/scene-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    场景搭建
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/your-first-env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第一个环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/state-queries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    读取状态
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/move-a-joint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    让机器人动起来
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/camera-and-vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    相机与视觉
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/simple-controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    简单控制器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/beginners/build-a-task/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    搭建一个任务
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/physics/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ⚛️ 物理仿真
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ⚛️ 物理仿真
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/physics/contacts-forces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接触与力
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/physics/equality-constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    等式约束
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/physics/mujoco-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MuJoCo 后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/physics/soft-bodies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    软体
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/physics/state-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    状态管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/robot_control/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🤖 机器人控制
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🤖 机器人控制
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/robot_control/action-space/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    动作空间
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/robot_control/inverse-kinematics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    逆运动学
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/robot_control/joint-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    关节控制
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/robot_control/mocap-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mocap 控制
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/robot_control/observation-space/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    观测空间
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/scene/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🎬 场景
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🎬 场景
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/scene/actor-manipulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    角色操作
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/scene/assets-rendering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    资源渲染
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/scene/scene-loading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    场景加载
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/scene/terrain-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    地形生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/sensing/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    👁️ 感知
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    👁️ 感知
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/sensing/contact-sensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接触感知
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/sensing/rgbd-camera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RGBD 相机
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/sensing/sensors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    传感器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorial/tools/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔧 工具
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🔧 工具
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/asset-processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    资源处理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/hdf5-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HDF5 查看器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/input-devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    输入设备
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/rllib-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RLlib 适配器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/robomimic-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Robomimic 适配器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/robosuite-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Robosuite 适配器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorial/tools/terrain-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    地形工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../api_reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API 参考
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API 参考
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    核心 API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/scene/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    场景
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/sensor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    传感器
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    工具函数
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    常见问题
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 为什么需要新架构
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 为什么需要新架构">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 现有体系的问题
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 用户代码现状
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 新架构做了什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 核心设计原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 核心设计原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 六大原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 六大原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P6 补充说明
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 设计模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 架构总览
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 架构总览">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 整体结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 与旧体系的对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 与旧体系的共存
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 组件说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 组件说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-orcagymeulerenv-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 OrcaGymEulerEnv — 环境 Facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-orcagymeuler-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 OrcaGymEuler — 仿真核心 Facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-mujocosimcore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 MuJoCoSimCore — 仿真核心
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-orcastudiobridge-studio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 OrcaStudioBridge — Studio 集成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-modelregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 ModelRegistry — 模型注册
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-simconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 SimConfig — 求解器配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-orcagymdataview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 OrcaGymDataView — 完整状态视图
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#48-euler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8 Euler 耦合 — 占位（当前未实现）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#49-orcagymenvmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.9 OrcaGymEnvMixin — 环境公共方法混入
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. API 使用契约
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. API 使用契约">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 契约层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 状态读取
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 状态写入
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 仿真步进
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 求解器配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 名称空间
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 完整公共 API 清单
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 封装与隔离
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 封装与隔离">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 机制总览
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 隔离效果对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 与旧体系的隔离强度对比
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 步进编排
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 步进编排">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-do_simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 do_simulation 内部流程
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 两种使用模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 迁移指南
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 迁移指南">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 迁移代价
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 83 处直接访问的替代方案
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 83 处直接访问的替代方案">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orcagymdataview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        读取类（→ OrcaGymDataView）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        写入类（→ 显式方法）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置类（→ SimConfig）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#env-orcagymmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型结构类（→ env 公共方法 / OrcaGymModel）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 迁移分类示例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 设计决策
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 设计决策">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-gymenv-orcagymenvmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 为何直接继承 gym.Env + OrcaGymEnvMixin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-mujocoadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 为何放弃 MuJoCoAdapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-_mjdata_mjmodel-mujocosimcore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 为何 _mjData/_mjModel 放在 MuJoCoSimCore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-selfgym-_gym" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 为何保留 self.gym 概念但重命名为 _gym
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="orcagym-euler">⚙️ OrcaGym Euler 架构<a class="headerlink" href="#orcagym-euler" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>📌 <strong>前置阅读</strong>：如果你是第一次接触 OrcaGym 架构，建议先阅读 <a href="../architecture-overview/">架构总览</a> 了解整体分层与 API 边界，再回到本文查看组件设计细节。</p>
+</blockquote>
+<h2 id="1">1. 为什么需要新架构<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<h3 id="11">1.1 现有体系的问题<a class="headerlink" href="#11" title="Permanent link">&para;</a></h3>
+<p><code>OrcaGymLocalEnv</code> + <code>OrcaGymLocal</code> 作为当前主用路径，存在三类结构性缺陷：</p>
+<table>
+<thead>
+<tr>
+<th>缺陷类型</th>
+<th>表现</th>
+<th>后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>上帝类</strong></td>
+<td><code>OrcaGymLocal</code> 单类承担仿真核心、Studio 集成、模型注册、求解器配置、物体操作等所有职责</td>
+<td>难以维护、难以扩展、职责耦合</td>
+</tr>
+<tr>
+<td><strong>API 不完备</strong></td>
+<td><code>OrcaGymData</code> 只缓存 5 个字段（qpos/qvel/qacc/qfrc_bias/time），缺 xfrc_applied/cvel/contact 等</td>
+<td>你不得不绕道 <code>gym._mjData</code> 直接访问</td>
+</tr>
+<tr>
+<td><strong>封装泄漏</strong></td>
+<td><code>_mjModel</code>/<code>_mjData</code> 作为公共属性暴露，<code>self.gym</code> 既是内部组件又作外部库句柄</td>
+<td>83 处直接访问，封装形同虚设</td>
+</tr>
+</tbody>
+</table>
+<h3 id="12">1.2 用户代码现状<a class="headerlink" href="#12" title="Permanent link">&para;</a></h3>
+<p>对 OrcaPlayground 和 OrcaManipulation 两个仓库的分析显示：</p>
+<ul>
+<li><strong>17 个直接子类</strong> + <strong>4 个间接子类</strong>继承自 <code>OrcaGymLocalEnv</code></li>
+<li><strong>83 处</strong>直接访问 <code>gym._mjData</code> / <code>gym._mjModel</code></li>
+<li>典型绕道场景：外力注入（<code>xfrc_applied</code>）、求解器配置（<code>opt.*</code>）、body 属性查询（<code>body_subtreemass</code>/<code>cvel</code>）、等式约束结构访问（<code>eq_data</code>）</li>
+</ul>
+<p>你绕道不是因为不懂封装，而是<strong>封装没有覆盖你的需求</strong>。</p>
+<h3 id="13">1.3 新架构做了什么<a class="headerlink" href="#13" title="Permanent link">&para;</a></h3>
+<p><code>OrcaGymEulerEnv</code> + <code>OrcaGymEuler</code> 采用 <strong>Facade + 职责内聚分解</strong>的设计，替代 <code>OrcaGymLocalEnv</code> + <code>OrcaGymLocal</code> 的上帝类模式：</p>
+<ul>
+<li><strong>完备的公共 API</strong>：覆盖所有合法的 MuJoCo 操作需求，你不再需要绕道访问内部数据</li>
+<li><strong>封装隔离</strong>：<code>_mjModel</code>/<code>_mjData</code> 不对外暴露，从机制上引导你和 AI 走正确路径</li>
+<li><strong>平滑迁移</strong>：约 70% API 零改动，25% 机械替换，5% 设计调整</li>
+</ul>
+<hr />
+<h2 id="2">2. 核心设计原则<a class="headerlink" href="#2" title="Permanent link">&para;</a></h2>
+<h3 id="21">2.1 六大原则<a class="headerlink" href="#21" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>原则</th>
+<th>含义</th>
+<th>对比旧体系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P1 完备性</strong></td>
+<td>公共 API 覆盖所有合法的 MuJoCo 操作需求</td>
+<td>大量缺口迫使绕道</td>
+</tr>
+<tr>
+<td><strong>P2 不暴露引擎内部</strong></td>
+<td><code>_mjModel</code>/<code>_mjData</code> 不作为公共属性暴露</td>
+<td>直接暴露</td>
+</tr>
+<tr>
+<td><strong>P3 状态一致性</strong></td>
+<td>任何写操作后，<code>self.data</code> 保证一致；任何读操作都走 <code>self.data</code> 或显式查询</td>
+<td><code>self.data</code> 与 <code>_mjData</code> 双轨制</td>
+</tr>
+<tr>
+<td><strong>P4 力应用可追踪</strong></td>
+<td>外力注入通过显式方法，未来 Euler 耦合器可感知</td>
+<td><code>xfrc_applied</code> 直接写，无感知</td>
+</tr>
+<tr>
+<td><strong>P5 职责内聚</strong></td>
+<td>按职责内聚划分模块，一组方法因同一原因变化、共享同一组数据</td>
+<td>上帝类</td>
+</tr>
+<tr>
+<td><strong>P6 框架无状态、业务自编排</strong></td>
+<td>框架只提供无状态原语（单次原子读写），多步编排流程由你的业务代码自行组合实现并自管状态</td>
+<td>框架混杂原语与编排，易误用</td>
+</tr>
+</tbody>
+</table>
+<h4 id="p6">P6 补充说明<a class="headerlink" href="#p6" title="Permanent link">&para;</a></h4>
+<p>框架公共 API 都是<strong>无状态原语</strong>——单次调用完成单一数据读写，不依赖前后调用顺序，不持有跨调用的快照或绑定标记。例如：</p>
+<ul>
+<li><code>equality_find_slot_by_body</code> — 按 body 查槽位</li>
+<li><code>equality_constraint(slot)</code> — 读单槽位</li>
+<li><code>equality_update(slot, **fields)</code> — 写单槽位</li>
+<li><code>set_mocap_pos_and_quat</code> — 写 mocap 位姿</li>
+</ul>
+<p>如果你的业务需要"绑定/释放/抓取"等多步编排流程，请自行组合这些原语实现，业务状态由你自己管理。这比框架代管更易审查、更不易误用。</p>
+<h3 id="22">2.2 设计模式<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>应用位置</th>
+<th>解决的问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Facade</strong></td>
+<td><code>OrcaGymEulerEnv</code> / <code>OrcaGymEuler</code></td>
+<td>组合多个子组件，提供统一 API，避免上帝类</td>
+</tr>
+<tr>
+<td><strong>组合优于继承</strong></td>
+<td>Env 持有 Gym，Gym 持有子组件</td>
+<td>避免继承链腐化，职责可独立演进</td>
+</tr>
+<tr>
+<td><strong>策略模式</strong></td>
+<td><code>OrcaGymEuler._euler</code> 字段（占位）</td>
+<td>当前恒为 None，通过 <code>has_euler()</code> / <code>step_with_coupling()</code> 封装切换有无 Euler 的策略（Euler 编排器后续设计）</td>
+</tr>
+<tr>
+<td><strong>依赖反转</strong></td>
+<td><code>OrcaStudioBridge</code> 不持有 mjData，通过接收数据参数实现解耦</td>
+<td>Studio 集成与仿真核心解耦</td>
+</tr>
+<tr>
+<td><strong>只读视图</strong></td>
+<td><code>OrcaGymDataView</code></td>
+<td>提供完整状态读取，禁止写入</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3">3. 架构总览<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
+<h3 id="31">3.1 整体结构<a class="headerlink" href="#31" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gym.Env
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └── OrcaGymEulerEnv (新)                    (Facade + 契约执行者，直接继承 gym.Env)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        │   ↑ OrcaGymEnvMixin（名称空间、动作/观测空间生成、reset 编排）
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        │   组合（非继承）
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        ├── _gym: OrcaGymEuler           (仿真核心 Facade)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        │     ├── _sim: MuJoCoSimCore    # 持有 _mjModel/_mjData（不对外暴露）
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        │     ├── _studio: OrcaStudioBridge  # gRPC 集成
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        │     ├── _registry: ModelRegistry  # 模型信息
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        │     ├── _opt: SimConfig        # 求解器配置（typed）
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        │     └── _euler: None  # Euler 耦合占位（当前未实现，后续设计）
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        │   公共 API（你面向的接口）
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        ├── .data → OrcaGymDataView      # 完整状态视图
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>        ├── .model → OrcaGymModel        # 模型结构（原样复用）
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        ├── .sim_config → SimConfig      # 求解器配置
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        ├── .ctrl → np.ndarray           # 控制数组
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        ├── 仿真控制
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        ├── 状态查询
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        ├── 状态设置
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        ├── 名称空间
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        └── Studio 交互
+</code></pre></div>
+<h3 id="32">3.2 与旧体系的对比<a class="headerlink" href="#32" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>OrcaGymLocalEnv + OrcaGymLocal</th>
+<th>OrcaGymEulerEnv + OrcaGymEuler</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>类结构</td>
+<td>上帝类，单类承担所有职责</td>
+<td>Facade + 职责内聚分解</td>
+</tr>
+<tr>
+<td><code>_mjModel</code>/<code>_mjData</code></td>
+<td>公共属性，83 处直接访问</td>
+<td>内部组件，多层隔离</td>
+</tr>
+<tr>
+<td><code>OrcaGymData</code></td>
+<td>5 字段缓存，不完整</td>
+<td><code>OrcaGymDataView</code> 完整只读视图</td>
+</tr>
+<tr>
+<td>求解器配置</td>
+<td>无接口，绕道 <code>opt.*</code></td>
+<td><code>SimConfig</code> typed 配置</td>
+</tr>
+<tr>
+<td>外力注入</td>
+<td>直接写 <code>xfrc_applied</code></td>
+<td><code>apply_body_force()</code> 显式方法</td>
+</tr>
+<tr>
+<td>继承体系</td>
+<td>继承自腐化的 <code>OrcaGymBase</code> 链</td>
+<td>直接继承 <code>gym.Env</code> + <code>OrcaGymEnvMixin</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="33">3.3 与旧体系的共存<a class="headerlink" href="#33" title="Permanent link">&para;</a></h3>
+<p>原有 <code>OrcaGymBase</code> → Remote / Local / Warp 继承体系不动，现有系统继续运行不受影响。<code>OrcaGymEulerEnv</code> 是独立的新类，与 <code>OrcaGymLocal</code> 长期共存。迁移路径上，<code>OrcaGymLocal</code> 最终将被废弃，届时原有体系直接删除即可。</p>
+<hr />
+<h2 id="4">4. 组件说明<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<h3 id="41-orcagymeulerenv-facade">4.1 OrcaGymEulerEnv — 环境 Facade<a class="headerlink" href="#41-orcagymeulerenv-facade" title="Permanent link">&para;</a></h3>
+<p>作为 Gymnasium <code>Env</code> 的实现，组合 <code>OrcaGymEuler</code> 仿真核心，向你暴露统一 API。继承结构：<code>OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env)</code>。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymEulerEnv</span><span class="p">(</span><span class="n">OrcaGymEnvMixin</span><span class="p">,</span> <span class="n">gym</span><span class="o">.</span><span class="n">Env</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">"""OrcaGym Euler 双引擎环境。</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="sd">    使用契约:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="sd">        读取状态:   env.data.qpos / env.data.body_xpos(name) / env.query_*()</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="sd">        写入状态:   env.set_joint_qpos() / env.apply_body_force()</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="sd">        仿真步进:   env.do_simulation(ctrl, n_frames)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="sd">        求解器配置: env.sim_config.timestep = 0.002</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="sd">    禁止:</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sd">        不要访问 env._gym._sim._mjData 或任何内部 MuJoCo 对象。</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="sd">        env.gym/env.stub/env.channel 不存在，直接继承 gym.Env 不创建这些属性。</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="sd">        缺少功能时，扩展本类的公共方法。</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="sd">    """</span>
+</code></pre></div>
+<p><strong>关键属性</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>OrcaGymDataView</code></td>
+<td>完整状态只读视图，替代 <code>_mjData</code> 读取</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>OrcaGymModel</code></td>
+<td>模型结构信息（原样复用）</td>
+</tr>
+<tr>
+<td><code>sim_config</code></td>
+<td><code>SimConfig</code></td>
+<td>求解器参数配置，替代 <code>opt.*</code> 直接访问</td>
+</tr>
+<tr>
+<td><code>ctrl</code></td>
+<td><code>np.ndarray</code></td>
+<td>控制数组</td>
+</tr>
+<tr>
+<td><code>frame_skip</code></td>
+<td><code>int</code></td>
+<td>每次 <code>step()</code> 的物理步进数</td>
+</tr>
+<tr>
+<td><code>dt</code></td>
+<td><code>float</code></td>
+<td>环境时间步长 = timestep × frame_skip（<code>timestep</code> 才是单步物理时间）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-orcagymeuler-facade">4.2 OrcaGymEuler — 仿真核心 Facade<a class="headerlink" href="#42-orcagymeuler-facade" title="Permanent link">&para;</a></h3>
+<p>组合仿真子组件，向 <code>OrcaGymEulerEnv</code> 提供仿真操作接口。持有 <code>MuJoCoSimCore</code>、<code>OrcaStudioBridge</code>、<code>ModelRegistry</code>、<code>SimConfig</code>，以及 <code>_euler</code> 占位字段（当前为 <code>None</code>，Euler 耦合编排器后续设计）。<strong>不暴露</strong> <code>_mjModel</code>/<code>_mjData</code>，依赖 <code>_</code> 前缀约定 + ruff SLF001 静态检查，通过 <code>__dir__</code> 控制 IDE 自动补全只显示公共 API。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymEuler</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">"""双引擎编排核心。</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="sd">    ┌─────────────────────────────────────────────────────────────┐</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="sd">    │  API 契约：你不应直接访问 _mjData / _mjModel。              │</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">    │  读取 MuJoCo 状态 → 使用 env.data（OrcaGymDataView）        │</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="sd">    │  写入外力 → 使用 env.apply_body_force()                     │</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="sd">    │  配置求解器 → 使用 env.sim_config                           │</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="sd">    │  缺少功能时 → 扩展 OrcaGymEulerEnv 公共方法                 │</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="sd">    └─────────────────────────────────────────────────────────────┘</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="sd">    """</span>
+</code></pre></div>
+<h3 id="43-mujocosimcore">4.3 MuJoCoSimCore — 仿真核心<a class="headerlink" href="#43-mujocosimcore" title="Permanent link">&para;</a></h3>
+<p>持有 <code>_mjModel</code>/<code>_mjData</code>，执行 <code>mj_step</code>/<code>mj_forward</code>/<code>set_ctrl</code> 等纯 MuJoCo 操作。<code>_mjModel</code>/<code>_mjData</code> 只存在于此类内部，不对外暴露。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">MuJoCoSimCore</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_mjModel</span><span class="p">:</span> <span class="n">mujoco</span><span class="o">.</span><span class="n">MjModel</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_mjData</span><span class="p">:</span> <span class="n">mujoco</span><span class="o">.</span><span class="n">MjData</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">init_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_xml_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nstep</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_ctrl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctrl</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">sync_to_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">view</span><span class="p">:</span> <span class="n">OrcaGymDataView</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">apply_body_force</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torque</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<h3 id="44-orcastudiobridge-studio">4.4 OrcaStudioBridge — Studio 集成<a class="headerlink" href="#44-orcastudiobridge-studio" title="Permanent link">&para;</a></h3>
+<p>处理与 OrcaStudio 的 gRPC 交互，包括渲染、视频保存、物体操作等。<strong>依赖反转</strong>设计：不持有 <code>_mjData</code>，通过接收数据参数实现解耦；不碰 <code>mj_step</code>，只负责通信和场景同步。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaStudioBridge</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stub</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qpos</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">sim_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">load_model_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">begin_save_video</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">capture_mode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stop_save_video</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_current_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_body_manipulation_anchored</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_body_manipulation_movement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<h3 id="45-modelregistry">4.5 ModelRegistry — 模型注册<a class="headerlink" href="#45-modelregistry" title="Permanent link">&para;</a></h3>
+<p>构建 <code>OrcaGymModel</code>/<code>OrcaGymData</code>，提供 <code>query_all_*</code> 等模型信息查询。<code>OrcaGymModel</code> 是成功抽象，原样复用，并扩展了缺失的模型结构查询。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ModelRegistry</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mj_model</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># None 时需 _bind(mj_model) 后再使用</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build_orca_gym_model</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OrcaGymModel</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build_orca_gym_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>   <span class="c1"># 抛 NotImplementedError：Euler 体系使用 OrcaGymDataView 替代</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_subtree_mass</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">equality_data_width</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">equality_object_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eq_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<h3 id="46-simconfig">4.6 SimConfig — 求解器配置<a class="headerlink" href="#46-simconfig" title="Permanent link">&para;</a></h3>
+<p>提供 typed 的 MuJoCo 求解器参数读写接口，替代 <code>_mjModel.opt.*</code> 直接访问。覆盖所有用户可访问的 <code>opt</code> 字段，修改在下次 <code>mj_step</code> 时生效。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SimConfig</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="sd">"""MuJoCo 求解器参数配置。替代直接访问 _mjModel.opt.*。修改在下次 mj_step 时生效。"""</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">timestep</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="nd">@timestep</span><span class="o">.</span><span class="n">setter</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">timestep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">integrator</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="nd">@integrator</span><span class="o">.</span><span class="n">setter</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">integrator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">iterations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="nd">@iterations</span><span class="o">.</span><span class="n">setter</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">iterations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    <span class="nd">@property</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">gravity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="nd">@gravity</span><span class="o">.</span><span class="n">setter</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">gravity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>    <span class="c1"># ... 覆盖 opt 的所有用户可访问字段 ...</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load_from_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>迁移映射</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjModel.opt.timestep = 0.002</code></td>
+<td><code>env.sim_config.timestep = 0.002</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.opt.iterations = 100</code></td>
+<td><code>env.sim_config.iterations = 100</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.opt.integrator = 0</code></td>
+<td><code>env.sim_config.integrator = 0</code></td>
+</tr>
+<tr>
+<td>30 行 <code>opt.*</code> 设置</td>
+<td><code>env.sim_config.load_from_dict({...})</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="47-orcagymdataview">4.7 OrcaGymDataView — 完整状态视图<a class="headerlink" href="#47-orcagymdataview" title="Permanent link">&para;</a></h3>
+<p>提供 MuJoCo 状态的完整只读视图，替代直接访问 <code>_mjData</code>。覆盖所有你需要读取的字段（不仅是原 <code>OrcaGymData</code> 的 5 个）。通过方法提供 body/site/geom 属性查询，你按名称访问，不需要知道 id。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymDataView</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="sd">"""MuJoCo 状态的完整只读视图。</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="sd">    替代直接访问 _mjData。所有字段在 update_data() 后保证一致。</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="sd">    你永远不需要访问 _mjData。</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="sd">    如果需要此视图未提供的字段，请在 OrcaGymDataView 中扩展，</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="sd">    不要通过 env._gym._sim._mjData 绕道访问。</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="sd">    """</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="c1"># --- 基本状态 ---</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">qpos</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">qvel</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">qacc</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">qfrc_bias</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">time</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="c1"># --- 扩展字段 ---</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="n">xfrc_applied</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>       <span class="c1"># 只读视图（写入用 apply_body_force）</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="n">actuator_force</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>     <span class="c1"># 执行器力</span>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    <span class="n">contact</span><span class="p">:</span> <span class="nb">list</span>                  <span class="c1"># 接触列表</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_xpos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_xquat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_xmat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_cvel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body_subtree_mass</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>
+<a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">site_xpos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">site_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">site_xmat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">site_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>迁移映射</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新 API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjData.qpos</code></td>
+<td><code>env.data.qpos</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.body(id).xpos</code></td>
+<td><code>env.data.body_xpos(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.cvel[id]</code></td>
+<td><code>env.data.body_cvel(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.xpos[body_id, 2]</code></td>
+<td><code>env.data.body_xpos(name)[2]</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.time</code></td>
+<td><code>env.data.time</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="48-euler">4.8 Euler 耦合 — 占位（当前未实现）<a class="headerlink" href="#48-euler" title="Permanent link">&para;</a></h3>
+<p>编排 Euler 非刚体求解器与 MuJoCo 刚体求解器的耦合步进。<strong>当前为设计占位，代码中不存在 <code>EulerOrchestrator</code> 类</strong>：<code>OrcaGymEuler._euler</code> 字段恒为 <code>None</code>，<code>OrcaGymEulerEnv</code> 表现为纯 MuJoCo 环境。Euler 耦合的开关通过 <code>OrcaGymEuler.has_euler()</code> 查询、步进通过 <code>OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)</code> 封装（<code>has_euler()</code> 为 <code>False</code> 时等价于纯 MuJoCo 步进）。具体编排器设计后续单独文档论述。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 当前代码中的实际封装（OrcaGymEuler 公共 API）</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">has_euler</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="sd">"""查询是否存在 Euler 耦合编排器。骨架阶段恒返回 False。"""</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_euler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">step_with_coupling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctrl</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">n_frames</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="sd">"""带 Euler 耦合的步进。has_euler()=False 时等价于 set_ctrl + step。"""</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="c1"># 骨架阶段：set_ctrl + step（无 Euler 耦合）</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_sim</span><span class="o">.</span><span class="n">set_ctrl</span><span class="p">(</span><span class="n">ctrl</span><span class="p">)</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_sim</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">n_frames</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="49-orcagymenvmixin">4.9 OrcaGymEnvMixin — 环境公共方法混入<a class="headerlink" href="#49-orcagymenvmixin" title="Permanent link">&para;</a></h3>
+<p>抽取 <code>OrcaGymLocalEnv</code>/<code>OrcaGymBaseEnv</code> 中与仿真引擎无关的公共方法，供 <code>OrcaGymEulerEnv</code> 使用。当前 <code>OrcaGymLocalEnv</code> 仍直接继承 <code>OrcaGymBaseEnv</code>，未接入 <code>OrcaGymEnvMixin</code>（可选重构，不强制）。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymEnvMixin</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="sd">"""OrcaGym 环境公共方法 Mixin。</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="sd">    提供名称空间解析、动作/观测空间生成、reset 编排等方法。</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="sd">    不定义 __init__，不持有状态，子类自行初始化 _agent_names 等字段。</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="sd">    """</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="c1"># --- 名称空间解析（自动添加 agent 前缀）---</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">body</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">actuator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">site</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">mocap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">sensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>    <span class="c1"># --- 空间生成 ---</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_action_space</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bounds</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">generate_observation_space</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Space</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>    <span class="c1"># --- reset 编排 ---</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_seed_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_reset_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span> <span class="o">...</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>    <span class="c1"># --- 辅助 ---</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_name_with_agent0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_name_with_agent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>    <span class="nd">@property</span>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">agent_num</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><strong>使用方式</strong>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Euler 体系（当前实际使用）</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymEulerEnv</span><span class="p">(</span><span class="n">OrcaGymEnvMixin</span><span class="p">,</span> <span class="n">gym</span><span class="o">.</span><span class="n">Env</span><span class="p">):</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_agent_names</span> <span class="o">=</span> <span class="n">agent_names</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_gym</span> <span class="o">=</span> <span class="n">OrcaGymEuler</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="c1"># Mixin 方法可直接使用</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="o">...</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="c1"># Local 体系（当前实际继承 OrcaGymBaseEnv，未接入 Mixin）</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrcaGymLocalEnv</span><span class="p">(</span><span class="n">OrcaGymBaseEnv</span><span class="p">):</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="o">...</span>
+</code></pre></div>
+<hr />
+<h2 id="5-api">5. API 使用契约<a class="headerlink" href="#5-api" title="Permanent link">&para;</a></h2>
+<h3 id="51">5.1 契约层级<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>含义</th>
+<th>违反后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L1 公共 API</strong></td>
+<td><code>__dir__</code> 暴露的方法和属性，你应该使用</td>
+<td>正常工作</td>
+</tr>
+<tr>
+<td><strong>L2 内部组件</strong></td>
+<td><code>_gym</code>/<code>_sim</code>/<code>_studio</code> 等，你不应访问</td>
+<td>ruff SLF001 报警</td>
+</tr>
+<tr>
+<td><strong>L3 引擎内部</strong></td>
+<td><code>_mjModel</code>/<code>_mjData</code>，你绝不应访问</td>
+<td>ruff SLF001 报警</td>
+</tr>
+</tbody>
+</table>
+<h3 id="52">5.2 状态读取<a class="headerlink" href="#52" title="Permanent link">&para;</a></h3>
+<p><strong>规则</strong>：所有状态读取通过 <code>env.data</code>（<code>OrcaGymDataView</code>）或 <code>env.query_*()</code> 方法。<code>env.data</code> 在 <code>do_simulation()</code> 返回后、<code>mj_forward()</code> 返回后保证一致。<code>env.data</code> 是只读视图，写入操作必须通过显式方法。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># ✅ 正确</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">qpos</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">qpos</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">body_pos</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">body_xpos</span><span class="p">(</span><span class="s2">"link1"</span><span class="p">)</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># ❌ 错误</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">qpos</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">_gym</span><span class="o">.</span><span class="n">_sim</span><span class="o">.</span><span class="n">_mjData</span><span class="o">.</span><span class="n">qpos</span>  <span class="c1"># ruff SLF001 报警</span>
+</code></pre></div>
+<h3 id="53">5.3 状态写入<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
+<p><strong>规则</strong>：所有状态写入通过显式方法，不直接操作 MuJoCo 数据结构。外力注入通过 <code>apply_body_force()</code>，不直接写 <code>xfrc_applied</code>。写入操作后若需立即读取一致状态，须调用 <code>mj_forward()</code>。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># ✅ 正确</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">env</span><span class="o">.</span><span class="n">set_joint_qpos</span><span class="p">({</span><span class="s2">"joint1"</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])})</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">env</span><span class="o">.</span><span class="n">apply_body_force</span><span class="p">(</span><span class="s2">"link1"</span><span class="p">,</span> <span class="n">force</span><span class="p">,</span> <span class="n">torque</span><span class="p">)</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">env</span><span class="o">.</span><span class="n">mj_forward</span><span class="p">()</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1"># ❌ 错误</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">env</span><span class="o">.</span><span class="n">_gym</span><span class="o">.</span><span class="n">_sim</span><span class="o">.</span><span class="n">_mjData</span><span class="o">.</span><span class="n">xfrc_applied</span><span class="p">[</span><span class="n">body_id</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">force</span>  <span class="c1"># ruff SLF001 报警</span>
+</code></pre></div>
+<h3 id="54">5.4 仿真步进<a class="headerlink" href="#54" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>职责</th>
+<th>Euler 耦合</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>do_simulation(ctrl, n)</code></td>
+<td>标准步进</td>
+<td>有（未来）</td>
+<td>大多数 Env 的 <code>step()</code></td>
+</tr>
+<tr>
+<td><code>mj_step(n)</code></td>
+<td>纯 MuJoCo 步进</td>
+<td>无</td>
+<td>需要精细控制时序的高级用户</td>
+</tr>
+<tr>
+<td><code>mj_forward()</code></td>
+<td>前向计算</td>
+<td>无</td>
+<td>状态设置后更新派生量</td>
+</tr>
+</tbody>
+</table>
+<p>两种使用模式：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># 模式 A（推荐，含 Euler 耦合）</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">env</span><span class="o">.</span><span class="n">do_simulation</span><span class="p">(</span><span class="n">ctrl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">)</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="c1"># do_simulation 返回后 env.data 已自动同步（内部调用 sync_to_view）</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1"># 模式 B（纯 MuJoCo，无耦合）</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">):</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">env</span><span class="o">.</span><span class="n">set_ctrl</span><span class="p">(</span><span class="n">torques</span><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">env</span><span class="o">.</span><span class="n">mj_step</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="c1"># 循环结束后需调用 env.mj_forward() 刷新派生量，再通过 env.data 读取</span>
+</code></pre></div>
+<blockquote>
+<p>模式 B 当前与 OrcaGymLocalEnv 行为一致。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。</p>
+</blockquote>
+<h3 id="55">5.5 求解器配置<a class="headerlink" href="#55" title="Permanent link">&para;</a></h3>
+<p>所有 <code>opt.*</code> 参数通过 <code>env.sim_config</code> 读写，配置修改在下次 <code>mj_step</code> 时生效。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># ✅ 正确</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">env</span><span class="o">.</span><span class="n">sim_config</span><span class="o">.</span><span class="n">timestep</span> <span class="o">=</span> <span class="mf">0.002</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">env</span><span class="o">.</span><span class="n">sim_config</span><span class="o">.</span><span class="n">iterations</span> <span class="o">=</span> <span class="mi">100</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">env</span><span class="o">.</span><span class="n">sim_config</span><span class="o">.</span><span class="n">load_from_dict</span><span class="p">({</span><span class="s2">"integrator"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"iterations"</span><span class="p">:</span> <span class="mi">100</span><span class="p">})</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="c1"># ❌ 错误</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="n">env</span><span class="o">.</span><span class="n">_gym</span><span class="o">.</span><span class="n">_sim</span><span class="o">.</span><span class="n">_mjModel</span><span class="o">.</span><span class="n">opt</span><span class="o">.</span><span class="n">timestep</span> <span class="o">=</span> <span class="mf">0.002</span>  <span class="c1"># ruff SLF001 报警</span>
+</code></pre></div>
+<h3 id="56">5.6 名称空间<a class="headerlink" href="#56" title="Permanent link">&para;</a></h3>
+<p>所有名称通过 <code>env.joint()</code>/<code>env.body()</code>/<code>env.site()</code>/<code>env.actuator()</code>/<code>env.sensor()</code> 解析，自动添加 agent 前缀。这部分 API 与 OrcaGymLocalEnv 完全一致，零改动迁移。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">joint_name</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">joint</span><span class="p">(</span><span class="s2">"joint1"</span><span class="p">)</span>  <span class="c1"># → "agent_name/joint1"</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">body_name</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">body</span><span class="p">(</span><span class="s2">"object"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="57-api">5.7 完整公共 API 清单<a class="headerlink" href="#57-api" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>状态读取</strong></td>
+<td><code>data</code>（OrcaGymDataView）, <code>model</code>（OrcaGymModel）, <code>ctrl</code>, <code>frame_skip</code>, <code>dt</code>, <code>realtime_step</code></td>
+</tr>
+<tr>
+<td><strong>仿真控制</strong></td>
+<td><code>do_simulation(ctrl, n)</code>, <code>mj_step(n)</code>, <code>mj_forward()</code></td>
+</tr>
+<tr>
+<td><strong>状态查询</strong></td>
+<td><code>query_joint_qpos/qvel/qacc/offsets/lengths()</code>, <code>query_site_pos_and_mat()</code>, <code>query_site_pos_and_quat_B()</code>, <code>query_site_xvalp_xvalr()</code>, <code>query_site_xvalp_xvalr_B()</code>, <code>query_actuator_torques()</code>, <code>query_sensor_data()</code>, <code>query_contact_simple()</code>, <code>get_body_xpos_xmat_xquat()</code></td>
+</tr>
+<tr>
+<td><strong>状态设置</strong></td>
+<td><code>set_joint_qpos/qvel()</code>, <code>set_mocap_pos_and_quat()</code>, <code>set_geom_friction()</code>, <code>apply_body_force()</code>, <code>clear_body_force()</code>, <code>clear_all_forces()</code></td>
+</tr>
+<tr>
+<td><strong>等式约束原语（无状态，L1）</strong></td>
+<td><code>equality_find_slot_by_body(body_name)</code>, <code>equality_constraint(slot)</code>, <code>equality_update(slot, **fields, forward=True)</code></td>
+</tr>
+<tr>
+<td><strong>求解器配置</strong></td>
+<td><code>sim_config</code>（SimConfig）</td>
+</tr>
+<tr>
+<td><strong>名称空间</strong></td>
+<td><code>joint()</code>, <code>body()</code>, <code>site()</code>, <code>actuator()</code>, <code>sensor()</code></td>
+</tr>
+<tr>
+<td><strong>Studio 交互</strong></td>
+<td><code>render()</code>, <code>begin_save_video()</code>, <code>stop_save_video()</code>, <code>get_current_frame()</code>, <code>get_frame_png()</code></td>
+</tr>
+<tr>
+<td><strong>生命周期</strong></td>
+<td><code>initialize_simulation()</code>, <code>initialize_grpc()</code>, <code>pause_simulation()</code>, <code>close()</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Studio UI 抓取为内部 API</strong>：原 <code>anchor_actor()</code> / <code>release_body_anchored()</code> / <code>do_body_manipulation()</code> 按 P6 原则改为 <code>_</code> 前缀内部方法，由 <code>render()</code> 内部驱动，不进入公共 API。程序化体操作应使用等式约束无状态原语自行实现。</p>
+</blockquote>
+<hr />
+<h2 id="6">6. 封装与隔离<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
+<h3 id="61">6.1 机制总览<a class="headerlink" href="#61" title="Permanent link">&para;</a></h3>
+<p>本架构通过多层引导让"正确方式"成为阻力最小的路径。<code>OrcaGymEulerEnv</code> 直接继承 <code>gym.Env</code>，不创建 <code>gym</code>/<code>stub</code>/<code>channel</code> 属性，Python 原生即拒绝访问；其余内部对象依赖 <code>_</code> 前缀约定 + ruff SLF001 静态检查 + AGENTS.md AI 行为约束：</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>实现</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Python 原生属性不存在</strong></td>
+<td><code>OrcaGymEulerEnv</code> 直接继承 <code>gym.Env</code>，<code>__init__</code> 中赋值的内部组件均带下划线前缀（如 <code>_gym</code>/<code>_stub</code>/<code>_channel</code>/<code>_studio_bridge</code> 等），不创建无前缀的 <code>gym</code>/<code>stub</code>/<code>channel</code> 属性</td>
+<td><code>env.gym</code>/<code>env.stub</code>/<code>env.channel</code> 抛 <code>AttributeError</code></td>
+</tr>
+<tr>
+<td><strong>ruff SLF001 静态检查</strong></td>
+<td>配置 <code>ruff check --select SLF001</code>，扫描外部访问 <code>_</code> 前缀属性的代码</td>
+<td>提交前/CI 阶段检测穿墙访问</td>
+</tr>
+<tr>
+<td><strong>AGENTS.md AI 约束</strong></td>
+<td>每个自研仓库根目录配置 <code>AGENTS.md</code>，明文禁止 AI 使用 <code>_</code> 前缀属性</td>
+<td>从输入端约束 AI 代码生成行为</td>
+</tr>
+<tr>
+<td><strong><code>__dir__</code> 控制</strong></td>
+<td>Env/Gym/DataView 实现 <code>__dir__</code>，只暴露公共 API</td>
+<td>IDE 自动补全引导正确路径</td>
+</tr>
+<tr>
+<td><strong>DataView 兜底</strong></td>
+<td><code>OrcaGymDataView.__getattr__</code> 缺字段时引导扩展</td>
+<td>缺功能时引导扩展而非绕道</td>
+</tr>
+<tr>
+<td><strong>类型标注</strong></td>
+<td>公共方法返回 typed 对象，不返回 <code>mujoco.MjData</code></td>
+<td>AI 代码生成走正确路径</td>
+</tr>
+<tr>
+<td><strong>docstring 契约</strong></td>
+<td>类文档明确列出正确用法和禁止事项</td>
+<td>阅读 API 即知契约</td>
+</tr>
+<tr>
+<td><strong>路径深度</strong></td>
+<td><code>_mjData</code> 在 <code>env._gym._sim._mjData</code> 三层之下</td>
+<td>天然屏障</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62">6.2 隔离效果对比<a class="headerlink" href="#62" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>触发机制</th>
+<th>你/AI 看到的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI 生成 <code>env._mjData.qpos</code></td>
+<td>ruff SLF001</td>
+<td>提交前报警：用 <code>env.data.qpos</code></td>
+</tr>
+<tr>
+<td>AI 生成 <code>env._gym._mjData</code></td>
+<td>ruff SLF001</td>
+<td>提交前报警：用 <code>env.data</code></td>
+</tr>
+<tr>
+<td>AI 生成 <code>env._mjModel.opt.iterations</code></td>
+<td>ruff SLF001</td>
+<td>提交前报警：用 <code>env.sim_config.iterations</code></td>
+</tr>
+<tr>
+<td>AI 在 IDE 中补全 <code>env.</code></td>
+<td><code>__dir__</code> 控制</td>
+<td>只看到公共 API</td>
+</tr>
+<tr>
+<td>AI 阅读 class docstring</td>
+<td>类型标注 + 契约</td>
+<td>知道正确用法和禁止事项</td>
+</tr>
+<tr>
+<td>AI 未执行 ruff 直接提交</td>
+<td>AGENTS.md 约束 + CI 门禁</td>
+<td>CI 拒绝合并</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63">6.3 与旧体系的隔离强度对比<a class="headerlink" href="#63" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>系统</th>
+<th>绕道路径</th>
+<th>层数</th>
+<th>内部组件是否可见</th>
+<th>静态检查</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OrcaGymLocalEnv</td>
+<td><code>env.gym._mjData</code></td>
+<td>2</td>
+<td><code>gym</code> 是公共属性</td>
+<td>无</td>
+</tr>
+<tr>
+<td>OrcaGymEulerEnv</td>
+<td><code>env._gym._sim._mjData</code></td>
+<td>3</td>
+<td><code>__dir__</code> 不列出</td>
+<td>ruff SLF001 报警</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7">7. 步进编排<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<h3 id="71-do_simulation">7.1 <code>do_simulation</code> 内部流程<a class="headerlink" href="#71-do_simulation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">do_simulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctrl</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">n_frames</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span><span class="sd">"""标准仿真步进（含 Euler 耦合）。</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="sd">    契约:</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="sd">    - 设置控制输入 → 步进 n_frames 次 → 同步状态</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="sd">    - Euler 耦合通过 step_with_coupling 封装（不写 if self._gym._euler is not None）</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="sd">    - 步进完成后 self.data 保证一致</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="sd">    """</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="c1"># K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_gym</span><span class="o">.</span><span class="n">step_with_coupling</span><span class="p">(</span><span class="n">ctrl</span><span class="p">,</span> <span class="n">n_frames</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dt</span><span class="p">)</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_gym</span><span class="o">.</span><span class="n">sync_to_view</span><span class="p">()</span>
+</code></pre></div>
+<blockquote>
+<p>实际实现见 <code>orca_gym/environment/euler/orca_gym_euler_env.py</code> 的 <code>do_simulation</code>。<code>step_with_coupling</code> 在 <code>has_euler()=False</code>（当前骨架阶段）时等价于 <code>set_ctrl + step</code>，后续 Euler 耦合实现时扩展。</p>
+</blockquote>
+<h3 id="72">7.2 两种使用模式<a class="headerlink" href="#72" title="Permanent link">&para;</a></h3>
+<p><strong>模式 A（委托式，推荐）</strong>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="n">torque</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_torque</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">do_simulation</span><span class="p">(</span><span class="n">torque</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">)</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">obs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_obs</span><span class="p">()</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="k">return</span> <span class="n">obs</span><span class="p">,</span> <span class="n">reward</span><span class="p">,</span> <span class="n">terminated</span><span class="p">,</span> <span class="n">truncated</span><span class="p">,</span> <span class="n">info</span>
+</code></pre></div>
+<p><strong>模式 B（手动循环式）</strong>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">):</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>        <span class="n">torque</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_torque</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">set_ctrl</span><span class="p">(</span><span class="n">torque</span><span class="p">)</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">mj_step</span><span class="p">(</span><span class="n">nstep</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="c1"># 循环结束后刷新派生量，再读取 env.data</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">mj_forward</span><span class="p">()</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="n">obs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_obs</span><span class="p">()</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>    <span class="k">return</span> <span class="n">obs</span><span class="p">,</span> <span class="n">reward</span><span class="p">,</span> <span class="n">terminated</span><span class="p">,</span> <span class="n">truncated</span><span class="p">,</span> <span class="n">info</span>
+</code></pre></div>
+<p><strong>契约</strong>：模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。</p>
+<hr />
+<h2 id="8">8. 迁移指南<a class="headerlink" href="#8" title="Permanent link">&para;</a></h2>
+<h3 id="81">8.1 迁移代价<a class="headerlink" href="#81" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>API 类别</th>
+<th>兼容难度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>生命周期与属性</td>
+<td>低</td>
+<td><code>model</code>/<code>data</code>/<code>ctrl</code>/<code>frame_skip</code> 等原样提供</td>
+</tr>
+<tr>
+<td>仿真步进（模式 A）</td>
+<td>低</td>
+<td><code>do_simulation</code> 内部委托，签名一致</td>
+</tr>
+<tr>
+<td>仿真步进（模式 B）</td>
+<td>中</td>
+<td><code>mj_step(1)</code> 行为需注意无 Euler 耦合</td>
+</tr>
+<tr>
+<td>状态查询</td>
+<td>低</td>
+<td><code>query_*</code> 方法原样复制</td>
+</tr>
+<tr>
+<td>状态设置</td>
+<td>低</td>
+<td><code>set_*</code> 方法原样复制 + 新增 <code>apply_body_force</code></td>
+</tr>
+<tr>
+<td>名称空间解析</td>
+<td>低</td>
+<td><code>joint()</code>/<code>body()</code>/<code>site()</code> 等原样提供</td>
+</tr>
+<tr>
+<td><code>_mjData</code>/<code>_mjModel</code> 直接访问</td>
+<td><strong>低</strong></td>
+<td>有正式 API 替代，机械替换</td>
+</tr>
+<tr>
+<td>Studio 交互</td>
+<td>低</td>
+<td>gRPC 逻辑原样复制</td>
+</tr>
+</tbody>
+</table>
+<p><strong>总体</strong>：约 70% 零改动，25% 机械替换，5% 设计调整。</p>
+<h3 id="82-83">8.2 83 处直接访问的替代方案<a class="headerlink" href="#82-83" title="Permanent link">&para;</a></h3>
+<h4 id="orcagymdataview">读取类（→ OrcaGymDataView）<a class="headerlink" href="#orcagymdataview" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新 API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjData.qpos</code></td>
+<td><code>env.data.qpos</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.qvel</code></td>
+<td><code>env.data.qvel</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.body(id).xpos</code></td>
+<td><code>env.data.body_xpos(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.cvel[id]</code></td>
+<td><code>env.data.body_cvel(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.xpos[body_id, 2]</code></td>
+<td><code>env.data.body_xpos(name)[2]</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.time</code></td>
+<td><code>env.data.time</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="_1">写入类（→ 显式方法）<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新 API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjData.xfrc_applied[id, :3] = f</code></td>
+<td><code>env.apply_body_force(name, f, tau)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.xfrc_applied[id].fill(0)</code></td>
+<td><code>env.clear_body_force(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjData.eq_active[gi] = bool</code></td>
+<td><code>env.equality_update(slot, active=bool)</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="simconfig">配置类（→ SimConfig）<a class="headerlink" href="#simconfig" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新 API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjModel.opt.timestep = 0.002</code></td>
+<td><code>env.sim_config.timestep = 0.002</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.opt.iterations = 100</code></td>
+<td><code>env.sim_config.iterations = 100</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.opt.integrator = 0</code></td>
+<td><code>env.sim_config.integrator = 0</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.opt.gravity = ...</code></td>
+<td><code>env.sim_config.gravity = ...</code></td>
+</tr>
+<tr>
+<td>30 行 <code>opt.*</code> 设置</td>
+<td><code>env.sim_config.load_from_dict({...})</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="env-orcagymmodel">模型结构类（→ env 公共方法 / OrcaGymModel）<a class="headerlink" href="#env-orcagymmodel" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>旧代码</th>
+<th>新 API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gym._mjModel.body_subtreemass[id]</code></td>
+<td><code>env.body_subtree_mass(name)</code> 或 <code>env.data.body_subtree_mass(name)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.eq_data.shape[1]</code></td>
+<td>当前 <code>env.model</code> 无此公共 API，需通过 <code>env._gym.equality_data_width()</code> 或扩展 <code>env.model</code> 公共方法</td>
+</tr>
+<tr>
+<td><code>gym._mjModel.eq_obj1id[gi]</code></td>
+<td>当前 <code>env.model</code> 无此公共 API，需通过 <code>env._gym.equality_object_ids(idx)</code> 或扩展 <code>env.model</code> 公共方法</td>
+</tr>
+<tr>
+<td><code>gym._mjModel.joint(i).name</code></td>
+<td><code>env.model.joint_id2name(i)</code></td>
+</tr>
+<tr>
+<td><code>gym._mjModel.njnt</code></td>
+<td><code>len(env.model.get_joint_dict())</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="83">8.3 迁移分类示例<a class="headerlink" href="#83" title="Permanent link">&para;</a></h3>
+<p><strong>第一类：零改动（业务逻辑保持）</strong></p>
+<p>关节查询、状态设置、名称空间、渲染、步进——API 签名完全一致。</p>
+<p><strong>第二类：机械替换（<code>_mjData</code> → 正式 API）</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># 迁移前</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">gym</span><span class="o">.</span><span class="n">_mjData</span><span class="o">.</span><span class="n">xfrc_applied</span><span class="p">[</span><span class="n">body_id</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">force</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># 迁移后</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="bp">self</span><span class="o">.</span><span class="n">apply_body_force</span><span class="p">(</span><span class="n">body_name</span><span class="p">,</span> <span class="n">force</span><span class="p">,</span> <span class="n">torque</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>第三类：设计调整（少数情况）</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># 迁移前（Local 体系）：手动循环步进</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">):</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">set_ctrl</span><span class="p">(</span><span class="n">torques</span><span class="p">)</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">mj_step</span><span class="p">(</span><span class="n">nstep</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">gym</span><span class="o">.</span><span class="n">update_data</span><span class="p">()</span>   <span class="c1"># Local 体系的老 API</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="c1"># 迁移后（Euler 体系）：若需 Euler 耦合，改用 do_simulation</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="c1"># do_simulation 内部已封装 step_with_coupling + sync_to_view，数据自动同步</span>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="bp">self</span><span class="o">.</span><span class="n">do_simulation</span><span class="p">(</span><span class="n">torques</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_skip</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="9">9. 设计决策<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<h3 id="91-gymenv-orcagymenvmixin">9.1 为何直接继承 gym.Env + OrcaGymEnvMixin<a class="headerlink" href="#91-gymenv-orcagymenvmixin" title="Permanent link">&para;</a></h3>
+<p><code>OrcaGymEulerEnv</code> 直接继承 <code>gym.Env</code>，通过 <code>OrcaGymEnvMixin</code> 共享公共方法，不继承 <code>OrcaGymBaseEnv</code> 也不继承 <code>OrcaGymLocalEnv</code>。</p>
+<p><strong>理由</strong>：
+- <code>OrcaGymLocalEnv</code> 是上帝类，继承会继承所有职责耦合
+- <code>OrcaGymLocal</code> 的 <code>_mjModel</code>/<code>_mjData</code> 暴露设计与 P2 原则冲突
+- <code>OrcaGymBaseEnv</code> 的 <code>self.gym</code>/<code>self.model</code>/<code>self.data</code> 赋值与 Euler 体系直接冲突，需要 <code>__setattr__</code> 屏蔽等补丁机制
+- 直接继承 <code>gym.Env</code> 后，<code>env.gym</code>/<code>env.stub</code>/<code>env.channel</code> 天然不存在（Python 原生 AttributeError），无需任何拦截机制
+- <code>OrcaGymEnvMixin</code> 抽取名称空间、空间生成、reset 编排等与引擎无关的方法，避免代码重复</p>
+<h3 id="92-mujocoadapter">9.2 为何放弃 MuJoCoAdapter<a class="headerlink" href="#92-mujocoadapter" title="Permanent link">&para;</a></h3>
+<p>不提供 <code>MuJoCoAdapter</code>（受控的 MuJoCo 句柄适配器）。</p>
+<p><strong>理由</strong>：原需求来自 robosuite 控制器等外部库需要直接操作 MuJoCo 对象，决定不再支持 robosuite 组件后该需求消失。放弃后设计更简洁——没有"逃生舱"，所有需求都通过扩展 Env/Gym 的公共方法解决。</p>
+<h3 id="93-_mjdata_mjmodel-mujocosimcore">9.3 为何 <code>_mjData</code>/<code>_mjModel</code> 放在 MuJoCoSimCore<a class="headerlink" href="#93-_mjdata_mjmodel-mujocosimcore" title="Permanent link">&para;</a></h3>
+<p><code>_mjModel</code>/<code>_mjData</code> 只存在于 <code>MuJoCoSimCore</code> 内部，<code>OrcaGymEuler</code> 和 <code>OrcaGymEulerEnv</code> 不持有引用。</p>
+<p><strong>理由</strong>：
+- 增加绕道路径深度（<code>env._gym._sim._mjData</code> 三层）
+- 职责内聚：MuJoCo 原生操作集中在 <code>MuJoCoSimCore</code>
+- <code>OrcaGymEuler</code> 作为 Facade 只协调，不直接操作引擎数据</p>
+<h3 id="94-selfgym-_gym">9.4 为何保留 <code>self.gym</code> 概念但重命名为 <code>_gym</code><a class="headerlink" href="#94-selfgym-_gym" title="Permanent link">&para;</a></h3>
+<p><code>OrcaGymEulerEnv</code> 持有 <code>_gym: OrcaGymEuler</code>，但不作为公共属性暴露。</p>
+<p><strong>理由</strong>：
+- 保留分层结构（Env → Gym → SimCore）便于职责划分
+- <code>_gym</code> 不在 <code>__dir__</code> 中列出，AI 难以发现
+- 你通过 Env 的公共方法间接使用 Gym，不直接接触</p>
+<hr />
+<h2 id="10">10. 总结<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
+<p>本文档的核心要点：</p>
+<ol>
+<li><strong>Facade + 职责内聚分解</strong>替代上帝类，组件按职责划分为 <code>MuJoCoSimCore</code>/<code>OrcaStudioBridge</code>/<code>ModelRegistry</code>/<code>SimConfig</code>（<code>_euler</code> 字段为占位，当前未实现）</li>
+<li><strong>直接继承 <code>gym.Env</code> + <code>OrcaGymEnvMixin</code></strong>：不继承 <code>OrcaGymBaseEnv</code>，公共方法通过 Mixin 共享</li>
+<li><strong>完备的公共 API 契约</strong>覆盖所有合法 MuJoCo 操作需求，消除绕道理由</li>
+<li><strong>多层封装隔离</strong>（ruff SLF001 + AGENTS.md + Python 原生属性不存在 + <code>__dir__</code> + DataView 兜底 + 类型标注 + docstring）引导你和 AI 走正确路径</li>
+<li><strong>步进编排契约</strong>明确 <code>do_simulation</code>（含耦合）与 <code>mj_step</code>（纯 MuJoCo）的语义区分</li>
+<li><strong>迁移策略</strong>约 70% 零改动、25% 机械替换、5% 设计调整</li>
+</ol>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="2026年8月18日 04:09:30 UTC">2026年8月18日 04:09:30</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="2026年8月18日 04:09:30 UTC">2026年8月18日 04:09:30</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../architecture-overview/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 架构概览">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                架构概览
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../gym-interface/" class="md-footer__link md-footer__link--next" aria-label="下一页: Gym 接口">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                Gym 接口
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 松应科技有限公司
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/openverse-orca/OrcaGym" target="_blank" rel="noopener" title="OrcaGym on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "search.share", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
