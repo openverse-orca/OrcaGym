@@ -694,3 +694,15 @@ class OrcaGymEuler:
     def set_equality_solimp(self, eq_idx: int, solimp) -> None:
         """设置等式约束 solver impedance 参数（委托 SimCore）。"""
         object.__getattribute__(self, "_sim").set_equality_solimp(eq_idx, solimp)
+
+    # --- AR-001：拖拽代理碰撞掩码关闭（委托 SimCore，不暴露 _mjModel）---
+
+    def disable_actor_manipulator_collision(self) -> int:
+        """关闭 ActorManipulator 拖拽代理几何体的碰撞掩码（委托 SimCore）。
+
+        模型加载时（init_simulation）已自动执行；本方法供环境在需要时重断言。
+
+        Returns:
+            本次被修改的 geom 数量。
+        """
+        return object.__getattribute__(self, "_sim").disable_actor_manipulator_collision()
