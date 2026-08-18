@@ -29,6 +29,43 @@ from orca_gym.core.orca_gym import OrcaGymBase
 from orca_gym.utils.dir_utils import cleanup_zombie_locks, file_lock
 
 import mujoco
+
+# 覆盖新旧两种命名：UUID 化 ORCA_MANIPULATOR_<uuid> 与旧版 ActorManipulator。
+_ACTOR_MANIPULATOR_BODY_NAMES = (
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_Anchor",
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_dummy",
+    "ActorManipulator_Anchor",
+    "ActorManipulator_dummy",
+)
+
+
+def disable_actor_manipulator_collision(model: mujoco.MjModel) -> int:
+    """
+    关闭 ActorManipulator 拖拽代理所有几何体的碰撞掩码（contype=conaffinity=0）。
+
+    拖拽/抓取依赖 mocap anchor 与 weld 等号约束，与接触完全无关，故关闭碰撞不影响功能；
+    但可消除 AR-001 中该代理埋地/远端碰撞体与无限平面贯产生的垃圾约束（junk efc）行。
+
+    Args:
+        model: 原始 mujoco.MjModel。
+
+    Returns:
+        被修改的 geom 数量（用于日志/断言）。
+    """
+    n_disabled = 0
+    for body_name in _ACTOR_MANIPULATOR_BODY_NAMES:
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if body_id < 0:
+            continue
+        for gid in range(model.ngeom):
+            if model.geom_bodyid[gid] == body_id:
+                if model.geom_contype[gid] != 0 or model.geom_conaffinity[gid] != 0:
+                    model.geom_contype[gid] = 0
+                    model.geom_conaffinity[gid] = 0
+                    n_disabled += 1
+    return n_disabled
+
+
 from scipy.spatial.transform import Rotation as R
 
 
@@ -306,6 +343,12 @@ class OrcaGymLocal(OrcaGymBase):
         self._xml_path = model_xml_path  # 保存 XML 路径，用于后续解析 mesh 文件路径
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
+
+        # AR-001：模型加载后关闭 ActorManipulator 拖拽代理的碰撞掩码，消除其埋地/远端
+        # 碰撞体与无限平面贯产生的垃圾约束行（不影响 mocap weld 拖拽）。
+        n = disable_actor_manipulator_collision(self._mjModel)
+        if n > 0:
+            _logger.info(f"disabled collision on {n} ActorManipulator geom(s).")
 
         size_model = mujoco.mj_sizeModel(self._mjModel)
         _logger.debug(f"size_model: {size_model}")

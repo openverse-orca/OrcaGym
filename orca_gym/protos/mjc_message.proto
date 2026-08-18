@@ -14,6 +14,7 @@ service GrpcService {
   // 场景控制
   rpc AddActor (AddActorRequest) returns (AddActorResponse);
   rpc PublishScene (PublishSceneRequest) returns (PublishSceneResponse);
+  rpc AppendScene (AppendSceneRequest) returns (AppendSceneResponse);
   rpc SetLightInfo (SetLightInfoRequest) returns (SetLightInfoResponse);
   rpc MakeCameraViewportActive (MakeCameraViewportActiveRequest) returns (MakeCameraViewportActiveResponse);
   rpc SetMaterialInfo (SetMaterialInfoRequest) returns (SetMaterialInfoResponse);
@@ -1077,6 +1078,18 @@ message PublishSceneResponse {
     }
     Status status = 1; // 状态码字段
     string error_message = 2; // 错误详情（可选）
+}
+
+// AppendScene: 增量 spawn —— 仅处理 m_addActorMap 队列中的新 Actor，
+//              不销毁已 spawn 的实体（跳过 OnDestroyScene），适用于时序 spawn 场景。
+message AppendSceneRequest {}
+message AppendSceneResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+    }
+    Status status = 1;
+    string error_message = 2;
 }
 
 message SetLightInfoRequest {

@@ -1,6 +1,6 @@
 # 🔧 MuJoCo Backend
 
-OrcaGym's Euler mode uses MuJoCo directly as the physics engine. Model loading is automatically completed during environment initialization.
+This document describes how to use OrcaGym's **MuJoCo backend**. The MuJoCo backend is the open-source standard path (CPU, pure rigid-body) in OrcaGym's dual-backend architecture, selected via `SimConfig.backend="mujoco"`. Model loading is automatically completed during environment initialization.
 
 > See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
 
@@ -111,7 +111,7 @@ print(f"Control frequency: {1.0/env.dt:.1f}Hz")
 
 ### G1 Standard Configuration
 
-The G1 humanoid robot uses the following standard parameters (from Euler examples):
+The G1 humanoid robot uses the following standard parameters:
 
 | Parameter | Value | Description |
 |------|-----|------|
@@ -122,11 +122,11 @@ The G1 humanoid robot uses the following standard parameters (from Euler example
 ## Debugging and Profiling
 
 ```python
-# View contact count (Euler path uses query_contact_simple to get the contact list length)
+# View contact count (use query_contact_simple to get the contact list length)
 contacts = env.query_contact_simple()
 print(f"Contact count: {len(contacts)}")
 
-# View model information (under the Euler path, OrcaGymModel does not expose nbody/njnt/nsite;
+# View model information (OrcaGymModel does not expose nbody/njnt/nsite;
 # use len() to get dictionary sizes; ngeom/nq/nv/nu are fields in model_info)
 print(f"nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
 print(f"ngeom={env.model.ngeom}")

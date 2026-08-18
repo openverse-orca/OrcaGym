@@ -43,7 +43,7 @@
 | **P1 完备性** | 公共 API 覆盖所有合法的 MuJoCo 操作需求 | 大量缺口迫使绕道 |
 | **P2 不暴露引擎内部** | `_mjModel`/`_mjData` 不作为公共属性暴露 | 直接暴露 |
 | **P3 状态一致性** | 任何写操作后，`self.data` 保证一致；任何读操作都走 `self.data` 或显式查询 | `self.data` 与 `_mjData` 双轨制 |
-| **P4 力应用可追踪** | 外力注入通过显式方法，未来 Euler 耦合器可感知 | `xfrc_applied` 直接写，无感知 |
+| **P4 力应用可追踪** | 外力注入通过显式方法，后端内部可感知 | `xfrc_applied` 直接写，无感知 |
 | **P5 职责内聚** | 按职责内聚划分模块，一组方法因同一原因变化、共享同一组数据 | 上帝类 |
 | **P6 框架无状态、业务自编排** | 框架只提供无状态原语（单次原子读写），多步编排流程由你的业务代码自行组合实现并自管状态 | 框架混杂原语与编排，易误用 |
 
@@ -64,7 +64,7 @@
 |------|---------|-----------|
 | **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | 组合多个子组件，提供统一 API，避免上帝类 |
 | **组合优于继承** | Env 持有 Gym，Gym 持有子组件 | 避免继承链腐化，职责可独立演进 |
-| **策略模式** | `OrcaGymEuler._euler` 字段（占位） | 当前恒为 None，通过 `has_euler()` / `step_with_coupling()` 封装切换有无 Euler 的策略（Euler 编排器后续设计） |
+| **策略模式** | `OrcaGymEuler._euler` 字段（占位） | 当前恒为 None，未来通过后端选择在 MuJoCo/Euler 两条互斥路径间切换（`has_euler()` / `step_with_coupling()` 为预留接口） |
 | **依赖反转** | `OrcaStudioBridge` 不持有 mjData，通过接收数据参数实现解耦 | Studio 集成与仿真核心解耦 |
 | **只读视图** | `OrcaGymDataView` | 提供完整状态读取，禁止写入 |
 
@@ -85,7 +85,7 @@ gym.Env
         │     ├── _studio: OrcaStudioBridge  # gRPC 集成
         │     ├── _registry: ModelRegistry  # 模型信息
         │     ├── _opt: SimConfig        # 求解器配置（typed）
-        │     └── _euler: None  # Euler 耦合占位（当前未实现，后续设计）
+        │     └── _euler: None  # Euler 后端占位（当前未实现，未来接入）
         │
         │   公共 API（你面向的接口）
         ├── .data → OrcaGymDataView      # 完整状态视图
@@ -153,11 +153,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
 ### 4.2 OrcaGymEuler — 仿真核心 Facade
 
-组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 耦合编排器后续设计）。**不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀约定 + ruff SLF001 静态检查，通过 `__dir__` 控制 IDE 自动补全只显示公共 API。
+组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 后端后续接入）。**不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀约定 + ruff SLF001 静态检查，通过 `__dir__` 控制 IDE 自动补全只显示公共 API。
 
 ```python
 class OrcaGymEuler:
-    """双引擎编排核心。
+    """仿真核心（双后端选择）。
 
     ┌─────────────────────────────────────────────────────────────┐
     │  API 契约：你不应直接访问 _mjData / _mjModel。              │
@@ -187,21 +187,11 @@ class MuJoCoSimCore:
     def apply_body_force(self, body_id: int, force: np.ndarray, torque: np.ndarray) -> None: ...
 ```
 
-### 4.4 OrcaStudioBridge — Studio 集成
+### 4.4 OrcaStudioBridge — 外部渲染器集成
 
-处理与 OrcaStudio 的 gRPC 交互，包括渲染、视频保存、物体操作等。**依赖反转**设计：不持有 `_mjData`，通过接收数据参数实现解耦；不碰 `mj_step`，只负责通信和场景同步。
+负责与外部渲染器（OrcaStudio / OrcaLab）通信，提供渲染、视频保存、物体操纵等交互能力。**依赖反转**设计：不持有 `_mjData`，通过接收数据参数实现解耦；不碰 `mj_step`，只负责通信和场景同步。
 
-```python
-class OrcaStudioBridge:
-    def __init__(self, stub=None) -> None: ...
-    async def render(self, qpos: np.ndarray, sim_time: float) -> None: ...
-    async def load_model_xml(self) -> str: ...
-    async def begin_save_video(self, file_path: str, capture_mode) -> None: ...
-    async def stop_save_video(self) -> None: ...
-    async def get_current_frame(self) -> int: ...
-    async def get_body_manipulation_anchored(self) -> tuple: ...
-    async def get_body_manipulation_movement(self) -> dict: ...
-```
+该组件是**旁路系统**，缺席时物理仿真仍可正常进行。
 
 ### 4.5 ModelRegistry — 模型注册
 
@@ -306,19 +296,21 @@ class OrcaGymDataView:
 | `gym._mjData.xpos[body_id, 2]` | `env.data.body_xpos(name)[2]` |
 | `gym._mjData.time` | `env.data.time` |
 
-### 4.8 Euler 耦合 — 占位（当前未实现）
+### 4.8 Euler 后端集成 — 占位（当前未实现）
 
-编排 Euler 非刚体求解器与 MuJoCo 刚体求解器的耦合步进。**当前为设计占位，代码中不存在 `EulerOrchestrator` 类**：`OrcaGymEuler._euler` 字段恒为 `None`，`OrcaGymEulerEnv` 表现为纯 MuJoCo 环境。Euler 耦合的开关通过 `OrcaGymEuler.has_euler()` 查询、步进通过 `OrcaGymEuler.step_with_coupling(ctrl, n_frames, dt)` 封装（`has_euler()` 为 `False` 时等价于纯 MuJoCo 步进）。具体编排器设计后续单独文档论述。
+Euler 后端是 OrcaGym 的可选物理后端之一，与 MuJoCo 后端互斥。Euler 作为完整物理引擎自治运行，对外提供 MuJoCo 风格 API，并通过 D2H 接口将 `qpos`/`xpos` 等数据提取到 CPU 供 OrcaGym 驱动渲染。
+
+**当前实现状态**：`OrcaGymEuler._euler` 字段为占位（恒为 `None`），`has_euler()` 恒返回 `False`，当前仅 MuJoCo 后端可用。Euler 后端的接入将在后续版本实现。代码中保留的 `has_euler()` / `step_with_coupling()` 接口为未来接入预留：
 
 ```python
-# 当前代码中的实际封装（OrcaGymEuler 公共 API）
+# 当前代码中的预留接口（OrcaGymEuler 公共 API）
 def has_euler(self) -> bool:
-    """查询是否存在 Euler 耦合编排器。骨架阶段恒返回 False。"""
+    """查询是否已加载 Euler 后端。当前恒返回 False。"""
     return self._euler is not None
 
 def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
-    """带 Euler 耦合的步进。has_euler()=False 时等价于 set_ctrl + step。"""
-    # 骨架阶段：set_ctrl + step（无 Euler 耦合）
+    """Euler 后端步进。当前（has_euler()=False）等价于 set_ctrl + step。"""
+    # 当前：set_ctrl + step（MuJoCo 后端路径）
     self._sim.set_ctrl(ctrl)
     self._sim.step(n_frames)
 ```
@@ -416,27 +408,27 @@ env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # ruff SLF001 报警
 
 ### 5.4 仿真步进
 
-| 方法 | 职责 | Euler 耦合 | 适用场景 |
-|------|------|-----------|---------|
-| `do_simulation(ctrl, n)` | 标准步进 | 有（未来） | 大多数 Env 的 `step()` |
-| `mj_step(n)` | 纯 MuJoCo 步进 | 无 | 需要精细控制时序的高级用户 |
-| `mj_forward()` | 前向计算 | 无 | 状态设置后更新派生量 |
+| 方法 | 职责 | 适用场景 |
+|------|------|---------|
+| `do_simulation(ctrl, n)` | 标准步进，委托到所选后端 | 大多数 Env 的 `step()` |
+| `mj_step(n)` | 纯 MuJoCo 步进 | 需要精细控制时序的高级用户 |
+| `mj_forward()` | 前向计算 | 状态设置后更新派生量 |
 
 两种使用模式：
 
 ```python
-# 模式 A（推荐，含 Euler 耦合）
+# 模式 A（推荐，后端无关）
 env.do_simulation(ctrl, self.frame_skip)
 # do_simulation 返回后 env.data 已自动同步（内部调用 sync_to_view）
 
-# 模式 B（纯 MuJoCo，无耦合）
+# 模式 B（精细控制，MuJoCo 后端专用）
 for _ in range(self.frame_skip):
     env.set_ctrl(torques)
     env.mj_step(1)
 # 循环结束后需调用 env.mj_forward() 刷新派生量，再通过 env.data 读取
 ```
 
-> 模式 B 当前与 OrcaGymLocalEnv 行为一致。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。
+> 模式 A 后端无关，MuJoCo/Euler 后端均适用；模式 B 仅 MuJoCo 后端可用（直接调用 `mj_step`）。
 
 ### 5.5 求解器配置
 
@@ -522,11 +514,11 @@ body_name = env.body("object")
 
 ```python
 def do_simulation(self, ctrl: np.ndarray, n_frames: int):
-    """标准仿真步进（含 Euler 耦合）。
+    """标准仿真步进（后端无关）。
 
     契约:
     - 设置控制输入 → 步进 n_frames 次 → 同步状态
-    - Euler 耦合通过 step_with_coupling 封装（不写 if self._gym._euler is not None）
+    - 后端选择通过 step_with_coupling 封装（不写 if self._gym._euler is not None）
     - 步进完成后 self.data 保证一致
     """
     # K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装
@@ -534,7 +526,7 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._gym.sync_to_view()
 ```
 
-> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。`step_with_coupling` 在 `has_euler()=False`（当前骨架阶段）时等价于 `set_ctrl + step`，后续 Euler 耦合实现时扩展。
+> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。`step_with_coupling` 在 `has_euler()=False`（当前）时走 MuJoCo 后端路径（等价于 `set_ctrl + step`），后续 Euler 后端接入时切换到 Euler 路径。
 
 ### 7.2 两种使用模式
 
@@ -562,7 +554,7 @@ def step(self, action):
     return obs, reward, terminated, truncated, info
 ```
 
-**契约**：模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。若未来需要 Euler 耦合，模式 B 用户必须改用模式 A。
+**契约**：模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。模式 B 仅 MuJoCo 后端可用（直接调用 `mj_step`）；若使用 Euler 后端，须改用模式 A。
 
 ---
 
@@ -574,7 +566,7 @@ def step(self, action):
 |---------|---------|------|
 | 生命周期与属性 | 低 | `model`/`data`/`ctrl`/`frame_skip` 等原样提供 |
 | 仿真步进（模式 A） | 低 | `do_simulation` 内部委托，签名一致 |
-| 仿真步进（模式 B） | 中 | `mj_step(1)` 行为需注意无 Euler 耦合 |
+| 仿真步进（模式 B） | 中 | `mj_step(1)` 仅 MuJoCo 后端可用，Euler 后端须改用模式 A |
 | 状态查询 | 低 | `query_*` 方法原样复制 |
 | 状态设置 | 低 | `set_*` 方法原样复制 + 新增 `apply_body_force` |
 | 名称空间解析 | 低 | `joint()`/`body()`/`site()` 等原样提供 |
@@ -649,7 +641,7 @@ for _ in range(self.frame_skip):
     self.mj_step(nstep=1)
     self.gym.update_data()   # Local 体系的老 API
 
-# 迁移后（Euler 体系）：若需 Euler 耦合，改用 do_simulation
+# 迁移后（Euler 体系）：使用 Euler 后端时须改用 do_simulation
 # do_simulation 内部已封装 step_with_coupling + sync_to_view，数据自动同步
 self.do_simulation(torques, self.frame_skip)
 ```

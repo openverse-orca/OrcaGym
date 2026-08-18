@@ -19,7 +19,7 @@ _logger = get_orca_logger()
 from orca_gym import OrcaGymLocal
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode, disable_actor_manipulator_collision
 from orca_gym.recorder import (
     CreateVideoRecorderManager,
     RemuxResult,
@@ -110,6 +110,11 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
             _logger.warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+
+        # 确保任何加载路径下该代理都不参与物理碰撞（拖拽依赖 mocap weld，与接触无关）。
+        if self.gym is not None and hasattr(self.gym, "_mjModel"):
+            n = disable_actor_manipulator_collision(self.gym._mjModel)
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
 
     def initialize_simulation(
         self,
