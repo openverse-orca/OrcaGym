@@ -112,11 +112,15 @@ class RollingFrameBuffer:
             )
 
         with self._lock:
-            # OrderedDict 按插入顺序，simulate_index 单调递增，直接遍历
-            result = []
-            for sim_idx, entry in self._frames.items():
-                if start_simulate_index <= sim_idx <= end_simulate_index:
-                    result.append(entry)
+            # OrderedDict 按插入顺序遍历，但插入顺序不保证数值升序
+            # （sim_idx=-1 的帧或重复 append reinsert 会破坏升序），
+            # 返回前显式按 simulate_index 排序，保证 docstring 声明的升序契约。
+            result = [
+                entry
+                for sim_idx, entry in self._frames.items()
+                if start_simulate_index <= sim_idx <= end_simulate_index
+            ]
+            result.sort(key=lambda e: e.simulate_index)
             return result
 
     def get_latest_simulate_index(self) -> int:

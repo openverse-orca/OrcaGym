@@ -220,6 +220,10 @@ class CameraRecorder(ABC):
         ``ConnectionError``。由于引擎需要先开启物理仿真才能输出图像，
         这里不要求首帧到达，给上层一个宽松的启动窗口。
 
+        PyAV 缺失时仍允许启动接收线程（仅缓存可用），解码/remux 路径在
+        实际调用时才 raise。符合模块顶部 Note "PyAV 未安装时仅录制不可用
+        （缓存可用）"的降级契约。
+
         Raises:
             RuntimeError: 录制器已在运行
             ConnectionError: WebSocket 连接超时或失败
@@ -228,8 +232,10 @@ class CameraRecorder(ABC):
             raise RuntimeError(f"Recorder for camera '{self._camera_name}' is already running")
 
         if av is None:
-            raise RuntimeError(
-                "PyAV (av) is not installed. Install with: pip install av"
+            _logger.warning(
+                f"[Recorder:{self._camera_name}] PyAV (av) is not installed; "
+                f"receiver/buffer will work but decode/remux are disabled. "
+                f"Install with: pip install av"
             )
 
         self._running = True

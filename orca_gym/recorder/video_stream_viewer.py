@@ -31,6 +31,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 from orca_gym.log.orca_log import get_orca_logger
+from orca_gym.recorder.camera_recorder import _WS_HEADER_SIZE
 
 if TYPE_CHECKING:
     from orca_gym.recorder.camera_recorder import CameraRecorder
@@ -121,8 +122,8 @@ def _viewer_subprocess(
                         except asyncio.TimeoutError:
                             continue
 
-                        # 跳过 8 字节时间戳头
-                        payload = data[8:]
+                        # 跳过 WebSocket 帧头（8B timestamp + 4B simulate_index，共 12B）
+                        payload = data[_WS_HEADER_SIZE:]
                         raw_buf.write(payload)
                         raw_buf.seek(cur_pos)
 
