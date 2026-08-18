@@ -238,6 +238,13 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 )
         except Exception as e:
             _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
+        # AR-001：关闭 ActorManipulator 拖拽代理碰撞掩码（init_simulation 已执行，
+        # 此处经公共方法再断言一次，覆盖新/旧 Anchor 命名，保证代理不参与物理碰撞）。
+        try:
+            n = self._gym.disable_actor_manipulator_collision()
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
+        except Exception as e:
+            _logger.warning(f"failed to disable ActorManipulator collision: {e}")
         return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
