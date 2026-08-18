@@ -74,6 +74,11 @@ class GrpcServiceStub(object):
                 request_serializer=mjc__message__pb2.PublishSceneRequest.SerializeToString,
                 response_deserializer=mjc__message__pb2.PublishSceneResponse.FromString,
                 _registered_method=True)
+        self.AppendScene = channel.unary_unary(
+                '/MujocoMessage.GrpcService/AppendScene',
+                request_serializer=mjc__message__pb2.AppendSceneRequest.SerializeToString,
+                response_deserializer=mjc__message__pb2.AppendSceneResponse.FromString,
+                _registered_method=True)
         self.SetLightInfo = channel.unary_unary(
                 '/MujocoMessage.GrpcService/SetLightInfo',
                 request_serializer=mjc__message__pb2.SetLightInfoRequest.SerializeToString,
@@ -589,6 +594,12 @@ class GrpcServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def PublishScene(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AppendScene(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1211,6 +1222,11 @@ def add_GrpcServiceServicer_to_server(servicer, server):
                     servicer.PublishScene,
                     request_deserializer=mjc__message__pb2.PublishSceneRequest.FromString,
                     response_serializer=mjc__message__pb2.PublishSceneResponse.SerializeToString,
+            ),
+            'AppendScene': grpc.unary_unary_rpc_method_handler(
+                    servicer.AppendScene,
+                    request_deserializer=mjc__message__pb2.AppendSceneRequest.FromString,
+                    response_serializer=mjc__message__pb2.AppendSceneResponse.SerializeToString,
             ),
             'SetLightInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.SetLightInfo,
@@ -1894,6 +1910,33 @@ class GrpcService(object):
             '/MujocoMessage.GrpcService/PublishScene',
             mjc__message__pb2.PublishSceneRequest.SerializeToString,
             mjc__message__pb2.PublishSceneResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AppendScene(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MujocoMessage.GrpcService/AppendScene',
+            mjc__message__pb2.AppendSceneRequest.SerializeToString,
+            mjc__message__pb2.AppendSceneResponse.FromString,
             options,
             channel_credentials,
             insecure,

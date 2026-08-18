@@ -160,6 +160,21 @@ class OrcaGymScene:
     def publish_scene(self):
         self.loop.run_until_complete(self._publish_scene())
 
+    async def _append_scene(self):
+        async with self.lock:
+            request = mjc_message_pb2.AppendSceneRequest()
+            response = await self.stub.AppendScene(request)
+            if response.status != mjc_message_pb2.AppendSceneResponse.SUCCESS:
+                _logger.error(f"Append scene failed:  {response.error_message}")
+                raise Exception("Append scene failed.")
+
+    def append_scene(self):
+        """增量发布场景 —— 仅 spawn m_addActorMap 中的新 Actor，不销毁已 spawn 的实体。
+
+        适用于时序 spawn 场景：逐步 add_actor + append_scene，前序机器人不被抹除。
+        """
+        self.loop.run_until_complete(self._append_scene())
+
     async def _add_actor(self, actor : Actor):
         async with self.lock:  # 加锁保证串行
             request = mjc_message_pb2.AddActorRequest(
