@@ -274,8 +274,25 @@ class OrcaGymEuler:
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
         await studio.render(
-            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr
+            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr, contacts=self._build_contact_data()
         )
+
+    def _build_contact_data(self) -> list[dict]:
+        sim = object.__getattribute__(self, "_sim")
+        contacts_simple = sim.query_contact_simple()
+        if not contacts_simple:
+            return []
+        contact_ids = list(range(len(contacts_simple)))
+        forces = sim.query_contact_force(contact_ids)
+        result: list[dict] = []
+        for i, con in enumerate(contacts_simple):
+            frame_mat = np.array(con["frame"]).reshape(3, 3, order='F')
+            world_force = -(frame_mat.T @ forces[i][:3])
+            result.append({
+                "pos": [float(con["pos"][0]), float(con["pos"][1]), float(con["pos"][2])],
+                "force": [float(world_force[0]), float(world_force[1]), float(world_force[2])],
+            })
+        return result
 
     async def pause_simulation(self) -> None:
         """通知 OrcaStudio 暂停仿真。"""
