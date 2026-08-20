@@ -408,9 +408,28 @@ class OrcaGymLocal(OrcaGymBase):
             # 服务器会更新可视化，并可能返回控制覆盖值
             ```
         """
-        await self.update_local_env(self.data.qpos, self._mjData.time)
+        await self.update_local_env(self.data.qpos, self._mjData.time, contacts=self._build_contact_data())
 
-    async def update_local_env(self, qpos, time):
+    def _build_contact_data(self):
+        data = self._mjData
+        model = self._mjModel
+        ncon = data.ncon
+        if ncon == 0:
+            return []
+        contacts = []
+        force_buf = np.zeros(6, dtype=np.float64)
+        for i in range(ncon):
+            con = data.contact[i]
+            mujoco.mj_contactForce(model, data, i, force_buf)
+            frame_mat = np.array(con.frame).reshape(3, 3, order='F')
+            world_force = -(frame_mat.T @ force_buf[:3])
+            contacts.append({
+                "pos": [float(con.pos[0]), float(con.pos[1]), float(con.pos[2])],
+                "force": [float(world_force[0]), float(world_force[1]), float(world_force[2])],
+            })
+        return contacts
+
+    async def update_local_env(self, qpos, time, contacts=None):
         """
         更新本地环境状态到服务器，并接收控制覆盖值
         
@@ -424,6 +443,7 @@ class OrcaGymLocal(OrcaGymBase):
         Args:
             qpos: 当前关节位置数组
             time: 当前仿真时间
+            contacts: 接触数据列表
         
         使用示例:
             ```python
@@ -433,6 +453,11 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        if contacts is not None:
+            for con in contacts:
+                cs = request.contacts.add()
+                cs.pos.extend(con["pos"])
+                cs.force.extend(con["force"])
         response = await self.stub.UpdateLocalEnv(request)
         override_ctrls = response.override_ctrls
         self._override_ctrls.clear()

@@ -213,20 +213,27 @@ class OrcaStudioBridge:
 
     # --- 渲染 ---
 
-    async def render(self, qpos: np.ndarray, sim_time: float) -> None:
+    async def render(self, qpos: np.ndarray, sim_time: float, contacts: list[dict] | None = None) -> None:
         """渲染当前仿真状态到 OrcaStudio（依赖反转：接收 qpos/sim_time）。
 
         离线模式 no-op；在线模式将 qpos/time 推送到 Studio，接收 override_ctrls。
+        接触快照（可选）随请求一并推送，Studio 侧 RuntimeDisplayEntityViewport 负责绘制。
 
         Args:
             qpos: 广义坐标位置数组。
             sim_time: 仿真时间。
+            contacts: 接触快照列表。
         """
         if self._stub is None:
             return
         request = mjc_message_pb2.UpdateLocalEnvRequest(
             qpos=qpos.tolist(), time=float(sim_time)
         )
+        if contacts is not None:
+            for con in contacts:
+                cs = request.contacts.add()
+                cs.pos.extend(con["pos"])
+                cs.force.extend(con["force"])
         response = await self._stub.UpdateLocalEnv(request)
         # 更新 override_ctrls 缓存
         self._override_ctrls.clear()
