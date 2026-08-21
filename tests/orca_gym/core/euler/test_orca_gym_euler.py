@@ -14,14 +14,17 @@
 import asyncio
 import inspect
 import os
+import sys
+import types
 import unittest
+from unittest import mock
 
 import mujoco
 import numpy as np
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 from orca_gym.core.orca_gym_model import OrcaGymModel
 
 
@@ -468,7 +471,7 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
         self.assertIn("env.data", msg)
 
     def test_blocked_attrs_frozenset_complete(self):
-        """_BLOCKED_ATTRS 是 frozenset 且包含全部 20 个拦截名（K3/K5 完整性）。"""
+        """_BLOCKED_ATTRS 是 frozenset 且包含全部 30 个拦截名（K3/K5 + Euler 后端）。"""
         self.assertIsInstance(OrcaGymEuler._BLOCKED_ATTRS, frozenset)
         expected_blocked = {
             # L3 引擎内部 (8)
@@ -477,6 +480,11 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             # K5 子组件 (12 = 6 带下划线 + 6 不带)
             "_sim", "_studio", "_registry", "_opt", "_view", "_euler",
             "sim", "studio", "registry", "opt", "view", "euler",
+            # Euler 后端 GPU 对象 (10)
+            "_mjf_model", "_mjf_data", "mjf_model", "mjf_data",
+            "_host_cache", "host_cache",
+            "_step_graph", "step_graph",
+            "_coupling", "coupling",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)
 
@@ -614,6 +622,68 @@ class TestGymQueryDelegationFunctional(unittest.TestCase):
         sim = object.__getattribute__(self.gym, "_sim")
         sim_result = sim.get_goal_bounding_box(geom_name)
         np.testing.assert_array_equal(gym_result, sim_result)
+
+
+class TestOrcaGymEulerEulerBackend(unittest.TestCase):
+    """Phase G：Euler 后端适配（_init_euler_backend / _BLOCKED_ATTRS / reset_coupling_state）。"""
+
+    def test_new_blocked_keys_present(self):
+        blocked = OrcaGymEuler._BLOCKED_ATTRS
+        for key in (
+            "_mjf_model", "_mjf_data", "mjf_model", "mjf_data",
+            "_host_cache", "host_cache", "_step_graph", "step_graph",
+            "_coupling", "coupling",
+        ):
+            self.assertIn(key, blocked)
+
+    def test_new_blocked_keys_raise_attribute_error(self):
+        gym = OrcaGymEuler()
+        for key in ("mjf_data", "_host_cache", "step_graph", "coupling"):
+            with self.subTest(key=key):
+                with self.assertRaises(AttributeError):
+                    getattr(gym, key)
+
+    def test_reset_coupling_state_noop_when_euler_none(self):
+        gym = OrcaGymEuler()
+        gym.reset_coupling_state()  # P1 no-op，无异常
+
+    def test_init_euler_backend_constructs_mujoco_sim_core_euler(self):
+        gym = OrcaGymEuler()
+        opt = object.__getattribute__(gym, "_opt")
+        opt.backend = SimBackend.EULER
+        opt.device = "cuda:0"
+        opt.nworld = 1
+
+        fake_model = object()
+        captured = {}
+
+        class FakeCore:
+            def init_simulation(self, model_xml_path, device="cuda", nworld=1):
+                captured["init_args"] = (model_xml_path, device, nworld)
+                self.mj_model = fake_model
+
+        fake_mod = types.ModuleType("orca_gym.core.euler.mujoco_sim_core_euler")
+        fake_mod.MuJoCoSimCoreEuler = FakeCore
+
+        with mock.patch.dict(sys.modules, {
+            "orca_gym.core.euler.mujoco_sim_core_euler": fake_mod,
+        }):
+            gym._init_euler_backend("dummy.xml", None)
+
+        self.assertEqual(captured["init_args"], ("dummy.xml", "cuda:0", 1))
+        sim = object.__getattribute__(gym, "_sim")
+        self.assertIsInstance(sim, FakeCore)
+        self.assertIs(sim.mj_model, fake_model)
+        self.assertIsNone(object.__getattribute__(gym, "_euler"))
+        self.assertIs(opt._mj_model, fake_model)
+
+    def test_init_euler_backend_multi_world_raises(self):
+        gym = OrcaGymEuler()
+        opt = object.__getattribute__(gym, "_opt")
+        opt.backend = SimBackend.EULER
+        opt.nworld = 2
+        with self.assertRaises(NotImplementedError):
+            gym._init_euler_backend("dummy.xml", None)
 
 
 if __name__ == "__main__":

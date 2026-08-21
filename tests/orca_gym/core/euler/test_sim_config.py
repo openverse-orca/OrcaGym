@@ -15,7 +15,7 @@ import unittest
 import mujoco
 import numpy as np
 
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 
 
 # 测试用 XML 模型：单铰链倒立摆（timestep=0.002, integrator=RK4, gravity=0 0 -9.81）
@@ -222,6 +222,96 @@ class TestSimConfigBoundDelegation(unittest.TestCase):
         config = SimConfig(self.mj_model)
         self.assertAlmostEqual(config.timestep, 0.002)
         self.assertEqual(int(config.integrator), 1)
+
+
+class TestSimConfigBackend(unittest.TestCase):
+    """SimBackend 枚举与 backend/device/nworld 字段（Phase A 验收）。"""
+
+    def test_backend_default_mujoco(self):
+        """默认后端为 MUJOCO（对齐 design §2.1 二选一默认项）。"""
+        self.assertIs(SimConfig().backend, SimBackend.MUJOCO)
+
+    def test_backend_accepts_str(self):
+        """backend setter 接受字符串 "euler" 并规范化为枚举。"""
+        config = SimConfig()
+        config.backend = "euler"
+        self.assertIs(config.backend, SimBackend.EULER)
+
+    def test_backend_accepts_enum(self):
+        """backend setter 接受 SimBackend 枚举。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        self.assertIs(config.backend, SimBackend.EULER)
+
+    def test_device_nworld_fields(self):
+        """默认 device == 'cuda'、nworld == 1（对齐 design §4.3）。"""
+        config = SimConfig()
+        self.assertEqual(config.device, "cuda")
+        self.assertEqual(config.nworld, 1)
+
+    def test_backend_device_nworld_round_trip(self):
+        """backend/device/nworld getter/setter 直存往返。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config.device = "cuda:0"
+        config.nworld = 2
+        self.assertIs(config.backend, SimBackend.EULER)
+        self.assertEqual(config.device, "cuda:0")
+        self.assertEqual(config.nworld, 2)
+
+
+class TestSimConfigEulerGuard(unittest.TestCase):
+    """Euler 后端 init_simulation 后只读守卫（Phase A A3 验收）。"""
+
+    def setUp(self):
+        """每个测试前加载真实 mjModel。"""
+        self.mj_model = mujoco.MjModel.from_xml_path(_PENDULUM_XML)
+
+    def test_timestep_setter_guard_euler(self):
+        """Euler 后端绑定后 timestep setter 抛 RuntimeError。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config._bind(self.mj_model)
+        with self.assertRaises(RuntimeError):
+            config.timestep = 0.001
+
+    def test_integrator_setter_guard_euler(self):
+        """Euler 后端绑定后 integrator setter 抛 RuntimeError。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config._bind(self.mj_model)
+        with self.assertRaises(RuntimeError):
+            config.integrator = 0
+
+    def test_iterations_setter_guard_euler(self):
+        """Euler 后端绑定后 iterations setter 抛 RuntimeError。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config._bind(self.mj_model)
+        with self.assertRaises(RuntimeError):
+            config.iterations = 50
+
+    def test_gravity_setter_guard_euler(self):
+        """Euler 后端绑定后 gravity setter 抛 RuntimeError。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config._bind(self.mj_model)
+        with self.assertRaises(RuntimeError):
+            config.gravity = np.array([0.0, 0.0, -5.0])
+
+    def test_unbound_euler_no_guard(self):
+        """Euler 后端未绑定时 setter 不抛（允许 init_simulation 前设置）。"""
+        config = SimConfig()
+        config.backend = SimBackend.EULER
+        config.timestep = 0.001  # 不应抛
+        self.assertAlmostEqual(config.timestep, 0.001)
+
+    def test_mujoco_backend_no_guard(self):
+        """MUJOCO 后端绑定后 setter 仍可写（不回归既有委托行为）。"""
+        config = SimConfig()
+        config._bind(self.mj_model)
+        config.timestep = 0.01  # 不应抛
+        self.assertAlmostEqual(config.timestep, 0.01)
 
 
 if __name__ == "__main__":

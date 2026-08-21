@@ -31,7 +31,7 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.utils.orca_debug_draw import DebugDraw
@@ -90,9 +90,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         time_step: float,
         *,
         model_xml_path: str | None = None,
+        esdf_path: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
+        device: str = "cpu",
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -107,9 +109,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
+            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
+            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0" 等 → Euler.SolverMujoco GPU）。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -121,6 +125,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 2. Env 自有字段
         self._skip_grpc_load = skip_grpc_load
         self._local_xml_path = model_xml_path
+        self._esdf_path = esdf_path
+        self._device = device
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
@@ -155,6 +161,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
         # 4. 生命周期编排（原父类 __init__ 中的编排，现在自主调用）
         self.initialize_grpc()
+        self._configure_backend()
         self.pause_simulation()
         self.set_time_step(time_step)
         self.initialize_simulation()   # 内部设置 _gym，model/data 通过 property 读取
@@ -205,6 +212,19 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
+    def _configure_backend(self) -> None:
+        """依据 device 参数配置后端（cpu → MuJoCo；cuda* → Euler）。
+
+        必须在 initialize_simulation 之前调用：initialize_simulation 内部
+        依据 sim_config.backend 决定走 CPU 或 Euler 初始化路径。
+        """
+        if self._device.startswith("cuda"):
+            self._gym.sim_config.backend = SimBackend.EULER
+            self._gym.sim_config.device = self._device
+        else:
+            self._gym.sim_config.backend = SimBackend.MUJOCO
+            self._gym.sim_config.device = self._device
+
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
         """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
 
@@ -216,9 +236,13 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
         # 2. 初始化仿真
-        self.loop.run_until_complete(self._gym.init_simulation(model_xml_path))
-        # 3. 应用缓存的 time_step（init_simulation 前设置的值需重新生效）
-        self._gym.sim_config.timestep = self._time_step
+        self.loop.run_until_complete(
+            self._gym.init_simulation(model_xml_path, esdf_path=self._esdf_path)
+        )
+        # 3. 应用缓存的 time_step（CPU 后端 _bind 后写 mj_model.opt；
+        #    Euler 后端 _bind 后禁改，跳过，时间步长由 XML/solver 决定）
+        if self._gym.sim_config.backend == SimBackend.MUJOCO:
+            self._gym.sim_config.timestep = self._time_step
         # 4. 在线模式：同步时间步到远端 OrcaStudio
         if not self._skip_grpc_load:
             self._studio_bridge.set_timestep_remote(self._time_step)
@@ -243,6 +267,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def reset_simulation(self) -> None:
         """重置 MjData 到初始状态并同步 DataView。"""
         self._gym.reset_data()
+        self._gym.reset_coupling_state()
         self._gym.sync_to_view()
 
     def init_qpos_qvel(self) -> None:

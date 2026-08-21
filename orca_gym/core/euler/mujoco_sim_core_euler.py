@@ -1,0 +1,561 @@
+"""MuJoCoSimCoreEuler — 单世界 Euler 后端编排层（P1，nworld=1）。
+
+本模块属于 OrcaGym Euler 体系 P1，是 Euler 后端的仿真核心编排层，
+与 CPU 版 `MuJoCoSimCore` 共享同一组方法签名（L1 对齐），内部把写操作
+落到 ``solver.host``（lazy-dirty），读操作先 ``_ensure_host_fresh()``
+（lazy-stale），GPU 推进（step/forward）前 ``_commit_if_dirty()``。
+
+lazy 同步原语（_mark_dirty/_mark_stale/_commit_if_dirty/_ensure_host_fresh）
+是本编排层的唯一同步入口，其余方法禁止直接调 flush/sync_to_host
+（对齐 design §5.1「单一同步入口」约束）。
+
+``_solver`` 通过字符串前向引用类型注释（`from __future__ import annotations`），
+避免在 CPU-only 测试环境 import `orca.euler`；真正的 import 放在
+`init_simulation` 内（见 Phase C1）。
+"""
+
+from __future__ import annotations
+
+import mujoco
+import numpy as np
+
+
+class MuJoCoSimCoreEuler:
+    """单世界编排层（nworld=1，对齐 design C3）。
+
+    与 CPU 版 MuJoCoSimCore 共享同一组方法签名，内部把写操作落到
+    ``solver.host``（lazy-dirty），读操作先 ``_ensure_host_fresh()``
+    （lazy-stale），GPU 推进（step/forward）前 ``_commit_if_dirty()``。
+
+    使用契约:
+        初始化:     core.init_simulation("model.xml", device, nworld)
+        重置:       core.reset_data()
+        步进:       core.step(nstep=1)
+        前向:       core.forward()
+        设控制:     core.set_ctrl(ctrl_array)
+        设状态:     core.set_qpos_qvel(qpos, qvel)
+        读状态:     core.sync_to_view(data_view)
+
+    禁止:
+        外部不应直接访问本类的 _solver。
+        其余方法不得直接调 flush/sync_to_host，统一走 lazy 同步原语。
+    """
+
+    def __init__(self) -> None:
+        self._solver = None     # SolverMujocoSingleWorld | None
+        self._nworld: int = 1
+        self._host_dirty: bool = False
+        self._host_stale: bool = True
+
+    # ---- lazy 同步原语（内部，B2 交付）----
+
+    def _mark_dirty(self) -> None:
+        self._host_dirty = True
+
+    def _mark_stale(self) -> None:
+        self._host_stale = True
+
+    def _commit_if_dirty(self) -> None:
+        if self._host_dirty:
+            self._solver.flush()
+            self._host_dirty = False
+
+    def _ensure_host_fresh(self) -> None:
+        if self._host_stale:
+            self._solver.sync_to_host()
+            self._host_stale = False
+
+    def _require_solver(self) -> None:
+        """确保 solver 已初始化，否则抛 RuntimeError（与 CPU 版一致）。"""
+        if self._solver is None:
+            raise RuntimeError("Simulation not initialized")
+
+    # ---- 维度 property（G 类，读 host model，无同步）----
+
+    @property
+    def nq(self) -> int:
+        self._require_solver()
+        return self._solver.mj_model.nq
+
+    @property
+    def nv(self) -> int:
+        self._require_solver()
+        return self._solver.mj_model.nv
+
+    @property
+    def nu(self) -> int:
+        self._require_solver()
+        return self._solver.mj_model.nu
+
+    @property
+    def mj_model(self):
+        """返回 host MjModel（只读，供 SimConfig/ModelRegistry 绑定）。"""
+        self._require_solver()
+        return self._solver.mj_model
+
+    # ---- A 类：生命周期方法（C1 交付）----
+
+    def init_simulation(
+        self, model_xml_path: str, device: str = "cuda", nworld: int = 1
+    ) -> None:
+        if nworld != 1:
+            raise NotImplementedError(
+                "P1 仅支持 nworld=1（多世界留给 MuJoCoSimCoreEulerMultiWorlds）。"
+            )
+        try:
+            import orca.euler as euler
+        except ImportError as e:
+            raise RuntimeError(
+                "Euler 后端不可用：orca.euler 未安装。"
+                "请确认已安装 orca.euler 且 SimConfig.backend = SimBackend.EULER。"
+            ) from e
+        self._solver = euler.SolverMujocoSingleWorld(
+            source=model_xml_path, device=device
+        )
+        self._nworld = nworld
+        self._host_dirty = False
+        self._host_stale = False   # 构造后 host 与 GPU 均为初始态，视为 fresh
+
+    def reset_data(self) -> None:
+        self._require_solver()
+        self._solver.reset()       # GPU reset + host 重置
+        self._host_dirty = False
+        self._host_stale = False
+
+    def step(self, nstep: int) -> None:
+        self._require_solver()
+        self._commit_if_dirty()    # H2D：让写操作进入 step 前生效
+        self._solver.step(nstep)
+        self._mark_stale()         # 步进后 host 过期
+
+    def forward(self) -> None:
+        self._require_solver()
+        self._commit_if_dirty()
+        self._solver.forward()
+        self._mark_stale()
+
+    def sync_to_view(self, view) -> None:
+        self._require_solver()
+        self._ensure_host_fresh()      # D2H：世界 0（nworld=1）
+        view._sync_from_mjdata(self._solver.host, self._solver.mj_model)  # noqa: SLF001
+
+    # ---- B 类：状态写入方法（C2 交付）----
+
+    def set_ctrl(self, ctrl: np.ndarray) -> None:
+        self._require_solver()
+        self._solver.host.ctrl[:] = ctrl
+        self._mark_dirty()
+
+    def set_qpos_qvel(self, qpos: np.ndarray, qvel: np.ndarray) -> None:
+        self._require_solver()
+        host = self._solver.host
+        host.qpos[:] = qpos
+        host.qvel[:] = qvel
+        self._mark_dirty()
+
+    def set_mocap_pos_and_quat(self, mocap_dict: dict[str, dict]) -> None:
+        self._require_solver()
+        model = self._solver.mj_model
+        host = self._solver.host
+        for body_name, pose in mocap_dict.items():
+            body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            mocap_id = int(model.body_mocapid[body_id])
+            if mocap_id >= 0:
+                host.mocap_pos[mocap_id] = np.asarray(
+                    pose["pos"], dtype=np.float64
+                ).reshape(3)
+                host.mocap_quat[mocap_id] = np.asarray(
+                    pose["quat"], dtype=np.float64
+                ).reshape(4)
+        self._mark_dirty()
+
+    # ---- C 类：力应用方法（C3 交付）----
+
+    def apply_body_force(self, body_id, force: np.ndarray, torque: np.ndarray) -> None:
+        self._require_solver()
+        # SolverMujocoSingleWorld 封装 body_id name 查询 + 写 host.xfrc_applied
+        self._solver.apply_body_force(body_id, force, torque)
+        self._mark_dirty()
+
+    def clear_body_force(self, body_id: int) -> None:
+        self._require_solver()
+        self._solver.host.xfrc_applied[body_id, :6] = 0.0
+        self._mark_dirty()
+
+    def clear_all_forces(self) -> None:
+        self._require_solver()
+        self._solver.host.xfrc_applied[:] = 0.0
+        self._mark_dirty()
+
+    def mj_apply_force_at_site(self, site_id: int, force: np.ndarray, torque: np.ndarray) -> None:
+        self._require_solver()
+        host = self._solver.host
+        body_id = self._solver.mj_model.site_bodyid[site_id]
+        host.xfrc_applied[body_id, :3] += np.asarray(force, dtype=np.float64).reshape(3)
+        host.xfrc_applied[body_id, 3:6] += np.asarray(torque, dtype=np.float64).reshape(3)
+        self._mark_dirty()
+
+    def mj_clear_xfrc_applied_for_site(self, site_id: int) -> None:
+        self._require_solver()
+        self.clear_body_force(int(self._solver.mj_model.site_bodyid[site_id]))
+
+    # ---- D 类：状态查询方法（D1 交付）----
+    # 18 个查询方法与 CPU 版逐字一致，仅前置 _require_solver/_ensure_host_fresh，
+    # 且 _mjModel/_mjData 替换为 _solver.mj_model/_solver.host。
+
+    def _joint_id(self, joint_name: str) -> int:
+        """解析关节名称到 joint_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_JOINT, joint_name
+        )
+
+    def _joint_qpos_len(self, joint_id: int) -> int:
+        """关节 qpos 长度（按类型：free=7, ball=4, hinge/slide=1）。"""
+        jtype = self._solver.mj_model.jnt_type[joint_id]
+        if jtype == mujoco.mjtJoint.mjJNT_FREE:
+            return 7
+        if jtype == mujoco.mjtJoint.mjJNT_BALL:
+            return 4
+        return 1  # HINGE / SLIDE
+
+    def _joint_qvel_len(self, joint_id: int) -> int:
+        """关节 qvel/qacc 长度（按类型：free=6, ball=3, hinge/slide=1）。"""
+        jtype = self._solver.mj_model.jnt_type[joint_id]
+        if jtype == mujoco.mjtJoint.mjJNT_FREE:
+            return 6
+        if jtype == mujoco.mjtJoint.mjJNT_BALL:
+            return 3
+        return 1  # HINGE / SLIDE
+
+    def query_joint_qpos(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        host = self._solver.host
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(model.jnt_qposadr[jid])
+            n = self._joint_qpos_len(jid)
+            result[name] = host.qpos[adr:adr + n]
+        return result
+
+    def query_joint_qvel(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        host = self._solver.host
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(model.jnt_dofadr[jid])
+            n = self._joint_qvel_len(jid)
+            result[name] = host.qvel[adr:adr + n]
+        return result
+
+    def query_joint_qacc(self, joint_names: list[str]) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        host = self._solver.host
+        result: dict[str, np.ndarray] = {}
+        for name in joint_names:
+            jid = self._joint_id(name)
+            adr = int(model.jnt_dofadr[jid])
+            n = self._joint_qvel_len(jid)
+            result[name] = host.qacc[adr:adr + n]
+        return result
+
+    def query_joint_offsets(
+        self, joint_names: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        qpos_adrs = []
+        qvel_adrs = []
+        qacc_adrs = []
+        for name in joint_names:
+            jid = self._joint_id(name)
+            qpos_adrs.append(int(model.jnt_qposadr[jid]))
+            dof_adr = int(model.jnt_dofadr[jid])
+            qvel_adrs.append(dof_adr)
+            qacc_adrs.append(dof_adr)
+        return (
+            np.array(qpos_adrs, dtype=int),
+            np.array(qvel_adrs, dtype=int),
+            np.array(qacc_adrs, dtype=int),
+        )
+
+    def query_joint_lengths(
+        self, joint_names: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        qpos_lens = []
+        qvel_lens = []
+        qacc_lens = []
+        for name in joint_names:
+            jid = self._joint_id(name)
+            qpos_lens.append(self._joint_qpos_len(jid))
+            n_qvel = self._joint_qvel_len(jid)
+            qvel_lens.append(n_qvel)
+            qacc_lens.append(n_qvel)
+        return (
+            np.array(qpos_lens, dtype=int),
+            np.array(qvel_lens, dtype=int),
+            np.array(qacc_lens, dtype=int),
+        )
+
+    def query_joint_dofadrs(self, joint_names: list[str]) -> dict[str, int]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        return {
+            name: int(self._solver.mj_model.jnt_dofadr[self._joint_id(name)])
+            for name in joint_names
+        }
+
+    def jnt_qposadr(self, joint_name: str) -> int:
+        self._require_solver()
+        self._ensure_host_fresh()
+        return int(self._solver.mj_model.jnt_qposadr[self._joint_id(joint_name)])
+
+    def jnt_dofadr(self, joint_name: str) -> int:
+        self._require_solver()
+        self._ensure_host_fresh()
+        return int(self._solver.mj_model.jnt_dofadr[self._joint_id(joint_name)])
+
+    def _body_id(self, body_name: str) -> int:
+        """解析 body 名称到 body_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name
+        )
+
+    def _site_id(self, site_name: str) -> int:
+        """解析 site 名称到 site_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_SITE, site_name
+        )
+
+    def query_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        result: dict[str, dict] = {}
+        for name in body_name_list:
+            bid = self._body_id(name)
+            result[name] = {
+                "xpos": host.xpos[bid],
+                "xmat": host.xmat[bid].reshape(3, 3),
+                "xquat": host.xquat[bid],
+            }
+        return result
+
+    def query_body_xpos_xmat_xquat_xvel(
+        self, body_name_list: list[str]
+    ) -> dict[str, dict]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        nv = self._solver.mj_model.nv
+        result: dict[str, dict] = {}
+        for name in body_name_list:
+            bid = self._body_id(name)
+            jacp = np.zeros((3, nv))
+            jacr = np.zeros((3, nv))
+            self.mj_jacBody(jacp, jacr, bid)
+            xvel = jacp @ host.qvel
+            result[name] = {
+                "xpos": host.xpos[bid],
+                "xmat": host.xmat[bid].reshape(3, 3),
+                "xquat": host.xquat[bid],
+                "xvel": xvel,
+            }
+        return result
+
+    def query_site_pos_and_mat(self, site_names: list[str]) -> dict[str, dict]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        result: dict[str, dict] = {}
+        for name in site_names:
+            sid = self._site_id(name)
+            result[name] = {
+                "xpos": host.site_xpos[sid],
+                "xmat": host.site_xmat[sid].reshape(3, 3),
+            }
+        return result
+
+    def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        result: dict[str, np.ndarray] = {}
+        for name in site_names:
+            sid = self._site_id(name)
+            result[name] = self._solver.mj_model.site_size[sid]
+        return result
+
+    def _sensor_id(self, sensor_name: str) -> int:
+        """解析传感器名称到 sensor_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, sensor_name
+        )
+
+    def _actuator_id(self, actuator_name: str) -> int:
+        """解析执行器名称到 actuator_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name
+        )
+
+    def _geom_id(self, geom_name: str) -> int:
+        """解析 geom 名称到 geom_id（内部辅助，无同步）。"""
+        return mujoco.mj_name2id(
+            self._solver.mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name
+        )
+
+    def query_sensor_data(
+        self, sensor_names: list[str], sensor_info: dict
+    ) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        host = self._solver.host
+        result: dict[str, np.ndarray] = {}
+        for name in sensor_names:
+            info = sensor_info.get(name) if sensor_info else None
+            if info is not None and "adr" in info and "dim" in info:
+                adr = int(info["adr"])
+                dim = int(info["dim"])
+            else:
+                sid = self._sensor_id(name)
+                adr = int(model.sensor_adr[sid])
+                dim = int(model.sensor_dim[sid])
+            result[name] = host.sensordata[adr:adr + dim]
+        return result
+
+    def query_actuator_torques(self, actuator_names: list[str]) -> dict[str, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        host = self._solver.host
+        result: dict[str, np.ndarray] = {}
+        for name in actuator_names:
+            aid = self._actuator_id(name)
+            adr = aid
+            dim = int(model.actuator_ctrlsz[aid]) if hasattr(
+                model, "actuator_ctrlsz"
+            ) else 1
+            result[name] = host.actuator_force[adr:adr + max(dim, 1)]
+        return result
+
+    def query_contact_simple(self) -> list[dict]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        contacts: list[dict] = []
+        ncon = host.ncon
+        for i in range(ncon):
+            con = host.contact[i]
+            contacts.append({
+                "geom1": int(con.geom1),
+                "geom2": int(con.geom2),
+                "dist": float(con.dist),
+                "pos": host.contact[i].pos,
+                "frame": host.contact[i].frame,
+            })
+        return contacts
+
+    def query_contact_force(self, contact_ids: list[int]) -> dict[int, np.ndarray]:
+        self._require_solver()
+        self._ensure_host_fresh()
+        result: dict[int, np.ndarray] = {}
+        for cid in contact_ids:
+            force = np.zeros(6)
+            mujoco.mj_contactForce(self._solver.mj_model, self._solver.host, cid, force)
+            result[cid] = force
+        return result
+
+    def get_cfrc_ext(self) -> np.ndarray:
+        self._require_solver()
+        self._ensure_host_fresh()
+        return self._solver.host.cfrc_ext
+
+    def get_goal_bounding_box(self, geom_name: str) -> np.ndarray:
+        self._require_solver()
+        self._ensure_host_fresh()
+        gid = self._geom_id(geom_name)
+        return self._solver.mj_model.geom_size[gid]
+
+    # ---- E 类：雅可比计算方法（E1 交付）----
+
+    def mj_jacBody(
+        self, jacp: np.ndarray, jacr: np.ndarray, body_id: int
+    ) -> None:
+        """计算 body 雅可比（mujoco.mj_jacBody，原地写 jacp/jacr）。"""
+        self._require_solver()
+        self._ensure_host_fresh()
+        mujoco.mj_jacBody(
+            self._solver.mj_model, self._solver.host, jacp, jacr, body_id
+        )
+
+    def mj_jacSite(
+        self, jacp: np.ndarray, jacr: np.ndarray, site_id: int
+    ) -> None:
+        """计算 site 雅可比（mujoco.mj_jacSite，原地写 jacp/jacr）。"""
+        self._require_solver()
+        self._ensure_host_fresh()
+        mujoco.mj_jacSite(
+            self._solver.mj_model, self._solver.host, jacp, jacr, site_id
+        )
+
+    def mj_jac_site(self, site_names: list[str]) -> dict[str, dict]:
+        """批量计算 site 雅可比（循环 mj_jacSite）。"""
+        self._require_solver()
+        self._ensure_host_fresh()
+        result: dict[str, dict] = {}
+        nv = self._solver.mj_model.nv
+        for site_name in site_names:
+            sid = self._site_id(site_name)
+            jacp = np.zeros((3, nv))
+            jacr = np.zeros((3, nv))
+            mujoco.mj_jacSite(
+                self._solver.mj_model, self._solver.host, jacp, jacr, sid
+            )
+            result[site_name] = {"jacp": jacp, "jacr": jacr}
+        return result
+
+    # ---- F 类：模型参数写入方法（F1 交付，P1 抛错）----
+
+    def _not_implemented_p2(self, method: str) -> None:
+        raise NotImplementedError(
+            f"MuJoCoSimCoreEuler.{method} 在 P1 未实现：Euler 后端修改模型常量 "
+            "需引入 override_model + mjf_model 重建（design §4.3 P2 策略）。"
+        )
+
+    def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
+        self._not_implemented_p2("set_geom_friction")
+
+    def add_extra_weight(self, weight_load_dict: dict) -> None:
+        self._not_implemented_p2("add_extra_weight")
+
+    def update_equality_constraints(self, eq_list: list[dict]) -> None:
+        self._not_implemented_p2("update_equality_constraints")
+
+    def modify_equality_objects(
+        self,
+        eq_ids: list[int],
+        obj1_ids=None,
+        obj2_ids=None,
+    ) -> None:
+        self._not_implemented_p2("modify_equality_objects")
+
+    def set_equality_active(self, eq_idx: int, active: bool) -> None:
+        self._not_implemented_p2("set_equality_active")
+
+    def set_equality_solref(self, eq_idx: int, solref: np.ndarray) -> None:
+        self._not_implemented_p2("set_equality_solref")
+
+    def set_equality_solimp(self, eq_idx: int, solimp: np.ndarray) -> None:
+        self._not_implemented_p2("set_equality_solimp")

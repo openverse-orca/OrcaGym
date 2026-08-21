@@ -17,7 +17,8 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 
 # Env 源码路径（用于 K4/K8/K9 源码审查测试）
 # __file__ = tests/orca_gym/environment/euler/test_*.py
@@ -55,7 +56,9 @@ def _exec_source_without_docstrings() -> str:
     return exec_source
 
 
-def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) -> OrcaGymEulerEnv:
+def _make_skeleton_env(
+    render_mode: str = "human", sync_render: bool = False, esdf_path: str | None = None
+) -> OrcaGymEulerEnv:
     """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
     # 测试 fixture 位于本仓 tests/orca_gym/environment/euler/fixtures/
     # __file__ = tests/orca_gym/environment/euler/test_*.py
@@ -70,6 +73,7 @@ def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) ->
         agent_names=["agent0"],
         time_step=0.002,
         model_xml_path=str(_pendulum_xml),
+        esdf_path=esdf_path,
         skip_grpc_load=True,
         render_mode=render_mode,
         sync_render=sync_render,
@@ -2060,6 +2064,88 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
         self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
         self.env._do_body_manipulation()
         self.assertIsNone(self.env._anchored_actor)
+
+
+class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
+    """Phase H: OrcaGymEulerEnv esdf_path 透传 + reset_simulation 调用 reset_coupling_state。"""
+
+    def test_esdf_path_stored_and_passed_to_init_simulation(self):
+        """构造时 esdf_path 存入 _esdf_path 并透传给 gym.init_simulation。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(self_, model_xml_path, esdf_path=None):
+            captured["model_xml_path"] = model_xml_path
+            captured["esdf_path"] = esdf_path
+            return await original_init(self_, model_xml_path, esdf_path)
+
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
+
+        self.assertEqual(env._esdf_path, "/tmp/dummy.esdf")
+        self.assertEqual(captured["esdf_path"], "/tmp/dummy.esdf")
+        self.assertTrue(captured["model_xml_path"].endswith("simple_pendulum.xml"))
+
+    def test_esdf_path_none_by_default(self):
+        """默认 esdf_path=None，透传 None（CPU 分支不回归）。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(self_, model_xml_path, esdf_path=None):
+            captured["esdf_path"] = esdf_path
+            return await original_init(self_, model_xml_path, esdf_path)
+
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = _make_skeleton_env()
+
+        self.assertIsNone(env._esdf_path)
+        self.assertIsNone(captured["esdf_path"])
+
+    def test_reset_simulation_calls_reset_coupling_state(self):
+        """reset_simulation 在 reset_data 后调用 gym.reset_coupling_state。"""
+        from unittest import mock
+
+        env = _make_skeleton_env()
+        with mock.patch.object(OrcaGymEuler, "reset_coupling_state") as m:
+            env.reset_simulation()
+        m.assert_called_once_with()
+
+
+class _FakeGymForBackend:
+    """最小 fake gym，仅为 _configure_backend 提供 sim_config。"""
+
+    def __init__(self) -> None:
+        self.sim_config = SimConfig()
+
+
+def _make_bare_env(device: str) -> OrcaGymEulerEnv:
+    """构造未走 __init__ 的 bare env，仅设置 _device/_gym 供 _configure_backend 测试。"""
+    env = object.__new__(OrcaGymEulerEnv)
+    env._device = device
+    env._gym = _FakeGymForBackend()
+    return env
+
+
+class TestEnvDeviceBackendSelection(unittest.TestCase):
+    """Phase I: --device 参数到后端选择的映射（cpu → MuJoCo，cuda* → Euler）。"""
+
+    def test_device_cpu_selects_mujoco_backend(self):
+        """--device cpu → backend=MUJOCO，device=cpu。"""
+        env = _make_bare_env("cpu")
+        env._configure_backend()
+        self.assertEqual(env._gym.sim_config.backend, SimBackend.MUJOCO)
+        self.assertEqual(env._gym.sim_config.device, "cpu")
+
+    def test_device_cuda_selects_euler_backend(self):
+        """--device cuda:0 → backend=EULER，device=cuda:0（不实际初始化 GPU）。"""
+        env = _make_bare_env("cuda:0")
+        env._configure_backend()
+        self.assertEqual(env._gym.sim_config.backend, SimBackend.EULER)
+        self.assertEqual(env._gym.sim_config.device, "cuda:0")
 
 
 if __name__ == "__main__":
