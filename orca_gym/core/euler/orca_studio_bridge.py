@@ -237,18 +237,17 @@ class OrcaStudioBridge:
         """
         if self._stub is None:
             return
-        if contacts is not None:
-            for con in contacts:
-                cs = request.contacts.add()
-                cs.pos.extend(con["pos"])
-                cs.force.extend(con["force"])
         request = mjc_message_pb2.UpdateLocalEnvRequest(
             qpos=qpos.tolist(),
             time=float(sim_time),
             simulate_index=simulate_index,
             request_idr=request_idr,
-            contacts=contacts,
         )
+        if contacts:
+            for con in contacts:
+                cs = request.contacts.add()
+                cs.pos.extend(con["pos"])
+                cs.force.extend(con["force"])
         response = await self._stub.UpdateLocalEnv(request)
         # 更新 override_ctrls 缓存
         self._override_ctrls.clear()

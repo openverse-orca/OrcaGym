@@ -420,16 +420,28 @@ class OrcaGymLocal(OrcaGymBase):
         """
         await self.update_local_env(self.data.qpos, self._mjData.time, simulate_index, request_idr, contacts=self._build_contact_data())
 
-    def _build_contact_data(self):
+    def _build_contact_data(self, bodys: list[int] | None = None):
+        """构建接触快照（pos+force 已转世界系），供 Studio 绘制。
+
+        Args:
+            bodys: body ID 列表。若给定，只构建 geom1/geom2 所属 body
+                在此列表中的接触；若为 None 或空，构建全部接触。
+        """
         data = self._mjData
         model = self._mjModel
         ncon = data.ncon
         if ncon == 0:
             return []
+        body_set = set(bodys) if bodys else None
         contacts = []
         force_buf = np.zeros(6, dtype=np.float64)
         for i in range(ncon):
             con = data.contact[i]
+            if body_set is not None:
+                b1 = int(model.geom_bodyid[con.geom1])
+                b2 = int(model.geom_bodyid[con.geom2])
+                if b1 not in body_set and b2 not in body_set:
+                    continue
             mujoco.mj_contactForce(model, data, i, force_buf)
             frame_mat = np.array(con.frame).reshape(3, 3, order='F')
             world_force = -(frame_mat.T @ force_buf[:3])
@@ -439,7 +451,7 @@ class OrcaGymLocal(OrcaGymBase):
             })
         return contacts
 
-    async def update_local_env(self, qpos, time, contacts=None):
+    async def update_local_env(self, qpos, time, simulate_index=-1, request_idr=False, contacts=None):
         """
         更新本地环境状态到服务器，并接收控制覆盖值
 
