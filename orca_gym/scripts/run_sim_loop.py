@@ -1,6 +1,6 @@
 import sys
 
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, Actor, LightInfo, CameraProperty, MaterialInfo
 from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 import numpy as np
 import orca_gym.utils.rotations as rotations
