@@ -1,4 +1,5 @@
 from os import path
+from concurrent.futures import Future
 from typing import Any, Dict, Optional, Tuple, Union, SupportsFloat
 
 import numpy as np
@@ -16,9 +17,14 @@ from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()
 
 from orca_gym import OrcaGymLocal
-from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub 
+from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.utils.rotations import mat2quat, quat2mat, quat_mul, quat2euler, euler2quat
-from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode
+from orca_gym.core.orca_gym_local import AnchorType, get_eq_type, CaptureMode, disable_actor_manipulator_collision
+from orca_gym.recorder import (
+    CreateVideoRecorderManager,
+    RemuxResult,
+    VideoRecorderManager,
+)
 
 from orca_gym import OrcaGymModel
 from orca_gym import OrcaGymData
@@ -61,7 +67,16 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # 用于同步渲染
         self._render_count_interval = self.realtime_step * render_fps
         self.render_count = 0
+        # 保存当前 render_fps，供 set_render_fps() 修改
+        self._render_fps = render_fps
         self._last_frame_index = -1
+
+        # 用于相机录制帧对齐的仿真步索引计数器
+        # -1 表示未启用（由服务端自增）；>= 0 时每次 render 递增
+        self._current_simulate_index = -1
+
+        # 相机录制管理器（惰性初始化，首次调用 save_streaming 时创建）
+        self._recorder_manager: VideoRecorderManager | None = None
 
         self.mj_forward()
 
@@ -95,6 +110,11 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             self._anchor_body_id = None
             self._anchor_dummy_body_id = None
             _logger.warning(f"Anchor body {self._anchor_body_name} not found in the model. Actor manipulation is disabled.")
+
+        # 确保任何加载路径下该代理都不参与物理碰撞（拖拽依赖 mocap weld，与接触无关）。
+        if self.gym is not None and hasattr(self.gym, "_mjModel"):
+            n = disable_actor_manipulator_collision(self.gym._mjModel)
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
 
     def initialize_simulation(
         self,
@@ -155,7 +175,20 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             await self.channel.close()
 
     def close(self):
-        """关闭环境，清理资源"""
+        """关闭环境，清理资源。
+
+        若有未完成的录制任务，自动保存为 MP4 后再关闭。
+        """
+        # 先保存未完成的录制任务
+        if self._recorder_manager is not None:
+            saved = self._recorder_manager.stop_all_and_save()
+            for cam_name, result in saved.items():
+                _logger.info(
+                    f"Auto-saved recording for camera '{cam_name}' "
+                    f"to {result.file_path}"
+                )
+            self._recorder_manager = None
+
         if self._skip_grpc_load:
             return
         self.loop.run_until_complete(self._close_grpc())
@@ -170,12 +203,40 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return await self.gym.get_body_manipulation_movement()
     
     def begin_save_video(self, file_path: str, capture_mode: CaptureMode = CaptureMode.ASYNC ):
+        """[Deprecated] 开始保存视频。
+
+        .. deprecated::
+            引擎侧 MP4 录制已废弃。请使用 ``save_streaming`` 进行客户端 PyAV
+            remux 录制。此方法现在为 no-op 并发出 ``DeprecationWarning``。
+        """
+        import warnings
+        warnings.warn(
+            "begin_save_video is deprecated. "
+            "Use save_streaming(camera_name, file_path, start_simulate_index, "
+            "end_simulate_index, color_port) for client-side PyAV remux recording.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.loop.run_until_complete(self._begin_save_video(file_path, capture_mode=capture_mode))
 
     async def _begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC ):
         return await self.gym.begin_save_video(file_path, capture_mode=capture_mode)
 
     def stop_save_video(self):
+        """[Deprecated] 停止保存视频。
+
+        .. deprecated::
+            引擎侧 MP4 录制已废弃。请使用 ``save_streaming``。
+            此方法现在为 no-op 并发出 ``DeprecationWarning``。
+        """
+        import warnings
+        warnings.warn(
+            "stop_save_video is deprecated. "
+            "Use save_streaming(camera_name, file_path, start_simulate_index, "
+            "end_simulate_index, color_port) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.loop.run_until_complete(self._stop_save_video())
 
     async def _stop_save_video(self):
@@ -214,6 +275,165 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     async def _get_frame_png(self, image_path):
         return await self.gym.get_frame_png(image_path)
+
+    # --- 相机属性查询/设置 + 推流状态机（转发到 VideoRecorderManager） ---
+
+    def set_video_recorder_manager(self, manager: VideoRecorderManager | None) -> None:
+        """注入 ``VideoRecorderManager`` 实例。
+
+        环境层相机属性查询/设置与录制统一转发到该管理器。为 ``None`` 时
+        后续首次调用相机/录制接口会由 ``CreateVideoRecorderManager`` 惰性创建。
+
+        Args:
+            manager: ``VideoRecorderManager`` 实例（可经
+                ``CreateVideoRecorderManager(self.stub)`` 创建）。
+        """
+        self._recorder_manager = manager
+
+    def get_recorder_manager(self) -> VideoRecorderManager:
+        """获取或惰性创建录制管理器（以 ``self.stub`` 为 gRPC 后端）。
+
+        调用方保证在单一线程中创建管理器，故无需加锁。以 ``self.loop`` 作为
+        事件循环桥接 stub 异步接口。相机属性/推流接口由 ``VideoRecorderManager``
+        基于 stub 直接实现（实际执行者）。
+
+        外部模块（如 OrcaManipulation 的 LeRobotDataStorage）可通过此方法
+        获取 manager，直接调用 ``submit_task`` / ``get_latest_frame_simulate_index``
+        等接口，避免在 env 层增加过多转发方法。
+        """
+        if self._recorder_manager is None:
+            self._recorder_manager = CreateVideoRecorderManager(self.stub, self.loop)
+        return self._recorder_manager
+
+    def get_camera_names(self) -> list[str]:
+        """获取所有已注册相机名称列表（转发到 VideoRecorderManager）。
+
+        Returns:
+            已注册相机名称列表。无后端时返回空列表。
+        """
+        return self.get_recorder_manager().get_camera_names()
+
+    def set_render_fps(self, fps: int) -> None:
+        """设置渲染帧率（render FPS）。
+
+        控制 ``render()`` 调用引擎渲染的频率：
+        - **同步渲染**（``sync_render=True``）：每隔 ``1/fps`` 个物理步渲染一帧
+        - **异步渲染**（``sync_render=False``）：每隔 ``1/fps`` 秒渲染一帧
+
+        同时更新 ``metadata['render_fps']``。
+
+        Args:
+            fps: 渲染帧率，必须 > 0。
+        """
+        if fps <= 0:
+            raise ValueError(f"fps must be > 0, got {fps}")
+        self._render_fps = fps
+        self.metadata["render_fps"] = fps
+        self._render_interval = 1.0 / fps
+        self._render_count_interval = self.realtime_step * fps
+
+    def set_sync_render(self, enabled: bool) -> None:
+        """设置是否启用同步渲染（开启后 ``render()`` 每物理步调用引擎渲染）。
+
+        用于相机录制帧对齐：启用录制时需每帧渲染并透传 ``simulate_index``，
+        因此应开启同步渲染（``enabled=True``）。
+
+        Args:
+            enabled: ``True`` 同步渲染（每 ``1/fps`` 个物理步渲染一帧）；
+                ``False`` 异步渲染（每 ``1/fps`` 秒渲染一帧）。
+        """
+        self._sync_render = bool(enabled)
+
+    # --- 相机串流与录制 API（基于客户端 PyAV remux） ---
+
+    def start_streaming(self, camera_name: str, **kwargs) -> None:
+        """开启指定相机的串流（含 color/depth 按传感器开关自动启动）。
+
+        内部委托 ``VideoRecorderManager.start_recorder``：查询相机属性确认
+       存在、按 ``kwargs`` 校验/同步属性（必要时停流重配）、开启推流，并根据
+        ``capture_rgb`` / ``capture_depth`` 启动对应的录制器。上层无需关心
+        Idle/Streaming 状态机。
+
+        Args:
+            camera_name: 相机名称（可通过 ``get_camera_names`` 枚举获取）。
+            **kwargs: 相机属性设置（如 ``capture_rgb`` / ``capture_depth`` /
+                ``color_port`` / ``depth_port`` / ``width`` / ``height`` /
+                ``near_clip`` / ``far_clip`` / ``gamma`` 等）以及 recorder
+                专属参数 ``max_buffer_frames``。未提供的键保留相机当前属性。
+
+        Raises:
+            ValueError: 相机不存在、未注册，或缺少有效端口。
+            ConnectionError: WebSocket 连接超时或失败。
+        """
+        self.get_recorder_manager().start_recorder(camera_name, **kwargs)
+
+    def save_streaming(
+        self,
+        camera_name: str,
+        camera_type: str,
+        file_path: str,
+        start_simulate_index: int,
+        end_simulate_index: int,
+    ) -> Future[RemuxResult]:
+        """保存指定相机 ``[start, end]`` 区间的视频流为 MP4。**非阻塞**。
+
+        需先调用 ``start_streaming`` 启动推流与录制器。本方法仅注册区间保存
+        任务，不重复启动录制器。内部默认前向截断到区间内第一个关键帧，
+        保证输出视频可正常播放。
+
+        Args:
+            camera_name: 相机名称。
+            camera_type: 流类型，``"color"`` 保存彩色流，``"depth"`` 保存深度流。
+            file_path: MP4 输出文件路径。
+            start_simulate_index: 区间起始（含），对应
+                ``render(simulate_index=...)`` 传入的值。
+            end_simulate_index: 区间结束（含）。
+
+        Returns:
+            ``Future[RemuxResult]``：保存完成后 ``future.result()`` 返回
+            ``RemuxResult``（file_path / frame_count / frame_indices /
+            timestamps_ns）。
+
+        Raises:
+            ValueError: 相机不存在或未启动对应类型的录制器。
+        """
+        manager = self.get_recorder_manager()
+        return manager.save_streaming(
+            camera_name=camera_name,
+            file_path=file_path,
+            start_simulate_index=start_simulate_index,
+            end_simulate_index=end_simulate_index,
+            stream_kind=camera_type,
+            truncate_to_keyframe=True,
+        )
+
+    def show_camera(
+        self,
+        camera_name: str,
+        camera_type: str = "color",
+        window_name: str | None = None,
+    ) -> None:
+        """实时展示指定相机的画面。**非阻塞**。
+
+        在独立子进程中建立 WebSocket 连接接收 H.264 码流、解码、用 matplotlib
+        显示，不影响仿真主线程、接收线程与保存线程。深度流直接显示原始
+        灰度帧，不做伪彩色转换。
+
+        需先调用 ``start_streaming`` 启动推流与录制器。
+
+        Args:
+            camera_name: 相机名称。
+            camera_type: 流类型，``"color"``（默认）或 ``"depth"``。
+            window_name: matplotlib 窗口标题；默认自动生成。
+
+        Raises:
+            ValueError: 相机未启动对应类型的录制器。
+        """
+        self.get_recorder_manager().start_viewer(
+            camera_name=camera_name,
+            window_name=window_name,
+            stream_kind=camera_type,
+        )
 
     def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
         return self.loop.run_until_complete(self._query_lidar_point_cloud(entity_name))
@@ -286,21 +506,55 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         else:
             return False
 
-    def render(self):
+    def render(self, simulate_index: int = -1, request_idr: bool = False):
+        """
+        渲染当前仿真状态到 OrcaSim 服务器。
+
+        将当前关节位置和仿真时间发送到服务器用于可视化。
+        同时处理场景视口交互（锚点操作）。
+
+        Args:
+            simulate_index: 物理仿真步索引，透传到引擎相机管线用于帧对齐。
+                ``-1``（默认）时使用 Env 内部自增计数器 ``_current_simulate_index``，
+                若计数器未启用（为 -1）则由服务端自增。
+                ``>= 0`` 时显式指定当前仿真步索引，同时更新内部计数器。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。录制段起点设 ``True`` 使该帧为关键帧，
+                配合 ``save_streaming`` 内部默认的前向截断使用。
+
+        使用示例:
+            ```python
+            # 向后兼容：不传 simulate_index，使用内部计数器
+            env.render()
+
+            # 显式传入仿真步索引（用于相机录制帧对齐）
+            env.render(simulate_index=100)
+
+            # 录制段起点请求 IDR（配合前向截断）
+            env.render(simulate_index=100, request_idr=True)
+            ```
+        """
         if self.render_mode not in ["human", "force"]:
             return
 
+        # 更新内部 simulate_index 计数器
+        if simulate_index >= 0:
+            self._current_simulate_index = simulate_index
+        elif self._current_simulate_index >= 0:
+            self._current_simulate_index += 1
+            simulate_index = self._current_simulate_index
+
         if self.sync_render:
             self.render_count += self._render_count_interval
-            if (self.render_count >= 1.0):
-                self.loop.run_until_complete(self.gym.render())
+            if (self.render_count >= 1.0 or request_idr):
+                self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
                 self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
                 self.render_count -= 1
         else:
             time_diff = time.perf_counter() - self._render_time_step
-            if (time_diff > self._render_interval):
+            if (time_diff > self._render_interval or request_idr):
                 self._render_time_step = time.perf_counter()
-                self.loop.run_until_complete(self.gym.render())
+                self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
                 self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
 
     def do_body_manipulation(self):

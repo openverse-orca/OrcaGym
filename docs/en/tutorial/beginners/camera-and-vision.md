@@ -227,19 +227,35 @@ Each camera's parameters can be configured in OrcaStudio:
 | RGB | Whether to output color image | `True` |
 | Depth | Whether to output depth image | `True` (when needed) |
 
-Configure on the Python side via `CameraSensorInfo`:
+Configure on the Python side via `CameraProperty`. The new interface uses a state machine:
+- `get_camera_names()` enumerates all registered camera names
+- `set_camera_properties` is only allowed in Idle state, used to set camera properties
+- `set_streaming_enabled(True)` enters Streaming state and ports start streaming
+- MP4 recording is controlled by the environment-layer `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` (client-side PyAV remux, non-blocking, returns a `Future`)
 
 ```python
-from orca_gym.scene.orca_gym_scene import CameraSensorInfo
+from orca_gym.scene.orca_gym_scene import CameraProperty
 
-# Configure sensor parameters for a specific camera
-camera_config = CameraSensorInfo(
+# 0. Enumerate all registered camera names
+camera_names = scene.get_camera_names()
+print(f"Found cameras: {camera_names}")
+
+# 1. Configure camera properties in Idle state (all fields optional, None means do not modify)
+camera_config = CameraProperty(
     capture_rgb=True,      # output RGB image
     capture_depth=True,    # output depth map
-    save_mp4_file=False,   # do not save to file
     use_dds=False,         # do not use DDS compression
 )
-scene.set_camera_sensor_info("camera_actor_name", camera_config)
+camera_name = camera_names[0]  # select the first camera
+scene.set_camera_properties(camera_name, camera_config)
+
+# 2. Start streaming (Idle -> Streaming, ports like 7070/7071 start listening and streaming)
+scene.set_streaming_enabled(camera_name, True)
+
+# 3. To modify properties, stop streaming first to return to Idle
+# scene.set_streaming_enabled(camera_name, False)
+# scene.set_camera_properties(camera_name, CameraProperty(width=1280, height=720))
+# scene.set_streaming_enabled(camera_name, True)
 ```
 
 ---

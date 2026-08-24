@@ -324,37 +324,71 @@ class OrcaGymEuler:
 
     # --- Studio 委托（骨架最小集）---
 
-    async def render(self) -> None:
+    async def render(self, simulate_index: int = -1, request_idr: bool = False) -> None:
         """渲染当前仿真状态到 OrcaStudio。
 
         从 DataView 读取 qpos/time（不直接触 _mjData），委托到 studio.render。
+        ``simulate_index`` 透传到 bridge 与相机管线，用于帧对齐；
+        ``-1`` 表示由服务端自增（向后兼容，默认值）。
+
+        Args:
+            simulate_index: 物理仿真步索引。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。
         """
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
-        await studio.render(view.qpos, view.time)
+        await studio.render(
+            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr
+        )
 
     async def pause_simulation(self) -> None:
         """通知 OrcaStudio 暂停仿真。"""
         await object.__getattribute__(self, "_studio").pause_simulation()
 
     # --- Studio 委托（阶段三 3.4.4，委托 _studio bridge）---
+    # 视频录制/帧捕获相关方法（begin_save_video / stop_save_video /
+    # get_current_frame / get_camera_time_stamp）所对应的引擎侧 RPC 已删除，
+    # bridge 层已降级为 no-op + DeprecationWarning。为保留向后兼容的调用链，
+    # 此处继续提供委托，调用时会触发 bridge 的 deprecation warning。
+    # 新代码请使用 OrcaGymEulerEnv.save_streaming 进行客户端 PyAV remux 录制。
 
     async def begin_save_video(self, file_path: str, capture_mode) -> None:
-        """开始录制视频（委托 bridge）。"""
+        """[Deprecated] 开始录制视频（委托 bridge）。
+
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除，bridge 层为 no-op。请使用
+            ``OrcaGymEulerEnv.save_streaming`` 进行客户端 PyAV remux 录制。
+        """
         await object.__getattribute__(self, "_studio").begin_save_video(
             file_path, capture_mode
         )
 
     async def stop_save_video(self) -> None:
-        """停止录制视频（委托 bridge）。"""
+        """[Deprecated] 停止录制视频（委托 bridge）。
+
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除，bridge 层为 no-op。请使用
+            ``OrcaGymEulerEnv.save_streaming``。
+        """
         await object.__getattribute__(self, "_studio").stop_save_video()
 
     async def get_current_frame(self) -> int:
-        """获取当前帧号（委托 bridge）。"""
+        """[Deprecated] 获取当前帧号（委托 bridge）。
+
+        .. deprecated::
+            引擎侧帧索引 RPC 已删除，bridge 层返回 -1。客户端录制通过
+            ``simulate_index`` 在 WebSocket 帧头中对齐。
+        """
         return await object.__getattribute__(self, "_studio").get_current_frame()
 
     async def get_camera_time_stamp(self, last_frame_index: int) -> dict:
-        """获取相机时间戳（委托 bridge）。"""
+        """[Deprecated] 获取相机时间戳（委托 bridge）。
+
+        .. deprecated::
+            引擎侧时间戳 RPC 已删除，bridge 层返回 ``{}``。客户端录制通过
+            WebSocket 帧头携带 uint64 timestamp 对齐。
+        """
         return await object.__getattribute__(
             self, "_studio"
         ).get_camera_time_stamp(last_frame_index)
@@ -362,35 +396,6 @@ class OrcaGymEuler:
     async def get_frame_png(self, image_path: str) -> None:
         """获取帧 PNG（委托 bridge）。"""
         await object.__getattribute__(self, "_studio").get_frame_png(image_path)
-
-    # --- 摄像头传感器激活（阶段四补遗，委托 _studio bridge）---
-
-    async def set_camera_sensor_info(
-        self,
-        actor_name: str,
-        capture_rgb: bool,
-        capture_depth: bool,
-        save_mp4_file: bool = False,
-        use_dds: bool = False,
-        **kwargs,
-    ) -> None:
-        """激活/配置摄像头传感器流（委托 bridge）。
-
-        Args:
-            actor_name: 摄像头所属 actor 名。
-            capture_rgb: 是否激活 RGB 视频流。
-            capture_depth: 是否激活深度视频流。
-            save_mp4_file: 是否同时保存 MP4 文件。
-            use_dds: 是否使用 DDS 传输。
-            **kwargs: 扩展 optional 参数（capture_normal/capture_object_color/
-                is_recording/use_nvenc/nvenc_gpu_index/random_object_color/
-                width/height/vertical_fov/near_clip/far_clip/gamma/
-                color_port/depth_port/dds_topic/dds_stream_id），
-                None 表示不修改现有值。
-        """
-        await object.__getattribute__(self, "_studio").set_camera_sensor_info(
-            actor_name, capture_rgb, capture_depth, save_mp4_file, use_dds, **kwargs
-        )
 
     async def make_camera_viewport_active(
         self, actor_name: str, entity_name: str
@@ -759,3 +764,15 @@ class OrcaGymEuler:
     def set_equality_solimp(self, eq_idx: int, solimp) -> None:
         """设置等式约束 solver impedance 参数（委托 SimCore）。"""
         object.__getattribute__(self, "_sim").set_equality_solimp(eq_idx, solimp)
+
+    # --- AR-001：拖拽代理碰撞掩码关闭（委托 SimCore，不暴露 _mjModel）---
+
+    def disable_actor_manipulator_collision(self) -> int:
+        """关闭 ActorManipulator 拖拽代理几何体的碰撞掩码（委托 SimCore）。
+
+        模型加载时（init_simulation）已自动执行；本方法供环境在需要时重断言。
+
+        Returns:
+            本次被修改的 geom 数量。
+        """
+        return object.__getattribute__(self, "_sim").disable_actor_manipulator_collision()

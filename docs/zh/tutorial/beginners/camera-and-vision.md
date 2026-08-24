@@ -227,22 +227,38 @@ print(f"可用视角: {list(views.keys())}")
 | RGB | 是否输出彩色图 | `True` |
 | Depth | 是否输出深度图 | `True`（需要时） |
 
-在 Python 侧通过 `CameraSensorInfo` 配置（需先创建 `OrcaGymScene` 实例）：
+在 Python 侧通过 `CameraProperty` 配置（需先创建 `OrcaGymScene` 实例）。新接口采用状态机：
+- `get_camera_names()` 枚举所有已注册相机名称
+- `set_camera_properties` 仅在 Idle 状态允许，用于设置相机属性
+- `set_streaming_enabled(True)` 进入 Streaming 状态后端口开始推流
+- MP4 录制由环境层的 `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` 控制（客户端 PyAV remux，非阻塞，返回 `Future`）
 
 ```python
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, CameraSensorInfo
+from orca_gym.scene.orca_gym_scene import OrcaGymScene, CameraProperty
 
 # 先创建场景管理器
 scene = OrcaGymScene(grpc_addr="localhost:50051")
 
-# 配置某个相机的传感器参数
-camera_config = CameraSensorInfo(
- capture_rgb=True, # 输出 RGB 图像
- capture_depth=True, # 输出深度图
- save_mp4_file=False, # 不保存到文件
- use_dds=False, # 不使用 DDS 压缩
+# 0. 枚举所有已注册相机名称
+camera_names = scene.get_camera_names()
+print(f"Found cameras: {camera_names}")
+
+# 1. 在 Idle 状态配置相机属性（所有字段 optional，None 表示不修改）
+camera_config = CameraProperty(
+    capture_rgb=True,      # 输出 RGB 图像
+    capture_depth=True,    # 输出深度图
+    use_dds=False,         # 不使用 DDS 压缩
 )
-scene.set_camera_sensor_info("camera_actor_name", camera_config)
+camera_name = camera_names[0]  # 选择第一个相机
+scene.set_camera_properties(camera_name, camera_config)
+
+# 2. 启动推流（Idle → Streaming，对应端口如 7070/7071 开始监听推流）
+scene.set_streaming_enabled(camera_name, True)
+
+# 3. 如需修改属性，先停止推流回到 Idle
+# scene.set_streaming_enabled(camera_name, False)
+# scene.set_camera_properties(camera_name, CameraProperty(width=1280, height=720))
+# scene.set_streaming_enabled(camera_name, True)
 ```
 
 ---
