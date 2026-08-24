@@ -220,6 +220,7 @@ class OrcaStudioBridge:
         sim_time: float,
         simulate_index: int = -1,
         request_idr: bool = False,
+        contacts: list[dict] | None = None,
     ) -> None:
         """渲染当前仿真状态到 OrcaStudio（依赖反转：接收 qpos/sim_time）。
 
@@ -242,6 +243,11 @@ class OrcaStudioBridge:
             simulate_index=simulate_index,
             request_idr=request_idr,
         )
+        if contacts:
+            for con in contacts:
+                cs = request.contacts.add()
+                cs.pos.extend(con["pos"])
+                cs.force.extend(con["force"])
         response = await self._stub.UpdateLocalEnv(request)
         # 更新 override_ctrls 缓存
         self._override_ctrls.clear()

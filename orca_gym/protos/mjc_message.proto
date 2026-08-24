@@ -1003,6 +1003,12 @@ message UpdateLocalEnvRequest{
     double time = 2;
     int32 simulate_index = 3;
     bool request_idr = 4;
+    repeated ContactSnapshot contacts = 5;  // 接触数据
+}
+
+message ContactSnapshot {
+    repeated double pos = 1;       // [x,y,z] 接触点世界坐标
+    repeated double force = 2;     // [fx,fy,fz] 世界系接触力
 }
 
 message UpdateLocalEnvResponse{

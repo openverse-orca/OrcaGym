@@ -274,8 +274,47 @@ class OrcaGymEuler:
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
         await studio.render(
-            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr
+            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr, contacts=self._build_contact_data()
         )
+
+    def _build_contact_data(self, bodys: list[int] | None = None) -> list[dict]:
+        """构建接触快照（pos+force 已转世界系），供 Studio 绘制。
+
+        Args:
+            bodys: body ID 列表。若给定，只构建 geom1/geom2 所属 body
+                在此列表中的接触；若为 None 或空，构建全部接触。
+        """
+        sim = object.__getattribute__(self, "_sim")
+        contacts_simple = sim.query_contact_simple()
+        if not contacts_simple:
+            return []
+
+        # 按 bodys 过滤（保留原始 contact index 供 query_contact_force 查询）
+        if bodys:
+            model = object.__getattribute__(sim, "_mjModel")
+            body_set = set(bodys)
+            indexed = [
+                (i, con) for i, con in enumerate(contacts_simple)
+                if int(model.geom_bodyid[con["geom1"]]) in body_set
+                or int(model.geom_bodyid[con["geom2"]]) in body_set
+            ]
+        else:
+            indexed = list(enumerate(contacts_simple))
+
+        if not indexed:
+            return []
+
+        contact_ids = [idx for idx, _ in indexed]
+        forces = sim.query_contact_force(contact_ids)
+        result: list[dict] = []
+        for orig_idx, con in indexed:
+            frame_mat = np.array(con["frame"]).reshape(3, 3, order='F')
+            world_force = -(frame_mat.T @ forces[orig_idx][:3])
+            result.append({
+                "pos": [float(con["pos"][0]), float(con["pos"][1]), float(con["pos"][2])],
+                "force": [float(world_force[0]), float(world_force[1]), float(world_force[2])],
+            })
+        return result
 
     async def pause_simulation(self) -> None:
         """通知 OrcaStudio 暂停仿真。"""
