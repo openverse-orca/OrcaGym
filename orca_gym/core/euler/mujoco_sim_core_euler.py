@@ -16,6 +16,8 @@ lazy 同步原语（_mark_dirty/_mark_stale/_commit_if_dirty/_ensure_host_fresh�
 
 from __future__ import annotations
 
+import warnings
+
 import mujoco
 import numpy as np
 
@@ -110,11 +112,38 @@ class MuJoCoSimCoreEuler:
                 "请确认已安装 orca.euler 且 SimConfig.backend = SimBackend.EULER。"
             ) from e
         self._solver = euler.SolverMujocoSingleWorld(
-            source=model_xml_path, device=device
+            source=self._prepare_model(model_xml_path), device=device
         )
         self._nworld = nworld
         self._host_dirty = False
         self._host_stale = False   # 构造后 host 与 GPU 均为初始态，视为 fresh
+
+    @staticmethod
+    def _prepare_model(model_xml_path: str) -> "mujoco.MjModel":
+        """加载 host MjModel 并降级 GPU 后端未支持的 no-slip 求解器。
+
+        mujoco_flow（fork 自 mujoco_warp 后端）上游未实现 no-slip 后处理，
+        ``put_model`` 对 ``noslip_iterations > 0`` 抛 ``NotImplementedError``。
+        因 OrcaGym 接入的 MJCF 由外部渲染端经 gRPC 提供（可能启用 no-slip），
+        此处清零 noslip_iterations 保证 GPU 后端可运行，代价是 GPU 结果与
+        CPU no-slip 配置存在近似差异。
+
+        Args:
+            model_xml_path: MuJoCo 模型 XML 文件路径。
+
+        Returns:
+            host MjModel（noslip_iterations 已按需清零）。
+        """
+        model = mujoco.MjModel.from_xml_path(model_xml_path)
+        if model.opt.noslip_iterations > 0:
+            warnings.warn(
+                f"GPU 后端不支持 no-slip 求解器，noslip_iterations 由 "
+                f"{model.opt.noslip_iterations} 降级为 0（模型: {model_xml_path}）。"
+                "GPU 物理结果与 CPU 的 no-slip 配置存在近似差异。",
+                stacklevel=2,
+            )
+            model.opt.noslip_iterations = 0
+        return model
 
     def reset_data(self) -> None:
         self._require_solver()
@@ -138,6 +167,14 @@ class MuJoCoSimCoreEuler:
         self._require_solver()
         self._ensure_host_fresh()      # D2H：世界 0（nworld=1）
         view._sync_from_mjdata(self._solver.host, self._solver.mj_model)  # noqa: SLF001
+        # --- 临时诊断：打印 GPU 同步的 qpos，与 CPU 后端对比渲染差异 ---
+        _q = np.asarray(self._solver.host.qpos, dtype=np.float64)
+        _max = float(np.max(np.abs(_q))) if _q.size else 0.0
+        print(
+            f"[GPU sync_to_view] t={self._solver.host.time:.4f} nq={_q.size} "
+            f"finite={bool(np.isfinite(_q).all())} max|qpos|={_max:.4g} "
+            f"qpos={np.round(_q, 4).tolist()}"
+        )
 
     # ---- B 类：状态写入方法（C2 交付）----
 

@@ -9,8 +9,10 @@ _mark_dirty/_commit_if_dirty（H2D 合并）、_mark_stale/_ensure_host_fresh（
 """
 
 import os
+import tempfile
 import types
 import unittest
+import warnings
 
 import mujoco
 import numpy as np
@@ -24,6 +26,19 @@ _G1_XML = os.path.abspath(os.path.join(
     os.path.dirname(__file__),
     "..", "..", "environment", "euler", "fixtures", "g1_29dof_camera_simplified.xml",
 ))
+
+
+# 最小单摆模型，含 noslip_iterations=3（用于验收 _prepare_model 降级）
+_NOSLIP_XML = """<mujoco>
+  <option timestep="0.002" noslip_iterations="3"/>
+  <worldbody>
+    <body>
+      <joint type="hinge"/>
+      <geom size="0.1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
 
 
 def _make_fake_mj_model() -> types.SimpleNamespace:
@@ -597,6 +612,45 @@ class TestModelWriteMethods(unittest.TestCase):
                 msg = str(ctx.exception)
                 self.assertIn(method, msg)
                 self.assertIn("P2", msg)
+
+
+class TestPrepareModel(unittest.TestCase):
+    """_prepare_model 降级 no-slip 求解器（GPU 后端上游未实现）。"""
+
+    def test_downgrades_noslip_iterations_with_warning(self):
+        """noslip_iterations>0 时清零并发出 warning。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertEqual(model.opt.noslip_iterations, 0)
+            self.assertTrue(
+                any("no-slip" in str(w.message) for w in caught)
+            )
+        finally:
+            os.remove(path)
+
+    def test_keeps_zero_noslip_without_warning(self):
+        """noslip_iterations=0 时保持 0 且不告警。"""
+        xml_no_noslip = _NOSLIP_XML.replace(' noslip_iterations="3"', "")
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(xml_no_noslip)
+            path = f.name
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertEqual(model.opt.noslip_iterations, 0)
+            self.assertEqual(len(caught), 0)
+        finally:
+            os.remove(path)
 
 
 if __name__ == "__main__":

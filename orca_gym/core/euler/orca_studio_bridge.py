@@ -14,12 +14,17 @@ import os
 import re
 import shutil
 import tempfile
+import warnings
 import xml.etree.ElementTree as ET
 
 import numpy as np
 
 from orca_gym.protos import mjc_message_pb2
 from orca_gym.utils.dir_utils import file_lock
+
+# qpos 幅值告警阈值。合法场景可能含远距离自由体（如 ActorManipulator 置于 -1000），
+# 因此阈值设得足够大，仅用于捕获明显的发散/偏移。
+_QPOS_MAGNITUDE_WARN_THRESHOLD = 1e6
 
 
 class AnchorType:
@@ -224,6 +229,24 @@ class OrcaStudioBridge:
         """
         if self._stub is None:
             return
+
+        qpos = np.asarray(qpos, dtype=np.float64)
+        if qpos.size and not np.isfinite(qpos).all():
+            non_finite = np.flatnonzero(~np.isfinite(qpos))
+            warnings.warn(
+                "渲染时 qpos 含非有限值（NaN/Inf），box 消失由数值发散导致："
+                f"非有限索引={non_finite.tolist()} 值={qpos[non_finite].tolist()}",
+                stacklevel=2,
+            )
+        elif qpos.size:
+            abs_max = float(np.max(np.abs(qpos)))
+            if abs_max > _QPOS_MAGNITUDE_WARN_THRESHOLD:
+                warnings.warn(
+                    f"渲染时 qpos 幅值过大（max|qpos|={abs_max:g}），"
+                    "box 可能已偏移出可视范围（有限但位置异常）",
+                    stacklevel=2,
+                )
+
         request = mjc_message_pb2.UpdateLocalEnvRequest(
             qpos=qpos.tolist(), time=float(sim_time)
         )
