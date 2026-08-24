@@ -21,6 +21,79 @@ import warnings
 import mujoco
 import numpy as np
 
+# ActorManipulator 拖拽代理（mocap anchor + 极轻 dummy 自由体）的地面安全停放高度。
+_ACTOR_MANIPULATOR_SAFE_HEIGHT = 0.5  # m
+
+
+def _actor_manipulator_body_ids(model: mujoco.MjModel) -> tuple[int, int]:
+    """返回拖拽代理的 (anchor_id, dummy_id)，不存在则 (-1, -1)。
+
+    匹配新旧两套命名：旧版 ``ActorManipulator_{Anchor,dummy}``，新版 UUID 化的
+    ``ORCA_MANIPULATOR_<uuid>_{Anchor,dummy}``。
+    """
+    anchor_id = -1
+    dummy_id = -1
+    for bid in range(model.nbody):
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, bid)
+        if name is None:
+            continue
+        if name.startswith("ORCA_MANIPULATOR_") and name.endswith("_Anchor"):
+            anchor_id = bid
+        elif name.startswith("ORCA_MANIPULATOR_") and name.endswith("_dummy"):
+            dummy_id = bid
+    if anchor_id < 0 or dummy_id < 0:
+        for bid in range(model.nbody):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, bid)
+            if name is None:
+                continue
+            if name == "ActorManipulator_Anchor":
+                anchor_id = bid
+            elif name == "ActorManipulator_dummy":
+                dummy_id = bid
+    return anchor_id, dummy_id
+
+
+def _park_actor_manipulator(model: mujoco.MjModel) -> int:
+    """把拖拽代理停放到地面以上并关闭其 geom 碰撞，返回处理数量（0/1）。
+
+    旧关卡导出的 ActorManipulator 代理被埋在 z=-1000（远低于 floor 平面 z=0），
+    dummy 自由体（质量 ~4e-6 kg）因此深深穿透 floor；接触反力与指向 anchor 的
+    软 weld 互相打架，在 GPU float32 下爆出 qacc ~1e6 并逐步累积为 NaN。
+    将 anchor/dummy 移到地面以上（保持 x,y，仅抬升 z），并关闭代理 geom 的碰撞
+    掩码（沿袭 CPU 版 AR-001），从根上消除接触与穿透。
+
+    Args:
+        model: 已加载的 host MjModel（就地修改）。
+
+    Returns:
+        处理的拖拽代理数量（0 或 1）。
+    """
+    anchor_id, dummy_id = _actor_manipulator_body_ids(model)
+    if anchor_id < 0 or dummy_id < 0:
+        return 0
+
+    # 关闭代理 geom 碰撞掩码：拖拽只依赖 mocap weld，与接触无关。
+    for bid in (anchor_id, dummy_id):
+        for gid in range(model.ngeom):
+            if model.geom_bodyid[gid] == bid:
+                model.geom_contype[gid] = 0
+                model.geom_conaffinity[gid] = 0
+
+    # 若停放在地面以下，则抬升到地面以上（保持 x,y，仅改 z）。
+    x = float(model.body_pos[anchor_id][0])
+    y = float(model.body_pos[anchor_id][1])
+    z = float(model.body_pos[anchor_id][2])
+    if z < 0.0:
+        target = np.array([x, y, _ACTOR_MANIPULATOR_SAFE_HEIGHT], dtype=np.float64)
+        # mocap anchor：body_pos 决定 reset 后的 mocap_pos。
+        model.body_pos[anchor_id] = target
+        # dummy 自由体：改 free joint 的初始位置（运行时位置来自 qpos0）。
+        dummy_jnt = int(model.body_jntadr[dummy_id])
+        if dummy_jnt >= 0:
+            qadr = int(model.jnt_qposadr[dummy_jnt])
+            model.qpos0[qadr:qadr + 3] = target
+    return 1
+
 
 class MuJoCoSimCoreEuler:
     """单世界编排层（nworld=1，对齐 design C3）。
@@ -120,19 +193,26 @@ class MuJoCoSimCoreEuler:
 
     @staticmethod
     def _prepare_model(model_xml_path: str) -> "mujoco.MjModel":
-        """加载 host MjModel 并降级 GPU 后端未支持的 no-slip 求解器。
+        """加载 host MjModel 并做 GPU 后端所需兼容性预处理。
 
-        mujoco_flow（fork 自 mujoco_warp 后端）上游未实现 no-slip 后处理，
-        ``put_model`` 对 ``noslip_iterations > 0`` 抛 ``NotImplementedError``。
-        因 OrcaGym 接入的 MJCF 由外部渲染端经 gRPC 提供（可能启用 no-slip），
-        此处清零 noslip_iterations 保证 GPU 后端可运行，代价是 GPU 结果与
-        CPU no-slip 配置存在近似差异。
+        两处预处理：
+
+        1. **降级 no-slip 求解器**：mujoco_flow（fork 自 mujoco_warp 后端）上游
+           未实现 no-slip 后处理，``put_model`` 对 ``noslip_iterations > 0`` 抛
+           ``NotImplementedError``。因 OrcaGym 接入的 MJCF 由外部渲染端经 gRPC
+           提供（可能启用 no-slip），此处清零 noslip_iterations 保证 GPU 后端可
+           运行，代价是 GPU 结果与 CPU no-slip 配置存在近似差异。
+
+        2. **停放 ActorManipulator 拖拽代理**：旧关卡导出的代理被埋在 z=-1000
+           （远低于 floor 平面），导致极轻 dummy 自由体穿透 floor、接触反力与软
+           weld 打架，在 float32 下爆出 qacc ~1e6 并累积为 NaN（见
+           ``_park_actor_manipulator``）。
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
 
         Returns:
-            host MjModel（noslip_iterations 已按需清零）。
+            host MjModel（已按需清零 noslip_iterations 并停放拖拽代理）。
         """
         model = mujoco.MjModel.from_xml_path(model_xml_path)
         if model.opt.noslip_iterations > 0:
@@ -143,6 +223,13 @@ class MuJoCoSimCoreEuler:
                 stacklevel=2,
             )
             model.opt.noslip_iterations = 0
+        if _park_actor_manipulator(model) > 0:
+            warnings.warn(
+                "检测到 ActorManipulator 拖拽代理（mocap anchor + dummy 自由体）"
+                "埋于地面以下，已将其停放到地面以上并关闭代理 geom 碰撞掩码，"
+                "以消除 GPU float32 下的数值发散。",
+                stacklevel=2,
+            )
         return model
 
     def reset_data(self) -> None:
@@ -167,14 +254,6 @@ class MuJoCoSimCoreEuler:
         self._require_solver()
         self._ensure_host_fresh()      # D2H：世界 0（nworld=1）
         view._sync_from_mjdata(self._solver.host, self._solver.mj_model)  # noqa: SLF001
-        # --- 临时诊断：打印 GPU 同步的 qpos，与 CPU 后端对比渲染差异 ---
-        _q = np.asarray(self._solver.host.qpos, dtype=np.float64)
-        _max = float(np.max(np.abs(_q))) if _q.size else 0.0
-        print(
-            f"[GPU sync_to_view] t={self._solver.host.time:.4f} nq={_q.size} "
-            f"finite={bool(np.isfinite(_q).all())} max|qpos|={_max:.4g} "
-            f"qpos={np.round(_q, 4).tolist()}"
-        )
 
     # ---- B 类：状态写入方法（C2 交付）----
 

@@ -199,8 +199,8 @@ class OrcaGymEuler:
                 "留待 P2 实现。"
             )
 
-        opt._bind(sim.mj_model)          # 绑 host MjModel
-        registry._bind(sim.mj_model)
+        opt._bind(sim.mj_model)              # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
+        registry._bind(sim.mj_model)         # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
         object.__setattr__(self, "_sim", sim)
         object.__setattr__(self, "_euler", None)   # P1 纯刚体，无 CouplingOrchestrator
 

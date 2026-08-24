@@ -154,14 +154,6 @@ class MuJoCoSimCore:
             view: 待填充的 OrcaGymDataView 实例。
         """
         view._sync_from_mjdata(self._mjData, self._mjModel)  # noqa: SLF001  core 层组件协作：SimCore 填充 DataView
-        # --- 临时诊断：打印 CPU 同步的 qpos，与 GPU 后端对比渲染差异 ---
-        _q = np.asarray(self._mjData.qpos, dtype=np.float64)
-        _max = float(np.max(np.abs(_q))) if _q.size else 0.0
-        print(
-            f"[CPU sync_to_view] t={self._mjData.time:.4f} nq={_q.size} "
-            f"finite={bool(np.isfinite(_q).all())} max|qpos|={_max:.4g} "
-            f"qpos={np.round(_q, 4).tolist()}"
-        )
 
     # --- 力应用方法（待完整 P4）---
 

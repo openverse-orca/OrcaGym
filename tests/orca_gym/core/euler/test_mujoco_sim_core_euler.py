@@ -17,7 +17,10 @@ import warnings
 import mujoco
 import numpy as np
 
-from orca_gym.core.euler.mujoco_sim_core_euler import MuJoCoSimCoreEuler
+from orca_gym.core.euler.mujoco_sim_core_euler import (
+    MuJoCoSimCoreEuler,
+    _actor_manipulator_body_ids,
+)
 
 
 # G1 模型 XML（Phase D 查询功能测试用，含 free joint + 29 hinge joint +
@@ -37,6 +40,27 @@ _NOSLIP_XML = """<mujoco>
       <geom size="0.1"/>
     </body>
   </worldbody>
+</mujoco>
+"""
+
+
+# 拖拽代理（mocap anchor + 极轻 dummy 自由体）埋于地面以下 + weld 约束，
+# 复刻旧关卡导出模型触发的 GPU float32 发散场景。{anchor}/{dummy} 用于切换新旧命名。
+_ACTOR_MANIPULATOR_XML_TMPL = """<mujoco>
+  <option gravity="0 0 -9.81" timestep="0.005"/>
+  <worldbody>
+    <geom type="plane" size="5 5 0.1"/>
+    <body pos="0 0 -1000" mocap="true" name="{anchor}">
+      <geom type="sphere" size="0.01" density="1000"/>
+    </body>
+    <body pos="0 0 -1000" name="{dummy}">
+      <geom type="sphere" size="0.01" density="1000"/>
+      <freejoint/>
+    </body>
+  </worldbody>
+  <equality>
+    <weld body1="{anchor}" body2="{dummy}" solref="0.02 1"/>
+  </equality>
 </mujoco>
 """
 
@@ -651,6 +675,65 @@ class TestPrepareModel(unittest.TestCase):
             self.assertEqual(len(caught), 0)
         finally:
             os.remove(path)
+
+
+class TestParkActorManipulator(unittest.TestCase):
+    """_prepare_model 停放 ActorManipulator 拖拽代理（消除 GPU float32 发散）。"""
+
+    def _prepare(self, anchor: str, dummy: str) -> mujoco.MjModel:
+        """用给定 (anchor, dummy) 命名渲染 XML 并走 _prepare_model。"""
+        xml = _ACTOR_MANIPULATOR_XML_TMPL.format(anchor=anchor, dummy=dummy)
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(xml)
+            path = f.name
+        try:
+            return MuJoCoSimCoreEuler._prepare_model(path)
+        finally:
+            os.remove(path)
+
+    def _assert_parked(self, model: mujoco.MjModel) -> None:
+        anchor_id, dummy_id = _actor_manipulator_body_ids(model)
+        self.assertGreaterEqual(anchor_id, 0)
+        self.assertGreaterEqual(dummy_id, 0)
+        # anchor（mocap）与 dummy（free body）均抬升到地面以上
+        self.assertAlmostEqual(float(model.body_pos[anchor_id][2]), 0.5)
+        dummy_jnt = int(model.body_jntadr[dummy_id])
+        qadr = int(model.jnt_qposadr[dummy_jnt])
+        self.assertAlmostEqual(float(model.qpos0[qadr + 2]), 0.5)
+        # 代理 geom 碰撞掩码被关闭
+        proxy = {anchor_id, dummy_id}
+        for gid in range(model.ngeom):
+            if int(model.geom_bodyid[gid]) in proxy:
+                self.assertEqual(model.geom_contype[gid], 0)
+                self.assertEqual(model.geom_conaffinity[gid], 0)
+
+    def test_parks_old_naming(self):
+        """旧版 ``ActorManipulator_{Anchor,dummy}`` 命名被识别并停放。"""
+        model = self._prepare("ActorManipulator_Anchor", "ActorManipulator_dummy")
+        self._assert_parked(model)
+
+    def test_parks_uuid_naming(self):
+        """新版 ``ORCA_MANIPULATOR_<uuid>_{Anchor,dummy}`` 命名被识别并停放。"""
+        model = self._prepare(
+            "ORCA_MANIPULATOR_ABC123_Anchor",
+            "ORCA_MANIPULATOR_ABC123_dummy",
+        )
+        self._assert_parked(model)
+
+    def test_no_proxy_returns_minus_one(self):
+        """无拖拽代理时返回 (-1, -1) 且不触发停放。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path)
+        finally:
+            os.remove(path)
+        self.assertEqual(_actor_manipulator_body_ids(model), (-1, -1))
 
 
 if __name__ == "__main__":
