@@ -17,6 +17,7 @@ import warnings
 import mujoco
 import numpy as np
 
+from orca.euler import ModelChangedFlags
 from orca_gym.core.euler.mujoco_sim_core_euler import (
     MuJoCoSimCoreEuler,
     _actor_manipulator_body_ids,
@@ -614,28 +615,96 @@ class TestJacMethods(unittest.TestCase):
         self.assertEqual(result["xvel"].shape, (3,))
 
 
+def _make_equality_model():
+    """带 1 body + 1 geom + 1 equality 的最小模型（weld world↔b1）。"""
+    xml = """
+    <mujoco>
+      <worldbody>
+        <geom name="g0" type="sphere" size="0.1"/>
+        <body name="b1" pos="0 0 0.1"/>
+      </worldbody>
+      <equality>
+        <weld name="e0" body1="world" body2="b1"/>
+      </equality>
+    </mujoco>
+    """
+    return mujoco.MjModel.from_xml_string(xml)
+
+
+class RecordingSolver:
+    """记录 notify_model_changed 的 flags；提供真 mj_model。"""
+
+    def __init__(self, mj_model):
+        self.mj_model = mj_model
+        self.calls = []
+
+    def notify_model_changed(self, flags) -> None:
+        self.calls.append(flags)
+
+
 class TestModelWriteMethods(unittest.TestCase):
-    """F 类模型写入方法验收：统一抛 NotImplementedError 且信息含方法名 + P2。"""
+    """F 类方法真实实现验收：写 host mj_model + notify_model_changed(正确 flag)。"""
 
-    CASES = [
-        ("set_geom_friction", ({},)),
-        ("add_extra_weight", ({},)),
-        ("update_equality_constraints", ([],)),
-        ("modify_equality_objects", ([],)),
-        ("set_equality_active", (0, True)),
-        ("set_equality_solref", (0, np.zeros(2))),
-        ("set_equality_solimp", (0, np.zeros(1))),
-    ]
-
-    def test_all_f_methods_raise_not_implemented_with_method_name_and_p2(self):
+    def _core(self):
         core = MuJoCoSimCoreEuler()
-        for method, args in self.CASES:
-            with self.subTest(method=method):
-                with self.assertRaises(NotImplementedError) as ctx:
-                    getattr(core, method)(*args)
-                msg = str(ctx.exception)
-                self.assertIn(method, msg)
-                self.assertIn("P2", msg)
+        core._solver = RecordingSolver(_make_equality_model())
+        return core
+
+    def test_set_geom_friction_writes_host(self):
+        core = self._core()
+        core.set_geom_friction({"g0": np.array([1.1, 1.2, 1.3])})
+        np.testing.assert_allclose(
+            core._solver.mj_model.geom_friction[0], [1.1, 1.2, 1.3]
+        )
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.GEOM_FRICTION])
+
+    def test_add_extra_weight_writes_host_and_accumulates(self):
+        core = self._core()
+        base = core._solver.mj_model.body_mass[0]
+        core.add_extra_weight({"world": 2.5})
+        self.assertAlmostEqual(core._solver.mj_model.body_mass[0], base + 2.5)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.BODY_INERTIAL])
+
+    def test_update_equality_constraints_writes_slot(self):
+        core = self._core()
+        core.update_equality_constraints(
+            [{"obj1_id": 0, "obj2_id": 1, "type": mujoco.mjtEq.mjEQ_WELD,
+              "data": np.zeros(mujoco.mjNEQDATA)}]
+        )
+        self.assertEqual(core._solver.mj_model.eq_type[0], mujoco.mjtEq.mjEQ_WELD)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_update_equality_constraints_unmatched_raises(self):
+        core = self._core()
+        with self.assertRaises(ValueError):
+            core.update_equality_constraints(
+                [{"obj1_id": 99, "obj2_id": 99, "type": 0, "data": np.zeros(11)}]
+            )
+
+    def test_modify_equality_objects_writes_objs(self):
+        core = self._core()
+        core.modify_equality_objects([0], obj1_ids=[1], obj2_ids=[1])
+        self.assertEqual(core._solver.mj_model.eq_obj1id[0], 1)
+        self.assertEqual(core._solver.mj_model.eq_obj2id[0], 1)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_active(self):
+        core = self._core()
+        core.set_equality_active(0, False)
+        self.assertFalse(bool(core._solver.mj_model.eq_active0[0]))
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_solref(self):
+        core = self._core()
+        core.set_equality_solref(0, np.array([0.01, 0.9]))
+        np.testing.assert_allclose(core._solver.mj_model.eq_solref[0], [0.01, 0.9])
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_solimp(self):
+        core = self._core()
+        core.set_equality_solimp(0, np.arange(5, dtype=np.float64))
+        np.testing.assert_allclose(core._solver.mj_model.eq_solimp[0], np.arange(5))
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
 
 
 class TestPrepareModel(unittest.TestCase):
@@ -673,6 +742,32 @@ class TestPrepareModel(unittest.TestCase):
                 model = MuJoCoSimCoreEuler._prepare_model(path)
             self.assertEqual(model.opt.noslip_iterations, 0)
             self.assertEqual(len(caught), 0)
+        finally:
+            os.remove(path)
+
+    def test_timestep_override_applied_before_solver(self):
+        """timestep 非 None 时覆盖 model.opt.timestep（Euler 只读约束）。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path, timestep=0.001)
+            self.assertAlmostEqual(float(model.opt.timestep), 0.001)
+        finally:
+            os.remove(path)
+
+    def test_timestep_none_preserves_xml_default(self):
+        """timestep=None 时保留 XML 默认值（0.002）。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertAlmostEqual(float(model.opt.timestep), 0.002)
         finally:
             os.remove(path)
 

@@ -19,7 +19,6 @@ import types
 import unittest
 from unittest import mock
 
-import mujoco
 import numpy as np
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
@@ -658,8 +657,8 @@ class TestOrcaGymEulerEulerBackend(unittest.TestCase):
         captured = {}
 
         class FakeCore:
-            def init_simulation(self, model_xml_path, device="cuda", nworld=1):
-                captured["init_args"] = (model_xml_path, device, nworld)
+            def init_simulation(self, model_xml_path, device="cuda", nworld=1, timestep=None):
+                captured["init_args"] = (model_xml_path, device, nworld, timestep)
                 self.mj_model = fake_model
 
         fake_mod = types.ModuleType("orca_gym.core.euler.mujoco_sim_core_euler")
@@ -670,7 +669,7 @@ class TestOrcaGymEulerEulerBackend(unittest.TestCase):
         }):
             gym._init_euler_backend("dummy.xml", None)
 
-        self.assertEqual(captured["init_args"], ("dummy.xml", "cuda:0", 1))
+        self.assertEqual(captured["init_args"], ("dummy.xml", "cuda:0", 1, 0.002))
         sim = object.__getattribute__(gym, "_sim")
         self.assertIsInstance(sim, FakeCore)
         self.assertIs(sim.mj_model, fake_model)

@@ -245,8 +245,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.loop.run_until_complete(
             self._gym.init_simulation(model_xml_path, esdf_path=self._esdf_path)
         )
-        # 3. 应用缓存的 time_step（CPU 后端 _bind 后写 mj_model.opt；
-        #    Euler 后端 _bind 后禁改，跳过，时间步长由 XML/solver 决定）
+        # 3. 应用缓存的 time_step：
+        #    - CPU 后端：_bind 后写 mj_model.opt.timestep。
+        #    - Euler 后端：init_simulation 内部（_init_euler_backend）已在构造
+        #      求解器前将 SimConfig.timestep 下发到模型，无需（也无法）在此重复设置。
         if self._gym.sim_config.backend == SimBackend.MUJOCO:
             self._gym.sim_config.timestep = self._time_step
         # 4. 在线模式：同步时间步到远端 OrcaStudio
@@ -290,21 +292,26 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.init_qvel = self._gym.data.qvel.ravel().copy()
 
     def set_time_step(self, time_step: float) -> None:
-        """设置仿真时间步长（本地缓存 + 远端同步）。
+        """设置仿真时间步长 dt（本地缓存 + 远端同步）——用户配置物理步长的明确接口。
 
-        __init__ 在 initialize_simulation 前调用本方法，此时 SimConfig
-        未绑定 mjModel，缓存到 self._time_step，在 initialize_simulation
-        末尾重新设置。initialize_simulation 后调用时，本地立即生效，
-        在线模式同步到远端 OrcaStudio。
+        时序约定（重要）：
+        - **初始化前调用**（``__init__`` 在 ``initialize_simulation`` 前调用本方法）：
+          SimConfig 尚未绑定 mjModel，仅缓存到 ``self._time_step``，随后由
+          ``initialize_simulation`` 下发到求解器，Euler 后端据此在 solver 构造时
+          固化步长（Euler 步长初始化后只读）。
+        - **初始化后调用**：
+          - CPU(MUJOCO) 后端：直接写 ``mj_model.opt.timestep``，立即生效；
+          - Euler 后端：timestep 已固化只读，SimConfig setter 抛出 RuntimeError，
+            明确提示用户在初始化前（构造参数 ``time_step``）配置，不静默吞掉。
+
+        远端（在线模式）始终同步到 OrcaStudio。
         """
         self._time_step = time_step
         self.realtime_step = time_step * self.frame_skip
-        # 本地：若 Gym 已初始化（init_simulation 已执行），直接设置
+        # 本地：未绑定时 setter 仅缓存 _timestep（不抛错）；绑定后按后端
+        # 应用（MUJOCO 立即生效；EULER 只读，setter 抛 RuntimeError）。
         if hasattr(self, "_gym") and self._gym is not None:
-            try:
-                self._gym.sim_config.timestep = time_step
-            except RuntimeError:
-                pass   # SimConfig 未绑定，缓存待 init_simulation
+            self._gym.sim_config.timestep = time_step
         # 远端：在线模式同步到 OrcaStudio
         if not self._skip_grpc_load and hasattr(self, "_studio_bridge"):
             self._studio_bridge.set_timestep_remote(time_step)

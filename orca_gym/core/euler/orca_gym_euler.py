@@ -175,6 +175,11 @@ class OrcaGymEuler:
     def _init_euler_backend(self, model_xml_path: str, esdf_path: str | None) -> None:
         """按 Euler 后端初始化：构造 MuJoCoSimCoreEuler 并绑定 host MjModel。
 
+        用户配置的物理时间步长（``SimConfig.timestep``，由 Env 层
+        ``set_time_step``/构造参数同步写入）在构造求解器前下发到
+        MuJoCoSimCoreEuler.init_simulation，确保 Euler 后端物理步长
+        与用户设置一致（Euler 后端初始化后 timestep 只读）。
+
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
             esdf_path: ESDF 场文件路径（P1 忽略）。
@@ -192,7 +197,12 @@ class OrcaGymEuler:
 
         if opt.nworld == 1:
             sim = MuJoCoSimCoreEuler()
-            sim.init_simulation(model_xml_path, device=opt.device, nworld=opt.nworld)
+            sim.init_simulation(
+                model_xml_path,
+                device=opt.device,
+                nworld=opt.nworld,
+                timestep=opt.timestep,
+            )
         else:
             raise NotImplementedError(
                 "P1 仅支持 nworld=1；多世界后端（MuJoCoSimCoreEulerMultiWorlds）"

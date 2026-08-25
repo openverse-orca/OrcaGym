@@ -16,6 +16,8 @@ lazy 同步原语（_mark_dirty/_mark_stale/_commit_if_dirty/_ensure_host_fresh�
 
 from __future__ import annotations
 
+import os
+import time
 import warnings
 
 import mujoco
@@ -23,6 +25,12 @@ import numpy as np
 
 # ActorManipulator 拖拽代理（mocap anchor + 极轻 dummy 自由体）的地面安全停放高度。
 _ACTOR_MANIPULATOR_SAFE_HEIGHT = 0.5  # m
+
+# 性能计时诊断：设置环境变量 ORCA_EULER_PERF_LOG=1 启用，打印 H2D(flush)/
+# GPU(step)/D2H(sync_to_host)/view 四阶段累计耗时，用于定位 GPU 后端仿真
+# 不流畅的瓶颈（是否因频繁 D2H 同步导致）。默认关闭，不影响正常仿真路径。
+_PERF_LOG_ENABLED = os.environ.get("ORCA_EULER_PERF_LOG") in {"1", "true", "True", "yes"}
+_PERF_REPORT_EVERY = 500  # 每累计多少次 step()/同步后打印一次平均耗时
 
 
 def _actor_manipulator_body_ids(model: mujoco.MjModel) -> tuple[int, int]:
@@ -95,6 +103,13 @@ def _park_actor_manipulator(model: mujoco.MjModel) -> int:
     return 1
 
 
+def _model_changed_flags():
+    """惰性导入 ModelChangedFlags，保持顶层不硬依赖 orca.euler（CPU-only 可 import）。"""
+    from orca.euler import ModelChangedFlags  # noqa: PLC0415
+
+    return ModelChangedFlags
+
+
 class MuJoCoSimCoreEuler:
     """单世界编排层（nworld=1，对齐 design C3）。
 
@@ -121,6 +136,12 @@ class MuJoCoSimCoreEuler:
         self._nworld: int = 1
         self._host_dirty: bool = False
         self._host_stale: bool = True
+        if _PERF_LOG_ENABLED:
+            self._perf_flush = 0.0
+            self._perf_gpu = 0.0
+            self._perf_sync = 0.0
+            self._perf_view = 0.0
+            self._perf_count = 0
 
     # ---- lazy 同步原语（内部，B2 交付）----
 
@@ -171,7 +192,11 @@ class MuJoCoSimCoreEuler:
     # ---- A 类：生命周期方法（C1 交付）----
 
     def init_simulation(
-        self, model_xml_path: str, device: str = "cuda", nworld: int = 1
+        self,
+        model_xml_path: str,
+        device: str = "cuda",
+        nworld: int = 1,
+        timestep: float | None = None,
     ) -> None:
         if nworld != 1:
             raise NotImplementedError(
@@ -184,15 +209,25 @@ class MuJoCoSimCoreEuler:
                 "Euler 后端不可用：orca.euler 未安装。"
                 "请确认已安装 orca.euler 且 SimConfig.backend = SimBackend.EULER。"
             ) from e
+        model = self._prepare_model(model_xml_path, timestep)
+        # 缓冲区上限对齐 Warp 后端（orca_gym_warp.py：njmax≥2000、nconmax≥500）。
+        # G1 等复杂模型在零控瘫倒等场景下接触/约束数量远超 mujoco_flow 默认
+        # 启发式（nconmax≈48、njmax≈64），若沿用默认值会触发 broadphase /
+        # narrowphase / nefc 溢出：接触被截断 → 机器人穿透地面 → float32
+        # 数值发散（qpos 出现 NaN）。
+        njmax = max(model.njmax, 2000)
+        nconmax = max(model.nconmax, 500)
         self._solver = euler.SolverMujocoSingleWorld(
-            source=self._prepare_model(model_xml_path), device=device
+            source=model, device=device, nconmax=nconmax, njmax=njmax
         )
         self._nworld = nworld
         self._host_dirty = False
         self._host_stale = False   # 构造后 host 与 GPU 均为初始态，视为 fresh
 
     @staticmethod
-    def _prepare_model(model_xml_path: str) -> "mujoco.MjModel":
+    def _prepare_model(
+        model_xml_path: str, timestep: float | None = None
+    ) -> "mujoco.MjModel":
         """加载 host MjModel 并做 GPU 后端所需兼容性预处理。
 
         两处预处理：
@@ -210,11 +245,16 @@ class MuJoCoSimCoreEuler:
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
+            timestep: 用户指定的物理时间步长（秒）。None 时保留 XML 默认值；
+                非 None 时在构造求解器前覆盖 ``model.opt.timestep``（Euler
+                后端初始化后 timestep 只读，故必须在此处生效）。
 
         Returns:
             host MjModel（已按需清零 noslip_iterations 并停放拖拽代理）。
         """
         model = mujoco.MjModel.from_xml_path(model_xml_path)
+        if timestep is not None:
+            model.opt.timestep = timestep
         if model.opt.noslip_iterations > 0:
             warnings.warn(
                 f"GPU 后端不支持 no-slip 求解器，noslip_iterations 由 "
@@ -240,8 +280,16 @@ class MuJoCoSimCoreEuler:
 
     def step(self, nstep: int) -> None:
         self._require_solver()
+        if _PERF_LOG_ENABLED:
+            t0 = time.perf_counter()
         self._commit_if_dirty()    # H2D：让写操作进入 step 前生效
+        if _PERF_LOG_ENABLED:
+            t1 = time.perf_counter()
         self._solver.step(nstep)
+        if _PERF_LOG_ENABLED:
+            self._perf_flush += t1 - t0
+            self._perf_gpu += time.perf_counter() - t1
+            self._perf_count += 1
         self._mark_stale()         # 步进后 host 过期
 
     def forward(self) -> None:
@@ -252,8 +300,31 @@ class MuJoCoSimCoreEuler:
 
     def sync_to_view(self, view) -> None:
         self._require_solver()
+        if _PERF_LOG_ENABLED:
+            t0 = time.perf_counter()
         self._ensure_host_fresh()      # D2H：世界 0（nworld=1）
+        if _PERF_LOG_ENABLED:
+            t1 = time.perf_counter()
+            self._perf_sync += t1 - t0
         view._sync_from_mjdata(self._solver.host, self._solver.mj_model)  # noqa: SLF001
+        if _PERF_LOG_ENABLED:
+            self._perf_view += time.perf_counter() - t1
+            if self._perf_count > 0 and self._perf_count % _PERF_REPORT_EVERY == 0:
+                self._perf_report()
+                self._perf_flush = self._perf_gpu = self._perf_sync = self._perf_view = 0.0
+                self._perf_count = 0
+
+    def _perf_report(self) -> None:
+        """打印最近一个统计窗口内各阶段平均耗时（仅 ORCA_EULER_PERF_LOG=1 时调用）。"""
+        n = self._perf_count
+        print(
+            f"[Euler perf] 最近 {n} 次 step/sync 平均: "
+            f"flush(H2D)={self._perf_flush / n * 1e3:.3f}ms  "
+            f"step(GPU)={self._perf_gpu / n * 1e3:.3f}ms  "
+            f"sync(D2H)={self._perf_sync / n * 1e3:.3f}ms  "
+            f"view={self._perf_view / n * 1e3:.3f}ms",
+            flush=True,
+        )
 
     # ---- B 类：状态写入方法（C2 交付）----
 
@@ -642,22 +713,56 @@ class MuJoCoSimCoreEuler:
             result[site_name] = {"jacp": jacp, "jacr": jacr}
         return result
 
-    # ---- F 类：模型参数写入方法（F1 交付，P1 抛错）----
-
-    def _not_implemented_p2(self, method: str) -> None:
-        raise NotImplementedError(
-            f"MuJoCoSimCoreEuler.{method} 在 P1 未实现：Euler 后端修改模型常量 "
-            "需引入 override_model + mjf_model 重建（design §4.3 P2 策略）。"
-        )
+    # ---- F 类：模型参数写入方法（P2 真实实现：写 host + notify）----
 
     def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
-        self._not_implemented_p2("set_geom_friction")
+        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。"""
+        self._require_solver()
+        model = self._solver.mj_model
+        for geom_name, friction in geom_friction_dict.items():
+            geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            model.geom_friction[geom_id] = np.asarray(
+                friction, dtype=np.float64
+            ).reshape(3)
+        # geom_friction 是叶子字段：仅 H2D 同步，无派生量重算
+        self._solver.notify_model_changed(_model_changed_flags().GEOM_FRICTION)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        self._not_implemented_p2("add_extra_weight")
+        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。"""
+        self._require_solver()
+        model = self._solver.mj_model
+        for body_name, weight in weight_load_dict.items():
+            body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            model.body_mass[body_id] += float(weight)
+        # body_mass 影响 subtreemass/invweight0，走全量 set_const（BODY_INERTIAL）
+        self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
 
     def update_equality_constraints(self, eq_list: list[dict]) -> None:
-        self._not_implemented_p2("update_equality_constraints")
+        """更新等式约束（写 host mj_model.eq_*，set_const_0 重算 eq_data）。"""
+        self._require_solver()
+        model = self._solver.mj_model
+        for eq in eq_list:
+            obj1_id = eq["obj1_id"]
+            obj2_id = eq["obj2_id"]
+            matched = False
+            for i in range(model.neq):
+                if (int(model.eq_obj1id[i]) == obj1_id
+                        and int(model.eq_obj2id[i]) == obj2_id):
+                    model.eq_type[i] = eq["type"]
+                    if "new_obj1_id" in eq:
+                        model.eq_obj1id[i] = eq["new_obj1_id"]
+                    if "new_obj2_id" in eq:
+                        model.eq_obj2id[i] = eq["new_obj2_id"]
+                    model.eq_data[i] = eq["data"]
+                    matched = True
+                    break
+            if not matched:
+                raise ValueError(
+                    f"未找到 (obj1_id={obj1_id}, obj2_id={obj2_id}) "
+                    f"匹配的等式约束槽位，请检查 XML 中是否预定义了对应的 "
+                    f"<equality><weld/connect body1=... body2=.../></equality>"
+                )
+        self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
 
     def modify_equality_objects(
         self,
@@ -665,13 +770,30 @@ class MuJoCoSimCoreEuler:
         obj1_ids=None,
         obj2_ids=None,
     ) -> None:
-        self._not_implemented_p2("modify_equality_objects")
+        """修改等式约束关联对象（改 host mj_model.eq_obj1id/eq_obj2id）。"""
+        self._require_solver()
+        model = self._solver.mj_model
+        for i, eq_id in enumerate(eq_ids):
+            if obj1_ids is not None:
+                model.eq_obj1id[eq_id] = obj1_ids[i]
+            if obj2_ids is not None:
+                model.eq_obj2id[eq_id] = obj2_ids[i]
+        self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
 
     def set_equality_active(self, eq_idx: int, active: bool) -> None:
-        self._not_implemented_p2("set_equality_active")
+        """设置等式约束初始激活状态（写 host mj_model.eq_active0）。"""
+        self._require_solver()
+        self._solver.mj_model.eq_active0[eq_idx] = bool(active)
+        self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
 
     def set_equality_solref(self, eq_idx: int, solref: np.ndarray) -> None:
-        self._not_implemented_p2("set_equality_solref")
+        """设置等式约束 solver reference（写 host mj_model.eq_solref）。"""
+        self._require_solver()
+        self._solver.mj_model.eq_solref[eq_idx] = solref
+        self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
 
     def set_equality_solimp(self, eq_idx: int, solimp: np.ndarray) -> None:
-        self._not_implemented_p2("set_equality_solimp")
+        """设置等式约束 solver impedance（写 host mj_model.eq_solimp）。"""
+        self._require_solver()
+        self._solver.mj_model.eq_solimp[eq_idx] = solimp
+        self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
