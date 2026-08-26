@@ -383,6 +383,46 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """设置控制输入，委托 self._gym.set_ctrl()。"""
         self._gym.set_ctrl(ctrl)
 
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> Any:
+        """注册 device-side PD 控制器（GPU(Euler) 后端专属）。
+
+        SingleWorld 封装原则（design §3.8 / guide §3.3）：仅暴露参数化配置接口，
+        用户不接触任何 ``flow.*`` 对象；CPU(MUJOCO) 后端无 GPU 图捕获能力，直接抛错。
+
+        Args:
+            controller_type: 控制算法标识（P1 仅 "pd"）。
+            kp: 位置增益 (nu,)。
+            kd: 速度增益 (nu,)。
+            motor_limits: 力矩限幅 (nu,)。
+            joint_names: 被驱动关节名（与 ctrl 执行器顺序一致）。
+
+        Returns:
+            PidController 句柄（``update_target`` / ``set_gains``）。
+
+        Raises:
+            NotImplementedError: CPU(MUJOCO) 后端。
+        """
+        if self._gym.sim_config.backend != SimBackend.EULER:
+            raise NotImplementedError(
+                "register_pid_controller 仅 GPU(Euler) 后端可用；"
+                "CPU(MUJOCO) 后端请使用 host 逐子步闭环（step 模式 2）。"
+            )
+        return self._gym.register_pid_controller(
+            controller_type,
+            kp=kp,
+            kd=kd,
+            motor_limits=motor_limits,
+            joint_names=joint_names,
+        )
+
     # --- 状态设置（reset_model 必需）---
 
     def set_joint_qpos(self, qpos: np.ndarray) -> None:

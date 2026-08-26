@@ -22,6 +22,8 @@ OrcaGymModel。
     绕过拦截。
 """
 
+from typing import Any
+
 import numpy as np
 
 from orca_gym.core.euler.mujoco_sim_core import MuJoCoSimCore
@@ -277,6 +279,35 @@ class OrcaGymEuler:
     def reset_data(self) -> None:
         """重置 MjData 到初始状态。"""
         object.__getattribute__(self, "_sim").reset_data()
+
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> Any:
+        """注册 device-side PD 控制器（委托 _sim，仅 Euler GPU 后端可用）。
+
+        Args:
+            controller_type: 控制算法标识（P1 仅 "pd"）。
+            kp: 位置增益 (nu,)。
+            kd: 速度增益 (nu,)。
+            motor_limits: 力矩限幅 (nu,)。
+            joint_names: 被驱动关节名。
+
+        Returns:
+            PidController 句柄（``update_target`` / ``set_gains``）。
+        """
+        return object.__getattribute__(self, "_sim").register_pid_controller(
+            controller_type,
+            kp=kp,
+            kd=kd,
+            motor_limits=motor_limits,
+            joint_names=joint_names,
+        )
 
     # --- 状态同步 ---
 

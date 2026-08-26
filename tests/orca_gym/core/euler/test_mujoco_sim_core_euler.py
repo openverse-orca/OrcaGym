@@ -831,5 +831,139 @@ class TestParkActorManipulator(unittest.TestCase):
         self.assertEqual(_actor_manipulator_body_ids(model), (-1, -1))
 
 
+class TestRegisterPidControllerValidation(unittest.TestCase):
+    """register_pid_controller 参数校验（Phase D §8.2，CPU-only）。
+
+    校验路径在 GPU/flow 导入之前抛出，用 FakeSolver（无 orca.euler）即可验收；
+    覆盖 RuntimeError（未初始化）、NotImplementedError（非 pd）、
+    ValueError（空关节 / kp/kd/motor_limits 维度不一致）。
+    """
+
+    @staticmethod
+    def _pd_kwargs(nu: int = 3) -> dict:
+        return dict(
+            controller_type="pd",
+            kp=np.zeros(nu, dtype=np.float64),
+            kd=np.zeros(nu, dtype=np.float64),
+            motor_limits=np.ones(nu, dtype=np.float64),
+            joint_names=[f"j{i}" for i in range(nu)],
+        )
+
+    def test_uninitialized_solver_raises(self):
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(RuntimeError):
+            core.register_pid_controller(**self._pd_kwargs())
+
+    def test_unsupported_controller_type(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs()
+        kwargs["controller_type"] = "pid"
+        with self.assertRaises(NotImplementedError):
+            core.register_pid_controller(**kwargs)
+
+    def test_empty_joint_names_raises(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(
+                "pd",
+                kp=np.zeros(0),
+                kd=np.zeros(0),
+                motor_limits=np.zeros(0),
+                joint_names=[],
+            )
+
+    def test_kp_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["kp"] = np.zeros(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+    def test_kd_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["kd"] = np.zeros(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+    def test_motor_limits_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["motor_limits"] = np.ones(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+
+class _RecordingDeviceArray:
+    """记录 assign 调用的最小 flow.array 替身（PidController 仅依赖 duck-typed assign）。"""
+
+    def __init__(self) -> None:
+        self.assigned: list[np.ndarray] = []
+
+    def assign(self, value) -> None:
+        self.assigned.append(np.asarray(value))
+
+
+class TestPidControllerInterface(unittest.TestCase):
+    """PidController 公共接口（update_target/set_gains）验收（Phase D §8.2，CPU-only）。
+
+    用 duck-typed device array 替身（只实现 assign）验收纯 numpy 参数的
+    dtype/reshape 处理与赋值目标，不触及 GPU 或 flow.array 分配。PidController 从
+    ``orca_gym.core.euler.controller`` 惰性导入（该模块顶层 import orca.flow，
+    装饰 ``@flow.kernel`` 在 launch 前不编译，sandbox 内导入安全）。
+    """
+
+    @staticmethod
+    def _make(nu: int = 3):
+        from orca_gym.core.euler.controller import PidController
+
+        q_target = _RecordingDeviceArray()
+        kp = _RecordingDeviceArray()
+        kd = _RecordingDeviceArray()
+        motor_limit = _RecordingDeviceArray()
+        ctrl = PidController(
+            q_target_dev=q_target,
+            kp_dev=kp,
+            kd_dev=kd,
+            motor_limit_dev=motor_limit,
+        )
+        return ctrl, (q_target, kp, kd, motor_limit)
+
+    def test_update_target_reshapes_to_1_by_nu(self):
+        ctrl, (q_target, _, _, _) = self._make(nu=3)
+        ctrl.update_target(np.array([0.1, 0.2, 0.3]))
+        self.assertEqual(len(q_target.assigned), 1)
+        self.assertEqual(q_target.assigned[0].shape, (1, 3))
+
+    def test_update_target_converts_dtype(self):
+        ctrl, (q_target, _, _, _) = self._make(nu=2)
+        ctrl.update_target(np.array([0.5, -0.5]))
+        self.assertEqual(q_target.assigned[0].dtype, np.float32)
+
+    def test_set_gains_assigns_kp_kd_only(self):
+        ctrl, (q_target, kp, kd, motor_limit) = self._make(nu=2)
+        ctrl.set_gains(np.array([10.0, 20.0]), np.array([0.5, 0.6]))
+        self.assertEqual(len(kp.assigned), 1)
+        self.assertEqual(len(kd.assigned), 1)
+        # set_gains 内部以 float32 上载：0.6 经 float32 round-trip 有 1e-8 级误差，
+        # 故用 assert_allclose 而非 assert_array_equal。
+        np.testing.assert_allclose(kp.assigned[0], [10.0, 20.0])
+        np.testing.assert_allclose(kd.assigned[0], [0.5, 0.6])
+        # q_target 与 motor_limit 不被触碰
+        self.assertEqual(len(q_target.assigned), 0)
+        self.assertEqual(len(motor_limit.assigned), 0)
+
+    def test_set_gains_dtype_is_float32(self):
+        ctrl, (_, kp, kd, _) = self._make(nu=2)
+        ctrl.set_gains(np.array([1.0, 2.0]), np.array([0.1, 0.2]))
+        self.assertEqual(kp.assigned[0].dtype, np.float32)
+        self.assertEqual(kd.assigned[0].dtype, np.float32)
+
+
 if __name__ == "__main__":
     unittest.main()

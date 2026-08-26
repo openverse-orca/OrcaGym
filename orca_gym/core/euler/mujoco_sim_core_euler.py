@@ -19,17 +19,29 @@ from __future__ import annotations
 import os
 import time
 import warnings
+from typing import TYPE_CHECKING
 
 import mujoco
 import numpy as np
 
+if TYPE_CHECKING:
+    from orca_gym.core.euler.controller import PidController
+
 # ActorManipulator 拖拽代理（mocap anchor + 极轻 dummy 自由体）的地面安全停放高度。
 _ACTOR_MANIPULATOR_SAFE_HEIGHT = 0.5  # m
 
-# 性能计时诊断：设置环境变量 ORCA_EULER_PERF_LOG=1 启用，打印 H2D(flush)/
-# GPU(step)/D2H(sync_to_host)/view 四阶段累计耗时，用于定位 GPU 后端仿真
-# 不流畅的瓶颈（是否因频繁 D2H 同步导致）。默认关闭，不影响正常仿真路径。
-_PERF_LOG_ENABLED = os.environ.get("ORCA_EULER_PERF_LOG") in {"1", "true", "True", "yes"}
+
+def _perf_log_enabled() -> bool:
+    """是否启用 GPU 阶段性能计时（环境变量 ``ORCA_EULER_PERF_LOG=1``）。
+
+    打印 H2D(flush)/GPU(step)/D2H(sync_to_host)/view 四阶段累计耗时，用于定位
+    GPU 后端仿真不流畅的瓶颈（是否因频繁 D2H 同步导致）。默认关闭，不影响正常
+    仿真路径。改为运行时读取环境变量（而非导入时常量），使 ``query_api.py`` 等
+    脚本的 ``--perf-log`` 开关能在导入后动态启用。
+    """
+    return os.environ.get("ORCA_EULER_PERF_LOG") in {"1", "true", "True", "yes"}
+
+
 _PERF_REPORT_EVERY = 500  # 每累计多少次 step()/同步后打印一次平均耗时
 
 
@@ -136,12 +148,11 @@ class MuJoCoSimCoreEuler:
         self._nworld: int = 1
         self._host_dirty: bool = False
         self._host_stale: bool = True
-        if _PERF_LOG_ENABLED:
-            self._perf_flush = 0.0
-            self._perf_gpu = 0.0
-            self._perf_sync = 0.0
-            self._perf_view = 0.0
-            self._perf_count = 0
+        self._perf_flush = 0.0
+        self._perf_gpu = 0.0
+        self._perf_sync = 0.0
+        self._perf_view = 0.0
+        self._perf_count = 0
 
     # ---- lazy 同步原语（内部，B2 交付）----
 
@@ -280,13 +291,13 @@ class MuJoCoSimCoreEuler:
 
     def step(self, nstep: int) -> None:
         self._require_solver()
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             t0 = time.perf_counter()
         self._commit_if_dirty()    # H2D：让写操作进入 step 前生效
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             t1 = time.perf_counter()
         self._solver.step(nstep)
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             self._perf_flush += t1 - t0
             self._perf_gpu += time.perf_counter() - t1
             self._perf_count += 1
@@ -300,14 +311,14 @@ class MuJoCoSimCoreEuler:
 
     def sync_to_view(self, view) -> None:
         self._require_solver()
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             t0 = time.perf_counter()
         self._ensure_host_fresh()      # D2H：世界 0（nworld=1）
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             t1 = time.perf_counter()
             self._perf_sync += t1 - t0
         view._sync_from_mjdata(self._solver.host, self._solver.mj_model)  # noqa: SLF001
-        if _PERF_LOG_ENABLED:
+        if _perf_log_enabled():
             self._perf_view += time.perf_counter() - t1
             if self._perf_count > 0 and self._perf_count % _PERF_REPORT_EVERY == 0:
                 self._perf_report()
@@ -797,3 +808,89 @@ class MuJoCoSimCoreEuler:
         self._require_solver()
         self._solver.mj_model.eq_solimp[eq_idx] = solimp
         self._solver.notify_model_changed(_model_changed_flags().EQUALITY)
+
+    # ---- 新增：GPU-Native PD 控制器注册（P1，41 委托方法之外）----
+
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> "PidController":
+        """注册 device-side 闭环控制 kernel（P1 仅 ``controller_type="pd"``）。
+
+        SingleWorld 封装原则（design §3.8 / guide §3.3）：``@flow.kernel``、device buffer
+        与 ``set_pre_step_kernel`` 均在本编排层内部独立完成，用户只以
+        numpy/list/str 参数化配置，不接触任何 ``flow.*`` 对象。
+
+        Args:
+            controller_type: 控制算法标识，P1 仅支持 "pd"。
+            kp: 位置增益，形状 (nu,)。
+            kd: 速度增益，形状 (nu,)。
+            motor_limits: 力矩限幅，形状 (nu,)。
+            joint_names: 被驱动关节名（与 ctrl 执行器顺序一致），长度 nu。
+
+        Returns:
+            PidController 句柄（提供 ``update_target`` / ``set_gains``）。
+
+        Raises:
+            RuntimeError: 求解器未初始化（CPU 后端或未调用 init_simulation）。
+            NotImplementedError: ``controller_type`` 非 "pd"。
+            ValueError: ``kp``/``kd``/``motor_limits``/``joint_names`` 维度不一致。
+        """
+        self._require_solver()
+        if controller_type != "pd":
+            raise NotImplementedError(
+                f"P1 仅支持 controller_type='pd'，收到 {controller_type!r}。"
+                "自定义控制算法将在后续向控制算法目录追加预编译 kernel。"
+            )
+        nu = len(joint_names)
+        if nu == 0:
+            raise ValueError("joint_names 不能为空。")
+        for name, arr in (("kp", kp), ("kd", kd), ("motor_limits", motor_limits)):
+            if np.asarray(arr).shape != (nu,):
+                raise ValueError(
+                    f"{name} 形状需为 ({nu},)，收到 {np.asarray(arr).shape}。"
+                )
+
+        # GPU-only：惰性导入 flow 与控制算法目录（不污染 CPU-only 导入路径）
+        import orca.flow as flow
+
+        from orca_gym.core.euler.controller import PidController, pd_kernel
+
+        # 关节偏移运行时解析（不硬编码 7/6，见 guide §3.3.1）
+        qpos_offset = self.jnt_qposadr(joint_names[0])
+        qvel_offset = self.jnt_dofadr(joint_names[0])
+
+        with flow.ScopedDevice(self._solver.device):
+            q_target_dev = flow.array(
+                np.zeros((1, nu), dtype=np.float32), dtype=flow.float32
+            )
+            kp_dev = flow.array(np.asarray(kp, dtype=np.float32), dtype=flow.float32)
+            kd_dev = flow.array(np.asarray(kd, dtype=np.float32), dtype=flow.float32)
+            motor_limit_dev = flow.array(
+                np.asarray(motor_limits, dtype=np.float32), dtype=flow.float32
+            )
+
+        inputs = [
+            q_target_dev,
+            self._solver.mjf_data.qpos,
+            self._solver.mjf_data.qvel,
+            kp_dev,
+            kd_dev,
+            motor_limit_dev,
+            self._solver.mjf_data.ctrl,
+            qpos_offset,
+            qvel_offset,
+        ]
+        self._solver.set_pre_step_kernel(pd_kernel, dim=nu, inputs=inputs)
+
+        return PidController(
+            q_target_dev=q_target_dev,
+            kp_dev=kp_dev,
+            kd_dev=kd_dev,
+            motor_limit_dev=motor_limit_dev,
+        )
