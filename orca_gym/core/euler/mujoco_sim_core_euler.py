@@ -31,15 +31,23 @@ if TYPE_CHECKING:
 _ACTOR_MANIPULATOR_SAFE_HEIGHT = 0.5  # m
 
 
+_PERF_LOG_CACHED: bool | None = None
+
+
 def _perf_log_enabled() -> bool:
     """是否启用 GPU 阶段性能计时（环境变量 ``ORCA_EULER_PERF_LOG=1``）。
 
     打印 H2D(flush)/GPU(step)/D2H(sync_to_host)/view 四阶段累计耗时，用于定位
     GPU 后端仿真不流畅的瓶颈（是否因频繁 D2H 同步导致）。默认关闭，不影响正常
-    仿真路径。改为运行时读取环境变量（而非导入时常量），使 ``query_api.py`` 等
-    脚本的 ``--perf-log`` 开关能在导入后动态启用。
+    仿真路径。开关在首次调用时求值并缓存——此后热路径仅一次函数调用 + 布尔
+    判断，关闭时无环境变量查询/计时/打印，实测开销 ≈ 0。
+    ``query_api.py`` 的 ``--perf-log`` 在 main() 先设环境变量再构造 env
+    （首次 step 前生效），兼容此契约。
     """
-    return os.environ.get("ORCA_EULER_PERF_LOG") in {"1", "true", "True", "yes"}
+    global _PERF_LOG_CACHED
+    if _PERF_LOG_CACHED is None:
+        _PERF_LOG_CACHED = os.environ.get("ORCA_EULER_PERF_LOG") in {"1", "true", "True", "yes"}
+    return _PERF_LOG_CACHED
 
 
 _PERF_REPORT_EVERY = 500  # 每累计多少次 step()/同步后打印一次平均耗时
@@ -326,13 +334,18 @@ class MuJoCoSimCoreEuler:
                 self._perf_count = 0
 
     def _perf_report(self) -> None:
-        """打印最近一个统计窗口内各阶段平均耗时（仅 ORCA_EULER_PERF_LOG=1 时调用）。"""
+        """打印最近一个统计窗口内各阶段平均耗时（仅 ORCA_EULER_PERF_LOG=1 时调用）。
+
+        注意 step/sync 的异步语义：step() 只把 GPU 计算入队（launch 开销），
+        真实物理计算时间被 sync 的流同步吸收，故 sync(D2H) 含等待 GPU 计算。
+        需要把两者拆开时看 solver 侧 [PackedSync perf] 分段报告（同开关）。
+        """
         n = self._perf_count
         print(
             f"[Euler perf] 最近 {n} 次 step/sync 平均: "
             f"flush(H2D)={self._perf_flush / n * 1e3:.3f}ms  "
-            f"step(GPU)={self._perf_gpu / n * 1e3:.3f}ms  "
-            f"sync(D2H)={self._perf_sync / n * 1e3:.3f}ms  "
+            f"step(GPU入队)={self._perf_gpu / n * 1e3:.3f}ms  "
+            f"sync(D2H,含等待GPU计算)={self._perf_sync / n * 1e3:.3f}ms  "
             f"view={self._perf_view / n * 1e3:.3f}ms",
             flush=True,
         )
