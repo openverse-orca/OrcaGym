@@ -124,3 +124,5 @@ MUJOCO_LOG.TXT
 
 .pypirc
 dist-test/
+
+logs/

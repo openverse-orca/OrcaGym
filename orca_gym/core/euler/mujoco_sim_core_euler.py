@@ -415,10 +415,19 @@ class MuJoCoSimCoreEuler:
     # 且 _mjModel/_mjData 替换为 _solver.mj_model/_solver.host。
 
     def _joint_id(self, joint_name: str) -> int:
-        """解析关节名称到 joint_id（内部辅助，无同步）。"""
-        return mujoco.mj_name2id(
+        """解析关节名称到 joint_id（内部辅助，无同步）。
+
+        Raises:
+            ValueError: 关节名不存在于当前模型（mj_name2id 返回 -1 时若放行，
+                后续 jnt_qposadr[-1] 等负索引会静默取到末尾关节的地址，
+                导致 device PD 等按偏移访问的 kernel 读/写到错误关节）。
+        """
+        jid = mujoco.mj_name2id(
             self._solver.mj_model, mujoco.mjtObj.mjOBJ_JOINT, joint_name
         )
+        if jid < 0:
+            raise ValueError(f"joint not found in model: {joint_name!r}")
+        return jid
 
     def _joint_qpos_len(self, joint_id: int) -> int:
         """关节 qpos 长度（按类型：free=7, ball=4, hinge/slide=1）。"""
