@@ -196,6 +196,10 @@ class OrcaGymModel:
 
         self.nmocap = len(mocap_dict)
 
+    def get_mocap_dict(self):
+        """获取所有 mocap body 字典"""
+        return self._mocap_dict or {}
+
     def init_actuator_dict(self, actuator_dict):
         """
         初始化执行器字典，建立名称和ID的映射关系

@@ -143,7 +143,8 @@ class OrcaGymEuler:
         sim.init_simulation(model_xml_path)
         # 绑定 SimConfig/ModelRegistry 到真实 mjModel
         opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
-        registry._bind(sim._mjModel)      # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
+        # registry._bind(sim._mjModel)      # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
+        registry._bind(sim._mjModel, model_xml_path)  # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
         # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
         object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
         # 首次同步 DataView
