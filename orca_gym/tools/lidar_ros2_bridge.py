@@ -5,16 +5,19 @@ LiDAR ROS2 Bridge — 将 gRPC LiDAR 数据转换为 ROS2 消息发布
   /scan          — sensor_msgs/LaserScan (2D, 最低垂直层)
   /point_cloud   — sensor_msgs/PointCloud2 (3D, 含 intensity)
 
-依赖安装:
-  1. sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py ros-humble-std-msgs
-  2. conda create -n ros2_bridge python=3.10 -y
-  3. conda run -n ros2_bridge pip install numpy grpcio grpcio-tools protobuf
+依赖安装（按 Ubuntu 版本选择对应 ROS2 发行版）:
+  Ubuntu 24.04 (noble) — ROS2 Jazzy:
+    sudo apt install -y ros-jazzy-ros-base ros-jazzy-sensor-msgs ros-jazzy-sensor-msgs-py ros-jazzy-std-msgs ros-jazzy-rviz2
+    conda create -n ros2_bridge python=3.12 -y
+  Ubuntu 22.04 (jammy) — ROS2 Humble:
+    sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py ros-humble-std-msgs ros-humble-rviz2
+    conda create -n ros2_bridge python=3.10 -y
+  通用:
+    conda run -n ros2_bridge pip install numpy grpcio grpcio-tools protobuf
 
-用法:
-  source /opt/ros/humble/setup.bash
+用法（脚本启动时自动检测 /opt/ros/<distro> 下已安装的 ROS2 版本，无需手动指定路径）:
+  source /opt/ros/<distro>/setup.bash  # humble 或 jazzy
   conda activate ros2_bridge
-  export PYTHONPATH=/opt/ros/humble/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:$PYTHONPATH
-  export LD_LIBRARY_PATH=/opt/ros/humble/lib:$LD_LIBRARY_PATH
   python lidar_ros2_bridge.py --entity LiDAR --frame_id base_scan
 
 RViz2 查看:
@@ -27,15 +30,51 @@ RViz2 查看:
 import argparse
 import sys
 import os
+import glob
 import struct
 import time
 
-_ros2_root = "/opt/ros/humble"
-_ros2_py_path = f"{_ros2_root}/local/lib/python3.10/dist-packages:{_ros2_root}/lib/python3.10/site-packages"
-if _ros2_py_path not in os.environ.get("PYTHONPATH", ""):
-    os.environ["PYTHONPATH"] = _ros2_py_path + ":" + os.environ.get("PYTHONPATH", "")
-if _ros2_root + "/lib" not in os.environ.get("LD_LIBRARY_PATH", ""):
-    os.environ["LD_LIBRARY_PATH"] = _ros2_root + "/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
+
+def _detect_ros2_root():
+    """扫描 /opt/ros/ 下已安装的 ROS2 发行版，按字母序取首个有效安装。"""
+    for candidate in sorted(glob.glob("/opt/ros/*")):
+        if os.path.isfile(os.path.join(candidate, "setup.bash")):
+            return candidate
+    return None
+
+
+def _detect_py_version(ros2_root):
+    """从 ROS2 安装目录探测 Python 版本目录名（如 python3.12 / python3.10）。"""
+    for pattern in ("local/lib/python3.*", "lib/python3.*"):
+        matches = sorted(glob.glob(os.path.join(ros2_root, pattern)))
+        if matches:
+            return os.path.basename(matches[0])
+    # 兜底：使用当前解释器版本
+    return f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+
+_ros2_root = _detect_ros2_root()
+if _ros2_root:
+    _py_ver = _detect_py_version(_ros2_root)
+    # Jazzy 布局：lib/python3.12/site-packages（无 local/lib 分支）
+    # Humble 布局：local/lib/python3.10/dist-packages + lib/python3.10/site-packages
+    _py_candidates = [
+        f"{_ros2_root}/local/lib/{_py_ver}/dist-packages",
+        f"{_ros2_root}/lib/{_py_ver}/site-packages",
+    ]
+    _ros2_py_path = ":".join(p for p in _py_candidates if os.path.isdir(p))
+    _need_restart = False
+    if _ros2_py_path and _ros2_py_path not in os.environ.get("PYTHONPATH", ""):
+        os.environ["PYTHONPATH"] = _ros2_py_path + ":" + os.environ.get("PYTHONPATH", "")
+        _need_restart = True
+    if _ros2_root + "/lib" not in os.environ.get("LD_LIBRARY_PATH", ""):
+        os.environ["LD_LIBRARY_PATH"] = _ros2_root + "/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
+        _need_restart = True
+    # LD_LIBRARY_PATH 在进程启动时被 ld.so 缓存，运行时修改 os.environ 不影响当前进程的 dlopen。
+    # 通过 os.execv 重启自身，让新进程以正确的环境变量启动。
+    if _need_restart and "_ROS2_BRIDGE_RESTARTED" not in os.environ:
+        os.environ["_ROS2_BRIDGE_RESTARTED"] = "1"
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 import numpy as np
 import grpc
@@ -52,9 +91,10 @@ try:
     from sensor_msgs.msg import LaserScan, PointCloud2, PointField
     from std_msgs.msg import Header
 except ImportError:
-    print("[ERROR] ROS2 Python packages not found. Install with:")
-    print("  sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py")
-    print("  source /opt/ros/humble/setup.bash")
+    print("[ERROR] ROS2 Python packages not found.")
+    print("  Ubuntu 22.04 (jammy): sudo apt install -y ros-humble-ros-base ros-humble-sensor-msgs ros-humble-sensor-msgs-py ros-humble-std-msgs")
+    print("  Ubuntu 24.04 (noble): sudo apt install -y ros-jazzy-ros-base ros-jazzy-sensor-msgs ros-jazzy-sensor-msgs-py ros-jazzy-std-msgs")
+    print("  source /opt/ros/<distro>/setup.bash")
     sys.exit(1)
 
 
