@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 import time
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import mujoco
 import numpy as np
@@ -216,6 +216,7 @@ class MuJoCoSimCoreEuler:
         device: str = "cuda",
         nworld: int = 1,
         timestep: float | None = None,
+        opt_overrides: dict[str, Any] | None = None,
     ) -> None:
         if nworld != 1:
             raise NotImplementedError(
@@ -228,7 +229,7 @@ class MuJoCoSimCoreEuler:
                 "Euler 后端不可用：orca.euler 未安装。"
                 "请确认已安装 orca.euler 且 SimConfig.backend = SimBackend.EULER。"
             ) from e
-        model = self._prepare_model(model_xml_path, timestep)
+        model = self._prepare_model(model_xml_path, timestep, opt_overrides)
         # 缓冲区上限对齐 Warp 后端（orca_gym_warp.py：njmax≥2000、nconmax≥500）。
         # G1 等复杂模型在零控瘫倒等场景下接触/约束数量远超 mujoco_flow 默认
         # 启发式（nconmax≈48、njmax≈64），若沿用默认值会触发 broadphase /
@@ -245,11 +246,13 @@ class MuJoCoSimCoreEuler:
 
     @staticmethod
     def _prepare_model(
-        model_xml_path: str, timestep: float | None = None
+        model_xml_path: str,
+        timestep: float | None = None,
+        opt_overrides: dict[str, Any] | None = None,
     ) -> "mujoco.MjModel":
         """加载 host MjModel 并做 GPU 后端所需兼容性预处理。
 
-        两处预处理：
+        预处理内容：
 
         1. **降级 no-slip 求解器**：mujoco_flow（fork 自 mujoco_warp 后端）上游
            未实现 no-slip 后处理，``put_model`` 对 ``noslip_iterations > 0`` 抛
@@ -267,6 +270,10 @@ class MuJoCoSimCoreEuler:
             timestep: 用户指定的物理时间步长（秒）。None 时保留 XML 默认值；
                 非 None 时在构造求解器前覆盖 ``model.opt.timestep``（Euler
                 后端初始化后 timestep 只读，故必须在此处生效）。
+            opt_overrides: 构造期 opt 覆盖（Feature A）。键已在上游（Env
+                ``__init__``）经 ``validate_opt_overrides`` 校验，此处信任传入
+                （内部边界）。在求解器构造（put_model）前写入 host
+                ``model.opt``，确保 GPU 侧固化值为用户指定值。
 
         Returns:
             host MjModel（已按需清零 noslip_iterations 并停放拖拽代理）。
@@ -274,6 +281,11 @@ class MuJoCoSimCoreEuler:
         model = mujoco.MjModel.from_xml_path(model_xml_path)
         if timestep is not None:
             model.opt.timestep = timestep
+        # 构造期 opt 覆盖（Feature A）：在 solver 构造（put_model）前写入 host
+        # model.opt，确保 GPU 侧固化值为用户指定值。
+        if opt_overrides:
+            for key, value in opt_overrides.items():
+                setattr(model.opt, key, value)
         if model.opt.noslip_iterations > 0:
             warnings.warn(
                 f"GPU 后端不支持 no-slip 求解器，noslip_iterations 由 "

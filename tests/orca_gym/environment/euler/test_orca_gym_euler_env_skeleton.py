@@ -57,7 +57,10 @@ def _exec_source_without_docstrings() -> str:
 
 
 def _make_skeleton_env(
-    render_mode: str = "human", sync_render: bool = False, esdf_path: str | None = None
+    render_mode: str = "human",
+    sync_render: bool = False,
+    esdf_path: str | None = None,
+    sim_config_overrides: dict | None = None,
 ) -> OrcaGymEulerEnv:
     """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
     # 测试 fixture 位于本仓 tests/orca_gym/environment/euler/fixtures/
@@ -77,6 +80,7 @@ def _make_skeleton_env(
         skip_grpc_load=True,
         render_mode=render_mode,
         sync_render=sync_render,
+        sim_config_overrides=sim_config_overrides,
     )
 
 
@@ -2130,10 +2134,10 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         original_init = OrcaGymEuler.init_simulation
         captured: dict = {}
 
-        async def spy_init(self_, model_xml_path, esdf_path=None):
+        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
             captured["model_xml_path"] = model_xml_path
             captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path)
+            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
             env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
@@ -2149,9 +2153,9 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         original_init = OrcaGymEuler.init_simulation
         captured: dict = {}
 
-        async def spy_init(self_, model_xml_path, esdf_path=None):
+        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
             captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path)
+            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
             env = _make_skeleton_env()
@@ -2167,6 +2171,37 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         with mock.patch.object(OrcaGymEuler, "reset_coupling_state") as m:
             env.reset_simulation()
         m.assert_called_once_with()
+
+
+class TestSimConfigOverrides(unittest.TestCase):
+    """Feature A: sim_config_overrides 构造期下发（CPU 后端离线验证）。"""
+
+    def test_sim_config_overrides_applied_cpu(self):
+        """CPU 后端：构造完成后 getter 即返回覆盖值。"""
+        env = _make_skeleton_env(
+            sim_config_overrides={
+                "integrator": 0,                          # Euler
+                "gravity": np.array([0.0, 0.0, -1.62]),   # 月球重力
+                "iterations": 42,
+            }
+        )
+        self.assertEqual(env.sim_config.integrator, 0)
+        np.testing.assert_array_almost_equal(
+            env.sim_config.gravity, np.array([0.0, 0.0, -1.62])
+        )
+        self.assertEqual(env.sim_config.iterations, 42)
+        # timestep 走既有 time_step 通道，不受 overrides 影响
+        self.assertAlmostEqual(env.sim_config.timestep, 0.002)
+
+    def test_sim_config_overrides_timestep_key_rejected(self):
+        """timestep 键被拒绝（双通道隔离）。"""
+        with self.assertRaises(ValueError):
+            _make_skeleton_env(sim_config_overrides={"timestep": 0.01})
+
+    def test_sim_config_overrides_unknown_key_rejected(self):
+        """未知键被拒绝。"""
+        with self.assertRaises(ValueError):
+            _make_skeleton_env(sim_config_overrides={"foo": 1})
 
 
 class _FakeGymForBackend:

@@ -15,7 +15,11 @@ import unittest
 import mujoco
 import numpy as np
 
-from orca_gym.core.euler.sim_config import SimBackend, SimConfig
+from orca_gym.core.euler.sim_config import (
+    SimBackend,
+    SimConfig,
+    validate_opt_overrides,
+)
 
 
 # 测试用 XML 模型：单铰链倒立摆（timestep=0.002, integrator=RK4, gravity=0 0 -9.81）
@@ -312,6 +316,40 @@ class TestSimConfigEulerGuard(unittest.TestCase):
         config._bind(self.mj_model)
         config.timestep = 0.01  # 不应抛
         self.assertAlmostEqual(config.timestep, 0.01)
+
+
+class TestValidateOptOverrides(unittest.TestCase):
+    """Feature A: validate_opt_overrides 四象限行为（用户边界校验）。"""
+
+    def test_none_passes(self):
+        """None 直接通过。"""
+        validate_opt_overrides(None)
+
+    def test_empty_dict_passes(self):
+        """空 dict 直接通过。"""
+        validate_opt_overrides({})
+
+    def test_legal_dict_passes(self):
+        """合法键（integrator/gravity/iterations）通过。"""
+        validate_opt_overrides({
+            "integrator": 1,
+            "gravity": np.array([0.0, 0.0, -1.62]),
+            "iterations": 50,
+        })
+
+    def test_timestep_key_raises(self):
+        """timestep 键被拒绝（与 time_step 构造参数双通道冲突）。"""
+        with self.assertRaises(ValueError) as ctx:
+            validate_opt_overrides({"timestep": 0.01})
+        self.assertIn("time_step", str(ctx.exception))
+
+    def test_unknown_key_raises(self):
+        """未知键被拒绝，错误消息列出合法键。"""
+        with self.assertRaises(ValueError) as ctx:
+            validate_opt_overrides({"solver": 1})
+        self.assertIn("solver", str(ctx.exception))
+        for key in ("integrator", "gravity", "iterations"):
+            self.assertIn(key, str(ctx.exception))
 
 
 if __name__ == "__main__":

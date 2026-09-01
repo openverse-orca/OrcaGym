@@ -657,8 +657,9 @@ class TestOrcaGymEulerEulerBackend(unittest.TestCase):
         captured = {}
 
         class FakeCore:
-            def init_simulation(self, model_xml_path, device="cuda", nworld=1, timestep=None):
-                captured["init_args"] = (model_xml_path, device, nworld, timestep)
+            def init_simulation(self, model_xml_path, device="cuda", nworld=1,
+                                timestep=None, opt_overrides=None):
+                captured["init_args"] = (model_xml_path, device, nworld, timestep, opt_overrides)
                 self.mj_model = fake_model
 
         fake_mod = types.ModuleType("orca_gym.core.euler.mujoco_sim_core_euler")
@@ -669,12 +670,44 @@ class TestOrcaGymEulerEulerBackend(unittest.TestCase):
         }):
             gym._init_euler_backend("dummy.xml", None)
 
-        self.assertEqual(captured["init_args"], ("dummy.xml", "cuda:0", 1, 0.002))
+        self.assertEqual(captured["init_args"], ("dummy.xml", "cuda:0", 1, 0.002, None))
         sim = object.__getattribute__(gym, "_sim")
         self.assertIsInstance(sim, FakeCore)
         self.assertIs(sim.mj_model, fake_model)
         self.assertIsNone(object.__getattribute__(gym, "_euler"))
         self.assertIs(opt._mj_model, fake_model)
+
+    def test_init_euler_backend_passes_opt_overrides(self):
+        """Feature A：opt_overrides 透传到 MuJoCoSimCoreEuler.init_simulation。"""
+        gym = OrcaGymEuler()
+        opt = object.__getattribute__(gym, "_opt")
+        opt.backend = SimBackend.EULER
+        opt.device = "cuda:0"
+        opt.nworld = 1
+
+        fake_model = object()
+        captured = {}
+
+        class FakeCore:
+            def init_simulation(self, model_xml_path, device="cuda", nworld=1,
+                                timestep=None, opt_overrides=None):
+                captured["init_args"] = (model_xml_path, device, nworld, timestep, opt_overrides)
+                self.mj_model = fake_model
+
+        fake_mod = types.ModuleType("orca_gym.core.euler.mujoco_sim_core_euler")
+        fake_mod.MuJoCoSimCoreEuler = FakeCore
+
+        overrides = {"integrator": 0}
+        with mock.patch.dict(sys.modules, {
+            "orca_gym.core.euler.mujoco_sim_core_euler": fake_mod,
+        }):
+            gym._init_euler_backend("dummy.xml", None, overrides)
+
+        self.assertEqual(
+            captured["init_args"], ("dummy.xml", "cuda:0", 1, 0.002, overrides)
+        )
+        sim = object.__getattribute__(gym, "_sim")
+        self.assertIsInstance(sim, FakeCore)
 
     def test_init_euler_backend_multi_world_raises(self):
         gym = OrcaGymEuler()

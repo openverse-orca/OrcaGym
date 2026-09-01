@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimBackend, SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig, validate_opt_overrides
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult, VideoRecorderManager
@@ -97,6 +97,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         render_mode: str = "human",
         sync_render: bool = False,
         device: str = "cpu",
+        sim_config_overrides: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -116,6 +117,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
             device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0" 等 → Euler.SolverMujoco GPU）。
+            sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
+                合法键为 integrator/gravity/iterations（timestep 请用 time_step
+                构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
+                在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
+                setter 写入立即生效。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -129,6 +135,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._local_xml_path = model_xml_path
         self._esdf_path = esdf_path
         self._device = device
+        # 用户边界校验：非法键（含 timestep）尽早失败
+        validate_opt_overrides(sim_config_overrides)
+        self._opt_overrides = dict(sim_config_overrides) if sim_config_overrides else None
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
@@ -241,9 +250,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             model_xml_path = self._local_xml_path
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
-        # 2. 初始化仿真
+        # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
+        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异）
         self.loop.run_until_complete(
-            self._gym.init_simulation(model_xml_path, esdf_path=self._esdf_path)
+            self._gym.init_simulation(
+                model_xml_path,
+                esdf_path=self._esdf_path,
+                opt_overrides=self._opt_overrides,
+            )
         )
         # 3. 应用缓存的 time_step：
         #    - CPU 后端：_bind 后写 mj_model.opt.timestep。

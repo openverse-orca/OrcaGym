@@ -11,8 +11,31 @@
 """
 
 import enum
+from typing import Any
 
 import numpy as np
+
+#: SimConfig 构造期 opt 覆盖支持的键（timestep 走 time_step 构造参数，单独通道）。
+OPT_OVERRIDE_KEYS: frozenset[str] = frozenset({"integrator", "gravity", "iterations"})
+
+
+def validate_opt_overrides(overrides: dict[str, Any] | None) -> None:
+    """校验构造期 opt 覆盖键（用户边界入口调用，越早失败越好）。
+
+    Args:
+        overrides: Env 构造参数 sim_config_overrides。None 或空 dict 直接通过。
+
+    Raises:
+        ValueError: 含非法键（含 "timestep" —— 该键与 time_step 构造参数双通道冲突）。
+    """
+    if not overrides:
+        return
+    invalid = set(overrides) - OPT_OVERRIDE_KEYS
+    if invalid:
+        raise ValueError(
+            f"不支持的 sim_config_overrides 键: {sorted(invalid)}；"
+            f"合法键: {sorted(OPT_OVERRIDE_KEYS)}（timestep 请用 time_step 构造参数）"
+        )
 
 
 class SimBackend(enum.Enum):
