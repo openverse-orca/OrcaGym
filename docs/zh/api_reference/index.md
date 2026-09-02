@@ -30,12 +30,12 @@ OrcaGym 的 API 文档，帮助你快速查找需要的接口。
 | 查询 body/site 状态 | `env.query_*()` / `env.get_body_*()` |
 | 施加外力 | `env.apply_body_force(name, force, torque)` |
 | 抓取/拖拽物体 | Mocap + 等式约束 |
-| 相机图像获取 | `CameraWrapper` |
+| 相机图像获取 | `start_streaming` / `show_camera` / `CameraWrapper` |
 | 场景中放置物体 | `OrcaGymScene` |
 | 逆运动学控制 | `InverseKinematicsController` |
 | 关节力矩控制 | `JointController` |
 | 旋转/姿态转换 | `rotations` |
-| 录制视频 | `begin_save_video` / `stop_save_video` |
+| 录制视频 | `save_streaming` / `start_streaming` |
 
 ## 关键概念速查
 

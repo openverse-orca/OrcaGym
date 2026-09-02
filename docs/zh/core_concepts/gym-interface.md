@@ -42,8 +42,8 @@ def step(self, action) -> tuple:
     """执行一步仿真，返回 obs, reward, terminated, truncated, info"""
     ...
 
-def reset_model(self) -> tuple:
-    """重置机器人状态到初始位姿"""
+def reset_model(self) -> tuple[dict, dict]:
+    """重置机器人状态到初始位姿，返回 (qpos_dict, qvel_dict)"""
     ...
 
 def _get_obs(self):

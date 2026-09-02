@@ -34,6 +34,12 @@ def publish_scene()
 
 > ⚠️ **注意**：调用后仿真场景会被重新加载，仿真对象会被重建。
 
+```python
+def append_scene()
+```
+增量发布场景：仅 spawn `m_addActorMap` 中的新 Actor，不销毁已 spawn 的实体。
+适用于时序 spawn 场景：逐步 `add_actor` + `append_scene`，前序机器人不被抹除。
+
 ### Actor 管理
 
 ```python
@@ -119,7 +125,22 @@ actor_name 映射表：
 ### 生命周期
 
 ```python
+def initialize_grpc()    # 初始化 gRPC 通信管道（__init__ 中自动调用）
 def close()
+```
+
+### 数据采集
+
+```python
+def get_rundata(scriptname: str, stepname: str)
+    # 数据采集信息上报（按脚本名/步骤名查询）
+```
+
+### Lua 参数设置
+
+```python
+def set_actor_lua_param_string(actor_name: str, param_name: str, value: str)
+    # 设置 Actor 的 Lua 字符串参数（set_ui_text / set_image_enabled 内部使用）
 ```
 
 ---
