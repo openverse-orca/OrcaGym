@@ -1,0 +1,60 @@
+docs/zh/tutorial/beginners/index.md
+  h_295d7b840d5b11 109
+docs/zh/tutorial/beginners/move-a-joint.md
+  h_295d7b840d5b11 5-6
+docs/zh/tutorial/beginners/scene-setup.md
+  h_295d7b840d5b11 183
+  s_4999158f2f122b::t_abe08c177317f0 164-168
+docs/zh/tutorial/beginners/state-queries.md
+  h_295d7b840d5b11 5,69
+  s_4999158f2f122b::t_6a043226e9c67f 171-172
+docs/zh/tutorial/beginners/build-a-task.md
+  s_4999158f2f122b::t_c33f5b90319357 15-29,43-44,48,58,60-71,76,78-81,83-86,93-147,152-244,252-265,272-273,275-277,279-283,285,287-289,291,293-296,298-300,302-303,305-307,309-312,314-315,317-318,320-321,328,339-342,345-346,349-355,358-361,375-376
+  s_4999158f2f122b::t_122fa71fc69195 59
+  s_4999158f2f122b::t_16531ad10b4b0a 148-151
+docs/zh/tutorial/beginners/hello-world.md
+  h_295d7b840d5b11 179
+docs/zh/tutorial/beginners/your-first-env.md
+  h_295d7b840d5b11 75
+docs/zh/tutorial/beginners/simple-controller.md
+  h_295d7b840d5b11 5,142,152
+docs/zh/tutorial/beginners/observation-action.md
+  s_4999158f2f122b::t_ea9ab2c9273914 112-116
+docs/zh/tutorial/beginners/ppo-training.md
+  s_4999158f2f122b::t_1f5ec59c8206de 297
+  h_295d7b840d5b11 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "ca4e9ce5393fbed420c99453c0a8388286a395c7",
+  "prompts": {},
+  "humans": {
+    "h_295d7b840d5b11": {
+      "author": "guojiatao <1570601232@qq.com>"
+    }
+  },
+  "sessions": {
+    "s_4999158f2f122b": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a966d597c70804470f2f601",
+        "model": "glm-5.1__dev"
+      },
+      "human_author": "guojiatao <1570601232@qq.com>",
+      "custom_attributes": {
+        "runtime_client": "trae-tob-git-ai",
+        "tool_id": "Edit",
+        "client_type": "ide",
+        "external_session_id": "6a966d597c70804470f2f601",
+        "source_scene": "unknown",
+        "tool_use_id": "6a97a5cb8637c8cc094584c6",
+        "tool_type": "agent",
+        "session_id": "6a966d597c70804470f2f601",
+        "operation_id": "6a97a5cb8637c8cc094584c6",
+        "dedupe_key": "6a966d597c70804470f2f601:6a97a5cb8637c8cc094584c6:afterEdit:118997c2",
+        "edit_kind": "file_edit"
+      }
+    }
+  }
+}
