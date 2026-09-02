@@ -14,6 +14,45 @@
 MuJoCo XML → OrcaGymEulerEnv → 驱动仿真（循环运行）
 ```
 
+## 场景 XML：单铰链倒立摆
+
+本节用一个**最简场景**作为示例 —— 单铰链倒立摆（Pendulum-v1 惯例，`theta=0` 为直立位置）。
+该 XML 位于仓库 `tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml`：
+
+```xml
+<!-- 单铰链倒立摆 + motor 执行器。
+     theta=0 为直立位置（摆杆沿 +z 方向），符合 Gymnasium Pendulum-v1 惯例。 -->
+<mujoco model="euler_simple_pendulum">
+  <option timestep="0.002" integrator="RK4" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="pendulum" pos="0 0 0">
+      <joint name="hinge" type="hinge" axis="0 1 0" pos="0 0 0"/>
+      <geom name="arm" type="box" size="0.05 0.05 0.5" pos="0 0 0.5" mass="1"/>
+      <site name="tip" pos="0 0 1.0"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="hinge_motor" joint="hinge" gear="10"/>
+  </actuator>
+</mujoco>
+```
+
+**结构速读**：
+
+| 元素 | 含义 |
+|------|------|
+| `<option>` | 仿真参数：步长 0.002s、RK4 积分器、重力 -9.81 |
+| `<body name="pendulum">` | 摆杆本体，铰链在原点 |
+| `<joint name="hinge" type="hinge">` | 绕 Y 轴转动的铰链关节 |
+| `<geom name="arm" type="box">` | 摆杆几何体（box，长 1m，质心在 0.5m 处） |
+| `<site name="tip">` | 摆杆末端站点（可用于传感器/渲染锚点） |
+| `<motor name="hinge_motor">` | 电机执行器，齿轮比 10（`action → 力矩`） |
+
+该场景下 `nq=nv=1`（一个铰链角度 + 角速度），`nu=1`（一个电机力矩），
+正好对应 `step(action)` 中 `action.shape == (1,)` 的标量力矩控制。
+
+> 若想直接复用此 XML，把下方示例中的 `SCENE_XML` 路径指向上面的文件即可。
+
 ## 最小环境骨架（，推荐）
 
 环境类需要实现 **3 个核心方法**：
@@ -33,7 +72,7 @@ _get_obs() — 收集观测数据
 ```python
 """
 my_first_env.py — 一个最小的自定义环境
-基于 [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground) 的简化版
+基于 [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler) 的简化版
 """
 
 import numpy as np
@@ -115,7 +154,7 @@ class MyFirstEnv(OrcaGymEulerEnv):
 # 使用
 # ============================================================
 if __name__ == "__main__":
- SCENE_XML = "/path/to/your/scene.xml"
+ SCENE_XML = "tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml"
 
  env = MyFirstEnv(model_xml_path=SCENE_XML)
  obs, _ = env.reset()

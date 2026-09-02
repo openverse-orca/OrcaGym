@@ -106,7 +106,7 @@ gymnasium.Env
 ```
 
 > **推荐**：`OrcaGymEulerEnv` 是当前推荐的新入口。 `OrcaGymLocalEnv` 处于维护模式，逐步废弃。
-> 可运行的完整示例见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)。
+> 可运行的完整示例见 [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler)。
 
 ---
 

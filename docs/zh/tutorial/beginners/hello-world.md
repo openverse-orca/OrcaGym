@@ -176,7 +176,7 @@ obs, reward, terminated, truncated, info = env.step(action) # 前进一步
 
 **原因**：`model_xml_path` 指向的 XML 文件不存在。
 
-**解决**：确认文件路径正确。你可以从 [OrcaPlayground](https://github.com/OrcaGym/OrcaPlayground) 获取示例场景文件。
+**解决**：确认文件路径正确。你可以从 [OrcaPlayground](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) 获取示例场景文件。
 
 ### `ModuleNotFoundError: No module named 'orca_gym'`
 
