@@ -1,0 +1,84 @@
+docs/zh/api_reference/environment.md
+  s_21a4ee186b4a94::t_e6232862e6ef53 254-255
+  s_21a4ee186b4a94::t_e6430fa2444227 363-369,372-399,403
+  s_21a4ee186b4a94::t_a43819d7e5ecac 416-421
+docs/zh/api_reference/core.md
+  s_21a4ee186b4a94::t_eb25a8dcfd148c 202
+  s_21a4ee186b4a94::t_16edc68ff66260 66-67
+  s_21a4ee186b4a94::t_b345cab28e364c 224
+docs/zh/core_concepts/architecture.md
+  s_21a4ee186b4a94::t_094b06235f1f54 486
+  s_21a4ee186b4a94::t_8dff8592fc0bea 500-501,509-512
+  s_21a4ee186b4a94::t_7d54b3ca0ce73c 435
+  s_21a4ee186b4a94::t_d82d244116fa0d 481
+  s_21a4ee186b4a94::t_60bd507ceb33b5 156
+  s_21a4ee186b4a94::t_f3f5a8c802073b 212,216
+  s_21a4ee186b4a94::t_13bbc26ffb8e34 462-466,470
+docs/zh/core_concepts/architecture-overview.md
+  s_21a4ee186b4a94::t_89e9cbed626ae5 212
+docs/zh/core_concepts/gym-interface.md
+  s_21a4ee186b4a94::t_4d175927219f9e 45-46
+docs/zh/api_reference/utils.md
+  s_21a4ee186b4a94::t_dca2b0456f154d 44-54
+  s_21a4ee186b4a94::t_52f0b52f71c549 239,242
+  s_21a4ee186b4a94::t_23e66bbd4bea8c 250
+  s_21a4ee186b4a94::t_e8ded7d5dadbb2 177,180,184-189
+  s_21a4ee186b4a94::t_a4dbb4b9f4be71 221-222
+  s_21a4ee186b4a94::t_d8b01718b89993 259,261-262
+  s_21a4ee186b4a94::t_5fea317f9ce0a4 215
+  s_21a4ee186b4a94::t_4537d4c872d248 115-125
+  s_21a4ee186b4a94::t_ae380aed3f7486 153-154
+  s_21a4ee186b4a94::t_0d1ad6250106f7 204-210
+  s_21a4ee186b4a94::t_9c8a2c35976d88 190
+docs/zh/api_reference/index.md
+  s_21a4ee186b4a94::t_26c17f05655f98 33,38
+docs/zh/api_reference/sensor.md
+  s_21a4ee186b4a94::t_2c2812eeaaf482 121-132
+  s_21a4ee186b4a94::t_3d2aa67d9c3acb 33,35
+  s_21a4ee186b4a94::t_7e22183f28aaeb 51
+  s_21a4ee186b4a94::t_1722cbf951b6d7 157-158
+docs/zh/api_reference/scene.md
+  s_21a4ee186b4a94::t_3ba14fa30e7d11 37-42
+  s_21a4ee186b4a94::t_7c192d8f950c97 128,132-144
+  s_21a4ee186b4a94::t_aab53465656bd3 145
+orca_gym/utils/inverse_kinematics_controller.py
+  s_21a4ee186b4a94::t_43eb9ed07bccf3 41
+docs/zh/core_concepts/model-data-opt.md
+  s_21a4ee186b4a94::t_6f409a3e2574bc 97
+  s_21a4ee186b4a94::t_c74cdf78d588e9 89
+  s_21a4ee186b4a94::t_584c7f60c80129 83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "68d20f24c279b3b787140989917a984495f6fbfc",
+  "prompts": {},
+  "humans": {
+    "h_295d7b840d5b11": {
+      "author": "guojiatao <1570601232@qq.com>"
+    }
+  },
+  "sessions": {
+    "s_21a4ee186b4a94": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a97dd278637c8cc09458a3e",
+        "model": "glm-5.2__dev"
+      },
+      "human_author": "guojiatao <1570601232@qq.com>",
+      "custom_attributes": {
+        "dedupe_key": "6a97dd278637c8cc09458a3e:6a97ecf88637c8cc09458bf1:afterEdit:5d9a97d4",
+        "session_id": "6a97dd278637c8cc09458a3e",
+        "client_type": "ide",
+        "edit_kind": "file_edit",
+        "source_scene": "unknown",
+        "runtime_client": "trae-tob-git-ai",
+        "operation_id": "6a97ecf88637c8cc09458bf1",
+        "tool_use_id": "6a97ecf88637c8cc09458bf1",
+        "tool_type": "agent",
+        "tool_id": "Write",
+        "external_session_id": "6a97dd278637c8cc09458a3e"
+      }
+    }
+  }
+}
