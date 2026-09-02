@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "bc1f70b5f1dddb919f86772033e859cb61ad42fc",
+  "prompts": {},
+  "humans": {
+    "h_e3b3be2b639b62": {
+      "author": "jimmy <1736368413@qq.com>"
+    }
+  }
+}
