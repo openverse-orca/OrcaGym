@@ -10,9 +10,9 @@ OrcaGym 是一个开源的机器人仿真平台，提供与 OpenAI Gym/Gymnasium
 
 | 章节 | 说明 |
 |------|------|
-| [🐋 什么是 OrcaGym](what-is-orcagym.md) | OrcaGym 是什么，核心功能一览 |
-| [🧬 为什么选择 OrcaGym](why-orcagym.md) | 与其他仿真平台的对比与优势 |
-| [🛠️ 安装指南](installation.md) | 安装与配置 |
+| [🐋 什么是 OrcaGym](getting-started/what-is-orcagym.md) | OrcaGym 是什么，核心功能一览 |
+| [🧬 为什么选择 OrcaGym](getting-started/why-orcagym.md) | 与其他仿真平台的对比与优势 |
+| [🛠️ 安装指南](getting-started/installation.md) | 安装与配置 |
 
 ---
 
@@ -51,4 +51,4 @@ OrcaGym 是机器人仿真生态的一部分：
 
 ## 下一步
 
-从 [安装指南](installation.md) 开始，然后阅读 [新手入门](../tutorial/beginners/index.md) 来运行你的第一个仿真！
+从 [安装指南](getting-started/installation.md) 开始，然后阅读 [新手入门](tutorial/beginners/index.md) 来运行你的第一个仿真！
