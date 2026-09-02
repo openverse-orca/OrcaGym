@@ -222,4 +222,4 @@ rotation = np.array([quat[3], quat[0], quat[1], quat[2]])
 
 ## 下一步
 
-场景搭好了，接下来学习如何**写一个环境类**来控制这个场景：[🏗️ 第一个环境](your-first-env.md)。
+场景搭好了，接下来了解 **MuJoCo 后端**的模型加载、步进控制与求解器配置：[🔧 MuJoCo 后端](mujoco-backend.md)。

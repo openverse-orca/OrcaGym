@@ -2,7 +2,7 @@
 
 本节介绍如何**施加外力、写入状态、使用雅可比矩阵和逆运动学（IK）**控制仿真。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/05_force_apply/](https://github.com/OrcaGym/OrcaPlayground) 和 [06_jacobian/](https://github.com/OrcaGym/OrcaPlayground)。
+> 本节基于 [OrcaPlayground examples/euler/06_force_apply/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/06_force_apply) 和 [07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian) 的场景和样例进行讲解，为教学目的整合为单一示例。
 
 ---
 
@@ -290,7 +290,7 @@ read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 ```
 
 **完整拖拽流程**（Euler 路径下 `anchor_actor`/`release_body_anchored` 不在 Env 公共 API；程序化操作应仿照 UI 抓取内部方法的编排模式，使用以下公共原语）：
-1. `equality_find_slot_by_body(env.body("mocap_anchor"))` — 查找含 mocap 的等式约束槽位
+1. `equality_find_slot_by_body(mocap_name)` — 查找含 mocap 的等式约束槽位（`mocap_name` 为场景中的 mocap body 名称，如 `TestMocapAnchor`）
 2. `equality_constraint(slot)` — 保存原始约束快照（释放时恢复）
 3. `set_mocap_pos_and_quat({...})` — 对齐 mocap 位姿到物体当前位姿
 4. `equality_update(slot, eq_type=mjtEq.mjEQ_WELD, obj1_name=..., obj2_name=...)` — 建立 WELD 约束
@@ -312,12 +312,13 @@ read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 qpos = env.data.qpos.copy()       # 1. 复制
 qpos[addr] = new_value             # 2. 修改副本
 env.set_joint_qpos(qpos)           # 3. 合规写入
-env.mj_forward()                   # 4. 必须！更新派生量
-env._sync_view()                   # 5. 同步到 DataView
+env.mj_forward()                   # 4. 必须！更新派生量（body 位姿、传感器等）
 ```
 
 > ⚠️ **关键**：修改 qpos/qvel 后**必须调用 `mj_forward()`**。不调用的话，
 > `get_body_xpos_xmat_xquat` 等读到的 body 位姿仍然是旧值。
+>
+> `do_simulation` 内部已自动执行 `mj_step` + 同步，无需手动调 `mj_forward`。
 
 ### 4. 雅可比矩阵
 

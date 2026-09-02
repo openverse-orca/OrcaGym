@@ -23,8 +23,7 @@ OrcaGym provides a rich set of tools and adapters for mainstream RL/IL framework
 ## Chapter Navigation
 
 - [🗺️ Terrain Tools](terrain-tools.md)
-- [🎨 Asset Processing](asset-processing.md)
-- [📊 HDF5 Viewer](hdf5-viewer.md)
+
 - [🎮 Input Devices](input-devices.md)
 - [🤖 RLlib Adapter](rllib-adapter.md)
 - [🧠 Robomimic Adapter](robomimic-adapter.md)

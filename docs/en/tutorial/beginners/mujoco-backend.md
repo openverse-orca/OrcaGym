@@ -2,7 +2,7 @@
 
 This document describes how to use OrcaGym's **MuJoCo backend**. The MuJoCo backend is the open-source standard path (CPU, pure rigid-body) in OrcaGym's dual-backend architecture, selected via `SimConfig.backend="mujoco"`. Model loading is automatically completed during environment initialization.
 
-> See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) for complete runnable code.
 
 ## Model Loading
 
@@ -133,3 +133,9 @@ print(f"ngeom={env.model.ngeom}")
 print(f"nbody={len(env.model.get_body_names())}")
 print(f"njnt={len(env.model.get_joint_dict())}")
 ```
+
+---
+
+## Next Step
+
+Now that you understand backend configuration, learn how to **write an environment class** to control this scene: [🏗️ Your First Environment](your-first-env.md).

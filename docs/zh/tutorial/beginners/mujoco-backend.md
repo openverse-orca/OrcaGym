@@ -2,7 +2,7 @@
 
 本文档介绍 OrcaGym 的 **MuJoCo 后端**使用方法。MuJoCo 后端是 OrcaGym 双后端架构中的开源标准路径（CPU、纯刚体），通过 `SimConfig.backend="mujoco"` 选择。环境初始化时自动完成模型加载。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler)。
 
 ## 模型加载
 
@@ -131,3 +131,9 @@ print(f"ngeom={env.model.ngeom}")
 print(f"nbody={len(env.model.get_body_names())}")
 print(f"njnt={len(env.model.get_joint_dict())}")
 ```
+
+---
+
+## 下一步
+
+了解了后端配置后，接下来学习如何**写一个环境类**来控制这个场景：[🏗️ 第一个环境](your-first-env.md)。

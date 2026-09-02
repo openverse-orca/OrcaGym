@@ -2,7 +2,7 @@
 
 本节介绍如何使用 OrcaGym 的**状态查询 API**，覆盖关节状态、Body 位姿、传感器、执行器力矩、接触信息等。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api)。
 
 ---
 

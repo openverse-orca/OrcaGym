@@ -2,7 +2,7 @@
 
 In the previous section we only read `self.data.qpos` and `self.data.qvel`. In this section, you will learn to use the **query API** provided by OrcaGym to obtain richer state information.
 
-> See [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/04_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api for complete runnable code.
 
 ---
 

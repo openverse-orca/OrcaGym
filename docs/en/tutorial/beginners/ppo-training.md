@@ -2,7 +2,7 @@
 
 This section shows you how to train an inverted pendulum to stay upright in an OrcaGym environment using the Stable Baselines3 PPO algorithm.
 
-> See [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/03_rl_ppo for complete runnable code.
 
 ---
 

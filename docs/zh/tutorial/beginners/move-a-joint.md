@@ -2,8 +2,9 @@
 
 前面我们只是"看"，这一节开始**让机器人动起来**。我们从最简单的开始：理解 `qpos`/`qvel`，手动控制关节。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler)（`hello_euler.py` + `simple_env.py`），
+> 本节基于 [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler) 的场景和样例进行讲解，
 > 其场景 XML 为 [assets/scenes/simple_pendulum.xml](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/assets/scenes/simple_pendulum.xml)。
+> 样例代码 (`simple_env.py`) 使用直接下标访问，本节为展示**按名称查询和设置**的写法进行了改写。
 
 本节示例**沿用该 XML**，关键名称对照如下（这些名称在 XML 中定义，后续读写都用它们）：
 

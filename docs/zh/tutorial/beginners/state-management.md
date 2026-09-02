@@ -2,7 +2,7 @@
 
 管理 MuJoCo 仿真中的状态（qpos/qvel/qacc）是正确使用 OrcaGym 的关键。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground) 和 [06_jacobian/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) 和 [07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian)。
 
 ## 状态数据布局
 
@@ -166,3 +166,9 @@ snapshot = env.data.qpos.copy()     # copy() 创建独立副本，不受后续�
 | 数组维度不对 | ValueError | 用 `jnt_qposadr` 检查地址和长度 |
 | 不调用 `mj_forward()` 就读 body 位姿 | 读到旧位姿 | 修改 qpos 后必须 `mj_forward()` |
 | 多 body 场景直接用 `data.qpos[7:]` | 读到其他 body 的数据 | 用 `jnt_qposadr` 逐关节切片拼接 |
+
+---
+
+## 下一步
+
+理解了状态布局和同步规则后，接下来学习如何用**按名称查询 API** 更直观地读取关节、body、传感器状态：[📡 读取状态](state-queries.md)。

@@ -31,9 +31,13 @@ We have designed a **progressive** learning path. Each step introduces only one 
  │
  └── 🎬 Scene Setup — Learn to place robots, objects, and lights in a scene
  │
+ └── 🔧 MuJoCo Backend — Model loading, stepping control, solver configuration
+ │
  └── 🏗️ Your First Environment — Learn to write your own environment class
  │
- └── 📡 Reading State — Learn to query joint angles and body poses
+ └── 📐 State Management — Understand qpos/qvel/qacc data layout and sync rules
+ │
+ └── 📡 Reading State — Learn to query joint angles and body poses by name
  │
  └── 🦾 Making the Robot Move — Understand qpos/qvel and control joints
  │
@@ -50,7 +54,9 @@ We have designed a **progressive** learning path. Each step introduces only one 
 |---------|-------------|----------------|
 | [🔌 Hello World](hello-world.md) | Offline mode, `do_simulation`, `data.qpos` | 5 min |
 | [🎬 Scene Setup](scene-setup.md) | `OrcaGymScene`, `Actor`, asset placement | 15 min |
+| [🔧 MuJoCo Backend](mujoco-backend.md) | Model loading, `sim_config`, stepping control | 15 min |
 | [🏗️ Your First Environment](your-first-env.md) | Inherit `OrcaGymEulerEnv`, implement `step`/`reset_model`/`_get_obs` | 15 min |
+| [📐 State Management](state-management.md) | qpos/qvel/qacc layout, `mj_forward` sync, zero-copy view | 15 min |
 | [📡 Reading State](state-queries.md) | `query_joint_qpos`, `get_body_xpos_xmat_xquat`, sensors | 15 min |
 | [🦾 Making the Robot Move](move-a-joint.md) | `qpos`/`qvel`, `set_joint_qpos`, `do_simulation` | 20 min |
 | [📷 Camera & Vision](camera-and-vision.md) | `CameraWrapper`, RGB-D image acquisition | 15 min |
@@ -106,7 +112,7 @@ gymnasium.Env
 ```
 
 > **Recommendation**: `OrcaGymEulerEnv` is the recommended entry point for new projects. `OrcaGymLocalEnv` is in maintenance mode and is being phased out.
-> See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for runnable examples.
+> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler for runnable examples.
 
 ---
 

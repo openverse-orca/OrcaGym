@@ -2,12 +2,10 @@
 
 OrcaGym's physics simulation is based on the MuJoCo engine, providing high-precision rigid body dynamics and constraint solving.
 
-> See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) for complete runnable code.
 
 ## Chapter Navigation
 
-- [🔧 MuJoCo Backend](mujoco-backend.md) — Model loading, solver configuration, stepping control
-- [📐 State Management](state-management.md) — qpos/qvel/qacc, state setting and reading
 - [💥 Contacts and Forces](contacts-forces.md) — Contact detection, force querying, external force injection
 - [🔄 Force Application and IK](force-apply.md) — External force application, state writing, Jacobians, inverse kinematics
 - [🔗 Equality Constraints](equality-constraints.md) — WELD/CONNECT constraints, mocap anchoring, grasp operations

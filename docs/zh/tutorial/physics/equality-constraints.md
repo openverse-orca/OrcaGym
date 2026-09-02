@@ -2,7 +2,7 @@
 
 MuJoCo 的等式约束是 OrcaGym 中实现物体抓取和操作的核心机制。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/05_force_apply/](https://github.com/OrcaGym/OrcaPlayground) 和 [09_body_manipulation/](https://github.com/OrcaGym/OrcaPlayground)。
+> 本节基于 [OrcaPlayground examples/euler/06_force_apply/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/06_force_apply) 和 [10_body_manipulation/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/10_body_manipulation) 的场景和样例进行讲解。样例中 `BodyManipulationEnv` 操作的是 pelvis，本节为展示抓取编排流程进行了改写。
 
 ---
 
@@ -34,7 +34,7 @@ class GraspDemo(OrcaGymEulerEnv):
         import mujoco
         agent = self._agent_names[0]
         object_name = f"{agent}_manipulation_box"
-        mocap_name = "ActorManipulator_Anchor"  # 旧关卡；新关卡为 ORCA_MANIPULATOR_<uuid>_Anchor
+        mocap_name = "TestMocapAnchor"  # 模型自带 mocap（区别于 UI 系统的 ActorManipulator）
         ctrl = np.zeros(self.model.nu)
 
         # ─── 第 1 步：抓取（用公共原语编排，等价于 Local 的 anchor_actor）───
@@ -105,9 +105,8 @@ class GraspDemo(OrcaGymEulerEnv):
 
         # ─── 第 4 步：查看约束信息 ───
         print(f"\n当前等式约束:")
-        for i in range(self._gym.n_equality()):
-            eq = self.equality_constraint(i)
-            print(f"  type={eq['type']}, obj1={eq['obj1_id']}, "
+        for eq in self.model.get_eq_list():
+            print(f"  type={eq['eq_type']}, obj1={eq['obj1_id']}, "
                   f"obj2={eq['obj2_id']}, active={eq['active']}")
 
     def step(self, action):
@@ -246,8 +245,9 @@ env.mj_forward()
 **查看约束**（两种等价途径）：
 ```python
 # 途径 A：通过 env.equality_constraint(slot) 逐个读取（返回键为 type）
-for slot in range(env._gym.n_equality()):
-    eq = env.equality_constraint(slot)
+eq_list = env.model.get_eq_list()
+for i in range(len(eq_list)):
+    eq = env.equality_constraint(i)
     print(f"type={eq['type']}, obj1={eq['obj1_id']}, "
           f"obj2={eq['obj2_id']}, active={eq['active']}")
 
@@ -265,7 +265,7 @@ for eq in eq_list:
 # Euler 路径：env.equality_update(slot, obj1_name=..., obj2_name=...)
 env.equality_update(
     0,                                        # 等式约束槽位索引
-    obj1_name="ActorManipulator_Anchor",      # 新 obj1（自动解析为 id）
+    obj1_name="TestMocapAnchor",      # 新 obj1（自动解析为 id）
     obj2_name="target_object",                # 新 obj2（自动解析为 id）
 )
 ```
@@ -286,12 +286,15 @@ env.equality_update(0, active=True)    # 重新激活
 
 ```python
 # render() 内部自动调用 do_body_manipulation()
-# 可通过 studio_bridge() 检测 UI 操作
+# 可通过 studio_bridge() 检测 UI 操作（async 接口，需 await）
+import asyncio
+
 bridge = env.studio_bridge()
-body_name, anchor_type = bridge.get_body_manipulation_anchored()
-if body_name is not None:
-    delta_pos, delta_quat = bridge.get_body_manipulation_movement()
-    print(f"用户正在拖拽: {body_name}, 位移: {delta_pos}")
+result = await bridge.get_body_manipulation_anchored()
+if result["body_name"] is not None:
+    movement = await bridge.get_body_manipulation_movement()
+    print(f"用户正在拖拽: {result['body_name']}, "
+          f"位移: {movement['delta_pos']}, 旋转: {movement['delta_quat']}")
 ```
 
 ---

@@ -2,7 +2,7 @@
 
 OrcaGym provides a rich set of robot control interfaces, from low-level joint control to high-level inverse kinematics.
 
-> For complete runnable code, see [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) (Lessons 4-9).
+> For complete runnable code, see [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) (Lessons 4-9).
 
 ## Control Hierarchy
 
