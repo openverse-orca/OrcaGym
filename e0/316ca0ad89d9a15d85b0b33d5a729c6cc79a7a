@@ -1,0 +1,142 @@
+docs/en/tutorial/beginners/scene-setup.md
+  s_4999158f2f122b::t_1cee01636294c3 206
+docs/zh/tutorial/tools/index.md
+  s_4999158f2f122b::t_d908e8952ee865 26
+docs/zh/tutorial/robot_control/index.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/beginners/hello-world.md
+  h_295d7b840d5b11 179
+docs/en/tutorial/beginners/state-management.md
+  s_4999158f2f122b::t_30b01bbcd8d8ee 169-174
+  h_295d7b840d5b11 5
+docs/zh/tutorial/physics/index.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/tools/index.md
+  s_4999158f2f122b::t_2a35fd09428175 26
+docs/en/tutorial/sensing/index.md
+  s_4999158f2f122b::t_5383cf5a58229f 32
+  h_295d7b840d5b11 5
+docs/en/tutorial/physics/force-apply.md
+  s_4999158f2f122b::t_31c4938b26f48e 61,98,131
+  s_4999158f2f122b::t_58598592cf321a 293
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_82981a5eb2b8f7 315
+  s_4999158f2f122b::t_27b75fc26ee2b8 320-321
+docs/zh/tutorial/beginners/move-a-joint.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_7ea22e7b8bf62c 7
+docs/en/tutorial/physics/equality-constraints.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_0a03bc82ada482 132
+  s_4999158f2f122b::t_1556233bb5d42e 217-219
+  s_4999158f2f122b::t_4968ab7d3b2102 34
+  s_4999158f2f122b::t_044b25832f150b 258-260,262-266
+  s_4999158f2f122b::t_9f0196dd491837 49,173,237
+docs/zh/tutorial/beginners/simple-controller.md
+  h_295d7b840d5b11 157,161
+docs/en/tutorial/robot_control/state-queries-api.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_61f025662db38f 43
+docs/zh/tutorial/physics/contacts-forces.md
+  s_4999158f2f122b::t_b2c9039f9a1311 9,14-33,36-41,44,46,49-54,57-61,63,65-69,72,74,76,78-96,99,101,104-109,111-113,115,118-124,127-131,134-142,144,147,149-151,154-159,162-164,166,168-186,188,190,210-223,234-235
+  s_4999158f2f122b::t_fb9dda39fac8fb 75
+  s_4999158f2f122b::t_f05d620990e770 114,116-117
+  h_295d7b840d5b11 5,11
+docs/zh/tutorial/robot_control/inverse-kinematics.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/beginners/your-first-env.md
+  s_4999158f2f122b::t_ed0be48c799672 252
+  h_295d7b840d5b11 36
+docs/zh/tutorial/physics/force-apply.md
+  s_4999158f2f122b::t_7a290967ee57e4 293
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_b7d819c5309a9a 315,320-321
+docs/zh/tutorial/beginners/your-first-env.md
+  s_4999158f2f122b::t_40f4e1371c64d7 291
+docs/en/tutorial/scene/index.md
+  s_4999158f2f122b::t_f6dfa678aa4b6f 26
+docs/zh/tutorial/beginners/mujoco-backend.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_2a7c5dc609bc2c 134-139
+docs/zh/tutorial/beginners/index.md
+  s_4999158f2f122b::t_f8275ca223056e 34-35,57
+  s_4999158f2f122b::t_44b5c3a36e9143 38-40,59
+docs/en/tutorial/robot_control/inverse-kinematics.md
+  h_295d7b840d5b11 5
+docs/zh/tutorial/scene/index.md
+  s_4999158f2f122b::t_8a2d00471ce4dc 26
+docs/zh/tutorial/beginners/state-management.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_76941bdee1cb65 169-174
+docs/zh/tutorial/sensing/index.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_46f81d08e26563 32
+docs/zh/tutorial/robot_control/state-queries-api.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/beginners/mujoco-backend.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_7b0f8b1bffe3af 136-141
+docs/en/tutorial/beginners/ppo-training.md
+  h_295d7b840d5b11 5
+docs/zh/tutorial/physics/equality-constraints.md
+  s_4999158f2f122b::t_aa0ad83961d95b 289-291,293-297
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_f39b51d8d22048 108-109
+  s_4999158f2f122b::t_77bbc82e46981d 37
+  s_4999158f2f122b::t_17965e0c590252 248-250
+  s_4999158f2f122b::t_48edd62d53eb91 268
+docs/en/tutorial/physics/contacts-forces.md
+  h_295d7b840d5b11 5,11
+  s_4999158f2f122b::t_75191c73b6b5f7 114,116-117
+  s_4999158f2f122b::t_1425e06490d74d 75
+  s_4999158f2f122b::t_8de8fb8308df06 9,14-33,36-41,44,46,49-54,57-61,63,65-69,72,74,76,78-96,99,101,104-109,111-113,115,118-124,127-131,134-142,144,147-149,151,154-159,162-164,166,168-186,188,190,194,197,203-205,210-223,227-230,232-235,239,241
+docs/en/tutorial/beginners/state-queries.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/robot_control/index.md
+  h_295d7b840d5b11 5
+docs/en/tutorial/beginners/move-a-joint.md
+  h_295d7b840d5b11 5
+  s_4999158f2f122b::t_3dad62ae3b3c8c 6
+docs/en/tutorial/beginners/index.md
+  s_4999158f2f122b::t_1fe084e3860d01 38-40,59
+  h_295d7b840d5b11 115
+  s_4999158f2f122b::t_ca6a7ddb6c7d7a 34-35,57
+docs/zh/tutorial/beginners/scene-setup.md
+  s_4999158f2f122b::t_25401c2070b9c8 225
+docs/en/tutorial/physics/index.md
+  h_295d7b840d5b11 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "e0316ca0ad89d9a15d85b0b33d5a729c6cc79a7a",
+  "prompts": {},
+  "humans": {
+    "h_295d7b840d5b11": {
+      "author": "guojiatao <1570601232@qq.com>"
+    }
+  },
+  "sessions": {
+    "s_4999158f2f122b": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a966d597c70804470f2f601",
+        "model": "glm-5.2__dev"
+      },
+      "human_author": "guojiatao <1570601232@qq.com>",
+      "custom_attributes": {
+        "operation_id": "6a97db108637c8cc09458a3a",
+        "tool_type": "agent",
+        "client_type": "ide",
+        "external_session_id": "6a966d597c70804470f2f601",
+        "dedupe_key": "6a966d597c70804470f2f601:6a97db108637c8cc09458a3a:afterEdit:8df98262",
+        "tool_use_id": "6a97db108637c8cc09458a3a",
+        "tool_id": "Edit",
+        "source_scene": "unknown",
+        "session_id": "6a966d597c70804470f2f601",
+        "runtime_client": "trae-tob-git-ai",
+        "edit_kind": "file_edit"
+      }
+    }
+  }
+}
