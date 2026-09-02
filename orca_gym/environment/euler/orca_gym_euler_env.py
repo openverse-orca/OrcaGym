@@ -116,7 +116,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
-            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0" 等 → Euler.SolverMujoco GPU）。
+            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0"/"hip:0" 等 → Euler.SolverMujoco GPU）。
             sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
                 合法键为 integrator/gravity/iterations（timestep 请用 time_step
                 构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
@@ -233,7 +233,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         必须在 initialize_simulation 之前调用：initialize_simulation 内部
         依据 sim_config.backend 决定走 CPU 或 Euler 初始化路径。
         """
-        if self._device.startswith("cuda"):
+        if self._device.startswith(("cuda", "hip")):
             self._gym.sim_config.backend = SimBackend.EULER
             self._gym.sim_config.device = self._device
         else:

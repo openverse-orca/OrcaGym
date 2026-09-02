@@ -617,6 +617,10 @@ class MuJoCoSimCore:
             ``pos`` (np.ndarray(3,))、``frame`` (np.ndarray(9,) 扁平)。
             无接触时返回空列表。
         """
+        if self._mjData is None:
+            # 离线骨架模式（未 init_simulation）：优雅降级为空接触列表，
+            # 维持 render() 的离线 no-op 契约
+            return []
         contacts: list[dict] = []
         ncon = self._mjData.ncon
         for i in range(ncon):

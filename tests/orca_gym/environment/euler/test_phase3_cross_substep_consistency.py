@@ -104,7 +104,7 @@ class TestDelegationChainQueryMethods(unittest.TestCase):
 
     def test_query_joint_qpos_chain(self):
         """query_joint_qpos 返回 dict，值形状与关节自由度一致。"""
-        joint_names = ["left_hip_pitch", "right_hip_pitch"]
+        joint_names = ["left_hip_pitch_joint", "right_hip_pitch_joint"]
         result = self.env.query_joint_qpos(joint_names)
         self.assertIsInstance(result, dict)
         for name in joint_names:
@@ -113,7 +113,7 @@ class TestDelegationChainQueryMethods(unittest.TestCase):
 
     def test_query_joint_qvel_chain(self):
         """query_joint_qvel 返回 dict，值形状与关节 dof 一致。"""
-        joint_names = ["left_hip_pitch", "right_hip_pitch"]
+        joint_names = ["left_hip_pitch_joint", "right_hip_pitch_joint"]
         result = self.env.query_joint_qvel(joint_names)
         self.assertIsInstance(result, dict)
         for name in joint_names:
@@ -152,7 +152,7 @@ class TestDelegationChainSetMethods(unittest.TestCase):
 
     def test_set_joint_qpos_chain(self):
         """set_joint_qpos 写入后 query_joint_qpos 读回一致。"""
-        joint_names = ["left_hip_pitch", "right_hip_pitch"]
+        joint_names = ["left_hip_pitch_joint", "right_hip_pitch_joint"]
         original = self.env.query_joint_qpos(joint_names)
         new_values = {name: val + 0.1 for name, val in original.items()}
         full_qpos = self.env.data.qpos.copy()
@@ -169,7 +169,7 @@ class TestDelegationChainSetMethods(unittest.TestCase):
 
     def test_set_joint_qvel_chain(self):
         """set_joint_qvel 写入后 query_joint_qvel 读回一致。"""
-        joint_names = ["left_hip_pitch", "right_hip_pitch"]
+        joint_names = ["left_hip_pitch_joint", "right_hip_pitch_joint"]
         original = self.env.query_joint_qvel(joint_names)
         new_values = {name: val + 0.5 for name, val in original.items()}
         full_qvel = self.env.data.qvel.copy()
@@ -369,7 +369,7 @@ class TestKConstraintRegression(unittest.TestCase):
         env = _make_g1_env()
         env.mj_forward()
         # query 方法返回 dict
-        self.assertIsInstance(env.query_joint_qpos(["left_hip_pitch"]), dict)
+        self.assertIsInstance(env.query_joint_qpos(["left_hip_pitch_joint"]), dict)
         # body 查询返回 dict
         self.assertIsInstance(env.get_body_xpos_xmat_xquat(["pelvis"]), dict)
         # 雅可比原地写（返回 None）

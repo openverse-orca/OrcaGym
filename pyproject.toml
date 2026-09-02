@@ -34,7 +34,7 @@ tools = [ "pyyaml", "trimesh", "requests", "tqdm",]
 robomimic = [ "h5py", "termcolor", "opencv-python",]
 robosuite = [ "numba",]
 euler = [ "orca-mujoco-flow>=26.8.1",]
-all = [ "stable-baselines3>=2.3.2", "sb3_contrib>=2.3.0", "tensorboard", "h5py", "opencv-python", "tqdm", "pygame>=2.6.0", "websockets", "av", "matplotlib", "pyyaml", "trimesh", "requests", "termcolor", "numba", "flask", "pillow",]
+all = [ "orca-gym[dev,rl,imitation,devices,sensors,tools,robomimic,robosuite,euler]", "flask",]
 
 [project.scripts]
 orcagym-loop = "orca_gym.scripts.run_sim_loop:main"
