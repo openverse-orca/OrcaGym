@@ -203,4 +203,4 @@ rotation = np.array([quat[3], quat[0], quat[1], quat[2]])
 
 ## Next Step
 
-The scene is set up. Next, learn how to **write an environment class** to control this scene: [🏗️ Your First Environment](your-first-env.md).
+The scene is set up. Next, learn about the **MuJoCo backend** model loading, stepping control, and solver configuration: [🔧 MuJoCo Backend](mujoco-backend.md).

@@ -2,7 +2,7 @@
 
 本节教你如何基于 Stable Baselines3 PPO 算法，在 OrcaGym 环境中训练一个倒立摆保持直立。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/03_rl_ppo)。
 
 ---
 
@@ -294,4 +294,4 @@ SB3 检测到 GPU 可用，默认用 GPU 但对 MLP 策略推荐 CPU。**可忽�
 
 ## 下一步
 
-训练好了控制器，接下来学习如何**查询更多仿真状态**：[📡 状态查询 API](../robot_control/state-queries-api.md)。
+训练好了控制器，接下来学习如何**查询更多仿真状态**：[📡 查询 API](state-queries.md)。

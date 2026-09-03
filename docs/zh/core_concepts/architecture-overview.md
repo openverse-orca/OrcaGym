@@ -209,6 +209,6 @@ env.body() / joint() / ...  │
 ```
 
 - **左列**：公共 API（L1），用户和 AI 应使用，IDE 自动补全可见
-- **右列**：内部组件（L2/L3），`_` 前缀约定 + ruff SLF001 静态检查 + AGENTS.md 约束，禁止外部访问
+- **右列**：内部组件（L2/L3），多层隔离：`OrcaGymEuler.__getattribute__` 主动拦截（访问 `_sim`/`_studio`/`_mjData` 等直接抛 `AttributeError`），辅以 `_` 前缀约定 + ruff SLF001 静态检查 + AGENTS.md 约束，禁止外部访问
 
 详细契约与隔离机制见 [architecture.md](architecture.md) §6–§7。

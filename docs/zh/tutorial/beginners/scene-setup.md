@@ -152,16 +152,35 @@ quat_wxyz = np.array([quat[3], quat[0], quat[1], quat[2]]) # 转 [w, x, y, z]
 
 ```
 1. OrcaGymScene(grpc_addr) ← 创建场景管理器
-2. scene.publish_scene() ← 发布空场景（清空）
-3. scene.add_actor(...) ← 逐个添加物体
-4. scene.set_light_info(...) ← 设置灯光（可选）
-5. scene.set_material_info() ← 修改材质（可选）
-6. scene.close() ← 关闭连接
+2. scene.publish_scene() ← 发布空场景（清空已有内容）
+3. scene.add_actor(...) ← 逐个添加物体（仅入队，不立即生成）
+4. scene.append_scene() ← 增量发布：spawn 新增 Actor，保留已有实体
+   （首次发布也可调用 publish_scene()，二者择一）
+5. scene.set_light_info(...) ← 设置灯光（可选）
+6. scene.set_material_info() ← 修改材质（可选）
+7. scene.close() ← 关闭连接
 ```
 
-!!! warning "`publish_scene()` 会清空场景！"
- 每次调用 `publish_scene()` 都会清空当前场景。
- 如果你只想添加物体而不清空，直接调用 `add_actor()` 即可。
+> ⚠️ **`publish_scene()` 会清空场景！**
+> `publish_scene()` 会清空当前场景中的所有实体后重新发布，适用于初始化或完全重置场景。
+> 若运行时只想追加 Actor 而不销毁已有实体，请改用 `append_scene()`：
+> 它仅 spawn `add_actor()` 新增的 Actor，保留前序已 spawn 的实体（如运行中的机器人），
+> 适用于时序 spawn 场景（逐步 `add_actor` + `append_scene`）。
+
+---
+
+## 获取资产
+
+场景中的 Actor 需要指定 `asset_path`，这些资产需先获取并导入到 OrcaStudio / OrcaLab 中。主要流程如下：
+
+1. **搜索资产**：前往 [SimAssets 资产商店](https://simassets.orca3d.cn/?tab=scene&sort=name) 搜索所需的相关资产。
+2. **进入资产包**：转到对应的资产包页面。
+3. **获取资产**：
+   - **OrcaLab 用户**：在资产包页面直接订阅。
+   - **OrcaStudio 用户**：下载原始资产，解压到项目目录中。
+4. **在编辑器中定位资产**：打开 OrcaLab / OrcaStudio，在资产搜索器中找到对应资产，即可获取其 `asset_path`。
+
+> 运行时动态添加 Actor 的示例详见 [OrcaPlayground - scene_building](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/scene_building)。
 
 ---
 
@@ -203,4 +222,4 @@ rotation = np.array([quat[3], quat[0], quat[1], quat[2]])
 
 ## 下一步
 
-场景搭好了，接下来学习如何**写一个环境类**来控制这个场景：[🏗️ 第一个环境](your-first-env.md)。
+场景搭好了，接下来了解 **MuJoCo 后端**的模型加载、步进控制与求解器配置：[🔧 MuJoCo 后端](mujoco-backend.md)。

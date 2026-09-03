@@ -33,7 +33,7 @@ Below is a **runnable** complete environment (offline mode, no Studio needed):
 ```python
 """
 my_first_env.py — A minimal custom environment.
-Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground).
+Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler.
 """
 
 import numpy as np
@@ -249,4 +249,4 @@ env.close()
 
 ## Next Step
 
-The environment class is written. Next, learn how to **read more state information**: [📡 Reading State](state-queries.md).
+The environment class is written. Next, learn about **simulation state data layout and synchronization rules**: [📐 State Management](state-management.md).

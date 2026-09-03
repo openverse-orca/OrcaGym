@@ -251,10 +251,8 @@ def set_render_fps(fps: int) -> None
     # 设置渲染帧率（render FPS）。控制 render() 调用引擎渲染的频率：
     # 同步渲染（sync_render=True）每隔 1/fps 个物理步渲染一帧；
     # 异步渲染（sync_render=False）每隔 1/fps 秒渲染一帧。
-
-def set_sync_render(enabled: bool) -> None
-    # 设置是否启用同步渲染。启用录制做帧对齐时需开启（enabled=True），
-    # 使 render() 每物理步调用引擎渲染并透传 simulate_index。
+    # 注意：sync_render 是构造参数，运行时无法通过方法切换；
+    # 如需运行时启用同步录制，请在构造 env 时传入 sync_render=True。
 
 def set_video_recorder_manager(manager: VideoRecorderManager | None) -> None
     # 注入 VideoRecorderManager 实例。环境层相机属性查询/设置与录制统一
@@ -362,17 +360,47 @@ viewer.stop()
 窗口通过关闭按钮或调用 ``viewer.stop()`` / ``manager.stop_viewer()`` 关闭
 （内部通过 ``stop_event`` 信号通知子进程退出）。
 
-### 相机属性查询/设置 + 推流状态机
+### 相机属性查询/设置 + 推流
+
+Env 层直接提供相机名称枚举与视口切换。相机属性查询/设置与推流状态机
+由底层 ``VideoRecorderManager`` 实现，需通过 ``get_recorder_manager()`` 获取
+manager 后调用（详见下方）。
+
+Env 层直接方法：
 
 ```python
-def get_camera_names() -> list[str]
-def get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
-def set_camera_properties(
+def get_camera_names() -> list[str]                   # 获取所有已注册相机名称列表
+def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+    # 将指定摄像头设为 Studio 视口激活相机
+
+def start_streaming(camera_name: str, **kwargs) -> None
+    # 开启指定相机的串流（含 color/depth 按传感器开关自动启动）。
+    # 内部委托 VideoRecorderManager.start_recorder：查询相机属性确认存在、
+    # 按 kwargs 校验/同步属性（必要时停流重配）、开启推流，并根据
+    # capture_rgb / capture_depth 启动对应的录制器。上层无需关心
+    # Idle/Streaming 状态机。
+    # kwargs: 相机属性设置（capture_rgb / capture_depth / color_port /
+    #   depth_port / width / height / near_clip / far_clip / gamma 等）以及
+    #   recorder 专属参数 max_buffer_frames。未提供的键保留相机当前属性。
+
+def show_camera(camera_name: str, camera_type: str = "color", window_name: str | None = None) -> None
+    # 实时展示指定相机的画面（非阻塞）。在独立子进程中建立 WebSocket 连接
+    # 接收 H.264 码流、解码、用 matplotlib 显示。深度流直接显示原始灰度帧。
+    # 需先调用 start_streaming 启动推流与录制器。
+```
+
+通过 ``VideoRecorderManager`` 的相机属性查询/设置 + 推流状态机
+（``orca_gym.recorder`` 模块，实际执行者）：
+
+```python
+manager = env.get_recorder_manager()
+manager.get_camera_names() -> list[str]
+manager.get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+manager.set_camera_properties(
     camera_name: str,
     **kwargs,   # 可选参数：capture_rgb, capture_depth, capture_normal, capture_object_color, random_object_color, use_nvenc, nvenc_gpu_index, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, use_dds, dds_topic, dds_stream_id
 ) -> None
-def set_streaming_enabled(camera_name: str, enabled: bool) -> None
-def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+manager.set_streaming_enabled(camera_name: str, enabled: bool) -> None
 ```
 
 状态机约束：
@@ -385,6 +413,12 @@ def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
 
 ```python
 def studio_bridge()   # 返回 OrcaStudio 桥接对象（K9 方法访问模式）
+
+def debug_draw() -> DebugDraw
+    # 返回 DebugDraw 实例（K9 方法访问模式）。用于在仿真场景中绘制调试
+    # 图元（球体、线段、坐标系等）。离线模式（skip_grpc_load=True）返回
+    # no-op 实例（stub=None），所有绘制方法为 async 但立即 return。
+    # 调用方用 loop.run_until_complete(dd.draw_sphere(...)) 或 await。
 ```
 
 ### 名称空间解析（多智能体）
@@ -459,7 +493,7 @@ def reset(*, seed: int | None = None, options: dict | None = None) -> tuple[ObsT
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[dict, dict]
+def reset_model() -> tuple[np.ndarray | dict, dict]   # 返回 (obs, info)，reset() 内部调用
 def _get_obs() -> np.ndarray | dict
 ```
 

@@ -2,268 +2,192 @@
 
 OrcaGym 提供全面的接触和力查询接口，用于奖励计算、调试和分析。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/05_force_apply/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/06_force_apply/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/06_force_apply)（`force_apply.py` + `force_apply_env.py`）。
 
 ---
 
-## 完整示例：先看全貌
+## 实战样例：G1 站立接触力验证
 
-下面是一个完整的接触与力分析演示，展示了接触检测、接触力查询、外力施加、碰撞检测和站立检测：
-
-```python
-"""接触与力完整演示"""
-import numpy as np
-from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-
-
-class ContactForceDemo(OrcaGymEulerEnv):
-    """演示接触检测、力查询和外力施加"""
-
-    def __init__(self, model_xml_path, **kwargs):
-        super().__init__(
-            frame_skip=kwargs.pop("frame_skip", 20),
-            orcagym_addr=kwargs.pop("orcagym_addr", "localhost:50051"),
-            agent_names=kwargs.pop("agent_names", ["g1"]),
-            time_step=kwargs.pop("time_step", 0.001),
-            model_xml_path=model_xml_path,
-            **kwargs,
-        )
-
-    # ─── 工具函数 ───
-
-    def analyze_contacts(self):
-        """分析当前所有接触"""
-        contacts = self.query_contact_simple()
-        if not contacts:
-            print("  没有活跃接触")
-            return
-
-        print(f"  活跃接触数: {len(contacts)}")
-        contact_ids = list(range(len(contacts)))
-        forces = self.query_contact_force(contact_ids)
-
-        # 显示前 5 个接触
-        for i, c in enumerate(contacts[:5]):
-            f = forces[i]
-            f_linear = f[:3]
-            f_magnitude = np.linalg.norm(f_linear)
-            print(f"    接触 {i}: geom{c['geom1']}↔geom{c['geom2']}, "
-                  f"力={f_magnitude:.2f}N, 方向={f_linear}")
-
-        # 最大法向力
-        max_normal = max(abs(f[0]) for f in forces.values())
-        print(f"  最大法向力: {max_normal:.1f}N")
-
-    def detect_collision(self, body_a, body_b):
-        """检查两个 body 之间是否碰撞"""
-        contacts = self.query_contact_simple()
-        id_a = self.model.body_name2id(body_a)
-        id_b = self.model.body_name2id(body_b)
-
-        for c in contacts:
-            g1 = self.model.get_geom_body_id(c["geom1"])
-            g2 = self.model.get_geom_body_id(c["geom2"])
-            if (g1 == id_a and g2 == id_b) or (g1 == id_b and g2 == id_a):
-                return True
-        return False
-
-    def is_standing(self, min_force=50.0):
-        """检查机器人是否站立（足部触地力足够）"""
-        contacts = self.query_contact_simple()
-        if not contacts:
-            return False
-        contact_ids = list(range(len(contacts)))
-        forces = self.query_contact_force(contact_ids)
-        max_normal = max(abs(f[0]) for f in forces.values())
-        return max_normal > min_force
-
-    # ─── 演示流程 ───
-
-    def demo(self):
-        self.reset()
-        agent = self._agent_names[0]
-        ctrl = np.zeros(self.model.nu)
-
-        # 先步进几步让机器人稳定触地
-        for _ in range(5):
-            self.do_simulation(ctrl, self.frame_skip)
-
-        # ─── 1. 接触检测 ───
-        print("=" * 50)
-        print("1. 接触检测（G1 站立触地）")
-        print("=" * 50)
-        contacts = self.query_contact_simple()
-        print(f"  接触对数量: {len(contacts)}")
-        print(f"  站立状态: {'✅ 站立' if self.is_standing() else '⚠️ 未站立'}")
-        self.analyze_contacts()
-
-        # ─── 2. Body 外部约束力 ───
-        print("\n" + "=" * 50)
-        print("2. Body 外部约束力")
-        print("=" * 50)
-        cfrc_ext = self.get_cfrc_ext()
-        # cfrc_ext 布局为 [torque(3), force(3)]，线性力在 [:, 3:]
-        max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, 3:], axis=1))
-        print(f"  受力最大的 body ID: {max_idx}, 力: {cfrc_ext[max_idx, 3:]}")
-
-        # ─── 3. 施加外力抬起 pelvis ───
-        print("\n" + "=" * 50)
-        print("3. 施加外力抬起机器人")
-        print("=" * 50)
-
-        pelvis_body = f"{agent}_pelvis"
-        pelvis = self.get_body_xpos_xmat_xquat([pelvis_body])
-        z_before = float(pelvis[pelvis_body]["xpos"][2])
-        print(f"  施力前 pelvis 高度: {z_before:.3f}m")
-
-        # 施加 500N 向上力
-        self.apply_body_force(
-            pelvis_body,
-            force=np.array([0.0, 0.0, 500.0]),
-            torque=np.array([0.0, 0.0, 0.0]),
-        )
-
-        # 步进让力生效
-        for _ in range(20):
-            self.do_simulation(ctrl, self.frame_skip)
-
-        pelvis = self.get_body_xpos_xmat_xquat([pelvis_body])
-        z_after = float(pelvis[pelvis_body]["xpos"][2])
-        print(f"  施力后 pelvis 高度: {z_after:.3f}m (Δ={z_after - z_before:.3f}m)")
-
-        # 验证 xfrc_applied
-        body_id = self.model.body_name2id(pelvis_body)
-        xfrc = self.data.xfrc_applied[body_id, :3]
-        print(f"  xfrc_applied 记录的力: {xfrc}")
-
-        # ─── 4. 清除外力 ───
-        print("\n" + "=" * 50)
-        print("4. 清除外力")
-        print("=" * 50)
-
-        self.clear_body_force(pelvis_body)
-        xfrc = self.data.xfrc_applied[body_id, :3]
-        print(f"  清力后 xfrc: {xfrc}")
-        assert np.all(xfrc == 0), "清力后 xfrc 应为零"
-        print("  ✅ clear_body_force 成功")
-
-        self.clear_all_forces()  # 全清（烟雾测试）
-        print("  ✅ clear_all_forces 成功")
-
-        # ─── 5. 碰撞检测测试 ───
-        print("\n" + "=" * 50)
-        print("5. 碰撞检测")
-        print("=" * 50)
-        left_foot = f"{agent}_left_ankle_roll_link"
-        right_foot = f"{agent}_right_ankle_roll_link"
-        # 地面 body 名称取决于 XML 定义
-        print(f"  左脚↔右脚碰撞: {self.detect_collision(left_foot, right_foot)}")
-
-        print("\n✅ 所有接触与力演示完成")
-
-    def step(self, action):
-        self.do_simulation(action, self.frame_skip)
-        return self._get_obs(), 0.0, False, False, {}
-
-    def reset_model(self):
-        self.set_joint_qpos(self.init_qpos)
-        self.set_joint_qvel(self.init_qvel)
-        self.mj_forward()
-        self._sync_view()
-        return self._get_obs(), {}
-
-    def _get_obs(self):
-        return self.data.qpos.copy()
-
-
-if __name__ == "__main__":
-    env = ContactForceDemo(
-        model_xml_path="/path/to/scene.xml",
-        skip_grpc_load=False,
-    )
-    env.demo()
-    env.close()
-```
-
----
-
-## 逐段解释
-
-### 1. 接触检测
+下面是 [Lesson 6](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/06_force_apply) 中的真实验证流程：G1 人形机器人站立时，足部与地面接触，查询接触对和接触法向力。
 
 ```python
+"""接触力查询验证（摘自 force_apply_env.py 阶段一）"""
+
+# ── step 0：G1 直立，足部触地 ──
 contacts = env.query_contact_simple()
-# → [{"geom1": 12, "geom2": 34, "dist": ..., "pos": ..., "frame": ...}, ...]
-```
+print(f"接触对数量: {len(contacts)}")  # 实际约 25 对（双脚与地面多 geom 接触）
 
-`query_contact_simple()` 返回所有当前活跃的接触对。每个接触是一个字典，
-包含两个碰撞 geom 的 ID、穿透距离、接触点位置和接触坐标系。
+# 验证：至少有 1 个接触（站立触地）
+assert len(contacts) >= 1, "G1 站立时应与地面有接触"
 
-> **注意**：字典 key 是**小写** `"geom1"` / `"geom2"`，不是大写。
-
-**获取接触力**（需要两步）：
-
-```python
-# 第 1 步：构造接触 ID 列表（按接触列表索引）
+# 查询接触力（需要接触索引列表）
 contact_ids = list(range(len(contacts)))
-
-# 第 2 步：查询接触力
 forces = env.query_contact_force(contact_ids)
 # → {0: array([normal, shear1, shear2, torque1, torque2, torque3]), ...}
 
-# 接触坐标系：第 0 分量 = 法向力
+# 接触力前 3 分量在接触坐标系下，第 0 分量为法向力
 max_normal = max(abs(f[0]) for f in forces.values())
+print(f"最大法向力: {max_normal:.1f}N")  # 实际约 109931.9N（G1 整重 ~343N）
+
+# 验证：法向力显著（> 50N，证明足部真实触地）
+assert max_normal > 50.0, "接触法向力应大于 50N"
 ```
 
-**接触坐标系**：接触力在**接触坐标系**下表示。
-- 第 0 分量：法向力（垂直于接触面）
-- 第 1-2 分量：切向力（摩擦力）
-- 第 3-5 分量：力矩分量
+**关键点**：
 
-### 2. Body 外部约束力
+- `query_contact_simple()` 返回所有活跃接触对，每个含 `geom1`/`geom2` ID
+- `query_contact_force(contact_ids)` 返回 6D 力（接触坐标系：法向 + 切向 + 力矩）
+- 第 0 分量 = 法向力，是判断"是否真实接触"的关键指标
+
+---
+
+## 接触力可视化（Studio 自动绘制）
+
+在 Euler 在线模式下，`env.render()` 会自动构建接触快照并传给 OrcaStudio 绘制：
+
+```python
+# 正常步进 + 渲染
+env.do_simulation(ctrl, env.frame_skip)
+env.render(simulate_index=step_idx)
+#                ↑ 内部自动：
+#   1. _build_contact_data() 收集所有接触的 pos + world_force
+#   2. 传给 Studio，在 3D 视口中绘制接触力向量
+```
+
+**绘制内容**：
+
+- 接触点位置（3D 箭头起点）
+- 接触力向量（世界坐标系，箭头方向和长度反映力的大小）
+- 力已从接触坐标系转换到世界坐标系（`frame.T @ force`）
+
+> 无需手动调用绘制接口——`render()` 自动处理。离线模式下无绘制（不连接 Studio）。
+
+---
+
+## 施加外力
+
+样例 step 10 对 G1 pelvis 施加 500N 向上力，验证 `apply_body_force`：
+
+```python
+"""外力应用（摘自 force_apply_env.py 阶段二）"""
+
+# ── step 10：记录 pelvis 初始高度，施加 500N 向上力 ──
+agent = env._agent_names[0]  # 如 "g1_29dof_camera_usda"
+pelvis_body = f"{agent}_pelvis"
+
+pelvis = env.get_body_xpos_xmat_xquat([pelvis_body])
+z_before = float(pelvis[pelvis_body]["xpos"][2])  # 实际 ~0.7864m
+print(f"施力前 pelvis 高度: {z_before:.4f}m")
+
+env.apply_body_force(
+    pelvis_body,
+    force=np.array([0.0, 0.0, 500.0]),   # 500N 向上（> G1 整重 ~343N）
+    torque=np.array([0.0, 0.0, 0.0]),
+)
+
+# ── step 30：验证 pelvis 上升 + xfrc 记录 ──
+for _ in range(20):  # 20 控制周期（0.4s）让力生效
+    env.do_simulation(np.zeros(env.model.nu), env.frame_skip)
+
+pelvis = env.get_body_xpos_xmat_xquat([pelvis_body])
+z_after = float(pelvis[pelvis_body]["xpos"][2])  # 实际 ~1.1777m
+print(f"施力后 pelvis 高度: {z_after:.4f}m (Δ={z_after - z_before:.4f}m)")
+# 验证：pelvis 上升 > 1cm
+assert z_after > z_before + 0.01
+```
+
+**为什么施力在 pelvis 而非 torso**：G1 采用力控 motor 执行器，`ctrl=0` 时关节无力矩，零控下腰部关节松弛，torso 施力难以经由松弛关节传递到 pelvis。直接对 pelvis 施力可可靠验证 API 并产生可见的整机抬起效果。
+
+### 验证 xfrc_applied 记录
+
+```python
+# xfrc_applied 是 DataView 只读视图，按 body_id 索引
+body_id = env.model.body_name2id(pelvis_body)
+xfrc = env.data.xfrc_applied[body_id, :3]
+print(f"xfrc 记录: {xfrc}")  # [0.0, 0.0, 500.0]
+assert np.any(xfrc != 0), "xfrc 应记录施加的力"
+```
+
+### 清除外力
+
+```python
+# ── step 30 末尾：验证上升后立即清力 ──
+env.clear_body_force(pelvis_body)
+
+# ── step 35：验证 xfrc 已归零 ──
+xfrc = env.data.xfrc_applied[body_id, :3]
+print(f"清力后 xfrc: {xfrc}")  # [0.0, 0.0, 0.0]
+assert np.all(xfrc == 0), "清力后 xfrc 应为零"
+
+# step 50：全清（烟雾测试）
+env.clear_all_forces()
+assert np.all(env.data.xfrc_applied == 0), "全清后所有 xfrc 应为零"
+```
+
+---
+
+## 摩擦系数设置
+
+样例 step 50 对 G1 geom 设置摩擦系数：
+
+```python
+"""摩擦设置（摘自 force_apply_env.py 阶段三）"""
+
+# 从 model.get_geom_dict() 动态获取 geom 名称（含 agent 前缀 + GUID 后缀）
+geom_dict = env.model.get_geom_dict()
+g1_geom = next(name for name in geom_dict if name.startswith(f"{agent}_"))
+
+env.set_geom_friction(
+    {g1_geom: np.array([0.8, 0.005, 0.0001])}
+    # [滑动摩擦, 扭转摩擦, 滚动摩擦]
+)
+print(f"已设置 {g1_geom} 摩擦系数")
+```
+
+---
+
+## Body 外部约束力
+
+查询所有 body 上的外部约束力（含接触反力、等式约束力等）：
 
 ```python
 cfrc_ext = env.get_cfrc_ext()  # shape: (nbody, 6)
-# 每行: [mx, my, mz, fx, fy, fz] — 作用在每个 body 上的外部约束力
-# MuJoCo spatial vector 布局：力矩在前(3)，力在后(3)，线性力在 [:, 3:]
+# 每行: [mx, my, mz, fx, fy, fz] — MuJoCo spatial vector 布局（力矩在前，力在后）
 
 # 找出受力最大的 body（按线性力大小）
 max_idx = np.argmax(np.linalg.norm(cfrc_ext[:, 3:], axis=1))
-print(f"受力最大: body {max_idx}, 力={cfrc_ext[max_idx, 3:]}")
+print(f"受力最大的 body ID: {max_idx}, 力: {cfrc_ext[max_idx, 3:]}")
 ```
 
-### 3. 施加外力
+---
+
+## 碰撞检测
+
+检查两个 body 之间是否碰撞：
 
 ```python
-env.apply_body_force(
-    "g1_pelvis",                          # body 名称
-    force=np.array([0.0, 0.0, 500.0]),    # 力 (N)，世界坐标系
-    torque=np.array([0.0, 0.0, 0.0]),     # 力矩 (N·m)
-)
+def detect_collision(env, body_a, body_b):
+    """检查两个 body 之间是否碰撞"""
+    contacts = env.query_contact_simple()
+    id_a = env.model.body_name2id(body_a)
+    id_b = env.model.body_name2id(body_b)
+
+    for c in contacts:
+        g1 = env.model.get_geom_body_id(c["geom1"])
+        g2 = env.model.get_geom_body_id(c["geom2"])
+        if (g1 == id_a and g2 == id_b) or (g1 == id_b and g2 == id_a):
+            return True
+    return False
+
+# 检查 G1 左右脚是否碰撞
+left_foot = f"{agent}_left_ankle_roll_link"
+right_foot = f"{agent}_right_ankle_roll_link"
+print(f"左脚↔右脚碰撞: {detect_collision(env, left_foot, right_foot)}")
 ```
 
-**原理**：直接在 MuJoCo 的 `xfrc_applied` 数组中写入力/力矩。
-力作用在 body 质心，力矩绕 body 质心。下一次 `mj_step()` 时参与动力学计算。
+---
 
-**验证**：`env.data.xfrc_applied[body_id, :3]` — 前 3 个分量为力。
-
-**清除**：
-```python
-env.clear_body_force("body_name")   # 清除单个
-env.clear_all_forces()              # 清除全部
-```
-
-### 4. 外力物理原理
-
-在 site 点施力时，等效到 body 中心的力和力矩：
-
-- **力不变**：F_body = F
-- **附加扭矩**：τ = r × F（r = site_pos - body_pos）
-- **总扭矩**：τ_total = r × F + τ_user
-
-这意味着对 site 施力会产生额外的力矩，等效于对 body 中心施同样的力 + 力臂力矩。
-
-### 5. 奖励函数中的接触
+## 奖励函数中的接触
 
 ```python
 def contact_reward(env):
@@ -283,6 +207,20 @@ def contact_reward(env):
 
 ---
 
+## 接触坐标系说明
+
+`query_contact_force` 返回的力在**接触坐标系**下表示：
+
+| 分量 | 含义 |
+|------|------|
+| `[0]` | 法向力（垂直于接触面） |
+| `[1:3]` | 切向力（摩擦力） |
+| `[3:6]` | 力矩分量 |
+
+> ⚠️ **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`。
+
+---
+
 ## API 速查
 
 | 操作 | API | 说明 |
@@ -293,6 +231,8 @@ def contact_reward(env):
 | 施加外力 | `env.apply_body_force(name, f, τ)` | 世界坐标系 |
 | 清除外力 | `env.clear_body_force(name)` | 清除指定 body |
 | 清除全部 | `env.clear_all_forces()` | 清除所有外力 |
+| 设置摩擦 | `env.set_geom_friction({name: arr})` | [滑动, 扭转, 滚动] |
+| 接触力绘制 | `env.render()` | 自动构建接触快照传 Studio 绘制 |
 
 ---
 

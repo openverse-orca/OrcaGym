@@ -2,7 +2,7 @@
 
 逆运动学（Inverse Kinematics）将末端执行器的目标位姿转换为关节角度。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/06_jacobian/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian)。
 
 ---
 

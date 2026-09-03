@@ -2,7 +2,8 @@
 
 So far we have only been "looking". In this section, we start **making the robot move**. We begin with the simplest case: understanding `qpos`/`qvel` and manually controlling joints.
 
-> See [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> This section is based on the scene and examples from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler).
+> The sample code (`simple_env.py`) uses direct index access; this section rewrites it to demonstrate **querying and setting by name**.
 
 ---
 

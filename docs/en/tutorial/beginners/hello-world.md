@@ -176,7 +176,7 @@ obs, reward, terminated, truncated, info = env.step(action)              # Advan
 
 **Cause**: The XML file pointed to by `model_xml_path` does not exist.
 
-**Solution**: Verify the file path is correct. You can obtain example scene files from [OrcaPlayground](https://github.com/OrcaGym/OrcaPlayground).
+**Solution**: Verify the file path is correct. You can obtain example scene files from [OrcaPlayground](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler).
 
 ### `ModuleNotFoundError: No module named 'orca_gym'`
 

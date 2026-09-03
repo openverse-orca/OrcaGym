@@ -2,7 +2,7 @@
 
 除了读取关节角度和 body 位姿，你还可以从仿真中获取**图像**——就像给机器人装上了眼睛。
 
-OrcaGym 通过 WebSocket 从 OrcaStudio 获取实时渲染的相机画面。
+OrcaGym 通过 WebSocket 从 OrcaStudio 获取实时渲染的相机画面，支持按物理步索引对齐帧、区间保存为 MP4、实时预览。
 
 ---
 
@@ -10,273 +10,344 @@ OrcaGym 通过 WebSocket 从 OrcaStudio 获取实时渲染的相机画面。
 
 ```python
 """
-first_camera.py — 获取仿真相机的第一张图像
+first_camera.py — 通过环境层获取相机画面
 """
 
-import time
 import numpy as np
-from orca_gym.sensor.rgbd_camera import CameraWrapper
+from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
-# 1. 创建相机包装器
-# name: 相机名称（任意）
-# port: WebSocket 端口（在 OrcaStudio 中配置）
-camera = CameraWrapper(name="front_camera", port=8765)
 
-# 2. 启动相机流（后台线程自动接收和解码）
-camera.start()
-print("相机已启动，等待第一帧...")
+class CameraEnv(OrcaGymEulerEnv):
+    """最简相机环境"""
 
-# 3. 等待第一帧到达
-while not camera.is_first_frame_received():
- time.sleep(0.1)
+    def __init__(self, model_xml_path, **kwargs):
+        super().__init__(
+            frame_skip=kwargs.pop("frame_skip", 5),
+            orcagym_addr=kwargs.pop("orcagym_addr", "localhost:50051"),
+            agent_names=kwargs.pop("agent_names", ["agent0"]),
+            time_step=kwargs.pop("time_step", 0.002),
+            model_xml_path=model_xml_path,
+            sync_render=kwargs.pop("sync_render", True),
+            render_fps=kwargs.pop("render_fps", 30),
+            **kwargs,
+        )
 
-print(f"✅ 收到第一帧！")
+    def step(self, action):
+        self.do_simulation(action, self.frame_skip)
+        return self._get_obs(), 0.0, False, False, {}
 
-# 4. 获取图像
-image = camera.image # NumPy 数组，形状 (H, W, 3)，格式 BGR
-print(f" 分辨率: {image.shape[1]}×{image.shape[0]}")
-print(f" 数据类型: {image.dtype}")
-print(f" 像素范围: [{image.min()}, {image.max()}]")
-print(f" 帧序号: {camera.image_index}")
+    def reset_model(self):
+        self.set_joint_qpos(self.init_qpos)
+        self.set_joint_qvel(self.init_qvel)
+        self.mj_forward()
+        self._sync_view()
+        return self._get_obs(), {}
 
-# 5. 保存图像（用 OpenCV）
-import cv2
-cv2.imwrite("first_frame.png", image)
-print("✅ 图像已保存到 first_frame.png")
+    def _get_obs(self):
+        return self.data.qpos.copy()
 
-# 6. 停止相机
-camera.stop()
+
+if __name__ == "__main__":
+    env = CameraEnv(
+        model_xml_path="tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml",
+        orcagym_addr="localhost:50051",
+        skip_grpc_load=False,  # 在线模式，需连接 OrcaStudio
+        render_mode="human",
+    )
+    env.reset()
+
+    # 1. 枚举所有已注册相机名称
+    camera_names = env.get_camera_names()
+    print(f"可用相机: {camera_names}")
+    assert camera_names, "未找到相机，请先在 OrcaStudio 场景中添加 Camera Entity"
+    camera_name = camera_names[0]
+
+    # 2. 启动串流（一键配置 + 推流）
+    env.start_streaming(
+        camera_name,
+        capture_rgb=True,       # 启用 RGB 流
+        color_port=7070,        # RGB 流 WebSocket 端口
+        width=640,
+        height=480,
+    )
+    print(f"✅ 相机 '{camera_name}' 串流已启动")
+
+    # 3. 主循环：render(simulate_index=...) 驱动渲染
+    #    simulate_index 用于按区间提取帧，必须递增
+    for step_idx in range(100):
+        action = np.zeros(env.model.nu, dtype=np.float32)
+        env.step(action)
+        env.render(simulate_index=step_idx)
+
+    # 4. 实时预览（非阻塞）
+    env.show_camera(camera_name, camera_type="color")
+
+    # 5. 保存区间视频为 MP4（非阻塞，返回 Future）
+    future = env.save_streaming(
+        camera_name=camera_name,
+        camera_type="color",
+        file_path="/tmp/pendulum.mp4",
+        start_simulate_index=0,
+        end_simulate_index=99,
+    )
+    result = future.result()  # 等待保存完成
+    print(f"✅ 已保存: {result.file_path} ({result.frame_count} 帧)")
+
+    env.close()
 ```
+
+> ⚠️ **本节示例需在线模式运行**（`skip_grpc_load=False`），需连接 OrcaStudio。
+> 离线模式下相机接口返回空列表 / no-op。
+
+---
+
+## 核心 API 详解
+
+### 1. 枚举相机名称
+
+```python
+camera_names = env.get_camera_names()
+# → ["Camera_Entity_[uuid1]", "Camera_Entity_[uuid2]", ...]
+```
+
+返回所有在 OrcaStudio 场景中注册的相机名称。离线模式返回空列表。
+
+### 2. 启动串流（`start_streaming`）⭐ 推荐
+
+```python
+env.start_streaming(
+    camera_name,
+    capture_rgb=True,           # 启用 RGB 流
+    capture_depth=True,         # 启用深度流
+    color_port=7070,            # RGB 流 WebSocket 端口
+    depth_port=7071,            # 深度流 WebSocket 端口
+    width=1280,                 # 图像宽度
+    height=720,                 # 图像高度
+    vertical_fov=60.0,          # 垂直视场角（度）
+    near_clip=0.01,             # 近裁剪面
+    far_clip=100.0,             # 远裁剪面
+    gamma=1.0,                  # 深度相机 gamma 校正
+    use_nvenc=True,             # 使用 NvEnc 硬件编码
+    nvenc_gpu_index=0,          # NvEnc GPU 索引
+)
+```
+
+| 参数 | 说明 | 典型值 |
+|------|------|--------|
+| `capture_rgb` | 是否输出 RGB 彩色图 | `True` |
+| `capture_depth` | 是否输出深度图 | `True`（需要时） |
+| `capture_normal` | 是否输出法线图 | `False` |
+| `capture_object_color` | 是否输出实例分割色标图 | `False` |
+| `width` / `height` | 图像分辨率 | 640×480, 1280×720 |
+| `vertical_fov` | 垂直视场角（度） | 60.0 |
+| `near_clip` / `far_clip` | 裁剪面距离 | 0.01 / 100.0 |
+| `color_port` / `depth_port` | WebSocket 端口 | 7070 / 7071 |
+| `use_nvenc` | NvEnc 硬件编码 | `True`（有 NVIDIA GPU 时） |
+
+> 💡 该方法内部自动处理相机属性同步和推流状态切换，上层无需关心底层状态机。
+
+### 3. 驱动渲染（`render`）
+
+```python
+env.render(simulate_index=step_idx, request_idr=False)
+```
+
+- **`simulate_index`**：物理仿真步索引，透传到引擎相机管线用于帧对齐。
+  保存区间视频时按此索引提取帧，**必须递增**。
+- **`request_idr`**：是否请求引擎输出 IDR 关键帧。
+  保存段起点可设 `True`，保证输出视频起点可正常播放。
+
+渲染频率由 `set_render_fps(fps)` 控制：
+- `sync_render=True`：按物理步节流（每 N 个物理步渲染一帧）
+- `sync_render=False`：按墙钟时间节流（每 `1/fps` 秒渲染一帧）
+
+### 4. 保存区间视频（`save_streaming`）
+
+```python
+future = env.save_streaming(
+    camera_name="Camera_Entity_[uuid]",
+    camera_type="color",          # "color" 或 "depth"
+    file_path="/tmp/output.mp4",
+    start_simulate_index=50,       # 区间起始（含）
+    end_simulate_index=200,       # 区间结束（含）
+)
+result = future.result()          # 非阻塞，等结果
+print(result.file_path, result.frame_count)
+```
+
+- **非阻塞**：立即返回 `Future`，保存完成后 `future.result()` 拿结果。
+- 需先调用 `start_streaming` 启动推流。
+
+### 5. 实时预览（`show_camera`）
+
+```python
+env.show_camera(camera_name, camera_type="color", window_name="Front View")
+```
+
+- **非阻塞**：在独立窗口中显示画面，不影响仿真主线程。
+- 深度流直接显示原始灰度帧，不做伪彩色转换。
+- 需先调用 `start_streaming` 启动推流。
 
 ---
 
 ## 在环境类中集成相机
-
-将相机作为环境的一部分，每步获取图像：
 
 ```python
 """
 vision_env.py — 带相机观测的环境
 """
 
-import time
 import numpy as np
 from gymnasium import spaces
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 
 class VisionEnv(OrcaGymEulerEnv):
- """在观测中加入相机图像的环境"""
+    """在观测中加入相机图像的环境"""
 
- def __init__(self, frame_skip, orcagym_addr, agent_names, time_step,
- camera_port: int = 8765, **kwargs):
- super().__init__(
- frame_skip=frame_skip,
- orcagym_addr=orcagym_addr,
- agent_names=agent_names,
- time_step=time_step,
- **kwargs,
- )
+    def __init__(self, model_xml_path, camera_name, **kwargs):
+        super().__init__(
+            frame_skip=kwargs.pop("frame_skip", 5),
+            orcagym_addr=kwargs.pop("orcagym_addr", "localhost:50051"),
+            agent_names=kwargs.pop("agent_names", ["agent0"]),
+            time_step=kwargs.pop("time_step", 0.002),
+            model_xml_path=model_xml_path,
+            sync_render=True,
+            render_fps=30,
+            render_mode="human",
+            skip_grpc_load=kwargs.pop("skip_grpc_load", False),
+            **kwargs,
+        )
 
- # ── 设置相机 ──
- self._camera = CameraWrapper(name="agent_view", port=camera_port)
- self._camera.start()
+        # ── 相机配置 ──
+        self._camera_name = camera_name
+        self.start_streaming(
+            camera_name,
+            capture_rgb=True,
+            color_port=7070,
+            width=640,
+            height=480,
+        )
+        self._step_idx = 0
 
- # 等待第一帧
- print("等待相机就绪...")
- while not self._camera.is_first_frame_received():
- time.sleep(0.1)
- print(f"✅ 相机就绪: {self._camera.image.shape}")
+        # ── 动作空间 ──
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(self.model.nu,), dtype=np.float32
+        )
 
- # 动作空间
- self.action_space = spaces.Box(
- low=-1.0, high=1.0, shape=(self.model.nu,), dtype=np.float32
- )
- obs_sample = self._get_obs()
- self.observation_space = spaces.Dict({
- key: spaces.Box(low=-np.inf, high=np.inf, shape=v.shape, dtype=v.dtype)
- if isinstance(v, np.ndarray) and v.dtype != np.uint8
- else spaces.Box(low=0, high=255, shape=v.shape, dtype=np.uint8)
- for key, v in obs_sample.items()
- })
+        # ── 观测空间 ──
+        obs_sample = self._get_obs()
+        self.observation_space = spaces.Dict({
+            key: spaces.Box(low=-np.inf, high=np.inf, shape=v.shape, dtype=v.dtype)
+            if isinstance(v, np.ndarray) and v.dtype != np.uint8
+            else spaces.Box(low=0, high=255, shape=v.shape, dtype=np.uint8)
+            for key, v in obs_sample.items()
+        })
 
- def _get_obs(self):
- """
- 观测 = 本体感知（关节角度）+ 视觉（相机图像）
+    def _get_obs(self):
+        """观测 = 本体感知 + 视觉"""
+        # 获取最新已解码帧（np.ndarray (H, W, 3) uint8 BGR，或 None）
+        frame = self.get_recorder_manager().get_last_decoded_frame(
+            self._camera_name, "color"
+        )
+        if frame is None:
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        return {
+            "joint_pos": self.data.qpos.copy().astype(np.float32),
+            "joint_vel": self.data.qvel.copy().astype(np.float32),
+            "image": frame.copy(),
+        }
 
- 本体感知 (proprioception): 机器人"感觉"到的自身状态
- 视觉 (vision): 相机看到的画面
- """
- return {
- # 本体感知
- "joint_pos": self.data.qpos.copy().astype(np.float32),
- "joint_vel": self.data.qvel.copy().astype(np.float32),
+    def step(self, action):
+        action = np.asarray(action, dtype=np.float32).reshape(self.model.nu)
+        self.do_simulation(action, self.frame_skip)
 
- # 视觉
- "image": self._camera.image.copy(), # (H, W, 3) uint8
- }
+        # 驱动渲染 + 帧对齐
+        self._step_idx += 1
+        self.render(simulate_index=self._step_idx)
 
- def step(self, action):
- action = np.asarray(action, dtype=np.float32).reshape(self.model.nu)
- self.do_simulation(action, self.frame_skip)
+        obs = self._get_obs()
+        return obs, 0.0, False, False, {}
 
- obs = self._get_obs()
- reward = 0.0
- terminated = False
- truncated = False
-
- return obs, reward, terminated, truncated, {}
-
- def reset_model(self):
- self.set_joint_qpos(self.init_qpos)
- self.set_joint_qvel(self.init_qvel)
- self.mj_forward()
- self._sync_view()
- return self._get_obs(), {}
-
- def close(self):
- self._camera.stop()
- super().close()
-```
-
----
-
-## 显示相机画面
-
-用 Matplotlib 实时显示：
-
-```python
-import matplotlib.pyplot as plt
-
-def show_camera_live(camera: CameraWrapper, duration: float = 10.0):
- """
- 实时显示相机画面（duration 秒）。
-
- 注意：这只是一个简单的显示示例。
- 实际 RL 训练中不需要这样逐帧显示——直接用 image 数组即可。
- """
- plt.ion() # 交互模式
- fig, ax = plt.subplots()
- img_display = ax.imshow(np.zeros((480, 640, 3), dtype=np.uint8))
- ax.set_title("Camera Feed")
- ax.axis('off')
-
- start = time.time()
- while time.time() - start < duration:
- frame = camera.image.copy()
- # OpenCV 的 BGR → Matplotlib 的 RGB
- frame_rgb = frame[..., ::-1]
- img_display.set_data(frame_rgb)
- fig.canvas.flush_events()
- plt.pause(0.03) # ~30 FPS
-
- plt.ioff()
- plt.close()
+    def reset_model(self):
+        self.set_joint_qpos(self.init_qpos)
+        self.set_joint_qvel(self.init_qvel)
+        self.mj_forward()
+        self._sync_view()
+        self._step_idx = 0
+        return self._get_obs(), {}
 ```
 
 ---
 
 ## 多相机设置
 
-需要多个视角？创建多个 `CameraWrapper`：
-
 ```python
-def setup_multi_camera():
- """同时启动多个相机"""
+# 1. 枚举所有相机
+camera_names = env.get_camera_names()
 
- cameras = {
- "front": CameraWrapper("front", port=8765),
- "side": CameraWrapper("side", port=8766),
- "top": CameraWrapper("top", port=8767),
- }
+# 2. 逐个启动串流（用不同端口避免冲突）
+env.start_streaming(camera_names[0], capture_rgb=True, color_port=7070)
+env.start_streaming(camera_names[1], capture_rgb=True, color_port=7071)
+env.start_streaming(camera_names[2], capture_rgb=True, color_port=7072)
 
- # 全部启动
- for cam in cameras.values():
- cam.start()
+# 3. 主循环中统一 render（一次 render 触发所有相机的渲染）
+for step_idx in range(100):
+    env.step(action)
+    env.render(simulate_index=step_idx)
 
- # 等待所有相机就绪
- for name, cam in cameras.items():
- while not cam.is_first_frame_received():
- time.sleep(0.1)
- print(f"✅ {name}: {cam.image.shape}")
-
- # 同步获取所有画面
- def get_all_views():
- return {name: cam.image.copy() for name, cam in cameras.items()}
-
- return cameras, get_all_views
-
-
-# 用法
-cameras, get_views = setup_multi_camera()
-views = get_views()
-print(f"可用视角: {list(views.keys())}")
+# 4. 分别预览
+env.show_camera(camera_names[0], "color", window_name="Front")
+env.show_camera(camera_names[2], "color", window_name="Top")
 ```
+
+> 💡 一次 `render(simulate_index=...)` 触发引擎渲染所有已启用的相机，
+> 无需为每个相机单独调用 render。
 
 ---
 
-## 相机参数配置
-
-在 OrcaStudio 中可以配置每个相机的参数：
-
-| 参数 | 说明 | 典型值 |
-|------|------|--------|
-| 分辨率 | 图像宽×高 | 640×480, 1280×720 |
-| 帧率 | 每秒帧数 | 15, 30, 60 |
-| RGB | 是否输出彩色图 | `True` |
-| Depth | 是否输出深度图 | `True`（需要时） |
-
-在 Python 侧通过 `CameraProperty` 配置（需先创建 `OrcaGymScene` 实例）。新接口采用状态机：
-- `get_camera_names()` 枚举所有已注册相机名称
-- `set_camera_properties` 仅在 Idle 状态允许，用于设置相机属性
-- `set_streaming_enabled(True)` 进入 Streaming 状态后端口开始推流
-- MP4 录制由环境层的 `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` 控制（客户端 PyAV remux，非阻塞，返回 `Future`）
+## 深度相机
 
 ```python
-from orca_gym.scene.orca_gym_scene import OrcaGymScene, CameraProperty
-
-# 先创建场景管理器
-scene = OrcaGymScene(grpc_addr="localhost:50051")
-
-# 0. 枚举所有已注册相机名称
-camera_names = scene.get_camera_names()
-print(f"Found cameras: {camera_names}")
-
-# 1. 在 Idle 状态配置相机属性（所有字段 optional，None 表示不修改）
-camera_config = CameraProperty(
-    capture_rgb=True,      # 输出 RGB 图像
-    capture_depth=True,    # 输出深度图
-    use_dds=False,         # 不使用 DDS 压缩
+# 启动深度流
+env.start_streaming(
+    camera_name,
+    capture_rgb=False,
+    capture_depth=True,
+    depth_port=7071,
+    near_clip=0.01,    # 深度相机近裁剪面
+    far_clip=100.0,    # 深度相机远裁剪面
+    gamma=1.0,         # 深度相机 gamma 校正
 )
-camera_name = camera_names[0]  # 选择第一个相机
-scene.set_camera_properties(camera_name, camera_config)
 
-# 2. 启动推流（Idle → Streaming，对应端口如 7070/7071 开始监听推流）
-scene.set_streaming_enabled(camera_name, True)
+# 预览（灰度显示，不做伪彩色转换）
+env.show_camera(camera_name, camera_type="depth")
 
-# 3. 如需修改属性，先停止推流回到 Idle
-# scene.set_streaming_enabled(camera_name, False)
-# scene.set_camera_properties(camera_name, CameraProperty(width=1280, height=720))
-# scene.set_streaming_enabled(camera_name, True)
+# 保存深度视频
+future = env.save_streaming(
+    camera_name, "depth", "/tmp/depth.mp4",
+    start_simulate_index=0, end_simulate_index=99,
+)
 ```
+
+> ⚠️ 深度流与彩色流是独立的码流，需分别用 `camera_type="color"` / `"depth"` 操作。
+> 同一相机可同时启用 RGB + Depth（`capture_rgb=True, capture_depth=True`）。
 
 ---
 
 ## 性能建议
 
-1. **不要在主循环中 `imshow`** — 图像显示很吃 CPU。训练时直接处理数组即可
-2. **缩小图像** — 如果不需要全分辨率，在 `_get_obs()` 中 resize
-3. **降低帧率** — 30 FPS 通常足够，更高的帧率浪费带宽
-4. **异步渲染** — 相机在后台线程解码，不阻塞主仿真线程
-
-```python
-def _get_obs(self):
- image = self._camera.image.copy()
- # 缩小到 128×128 以减少计算量
- small_image = cv2.resize(image, (128, 128))
- return {..., "image": small_image}
-```
+1. **不要在主循环中 `imshow`** — 图像显示很吃 CPU。
+   用 `show_camera()` 让它在独立窗口显示，或训练时完全不显示。
+2. **降低帧率** — 训练时 15~30 FPS 通常足够，更高的帧率浪费带宽。
+3. **NvEnc 硬件编码** — 有 NVIDIA GPU 时设 `use_nvenc=True` 可大幅降低编码 CPU 开销。
+4. **缩小图像** — 若 RL 策略不需要全分辨率，在 `_get_obs()` 中 resize：
+   ```python
+   import cv2
+   small = cv2.resize(frame, (128, 128))
+   ```
+5. **区间录制而非全程录制** — 用 `save_streaming(start, end)` 只保存关键区间，
+   内存占用恒定。
 
 ---
 

@@ -153,7 +153,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
 ### 4.2 OrcaGymEuler — 仿真核心 Facade
 
-组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 后端后续接入）。**不暴露** `_mjModel`/`_mjData`，依赖 `_` 前缀约定 + ruff SLF001 静态检查，通过 `__dir__` 控制 IDE 自动补全只显示公共 API。
+组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 后端后续接入）。**不暴露** `_mjModel`/`_mjData`，通过 `__getattribute__` 主动拦截对 `_sim`/`_studio`/`_mjData` 等内部组件的访问（直接抛 `AttributeError`），辅以 `_` 前缀约定 + ruff SLF001 静态检查 + `__dir__` 控制 IDE 自动补全只显示公共 API。
 
 ```python
 class OrcaGymEuler:
@@ -209,11 +209,11 @@ class ModelRegistry:
 
 ### 4.6 SimConfig — 求解器配置
 
-提供 typed 的 MuJoCo 求解器参数读写接口，替代 `_mjModel.opt.*` 直接访问。覆盖所有用户可访问的 `opt` 字段，修改在下次 `mj_step` 时生效。
+提供 typed 的 MuJoCo 求解器参数读写接口，替代 `_mjModel.opt.*` 直接访问。覆盖所有用户可访问的 `opt` 字段，修改立即写入 `mj_model.opt`（下次 `mj_step` 即按新值计算）。
 
 ```python
 class SimConfig:
-    """MuJoCo 求解器参数配置。替代直接访问 _mjModel.opt.*。修改在下次 mj_step 时生效。"""
+    """MuJoCo 求解器参数配置。替代直接访问 _mjModel.opt.*。修改立即写入 opt 结构，下次 mj_step 生效。"""
 
     @property
     def timestep(self) -> float: ...
@@ -432,7 +432,7 @@ for _ in range(self.frame_skip):
 
 ### 5.5 求解器配置
 
-所有 `opt.*` 参数通过 `env.sim_config` 读写，配置修改在下次 `mj_step` 时生效。
+所有 `opt.*` 参数通过 `env.sim_config` 读写，配置修改立即写入 `mj_model.opt`，下次 `mj_step` 即按新值计算。
 
 ```python
 # ✅ 正确
@@ -459,12 +459,15 @@ body_name = env.body("object")
 |------|-----|
 | **状态读取** | `data`（OrcaGymDataView）, `model`（OrcaGymModel）, `ctrl`, `frame_skip`, `dt`, `realtime_step` |
 | **仿真控制** | `do_simulation(ctrl, n)`, `mj_step(n)`, `mj_forward()` |
-| **状态查询** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_mat()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
-| **状态设置** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
+| **状态查询** | `query_joint_qpos/qvel/qacc/offsets/lengths/dofadrs()`, `jnt_qposadr()`, `jnt_dofadr()`, `query_site_pos_and_mat()`, `query_site_size()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `query_contact_force()`, `get_body_xpos_xmat_xquat()`, `get_body_xpos_xmat_xquat_xvel()`, `get_cfrc_ext()`, `get_goal_bounding_box()`, `body_subtree_mass()` |
+| **基座坐标查询** | `query_velocity_body_B()`, `query_position_body_B()`, `query_orientation_body_B()`, `query_joint_axes_B()` |
+| **里程计查询** | `query_robot_velocity_odom()`, `query_robot_position_odom()`, `query_robot_orientation_odom()` |
+| **雅可比** | `mj_jacBody()`, `mj_jacSite()`, `mj_jac_site()` |
+| **状态设置** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `add_extra_weight()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()`, `mj_apply_force_at_site()`, `mj_clear_xfrc_applied_for_site()` |
 | **等式约束原语（无状态，L1）** | `equality_find_slot_by_body(body_name)`, `equality_constraint(slot)`, `equality_update(slot, **fields, forward=True)` |
 | **求解器配置** | `sim_config`（SimConfig） |
 | **名称空间** | `joint()`, `body()`, `site()`, `actuator()`, `sensor()` |
-| **Studio 交互** | `render()`, `begin_save_video()`, `stop_save_video()`, `get_current_frame()`, `get_frame_png()` |
+| **Studio 交互** | `render()`, `save_streaming()`, `start_streaming()`, `show_camera()`, `get_recorder_manager()`, `set_render_fps()`, `set_video_recorder_manager()`, `get_camera_names()`, `make_camera_viewport_active()`, `load_content_file()`, `studio_bridge()`, `debug_draw()` |
 | **生命周期** | `initialize_simulation()`, `initialize_grpc()`, `pause_simulation()`, `close()` |
 
 > **Studio UI 抓取为内部 API**：原 `anchor_actor()` / `release_body_anchored()` / `do_body_manipulation()` 按 P6 原则改为 `_` 前缀内部方法，由 `render()` 内部驱动，不进入公共 API。程序化体操作应使用等式约束无状态原语自行实现。
@@ -475,11 +478,12 @@ body_name = env.body("object")
 
 ### 6.1 机制总览
 
-本架构通过多层引导让"正确方式"成为阻力最小的路径。`OrcaGymEulerEnv` 直接继承 `gym.Env`，不创建 `gym`/`stub`/`channel` 属性，Python 原生即拒绝访问；其余内部对象依赖 `_` 前缀约定 + ruff SLF001 静态检查 + AGENTS.md AI 行为约束：
+本架构通过多层引导让"正确方式"成为阻力最小的路径。`OrcaGymEulerEnv` 直接继承 `gym.Env`，不创建 `gym`/`stub`/`channel` 属性，Python 原生即拒绝访问；`OrcaGymEuler` 通过 `__getattribute__` 主动拦截内部组件访问；其余内部对象依赖 `_` 前缀约定 + ruff SLF001 静态检查 + AGENTS.md AI 行为约束：
 
 | 机制 | 实现 | 效果 |
 |------|------|------|
 | **Python 原生属性不存在** | `OrcaGymEulerEnv` 直接继承 `gym.Env`，`__init__` 中赋值的内部组件均带下划线前缀（如 `_gym`/`_stub`/`_channel`/`_studio_bridge` 等），不创建无前缀的 `gym`/`stub`/`channel` 属性 | `env.gym`/`env.stub`/`env.channel` 抛 `AttributeError` |
+| **`__getattribute__` 主动拦截** | `OrcaGymEuler.__getattribute__` 维护 `_BLOCKED_ATTRS` 集合，外部访问 `_sim`/`_studio`/`_registry`/`_opt`/`_mjData`/`_mjModel` 等内部组件时直接抛 `AttributeError`（内部 `self._xxx` 委托通过 `object.__getattribute__` 白名单放行） | `env._gym._sim` / `env._gym._mjData` 等穿墙访问运行时即阻断 |
 | **ruff SLF001 静态检查** | 配置 `ruff check --select SLF001`，扫描外部访问 `_` 前缀属性的代码 | 提交前/CI 阶段检测穿墙访问 |
 | **AGENTS.md AI 约束** | 每个自研仓库根目录配置 `AGENTS.md`，明文禁止 AI 使用 `_` 前缀属性 | 从输入端约束 AI 代码生成行为 |
 | **`__dir__` 控制** | Env/Gym/DataView 实现 `__dir__`，只暴露公共 API | IDE 自动补全引导正确路径 |
@@ -493,7 +497,8 @@ body_name = env.body("object")
 | 场景 | 触发机制 | 你/AI 看到的 |
 |------|---------|-------------|
 | AI 生成 `env._mjData.qpos` | ruff SLF001 | 提交前报警：用 `env.data.qpos` |
-| AI 生成 `env._gym._mjData` | ruff SLF001 | 提交前报警：用 `env.data` |
+| AI 生成 `env._gym._mjData` | `__getattribute__` + ruff SLF001 | 运行时 `AttributeError` + 提交前报警 |
+| AI 生成 `env._gym._sim` | `__getattribute__` | 运行时即 `AttributeError`（`_sim` 在 `_BLOCKED_ATTRS`） |
 | AI 生成 `env._mjModel.opt.iterations` | ruff SLF001 | 提交前报警：用 `env.sim_config.iterations` |
 | AI 在 IDE 中补全 `env.` | `__dir__` 控制 | 只看到公共 API |
 | AI 阅读 class docstring | 类型标注 + 契约 | 知道正确用法和禁止事项 |
@@ -501,10 +506,10 @@ body_name = env.body("object")
 
 ### 6.3 与旧体系的隔离强度对比
 
-| 系统 | 绕道路径 | 层数 | 内部组件是否可见 | 静态检查 |
-|------|---------|------|----------------|---------|
-| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` 是公共属性 | 无 |
-| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` 不列出 | ruff SLF001 报警 |
+| 系统 | 绕道路径 | 层数 | 内部组件是否可见 | 运行时拦截 | 静态检查 |
+|------|---------|------|----------------|-----------|---------|
+| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` 是公共属性 | 无 | 无 |
+| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` 不列出 | `__getattribute__` 主动抛 `AttributeError`（`_sim`/`_mjData` 被拦截） | ruff SLF001 报警 |
 
 ---
 

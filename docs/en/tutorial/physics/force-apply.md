@@ -2,7 +2,7 @@
 
 This section covers how to **apply external forces, write state, use Jacobian matrices, and inverse kinematics (IK)** to control the simulation.
 
-> See [OrcaPlayground examples/euler/05_force_apply/](https://github.com/OrcaGym/OrcaPlayground) and [06_jacobian/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> This section is based on the scene and examples from [OrcaPlayground examples/euler/06_force_apply/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/06_force_apply) and [07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian), integrated into a single example for teaching purposes.
 
 ---
 
@@ -58,7 +58,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_force_apply(self):
         """Demo 1: Apply external force to lift the robot."""
-        agent = self.agent_name
+        agent = self._agent_names[0]
 
         # Record initial height
         pelvis = self.get_body_xpos_xmat_xquat([f"{agent}_pelvis"])
@@ -95,7 +95,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_mocap_drag(self):
         """Demo 2: Drag an object using mocap + weld constraint."""
-        agent = self.agent_name
+        agent = self._agent_names[0]
 
         # Set mocap target pose
         target_pos = np.array([0.7, 0.0, 0.5])
@@ -128,7 +128,7 @@ class ForceAndIKDemo(OrcaGymEulerEnv):
 
     def demo_ik_lift_foot(self):
         """Demo 3: Damped least-squares IK to lift the left foot."""
-        agent = self.agent_name
+        agent = self._agent_names[0]
         foot_body = f"{agent}_left_ankle_roll_link"
 
         # --- Prepare G1 joint info ---
@@ -290,7 +290,7 @@ read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 ```
 
 **Complete Dragging Workflow** (under the Euler path, `anchor_actor`/`release_body_anchored` are not public Env API; programmatic operations should follow the UI-grasp internal method orchestration pattern using these public primitives):
-1. `equality_find_slot_by_body(env.body("mocap_anchor"))` — find the equality constraint slot containing the mocap
+1. `equality_find_slot_by_body(mocap_name)` — find the equality constraint slot containing the mocap (mocap_name is the mocap body name in the scene, e.g. TestMocapAnchor)
 2. `equality_constraint(slot)` — save original constraint snapshot (restore on release)
 3. `set_mocap_pos_and_quat(...)` — align mocap pose to the object's current pose
 4. `equality_update(slot, eq_type=mjtEq.mjEQ_WELD, obj1_name=..., obj2_name=...)` — establish WELD constraint
@@ -312,12 +312,13 @@ read_quat = env.data.mocap_quat("mocap_name")  # (4,)
 qpos = env.data.qpos.copy()       # 1. Copy
 qpos[addr] = new_value             # 2. Modify the copy
 env.set_joint_qpos(qpos)           # 3. Compliant write
-env.mj_forward()                   # 4. Required! Update derived quantities
-env._sync_view()                   # 5. Sync to DataView
+env.mj_forward()                   # 4. Required! Update derived quantities (body poses, sensors, etc.)
 ```
 
 > ⚠️ **Critical**: After modifying qpos/qvel, you **must call `mj_forward()`**. Without it,
 > body poses read by `get_body_xpos_xmat_xquat` etc. will still be the old values.
+>
+> `do_simulation` internally already executes `mj_step` + sync, no need to manually call `mj_forward`.
 
 ### 4. Jacobian Matrices
 
