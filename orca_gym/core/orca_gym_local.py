@@ -270,7 +270,8 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
         self._override_ctrls : dict[int, float] = {}
-        
+        self._protected_override_ctrl_ids: set[int] = set()
+
         # 清理可能的僵尸锁文件
         import tempfile
         temp_dir = tempfile.gettempdir()
@@ -494,6 +495,18 @@ class OrcaGymLocal(OrcaGymBase):
                     _logger.warning(f"Invalid control index: {ctrl.index}, skipping.")
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
+
+    async def push_visual_state(self, qpos, time) -> None:
+        """
+        仅将 qpos 推送到 Studio MuJoCo 视口做运动学显示，不读取 override_ctrls。
+
+        用于 replay + skip_render 场景：避免 Studio 界面控制覆盖 OSC 力矩，
+        同时让 Studio 窗口中的机器人跟随 OrcaGym 本地仿真。
+        """
+        if self._skip_grpc_load or self.stub is None:
+            return
+        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        await self.stub.UpdateLocalEnv(request)
 
     async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
         """
@@ -2051,10 +2064,20 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         if len(self._override_ctrls) > 0:
-            # 如果有 override 控制，则使用 override 控制
+            protected = self._protected_override_ctrl_ids
             for actuator_id, value in self._override_ctrls.items():
+                if actuator_id in protected:
+                    continue
                 ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
+
+    def clear_override_ctrls(self) -> None:
+        """清空 Studio UpdateLocalEnv 缓存的 override，避免覆盖遥操 ctrl。"""
+        self._override_ctrls.clear()
+
+    def set_protected_override_ctrl_ids(self, actuator_ids: set[int] | list[int]) -> None:
+        """这些 actuator 索引不受 Studio override_ctrls 覆盖（如 G1 夹爪 pctrl）。"""
+        self._protected_override_ctrl_ids = {int(i) for i in actuator_ids}
 
     def mj_step(self, nstep):
         """
@@ -2237,7 +2260,11 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         mass_matrix = np.ndarray(shape=(self._mjModel.nv, self._mjModel.nv), dtype=np.float64, order="C")
-        mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        # MuJoCo 3.12+ 移除 mjData.qM，mj_fullM 签名改为 (m, d, dst)
+        if hasattr(self._mjData, "qM"):
+            mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        else:
+            mujoco.mj_fullM(self._mjModel, self._mjData, mass_matrix)
         mass_matrix = np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))        
         return mass_matrix
 

@@ -1102,7 +1102,10 @@ class OrcaGymWarp(OrcaGymBase):
         
     def mj_fullM(self):
         mass_matrix = np.ndarray(shape=(self._mjModel.nv, self._mjModel.nv), dtype=np.float64, order="C")
-        mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        if hasattr(self._mjData, "qM"):
+            mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        else:
+            mujoco.mj_fullM(self._mjModel, self._mjData, mass_matrix)
         mass_matrix = np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))        
         return mass_matrix
 
