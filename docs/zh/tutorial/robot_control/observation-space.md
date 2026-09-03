@@ -40,13 +40,18 @@ def _get_obs(self):
 def _get_obs(self):
     return {
         "proprio": np.concatenate([
-            self.data.qpos.copy(), 
+            self.data.qpos.copy(),
             self.data.qvel.copy()
         ]).astype(np.float32),
-        "vision": self.get_camera_image("front_camera"),  # 需要自定义相机采集
+        # 相机图像：需先 start_streaming 启动推流，再通过 VideoRecorderManager 获取帧
+        # "vision": env.get_recorder_manager().get_frame(...),  # 见相机推流章节
         "force": self.query_sensor_data(["ft_sensor"])["ft_sensor"],
     }
 ```
+
+> 注：相机图像采集需通过 `env.start_streaming(camera_name, ...)` 启动推流后，
+> 经 `env.get_recorder_manager()` 获取 `VideoRecorderManager` 读取帧，
+> 不存在 `get_camera_image` 方法。详见 [API 参考 · 传感器](../../api_reference/sensor.md)。
 
 ## 自动推断观测空间
 

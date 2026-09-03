@@ -7,10 +7,9 @@
 ```
 1. gRPC: LoadLocalEnv → 获取模型 XML
 2. 本地: 解析 XML → 下载 mesh/hfield 依赖
-3. 本地: mujoco.MjModel.from_xml_path()
-4. 本地: mujoco.MjData(model)
-5. 本地: 查询并填充 Model / Opt / Data
-6. 本地: 初始化所有字典（body, joint, actuator, ...）
+3. 本地: 创建 MuJoCo 模型和数据结构
+4. 本地: 查询并填充 Model / Opt / Data
+5. 本地: 初始化所有字典（body, joint, actuator, ...）
 ```
 
 ## OrcaGymScene 工具
@@ -44,8 +43,10 @@ from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 # OrcaGymSceneRuntime 封装 OrcaGymScene 的运行时操作（光源、相机视口等）
 scene_runtime = OrcaGymSceneRuntime(scene)
 
-# 注意：OrcaGymEulerEnv 不提供 set_scene_runtime 方法（该方法仅在 Local 体系存在）。
-# Euler 体系下如需在 Env 中持有 scene_runtime，需扩展 Env 公共方法。
+# 注意：当前 OrcaGymEulerEnv 和 OrcaGymLocalEnv 均未定义 set_scene_runtime 方法。
+# run_sim_loop.py 通过 hasattr(env, "set_scene_runtime") 检测，
+# 若 Env 子类扩展了该方法并接受 OrcaGymSceneRuntime，脚本会自动注入。
+# 如需在 Env 中持有 scene_runtime，需在子类中自行扩展。
 ```
 
 ## 模型 XML 资源

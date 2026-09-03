@@ -9,7 +9,9 @@
 ctrl = np.array([0.1, -0.2, 0.0, ...], dtype=np.float64) # (nu,)
 env.set_ctrl(ctrl)
 env.mj_step(n_frames)
-env._sync_view() 
+# 注意：set_ctrl + mj_step 不会自动同步 DataView。
+# 推荐使用 do_simulation（下方），它内部封装了 set_ctrl + mj_step + sync_to_view。
+# 如需手动同步，子类内部可调用 self._sync_view()（私有方法，仅限子类内部使用）。
 ```
 
 ## 通过 do_simulation 原子化操作（推荐）

@@ -27,3 +27,4 @@ OrcaGym 提供了丰富的工具集和主流 RL/IL 框架的适配器。
 - [🎮 输入设备](input-devices.md)
 - [🤖 RLlib 适配器](rllib-adapter.md)
 - [🧠 Robomimic 适配器](robomimic-adapter.md)
+- [🔧 Robosuite 适配器](robosuite-adapter.md)

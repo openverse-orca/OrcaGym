@@ -267,7 +267,7 @@ env.clear_body_force("g1_pelvis")   # 清除单个 body 的力
 env.clear_all_forces()              # 清除所有外力
 ```
 
-> **注意**：G1 使用力控 motor，`ctrl=0` 时关节无力矩。施加外力时应选择能直接受力的 body（如 pelvis），
+> ⚠️ **注意**：G1 使用力控 motor，`ctrl=0` 时关节无力矩。施加外力时应选择能直接受力的 body（如 pelvis），
 > 避免对松软关节链上的 body 施力（力会被关节吸收）。
 
 ### 2. Mocap 拖拽

@@ -2,7 +2,7 @@
 
 OrcaGym 的场景系统提供了对仿真场景的运行时控制。
 
-> 场景加载在 Euler 环境中通过 `model_xml_path` 参数自动完成，详见 [🔧 MuJoCo 后端](../physics/mujoco-backend.md)。
+> 场景加载在 Euler 环境中通过 `model_xml_path` 参数自动完成，详见 [🔧 MuJoCo 后端](../beginners/mujoco-backend.md)。
 
 ## 场景对象
 

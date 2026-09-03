@@ -217,7 +217,7 @@ def contact_reward(env):
 | `[1:3]` | 切向力（摩擦力） |
 | `[3:6]` | 力矩分量 |
 
-> **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`。
+> ⚠️ **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`。
 
 ---
 

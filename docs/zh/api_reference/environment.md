@@ -493,7 +493,7 @@ def reset(*, seed: int | None = None, options: dict | None = None) -> tuple[ObsT
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[dict, dict]
+def reset_model() -> tuple[np.ndarray | dict, dict]   # 返回 (obs, info)，reset() 内部调用
 def _get_obs() -> np.ndarray | dict
 ```
 

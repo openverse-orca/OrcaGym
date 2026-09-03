@@ -182,7 +182,7 @@ obs, reward, terminated, truncated, info = env.step(action) # 前进一步
 
 **原因**：OrcaGym 未安装。
 
-**解决**：按照 [安装指南](../getting-started/installation.md) 安装。
+**解决**：按照 [安装指南](../../getting-started/installation.md) 安装。
 
 ### 离线模式下 `env.render()` 不起作用？
 

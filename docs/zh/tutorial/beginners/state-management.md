@@ -66,7 +66,7 @@ dof_adr = env.jnt_dofadr("g1_left_knee_joint")      # qvel/qacc 中的起始索�
 knee_angle = env.data.qpos[qpos_adr]                 # 铰链关节 qpos 长度 = 1
 ```
 
-> **注意**：`env.data.qpos` 是**全局**数组（包含所有 body 的自由度和关节 qpos）。
+> ⚠️ **注意**：`env.data.qpos` 是**全局**数组（包含所有 body 的自由度和关节 qpos）。
 > 在多 body 场景中，不能直接 `data.qpos[7:]` 访问 G1 关节 —— 必须通过 `jnt_qposadr`
 > 按各关节地址逐段拼接。例如 G1 的 29 个旋转关节的 qpos 地址可能与 `data.qpos[7:]` 不连续。
 

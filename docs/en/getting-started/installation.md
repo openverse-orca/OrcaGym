@@ -34,7 +34,7 @@ pip install orca-gym[all]         # All optional dependencies
 
 ## Configure External Visualization Tools (Optional)
 
-OrcaGym's physics simulation does not depend on external tools and can run locally. For scene visualization or remote rendering, download and install [OrcaStudio](http://orca3d.cn/) or OrcaLab; refer to their respective documentation for features and configuration.
+OrcaGym's physics simulation does not depend on external tools and can run locally. For scene visualization or remote rendering, download and install [OrcaStudio](https://www.orca3d.cn/) or OrcaLab; refer to their respective documentation for features and configuration.
 
 ## Verify the Installation
 

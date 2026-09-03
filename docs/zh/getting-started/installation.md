@@ -34,7 +34,7 @@ pip install orca-gym[all]         # 所有可选依赖
 
 ## 配置外部可视化工具（可选）
 
-OrcaGym 的物理仿真不依赖外部工具，可直接在本地运行。如需可视化场景或远程渲染，可下载并安装 [OrcaStudio](http://orca3d.cn/) 或 OrcaLab，具体功能与配置请参照其各自文档。
+OrcaGym 的物理仿真不依赖外部工具，可直接在本地运行。如需可视化场景或远程渲染，可下载并安装 [OrcaStudio](https://www.orca3d.cn/) 或 OrcaLab，具体功能与配置请参照其各自文档。
 
 ## 验证安装
 

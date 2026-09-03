@@ -298,7 +298,7 @@ forces = env.query_contact_force(contact_ids)
 max_normal = max(abs(f[0]) for f in forces.values())
 ```
 
-> **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`，
+> ⚠️ **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`，
 > 不是大写 `"Geom1"` / `"Geom2"`。
 
 ### 5. 基座坐标系变换
