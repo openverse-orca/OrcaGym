@@ -34,6 +34,12 @@ Publishes the current scene configuration. Call this after all `add_actor()` cal
 
 > ⚠️ **Note**: After calling this, the simulation scene will be reloaded and simulation objects will be reconstructed.
 
+```python
+def append_scene()
+```
+Incrementally publishes the scene: only spawns the new Actors in `m_addActorMap` without destroying already-spawned entities.
+Suitable for timed-spawn scenes: progressively `add_actor` + `append_scene` without erasing earlier robots.
+
 ### Actor Management
 
 ```python
@@ -119,7 +125,22 @@ def set_image_enabled(actor_name: int, enabled: bool)
 ### Lifecycle
 
 ```python
+def initialize_grpc()    # Initialize the gRPC communication channel (called automatically in __init__)
 def close()
+```
+
+### Data Collection
+
+```python
+def get_rundata(scriptname: str, stepname: str)
+    # Data collection information reporting (query by script name / step name)
+```
+
+### Lua Parameter Setting
+
+```python
+def set_actor_lua_param_string(actor_name: str, param_name: str, value: str)
+    # Set an Actor's Lua string parameter (used internally by set_ui_text / set_image_enabled)
 ```
 
 ---

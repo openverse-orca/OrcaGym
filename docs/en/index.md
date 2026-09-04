@@ -2,7 +2,7 @@
 
 Welcome to the **OrcaGym** documentation!
 
-OrcaGym is an open-source robot simulation platform that provides an interface fully compatible with OpenAI Gym/Gymnasium, supporting multiple physics backends and distributed simulation.
+OrcaGym is an open-source robot simulation platform that provides an interface fully compatible with OpenAI Gym/Gymnasium, supporting dual physics backends and distributed simulation.
 
 ---
 
@@ -10,9 +10,9 @@ OrcaGym is an open-source robot simulation platform that provides an interface f
 
 | Section | Description |
 |---------|-------------|
-| [🐋 What is OrcaGym](what-is-orcagym.md) | What OrcaGym is, core features at a glance |
-| [🧬 Why Choose OrcaGym](why-orcagym.md) | Comparison and advantages over other simulation platforms |
-| [🛠️ Installation Guide](installation.md) | Installation and configuration |
+| [🐋 What is OrcaGym](getting-started/what-is-orcagym.md) | What OrcaGym is, core features at a glance |
+| [🧬 Why Choose OrcaGym](getting-started/why-orcagym.md) | Comparison and advantages over other simulation platforms |
+| [🛠️ Installation Guide](getting-started/installation.md) | Installation and configuration |
 
 ---
 
@@ -20,7 +20,7 @@ OrcaGym is an open-source robot simulation platform that provides an interface f
 
 OrcaGym is a **cloud-native robot simulation platform** with the following core features:
 
-- :material-gym: **Gymnasium Compatible** — Seamless integration with existing RL algorithms
+- :material-gymnastics: **Gymnasium Compatible** — Seamless integration with existing RL algorithms
 - :material-engine: **Dual Physics Backends** — MuJoCo (CPU, open-source standard) and Euler (GPU, in-house), mutually independent
 - :material-cloud: **Distributed Deployment** — Supports local development and remote large-scale training
 - :material-camera: **Extensible Rendering** — External visualization tools can be attached
@@ -51,4 +51,4 @@ OrcaGym is part of the robot simulation ecosystem:
 
 ## Next Steps
 
-Start with the [Installation Guide](installation.md), then read the [Beginner's Tutorial](../tutorial/beginners/index.md) to run your first simulation!
+Start with the [Installation Guide](getting-started/installation.md), then read the [Beginner's Tutorial](tutorial/beginners/index.md) to run your first simulation!

@@ -58,10 +58,11 @@ def do_simulation(ctrl: np.ndarray, n_frames: int) -> None
 Core stepping method. Set control → step n_frames → auto-sync state. After calling, `self.data` is the latest state. `ctrl` must have shape `(nu,)`.
 
 ```python
+def set_ctrl(ctrl: np.ndarray) -> None
 def mj_step(nstep: int) -> None
 def mj_forward() -> None
 ```
-Low-level simulation controls, typically not needed directly.
+`set_ctrl` sets the control input without stepping; `mj_step` / `mj_forward` are low-level simulation controls, typically not needed directly.
 
 ### State Setting
 
@@ -147,8 +148,6 @@ def mj_jacBody(jacp: np.ndarray, jacr: np.ndarray, body_name: str) -> None
 def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
-
-> Note: `mj_jacBody` / `mj_jacSite` signatures are `(jacp, jacr, body_name)` — no `*` separator. The first two parameters are caller-preallocated arrays written in-place.
 
 ### Equality Constraints and Body Manipulation
 
@@ -263,11 +262,9 @@ def set_render_fps(fps: int) -> None
     # Sets the render frame rate (render FPS), controlling how often render()
     # invokes the engine: with sync_render=True one frame is rendered every
     # 1/fps physics steps; with sync_render=False one frame every 1/fps seconds.
-
-def set_sync_render(enabled: bool) -> None
-    # Enables/disables synchronous rendering. Enable it (enabled=True) when
-    # recording for frame alignment, so render() invokes the engine every physics
-    # step and forwards simulate_index.
+    # Note: sync_render is a constructor parameter and cannot be toggled via a
+    # method at runtime; to enable synchronous recording at runtime, pass
+    # sync_render=True when constructing the env.
 
 def set_video_recorder_manager(manager: VideoRecorderManager | None) -> None
     # Injects a VideoRecorderManager instance. The environment layer forwards all
@@ -388,17 +385,53 @@ Close the window via the window close button or by calling ``viewer.stop()`` /
 ``manager.stop_viewer()`` (internally signals the subprocess to exit via
 ``stop_event``).
 
-### Camera Property Query/Set + Streaming State Machine
+### Camera Property Query/Set + Streaming
+
+The env layer directly provides camera name enumeration and viewport switching.
+Camera property query/set and the streaming state machine are implemented by the
+underlying ``VideoRecorderManager``; obtain the manager via
+``get_recorder_manager()`` before calling them (see below).
+
+Env-layer direct methods:
 
 ```python
-def get_camera_names() -> list[str]
-def get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
-def set_camera_properties(
+def get_camera_names() -> list[str]                   # Get the list of all registered camera names
+def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+    # Set the specified camera as the active viewport camera in Studio
+
+def start_streaming(camera_name: str, **kwargs) -> None
+    # Start streaming the specified camera (color/depth started automatically
+    # based on the sensor switches).
+    # Internally delegates to VideoRecorderManager.start_recorder: queries camera
+    # properties to confirm it exists, validates/syncs properties per kwargs
+    # (restarts streaming to reconfigure if necessary), starts streaming, and
+    # starts the corresponding recorder based on capture_rgb / capture_depth.
+    # The upper layer does not need to worry about the Idle/Streaming state machine.
+    # kwargs: camera property settings (capture_rgb / capture_depth / color_port /
+    #   depth_port / width / height / near_clip / far_clip / gamma, etc.) and the
+    #   recorder-specific parameter max_buffer_frames. Keys not provided keep the
+    #   camera's current properties.
+
+def show_camera(camera_name: str, camera_type: str = "color", window_name: str | None = None) -> None
+    # Display the specified camera's stream in real time (non-blocking). It
+    # establishes a WebSocket connection in an independent subprocess, receives
+    # the H.264 stream, decodes it, and displays it with matplotlib. Depth
+    # streams display the raw grayscale frames directly. Requires calling
+    # start_streaming first to start the stream and recorder.
+```
+
+Camera property query/set + streaming state machine via ``VideoRecorderManager``
+(the ``orca_gym.recorder`` module, the actual executor):
+
+```python
+manager = env.get_recorder_manager()
+manager.get_camera_names() -> list[str]
+manager.get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+manager.set_camera_properties(
     camera_name: str,
     **kwargs,   # Optional parameters: capture_rgb, capture_depth, capture_normal, capture_object_color, random_object_color, use_nvenc, nvenc_gpu_index, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, use_dds, dds_topic, dds_stream_id
 ) -> None
-def set_streaming_enabled(camera_name: str, enabled: bool) -> None
-def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+manager.set_streaming_enabled(camera_name: str, enabled: bool) -> None
 ```
 
 State machine constraints:
@@ -411,6 +444,13 @@ State machine constraints:
 
 ```python
 def studio_bridge()   # Returns the OrcaStudio bridge object (K9 method access pattern)
+
+def debug_draw() -> DebugDraw
+    # Returns the DebugDraw instance (K9 method access pattern). Used to draw
+    # debug primitives (spheres, line segments, coordinate frames, etc.) in the
+    # simulation scene. In offline mode (skip_grpc_load=True) it returns a no-op
+    # instance (stub=None), where all drawing methods are async but return
+    # immediately. Callers use loop.run_until_complete(dd.draw_sphere(...)) or await.
 ```
 
 ### Namespace Resolution (Multi-Agent)
@@ -485,7 +525,7 @@ Provided by `OrcaGymEnvMixin`, orchestration order: `set_seed_value` → `reset_
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[dict, dict]
+def reset_model() -> tuple[np.ndarray | dict, dict]
 def _get_obs() -> np.ndarray | dict
 ```
 
@@ -572,7 +612,7 @@ if __name__ == "__main__":
 
 ## OrcaGymVectorEnv
 
-Vectorized environment, running multiple environments in parallel.
+Vectorized environment, running multiple environments in parallel. Inherits from Gymnasium `VectorEnv`.
 
 ```python
 class OrcaGymVectorEnv(VectorEnv):
@@ -580,6 +620,35 @@ class OrcaGymVectorEnv(VectorEnv):
     def step(actions) -> tuple[obs, rewards, terminations, truncations, infos]
     def reset(*, seed=None, options=None) -> tuple[obs, infos]
 ```
+
+### Public Properties
+
+```python
+num_envs: int                        # Number of parallel environments
+observation_space: gym.Space         # Batch observation space
+single_observation_space: gym.Space  # Single-environment observation space
+action_space: gym.Space              # Batch action space
+single_action_space: gym.Space       # Single-environment action space
+```
+
+### Main Methods
+
+```python
+def reset(*, seed=None, options=None) -> tuple[ObsType, list[dict]]
+def step(actions: ActType) -> tuple[ObsType, np.ndarray, np.ndarray, np.ndarray, list[dict]]
+def render() -> None
+def close() -> None
+```
+
+### Return Value Description
+
+| Return value | Shape/type | Description |
+|--------|-----------|------|
+| `observations` | `(num_envs, *obs_shape)` | Observations of all environments |
+| `rewards` | `(num_envs,)` | Rewards of all environments |
+| `terminated` | `(num_envs,) bool` | Whether terminated |
+| `truncated` | `(num_envs,) bool` | Whether truncated |
+| `infos` | `list[dict]` | Info dict of each environment |
 
 ---
 

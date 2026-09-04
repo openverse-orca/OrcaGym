@@ -151,17 +151,36 @@ quat_wxyz = np.array([quat[3], quat[0], quat[1], quat[2]]) # convert to [w, x, y
 ### Operation Order
 
 ```
-1. OrcaGymScene(grpc_addr)        <- create scene manager
-2. scene.publish_scene()          <- publish empty scene (clear)
-3. scene.add_actor(...)           <- add objects one by one
-4. scene.set_light_info(...)      <- set lights (optional)
-5. scene.set_material_info()      <- modify materials (optional)
-6. scene.close()                  <- close connection
+1. OrcaGymScene(grpc_addr) ← create scene manager
+2. scene.publish_scene() ← publish empty scene (clear existing content)
+3. scene.add_actor(...) ← add objects one by one (only enqueued, not spawned yet)
+4. scene.append_scene() ← incremental publish: spawn newly added Actors, keep existing entities
+   (first publish may also call publish_scene(), either one works)
+5. scene.set_light_info(...) ← set lights (optional)
+6. scene.set_material_info() ← modify materials (optional)
+7. scene.close() ← close connection
 ```
 
-!!! warning "`publish_scene()` clears the scene!"
-    Each call to `publish_scene()` clears the current scene.
-    To add objects without clearing the scene, call `add_actor()` directly.
+> ⚠️ **`publish_scene()` clears the scene!**
+> `publish_scene()` clears all entities in the current scene and republishes, suitable for initialization or a full scene reset.
+> If you only want to append Actors at runtime without destroying existing entities, use `append_scene()` instead:
+> it only spawns the Actors newly added via `add_actor()`, keeping previously spawned entities (such as a running robot),
+> suitable for time-sequential spawning (gradually `add_actor` + `append_scene`).
+
+---
+
+## Getting Assets
+
+Actors in a scene need an `asset_path`; these assets must first be fetched and imported into OrcaStudio / OrcaLab. The main workflow is as follows:
+
+1. **Search assets**: go to the [SimAssets asset store](https://simassets.orca3d.cn/?tab=scene&sort=name) to search for the relevant assets you need.
+2. **Enter the asset pack**: navigate to the corresponding asset pack page.
+3. **Fetch the asset**:
+   - **OrcaLab users**: subscribe directly on the asset pack page.
+   - **OrcaStudio users**: download the raw assets and extract them into your project directory.
+4. **Locate the asset in the editor**: open OrcaLab / OrcaStudio, find the asset in the asset search, and you can get its `asset_path`.
+
+> For an example of dynamically adding Actors at runtime, see [OrcaPlayground - scene_building](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/scene_building).
 
 ---
 

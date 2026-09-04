@@ -66,7 +66,7 @@ dof_adr = env.jnt_dofadr("g1_left_knee_joint")      # starting index in qvel/qac
 knee_angle = env.data.qpos[qpos_adr]                 # hinge joint qpos length = 1
 ```
 
-> **Note**: `env.data.qpos` is a **global** array (containing all body free dofs and joint qpos).
+> ⚠️ **Note**: `env.data.qpos` is a **global** array (containing all body free dofs and joint qpos).
 > In multi-body scenes, you cannot directly use `data.qpos[7:]` to access G1 joints — you must use `jnt_qposadr`
 > to stitch together segments by each joint's address. For example, the qpos addresses of G1's 29 revolute joints may not be contiguous with `data.qpos[7:]`.
 

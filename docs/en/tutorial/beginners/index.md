@@ -112,7 +112,7 @@ gymnasium.Env
 ```
 
 > **Recommendation**: `OrcaGymEulerEnv` is the recommended entry point for new projects. `OrcaGymLocalEnv` is in maintenance mode and is being phased out.
-> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler for runnable examples.
+> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) for runnable examples.
 
 ---
 

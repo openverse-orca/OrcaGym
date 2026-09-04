@@ -6,7 +6,7 @@ Goal: Run a minimal simulation loop in 5 minutes (no OrcaStudio required, offlin
 
 ## Prerequisites
 
-- OrcaGym installed (you can `from orca_gym.environment.euler import OrcaGymEulerEnv`)
+- OrcaGym installed (you can `from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv`)
 - A simple MuJoCo XML scene file (this section uses a built-in example)
 
 ---
@@ -182,7 +182,7 @@ obs, reward, terminated, truncated, info = env.step(action)              # Advan
 
 **Cause**: OrcaGym is not installed.
 
-**Solution**: Follow the [Installation Guide](../getting-started/installation.md) to install.
+**Solution**: Follow the [Installation Guide](../../getting-started/installation.md) to install.
 
 ### `env.render()` does not work in offline mode?
 

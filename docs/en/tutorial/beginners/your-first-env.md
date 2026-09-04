@@ -14,6 +14,45 @@ An environment class = the "driver" for the scene:
 MuJoCo XML -> OrcaGymEulerEnv -> Drive simulation (loop execution)
 ```
 
+## Scene XML: Single-Hinge Inverted Pendulum
+
+This section uses a **minimal scene** as an example — a single-hinge inverted pendulum (Pendulum-v1 convention, `theta=0` is the upright position).
+The XML lives in the repo at `tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml`:
+
+```xml
+<!-- Single-hinge inverted pendulum + motor actuator.
+     theta=0 is the upright position (pendulum along +z), matching the Gymnasium Pendulum-v1 convention. -->
+<mujoco model="euler_simple_pendulum">
+  <option timestep="0.002" integrator="RK4" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="pendulum" pos="0 0 0">
+      <joint name="hinge" type="hinge" axis="0 1 0" pos="0 0 0"/>
+      <geom name="arm" type="box" size="0.05 0.05 0.5" pos="0 0 0.5" mass="1"/>
+      <site name="tip" pos="0 0 1.0"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="hinge_motor" joint="hinge" gear="10"/>
+  </actuator>
+</mujoco>
+```
+
+**Structure at a glance**:
+
+| Element | Meaning |
+|---------|---------|
+| `<option>` | simulation parameters: timestep 0.002s, RK4 integrator, gravity -9.81 |
+| `<body name="pendulum">` | pendulum body, hinge at the origin |
+| `<joint name="hinge" type="hinge">` | hinge joint rotating around the Y axis |
+| `<geom name="arm" type="box">` | pendulum geometry (box, 1m long, center of mass at 0.5m) |
+| `<site name="tip">` | pendulum tip site (can be used as a sensor/render anchor) |
+| `<motor name="hinge_motor">` | motor actuator, gear ratio 10 (`action → torque`) |
+
+In this scene, `nq=nv=1` (one hinge angle + angular velocity) and `nu=1` (one motor torque),
+which corresponds exactly to the scalar torque control `action.shape == (1,)` in `step(action)`.
+
+> If you want to reuse this XML directly, point the `SCENE_XML` path in the example below to the file above.
+
 ## Minimal Environment Skeleton (recommended)
 
 An environment class needs to implement **3 core methods**:
@@ -33,7 +72,7 @@ Below is a **runnable** complete environment (offline mode, no Studio needed):
 ```python
 """
 my_first_env.py — A minimal custom environment.
-Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler.
+Simplified from [OrcaPlayground examples/euler/01_hello_euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/01_hello_euler)
 """
 
 import numpy as np
@@ -115,7 +154,7 @@ class MyFirstEnv(OrcaGymEulerEnv):
 # Usage
 # ============================================================
 if __name__ == "__main__":
-    SCENE_XML = "/path/to/your/scene.xml"
+    SCENE_XML = "tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml"
 
     env = MyFirstEnv(model_xml_path=SCENE_XML)
     obs, _ = env.reset()

@@ -217,7 +217,7 @@ def contact_reward(env):
 | `[1:3]` | Shear force (friction) |
 | `[3:6]` | Torque components |
 
-> **Note**: `query_contact_simple()` returns dict keys in **lowercase** `"geom1"` / `"geom2"`.
+> ⚠️ **Note**: `query_contact_simple()` returns dict keys in **lowercase** `"geom1"` / `"geom2"`.
 
 ---
 

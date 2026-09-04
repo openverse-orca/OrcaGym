@@ -2,7 +2,7 @@
 
 This section shows you how to train an inverted pendulum to stay upright in an OrcaGym environment using the Stable Baselines3 PPO algorithm.
 
-> See [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/03_rl_ppo for complete runnable code.
+> See [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/03_rl_ppo) for complete runnable code.
 
 ---
 
@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     if args.eval:
         model_path = args.model_path or os.path.join(_MODEL_DIR, "ppo_pendulum.zip")
-        evaluate(model_path)
+        evaluate(model_path, episodes=5)
     else:
         train(args.total_timesteps, args.device)
 ```
@@ -294,4 +294,4 @@ Check:
 
 ## Next Step
 
-You have trained a controller. Next, learn how to **query more simulation state**: [📡 State Query API](../robot_control/state-queries-api.md).
+You have trained a controller. Next, learn how to **query more simulation state**: [📡 Query API](state-queries.md).

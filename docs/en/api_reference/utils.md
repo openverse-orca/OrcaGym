@@ -41,7 +41,17 @@ class InverseKinematicsController:
 def set_goal(pos: np.ndarray, quat: np.ndarray)         # Set target pose
 def set_lambda(lambda_value: float)                     # Set damping coefficient
 def set_alpha(alpha_value: float)                       # Set step size
-def compute_inverse_kinematics() -> np.ndarray          # Compute incremental joint angles dq
+def compute_inverse_kinematics() -> np.ndarray          # Compute incremental joint angles dq (length model.nv, not just the controlled-joint subvector)
+```
+
+### Public Properties
+
+```python
+env: RobomimicEnv             # Associated environment adapter
+site_id: int                  # End-effector site ID
+dof_indices: list[int]        # DOF indices of controlled joints
+goal_pos: np.ndarray | None   # Target position
+goal_quat: np.ndarray | None  # Target orientation
 ```
 
 ### Usage Example
@@ -102,6 +112,17 @@ def compute_torque(
 ) -> float                    # Output torque (Nm)
 ```
 
+### Public Properties
+
+```python
+Kp / Ki / Kd / Kv: float       # PID gains and velocity feedback gain
+max_speed: float               # Maximum allowed target velocity
+ctrl_low / ctrl_high: float    # Actuator torque limits (split from ctrlrange)
+integral: float                # Integral term (state variable)
+prev_error_pos: float          # Previous position error (state variable)
+prev_error_vel: float          # Previous velocity error (state variable)
+```
+
 ### Usage Example
 
 ```python
@@ -129,6 +150,8 @@ for target in target_trajectory:
 
 Simple PD controller function.
 
+Module path: `from orca_gym.utils.joint_controller import pd_control`
+
 ```python
 def pd_control(
     target_q: np.ndarray,      # Target position
@@ -151,12 +174,19 @@ First-order exponential smoothing low-pass filter.
 ```python
 class LowPassFilter:
     def __init__(self, alpha: float, initial_output: np.ndarray)
-    def apply(self, x: np.ndarray) -> np.ndarray
+    def apply(self, input: np.ndarray) -> np.ndarray
 ```
 
-Formula: `output[t] = alpha × x[t] + (1 - alpha) × output[t-1]`
+Formula: `output[t] = alpha × input[t] + (1 - alpha) × output[t-1]`
 
 - `alpha`: Smoothing coefficient in (0, 1]; 1 = no filtering, near 0 = strong filtering
+
+### Public Properties
+
+```python
+alpha: float              # Smoothing coefficient
+output: np.ndarray        # Current filtered output (readable)
+```
 
 ---
 
@@ -171,16 +201,25 @@ class RewardPrinter:
     def print_reward(self, message: str, reward: float = 0, coeff: float = 1.0)
 ```
 
+### Public Properties
+
+```python
+reward_history: dict          # Record of historical mean rewards
+file_name: str                # Path where the reward history is written to disk
+```
+
 ---
 
 ## Rotation Utilities (`rotations`)
 
-All functions support **batch operations**, with angles in **radians**.
+Angles are in **radians**.
 
 ### Conventions
 
 - **Quaternion format**: `[w, x, y, z]` (MuJoCo standard)
 - **Matrix format**: 3×3 rotation matrix
+- **Batch operations**: most conversion functions (`mat2quat`/`quat2mat`/`euler2mat`/`mat2euler`/`euler2quat`/`quat2euler`) support batch.
+  Note: `quat2axisangle`, `quat_rot_vec`, and `quat_slerp` only support a single quaternion/vector, not batch.
 
 ### Conversion Functions
 
@@ -197,10 +236,10 @@ All functions support **batch operations**, with angles in **radians**.
 ### Quaternion Operations
 
 ```python
-rotations.quat_mul(q1, q2)              # Quaternion multiplication q1 * q2
+rotations.quat_mul(q0, q1)              # Quaternion multiplication q0 * q1
 rotations.quat_conjugate(q)             # Quaternion conjugate
 rotations.quat_identity()               # Identity quaternion [1, 0, 0, 0]
-rotations.quat_rot_vec(q, v0)           # Rotate a vector by a quaternion
+rotations.quat_rot_vec(q, v0)           # Rotate a vector by a quaternion (single quaternion/vector only, no batch)
 ```
 
 ### Euler Angle Operations
@@ -208,7 +247,7 @@ rotations.quat_rot_vec(q, v0)           # Rotate a vector by a quaternion
 ```python
 rotations.subtract_euler(e1, e2)        # Euler angle difference
 rotations.euler2point_euler(euler)      # Euler angles → point representation
-rotations.point_euler2euler(pe)         # Point representation → Euler angles
+rotations.point_euler2euler(euler)     # Point representation → Euler angles
 rotations.normalize_angles(angles)      # Normalize angles to [-pi, pi]
 rotations.round_to_straight_angles(angles)  # Round to right angles
 ```
@@ -217,10 +256,10 @@ rotations.round_to_straight_angles(angles)  # Round to right angles
 
 ```python
 rotations.quat2point_quat(quat)         # Quaternion → point representation
-rotations.point_quat2quat(pq)           # Point representation → quaternion
+rotations.point_quat2quat(quat)         # Point representation → quaternion
 rotations.get_parallel_rotations()      # Get set of parallel rotations
-rotations.unit_vector(data, axis, out)  # Unit vector
-rotations.quat_slerp(q0, q1, fraction, shortestpath=True)  # Spherical linear interpolation
+rotations.unit_vector(data, axis=None, out=None)  # Unit vector (axis/out optional)
+rotations.quat_slerp(quat0, quat1, fraction, shortestpath=True)  # Spherical linear interpolation (single quaternion only, no batch)
 ```
 
 ### Usage Example
