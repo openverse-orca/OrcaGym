@@ -212,6 +212,6 @@ env.body() / joint() / ...    │
 ```
 
 - **Left column**: Public API (L1), intended for users and AI to use, visible in IDE autocompletion
-- **Right column**: Internal components (L2/L3), `_` prefix convention + ruff SLF001 static checking + AGENTS.md constraints prohibit external access
+- **Right column**: Internal components (L2/L3), multi-layer isolation: `OrcaGymEuler.__getattribute__` actively intercepts access (accessing `_sim`/`_studio`/`_mjData`, etc. directly raises `AttributeError`), supplemented by the `_` prefix convention + ruff SLF001 static checking + AGENTS.md constraints, prohibiting external access
 
 For detailed contracts and isolation mechanisms, see [architecture.md](architecture.md) sections 6-7.

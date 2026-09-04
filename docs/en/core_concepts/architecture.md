@@ -1,6 +1,6 @@
 # ⚙️ OrcaGym Euler Architecture
 
-> 📌 **Prerequisite Reading**: This document covers overall layering, API boundaries, and component design details. If this is your first time encountering the OrcaGym architecture, we recommend first reading [Model / Data / Config](model-data-opt.md) and [Gymnasium Interface](gym-interface.md) to build a basic understanding, then return to this document for the architecture design.
+> 📌 **Prerequisite Reading**: If this is your first time encountering the OrcaGym architecture, we recommend first reading [Architecture Overview](architecture-overview.md) to understand the overall layering and API boundaries, then return to this document for the component design details.
 
 ## 1. Why a New Architecture Is Needed
 
@@ -153,7 +153,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
 ### 4.2 OrcaGymEuler — Simulation Core Facade
 
-Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, and the `_euler` placeholder field (currently `None`, Euler backend integration TBD). **Does not expose** `_mjModel`/`_mjData`, relies on the `_` prefix convention + ruff SLF001 static checking, controls IDE autocompletion via `__dir__` to show only the public API.
+Composes simulation subcomponents, providing simulation operation interfaces to `OrcaGymEulerEnv`. Holds `MuJoCoSimCore`, `OrcaStudioBridge`, `ModelRegistry`, `SimConfig`, and the `_euler` placeholder field (currently `None`, Euler backend integration TBD). **Does not expose** `_mjModel`/`_mjData`; proactively intercepts access to internal components such as `_sim`/`_studio`/`_mjData` via `__getattribute__` (raising `AttributeError` directly), supplemented by the `_` prefix convention + ruff SLF001 static checking + `__dir__` controlling IDE autocompletion to show only the public API.
 
 ```python
 class OrcaGymEuler:
@@ -189,21 +189,11 @@ class MuJoCoSimCore:
     def apply_body_force(self, body_id: int, force: np.ndarray, torque: np.ndarray) -> None: ...
 ```
 
-### 4.4 OrcaStudioBridge — Studio Integration
+### 4.4 OrcaStudioBridge — External Renderer Integration
 
-Handles gRPC interaction with OrcaStudio, including rendering, video saving, object manipulation, etc. **Dependency inversion** design: does not hold `_mjData`, achieves decoupling by receiving data parameters; does not touch `mj_step`, and only handles communication and scene synchronization.
+Handles communication with the external renderer (OrcaStudio / OrcaLab), providing rendering, video saving, object manipulation, and other interactive capabilities. **Dependency inversion** design: does not hold `_mjData`, achieves decoupling by receiving data parameters; does not touch `mj_step`, and only handles communication and scene synchronization.
 
-```python
-class OrcaStudioBridge:
-    def __init__(self, stub=None) -> None: ...
-    async def render(self, qpos: np.ndarray, sim_time: float) -> None: ...
-    async def load_model_xml(self) -> str: ...
-    async def begin_save_video(self, file_path: str, capture_mode) -> None: ...
-    async def stop_save_video(self) -> None: ...
-    async def get_current_frame(self) -> int: ...
-    async def get_body_manipulation_anchored(self) -> tuple: ...
-    async def get_body_manipulation_movement(self) -> dict: ...
-```
+This component is a **bypass system**; physics simulation continues normally in its absence.
 
 ### 4.5 ModelRegistry — Model Registration
 
@@ -474,12 +464,15 @@ body_name = env.body("object")
 |------|-----|
 | **State Reading** | `data` (OrcaGymDataView), `model` (OrcaGymModel), `ctrl`, `frame_skip`, `dt`, `realtime_step` |
 | **Simulation Control** | `do_simulation(ctrl, n)`, `mj_step(n)`, `mj_forward()` |
-| **State Query** | `query_joint_qpos/qvel/qacc/offsets/lengths()`, `query_site_pos_and_mat()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `get_body_xpos_xmat_xquat()` |
-| **State Setting** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()` |
+| **State Query** | `query_joint_qpos/qvel/qacc/offsets/lengths/dofadrs()`, `jnt_qposadr()`, `jnt_dofadr()`, `query_site_pos_and_mat()`, `query_site_size()`, `query_site_pos_and_quat_B()`, `query_site_xvalp_xvalr()`, `query_site_xvalp_xvalr_B()`, `query_actuator_torques()`, `query_sensor_data()`, `query_contact_simple()`, `query_contact_force()`, `get_body_xpos_xmat_xquat()`, `get_body_xpos_xmat_xquat_xvel()`, `get_cfrc_ext()`, `get_goal_bounding_box()`, `body_subtree_mass()` |
+| **Base Frame Queries** | `query_velocity_body_B()`, `query_position_body_B()`, `query_orientation_body_B()`, `query_joint_axes_B()` |
+| **Odometry Queries** | `query_robot_velocity_odom()`, `query_robot_position_odom()`, `query_robot_orientation_odom()` |
+| **Jacobian** | `mj_jacBody()`, `mj_jacSite()`, `mj_jac_site()` |
+| **State Setting** | `set_joint_qpos/qvel()`, `set_mocap_pos_and_quat()`, `set_geom_friction()`, `add_extra_weight()`, `apply_body_force()`, `clear_body_force()`, `clear_all_forces()`, `mj_apply_force_at_site()`, `mj_clear_xfrc_applied_for_site()` |
 | **Equality Constraint Primitives (Stateless, L1)** | `equality_find_slot_by_body(body_name)`, `equality_constraint(slot)`, `equality_update(slot, **fields, forward=True)` |
 | **Solver Configuration** | `sim_config` (SimConfig) |
 | **Namespace** | `joint()`, `body()`, `site()`, `actuator()`, `sensor()` |
-| **Studio Interaction** | `render()`, `begin_save_video()`, `stop_save_video()`, `get_current_frame()`, `get_frame_png()` |
+| **Studio Interaction** | `render()`, `save_streaming()`, `start_streaming()`, `show_camera()`, `get_recorder_manager()`, `set_render_fps()`, `set_video_recorder_manager()`, `get_camera_names()`, `make_camera_viewport_active()`, `load_content_file()`, `studio_bridge()`, `debug_draw()` |
 | **Lifecycle** | `initialize_simulation()`, `initialize_grpc()`, `pause_simulation()`, `close()` |
 
 > **Studio UI grasping is an internal API**: The original `anchor_actor()` / `release_body_anchored()` / `do_body_manipulation()` have been changed to `_`-prefixed internal methods per the P6 principle, driven internally by `render()`, and do not enter the public API. Programmatic body manipulation should use equality constraint stateless primitives implemented by yourself.
@@ -490,11 +483,12 @@ body_name = env.body("object")
 
 ### 6.1 Mechanism Overview
 
-This architecture uses multiple layers of guidance to make the "correct way" the path of least resistance. `OrcaGymEulerEnv` directly inherits `gym.Env`, does not create `gym`/`stub`/`channel` attributes — Python natively rejects access; other internal objects rely on the `_` prefix convention + ruff SLF001 static checking + AGENTS.md AI behavior constraints:
+This architecture uses multiple layers of guidance to make the "correct way" the path of least resistance. `OrcaGymEulerEnv` directly inherits `gym.Env`, does not create `gym`/`stub`/`channel` attributes — Python natively rejects access; `OrcaGymEuler` proactively intercepts internal component access via `__getattribute__`; other internal objects rely on the `_` prefix convention + ruff SLF001 static checking + AGENTS.md AI behavior constraints:
 
 | Mechanism | Implementation | Effect |
 |------|------|------|
 | **Python Native Attribute Absence** | `OrcaGymEulerEnv` directly inherits `gym.Env`; all internal components assigned in `__init__` are prefixed with underscore (e.g. `_gym`/`_stub`/`_channel`/`_studio_bridge`, etc.), no unprefixed `gym`/`stub`/`channel` attributes are created | `env.gym`/`env.stub`/`env.channel` raise `AttributeError` |
+| **`__getattribute__` Proactive Interception** | `OrcaGymEuler.__getattribute__` maintains a `_BLOCKED_ATTRS` set; external access to internal components such as `_sim`/`_studio`/`_registry`/`_opt`/`_mjData`/`_mjModel` directly raises `AttributeError` (internal `self._xxx` delegation is whitelisted via `object.__getattribute__`) | Wall-bypassing access such as `env._gym._sim` / `env._gym._mjData` is blocked at runtime |
 | **ruff SLF001 Static Check** | Configure `ruff check --select SLF001` to scan code accessing `_`-prefixed attributes externally | Detect wall-bypassing access at pre-commit / CI stage |
 | **AGENTS.md AI Constraints** | Each in-house repo configures `AGENTS.md` at root, explicitly prohibiting AI from using `_`-prefixed attributes | Constrain AI code generation behavior from the input side |
 | **`__dir__` Control** | Env/Gym/DataView implement `__dir__`, only exposing public API | IDE autocompletion guides the correct path |
@@ -508,7 +502,8 @@ This architecture uses multiple layers of guidance to make the "correct way" the
 | Scenario | Trigger Mechanism | What You/AI See |
 |------|---------|-------------|
 | AI generates `env._mjData.qpos` | ruff SLF001 | Pre-commit warning: use `env.data.qpos` |
-| AI generates `env._gym._mjData` | ruff SLF001 | Pre-commit warning: use `env.data` |
+| AI generates `env._gym._mjData` | `__getattribute__` + ruff SLF001 | Runtime `AttributeError` + pre-commit warning |
+| AI generates `env._gym._sim` | `__getattribute__` | Runtime `AttributeError` (`_sim` is in `_BLOCKED_ATTRS`) |
 | AI generates `env._mjModel.opt.iterations` | ruff SLF001 | Pre-commit warning: use `env.sim_config.iterations` |
 | AI autocompletes `env.` in IDE | `__dir__` control | Only sees public API |
 | AI reads class docstring | Type annotations + contract | Knows correct usage and prohibitions |
@@ -516,10 +511,10 @@ This architecture uses multiple layers of guidance to make the "correct way" the
 
 ### 6.3 Isolation Strength Comparison with Old System
 
-| System | Bypass Path | Depth | Internal Components Visible | Static Check |
-|------|---------|------|----------------|---------|
-| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` is a public attribute | None |
-| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` does not list | ruff SLF001 warning |
+| System | Bypass Path | Depth | Internal Components Visible | Runtime Interception | Static Check |
+|------|---------|------|----------------|-----------|---------|
+| OrcaGymLocalEnv | `env.gym._mjData` | 2 | `gym` is a public attribute | None | None |
+| OrcaGymEulerEnv | `env._gym._sim._mjData` | 3 | `__dir__` does not list | `__getattribute__` proactively raises `AttributeError` (`_sim`/`_mjData` are intercepted) | ruff SLF001 warning |
 
 ---
 

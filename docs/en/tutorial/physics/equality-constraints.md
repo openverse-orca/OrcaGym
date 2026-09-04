@@ -31,13 +31,37 @@ class GraspDemo(OrcaGymEulerEnv):
 
     def demo_grasp_and_move(self):
         """Complete demo: grasp object → move to target → release."""
+        import mujoco
         agent = self._agent_names[0]
         object_name = f"{agent}_manipulation_box"
+        mocap_name = "TestMocapAnchor"  # model-built-in mocap (distinct from UI system's ActorManipulator)
         ctrl = np.zeros(self.model.nu)
 
-        # ─── Step 1: Grasp ───
+        # ─── Step 1: Grasp (orchestrate with public primitives, equivalent to Local's anchor_actor) ───
         print("Step 1: Grasping object...")
-        self.anchor_actor(object_name, "weld")
+        # 1.1 Find the equality constraint slot containing the mocap
+        slot = self.equality_find_slot_by_body(mocap_name)
+        if slot == -1:
+            raise ValueError(f"No equality slot containing {mocap_name} in the model")
+        # 1.2 Save the original constraint snapshot (restore on release)
+        original_eq = self.equality_constraint(slot)
+        # 1.3 Align the mocap pose to the object's current pose (avoid yanking on the next frame)
+        obj_pose = self.get_body_xpos_xmat_xquat([object_name])[object_name]
+        self.set_mocap_pos_and_quat({
+            mocap_name: {"pos": obj_pose["xpos"], "quat": obj_pose["xquat"]}
+        })
+        # 1.4 Write the WELD constraint (type/obj, internally calls mj_forward)
+        mocap_id = self.model.body_name2id(mocap_name)
+        if original_eq["obj1_id"] == mocap_id:
+            new_obj1_name, new_obj2_name = mocap_name, object_name
+        else:
+            new_obj1_name, new_obj2_name = object_name, mocap_name
+        self.equality_update(
+            slot,
+            eq_type=mujoco.mjtEq.mjEQ_WELD,
+            obj1_name=new_obj1_name,
+            obj2_name=new_obj2_name,
+        )
         print(f"  ✅ {object_name} anchored (WELD constraint)")
 
         # ─── Step 2: Move ───
@@ -46,7 +70,7 @@ class GraspDemo(OrcaGymEulerEnv):
         print(f"\nStep 2: Moving object to {target_pos}...")
 
         self.set_mocap_pos_and_quat({
-            "TestMocapAnchor": {
+            mocap_name: {
                 "pos": target_pos,
                 "quat": target_quat,
             }
@@ -57,7 +81,7 @@ class GraspDemo(OrcaGymEulerEnv):
         for _ in range(10):
             self.do_simulation(ctrl, self.frame_skip)
 
-        # Verify: object has followed to target
+        # Verify: object has followed to the target
         box = self.get_body_xpos_xmat_xquat([object_name])
         box_pos = box[object_name]["xpos"]
         dist = np.linalg.norm(box_pos - target_pos)
@@ -65,16 +89,23 @@ class GraspDemo(OrcaGymEulerEnv):
         print(f"  Distance to target: {dist:.4f}m")
         print(f"  {'✅ Object reached target' if dist < 0.05 else '⚠️ Not reached'}")
 
-        # ─── Step 3: Release ───
+        # ─── Step 3: Release (restore the original constraint with public primitives) ───
         print(f"\nStep 3: Releasing object...")
-        self.release_body_anchored()
+        slot = self.equality_find_slot_by_body(object_name)
+        if slot != -1:
+            self.equality_update(
+                slot,
+                eq_type=original_eq["type"],
+                obj1_name=self.model.body_id2name(original_eq["obj1_id"]),
+                obj2_name=self.model.body_id2name(original_eq["obj2_id"]),
+                data=original_eq["data"],
+            )
         self.mj_forward()
         print("  ✅ Object released")
 
         # ─── Step 4: View constraint info ───
         print(f"\nCurrent equality constraints:")
-        eq_list = self.model.get_eq_list()
-        for eq in eq_list:
+        for eq in self.model.get_eq_list():
             print(f"  type={eq['eq_type']}, obj1={eq['obj1_id']}, "
                   f"obj2={eq['obj2_id']}, active={eq['active']}")
 
@@ -129,7 +160,7 @@ User sets mocap pose → WELD constraint → anchored object follows the movemen
 # Equivalent to Local system's env.anchor_actor("target_object", "weld")
 import mujoco
 
-mocap_name = "TestMocapAnchor"   # model-built-in mocap (distinct from UI system's ActorManipulator)
+mocap_name = "ActorManipulator_Anchor"   # the mocap body in the scene
 object_name = "target_object"
 
 # 1. Find the equality constraint slot containing the mocap
@@ -170,7 +201,7 @@ mujoco.mjtEq.mjEQ_JOINT     # Joint coupling
 
 ```python
 env.set_mocap_pos_and_quat({
-    "TestMocapAnchor": {
+    "ActorManipulator_Anchor": {
         "pos": np.array([0.7, 0.0, 0.5]),          # target position [x, y, z]
         "quat": np.array([1.0, 0.0, 0.0, 0.0]),    # target quaternion [w, x, y, z]
     }
@@ -271,8 +302,8 @@ if result["body_name"] is not None:
 ## Complete Workflow Summary
 
 ```
-Grasp:  equality_find_slot_by_body(mocap) → equality_constraint(slot) (save snapshot)
-        → set_mocap_pos_and_quat(...) (align) → equality_update(slot, WELD, obj1, obj2)
+Grasp:  equality_find_slot_by_body(mocap) → equality_constraint(slot) save original
+       → set_mocap_pos_and_quat align pose → equality_update(WELD, mocap, object)
          ↓
 Move:   set_mocap_pos_and_quat({mocap: {pos, quat}})
          ↓
@@ -280,7 +311,7 @@ Move:   set_mocap_pos_and_quat({mocap: {pos, quat}})
          ↓
         do_simulation(ctrl, n_frames)  ← constraint takes effect, object follows
          ↓
-Release: equality_find_slot_by_body(object) → equality_update(slot, restore from snapshot)
+Release: equality_find_slot_by_body(object) → equality_update restore original_eq fields
 ```
 
 ---

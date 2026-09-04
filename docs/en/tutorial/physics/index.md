@@ -38,7 +38,6 @@ Configure via `env.sim_config`:
 | `iterations` | 100 | Solver iteration count |
 | `integrator` | 0 (Euler) | Integrator type (0=Euler, 1=RK4) |
 | `gravity` | `[0, 0, -9.81]` | Gravity vector |
-| `tolerance` | 1e-8 | Solver tolerance |
 
 ## G1 Humanoid Robot Standard Configuration
 

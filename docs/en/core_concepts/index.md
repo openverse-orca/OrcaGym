@@ -93,4 +93,5 @@ Different joint types occupy different numbers of elements in `qpos` and `qvel`:
 1. [Model / Data / Config](model-data-opt.md) — Understand the three core data objects
 2. [Gymnasium Interface](gym-interface.md) — Understand the standard RL interface
 3. [Data Flow](data-flow.md) — Understand how data flows through the simulation
-4. [System Architecture](architecture.md) — Understand the overall layered design, API boundaries, component design, encapsulation isolation, and the migration guide
+4. [Architecture Overview](architecture-overview.md) — Understand the overall layered design, API boundaries, and call flows
+5. [System Architecture](architecture.md) — Understand component design, API contracts, encapsulation isolation, and the migration guide

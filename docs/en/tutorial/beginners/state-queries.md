@@ -2,7 +2,7 @@
 
 In the previous section we only read `self.data.qpos` and `self.data.qvel`. In this section, you will learn to use the **query API** provided by OrcaGym to obtain richer state information.
 
-> See [OrcaPlayground examples/euler/04_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api for complete runnable code.
+> See [OrcaPlayground examples/euler/04_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/04_query_api) for complete runnable code.
 
 ---
 
@@ -38,7 +38,7 @@ class StateDumper:
         # -- End effector --
         try:
             ee_site = env.site("end_effector")
-            sites = env.query_site_pos_and_quat([ee_site])
+            sites = env.query_site_pos_and_mat([ee_site])
             ee_pos = sites[ee_site]["xpos"]
             print(f"\nEnd-effector position: [{ee_pos[0]:.4f}, {ee_pos[1]:.4f}, {ee_pos[2]:.4f}]")
         except Exception:
@@ -65,7 +65,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         )
         self._dumper = StateDumper(self)
 
-    # --- Query methods ---
+    # --- Query API ---
 
     def check_joints(self):
         """Query positions and velocities of all joints."""
@@ -117,6 +117,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         print(f"End-effector (site: {ee_site}):")
         print(f"  Position: {ee['xpos']}")
         print(f"  Rotation matrix: {ee['xmat']}")
+        # To convert to a quaternion, use orca_gym.utils.rotations.mat2quat(ee['xmat'])
 
         # Velocity
         linear_vel, angular_vel = self.query_site_xvalp_xvalr([ee_site])
@@ -166,6 +167,8 @@ class StateQueryDemo(OrcaGymEulerEnv):
         return self._get_obs(), {}
 
     def _get_obs(self):
+        # Simplified example: directly read the full qpos array as the observation
+        # In real tasks, query specific joints by name: self.query_joint_qpos(joint_names)
         return self.data.qpos.copy()
 
 
@@ -192,7 +195,7 @@ OrcaGym provides APIs that query by **name** (no need to remember IDs):
 | Joint velocity | `query_joint_qvel(names)` | `dict[str, array]` |
 | Body pose | `get_body_xpos_xmat_xquat(names)` | `dict[str, dict]` |
 | Body position (single) | `env.data.body_xpos(name)` | `(3,)` |
-| Site pose | `query_site_pos_and_quat(names)` | `dict[str, dict]` |
+| Site pose | `query_site_pos_and_mat(names)` | `dict[str, dict]` |
 | Site velocity | `query_site_xvalp_xvalr(names)` | `tuple[dict, dict]` |
 | Sensor | `query_sensor_data(names)` | `dict[str, array]` |
 | Actuator torque | `query_actuator_torques(names)` | `dict[str, array]` |
@@ -236,10 +239,12 @@ quat = env.data.body_xquat("base_link")   # (4,) [w,x,y,z]
 Sites are marker points in MuJoCo, typically marking the **end-effector**, **IMU position**, etc.:
 
 ```python
-# Pose
-sites = env.query_site_pos_and_quat(["robot_0_end_effector"])
+# Pose (returns xpos + xmat rotation matrix)
+sites = env.query_site_pos_and_mat(["robot_0_end_effector"])
 ee = sites["robot_0_end_effector"]
 print(f"End-effector position: {ee['xpos']}")
+print(f"End-effector rotation matrix: {ee['xmat']}")  # (3, 3)
+# To convert to a quaternion, use orca_gym.utils.rotations.mat2quat(ee['xmat'])
 
 # Velocity (linear + angular)
 lin_vel, ang_vel = env.query_site_xvalp_xvalr(["robot_0_end_effector"])

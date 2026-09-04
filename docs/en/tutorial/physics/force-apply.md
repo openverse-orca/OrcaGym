@@ -267,7 +267,7 @@ env.clear_body_force("g1_pelvis")   # Clear force on a single body
 env.clear_all_forces()              # Clear all external forces
 ```
 
-> **Note**: G1 uses force-controlled motors, so joints produce zero torque when `ctrl=0`. When applying external forces, choose a body that can directly receive force (e.g., pelvis),
+> ⚠️ **Note**: G1 uses force-controlled motors, so joints produce zero torque when `ctrl=0`. When applying external forces, choose a body that can directly receive force (e.g., pelvis),
 > and avoid applying force to bodies on a limp joint chain (the force will be absorbed by the joints).
 
 ### 2. Mocap Dragging
@@ -340,6 +340,7 @@ env.mj_jacBody(jacp, jacr, body_name="g1_pelvis")
 
 ```python
 jacp_site = np.zeros((3, env.model.nv))
+jacr_site = np.zeros((3, env.model.nv))   # must pre-allocate; mj_jacSite writes in-place
 env.mj_jacSite(jacp_site, jacr_site, site_name="g1_imu")
 
 # Verify consistency

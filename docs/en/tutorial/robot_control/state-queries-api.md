@@ -298,7 +298,7 @@ forces = env.query_contact_force(contact_ids)
 max_normal = max(abs(f[0]) for f in forces.values())
 ```
 
-> **Note**: The dict keys returned by `query_contact_simple()` are **lowercase** `"geom1"` / `"geom2"`,
+> ⚠️ **Note**: The dict keys returned by `query_contact_simple()` are **lowercase** `"geom1"` / `"geom2"`,
 > not uppercase `"Geom1"` / `"Geom2"`.
 
 ### 5. Base Frame Transform

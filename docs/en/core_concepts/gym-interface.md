@@ -43,7 +43,7 @@ def step(self, action) -> tuple:
     ...
 
 def reset_model(self) -> tuple:
-    """Reset the robot state to its initial pose"""
+    """Reset the robot state to its initial pose, returning (obs, info)"""
     ...
 
 def _get_obs(self):

@@ -2,7 +2,7 @@
 
 Beyond reading joint angles and body poses, you can also obtain **images** from the simulation — like giving the robot eyes.
 
-OrcaGym receives real-time rendered camera frames from OrcaStudio via WebSocket.
+OrcaGym receives real-time rendered camera frames from OrcaStudio via WebSocket, supporting frame alignment by physics-step index, saving intervals as MP4, and live preview.
 
 ---
 
@@ -10,89 +10,232 @@ OrcaGym receives real-time rendered camera frames from OrcaStudio via WebSocket.
 
 ```python
 """
-first_camera.py — Get the first image from a simulation camera
+first_camera.py — Get camera frames via the environment layer
 """
 
-import time
 import numpy as np
-from orca_gym.sensor.rgbd_camera import CameraWrapper
+from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 
-# 1. Create camera wrapper
-# name: camera name (arbitrary)
-# port: WebSocket port (configured in OrcaStudio)
-camera = CameraWrapper(name="front_camera", port=8765)
 
-# 2. Start camera stream (a background thread auto-receives and decodes frames)
-camera.start()
-print("Camera started, waiting for first frame...")
+class CameraEnv(OrcaGymEulerEnv):
+    """Minimal camera environment."""
 
-# 3. Wait for the first frame to arrive
-while not camera.is_first_frame_received():
-    time.sleep(0.1)
+    def __init__(self, model_xml_path, **kwargs):
+        super().__init__(
+            frame_skip=kwargs.pop("frame_skip", 5),
+            orcagym_addr=kwargs.pop("orcagym_addr", "localhost:50051"),
+            agent_names=kwargs.pop("agent_names", ["agent0"]),
+            time_step=kwargs.pop("time_step", 0.002),
+            model_xml_path=model_xml_path,
+            sync_render=kwargs.pop("sync_render", True),
+            render_fps=kwargs.pop("render_fps", 30),
+            **kwargs,
+        )
 
-print(f"✅ First frame received!")
+    def step(self, action):
+        self.do_simulation(action, self.frame_skip)
+        return self._get_obs(), 0.0, False, False, {}
 
-# 4. Get the image
-image = camera.image  # NumPy array, shape (H, W, 3), format BGR
-print(f" Resolution: {image.shape[1]}x{image.shape[0]}")
-print(f" Data type: {image.dtype}")
-print(f" Pixel range: [{image.min()}, {image.max()}]")
-print(f" Frame index: {camera.image_index}")
+    def reset_model(self):
+        self.set_joint_qpos(self.init_qpos)
+        self.set_joint_qvel(self.init_qvel)
+        self.mj_forward()
+        self._sync_view()
+        return self._get_obs(), {}
 
-# 5. Save the image (with OpenCV)
-import cv2
-cv2.imwrite("first_frame.png", image)
-print("✅ Image saved to first_frame.png")
+    def _get_obs(self):
+        return self.data.qpos.copy()
 
-# 6. Stop the camera
-camera.stop()
+
+if __name__ == "__main__":
+    env = CameraEnv(
+        model_xml_path="tests/orca_gym/environment/euler/fixtures/simple_pendulum.xml",
+        orcagym_addr="localhost:50051",
+        skip_grpc_load=False,  # online mode, requires connecting to OrcaStudio
+        render_mode="human",
+    )
+    env.reset()
+
+    # 1. Enumerate all registered camera names
+    camera_names = env.get_camera_names()
+    print(f"Available cameras: {camera_names}")
+    assert camera_names, "No cameras found. Add a Camera Entity in the OrcaStudio scene first"
+    camera_name = camera_names[0]
+
+    # 2. Start streaming (one-shot configuration + push stream)
+    env.start_streaming(
+        camera_name,
+        capture_rgb=True,       # enable RGB stream
+        color_port=7070,        # RGB stream WebSocket port
+        width=640,
+        height=480,
+    )
+    print(f"✅ Camera '{camera_name}' streaming started")
+
+    # 3. Main loop: render(simulate_index=...) drives rendering
+    #    simulate_index is used to extract frames by interval; it must be monotonically increasing
+    for step_idx in range(100):
+        action = np.zeros(env.model.nu, dtype=np.float32)
+        env.step(action)
+        env.render(simulate_index=step_idx)
+
+    # 4. Live preview (non-blocking)
+    env.show_camera(camera_name, camera_type="color")
+
+    # 5. Save an interval video as MP4 (non-blocking, returns a Future)
+    future = env.save_streaming(
+        camera_name=camera_name,
+        camera_type="color",
+        file_path="/tmp/pendulum.mp4",
+        start_simulate_index=0,
+        end_simulate_index=99,
+    )
+    result = future.result()  # wait for saving to finish
+    print(f"✅ Saved: {result.file_path} ({result.frame_count} frames)")
+
+    env.close()
 ```
+
+> ⚠️ **The examples in this section require online mode** (`skip_grpc_load=False`) and a connection to OrcaStudio.
+> In offline mode, the camera interface returns an empty list / no-op.
+
+---
+
+## Core API Reference
+
+### 1. Enumerate Camera Names
+
+```python
+camera_names = env.get_camera_names()
+# → ["Camera_Entity_[uuid1]", "Camera_Entity_[uuid2]", ...]
+```
+
+Returns all camera names registered in the OrcaStudio scene. In offline mode it returns an empty list.
+
+### 2. Start Streaming (`start_streaming`) ⭐ Recommended
+
+```python
+env.start_streaming(
+    camera_name,
+    capture_rgb=True,           # enable RGB stream
+    capture_depth=True,         # enable depth stream
+    color_port=7070,            # RGB stream WebSocket port
+    depth_port=7071,            # depth stream WebSocket port
+    width=1280,                 # image width
+    height=720,                 # image height
+    vertical_fov=60.0,          # vertical field of view (degrees)
+    near_clip=0.01,             # near clip plane
+    far_clip=100.0,             # far clip plane
+    gamma=1.0,                  # depth camera gamma correction
+    use_nvenc=True,             # use NvEnc hardware encoding
+    nvenc_gpu_index=0,          # NvEnc GPU index
+)
+```
+
+| Parameter | Description | Typical Value |
+|-----------|-------------|---------------|
+| `capture_rgb` | whether to output RGB color image | `True` |
+| `capture_depth` | whether to output depth image | `True` (when needed) |
+| `capture_normal` | whether to output normal map | `False` |
+| `capture_object_color` | whether to output instance-segmentation color-coded image | `False` |
+| `width` / `height` | image resolution | 640×480, 1280×720 |
+| `vertical_fov` | vertical field of view (degrees) | 60.0 |
+| `near_clip` / `far_clip` | clip plane distances | 0.01 / 100.0 |
+| `color_port` / `depth_port` | WebSocket ports | 7070 / 7071 |
+| `use_nvenc` | NvEnc hardware encoding | `True` (when an NVIDIA GPU is available) |
+
+> 💡 This method internally handles camera-property synchronization and streaming-state transitions, so the upper layer does not need to care about the underlying state machine.
+
+### 3. Drive Rendering (`render`)
+
+```python
+env.render(simulate_index=step_idx, request_idr=False)
+```
+
+- **`simulate_index`**: physics simulation step index, passed through to the engine camera pipeline for frame alignment.
+  When saving interval video, frames are extracted by this index, which **must be monotonically increasing**.
+- **`request_idr`**: whether to request the engine to output an IDR keyframe.
+  Set `True` at the start of a saved segment to ensure the output video starts playing correctly.
+
+Rendering frequency is controlled by `set_render_fps(fps)`:
+- `sync_render=True`: throttled by physics step (render one frame every N physics steps)
+- `sync_render=False`: throttled by wall-clock time (render one frame every `1/fps` seconds)
+
+### 4. Save Interval Video (`save_streaming`)
+
+```python
+future = env.save_streaming(
+    camera_name="Camera_Entity_[uuid]",
+    camera_type="color",          # "color" or "depth"
+    file_path="/tmp/output.mp4",
+    start_simulate_index=50,       # interval start (inclusive)
+    end_simulate_index=200,       # interval end (inclusive)
+)
+result = future.result()          # non-blocking, wait for result
+print(result.file_path, result.frame_count)
+```
+
+- **Non-blocking**: returns a `Future` immediately; call `future.result()` to get the result after saving completes.
+- `start_streaming` must be called first to start the stream.
+
+### 5. Live Preview (`show_camera`)
+
+```python
+env.show_camera(camera_name, camera_type="color", window_name="Front View")
+```
+
+- **Non-blocking**: shows frames in a separate window without affecting the main simulation thread.
+- Depth streams display raw grayscale frames directly, without pseudo-color conversion.
+- `start_streaming` must be called first to start the stream.
 
 ---
 
 ## Integrating the Camera into an Environment Class
-
-Make the camera part of the environment, capturing an image at each step:
 
 ```python
 """
 vision_env.py — Environment with camera observations
 """
 
-import time
 import numpy as np
 from gymnasium import spaces
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
-from orca_gym.sensor.rgbd_camera import CameraWrapper
 
 
 class VisionEnv(OrcaGymEulerEnv):
     """Environment that includes camera images in observations."""
 
-    def __init__(self, frame_skip, orcagym_addr, agent_names, time_step,
-                 camera_port: int = 8765, **kwargs):
+    def __init__(self, model_xml_path, camera_name, **kwargs):
         super().__init__(
-            frame_skip=frame_skip,
-            orcagym_addr=orcagym_addr,
-            agent_names=agent_names,
-            time_step=time_step,
+            frame_skip=kwargs.pop("frame_skip", 5),
+            orcagym_addr=kwargs.pop("orcagym_addr", "localhost:50051"),
+            agent_names=kwargs.pop("agent_names", ["agent0"]),
+            time_step=kwargs.pop("time_step", 0.002),
+            model_xml_path=model_xml_path,
+            sync_render=True,
+            render_fps=30,
+            render_mode="human",
+            skip_grpc_load=kwargs.pop("skip_grpc_load", False),
             **kwargs,
         )
 
-        # -- Set up camera --
-        self._camera = CameraWrapper(name="agent_view", port=camera_port)
-        self._camera.start()
+        # ── Camera configuration ──
+        self._camera_name = camera_name
+        self.start_streaming(
+            camera_name,
+            capture_rgb=True,
+            color_port=7070,
+            width=640,
+            height=480,
+        )
+        self._step_idx = 0
 
-        # Wait for first frame
-        print("Waiting for camera to be ready...")
-        while not self._camera.is_first_frame_received():
-            time.sleep(0.1)
-        print(f"✅ Camera ready: {self._camera.image.shape}")
-
-        # Action space
+        # ── Action space ──
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(self.model.nu,), dtype=np.float32
         )
+
+        # ── Observation space ──
         obs_sample = self._get_obs()
         self.observation_space = spaces.Dict({
             key: spaces.Box(low=-np.inf, high=np.inf, shape=v.shape, dtype=v.dtype)
@@ -102,178 +245,109 @@ class VisionEnv(OrcaGymEulerEnv):
         })
 
     def _get_obs(self):
-        """
-        Observation = proprioception (joint angles) + vision (camera image)
-
-        Proprioception: the state the robot "feels" about itself
-        Vision: what the camera sees
-        """
+        """Observation = proprioception + vision"""
+        # Get the latest decoded frame (np.ndarray (H, W, 3) uint8 BGR, or None)
+        frame = self.get_recorder_manager().get_last_decoded_frame(
+            self._camera_name, "color"
+        )
+        if frame is None:
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
         return {
-            # Proprioception
             "joint_pos": self.data.qpos.copy().astype(np.float32),
             "joint_vel": self.data.qvel.copy().astype(np.float32),
-
-            # Vision
-            "image": self._camera.image.copy(),  # (H, W, 3) uint8
+            "image": frame.copy(),
         }
 
     def step(self, action):
         action = np.asarray(action, dtype=np.float32).reshape(self.model.nu)
         self.do_simulation(action, self.frame_skip)
 
-        obs = self._get_obs()
-        reward = 0.0
-        terminated = False
-        truncated = False
+        # Drive rendering + frame alignment
+        self._step_idx += 1
+        self.render(simulate_index=self._step_idx)
 
-        return obs, reward, terminated, truncated, {}
+        obs = self._get_obs()
+        return obs, 0.0, False, False, {}
 
     def reset_model(self):
         self.set_joint_qpos(self.init_qpos)
         self.set_joint_qvel(self.init_qvel)
         self.mj_forward()
         self._sync_view()
+        self._step_idx = 0
         return self._get_obs(), {}
-
-    def close(self):
-        self._camera.stop()
-        super().close()
-```
-
----
-
-## Displaying the Camera Feed
-
-Live display with Matplotlib:
-
-```python
-import matplotlib.pyplot as plt
-
-def show_camera_live(camera: CameraWrapper, duration: float = 10.0):
-    """
-    Live display of camera feed (for duration seconds).
-
-    Note: This is only a simple display example.
-    Real RL training does not require frame-by-frame display — just use the image array directly.
-    """
-    plt.ion()  # interactive mode
-    fig, ax = plt.subplots()
-    img_display = ax.imshow(np.zeros((480, 640, 3), dtype=np.uint8))
-    ax.set_title("Camera Feed")
-    ax.axis('off')
-
-    start = time.time()
-    while time.time() - start < duration:
-        frame = camera.image.copy()
-        # OpenCV BGR -> Matplotlib RGB
-        frame_rgb = frame[..., ::-1]
-        img_display.set_data(frame_rgb)
-        fig.canvas.flush_events()
-        plt.pause(0.03)  # ~30 FPS
-
-    plt.ioff()
-    plt.close()
 ```
 
 ---
 
 ## Multi-Camera Setup
 
-Need multiple viewpoints? Create multiple `CameraWrapper` instances:
-
 ```python
-def setup_multi_camera():
-    """Start multiple cameras simultaneously."""
+# 1. Enumerate all cameras
+camera_names = env.get_camera_names()
 
-    cameras = {
-        "front": CameraWrapper("front", port=8765),
-        "side": CameraWrapper("side", port=8766),
-        "top": CameraWrapper("top", port=8767),
-    }
+# 2. Start streaming for each (use different ports to avoid conflicts)
+env.start_streaming(camera_names[0], capture_rgb=True, color_port=7070)
+env.start_streaming(camera_names[1], capture_rgb=True, color_port=7071)
+env.start_streaming(camera_names[2], capture_rgb=True, color_port=7072)
 
-    # Start all
-    for cam in cameras.values():
-        cam.start()
+# 3. Render once in the main loop (one render triggers rendering for all cameras)
+for step_idx in range(100):
+    env.step(action)
+    env.render(simulate_index=step_idx)
 
-    # Wait for all cameras to be ready
-    for name, cam in cameras.items():
-        while not cam.is_first_frame_received():
-            time.sleep(0.1)
-        print(f"✅ {name}: {cam.image.shape}")
-
-    # Synchronized retrieval of all views
-    def get_all_views():
-        return {name: cam.image.copy() for name, cam in cameras.items()}
-
-    return cameras, get_all_views
-
-
-# Usage
-cameras, get_views = setup_multi_camera()
-views = get_views()
-print(f"Available views: {list(views.keys())}")
+# 4. Preview individually
+env.show_camera(camera_names[0], "color", window_name="Front")
+env.show_camera(camera_names[2], "color", window_name="Top")
 ```
+
+> 💡 A single `render(simulate_index=...)` triggers the engine to render all enabled cameras,
+> so there is no need to call render for each camera individually.
 
 ---
 
-## Camera Parameter Configuration
-
-Each camera's parameters can be configured in OrcaStudio:
-
-| Parameter | Description | Typical Values |
-|-----------|-------------|----------------|
-| Resolution | Image width x height | 640x480, 1280x720 |
-| Frame rate | Frames per second | 15, 30, 60 |
-| RGB | Whether to output color image | `True` |
-| Depth | Whether to output depth image | `True` (when needed) |
-
-Configure on the Python side via `CameraProperty`. The new interface uses a state machine:
-- `get_camera_names()` enumerates all registered camera names
-- `set_camera_properties` is only allowed in Idle state, used to set camera properties
-- `set_streaming_enabled(True)` enters Streaming state and ports start streaming
-- MP4 recording is controlled by the environment-layer `save_streaming(camera_name, camera_type, file_path, start_simulate_index, end_simulate_index)` (client-side PyAV remux, non-blocking, returns a `Future`)
+## Depth Camera
 
 ```python
-from orca_gym.scene.orca_gym_scene import CameraProperty
-
-# 0. Enumerate all registered camera names
-camera_names = scene.get_camera_names()
-print(f"Found cameras: {camera_names}")
-
-# 1. Configure camera properties in Idle state (all fields optional, None means do not modify)
-camera_config = CameraProperty(
-    capture_rgb=True,      # output RGB image
-    capture_depth=True,    # output depth map
-    use_dds=False,         # do not use DDS compression
+# Start the depth stream
+env.start_streaming(
+    camera_name,
+    capture_rgb=False,
+    capture_depth=True,
+    depth_port=7071,
+    near_clip=0.01,    # depth camera near clip plane
+    far_clip=100.0,    # depth camera far clip plane
+    gamma=1.0,         # depth camera gamma correction
 )
-camera_name = camera_names[0]  # select the first camera
-scene.set_camera_properties(camera_name, camera_config)
 
-# 2. Start streaming (Idle -> Streaming, ports like 7070/7071 start listening and streaming)
-scene.set_streaming_enabled(camera_name, True)
+# Preview (grayscale display, no pseudo-color conversion)
+env.show_camera(camera_name, camera_type="depth")
 
-# 3. To modify properties, stop streaming first to return to Idle
-# scene.set_streaming_enabled(camera_name, False)
-# scene.set_camera_properties(camera_name, CameraProperty(width=1280, height=720))
-# scene.set_streaming_enabled(camera_name, True)
+# Save depth video
+future = env.save_streaming(
+    camera_name, "depth", "/tmp/depth.mp4",
+    start_simulate_index=0, end_simulate_index=99,
+)
 ```
+
+> ⚠️ Depth and color streams are independent streams; operate on them separately with `camera_type="color"` / `"depth"`.
+> The same camera can enable RGB + Depth simultaneously (`capture_rgb=True, capture_depth=True`).
 
 ---
 
 ## Performance Tips
 
-1. **Do not `imshow` in the main loop** — image display is very CPU-intensive. During training, just process the array directly.
-2. **Downscale images** — if full resolution is not needed, resize in `_get_obs()`.
-3. **Lower the frame rate** — 30 FPS is usually sufficient; higher frame rates waste bandwidth.
-4. **Asynchronous rendering** — the camera decodes frames in a background thread without blocking the main simulation thread.
-
-```python
-def _get_obs(self):
-    image = self._camera.image.copy()
-    # Downscale to 128x128 to reduce computation
-    small_image = cv2.resize(image, (128, 128))
-    return {..., "image": small_image}
-```
+1. **Don't `imshow` in the main loop** — image display is very CPU-intensive.
+   Use `show_camera()` to display it in a separate window, or skip display entirely during training.
+2. **Lower the frame rate** — 15–30 FPS is usually sufficient during training; higher frame rates waste bandwidth.
+3. **NvEnc hardware encoding** — set `use_nvenc=True` when an NVIDIA GPU is available to greatly reduce encoding CPU overhead.
+4. **Downscale images** — if your RL policy does not need full resolution, resize in `_get_obs()`:
+   ```python
+   import cv2
+   small = cv2.resize(frame, (128, 128))
+   ```
+5. **Record intervals rather than the full run** — use `save_streaming(start, end)` to save only key intervals,
+   with constant memory usage.
 
 ---
 

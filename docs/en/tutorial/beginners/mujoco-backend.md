@@ -76,7 +76,6 @@ env.sim_config.gravity = np.array([0., 0., -9.81])
 env.sim_config.load_from_dict({
     "integrator": 0,
     "iterations": 100,
-    "tolerance": 1e-8,
 })
 
 # Export configuration
@@ -91,7 +90,6 @@ config = env.sim_config.to_dict()
 | `iterations` | int | 100 | Solver iteration count |
 | `integrator` | int | 0 | 0=Euler, 1=RK4 |
 | `gravity` | ndarray | [0,0,-9.81] | Gravitational acceleration |
-| `tolerance` | float | 1e-8 | Solver tolerance |
 
 ## Timestep vs Control Frequency
 
