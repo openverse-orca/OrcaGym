@@ -137,6 +137,12 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         await self.gym.init_simulation(model_xml_path)
         return
 
+    def _grpc_channel_options(self):
+        return [
+            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+            ("grpc.max_send_message_length", 1024 * 1024 * 1024),
+        ]
+
     def initialize_grpc(self):
         """初始化 gRPC 通信通道和客户端"""
         if self._skip_grpc_load:
@@ -151,14 +157,32 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
             return
         self.channel = grpc.aio.insecure_channel(
             self.orcagym_addr,
-            options=[
-                ('grpc.max_receive_message_length', 1024 * 1024 * 1024),
-                ('grpc.max_send_message_length', 1024 * 1024 * 1024),
-            ]
+            options=self._grpc_channel_options(),
         )
         self.stub = GrpcServiceStub(self.channel)
         self.gym = OrcaGymLocal(self.stub)
-    
+
+    async def _reconnect_grpc(self):
+        """Studio gRPC 短暂断开后重建 channel/stub，保留本地 MuJoCo 状态。"""
+        if self._skip_grpc_load:
+            return
+        if self.channel is not None:
+            try:
+                await self.channel.close()
+            except Exception:
+                pass
+        self.channel = grpc.aio.insecure_channel(
+            self.orcagym_addr,
+            options=self._grpc_channel_options(),
+        )
+        self.stub = GrpcServiceStub(self.channel)
+        if self.gym is not None:
+            self.gym.stub = self.stub
+
+    def reconnect_grpc(self):
+        """同步封装：供遥操主循环在 push_visual 失败时重连。"""
+        self.loop.run_until_complete(self._reconnect_grpc())
+
     def pause_simulation(self):
         """暂停仿真（采用被动模式）"""
         if self._skip_grpc_load:
