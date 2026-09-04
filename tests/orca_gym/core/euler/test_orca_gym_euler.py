@@ -470,7 +470,7 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
         self.assertIn("env.data", msg)
 
     def test_blocked_attrs_frozenset_complete(self):
-        """_BLOCKED_ATTRS 是 frozenset 且包含全部 30 个拦截名（K3/K5 + Euler 后端）。"""
+        """_BLOCKED_ATTRS 是 frozenset 且包含全部 32 个拦截名（K3/K5 + Euler 后端 + 多世界边界标记）。"""
         self.assertIsInstance(OrcaGymEuler._BLOCKED_ATTRS, frozenset)
         expected_blocked = {
             # L3 引擎内部 (8)
@@ -484,6 +484,8 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             "_host_cache", "host_cache",
             "_step_graph", "step_graph",
             "_coupling", "coupling",
+            # 多世界 DataView 边界标记（决策 D5）
+            "_multi_world", "multi_world",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)
 
@@ -709,13 +711,49 @@ class TestOrcaGymEulerEulerBackend(unittest.TestCase):
         sim = object.__getattribute__(gym, "_sim")
         self.assertIsInstance(sim, FakeCore)
 
-    def test_init_euler_backend_multi_world_raises(self):
+    def test_init_euler_backend_multi_world_constructs_multi_worlds_core(self):
+        """P2：nworld>1 构造 MuJoCoSimCoreEulerMultiWorlds（解除 P1 占位）。"""
         gym = OrcaGymEuler()
         opt = object.__getattribute__(gym, "_opt")
         opt.backend = SimBackend.EULER
-        opt.nworld = 2
-        with self.assertRaises(NotImplementedError):
+        opt.device = "cuda:0"
+        opt.nworld = 4
+        opt.timestep = 0.002
+
+        fake_model = object()
+        captured = {}
+
+        class FakeSingleCore:
+            def init_simulation(self, *args, **kwargs):
+                raise AssertionError("nworld>1 不应构造单世界编排层")
+
+        class FakeMultiCore:
+            def init_simulation(self, model_xml_path, device="cuda", nworld=2,
+                                timestep=None, opt_overrides=None):
+                captured["init_args"] = (model_xml_path, device, nworld, timestep, opt_overrides)
+                self.mj_model = fake_model
+
+        fake_single_mod = types.ModuleType("orca_gym.core.euler.mujoco_sim_core_euler")
+        fake_single_mod.MuJoCoSimCoreEuler = FakeSingleCore
+        fake_multi_mod = types.ModuleType(
+            "orca_gym.core.euler.mujoco_sim_core_euler_multi_worlds"
+        )
+        fake_multi_mod.MuJoCoSimCoreEulerMultiWorlds = FakeMultiCore
+
+        with mock.patch.dict(sys.modules, {
+            "orca_gym.core.euler.mujoco_sim_core_euler": fake_single_mod,
+            "orca_gym.core.euler.mujoco_sim_core_euler_multi_worlds": fake_multi_mod,
+        }):
             gym._init_euler_backend("dummy.xml", None)
+
+        self.assertEqual(
+            captured["init_args"], ("dummy.xml", "cuda:0", 4, 0.002, None)
+        )
+        sim = object.__getattribute__(gym, "_sim")
+        self.assertIsInstance(sim, FakeMultiCore)
+        # DataView 边界标记（决策 D5）：多世界跳过 build/sync
+        self.assertTrue(object.__getattribute__(gym, "_multi_world"))
+        self.assertIs(opt._mj_model, fake_model)
 
 
 if __name__ == "__main__":

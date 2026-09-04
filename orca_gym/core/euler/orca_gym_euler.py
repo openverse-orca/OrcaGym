@@ -69,6 +69,7 @@ class OrcaGymEuler:
         "_host_cache", "host_cache",
         "_step_graph", "step_graph",
         "_coupling", "coupling",
+        "_multi_world", "multi_world",
     })
 
     def __init__(self, stub=None) -> None:
@@ -87,6 +88,7 @@ class OrcaGymEuler:
         self._view = OrcaGymDataView()
         self._euler = None    # EulerOrchestrator | None（骨架阶段恒为 None）
         self._orca_model = None  # OrcaGymModel | None（init_simulation 后填充，model property 返回缓存）
+        self._multi_world = False    # DataView 边界标记（多世界跳过 build/sync，决策 D5）
 
     # --- K3/K5: 隔离机制 ---
 
@@ -123,6 +125,12 @@ class OrcaGymEuler:
             elif name in ("_coupling", "coupling"):
                 euler_hint = (
                     "  Euler 耦合查询 → 使用 env.has_euler() / env.step_with_coupling()\n"
+                )
+            elif name in ("_multi_world", "multi_world"):
+                euler_hint = (
+                    "  多世界数据读写 → 由应用框架直接持有编排类实例，"
+                    "经 sim.solver.mjf_data.<field>.assign/.numpy()\n"
+                    "  （GPU-native 范式，见多世界适配设计 §3）\n"
                 )
             else:
                 # L3 引擎内部 _mjData/_mjModel 等
@@ -181,11 +189,17 @@ class OrcaGymEuler:
                     setattr(opt, key, value)
         # 分支可能替换 _sim，重新取后再同步 DataView
         sim = object.__getattribute__(self, "_sim")
-        
-        # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
-        object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
-        # 首次同步 DataView
-        sim.sync_to_view(view)
+
+        if not object.__getattribute__(self, "_multi_world"):
+            # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
+            object.__setattr__(
+                self, "_orca_model", registry.build_orca_gym_model()
+            )
+            # 首次同步 DataView
+            sim.sync_to_view(view)
+        # 多世界：跳过 OrcaGymModel 构建与 DataView 首同步（决策 D5）——
+        # obs 经 mjf_data.<field>.numpy() 直读，41 个委托方法不构成多世界
+        # 数据通路（适配设计 §7.1），数据面归应用框架。
 
     def _init_euler_backend(
         self,
@@ -209,6 +223,9 @@ class OrcaGymEuler:
         """
         try:
             from orca_gym.core.euler.mujoco_sim_core_euler import MuJoCoSimCoreEuler
+            from orca_gym.core.euler.mujoco_sim_core_euler_multi_worlds import (
+                MuJoCoSimCoreEulerMultiWorlds,
+            )
         except ImportError as e:
             raise RuntimeError(
                 "Euler 后端不可用：MuJoCoSimCoreEuler 或其依赖 orca.euler 未安装。"
@@ -227,16 +244,23 @@ class OrcaGymEuler:
                 timestep=opt.timestep,
                 opt_overrides=opt_overrides,
             )
+            multi_world = False
         else:
-            raise NotImplementedError(
-                "P1 仅支持 nworld=1；多世界后端（MuJoCoSimCoreEulerMultiWorlds）"
-                "留待 P2 实现。"
+            sim = MuJoCoSimCoreEulerMultiWorlds()
+            sim.init_simulation(
+                model_xml_path,
+                device=opt.device,
+                nworld=opt.nworld,
+                timestep=opt.timestep,
+                opt_overrides=opt_overrides,
             )
+            multi_world = True
 
         opt._bind(sim.mj_model)              # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
         registry._bind(sim.mj_model)         # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
         object.__setattr__(self, "_sim", sim)
         object.__setattr__(self, "_euler", None)   # P1 纯刚体，无 CouplingOrchestrator
+        object.__setattr__(self, "_multi_world", multi_world)   # DataView 边界标记（决策 D5）
 
     def reset_coupling_state(self) -> None:
         """重置 Euler 耦合编排器内部状态（供 reset_simulation 调用）。
@@ -402,7 +426,11 @@ class OrcaGymEuler:
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
         await studio.render(
-            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr, contacts=self._build_contact_data()
+            view.qpos,
+            view.time,
+            simulate_index=simulate_index,
+            request_idr=request_idr,
+            contacts=self._build_contact_data(),
         )
 
     def _build_contact_data(self, bodys: list[int] | None = None) -> list[dict]:

@@ -130,6 +130,65 @@ def _model_changed_flags():
     return ModelChangedFlags
 
 
+def prepare_host_model(
+    model_xml_path: str,
+    timestep: float | None = None,
+    opt_overrides: dict[str, Any] | None = None,
+) -> "mujoco.MjModel":
+    """加载 host MjModel 并做 GPU 后端所需兼容性预处理（单/多世界共用）。
+
+    预处理内容：
+
+    1. **降级 no-slip 求解器**：mujoco_flow（fork 自 mujoco_warp 后端）上游
+       未实现 no-slip 后处理，``put_model`` 对 ``noslip_iterations > 0`` 抛
+       ``NotImplementedError``。因 OrcaGym 接入的 MJCF 由外部渲染端经 gRPC
+       提供（可能启用 no-slip），此处清零 noslip_iterations 保证 GPU 后端可
+       运行，代价是 GPU 结果与 CPU no-slip 配置存在近似差异。
+
+    2. **停放 ActorManipulator 拖拽代理**：旧关卡导出的代理被埋在 z=-1000
+       （远低于 floor 平面），导致极轻 dummy 自由体穿透 floor、接触反力与软
+       weld 打架，在 float32 下爆出 qacc ~1e6 并累积为 NaN（见
+       ``_park_actor_manipulator``）。
+
+    Args:
+        model_xml_path: MuJoCo 模型 XML 文件路径。
+        timestep: 用户指定的物理时间步长（秒）。None 时保留 XML 默认值；
+            非 None 时在构造求解器前覆盖 ``model.opt.timestep``（Euler
+            后端初始化后 timestep 只读，故必须在此处生效）。
+        opt_overrides: 构造期 opt 覆盖（Feature A）。键已在上游（Env
+            ``__init__``）经 ``validate_opt_overrides`` 校验，此处信任传入
+            （内部边界）。在求解器构造（put_model）前写入 host
+            ``model.opt``，确保 GPU 侧固化值为用户指定值。
+
+    Returns:
+        host MjModel（已按需清零 noslip_iterations 并停放拖拽代理）。
+    """
+    model = mujoco.MjModel.from_xml_path(model_xml_path)
+    if timestep is not None:
+        model.opt.timestep = timestep
+    # 构造期 opt 覆盖（Feature A）：在 solver 构造（put_model）前写入 host
+    # model.opt，确保 GPU 侧固化值为用户指定值。
+    if opt_overrides:
+        for key, value in opt_overrides.items():
+            setattr(model.opt, key, value)
+    if model.opt.noslip_iterations > 0:
+        warnings.warn(
+            f"GPU 后端不支持 no-slip 求解器，noslip_iterations 由 "
+            f"{model.opt.noslip_iterations} 降级为 0（模型: {model_xml_path}）。"
+            "GPU 物理结果与 CPU 的 no-slip 配置存在近似差异。",
+            stacklevel=2,
+        )
+        model.opt.noslip_iterations = 0
+    if _park_actor_manipulator(model) > 0:
+        warnings.warn(
+            "检测到 ActorManipulator 拖拽代理（mocap anchor + dummy 自由体）"
+            "埋于地面以下，已将其停放到地面以上并关闭代理 geom 碰撞掩码，"
+            "以消除 GPU float32 下的数值发散。",
+            stacklevel=2,
+        )
+    return model
+
+
 class MuJoCoSimCoreEuler:
     """单世界编排层（nworld=1，对齐 design C3）。
 
@@ -250,58 +309,13 @@ class MuJoCoSimCoreEuler:
         timestep: float | None = None,
         opt_overrides: dict[str, Any] | None = None,
     ) -> "mujoco.MjModel":
-        """加载 host MjModel 并做 GPU 后端所需兼容性预处理。
+        """薄委托模块级 ``prepare_host_model``（单/多世界共用预处理）。
 
-        预处理内容：
-
-        1. **降级 no-slip 求解器**：mujoco_flow（fork 自 mujoco_warp 后端）上游
-           未实现 no-slip 后处理，``put_model`` 对 ``noslip_iterations > 0`` 抛
-           ``NotImplementedError``。因 OrcaGym 接入的 MJCF 由外部渲染端经 gRPC
-           提供（可能启用 no-slip），此处清零 noslip_iterations 保证 GPU 后端可
-           运行，代价是 GPU 结果与 CPU no-slip 配置存在近似差异。
-
-        2. **停放 ActorManipulator 拖拽代理**：旧关卡导出的代理被埋在 z=-1000
-           （远低于 floor 平面），导致极轻 dummy 自由体穿透 floor、接触反力与软
-           weld 打架，在 float32 下爆出 qacc ~1e6 并累积为 NaN（见
-           ``_park_actor_manipulator``）。
-
-        Args:
-            model_xml_path: MuJoCo 模型 XML 文件路径。
-            timestep: 用户指定的物理时间步长（秒）。None 时保留 XML 默认值；
-                非 None 时在构造求解器前覆盖 ``model.opt.timestep``（Euler
-                后端初始化后 timestep 只读，故必须在此处生效）。
-            opt_overrides: 构造期 opt 覆盖（Feature A）。键已在上游（Env
-                ``__init__``）经 ``validate_opt_overrides`` 校验，此处信任传入
-                （内部边界）。在求解器构造（put_model）前写入 host
-                ``model.opt``，确保 GPU 侧固化值为用户指定值。
-
-        Returns:
-            host MjModel（已按需清零 noslip_iterations 并停放拖拽代理）。
+        保留本静态方法以维持既有调用点零改动；预处理逻辑见
+        ``prepare_host_model`` docstring（no-slip 降级、拖拽代理停放、
+        timestep/opt_overrides 构造期下发）。
         """
-        model = mujoco.MjModel.from_xml_path(model_xml_path)
-        if timestep is not None:
-            model.opt.timestep = timestep
-        # 构造期 opt 覆盖（Feature A）：在 solver 构造（put_model）前写入 host
-        # model.opt，确保 GPU 侧固化值为用户指定值。
-        if opt_overrides:
-            for key, value in opt_overrides.items():
-                setattr(model.opt, key, value)
-        if model.opt.noslip_iterations > 0:
-            warnings.warn(
-                f"GPU 后端不支持 no-slip 求解器，noslip_iterations 由 "
-                f"{model.opt.noslip_iterations} 降级为 0（模型: {model_xml_path}）。"
-                "GPU 物理结果与 CPU 的 no-slip 配置存在近似差异。",
-                stacklevel=2,
-            )
-            model.opt.noslip_iterations = 0
-        if _park_actor_manipulator(model) > 0:
-            warnings.warn(
-                "检测到 ActorManipulator 拖拽代理（mocap anchor + dummy 自由体）"
-                "埋于地面以下，已将其停放到地面以上并关闭代理 geom 碰撞掩码，"
-                "以消除 GPU float32 下的数值发散。",
-                stacklevel=2,
-            )
-        return model
+        return prepare_host_model(model_xml_path, timestep, opt_overrides)
 
     def reset_data(self) -> None:
         self._require_solver()
