@@ -22,12 +22,14 @@ OrcaGymModel。
     绕过拦截。
 """
 
+from typing import Any
+
 import numpy as np
 
 from orca_gym.core.euler.mujoco_sim_core import MuJoCoSimCore
 from orca_gym.core.euler.orca_studio_bridge import AnchorType, OrcaStudioBridge
 from orca_gym.core.euler.model_registry import ModelRegistry
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 
 
@@ -62,6 +64,12 @@ class OrcaGymEuler:
         # K5: 子组件对象也不对外暴露
         "_sim", "_studio", "_registry", "_opt", "_view", "_euler",
         "sim", "studio", "registry", "opt", "view", "euler",
+        # Euler 后端 GPU 对象
+        "_mjf_model", "_mjf_data", "mjf_model", "mjf_data",
+        "_host_cache", "host_cache",
+        "_step_graph", "step_graph",
+        "_coupling", "coupling",
+        "_multi_world", "multi_world",
     })
 
     def __init__(self, stub=None) -> None:
@@ -80,6 +88,7 @@ class OrcaGymEuler:
         self._view = OrcaGymDataView()
         self._euler = None    # EulerOrchestrator | None（骨架阶段恒为 None）
         self._orca_model = None  # OrcaGymModel | None（init_simulation 后填充，model property 返回缓存）
+        self._multi_world = False    # DataView 边界标记（多世界跳过 build/sync，决策 D5）
 
     # --- K3/K5: 隔离机制 ---
 
@@ -107,6 +116,22 @@ class OrcaGymEuler:
                 euler_hint = "  求解器配置 → 使用 env.sim_config\n"
             elif name in ("_view", "view"):
                 euler_hint = "  状态读取 → 使用 env.data（OrcaGymDataView）\n"
+            elif name in ("_mjf_model", "_mjf_data", "mjf_model", "mjf_data"):
+                euler_hint = "  读取 MuJoCo 状态 → 使用 env.data（OrcaGymDataView）\n"
+            elif name in ("_host_cache", "host_cache"):
+                euler_hint = "  host 缓存 → 使用 solver.host（合法公开点）\n"
+            elif name in ("_step_graph", "step_graph"):
+                euler_hint = "  step graph → 由 solver 内部管理，不对外暴露\n"
+            elif name in ("_coupling", "coupling"):
+                euler_hint = (
+                    "  Euler 耦合查询 → 使用 env.has_euler() / env.step_with_coupling()\n"
+                )
+            elif name in ("_multi_world", "multi_world"):
+                euler_hint = (
+                    "  多世界数据读写 → 由应用框架直接持有编排类实例，"
+                    "经 sim.solver.mjf_data.<field>.assign/.numpy()\n"
+                    "  （GPU-native 范式，见多世界适配设计 §3）\n"
+                )
             else:
                 # L3 引擎内部 _mjData/_mjModel 等
                 euler_hint = ""
@@ -129,26 +154,123 @@ class OrcaGymEuler:
 
     # --- 生命周期 ---
 
-    async def init_simulation(self, model_xml_path: str) -> None:
+    async def init_simulation(
+        self,
+        model_xml_path: str,
+        esdf_path: str | None = None,
+        opt_overrides: dict[str, Any] | None = None,
+    ) -> None:
         """初始化仿真：加载模型、绑定 SimConfig/ModelRegistry、同步 DataView。
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
+            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
+            opt_overrides: 构造期 opt 覆盖（Feature A，键为
+                integrator/gravity/iterations）。Euler 分支在求解器构造前
+                写入 host model.opt（GPU 固化值）；CPU 分支绑定后经公共
+                setter 写入 mj_model.opt 立即生效。键已在上游（Env
+                ``__init__``）经 ``validate_opt_overrides`` 校验。
         """
         sim = object.__getattribute__(self, "_sim")
         opt = object.__getattribute__(self, "_opt")
         registry = object.__getattribute__(self, "_registry")
         view = object.__getattribute__(self, "_view")
 
-        sim.init_simulation(model_xml_path)
-        # 绑定 SimConfig/ModelRegistry 到真实 mjModel
-        opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
-        # registry._bind(sim._mjModel)      # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
-        registry._bind(sim._mjModel, model_xml_path)  # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
-        # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
-        object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
-        # 首次同步 DataView
-        sim.sync_to_view(view)
+        if opt.backend == SimBackend.EULER:
+            self._init_euler_backend(model_xml_path, esdf_path, opt_overrides)
+        else:
+            sim.init_simulation(model_xml_path)
+            # 绑定 SimConfig/ModelRegistry 到真实 mjModel
+            opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
+            registry._bind(sim._mjModel, model_xml_path)  # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
+            # CPU 分支：绑定后经公共 setter 应用（写 mj_model.opt 立即生效）
+            if opt_overrides:
+                for key, value in opt_overrides.items():
+                    setattr(opt, key, value)
+        # 分支可能替换 _sim，重新取后再同步 DataView
+        sim = object.__getattribute__(self, "_sim")
+
+        if not object.__getattribute__(self, "_multi_world"):
+            # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
+            object.__setattr__(
+                self, "_orca_model", registry.build_orca_gym_model()
+            )
+            # 首次同步 DataView
+            sim.sync_to_view(view)
+        # 多世界：跳过 OrcaGymModel 构建与 DataView 首同步（决策 D5）——
+        # obs 经 mjf_data.<field>.numpy() 直读，41 个委托方法不构成多世界
+        # 数据通路（适配设计 §7.1），数据面归应用框架。
+
+    def _init_euler_backend(
+        self,
+        model_xml_path: str,
+        esdf_path: str | None,
+        opt_overrides: dict[str, Any] | None = None,
+    ) -> None:
+        """按 Euler 后端初始化：构造 MuJoCoSimCoreEuler 并绑定 host MjModel。
+
+        用户配置的物理时间步长（``SimConfig.timestep``，由 Env 层
+        ``set_time_step``/构造参数同步写入）在构造求解器前下发到
+        MuJoCoSimCoreEuler.init_simulation，确保 Euler 后端物理步长
+        与用户设置一致（Euler 后端初始化后 timestep 只读）。
+
+        Args:
+            model_xml_path: MuJoCo 模型 XML 文件路径。
+            esdf_path: ESDF 场文件路径（P1 忽略）。
+            opt_overrides: 构造期 opt 覆盖（Feature A）。在求解器构造前
+                随 init_simulation 下发，由 ``_prepare_model`` 写入 host
+                model.opt（GPU 固化值）。
+        """
+        try:
+            from orca_gym.core.euler.mujoco_sim_core_euler import MuJoCoSimCoreEuler
+            from orca_gym.core.euler.mujoco_sim_core_euler_multi_worlds import (
+                MuJoCoSimCoreEulerMultiWorlds,
+            )
+        except ImportError as e:
+            raise RuntimeError(
+                "Euler 后端不可用：MuJoCoSimCoreEuler 或其依赖 orca.euler 未安装。"
+                "请确认已安装 orca.euler 且 SimConfig.backend = SimBackend.EULER。"
+            ) from e
+
+        opt = object.__getattribute__(self, "_opt")
+        registry = object.__getattribute__(self, "_registry")
+
+        if opt.nworld == 1:
+            sim = MuJoCoSimCoreEuler()
+            sim.init_simulation(
+                model_xml_path,
+                device=opt.device,
+                nworld=opt.nworld,
+                timestep=opt.timestep,
+                opt_overrides=opt_overrides,
+            )
+            multi_world = False
+        else:
+            sim = MuJoCoSimCoreEulerMultiWorlds()
+            sim.init_simulation(
+                model_xml_path,
+                device=opt.device,
+                nworld=opt.nworld,
+                timestep=opt.timestep,
+                opt_overrides=opt_overrides,
+            )
+            multi_world = True
+
+        opt._bind(sim.mj_model)              # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
+        registry._bind(sim.mj_model)         # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
+        object.__setattr__(self, "_sim", sim)
+        object.__setattr__(self, "_euler", None)   # P1 纯刚体，无 CouplingOrchestrator
+        object.__setattr__(self, "_multi_world", multi_world)   # DataView 边界标记（决策 D5）
+
+    def reset_coupling_state(self) -> None:
+        """重置 Euler 耦合编排器内部状态（供 reset_simulation 调用）。
+
+        P1 下 _euler 恒为 None，本方法为 no-op，但签名存在以保证
+        OrcaGymEulerEnv.reset_simulation 无需分支。
+        """
+        coupling = object.__getattribute__(self, "_euler")
+        if coupling is not None:
+            coupling.reset()
 
     async def load_model_xml(self) -> str:
         """加载模型 XML（在线模式从 Studio 拉取，离线模式返回本地路径）。
@@ -203,6 +325,35 @@ class OrcaGymEuler:
     def reset_data(self) -> None:
         """重置 MjData 到初始状态。"""
         object.__getattribute__(self, "_sim").reset_data()
+
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> Any:
+        """注册 device-side PD 控制器（委托 _sim，仅 Euler GPU 后端可用）。
+
+        Args:
+            controller_type: 控制算法标识（P1 仅 "pd"）。
+            kp: 位置增益 (nu,)。
+            kd: 速度增益 (nu,)。
+            motor_limits: 力矩限幅 (nu,)。
+            joint_names: 被驱动关节名。
+
+        Returns:
+            PidController 句柄（``update_target`` / ``set_gains``）。
+        """
+        return object.__getattribute__(self, "_sim").register_pid_controller(
+            controller_type,
+            kp=kp,
+            kd=kd,
+            motor_limits=motor_limits,
+            joint_names=joint_names,
+        )
 
     # --- 状态同步 ---
 
@@ -275,7 +426,11 @@ class OrcaGymEuler:
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
         await studio.render(
-            view.qpos, view.time, simulate_index=simulate_index, request_idr=request_idr, contacts=self._build_contact_data()
+            view.qpos,
+            view.time,
+            simulate_index=simulate_index,
+            request_idr=request_idr,
+            contacts=self._build_contact_data(),
         )
 
     def _build_contact_data(self, bodys: list[int] | None = None) -> list[dict]:

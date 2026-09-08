@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig, validate_opt_overrides
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
 from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult, VideoRecorderManager
@@ -92,9 +92,12 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         time_step: float,
         *,
         model_xml_path: str | None = None,
+        esdf_path: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
+        device: str = "cpu",
+        sim_config_overrides: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -109,9 +112,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
+            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
+            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0"/"hip:0" 等 → Euler.SolverMujoco GPU）。
+            sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
+                合法键为 integrator/gravity/iterations（timestep 请用 time_step
+                构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
+                在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
+                setter 写入立即生效。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -123,6 +133,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 2. Env 自有字段
         self._skip_grpc_load = skip_grpc_load
         self._local_xml_path = model_xml_path
+        self._esdf_path = esdf_path
+        self._device = device
+        # 用户边界校验：非法键（含 timestep）尽早失败
+        validate_opt_overrides(sim_config_overrides)
+        self._opt_overrides = dict(sim_config_overrides) if sim_config_overrides else None
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
@@ -161,6 +176,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
         # 4. 生命周期编排（原父类 __init__ 中的编排，现在自主调用）
         self.initialize_grpc()
+        self._configure_backend()
         self.pause_simulation()
         self.set_time_step(time_step)
         self.initialize_simulation()   # 内部设置 _gym，model/data 通过 property 读取
@@ -211,6 +227,19 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
+    def _configure_backend(self) -> None:
+        """依据 device 参数配置后端（cpu → MuJoCo；cuda* → Euler）。
+
+        必须在 initialize_simulation 之前调用：initialize_simulation 内部
+        依据 sim_config.backend 决定走 CPU 或 Euler 初始化路径。
+        """
+        if self._device.startswith(("cuda", "hip")):
+            self._gym.sim_config.backend = SimBackend.EULER
+            self._gym.sim_config.device = self._device
+        else:
+            self._gym.sim_config.backend = SimBackend.MUJOCO
+            self._gym.sim_config.device = self._device
+
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
         """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
 
@@ -221,10 +250,21 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             model_xml_path = self._local_xml_path
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
-        # 2. 初始化仿真
-        self.loop.run_until_complete(self._gym.init_simulation(model_xml_path))
-        # 3. 应用缓存的 time_step（init_simulation 前设置的值需重新生效）
-        self._gym.sim_config.timestep = self._time_step
+        # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
+        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异）
+        self.loop.run_until_complete(
+            self._gym.init_simulation(
+                model_xml_path,
+                esdf_path=self._esdf_path,
+                opt_overrides=self._opt_overrides,
+            )
+        )
+        # 3. 应用缓存的 time_step：
+        #    - CPU 后端：_bind 后写 mj_model.opt.timestep。
+        #    - Euler 后端：init_simulation 内部（_init_euler_backend）已在构造
+        #      求解器前将 SimConfig.timestep 下发到模型，无需（也无法）在此重复设置。
+        if self._gym.sim_config.backend == SimBackend.MUJOCO:
+            self._gym.sim_config.timestep = self._time_step
         # 4. 在线模式：同步时间步到远端 OrcaStudio
         if not self._skip_grpc_load:
             self._studio_bridge.set_timestep_remote(self._time_step)
@@ -256,6 +296,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def reset_simulation(self) -> None:
         """重置 MjData 到初始状态并同步 DataView。"""
         self._gym.reset_data()
+        self._gym.reset_coupling_state()
         self._gym.sync_to_view()
 
     def init_qpos_qvel(self) -> None:
@@ -265,21 +306,26 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.init_qvel = self._gym.data.qvel.ravel().copy()
 
     def set_time_step(self, time_step: float) -> None:
-        """设置仿真时间步长（本地缓存 + 远端同步）。
+        """设置仿真时间步长 dt（本地缓存 + 远端同步）——用户配置物理步长的明确接口。
 
-        __init__ 在 initialize_simulation 前调用本方法，此时 SimConfig
-        未绑定 mjModel，缓存到 self._time_step，在 initialize_simulation
-        末尾重新设置。initialize_simulation 后调用时，本地立即生效，
-        在线模式同步到远端 OrcaStudio。
+        时序约定（重要）：
+        - **初始化前调用**（``__init__`` 在 ``initialize_simulation`` 前调用本方法）：
+          SimConfig 尚未绑定 mjModel，仅缓存到 ``self._time_step``，随后由
+          ``initialize_simulation`` 下发到求解器，Euler 后端据此在 solver 构造时
+          固化步长（Euler 步长初始化后只读）。
+        - **初始化后调用**：
+          - CPU(MUJOCO) 后端：直接写 ``mj_model.opt.timestep``，立即生效；
+          - Euler 后端：timestep 已固化只读，SimConfig setter 抛出 RuntimeError，
+            明确提示用户在初始化前（构造参数 ``time_step``）配置，不静默吞掉。
+
+        远端（在线模式）始终同步到 OrcaStudio。
         """
         self._time_step = time_step
         self.realtime_step = time_step * self.frame_skip
-        # 本地：若 Gym 已初始化（init_simulation 已执行），直接设置
+        # 本地：未绑定时 setter 仅缓存 _timestep（不抛错）；绑定后按后端
+        # 应用（MUJOCO 立即生效；EULER 只读，setter 抛 RuntimeError）。
         if hasattr(self, "_gym") and self._gym is not None:
-            try:
-                self._gym.sim_config.timestep = time_step
-            except RuntimeError:
-                pass   # SimConfig 未绑定，缓存待 init_simulation
+            self._gym.sim_config.timestep = time_step
         # 远端：在线模式同步到 OrcaStudio
         if not self._skip_grpc_load and hasattr(self, "_studio_bridge"):
             self._studio_bridge.set_timestep_remote(time_step)
@@ -350,6 +396,46 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def set_ctrl(self, ctrl: np.ndarray) -> None:
         """设置控制输入，委托 self._gym.set_ctrl()。"""
         self._gym.set_ctrl(ctrl)
+
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> Any:
+        """注册 device-side PD 控制器（GPU(Euler) 后端专属）。
+
+        SingleWorld 封装原则（design §3.8 / guide §3.3）：仅暴露参数化配置接口，
+        用户不接触任何 ``flow.*`` 对象；CPU(MUJOCO) 后端无 GPU 图捕获能力，直接抛错。
+
+        Args:
+            controller_type: 控制算法标识（P1 仅 "pd"）。
+            kp: 位置增益 (nu,)。
+            kd: 速度增益 (nu,)。
+            motor_limits: 力矩限幅 (nu,)。
+            joint_names: 被驱动关节名（与 ctrl 执行器顺序一致）。
+
+        Returns:
+            PidController 句柄（``update_target`` / ``set_gains``）。
+
+        Raises:
+            NotImplementedError: CPU(MUJOCO) 后端。
+        """
+        if self._gym.sim_config.backend != SimBackend.EULER:
+            raise NotImplementedError(
+                "register_pid_controller 仅 GPU(Euler) 后端可用；"
+                "CPU(MUJOCO) 后端请使用 host 逐子步闭环（step 模式 2）。"
+            )
+        return self._gym.register_pid_controller(
+            controller_type,
+            kp=kp,
+            kd=kd,
+            motor_limits=motor_limits,
+            joint_names=joint_names,
+        )
 
     # --- 状态设置（reset_model 必需）---
 

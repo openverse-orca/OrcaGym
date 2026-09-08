@@ -379,10 +379,13 @@ class TestStartTimeoutMechanism(unittest.TestCase):
                 with patch(
                     "orca_gym.recorder.camera_recorder._WS_CONNECT_TIMEOUT", 5.0
                 ):
-                    with self.assertRaises(ConnectionError) as ctx:
-                        rec.start()
+                    # assertLogs 捕获预期 ERROR（静音 + 断言日志确实产生）
+                    with self.assertLogs("OrcaGym", level="ERROR") as logs:
+                        with self.assertRaises(ConnectionError) as ctx:
+                            rec.start()
         self.assertIn("Failed to connect", str(ctx.exception))
         self.assertFalse(rec.is_running)
+        self.assertIn("WebSocket connect failed", "".join(logs.output))
 
     def test_start_does_not_wait_for_first_frame(self):
         """``start`` 只等待 WebSocket 连接建立，不等待首帧 IDR。
@@ -419,9 +422,10 @@ class TestManagerStartRecorder(unittest.TestCase):
                 with patch(
                     "orca_gym.recorder.camera_recorder._WS_CONNECT_TIMEOUT", 5.0
                 ):
-                    # 连接不存在的端口会失败
-                    with self.assertRaises(ConnectionError):
-                        manager.start_recorder("cam1", color_port=9999)
+                    # assertLogs 捕获预期 ERROR（静音 + 断言日志确实产生）
+                    with self.assertLogs("OrcaGym", level="ERROR"):
+                        with self.assertRaises(ConnectionError):
+                            manager.start_recorder("cam1", color_port=9999)
 
         # 失败后 recorder 仍存在但未运行
         rec = manager.get_recorder("cam1")
@@ -536,11 +540,14 @@ class TestIDRPrimerBacktrack(unittest.TestCase):
                 is_keyframe=False,
             )
         with TemporaryDirectory() as tmpdir:
-            result = rec.remux_range(
-                file_path=str(Path(tmpdir) / "out.mp4"),
-                start_simulate_index=0,
-                end_simulate_index=4,
-            )
+            # assertLogs 捕获预期 WARNING（静音 + 断言日志确实产生）
+            with self.assertLogs("OrcaGym", level="WARNING") as logs:
+                result = rec.remux_range(
+                    file_path=str(Path(tmpdir) / "out.mp4"),
+                    start_simulate_index=0,
+                    end_simulate_index=4,
+                )
+        self.assertIn("no IDR primer", "".join(logs.output))
         # 无 primer，frame_count == 区间帧数
         self.assertEqual(result.frame_count, 5)
         self.assertEqual(result.frame_indices, [0, 1, 2, 3, 4])

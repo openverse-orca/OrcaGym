@@ -16,11 +16,32 @@ import shutil
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import numpy as np
 
 from orca_gym.protos import mjc_message_pb2
 from orca_gym.utils.dir_utils import file_lock
+
+# qpos 幅值告警阈值。合法场景可能含远距离自由体（如 ActorManipulator 置于 -1000），
+# 因此阈值设得足够大，仅用于捕获明显的发散/偏移。
+_QPOS_MAGNITUDE_WARN_THRESHOLD = 1e6
+
+# MuJoCo 场景参数字段表（QueryOptConfigResponse / SetOptConfigRequest 同构，
+# 权威清单以 mjc_message.proto 为准）。query_opt_config / set_opt_config 共用。
+_OPT_DOUBLE_FIELDS: tuple[str, ...] = (
+    "timestep", "impratio", "tolerance", "ls_tolerance", "noslip_tolerance",
+    "ccd_tolerance", "density", "viscosity", "o_margin",
+)
+_OPT_INT_FIELDS: tuple[str, ...] = (
+    "integrator", "cone", "jacobian", "solver", "iterations", "ls_iterations",
+    "noslip_iterations", "ccd_iterations", "disableflags", "enableflags",
+    "disableactuator", "sdf_initpoints", "sdf_iterations",
+)
+_OPT_VECTOR_FIELDS: tuple[str, ...] = (
+    "gravity", "wind", "magnetic", "o_solref", "o_solimp", "o_friction",
+)
+_OPT_KNOWN_FIELDS = frozenset(_OPT_DOUBLE_FIELDS + _OPT_INT_FIELDS + _OPT_VECTOR_FIELDS)
 
 
 class AnchorType:
@@ -237,6 +258,24 @@ class OrcaStudioBridge:
         """
         if self._stub is None:
             return
+
+        qpos = np.asarray(qpos, dtype=np.float64)
+        if qpos.size and not np.isfinite(qpos).all():
+            non_finite = np.flatnonzero(~np.isfinite(qpos))
+            warnings.warn(
+                "渲染时 qpos 含非有限值（NaN/Inf），box 消失由数值发散导致："
+                f"非有限索引={non_finite.tolist()} 值={qpos[non_finite].tolist()}",
+                stacklevel=2,
+            )
+        elif qpos.size:
+            abs_max = float(np.max(np.abs(qpos)))
+            if abs_max > _QPOS_MAGNITUDE_WARN_THRESHOLD:
+                warnings.warn(
+                    f"渲染时 qpos 幅值过大（max|qpos|={abs_max:g}），"
+                    "box 可能已偏移出可视范围（有限但位置异常）",
+                    stacklevel=2,
+                )
+
         request = mjc_message_pb2.UpdateLocalEnvRequest(
             qpos=qpos.tolist(),
             time=float(sim_time),
@@ -297,6 +336,82 @@ class OrcaStudioBridge:
         except RuntimeError:
             # 无 event loop，创建临时 loop
             asyncio.run(self._stub.SetOptTimestep(request))
+
+    # --- 场景参数读写 ---
+
+    async def query_opt_config(self) -> dict[str, Any]:
+        """查询远端 MuJoCo 场景参数（QueryOptConfig）。
+
+        Returns:
+            扁平 dict：标量字段为 float/int，向量字段（gravity/wind 等）为
+            list[float]。离线模式返回空 dict。
+        """
+        if self._stub is None:
+            return {}
+        resp = await self._stub.QueryOptConfig(
+            mjc_message_pb2.QueryOptConfigRequest()
+        )
+        return self._opt_config_to_dict(resp)
+
+    @classmethod
+    def _opt_config_to_dict(cls, resp: Any) -> dict[str, Any]:
+        """把 OptConfig proto 响应转为扁平 dict（字段表驱动）。"""
+        result: dict[str, Any] = {}
+        for name in _OPT_DOUBLE_FIELDS:
+            result[name] = float(getattr(resp, name))
+        for name in _OPT_INT_FIELDS:
+            result[name] = int(getattr(resp, name))
+        for name in _OPT_VECTOR_FIELDS:
+            result[name] = [float(v) for v in getattr(resp, name)]
+        return result
+
+    async def set_opt_config(self, overrides: dict[str, Any]) -> dict[str, Any]:
+        """部分更新远端 MuJoCo 场景参数（SetOptConfig）。
+
+        内部四步：query 当前值 → merge overrides → set 全量写入 → 回读，
+        返回写后快照 dict（以远端回读为准，供调用方做一致性校验）。
+        只覆盖 overrides 中出现的键，其余字段保留远端当前值。
+
+        Args:
+            overrides: 待覆盖的字段名到值的映射。向量字段接受
+                list/tuple/ndarray，标量字段接受 float/int。
+
+        Returns:
+            写后快照 dict（结构同 query_opt_config）。
+            离线模式返回空 dict（no-op）。
+
+        Raises:
+            ValueError: overrides 含字段表之外的未知键（校验先于网络调用）。
+        """
+        if self._stub is None:
+            return {}
+        unknown = set(overrides) - _OPT_KNOWN_FIELDS
+        if unknown:
+            raise ValueError(
+                f"set_opt_config: unknown field(s) {sorted(unknown)}; "
+                f"known fields: {sorted(_OPT_KNOWN_FIELDS)}"
+            )
+        current = await self.query_opt_config()
+        merged = dict(current)
+        merged.update(overrides)
+        request = self._opt_config_to_request(merged)
+        await self._stub.SetOptConfig(request)
+        return await self.query_opt_config()
+
+    @staticmethod
+    def _opt_config_to_request(values: dict[str, Any]) -> Any:
+        """把扁平 dict 构造为 SetOptConfigRequest（值规范化：float/int/list）。"""
+        kwargs: dict[str, Any] = {}
+        for name in _OPT_DOUBLE_FIELDS:
+            if name in values:
+                kwargs[name] = float(values[name])
+        for name in _OPT_INT_FIELDS:
+            if name in values:
+                kwargs[name] = int(values[name])
+        for name in _OPT_VECTOR_FIELDS:
+            if name in values:
+                kwargs[name] = [float(v) for v in values[name]]
+        return mjc_message_pb2.SetOptConfigRequest(**kwargs)
 
     # --- 体操作 ---
 
