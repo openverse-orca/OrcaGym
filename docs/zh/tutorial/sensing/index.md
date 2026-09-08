@@ -2,7 +2,7 @@
 
 OrcaGym 提供多种传感器接口和 RGB-D 相机支持。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) 和 [08_video_capture/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/08_video_capture)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) 和 [09_video_capture/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/09_video_capture)。
 
 ## 传感器类型
 

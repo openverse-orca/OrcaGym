@@ -2,7 +2,7 @@
 
 OrcaGym provides various sensor interfaces and RGB-D camera support.
 
-> For complete runnable code, see [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) and [08_video_capture/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/08_video_capture).
+> For complete runnable code, see [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) and [09_video_capture/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/09_video_capture).
 
 ## Sensor Types
 

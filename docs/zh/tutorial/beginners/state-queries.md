@@ -2,7 +2,7 @@
 
 上一节我们只读了 `self.data.qpos` 和 `self.data.qvel`。这一节，你将学会用 OrcaGym 提供的**查询 API** 来获取更丰富的状态信息。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/04_query_api)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api)。
 
 ---
 
