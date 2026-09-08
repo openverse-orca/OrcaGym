@@ -993,5 +993,205 @@ class TestBridgeLoadModelXmlIntegration(unittest.TestCase):
         self.assertEqual(result, process_called["path"])
 
 
+# =============================================================================
+# 渲染桥接 S1：OrcaStudioBridge.query_opt_config
+# （docs：render_bridge_implementation_guide.md §4）
+# =============================================================================
+
+
+class _FakeOptConfigStub:
+    """QueryOptConfig mock：返回预置 proto 响应并记录调用。"""
+
+    def __init__(self, opt_response):
+        self._resp = opt_response
+        self.calls = []
+
+    async def QueryOptConfig(self, request):
+        self.calls.append(request)
+        return self._resp
+
+
+class TestBridgeQueryOptConfig(unittest.TestCase):
+    """S1 单元测试（T1.1–T1.5，纯 mock，无 gRPC 连接）。"""
+
+    def test_t1_1_offline_returns_empty_dict(self):
+        """T1.1: 离线模式（stub=None）返回空 dict，不抛异常。"""
+        import asyncio
+        bridge = OrcaStudioBridge()
+        result = asyncio.run(bridge.query_opt_config())
+        self.assertEqual(result, {})
+
+    def test_t1_2_scalar_mapping(self):
+        """T1.2: 标量字段映射为 float/int。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+        resp = mjc_message_pb2.QueryOptConfigResponse(
+            timestep=0.002, density=1.225, iterations=50, integrator=1,
+        )
+        bridge = OrcaStudioBridge(stub=_FakeOptConfigStub(resp))
+        result = asyncio.run(bridge.query_opt_config())
+        self.assertEqual(result["timestep"], 0.002)
+        self.assertIsInstance(result["timestep"], float)
+        self.assertEqual(result["density"], 1.225)
+        self.assertEqual(result["iterations"], 50)
+        self.assertIsInstance(result["iterations"], int)
+        self.assertEqual(result["integrator"], 1)
+        self.assertIsInstance(result["integrator"], int)
+
+    def test_t1_3_vector_mapping(self):
+        """T1.3: 向量字段映射为 list[float]。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+        resp = mjc_message_pb2.QueryOptConfigResponse(
+            gravity=[0.0, 0.0, -9.81], wind=[1.0, 2.0, 3.0],
+        )
+        bridge = OrcaStudioBridge(stub=_FakeOptConfigStub(resp))
+        result = asyncio.run(bridge.query_opt_config())
+        self.assertEqual(result["gravity"], [0.0, 0.0, -9.81])
+        self.assertEqual(result["wind"], [1.0, 2.0, 3.0])
+        for v in result["gravity"] + result["wind"]:
+            self.assertIsInstance(v, float)
+
+    def test_t1_4_empty_vector_tolerance(self):
+        """T1.4: 未设置的向量字段得到空 list，不抛异常。"""
+        import asyncio
+        from orca_gym.protos import mjc_message_pb2
+        resp = mjc_message_pb2.QueryOptConfigResponse(timestep=0.005)
+        bridge = OrcaStudioBridge(stub=_FakeOptConfigStub(resp))
+        result = asyncio.run(bridge.query_opt_config())
+        self.assertEqual(result["gravity"], [])
+        self.assertEqual(result["o_solref"], [])
+        self.assertEqual(result["o_friction"], [])
+
+    def test_t1_5_full_field_coverage(self):
+        """T1.5: 返回 dict 键集合与字段表并集一致（防字段表遗漏）。"""
+        import asyncio
+        from orca_gym.core.euler.orca_studio_bridge import (
+            _OPT_DOUBLE_FIELDS,
+            _OPT_INT_FIELDS,
+            _OPT_VECTOR_FIELDS,
+        )
+        from orca_gym.protos import mjc_message_pb2
+        # proto3 全默认构造：所有字段均可读（标量 0 / 向量空）
+        resp = mjc_message_pb2.QueryOptConfigResponse()
+        bridge = OrcaStudioBridge(stub=_FakeOptConfigStub(resp))
+        result = asyncio.run(bridge.query_opt_config())
+        expected_keys = set(
+            _OPT_DOUBLE_FIELDS + _OPT_INT_FIELDS + _OPT_VECTOR_FIELDS
+        )
+        self.assertEqual(set(result.keys()), expected_keys)
+        # 反向防遗漏：字段表键数 = proto 消息字段数（29 - 2 reserved）
+        self.assertEqual(len(expected_keys), 28)
+
+
+# =============================================================================
+# 渲染桥接 S2：OrcaStudioBridge.set_opt_config
+# （docs：render_bridge_implementation_guide.md §5）
+# =============================================================================
+
+
+class _FakeSetOptStub:
+    """有状态 OptConfig mock：模拟远端读改写语义。
+
+    维护一份远端状态 dict；Query 返回当前状态，Set 应用请求字段后更新状态。
+    记录 RPC 调用序列（"Query" / "Set"）与收到的 SetOptConfigRequest。
+    """
+
+    def __init__(self, state: dict):
+        from orca_gym.core.euler.orca_studio_bridge import (
+            _OPT_DOUBLE_FIELDS,
+            _OPT_INT_FIELDS,
+            _OPT_VECTOR_FIELDS,
+        )
+        self._double_fields = _OPT_DOUBLE_FIELDS
+        self._int_fields = _OPT_INT_FIELDS
+        self._vector_fields = _OPT_VECTOR_FIELDS
+        self._state = dict(state)
+        self.call_sequence = []
+        self.set_requests = []
+
+    async def QueryOptConfig(self, request):
+        from orca_gym.protos import mjc_message_pb2
+        self.call_sequence.append("Query")
+        kwargs = {k: v for k, v in self._state.items()}
+        return mjc_message_pb2.QueryOptConfigResponse(**kwargs)
+
+    async def SetOptConfig(self, request):
+        self.call_sequence.append("Set")
+        self.set_requests.append(request)
+        for name in self._double_fields:
+            self._state[name] = float(getattr(request, name))
+        for name in self._int_fields:
+            self._state[name] = int(getattr(request, name))
+        for name in self._vector_fields:
+            self._state[name] = [float(v) for v in getattr(request, name)]
+
+
+class TestBridgeSetOptConfig(unittest.TestCase):
+    """S2 单元测试（T2.1–T2.6，纯 mock，无 gRPC 连接）。"""
+
+    def test_t2_1_offline_noop(self):
+        """T2.1: 离线模式返回空 dict，无任何 RPC 尝试。"""
+        import asyncio
+        bridge = OrcaStudioBridge()
+        result = asyncio.run(bridge.set_opt_config({"timestep": 0.002}))
+        self.assertEqual(result, {})
+
+    def test_t2_2_partial_update_merge(self):
+        """T2.2: 未覆盖字段保留远端当前值（部分更新语义）。"""
+        import asyncio
+        stub = _FakeSetOptStub({
+            "timestep": 0.005, "density": 1.225, "gravity": [0.0, 0.0, -9.81],
+        })
+        bridge = OrcaStudioBridge(stub=stub)
+        asyncio.run(bridge.set_opt_config({"timestep": 0.002, "density": 0}))
+        req = stub.set_requests[0]
+        self.assertEqual(req.timestep, 0.002)
+        self.assertEqual(req.density, 0.0)
+        # gravity 未在 overrides 中 → 保留远端当前值
+        self.assertEqual(list(req.gravity), [0.0, 0.0, -9.81])
+
+    def test_t2_3_call_sequence(self):
+        """T2.3: 一拍内调用序列恰为 Query → Set → Query。"""
+        import asyncio
+        stub = _FakeSetOptStub({"timestep": 0.005})
+        bridge = OrcaStudioBridge(stub=stub)
+        asyncio.run(bridge.set_opt_config({"timestep": 0.002}))
+        self.assertEqual(stub.call_sequence, ["Query", "Set", "Query"])
+
+    def test_t2_4_returns_post_write_snapshot(self):
+        """T2.4: 返回值为远端回读快照（以远端为准，而非 merged 输入）。"""
+        import asyncio
+        stub = _FakeSetOptStub({"timestep": 0.005, "iterations": 10})
+        bridge = OrcaStudioBridge(stub=stub)
+        snapshot = asyncio.run(bridge.set_opt_config({"timestep": 0.002}))
+        # 回读快照 = 远端应用后的状态
+        self.assertEqual(snapshot["timestep"], 0.002)
+        self.assertEqual(snapshot["iterations"], 10)
+
+    def test_t2_5_unknown_key_rejected_before_rpc(self):
+        """T2.5: 未知键抛 ValueError 且不发起任何 RPC（校验先于网络调用）。"""
+        import asyncio
+        stub = _FakeSetOptStub({"timestep": 0.005})
+        bridge = OrcaStudioBridge(stub=stub)
+        with self.assertRaises(ValueError) as ctx:
+            asyncio.run(bridge.set_opt_config({"timestep_typo": 0.002}))
+        # 错误消息含合法键清单
+        self.assertIn("timestep", str(ctx.exception))
+        # 未发起任何 RPC
+        self.assertEqual(stub.call_sequence, [])
+
+    def test_t2_6_vector_value_normalization(self):
+        """T2.6: 向量字段接受 tuple / ndarray，均规范化为 list[float]。"""
+        import asyncio
+        for wind_value in [(0, 0, 0), np.zeros(3)]:
+            with self.subTest(wind_value=wind_value):
+                stub = _FakeSetOptStub({"wind": [1.0, 2.0, 3.0]})
+                bridge = OrcaStudioBridge(stub=stub)
+                asyncio.run(bridge.set_opt_config({"wind": wind_value}))
+                req = stub.set_requests[0]
+                self.assertEqual(list(req.wind), [0.0, 0.0, 0.0])
+
+
 if __name__ == "__main__":
     unittest.main()
