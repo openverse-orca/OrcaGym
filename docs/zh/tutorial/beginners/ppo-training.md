@@ -2,7 +2,7 @@
 
 本节教你如何基于 Stable Baselines3 PPO 算法，在 OrcaGym 环境中训练一个倒立摆保持直立。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/03_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/03_rl_ppo)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/04_rl_ppo/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/04_rl_ppo)。
 
 ---
 
