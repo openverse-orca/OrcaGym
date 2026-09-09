@@ -114,8 +114,10 @@ def _direction_to_quat(direction: np.ndarray) -> np.ndarray:
       - direction = (to - from)，结果四元数使基元从 from 指向 to
     direction 会被归一化；零向量返回单位四元数（无旋转，保持 +Y 朝向）。
 
-    注意：O3DE/AZ::Quaternion 使用 Hamilton 共轭形式 (q*·v·q)，旋转方向与
-    标准约定 (q·v·q*) 相反，故内部使用 ``cross(d, y)`` 而非 ``cross(y, d)``。
+    标准 Hamilton 约定：旋转轴 = y × d（右手定则，将 +Y 旋转到 direction），
+    四元数 q = [sin(θ/2)·axis, cos(θ/2)]，对应矩阵 R(q) 满足 v' = R(q)·v。
+    DebugMesh.azsl 的 QuaternionToRotation 已修正为生成标准旋转矩阵，
+    因此此处无需任何补偿，直接传标准四元数即可。
     """
     d = np.asarray(direction, dtype=np.float64)
     norm = np.linalg.norm(d)
@@ -124,10 +126,8 @@ def _direction_to_quat(direction: np.ndarray) -> np.ndarray:
     d = d / norm
 
     y = np.array([0.0, 1.0, 0.0], dtype=np.float64)
-    # 旋转轴 = d × y（非 y × d）。O3DE/AZ::Quaternion 使用 Hamilton 约定的
-    # 共轭形式 (q*·v·q)，与标准数学约定 (q·v·q*) 相比旋转方向相反。
-    # 故此处用 reversed cross 使最终视觉效果为 "将 +Y 轴对齐到 direction"。
-    axis = np.cross(d, y)
+    # 旋转轴 = y × d（标准右手定则，将 +Y 旋转到 d）。
+    axis = np.cross(y, d)
     cos_angle = float(np.clip(np.dot(y, d), -1.0, 1.0))
     # 当 d ≈ +y 时无旋转；当 d ≈ -y 时绕任意垂直轴转 180°
     if np.linalg.norm(axis) < 1e-12:
@@ -243,8 +243,8 @@ class DebugDraw:
               圆锥朝 -Y → _direction_to_quat([0,-1,0])。
           若希望视觉上从 from 到 to：
               position = from，rotation = _direction_to_quat(to - from)，scale.y = |to - from|。
-          O3DE/AZ::Quaternion 使用 Hamilton 共轭形式，旋转方向与标准约定相反，
-          _direction_to_quat 内部已用 cross(d, y) 补偿。
+          DebugMesh.azsl 的 QuaternionToRotation 已修正为标准 Hamilton 旋转矩阵，
+          _direction_to_quat 直接生成标准四元数（cross(y, d)），无需任何补偿。
 
         指向 API 语义（draw_cylinder/draw_arrow 的 p_from→p_to）：
           方向 = (p_to - p_from)，_direction_to_quat 自动生成旋转。

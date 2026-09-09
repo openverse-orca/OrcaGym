@@ -58,7 +58,7 @@ env.step(action)
 | `set_joint_qvel()` | `mj_forward()` |
 | `set_mocap_pos_and_quat()` | `mj_forward()` |
 
-> **重要**：`do_simulation()` 返回后数据已自动同步。只有手动修改状态时，才需要手动调用 `mj_forward()`。
+> ⚠️ **重要**：`do_simulation()` 返回后数据已自动同步。只有手动修改状态时，才需要手动调用 `mj_forward()`。
 
 ## 为什么修改 qpos 后需要 mj_forward？
 

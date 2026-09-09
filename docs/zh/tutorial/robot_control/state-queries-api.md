@@ -2,7 +2,7 @@
 
 本节介绍如何使用 OrcaGym 的**状态查询 API**，覆盖关节状态、Body 位姿、传感器、执行器力矩、接触信息等。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api)。
 
 ---
 
@@ -298,7 +298,7 @@ forces = env.query_contact_force(contact_ids)
 max_normal = max(abs(f[0]) for f in forces.values())
 ```
 
-> **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`，
+> ⚠️ **注意**：`query_contact_simple()` 返回的字典 key 是**小写** `"geom1"` / `"geom2"`，
 > 不是大写 `"Geom1"` / `"Geom2"`。
 
 ### 5. 基座坐标系变换

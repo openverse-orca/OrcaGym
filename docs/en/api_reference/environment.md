@@ -58,10 +58,11 @@ def do_simulation(ctrl: np.ndarray, n_frames: int) -> None
 Core stepping method. Set control → step n_frames → auto-sync state. After calling, `self.data` is the latest state. `ctrl` must have shape `(nu,)`.
 
 ```python
+def set_ctrl(ctrl: np.ndarray) -> None
 def mj_step(nstep: int) -> None
 def mj_forward() -> None
 ```
-Low-level simulation controls, typically not needed directly.
+`set_ctrl` sets the control input without stepping; `mj_step` / `mj_forward` are low-level simulation controls, typically not needed directly.
 
 ### State Setting
 
@@ -148,8 +149,6 @@ def mj_jacSite(jacp: np.ndarray, jacr: np.ndarray, site_name: str) -> None
 def mj_jac_site(site_names: list[str]) -> dict[str, dict]
 ```
 
-> Note: `mj_jacBody` / `mj_jacSite` signatures are `(jacp, jacr, body_name)` — no `*` separator. The first two parameters are caller-preallocated arrays written in-place.
-
 ### Equality Constraints and Body Manipulation
 
 Env-layer public primitives (programmatic manipulation should be orchestrated using the following methods):
@@ -193,34 +192,265 @@ def geom_friction(geom_name: str) -> np.ndarray   # Geom friction coefficients (
 ### Studio Interaction
 
 ```python
-def render() -> np.ndarray | None              # Render to Studio
-def begin_save_video(file_path, capture_mode=0) -> None
-def stop_save_video() -> None
-def get_current_frame() -> int
-def get_next_frame() -> int
-def get_camera_time_stamp(last_frame_index) -> dict
+def render(simulate_index: int = -1, request_idr: bool = False) -> np.ndarray | None
+    # Render to Studio. simulate_index is passed through to the engine camera
+    # pipeline for frame alignment. -1 means server-side auto-increment (default).
+    # Pass a monotonically increasing value >=0 when client-side recording is enabled.
+    # request_idr=True asks the engine to output an IDR keyframe on this render
+    # (use at a recording-segment start, together with save_streaming's internal
+    # default truncation so the video starts at a keyframe).
+
+# The following methods are deprecated (engine-side MP4 recording RPCs removed).
+# Calling them emits a DeprecationWarning:
+def begin_save_video(file_path, capture_mode=0) -> None       # [Deprecated] no-op
+def stop_save_video() -> None                                  # [Deprecated] no-op
+def get_current_frame() -> int                                 # [Deprecated] returns -1
+def get_next_frame() -> int                                    # [Deprecated] returns 0
+def get_camera_time_stamp(last_frame_index) -> dict            # [Deprecated] returns {}
+
 def get_frame_png(image_path) -> None
 def load_content_file(content_file_name, **kwargs) -> None
 ```
 
-### Camera Sensor Configuration
+### Camera Recording API (Client-side PyAV remux)
 
 ```python
-def set_camera_sensor_info(
-    actor_name: str,
-    capture_rgb: bool,
-    capture_depth: bool,
-    save_mp4_file: bool = False,
-    use_dds: bool = False,
-    **kwargs,   # Optional extension parameters: capture_normal, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, ...
-) -> None
-def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+def save_streaming(
+    camera_name: str,
+    camera_type: str,
+    file_path: str,
+    start_simulate_index: int,
+    end_simulate_index: int,
+) -> Future[RemuxResult]
+    # Save the specified camera's [start, end] range as an MP4. **Non-blocking**,
+    # returns a Future.
+    # Operates via the VideoRecorderManager unified interface: idempotently starts
+    # the recorder and registers a range-save task in that camera's waiting queue.
+    # Each range task carries its own start/end independently, so multiple ranges
+    # can be registered simultaneously without interfering with each other.
+    # When the receiver thread sees a frame with simulate_index >= end, a save
+    # worker thread remuxes asynchronously without blocking the receiver thread
+    # or the caller thread.
+    # This tolerates the physics-step -> render -> frame-capture latency (e.g.
+    # saving 0-500 while the buffer only holds 490 frames; the task waits until
+    # frame 500 arrives before saving).
+    # Internally truncates to the first keyframe in the range
+    # (``truncate_to_keyframe=True``) so the video starts at a keyframe (use with
+    # a recording-start ``render(request_idr=True)``).
+    # env.close() automatically saves any unfinished recording tasks (blocking
+    # until remux finishes).
+    # Prerequisite: ``start_streaming`` must be called first.
+    # Internally remux_range uses timestamp_ns as PTS time base (not fixed FPS),
+    # and returns RemuxResult (with frame_indices / timestamps_ns frame-number
+    # ↔ physical-index mapping).
+
+def get_recorder_manager() -> VideoRecorderManager
+    # Get or lazily create the recorder manager. **Public method**: external
+    # modules can obtain the manager to call ``submit_task`` /
+    # ``save_streaming`` / ``get_latest_frame_simulate_index`` etc. directly,
+    # avoiding too many forwarding methods at the env layer.
+    # Internally uses ``self.stub`` as gRPC backend, ``self.loop`` as event
+    # loop bridge. The caller guarantees single-threaded creation, so no
+    # locking is needed.
+    #
+    # Advanced per-frame callback usage: the caller obtains the manager via
+    # this method, constructs a ``SingleFrameTask`` (or other RecordingTask
+    # subclass) and submits it via ``manager.submit_task`` — no env-layer
+    # forwarding method is needed (see example below).
+
+def set_render_fps(fps: int) -> None
+    # Sets the render frame rate (render FPS), controlling how often render()
+    # invokes the engine: with sync_render=True one frame is rendered every
+    # 1/fps physics steps; with sync_render=False one frame every 1/fps seconds.
+    # Note: sync_render is a constructor parameter and cannot be toggled via a
+    # method at runtime; to enable synchronous recording at runtime, pass
+    # sync_render=True when constructing the env.
+
+def set_video_recorder_manager(manager: VideoRecorderManager | None) -> None
+    # Injects a VideoRecorderManager instance. The environment layer forwards all
+    # camera property query/set and recording operations to this manager. When
+    # None, the next camera/recording call lazily creates it via
+    # CreateVideoRecorderManager(self.stub, self.loop).
 ```
+
+Underlying ``VideoRecorderManager`` unified interface (``orca_gym.recorder`` module).
+Camera property query/set and the streaming state machine are implemented centrally
+by ``VideoRecorderManager``; the environment layers (``OrcaGymLocalEnv`` /
+``OrcaGymEulerEnv``) only forward calls. It directly implements them on the
+injected gRPC capability stub (``GrpcServiceStub``).
+
+```python
+from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult
+from concurrent.futures import Future
+
+# stub is the gRPC capability stub (GrpcServiceStub), providing interfaces for
+# camera property query/set + streaming state machine; it may be None (recording
+# only, no camera configuration).
+# loop is the owning env's event loop (self.loop), used to bridge the stub's
+# async interfaces synchronously.
+manager = CreateVideoRecorderManager(stub=env.stub, loop=env.loop)
+manager.start_recorder(camera_name, color_port=7070)      # idempotent start
+future: Future[RemuxResult] = manager.save_streaming(
+    camera_name, file_path, start_idx, end_idx
+)  # register a range-save task, non-blocking
+result: RemuxResult = future.result()                    # wait for save to finish (optional)
+# result.file_path / result.frame_count / result.frame_indices / result.timestamps_ns
+manager.stop_all_and_save() -> dict[str, RemuxResult]    # env.close() auto-save (blocking wait)
+```
+
+```python
+from orca_gym.recorder import SingleFrameTask
+
+# Per-frame callback: when the target frame arrives, the callback runs in the
+# save_worker thread; the main thread is not blocked.
+# The callback receives the FrameEntry and the decoded RGB numpy array
+# (H, W, 3) dtype=uint8 (decoded by the save_worker's persistent CodecContext,
+# no need to rewind to IDR). decoded_frame is None if decoding failed.
+# The callback's return value becomes future.result() (Any type), decided by
+# the callback itself.
+# When downsampling (control freq > render freq), the target sim_idx may have
+# no corresponding video frame (renderer skip); in that case future.result()
+# returns None to indicate a skip.
+def on_frame(frame_entry, decoded_frame):
+    # frame_entry.timestamp_ns / simulate_index / nal_data / is_keyframe
+    # decoded_frame: np.ndarray (H, W, 3) uint8 or None
+    # LeRobot add_frame etc. can be called here (save_worker is serial, thread-safe)
+    return decoded_frame  # return value becomes future.result(), for multi-camera sync
+
+task = SingleFrameTask(simulate_index=100, on_frame=on_frame)
+future = manager.submit_task(camera_name, task)  # non-blocking, returns task.future
+result = future.result()  # None means no video frame at this sim_idx (skipped); otherwise the on_frame return value
+```
+
+```python
+# Obtain manager via get_recorder_manager to call low-level interfaces directly
+# (avoid too many forwarding methods at env layer)
+manager = env.get_recorder_manager()
+
+# Downsample gating: query the latest arrived frame's simulate_index
+latest_idx = manager.get_latest_frame_simulate_index(camera_name, "color")
+# None means no frame arrived; int means the latest frame's simulate_index
+```
+
+> Task queue abstraction: each save task (``RecordingTask``) in the waiting queue
+> independently carries a trigger callback (``trigger_fn``) and execution logic
+> (``execute``). The trigger condition is a callback
+> ``(task, current_simulate_index) -> bool``, polled per-frame by the receiver
+> thread, making it easy to extend new task types (e.g. triggered by timestamp
+> or frame count).
+>
+> Built-in task types:
+> - ``RangeSaveTask``: save a ``[start, end]`` range as MP4 (used internally by ``save_streaming``)
+> - ``SingleFrameTask``: execute a callback when the target frame arrives (per-frame callback use case, e.g. LeRobot streaming frame writes)
+
+### Real-time video visualization (``VideoStreamViewer``)
+
+``VideoRecorderManager`` provides real-time visualization: it launches an
+**independent subprocess** that establishes its own WebSocket connection to
+receive the H.264 stream, decodes it, and renders it with matplotlib. The
+subprocess is fully decoupled from the main process — it does not read the
+recorder's rolling buffer, and never blocks the receiver thread, the save
+worker, or the main simulation thread.
+
+```python
+from orca_gym.recorder import CreateVideoRecorderManager, VideoStreamViewer
+
+manager = CreateVideoRecorderManager(stub=env.stub, loop=env.loop)
+manager.start_recorder(camera_name, color_port=7070)   # ensure the recorder is running
+
+# Non-blocking start of the visualization window (subprocess connects to
+# WebSocket and renders with matplotlib)
+viewer: VideoStreamViewer = manager.start_viewer(camera_name, window_name=None)
+viewer.is_running
+
+manager.get_viewer(camera_name)        # get the viewer (None if not started)
+manager.stop_viewer(camera_name)       # stop one camera's window
+manager.stop_all_viewers()             # stop all windows
+manager.get_viewer_stats()             # stats for all windows
+```
+
+Using ``VideoStreamViewer`` standalone (without the manager):
+
+```python
+from orca_gym.recorder import VideoStreamViewer
+
+viewer = VideoStreamViewer(recorder, window_name="Camera")
+viewer.start()
+# ... in the simulation loop ...
+viewer.stop()
+```
+
+Requires ``matplotlib`` / ``numpy`` / ``av`` / ``websockets`` / ``opencv-python``.
+Close the window via the window close button or by calling ``viewer.stop()`` /
+``manager.stop_viewer()`` (internally signals the subprocess to exit via
+``stop_event``).
+
+### Camera Property Query/Set + Streaming
+
+The env layer directly provides camera name enumeration and viewport switching.
+Camera property query/set and the streaming state machine are implemented by the
+underlying ``VideoRecorderManager``; obtain the manager via
+``get_recorder_manager()`` before calling them (see below).
+
+Env-layer direct methods:
+
+```python
+def get_camera_names() -> list[str]                   # Get the list of all registered camera names
+def make_camera_viewport_active(actor_name: str, entity_name: str) -> None
+    # Set the specified camera as the active viewport camera in Studio
+
+def start_streaming(camera_name: str, **kwargs) -> None
+    # Start streaming the specified camera (color/depth started automatically
+    # based on the sensor switches).
+    # Internally delegates to VideoRecorderManager.start_recorder: queries camera
+    # properties to confirm it exists, validates/syncs properties per kwargs
+    # (restarts streaming to reconfigure if necessary), starts streaming, and
+    # starts the corresponding recorder based on capture_rgb / capture_depth.
+    # The upper layer does not need to worry about the Idle/Streaming state machine.
+    # kwargs: camera property settings (capture_rgb / capture_depth / color_port /
+    #   depth_port / width / height / near_clip / far_clip / gamma, etc.) and the
+    #   recorder-specific parameter max_buffer_frames. Keys not provided keep the
+    #   camera's current properties.
+
+def show_camera(camera_name: str, camera_type: str = "color", window_name: str | None = None) -> None
+    # Display the specified camera's stream in real time (non-blocking). It
+    # establishes a WebSocket connection in an independent subprocess, receives
+    # the H.264 stream, decodes it, and displays it with matplotlib. Depth
+    # streams display the raw grayscale frames directly. Requires calling
+    # start_streaming first to start the stream and recorder.
+```
+
+Camera property query/set + streaming state machine via ``VideoRecorderManager``
+(the ``orca_gym.recorder`` module, the actual executor):
+
+```python
+manager = env.get_recorder_manager()
+manager.get_camera_names() -> list[str]
+manager.get_camera_properties(camera_name: str) -> GetCameraPropertiesResponse
+manager.set_camera_properties(
+    camera_name: str,
+    **kwargs,   # Optional parameters: capture_rgb, capture_depth, capture_normal, capture_object_color, random_object_color, use_nvenc, nvenc_gpu_index, width, height, vertical_fov, near_clip, far_clip, gamma, color_port, depth_port, use_dds, dds_topic, dds_stream_id
+) -> None
+manager.set_streaming_enabled(camera_name: str, enabled: bool) -> None
+```
+
+State machine constraints:
+- `camera_name` can be enumerated via `get_camera_names()`
+- `set_camera_properties` is only allowed in `Idle` state; in `Streaming` state, call `set_streaming_enabled(False)` first to return to `Idle` before setting properties
+- After `set_streaming_enabled(True)` enters `Streaming` state, the corresponding ports (e.g., 7070/7071) start listening and streaming
+- Client-side PyAV recording is controlled by `save_streaming`, orthogonal to this group of interfaces (but requires `set_streaming_enabled(True)` first)
 
 ### Studio Bridge
 
 ```python
 def studio_bridge()   # Returns the OrcaStudio bridge object (K9 method access pattern)
+
+def debug_draw() -> DebugDraw
+    # Returns the DebugDraw instance (K9 method access pattern). Used to draw
+    # debug primitives (spheres, line segments, coordinate frames, etc.) in the
+    # simulation scene. In offline mode (skip_grpc_load=True) it returns a no-op
+    # instance (stub=None), where all drawing methods are async but return
+    # immediately. Callers use loop.run_until_complete(dd.draw_sphere(...)) or await.
 ```
 
 ### Namespace Resolution (Multi-Agent)
@@ -295,7 +525,7 @@ Provided by `OrcaGymEnvMixin`, orchestration order: `set_seed_value` → `reset_
 
 ```python
 def step(action: np.ndarray) -> tuple[ObsType, float, bool, bool, dict]
-def reset_model() -> tuple[dict, dict]
+def reset_model() -> tuple[np.ndarray | dict, dict]
 def _get_obs() -> np.ndarray | dict
 ```
 
@@ -382,7 +612,7 @@ if __name__ == "__main__":
 
 ## OrcaGymVectorEnv
 
-Vectorized environment, running multiple environments in parallel.
+Vectorized environment, running multiple environments in parallel. Inherits from Gymnasium `VectorEnv`.
 
 ```python
 class OrcaGymVectorEnv(VectorEnv):
@@ -390,6 +620,35 @@ class OrcaGymVectorEnv(VectorEnv):
     def step(actions) -> tuple[obs, rewards, terminations, truncations, infos]
     def reset(*, seed=None, options=None) -> tuple[obs, infos]
 ```
+
+### Public Properties
+
+```python
+num_envs: int                        # Number of parallel environments
+observation_space: gym.Space         # Batch observation space
+single_observation_space: gym.Space  # Single-environment observation space
+action_space: gym.Space              # Batch action space
+single_action_space: gym.Space       # Single-environment action space
+```
+
+### Main Methods
+
+```python
+def reset(*, seed=None, options=None) -> tuple[ObsType, list[dict]]
+def step(actions: ActType) -> tuple[ObsType, np.ndarray, np.ndarray, np.ndarray, list[dict]]
+def render() -> None
+def close() -> None
+```
+
+### Return Value Description
+
+| Return value | Shape/type | Description |
+|--------|-----------|------|
+| `observations` | `(num_envs, *obs_shape)` | Observations of all environments |
+| `rewards` | `(num_envs,)` | Rewards of all environments |
+| `terminated` | `(num_envs,) bool` | Whether terminated |
+| `truncated` | `(num_envs,) bool` | Whether truncated |
+| `infos` | `list[dict]` | Info dict of each environment |
 
 ---
 

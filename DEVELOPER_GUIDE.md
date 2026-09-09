@@ -18,7 +18,7 @@
 - **CUDA 驱动**：已安装 NVIDIA 驱动，`nvidia-smi` 可正常输出
 - **conda**：已安装 Anaconda 或 Miniconda
 - **TRAE IDE**：已安装 TRAE CN 版（sandbox 旁路依赖此 IDE 的白名单功能）
-- **Euler GPU 运行时**：`orca` 环境中已安装 Flow / Warp 等原生 CUDA 库（详见 README）
+- **Euler GPU 运行时**：`orca` 环境中已安装 Euler 后端所需的 GPU 依赖（详见 README）
 
 ## 步骤 1：创建 orca conda 环境
 
@@ -29,7 +29,7 @@ conda create -n orca python=3.12 -y
 conda activate orca
 ```
 
-按 README 指引安装本项目依赖。若需 GPU 加速（Euler 体系使用 MuJoCoFlow / Flow 在 GPU 上求解），还需确保 `orca` 环境内已安装 Flow / Warp 的原生 CUDA 库。
+按 README 指引安装本项目依赖。若需 GPU 加速（Euler 后端），还需确保 `orca` 环境内已安装 Euler 后端所需的 GPU 依赖。
 
 ## 步骤 2：配置国内镜像源（国内网络必需）
 
@@ -110,16 +110,16 @@ TRAE IDE 支持 **命令白名单**，可完全跳过 sandbox 包裹。当命令
 在 TRAE IDE 的 AI agent 终端中执行（注意：不要用管道 `|`，会触发 sandbox 包裹）：
 
 ```bash
-<conda-base>/envs/orca/bin/python -c "import orca.flow as flow; print(flow.get_devices())"
+<conda-base>/envs/orca/bin/python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"
 ```
 
 预期输出（旁路生效）：
 
 ```
-devices: ['cuda:0']
+True 1
 ```
 
-若输出 `devices: []` 且日志出现 `CUDA driver not available`，说明白名单未生效，请回到步骤 3 检查。
+若输出 `False 0` 且日志出现 `CUDA driver not available`，说明白名单未生效，请回到步骤 3 检查。
 
 ## 常见问题
 

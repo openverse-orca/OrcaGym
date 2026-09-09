@@ -2,7 +2,7 @@
 
 OrcaGym 提供丰富的机器人控制接口，从底层的关节控制到高层的逆运动学。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)（Lesson 4-9）。
+> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler)（Lesson 4-9）。
 
 ## 控制层级
 

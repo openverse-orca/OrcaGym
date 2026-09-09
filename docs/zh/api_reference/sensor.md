@@ -30,9 +30,9 @@ class CameraWrapper:
 ### 属性
 
 ```python
-name: str                       # 相机名称
+name: str                       # 相机名称（@property，内部存储 _name）
 port: int                       # WebSocket 端口
-image: np.ndarray               # 当前图像 (H, W, 3)，BGR 格式
+image: np.ndarray               # 当前图像 (H, W, 3)，BGR 格式；首帧到达前为随机噪声 (480, 640, 3)
 image_index: int                # 当前帧索引
 enabled: bool                   # 是否启用（默认 True）
 received_first_frame: bool      # 是否已收到第一帧
@@ -48,7 +48,7 @@ def stop()                      # 停止接收
 ### 帧获取
 
 ```python
-def get_frame(format: str = 'bgr24', size: tuple | None = None) -> tuple[np.ndarray, int]
+def get_frame(self, format='bgr24', size: tuple = None) -> tuple[np.ndarray, int]
 ```
 - `format`: `'bgr24'`（默认）或 `'rgb24'`
 - `size`: 可选的目标尺寸 `(width, height)`
@@ -118,8 +118,18 @@ class CameraDataParser:
 ### 帧查找
 
 ```python
-def get_closed_frame(ts: int) -> tuple[int, np.ndarray]  # 按时间戳查找最近帧
-def get_frame(index: int) -> np.ndarray                   # 按索引获取指定帧
+def get_closed_frame(self, ts) -> tuple[int, np.ndarray]  # 按时间戳查找最近帧
+def get_frame(self, index) -> np.ndarray                  # 按索引获取指定帧（线性向前迭代，非随机访问）
+```
+
+> 注意：`get_frame` 仅支持向前线性访问。当 `index == current_index` 时返回缓存帧，
+> 否则向前解码到目标帧并缓存。无法随机回溯。
+
+### 模块级辅助函数
+
+```python
+def find_closest_index(a: np.ndarray, target: int) -> int
+    # 二分查找：在升序时间戳数组 a 中返回与 target 最接近的索引
 ```
 
 ---
@@ -144,7 +154,8 @@ class VideoPlayer:
 class Monitor:
     def __init__(self, name: str, fps: int = 30, port: int = 7070)
     def start()                    # 启动监控窗口（会阻塞当前线程）
-    def stop()                     # 停止（释放摄像头资源，当前实现为空方法体）
+    def stop()                     # 停止：释放相机资源（camera.stop()）并关闭图形窗口（plt.close）
+    def update(frame)              # matplotlib 动画回调，内部使用
 ```
 
 ---

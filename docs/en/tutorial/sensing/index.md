@@ -2,7 +2,7 @@
 
 OrcaGym provides various sensor interfaces and RGB-D camera support.
 
-> For complete runnable code, see [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground) and [08_video_capture/](https://github.com/OrcaGym/OrcaPlayground).
+> For complete runnable code, see [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) and [08_video_capture/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/08_video_capture).
 
 ## Sensor Types
 
@@ -29,5 +29,5 @@ imu_gyro = sensor_data["g1_imu_gyro"]  # (3,) angular velocity
 ## Chapter Navigation
 
 - [🖲️ Sensor System](sensors.md) — MuJoCo native sensor querying and data layout
-- [📹 RGB-D Camera](rgbd-camera.md) — WebSocket camera streaming
+
 - [🤝 Contact Sensing](contact-sensing.md) — Contact forces as tactile perception

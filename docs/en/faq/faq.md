@@ -27,7 +27,7 @@ brew install glfw glew
 
 ### Q: How to connect to OrcaStudio/OrcaLab?
 
-1. Download and install from [orca3d.cn](http://orca3d.cn/)
+1. Download and install from [orca3d.cn](https://www.orca3d.cn/)
 2. Open the software and click the "Run" button
 3. The default gRPC address is `localhost:50051`
 

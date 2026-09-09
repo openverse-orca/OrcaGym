@@ -58,7 +58,7 @@ After modifying the simulation state, certain operations must be performed to en
 | `set_joint_qvel()` | `mj_forward()` |
 | `set_mocap_pos_and_quat()` | `mj_forward()` |
 
-> **Important**: After `do_simulation()` returns, the data is already automatically synchronized. You only need to manually call `mj_forward()` when you manually modify the state.
+> ⚠️ **Important**: After `do_simulation()` returns, the data is already automatically synchronized. You only need to manually call `mj_forward()` when you manually modify the state.
 
 ## Why mj_forward() Is Needed After Modifying qpos
 

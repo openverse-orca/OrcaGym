@@ -7,12 +7,11 @@ Among the many robot simulation platforms available, what are OrcaGym's unique a
 | Feature | OrcaGym | Isaac Gym | MuJoCo (Native) | PyBullet | SAPIEN |
 |---------|---------|-----------|-----------------|----------|--------|
 | Gymnasium API | ✅ Fully compatible | ❌ Custom VecEnv | Requires manual wrapping | ✅ | ❌ |
-| Multi-physics backend | ✅ Core MuJoCo/MuJoCoWarp/Euler + remote PhysX/ODE | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
+| Dual physics backends | ✅ MuJoCo (CPU) + Euler (GPU) | ❌ PhysX only | ❌ MuJoCo only | ❌ Bullet only | ❌ PhysX only |
 | Distributed deployment | ✅ Native support | ❌ Single machine | ❌ Single machine | ❌ Single machine | ❌ Single machine |
-| Ray tracing | ✅ | ❌ | ❌ | ❌ | ✅ |
-| GPU acceleration | ✅ MuJoCoWarp (CUDA) / Euler (multi-vendor GPU) | ✅ (native) | ❌ (CPU) | ❌ (CPU) | ✅ |
+| Ray tracing | ✅ Optional integration | ❌ | ❌ | ❌ | ✅ |
+| GPU acceleration | ✅ Euler backend | ✅ (native) | ❌ (CPU) | ❌ (CPU) | ✅ |
 | Multi-agent | ✅ Native | ⚠️ Manual setup | ⚠️ Manual setup | ⚠️ Manual setup | ✅ |
-| Visual editor | ✅ OrcaStudio | ❌ | ❌ | ❌ | ❌ |
 | Open source | ✅ MIT | ✅ Non-commercial | ✅ Apache 2.0 | ✅ | ✅ |
 
 ## Core Advantages in Detail
@@ -39,7 +38,7 @@ model.learn(total_timesteps=1_000_000)
 Unlike single-machine simulators, OrcaGym natively supports:
 
 - **Local Mode**: Drive MuJoCo directly within the Python process, suitable for development and debugging
-- **Remote Mode**: The Python client connects to a remote OrcaStudio/OrcaLab, suitable for large-scale training
+- **Remote Mode**: Connect to a remote simulation service, suitable for large-scale training
 - **Hybrid Mode**: Training on remote, policy execution locally
 
 ```
@@ -47,14 +46,9 @@ Development: Local Mode → Rapid iteration
 Deployment: Remote Mode → Elastic scaling
 ```
 
-### 3. Visualization and Debugging Ecosystem
+### 3. Extensible Visualization Integration
 
-OrcaGym is deeply integrated with OrcaStudio/OrcaLab, providing:
-
-- Real-time 3D scene visualization
-- Interactive object drag-and-drop manipulation
-- Real-time joint/sensor data monitoring
-- Video recording and playback
+OrcaGym's state view (`env.data`) can be consumed by external visualization tools. OrcaStudio/OrcaLab and other external platforms can be attached for scene visualization and debugging (external tools are optional and do not affect physics simulation).
 
 ## Use Cases
 
@@ -69,6 +63,6 @@ OrcaGym is deeply integrated with OrcaStudio/OrcaLab, providing:
 
 ## Limitations
 
-- The core package supports MuJoCo (CPU)/MuJoCoWarp (CUDA)/Euler (multi-vendor GPU); the PhysX/ODE backends require OrcaStudio/OrcaLab
-- Remote mode depends on the OrcaStudio/OrcaLab server
+- The core package supports dual backends: MuJoCo (CPU, fully functional) and Euler (GPU, reserved interface, integration plan TBD)
+- Remote visualization/rendering depends on external tools (e.g., OrcaStudio/OrcaLab)
 - The community is still in its early stages, with fewer third-party examples

@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import warnings
 from typing import Optional
 import grpc
 import aiofiles
@@ -28,6 +29,43 @@ from orca_gym.core.orca_gym import OrcaGymBase
 from orca_gym.utils.dir_utils import cleanup_zombie_locks, file_lock
 
 import mujoco
+
+# 覆盖新旧两种命名：UUID 化 ORCA_MANIPULATOR_<uuid> 与旧版 ActorManipulator。
+_ACTOR_MANIPULATOR_BODY_NAMES = (
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_Anchor",
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_dummy",
+    "ActorManipulator_Anchor",
+    "ActorManipulator_dummy",
+)
+
+
+def disable_actor_manipulator_collision(model: mujoco.MjModel) -> int:
+    """
+    关闭 ActorManipulator 拖拽代理所有几何体的碰撞掩码（contype=conaffinity=0）。
+
+    拖拽/抓取依赖 mocap anchor 与 weld 等号约束，与接触完全无关，故关闭碰撞不影响功能；
+    但可消除 AR-001 中该代理埋地/远端碰撞体与无限平面贯产生的垃圾约束（junk efc）行。
+
+    Args:
+        model: 原始 mujoco.MjModel。
+
+    Returns:
+        被修改的 geom 数量（用于日志/断言）。
+    """
+    n_disabled = 0
+    for body_name in _ACTOR_MANIPULATOR_BODY_NAMES:
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if body_id < 0:
+            continue
+        for gid in range(model.ngeom):
+            if model.geom_bodyid[gid] == body_id:
+                if model.geom_contype[gid] != 0 or model.geom_conaffinity[gid] != 0:
+                    model.geom_contype[gid] = 0
+                    model.geom_conaffinity[gid] = 0
+                    n_disabled += 1
+    return n_disabled
+
+
 from scipy.spatial.transform import Rotation as R
 
 
@@ -232,7 +270,8 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = None
         self._mjData = None
         self._override_ctrls : dict[int, float] = {}
-        
+        self._protected_override_ctrl_ids: set[int] = set()
+
         # 清理可能的僵尸锁文件
         import tempfile
         temp_dir = tempfile.gettempdir()
@@ -306,6 +345,12 @@ class OrcaGymLocal(OrcaGymBase):
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
 
+        # AR-001：模型加载后关闭 ActorManipulator 拖拽代理的碰撞掩码，消除其埋地/远端
+        # 碰撞体与无限平面贯产生的垃圾约束行（不影响 mocap weld 拖拽）。
+        n = disable_actor_manipulator_collision(self._mjModel)
+        if n > 0:
+            _logger.info(f"disabled collision on {n} ActorManipulator geom(s).")
+
         size_model = mujoco.mj_sizeModel(self._mjModel)
         _logger.debug(f"size_model: {size_model}")
 
@@ -351,45 +396,96 @@ class OrcaGymLocal(OrcaGymBase):
             return None
         return await super().pause_simulation()
 
-    async def render(self):
+    async def render(self, simulate_index: int = -1, request_idr: bool = False):
         """
         渲染当前仿真状态到 OrcaSim 服务器
-        
+
         将当前的关节位置和仿真时间发送到服务器，用于可视化。
         同时接收服务器返回的控制覆盖值（如果用户在界面中手动控制）。
-        
+
+        Args:
+            simulate_index: 物理仿真步索引，透传到相机管线用于帧对齐。
+                ``-1`` 表示由服务端自增（向后兼容，默认值）。
+                ``>= 0`` 表示显式指定当前仿真步索引。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。
+
         使用示例:
             ```python
-            # 在环境的 render 方法中调用
+            # 向后兼容：不传 simulate_index
             await self.gym.render()
-            # 服务器会更新可视化，并可能返回控制覆盖值
+
+            # 显式传入仿真步索引（用于相机录制帧对齐）
+            await self.gym.render(simulate_index=100)
             ```
         """
-        await self.update_local_env(self.data.qpos, self._mjData.time)
+        await self.update_local_env(self.data.qpos, self._mjData.time, simulate_index, request_idr, contacts=self._build_contact_data())
 
-    async def update_local_env(self, qpos, time):
+    def _build_contact_data(self, bodys: list[int] | None = None):
+        """构建接触快照（pos+force 已转世界系），供 Studio 绘制。
+
+        Args:
+            bodys: body ID 列表。若给定，只构建 geom1/geom2 所属 body
+                在此列表中的接触；若为 None 或空，构建全部接触。
+        """
+        data = self._mjData
+        model = self._mjModel
+        ncon = data.ncon
+        if ncon == 0:
+            return []
+        body_set = set(bodys) if bodys else None
+        contacts = []
+        force_buf = np.zeros(6, dtype=np.float64)
+        for i in range(ncon):
+            con = data.contact[i]
+            if body_set is not None:
+                b1 = int(model.geom_bodyid[con.geom1])
+                b2 = int(model.geom_bodyid[con.geom2])
+                if b1 not in body_set and b2 not in body_set:
+                    continue
+            mujoco.mj_contactForce(model, data, i, force_buf)
+            frame_mat = np.array(con.frame).reshape(3, 3, order='F')
+            world_force = -(frame_mat.T @ force_buf[:3])
+            contacts.append({
+                "pos": [float(con.pos[0]), float(con.pos[1]), float(con.pos[2])],
+                "force": [float(world_force[0]), float(world_force[1]), float(world_force[2])],
+            })
+        return contacts
+
+    async def update_local_env(self, qpos, time, simulate_index=-1, request_idr=False, contacts=None):
         """
         更新本地环境状态到服务器，并接收控制覆盖值
-        
+
         将当前状态发送到服务器用于渲染，同时接收用户通过界面手动控制的值。
         这些覆盖值会在下次 set_ctrl 时应用。
-        
+
         术语说明:
             - 控制覆盖 (Control Override): 外部（如用户界面）覆盖执行器的控制值
             - 用于实现手动控制、遥操作等功能
-        
+
         Args:
             qpos: 当前关节位置数组
             time: 当前仿真时间
-        
+            simulate_index: 物理仿真步索引，透传到相机管线用于帧对齐。
+                ``-1`` 表示由服务端自增（向后兼容，默认值）。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。
+
         使用示例:
             ```python
             # 在 render 中自动调用
-            await self.gym.update_local_env(self.data.qpos, self._mjData.time)
+            await self.gym.update_local_env(self.data.qpos, self._mjData.time, simulate_index)
             # 如果用户在界面中控制，override_ctrls 会被更新
             ```
         """
-        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        request = mjc_message_pb2.UpdateLocalEnvRequest(
+            qpos=qpos, time=time, simulate_index=simulate_index, request_idr=request_idr
+        )
+        if contacts is not None:
+            for con in contacts:
+                cs = request.contacts.add()
+                cs.pos.extend(con["pos"])
+                cs.force.extend(con["force"])
         response = await self.stub.UpdateLocalEnv(request)
         override_ctrls = response.override_ctrls
         self._override_ctrls.clear()
@@ -399,6 +495,18 @@ class OrcaGymLocal(OrcaGymBase):
                     _logger.warning(f"Invalid control index: {ctrl.index}, skipping.")
                     continue
                 self._override_ctrls[ctrl.index] = ctrl.value
+
+    async def push_visual_state(self, qpos, time) -> None:
+        """
+        仅将 qpos 推送到 Studio MuJoCo 视口做运动学显示，不读取 override_ctrls。
+
+        用于 replay + skip_render 场景：避免 Studio 界面控制覆盖 OSC 力矩，
+        同时让 Studio 窗口中的机器人跟随 OrcaGym 本地仿真。
+        """
+        if self._skip_grpc_load or self.stub is None:
+            return
+        request = mjc_message_pb2.UpdateLocalEnvRequest(qpos=qpos, time=time)
+        await self.stub.UpdateLocalEnv(request)
 
     async def load_content_file(self, content_file_name, remote_file_dir="", local_file_dir="", temp_file_path=None):
         """
@@ -527,81 +635,79 @@ class OrcaGymLocal(OrcaGymBase):
         return
     
     async def begin_save_video(self, file_path, capture_mode: CaptureMode = CaptureMode.ASYNC):
+        """[Deprecated] 开始保存视频到指定路径。
+
+        .. deprecated::
+            引擎侧 MP4 录制 RPC（``BeginSaveMp4File``）已从 proto 中删除。
+            请使用 ``OrcaGymLocalEnv.save_streaming`` 进行客户端 PyAV remux 录制。
+            此方法现在为 no-op 并发出 ``DeprecationWarning``。
         """
-        开始保存视频到指定路径。
-
-        参数：
-        - `file_path`：视频文件保存路径（如 "output.mp4"）
-        - `capture_mode`：捕获模式（`CaptureMode.ASYNC` 或 `CaptureMode.SYNC`，默认 ASYNC）
-
-        说明：
-        - ASYNC 模式：相机帧独立捕获，性能较高但可能不完全对齐。
-        - SYNC 模式：每个相机帧都与仿真步进对齐，性能较低但帧对齐。
-
-        注意：
-        - 异步方法，需要在 `async` 函数中 `await` 调用。
-        - 调用 `stop_save_video()` 停止保存。
-        """
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path, capture_mode=capture_mode)
-        response = await self.stub.BeginSaveMp4File(request)
-        if response.status == mjc_message_pb2.BeginSaveMp4FileResponse.Status.SUCCESS:
-            _logger.info(f"Video saving started at {file_path}")
-        else:
-            _logger.error(f"Failed to start video saving: {response.error_message}")
+        warnings.warn(
+            "begin_save_video is deprecated: the engine-side MP4 recording RPC "
+            "(BeginSaveMp4File) has been removed from proto. "
+            "Use OrcaGymLocalEnv.save_streaming instead for client-side "
+            "PyAV remux recording.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _logger.warning(
+            "begin_save_video is deprecated (engine RPC removed). "
+            "Use save_streaming instead. No-op."
+        )
 
     async def stop_save_video(self):
-        """
-        停止保存视频。
+        """[Deprecated] 停止保存视频。
 
-        说明：
-        - 停止由 `begin_save_video()` 启动的视频保存过程。
-        - 视频文件会在停止时完成写入。
-
-        注意：
-        - 异步方法，需要在 `async` 函数中 `await` 调用。
+        .. deprecated::
+            引擎侧 MP4 录制 RPC（``StopSaveMp4File``）已从 proto 中删除。
+            请使用 ``OrcaGymLocalEnv.save_streaming``。
+            此方法现在为 no-op 并发出 ``DeprecationWarning``。
         """
-        request =  mjc_message_pb2.StopSaveMp4FileRequest()
-        await self.stub.StopSaveMp4File(request)
+        warnings.warn(
+            "stop_save_video is deprecated: the engine-side MP4 recording RPC "
+            "(StopSaveMp4File) has been removed from proto. "
+            "Use OrcaGymLocalEnv.save_streaming instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _logger.warning(
+            "stop_save_video is deprecated (engine RPC removed). "
+            "Use save_streaming instead. No-op."
+        )
 
     async def get_current_frame(self)-> int:
+        """[Deprecated] 获取当前相机帧索引。
+
+        .. deprecated::
+            引擎侧 RPC（``GetCurrentFrameIndex``）已从 proto 中删除。
+            ``simulate_index`` 现通过 ``UpdateLocalEnv`` 透传到 WebSocket 帧头。
+            此方法返回 -1 并发出 ``DeprecationWarning``。
         """
-        获取当前相机帧索引。
-
-        返回：
-        - 当前帧索引（int）
-
-        说明：
-        - 用于查询当前渲染帧的索引，常用于视频保存时的帧对齐。
-
-        注意：
-        - 异步方法，需要在 `async` 函数中 `await` 调用。
-        """
-        request = mjc_message_pb2.GetCurrentFrameIndexRequest()
-        response = await self.stub.GetCurrentFrameIndex(request)
-        return response.current_frame
+        warnings.warn(
+            "get_current_frame is deprecated: the engine-side RPC "
+            "(GetCurrentFrameIndex) has been removed from proto. "
+            "Use simulate_index from render() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return -1
 
     async def get_camera_time_stamp(self, last_frame) -> dict:
+        """[Deprecated] 获取相机时间戳。
+
+        .. deprecated::
+            引擎侧 RPC（``GetTimeStamp``）已从 proto 中删除。
+            时间戳现在包含在 WebSocket 帧头中。
+            此方法返回空字典并发出 ``DeprecationWarning``。
         """
-        获取相机时间戳。
-
-        参数：
-        - `last_frame`：上次查询的帧索引
-
-        返回：
-        - 字典，键为相机名称，值为时间戳列表
-
-        说明：
-        - 用于查询各相机的时间戳信息，常用于视频保存时的帧对齐。
-
-        注意：
-        - 异步方法，需要在 `async` 函数中 `await` 调用。
-        """
-        request = mjc_message_pb2.GetTimeStampRequest()
-        request.last_frame_index = last_frame
-        response = await self.stub.GetTimeStamp(request)
-        if response.error_message != "":
-            _logger.error(f"Get time stamp failed. error message: {response.error_message}")
-        return {camera_name: time_stamp_list.time_stamps for camera_name, time_stamp_list in response.time_stamp_map.items()}
+        warnings.warn(
+            "get_camera_time_stamp is deprecated: the engine-side RPC "
+            "(GetTimeStamp) has been removed from proto. "
+            "Timestamps are now embedded in WebSocket frame headers.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return {}
 
     async def get_frame_png(self, image_path):
         """
@@ -1958,10 +2064,20 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         if len(self._override_ctrls) > 0:
-            # 如果有 override 控制，则使用 override 控制
+            protected = self._protected_override_ctrl_ids
             for actuator_id, value in self._override_ctrls.items():
+                if actuator_id in protected:
+                    continue
                 ctrl[actuator_id] = value
         self._mjData.ctrl = ctrl.copy()
+
+    def clear_override_ctrls(self) -> None:
+        """清空 Studio UpdateLocalEnv 缓存的 override，避免覆盖遥操 ctrl。"""
+        self._override_ctrls.clear()
+
+    def set_protected_override_ctrl_ids(self, actuator_ids: set[int] | list[int]) -> None:
+        """这些 actuator 索引不受 Studio override_ctrls 覆盖（如 G1 夹爪 pctrl）。"""
+        self._protected_override_ctrl_ids = {int(i) for i in actuator_ids}
 
     def mj_step(self, nstep):
         """
@@ -2144,7 +2260,11 @@ class OrcaGymLocal(OrcaGymBase):
             ```
         """
         mass_matrix = np.ndarray(shape=(self._mjModel.nv, self._mjModel.nv), dtype=np.float64, order="C")
-        mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        # MuJoCo 3.12+ 移除 mjData.qM，mj_fullM 签名改为 (m, d, dst)
+        if hasattr(self._mjData, "qM"):
+            mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        else:
+            mujoco.mj_fullM(self._mjModel, self._mjData, mass_matrix)
         mass_matrix = np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))        
         return mass_matrix
 

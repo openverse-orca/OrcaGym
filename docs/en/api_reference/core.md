@@ -63,7 +63,8 @@ def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
 
 # mocap: initialized via init_mocap_dict(mocap_dict),
-# count obtained via the nmocap attribute (there is no get_mocap_dict method)
+# count obtained via the nmocap attribute, and the dict obtained via get_mocap_dict()
+def get_mocap_dict() -> dict
 ```
 
 ### Get Entity by ID / by Name
@@ -198,7 +199,7 @@ env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 ### AnchorType
 
 Module path: in the Euler system, this is located at `orca_gym.core.euler.orca_studio_bridge`;
-in the Local/Warp system, it is located at `orca_gym.core.orca_gym_local`.
+in the Local system, it is located at `orca_gym.core.orca_gym_local`, and in the Warp system at `orca_gym.core.orca_gym_warp`.
 
 ```python
 class AnchorType:
@@ -220,7 +221,7 @@ class CaptureMode:
 
 ### Utility Functions
 
-Module path: `orca_gym.core.orca_gym_local` (Local/Warp system).
+Module path: `orca_gym.core.orca_gym_local` (Local system) and `orca_gym.core.orca_gym_warp` (Warp system).
 The Euler system does not export these two functions.
 
 ```python

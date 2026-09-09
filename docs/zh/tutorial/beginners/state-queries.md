@@ -2,7 +2,7 @@
 
 上一节我们只读了 `self.data.qpos` 和 `self.data.qvel`。这一节，你将学会用 OrcaGym 提供的**查询 API** 来获取更丰富的状态信息。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/04_query_api)。
 
 ---
 
@@ -66,7 +66,7 @@ class StateQueryDemo(OrcaGymEulerEnv):
         )
         self._dumper = StateDumper(self)
 
-    # ─── 查询方法 ───
+    # ─── 查询 API ───
 
     def check_joints(self):
         """查询所有关节的位置和速度"""
@@ -168,6 +168,8 @@ class StateQueryDemo(OrcaGymEulerEnv):
         return self._get_obs(), {}
 
     def _get_obs(self):
+        # 简化示例：直接读取全量 qpos 数组作为观测
+        # 实际任务中，推荐按名称查询特定关节：self.query_joint_qpos(joint_names)
         return self.data.qpos.copy()
 
 

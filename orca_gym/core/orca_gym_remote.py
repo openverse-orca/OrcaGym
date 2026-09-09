@@ -1,6 +1,7 @@
 import sys
 import os
 import grpc
+import warnings
 
 proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 proto_path = os.path.abspath(os.path.join(proj_dir, "protos"))
@@ -808,18 +809,32 @@ class OrcaGymRemote(OrcaGymBase):
         return site_dict    
     
     async def begin_save_video(self, file_path):
-        request = mjc_message_pb2.BeginSaveMp4FileRequest(file_path=file_path)
-        response = await self.stub.BeginSaveMp4File(request)
-        if response.success:
-            _logger.info(f"Video saving started at {file_path}")
-        else:
-            _logger.error(f"Failed to start video saving: {response.error_message}")
+        """[Deprecated] 引擎侧 MP4 录制 RPC 已删除，no-op + DeprecationWarning。"""
+        warnings.warn(
+            "begin_save_video is deprecated: engine-side MP4 recording RPC "
+            "(BeginSaveMp4File) has been removed from proto. "
+            "Use OrcaGymRemoteEnv.save_streaming for client-side PyAV remux.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     async def stop_save_video(self):
-        request = mjc_message_pb2.StopSaveMp4FileRequest()
-        await self.stub.StopSaveMp4File(request)
-        
+        """[Deprecated] 引擎侧 MP4 录制 RPC 已删除，no-op + DeprecationWarning。"""
+        warnings.warn(
+            "stop_save_video is deprecated: engine-side MP4 recording RPC "
+            "(StopSaveMp4File) has been removed from proto. "
+            "Use OrcaGymRemoteEnv.save_streaming instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     async def get_current_frame(self):
-        request = mjc_message_pb2.GetCurrentFrameIndexRequest()
-        response = await self.stub.GetCurrentFrameIndex(request)
-        return response.current_frame
+        """[Deprecated] 引擎侧帧索引 RPC 已删除，返回 -1 + DeprecationWarning。"""
+        warnings.warn(
+            "get_current_frame is deprecated: engine-side frame index RPC "
+            "(GetCurrentFrameIndex) has been removed from proto. "
+            "Use simulate_index in render() for frame alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return -1

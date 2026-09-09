@@ -4,16 +4,16 @@ OrcaGym is an **open-source, cloud-native robot simulation platform** that provi
 
 ## In a Nutshell
 
-**OrcaGym = Gymnasium API + MuJoCo Physics Engine + Distributed Communication + OrcaStudio/OrcaLab Cloud Platform**
+**OrcaGym = Gymnasium API + Dual Physics Backends (MuJoCo / Euler) + Distributed Communication**
 
 ## Core Positioning
 
 Traditional robot simulation solutions often face trade-offs between fidelity and computational efficiency. OrcaGym bridges this gap through:
 
 1. **Standardized Interface**: Fully compatible with the Gymnasium API, enabling zero-cost migration of existing RL algorithms
-2. **Multiple Physics Backends**: The core package locally supports MuJoCo/MuJoCoWarp/Euler; PhysX and ODE can be accessed via OrcaStudio/OrcaLab
+2. **Dual Physics Backends**: The core package supports two mutually independent paths — MuJoCo (open-source, CPU, pure rigid-body) and Euler (in-house, GPU) — selected via `SimConfig.backend`
 3. **Cloud-Native Architecture**: Enables hybrid local/remote deployment
-4. **Realistic Rendering**: Ray tracing provides high-quality observations for visual RL tasks (provided by the OrcaStudio/OrcaLab server)
+4. **Extensible Rendering**: High-quality rendering such as ray tracing can be accessed via external visualization tools (e.g., OrcaStudio/OrcaLab)
 
 ## Key Features
 
@@ -30,15 +30,16 @@ obs, reward, terminated, truncated, info = env.step(action)
 
 Seamlessly integrates with mainstream RL libraries such as Stable-Baselines3, RLlib, and CleanRL.
 
-### ⚡ Multiple Physics Backends
+### ⚡ Dual Physics Backends
 
-| Backend | Availability | Characteristics | Use Case |
-|---------|--------------|-----------------|----------|
-| **MuJoCo** | Core package (local) | High-precision rigid-body dynamics (CPU) | Legged robots, robotic arm manipulation |
-| **MuJoCoWarp** | Core package (local) | GPU (CUDA) accelerated parallelism | Large-scale parallel training |
-| **Euler** | Core package (local) | Multi-vendor GPU multi-physics engine | High-fidelity multi-physics simulation |
-| **PhysX** | Remote only (OrcaStudio/OrcaLab) | GPU accelerated, massively parallel | Swarm simulation, complex scenes |
-| **ODE** | Remote only (OrcaStudio/OrcaLab) | Open-source, general-purpose | Rapid prototyping, educational use |
+OrcaGym adopts a dual-backend architecture with two mutually independent paths, selected via `SimConfig.backend`:
+
+| Backend | Positioning | Characteristics | Use Case |
+|---------|-------------|-----------------|----------|
+| **MuJoCo** | Open-source standard path | High-precision rigid-body dynamics (CPU) | Legged robots, robotic arm manipulation, rapid prototyping |
+| **Euler** | In-house path (Orca team) | GPU accelerated | Large-scale parallel training, high-fidelity simulation |
+
+> **Current implementation status**: The MuJoCo backend is fully functional; the Euler backend is a reserved interface (`_euler=None`), integration plan TBD.
 
 ### 🌐 Distributed Deployment
 

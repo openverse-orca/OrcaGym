@@ -80,13 +80,13 @@ do_simulation(ctrl, n_frames)   ← 仿真步进
   └─▶ 可直接读取 env.data.qpos 等
 ```
 
-> ⚠️ **重要**：`do_simulation()` 返回后 `env.data` 已自动同步，可直接读取。手动调用 `mj_forward()` 后如需读取 `env.data` 中的派生量（如 `body_xpos`、`site_xpos` 等），建议通过 `do_simulation()` 走标准步进路径（内部已封装 `sync_to_view`），或在子类内部使用同步机制。直接调用 `mj_forward()` 不会自动刷新 `env.data` 的派生量视图。
+> ⚠️ **重要**：`do_simulation()` 返回后 `env.data` 已自动同步（内部调用 `sync_to_view`），可直接读取。`env.data` 的基础字段（`qpos`/`qvel` 等）为零拷贝视图，派生量（`body_xpos`/`site_xpos` 等）按需从 live `_mjData` 读取，因此 `mj_forward()` 执行后派生量会反映最新值（`mj_forward` 原地更新 `_mjData`）。但 `env.data.time` 是浮点拷贝（非视图），仅在 `sync_to_view` 时刷新——`mj_forward` 不改变 `time`，故无影响；若需读取 `mj_step` 后的 `time`，请走 `do_simulation()` 或手动 `sync_to_view`。
 
 ---
 
 ## SimConfig — 求解器配置
 
-`SimConfig` 提供仿真参数的读写接口，通过 `env.sim_config` 访问。修改在下次仿真步进时生效。
+`SimConfig` 提供仿真参数的读写接口，通过 `env.sim_config` 访问。修改立即写入 `mj_model.opt`，下次 `mj_step` 即按新值计算。
 
 ```python
 sim_config = env.sim_config
@@ -94,7 +94,7 @@ sim_config = env.sim_config
 # 读写参数
 sim_config.timestep = 0.002     # 物理时间步长
 sim_config.iterations = 100     # 求解器迭代次数
-sim_config.integrator = 1       # 积分器（0=Euler, 1=RK4）
+sim_config.integrator = 1       # 积分器（0=Euler, 1=RK4, 2=IMPLICIT, 3=IMPLICITFAST）
 sim_config.gravity = np.array([0., 0., -9.81])  # 重力
 
 # 批量设置

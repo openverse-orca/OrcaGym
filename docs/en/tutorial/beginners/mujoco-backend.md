@@ -1,8 +1,8 @@
 # 🔧 MuJoCo Backend
 
-OrcaGym's Euler mode uses MuJoCo directly as the physics engine. Model loading is automatically completed during environment initialization.
+This document describes how to use OrcaGym's **MuJoCo backend**. The MuJoCo backend is the open-source standard path (CPU, pure rigid-body) in OrcaGym's dual-backend architecture, selected via `SimConfig.backend="mujoco"`. Model loading is automatically completed during environment initialization.
 
-> See [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler) for complete runnable code.
 
 ## Model Loading
 
@@ -76,7 +76,6 @@ env.sim_config.gravity = np.array([0., 0., -9.81])
 env.sim_config.load_from_dict({
     "integrator": 0,
     "iterations": 100,
-    "tolerance": 1e-8,
 })
 
 # Export configuration
@@ -91,7 +90,6 @@ config = env.sim_config.to_dict()
 | `iterations` | int | 100 | Solver iteration count |
 | `integrator` | int | 0 | 0=Euler, 1=RK4 |
 | `gravity` | ndarray | [0,0,-9.81] | Gravitational acceleration |
-| `tolerance` | float | 1e-8 | Solver tolerance |
 
 ## Timestep vs Control Frequency
 
@@ -111,7 +109,7 @@ print(f"Control frequency: {1.0/env.dt:.1f}Hz")
 
 ### G1 Standard Configuration
 
-The G1 humanoid robot uses the following standard parameters (from Euler examples):
+The G1 humanoid robot uses the following standard parameters:
 
 | Parameter | Value | Description |
 |------|-----|------|
@@ -122,14 +120,20 @@ The G1 humanoid robot uses the following standard parameters (from Euler example
 ## Debugging and Profiling
 
 ```python
-# View contact count (Euler path uses query_contact_simple to get the contact list length)
+# View contact count (use query_contact_simple to get the contact list length)
 contacts = env.query_contact_simple()
 print(f"Contact count: {len(contacts)}")
 
-# View model information (under the Euler path, OrcaGymModel does not expose nbody/njnt/nsite;
+# View model information (OrcaGymModel does not expose nbody/njnt/nsite;
 # use len() to get dictionary sizes; ngeom/nq/nv/nu are fields in model_info)
 print(f"nq={env.model.nq}, nv={env.model.nv}, nu={env.model.nu}")
 print(f"ngeom={env.model.ngeom}")
 print(f"nbody={len(env.model.get_body_names())}")
 print(f"njnt={len(env.model.get_joint_dict())}")
 ```
+
+---
+
+## Next Step
+
+Now that you understand backend configuration, learn how to **write an environment class** to control this scene: [🏗️ Your First Environment](your-first-env.md).

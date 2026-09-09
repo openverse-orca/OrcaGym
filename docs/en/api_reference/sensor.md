@@ -30,9 +30,9 @@ class CameraWrapper:
 ### Properties
 
 ```python
-name: str                       # Camera name
+name: str                       # Camera name (@property, stored internally as _name)
 port: int                       # WebSocket port
-image: np.ndarray               # Current image (H, W, 3), BGR format
+image: np.ndarray               # Current image (H, W, 3), BGR format; random noise (480, 640, 3) before the first frame arrives
 image_index: int                # Current frame index
 enabled: bool                   # Whether enabled (default True)
 received_first_frame: bool      # Whether the first frame has been received
@@ -48,7 +48,7 @@ def stop()                      # Stop receiving
 ### Frame Retrieval
 
 ```python
-def get_frame(format: str = 'bgr24', size: tuple | None = None) -> tuple[np.ndarray, int]
+def get_frame(self, format='bgr24', size: tuple = None) -> tuple[np.ndarray, int]
 ```
 - `format`: `'bgr24'` (default) or `'rgb24'`
 - `size`: Optional target size `(width, height)`
@@ -118,8 +118,18 @@ class CameraDataParser:
 ### Frame Lookup
 
 ```python
-def get_closed_frame(ts: int) -> tuple[int, np.ndarray]  # Find the nearest frame by timestamp
-def get_frame(index: int) -> np.ndarray                   # Get a specific frame by index
+def get_closed_frame(self, ts) -> tuple[int, np.ndarray]  # Find the nearest frame by timestamp
+def get_frame(self, index) -> np.ndarray                  # Get a specific frame by index (linear forward iteration, not random access)
+```
+
+> Note: `get_frame` only supports linear forward access. When `index == current_index` it returns the cached frame,
+> otherwise it decodes forward to the target frame and caches it. Random backward access is not possible.
+
+### Module-Level Helper Functions
+
+```python
+def find_closest_index(a: np.ndarray, target: int) -> int
+    # Binary search: returns the index in the ascending timestamp array `a` closest to `target`
 ```
 
 ---
@@ -144,7 +154,8 @@ Matplotlib-based real-time camera monitoring window.
 class Monitor:
     def __init__(self, name: str, fps: int = 30, port: int = 7070)
     def start()                    # Start the monitoring window (blocks the current thread)
-    def stop()                     # Stop (release camera resources; current implementation is a no-op)
+    def stop()                     # Stop: release camera resources (camera.stop()) and close the figure window (plt.close)
+    def update(frame)              # matplotlib animation callback, used internally
 ```
 
 ---
