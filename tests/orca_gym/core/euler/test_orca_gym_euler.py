@@ -470,7 +470,7 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
         self.assertIn("env.data", msg)
 
     def test_blocked_attrs_frozenset_complete(self):
-        """_BLOCKED_ATTRS 是 frozenset 且包含全部 32 个拦截名（K3/K5 + Euler 后端 + 多世界边界标记）。"""
+        """_BLOCKED_ATTRS 是 frozenset 且包含全部 34 个拦截名（K3/K5 + Euler 后端 + 多世界边界标记 + P5 柔体槽）。"""
         self.assertIsInstance(OrcaGymEuler._BLOCKED_ATTRS, frozenset)
         expected_blocked = {
             # L3 引擎内部 (8)
@@ -486,6 +486,8 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             "_coupling", "coupling",
             # 多世界 DataView 边界标记（决策 D5）
             "_multi_world", "multi_world",
+            # P5 ESDF 非耦合柔体槽（EulerSoftSim）
+            "_soft", "soft",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)
 

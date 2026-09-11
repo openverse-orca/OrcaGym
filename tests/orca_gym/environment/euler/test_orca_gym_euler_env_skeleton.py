@@ -2134,10 +2134,16 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         original_init = OrcaGymEuler.init_simulation
         captured: dict = {}
 
-        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None,
+        ):
             captured["model_xml_path"] = model_xml_path
             captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target,
+            )
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
             env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
@@ -2153,9 +2159,15 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         original_init = OrcaGymEuler.init_simulation
         captured: dict = {}
 
-        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None,
+        ):
             captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target,
+            )
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
             env = _make_skeleton_env()
@@ -2171,6 +2183,197 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         with mock.patch.object(OrcaGymEuler, "reset_coupling_state") as m:
             env.reset_simulation()
         m.assert_called_once_with()
+
+
+class TestEsdfAutoDiscovery(unittest.TestCase):
+    """方案 A 同名推导：esdf_path="auto" 从 Studio 导出 XML 推导 ESDF。
+
+    纯函数（_discover_esdf_from_xml）+ Env 集成（auto 哨兵解析与降级）。
+    """
+
+    # --- 纯函数：目录扫描 ---
+
+    def test_discover_unique_match(self):
+        """唯一命中：<root>/<proj>/tmp/<uuid>.esdf 直接返回。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            esdf = pathlib.Path(root) / "proj_a" / "tmp" / "abc123.esdf"
+            esdf.parent.mkdir(parents=True)
+            esdf.touch()
+            result = _discover_esdf_from_xml(
+                "/anywhere/abc123.xml", studio_data_root=root
+            )
+            self.assertEqual(result, str(esdf))
+
+    def test_discover_multiple_match_latest_mtime(self):
+        """多项目命中：取 mtime 最新（模拟残留旧导出）。"""
+        import os
+        import tempfile
+
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            old = pathlib.Path(root) / "proj_old" / "tmp" / "abc123.esdf"
+            new = pathlib.Path(root) / "proj_new" / "tmp" / "abc123.esdf"
+            for p in (old, new):
+                p.parent.mkdir(parents=True)
+                p.touch()
+            # new 的 mtime 晚 2 秒（mtime 分辨率兜底）。
+            st = new.stat()
+            os.utime(new, (st.st_atime, st.st_mtime + 2))
+            result = _discover_esdf_from_xml(
+                "/anywhere/abc123.xml", studio_data_root=root
+            )
+            self.assertEqual(result, str(new))
+
+    def test_discover_no_match_returns_none(self):
+        """无同名 .esdf：返回 None（调用方降级）。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            (pathlib.Path(root) / "proj_a" / "tmp").mkdir(parents=True)
+            result = _discover_esdf_from_xml(
+                "/anywhere/nonexistent.xml", studio_data_root=root
+            )
+            self.assertIsNone(result)
+
+    def test_discover_missing_root_returns_none(self):
+        """studio_data_root 不存在：返回 None。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        result = _discover_esdf_from_xml(
+            "/anywhere/abc123.xml",
+            studio_data_root="/nonexistent/root/for/test",
+        )
+        self.assertIsNone(result)
+
+    def test_discover_none_xml_returns_none(self):
+        """XML 路径为 None：返回 None。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            self.assertIsNone(
+                _discover_esdf_from_xml(None, studio_data_root=root)
+            )
+
+    # --- Env 集成：auto 哨兵解析 ---
+
+    def test_auto_resolved_to_discovered_path(self):
+        """esdf_path="auto" + 推导成功：_esdf_path 替换为发现路径并透传。"""
+        from unittest import mock
+
+        discovered = "/tmp/fake_studio/proj/tmp/abc123.esdf"
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None,
+        ):
+            captured["esdf_path"] = esdf_path
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target,
+            )
+
+        with mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value=discovered,
+        ), mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = _make_skeleton_env(esdf_path="auto")
+
+        self.assertEqual(env._esdf_path, discovered)
+        self.assertEqual(captured["esdf_path"], discovered)
+
+    def test_auto_fallback_warns_and_degrades_to_none(self):
+        """esdf_path="auto" + 推导失败：RuntimeWarning + 降级 None（纯刚体）。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None,
+        ):
+            captured["esdf_path"] = esdf_path
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target,
+            )
+
+        with mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value=None,
+        ), mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            with self.assertWarns(RuntimeWarning):
+                env = _make_skeleton_env(esdf_path="auto")
+
+        self.assertIsNone(env._esdf_path)
+        self.assertIsNone(captured["esdf_path"])
+
+    def test_explicit_path_skips_discovery(self):
+        """esdf_path 为具体路径：不触发推导，原样透传。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None,
+        ):
+            captured["esdf_path"] = esdf_path
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target,
+            )
+
+        discover = mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value="/should/not/be/used.esdf",
+        )
+        with discover as m, mock.patch.object(
+            OrcaGymEuler, "init_simulation", spy_init
+        ):
+            env = _make_skeleton_env(esdf_path="/tmp/explicit.esdf")
+
+        m.assert_not_called()
+        self.assertEqual(env._esdf_path, "/tmp/explicit.esdf")
+        self.assertEqual(captured["esdf_path"], "/tmp/explicit.esdf")
+
+    def test_none_path_skips_discovery(self):
+        """esdf_path=None（默认）：不触发推导，行为零变化。"""
+        from unittest import mock
+
+        discover = mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value="/should/not/be/used.esdf",
+        )
+        with discover as m:
+            env = _make_skeleton_env()
+
+        m.assert_not_called()
+        self.assertIsNone(env._esdf_path)
 
 
 class TestSimConfigOverrides(unittest.TestCase):

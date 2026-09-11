@@ -323,6 +323,36 @@ class MuJoCoSimCoreEuler:
         self._host_dirty = False
         self._host_stale = False
 
+    def query_dual_engine_state(self) -> dict[str, np.ndarray]:
+        """返回双引擎耦合所需的 host kinematics 批量快照（拷贝）。
+
+        供 ``OrcaGymEuler.step_with_coupling`` / ``reset_coupling_state``
+        读取 MuJoCo 刚体位姿后注入 EulerSoftSim。单次 D2H 同步
+        （``_ensure_host_fresh``）后拷贝全部所需数组，避免后续 GPU
+        覆盖 host 时数据撕裂。
+
+        Returns:
+            dict 含键（均为 numpy 拷贝）：
+                - ``xpos``: (nbody, 3) body 原点世界坐标。
+                - ``xquat``: (nbody, 4) body 四元数 [w, x, y, z]。
+                - ``xmat``: (nbody, 9) body 旋转矩阵（行优先扁平）。
+                - ``cvel``: (nbody, 6) 空间速度 [ang(3), lin(3)]，
+                  subtree COM 参考、世界系。
+                - ``xipos``: (nbody, 3) body COM 世界坐标。
+                - ``subtree_com``: (nbody, 3) subtree COM 世界坐标。
+        """
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        return {
+            "xpos": np.array(host.xpos),
+            "xquat": np.array(host.xquat),
+            "xmat": np.array(host.xmat),
+            "cvel": np.array(host.cvel),
+            "xipos": np.array(host.xipos),
+            "subtree_com": np.array(host.subtree_com),
+        }
+
     def step(self, nstep: int) -> None:
         self._require_solver()
         if _perf_log_enabled():
