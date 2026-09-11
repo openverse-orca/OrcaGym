@@ -35,10 +35,15 @@ import grpc
 
 from datetime import datetime
 import time
+from collections import deque
 
 class OrcaGymLocalEnv(OrcaGymBaseEnv):
     metadata = {'render_modes': ['human', 'none'], 'version': '0.0.1', 'render_fps': 30}
-    
+
+    # 渲染耗时统计：每 N 次渲染输出一次 PERFORMANCE 汇总
+    _RENDER_TIMING_REPORT_INTERVAL = 100
+    _RENDER_TIMING_WINDOW = 500
+
     def __init__(
         self,
         frame_skip: int,
@@ -75,6 +80,13 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         # -1 表示未启用（由服务端自增）；>= 0 时每次 render 递增
         self._current_simulate_index = -1
 
+        # 渲染同步耗时统计（诊断 UpdateLocalEnv gRPC 同步等待对仿真频率的影响）
+        # 样本: (UpdateLocalEnv gRPC 耗时 ms, 锚点交互 do_body_manipulation 耗时 ms)
+        self._render_timing_samples: deque[tuple[float, float]] = deque(
+            maxlen=self._RENDER_TIMING_WINDOW
+        )
+        self._render_timing_count = 0
+
         # 相机录制管理器（惰性初始化，首次调用 save_streaming 时创建）
         self._recorder_manager: VideoRecorderManager | None = None
 
@@ -82,6 +94,10 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
         self._body_anchored = None
         self._is_flex_vertex_anchored = False  # 标记当前锚定的是否为 flex vertex
+        self.init_anchor_body()
+
+    def init_anchor_body(self):
+        """初始化锚定体"""
         # 默认关卡 ActorManipulator 已改名为 UUID 化的 ORCA_MANIPULATOR_<uuid>，旧关卡按需回退。
         _ORCA_MANIPULATOR_UUID = "a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e"
         _NEW_ANCHOR_NAME = f"ORCA_MANIPULATOR_{_ORCA_MANIPULATOR_UUID}_Anchor"
@@ -571,15 +587,55 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         if self.sync_render:
             self.render_count += self._render_count_interval
             if (self.render_count >= 1.0 or request_idr):
-                self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
-                self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+                self._render_and_time(simulate_index, request_idr)
                 self.render_count -= 1
         else:
             time_diff = time.perf_counter() - self._render_time_step
             if (time_diff > self._render_interval or request_idr):
                 self._render_time_step = time.perf_counter()
-                self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
-                self.do_body_manipulation() # 只有在渲染时才处理锚点操作，否则也不会有场景视口交互行为
+                self._render_and_time(simulate_index, request_idr)
+
+    def _render_and_time(self, simulate_index: int, request_idr: bool) -> None:
+        """执行渲染 gRPC 同步调用并统计耗时。
+
+        分别测量 ``UpdateLocalEnv``（``gym.render``）与锚点交互
+        （``do_body_manipulation``，锚点激活时含额外 gRPC 往返）的墙钟耗时，
+        每 ``_RENDER_TIMING_REPORT_INTERVAL`` 次渲染输出一次 PERFORMANCE
+        汇总，用于定位渲染同步等待对仿真频率的影响。
+        """
+        t0 = time.perf_counter()
+        self.loop.run_until_complete(self.gym.render(simulate_index, request_idr))
+        grpc_ms = (time.perf_counter() - t0) * 1000.0
+        t1 = time.perf_counter()
+        self.do_body_manipulation()  # 只有在渲染时才处理锚点操作
+        manip_ms = (time.perf_counter() - t1) * 1000.0
+
+        self._render_timing_samples.append((grpc_ms, manip_ms))
+        self._render_timing_count += 1
+        if self._render_timing_count % self._RENDER_TIMING_REPORT_INTERVAL == 0:
+            self._log_render_timing()
+
+    def _log_render_timing(self) -> None:
+        """输出渲染耗时统计汇总（PERFORMANCE 等级）。"""
+        if not self._render_timing_samples:
+            return
+        grpc_vals = [g for g, _ in self._render_timing_samples]
+        manip_vals = [m for _, m in self._render_timing_samples]
+
+        def _stats(vals: list[float]) -> str:
+            n = len(vals)
+            s = sorted(vals)
+            p95 = s[min(n - 1, int(n * 0.95))]
+            return (
+                f"mean={sum(vals) / n:.2f} min={min(vals):.2f} "
+                f"max={max(vals):.2f} p95={p95:.2f}"
+            )
+
+        _logger.performance(
+            f"[RenderTiming] render#{self._render_timing_count} "
+            f"UpdateLocalEnv(gRPC): {_stats(grpc_vals)} (ms) | "
+            f"anchor(do_body_manipulation): {_stats(manip_vals)} (ms)"
+        )
 
     def do_body_manipulation(self):
         if self._anchor_body_id is None:
@@ -932,6 +988,8 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         """
         self.gym.load_initial_frame()
         self.gym.update_data()
+        self.init_anchor_body()
+
         self.set_time_step(self.time_step)
 
     def init_qpos_qvel(self):
