@@ -19,6 +19,8 @@ reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
 """
 
 import asyncio
+import glob
+import os
 import time
 import warnings
 from concurrent.futures import Future
@@ -41,6 +43,64 @@ from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env_mixin import OrcaGymEnvMixin
 
 _logger = get_orca_logger()
+
+# Studio 用户数据根候选（对齐引擎 OrcaUtil::GetOrcaDataDirectory）。
+# 2607 实测：~/Orca/OrcaStudio/<project_id>/tmp/<uuid>.{xml,esdf}；
+# 2409 源码行为（QStandardPaths::AppDataLocation）留作第二候选。
+_DEFAULT_STUDIO_DATA_ROOTS = (
+    os.path.join("~", "Orca", "OrcaStudio"),
+    os.path.join("~", ".local", "share", "Orca", "OrcaStudio"),
+)
+
+
+def _discover_esdf_from_xml(
+    model_xml_path: str | None,
+    studio_data_root: str | None = None,
+) -> str | None:
+    """从 Studio 自动导出的 XML 推导同名 ESDF 路径（方案 A 同名推导）。
+
+    引擎 MjGlobalSettingsComponent::CreateScene 自动导出 XML 与 ESDF 到
+    同目录同名（``<uuid>.xml`` / ``<uuid>.esdf``），目录为
+    ``<OrcaDataDirectory>/tmp/``（2607 实测 ``~/Orca/OrcaStudio/
+    <project_id>/tmp/``）。OrcaGym 在线拉取 XML 时保留了原文件名
+    （MjGrpcServerComponent::LoadLocalEnv 返回 m_localEnvTempXMLPath
+    的 uuid 文件名），故可由 XML 文件名推导同批导出的 ESDF
+    （单机场景，Studio 与 Gym 同机时有效）。
+
+    Args:
+        model_xml_path: 已解析的模型 XML 本地路径（文件名须为 Studio
+            导出的原名 ``<uuid>.xml``）。
+        studio_data_root: Studio 用户数据根目录；None 用默认候选列表
+            （测试可注入单根）。
+
+    Returns:
+        推导成功的 ESDF 绝对路径；无匹配返回 None（调用方降级）。
+    """
+    if not model_xml_path:
+        return None
+    stem = os.path.splitext(os.path.basename(model_xml_path))[0]
+    esdf_name = stem + ".esdf"
+    if studio_data_root is not None:
+        roots = [os.path.expanduser(studio_data_root)]
+    else:
+        roots = [os.path.expanduser(r) for r in _DEFAULT_STUDIO_DATA_ROOTS]
+    candidates: list[str] = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        candidates.extend(
+            glob.glob(
+                os.path.join(
+                    glob.escape(root), "*", "tmp", glob.escape(esdf_name)
+                )
+            )
+        )
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    # 多项目目录命中（uuid 碰撞或残留旧导出）：取最新修改时间。
+    return max(candidates, key=os.path.getmtime)
 
 
 class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
@@ -93,6 +153,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         *,
         model_xml_path: str | None = None,
         esdf_path: str | None = None,
+        euler_render_target: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
@@ -112,7 +173,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
-            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
+            esdf_path: ESDF 场文件路径（仅 Euler 后端使用；非 None 时
+                构造非耦合柔体仿真器，P5）。支持哨兵值 "auto"：由
+                Studio 自动导出的 XML（同目录同名 ``<uuid>.esdf``，
+                位于 ``~/.local/share/Orca/OrcaStudio/<project_id>/tmp/``）
+                推导 ESDF 路径（单机场景；推导失败降级为 None 并告警，
+                不影响纯刚体仿真）。
+            euler_render_target: ESDF 柔体渲染流 gRPC 地址（P5 改动点 2，
+                如 "127.0.0.1:50451"）。仅 esdf_path 非 None 时生效：
+                init 时连接 RenderClient 并逐 body 注册可变形顶点通道，
+                render() 节拍内 skinning → 读槽 → 推流（30Hz 节流复用
+                本 Env 的 render 策略）。None（默认）不推流。连接失败
+                fail-fast（显式 opt-in 语义）。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
@@ -134,6 +206,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._skip_grpc_load = skip_grpc_load
         self._local_xml_path = model_xml_path
         self._esdf_path = esdf_path
+        self._euler_render_target = euler_render_target
         self._device = device
         # 用户边界校验：非法键（含 timestep）尽早失败
         validate_opt_overrides(sim_config_overrides)
@@ -250,13 +323,32 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             model_xml_path = self._local_xml_path
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
+        # 1.5 ESDF 自动发现（esdf_path="auto"）：由 Studio 自动导出的
+        #     XML 同名推导 ESDF（单机）；失败降级为 None（纯刚体行为，
+        #     不破坏既有流程）。仅 "auto" 哨兵触发，None/具体路径零变化。
+        if self._esdf_path == "auto":
+            resolved = _discover_esdf_from_xml(model_xml_path)
+            if resolved is None:
+                warnings.warn(
+                    "esdf_path='auto' 未能推导 ESDF（无与 XML 同名的 "
+                    ".esdf 于 ~/.local/share/Orca/OrcaStudio/*/tmp/），"
+                    "降级为纯刚体仿真。请确认 Studio 已开启『导出XML』"
+                    "且场景含可变形体，或显式传入 esdf_path。",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._esdf_path = None
+            else:
+                self._esdf_path = resolved
         # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
-        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异）
+        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异。
+        #    P5 改动点 2：euler_render_target 透传 → _soft 渲染流 opt-in）
         self.loop.run_until_complete(
             self._gym.init_simulation(
                 model_xml_path,
                 esdf_path=self._esdf_path,
                 opt_overrides=self._opt_overrides,
+                euler_render_target=self._euler_render_target,
             )
         )
         # 3. 应用缓存的 time_step：
@@ -365,10 +457,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
     def do_simulation(self, ctrl: np.ndarray, n_frames: int) -> None:
-        """标准仿真步进（含 Euler 耦合，骨架阶段等价于纯 MuJoCo）。
+        """标准仿真步进（含 ESDF 柔体同拍推进与力回流）。
 
-        K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler 等私有。
+        K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler/_soft 等私有。
         K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
+
+        esdf_path 未注入时（has_soft_sim()=False）等价于纯 MuJoCo 步进；
+        注入时每个调用周期执行非耦合双引擎四步时序（详见
+        ``OrcaGymEuler.step_with_coupling`` docstring）。
 
         Args:
             ctrl: 控制输入数组，形状 (nu,)。
