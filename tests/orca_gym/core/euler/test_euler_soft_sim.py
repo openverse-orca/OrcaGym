@@ -10,11 +10,12 @@
   4. reset（CPU）：双 State 回初始 + 快照注入。
   5. 错误路径：不支持的 solver.type / XPBD 缺 soft_contact。
   6. 渲染流（P5 改动点 2，mock RenderClient）：构造期烘焙/建通道、
-     enable 注册、render_frame payload==读槽 + sequence + 节拍不进
-     step、send 失败断流降级、degraded ESDF 无渲染流。
-  7. OrcaGymEuler 集成（mock）：_soft 槽隔离（K3/K5）、has_soft_sim、
-     step_with_coupling 四步时序编排、render() 挂 render_frame、
-     euler_render_target 透传。
+     enable 注册、render_frame payload==网格局部（读槽世界坐标按 ESDF
+     initial 逆变换）+ sequence + 节拍不进 step、send 失败断流降级、
+     degraded ESDF 无渲染流。
+  7. OrcaGymEuler 集成（mock）：旧 _soft 槽已删、has_soft_sim、
+     Gym 只驱动 euler.step（不拆窗、不写 xfrc）、render() 挂 render_frame、
+     CoupledGpuSim 透传。
   8. GPU 真链路（RTX 4070，skipUnless）：XPBD solver.step 冒烟 + body_f 有限。
 
 资产来源（ORCA_EULER_EXAMPLES 可覆盖）：
@@ -33,7 +34,11 @@ from unittest import mock
 
 import numpy as np
 
-from orca_gym.core.euler.euler_soft_sim import EulerSoftSim
+from orca_gym.core.euler.euler_soft_sim import (
+    EulerSoftSim,
+    _rotation_matrix_from_esdf_wxyz,
+    _world_vertices_to_mesh_local,
+)
 
 # ---------------------------------------------------------------------------
 # 资产定位（OrcaEuler examples；跨仓库引用，允许 env 覆盖 + 存在性 skip）
@@ -519,6 +524,31 @@ class TestEulerSoftSimErrorPaths(unittest.TestCase):
 _RENDER_TARGET = "127.0.0.1:50451"
 
 
+class TestWorldVerticesToMeshLocal(unittest.TestCase):
+    """推流世界→局部：不接求解器，只验变换本身。"""
+
+    def test_identity_minus_translation(self):
+        """单位旋转时，局部 = 世界减去 ESDF 平移（盒子抬高 0.5m）。"""
+        world = np.array([[0.1, 0.2, 0.8], [0.0, 0.0, 0.5]], dtype=np.float32)
+        origin = np.array([0.0, 0.0, 0.5], dtype=np.float64)
+        local = _world_vertices_to_mesh_local(world, origin, np.eye(3))
+        np.testing.assert_allclose(
+            local,
+            np.array([[0.1, 0.2, 0.3], [0.0, 0.0, 0.0]], dtype=np.float32),
+            atol=1e-6,
+        )
+
+    def test_rx90_roundtrip(self):
+        """绕 X 90°：世界坐标逆变后回到网格局部（这件衣服的朝向）。"""
+        half = 0.7071067811865476
+        rotation = _rotation_matrix_from_esdf_wxyz((half, half, 0.0, 0.0))
+        origin = np.array([-1.590, 3.471, 0.357], dtype=np.float64)
+        local = np.array([[0.5, 0.25, 0.0], [-0.5, -0.25, 0.0]], dtype=np.float64)
+        world = local @ rotation.T + origin
+        recovered = _world_vertices_to_mesh_local(world, origin, rotation)
+        np.testing.assert_allclose(recovered, local, atol=1e-6)
+
+
 @unittest.skipUnless(
     _HAS_ORCA_EULER and _ASSETS_OK and _HAS_GRPC,
     "orca.euler / dual-file assets / grpcio required",
@@ -582,26 +612,36 @@ class TestEulerSoftSimRenderStream(unittest.TestCase):
         soft.disable_render_stream()
 
     def test_render_frame_payload_and_sequence(self):
-        """render_frame：payload==读槽、sequence 单调、body_name 路由。
+        """render_frame：payload 是网格局部、sequence 单调、body_name 路由。
 
-        CPU 路径：skinning（bind 恒等）→ sync → 读槽。推流两次验证
-        sequence 1→2 与读槽逐元素一致。
+        CPU 路径：skinning（bind 恒等）→ sync → 读槽世界坐标 → 按 ESDF
+        ``initial.position/rotation`` 变回局部再发送。本资产平移
+        ``(0, 0, 0.5)``、单位旋转，所以局部比读槽矮 0.5m。
         """
         soft = self._build()
         body_name, ch = self._channel(soft)
+        origin, rotation = soft._render_body_poses[body_name]  # noqa: SLF001
+        np.testing.assert_allclose(origin, [0.0, 0.0, 0.5], atol=1e-6)
+        np.testing.assert_allclose(rotation, np.eye(3), atol=1e-6)
         with mock.patch("orca.euler.render.RenderClient") as client_cls:
             soft.enable_render_stream(_RENDER_TARGET)
             client = client_cls.return_value
             self.assertTrue(soft.render_frame())
             self.assertTrue(soft.render_frame())
             self.assertEqual(client.send_deformable_vertices.call_count, 2)
+            expected = _world_vertices_to_mesh_local(
+                ch.read_q.numpy(), origin, rotation
+            )
             for i, call in enumerate(
                 client.send_deformable_vertices.call_args_list
             ):
                 args, kwargs = call
                 payload = args[0] if args else kwargs["positions"]
+                np.testing.assert_allclose(payload, expected, atol=1e-6)
                 np.testing.assert_allclose(
-                    payload, ch.read_q.numpy(), atol=1e-6
+                    np.reshape(payload, (-1, 3))[:, 2],
+                    np.reshape(ch.read_q.numpy(), (-1, 3))[:, 2] - 0.5,
+                    atol=1e-6,
                 )
                 seq = (
                     kwargs["sequence"]
@@ -713,79 +753,88 @@ class TestEulerSoftSimRenderStream(unittest.TestCase):
 
 
 class TestOrcaGymEulerSoftSlot(unittest.TestCase):
-    """_soft 槽隔离（K3/K5）+ has_soft_sim + step_with_coupling 编排。"""
+    """旧 _soft 槽已删除；has_soft_sim 与 Gym 只驱动 CoupledGpuSim。"""
 
-    def test_soft_attr_blocked(self):
-        """访问 gym._soft/soft 抛 AttributeError，dir 不列出（K3/K5）。"""
+    def test_soft_slot_removed(self):
+        """Gym 不再持有 _soft 槽；名字仍拦截，防止旧代码误用。"""
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
+        self.assertNotIn("_soft", gym.__dict__)
+        self.assertFalse(gym.has_soft_sim())
         for name in ("_soft", "soft"):
-            with self.assertRaises(AttributeError):
+            with self.assertRaises(AttributeError) as ctx:
                 getattr(gym, name)
+            self.assertIn("已删除", str(ctx.exception))
             self.assertNotIn(name, dir(gym))
 
-    def test_soft_in_instance_dict(self):
-        """_soft 槽存在（初始 None）。"""
-        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+    def test_step_with_coupling_drives_euler_only(self):
+        """有 CoupledGpuSim：Gym 只 set_ctrl + euler.step + notify_gpu_advanced。
 
-        gym = OrcaGymEuler()
-        self.assertIn("_soft", gym.__dict__)
-        self.assertIsNone(gym.__dict__["_soft"])
-        self.assertFalse(gym.has_soft_sim())
-
-    def test_step_with_coupling_orchestration(self):
-        """四步时序：sim.step → snapshot → soft.sync/step → 力回流。
-
-        用 mock _sim/_soft 验证编排与 COM→origin 力矩变换，不依赖
-        orca.euler / GPU。
+        不拆窗、不 D2H 快照、不写 xfrc。M:N 在 Euler 内部。
         """
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
-
-        fake_snapshot = {
-            "xpos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]]),
-            "xipos": np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 1.2]]),
-        }
-        # body_map={1: 0}：MuJoCo body 1 ↔ Euler body 0。
-        # body_f[0]: F=(3,0,0)，T_com=(0,0,0)；r_com = xipos-xpos = (0,0,0.2)。
-        # 期望 T_origin = T_com + cross(r_com, F) = (0, 0.6, 0)。
-        # （叉积 (0,0,0.2)×(3,0,0) = (0, +0.6, 0)）
-        fake_body_f = np.array(
-            [[3.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0] * 6], dtype=np.float64
-        )
+        self.assertEqual(gym.get_coupling_ratio(), (1, 1))
 
         sim_mock = mock.MagicMock()
-        sim_mock.query_dual_engine_state.return_value = fake_snapshot
-
-        soft_mock = mock.MagicMock()
-        soft_mock.body_map = {1: 0}
-        soft_mock.body_f_numpy.return_value = fake_body_f
-
+        euler_mock = mock.MagicMock()
         object.__setattr__(gym, "_sim", sim_mock)
-        object.__setattr__(gym, "_soft", soft_mock)
+        object.__setattr__(gym, "_euler", euler_mock)
 
         ctrl = np.zeros(4)
-        gym.step_with_coupling(ctrl, n_frames=2, dt=0.001)
+        gym.step_with_coupling(ctrl, n_frames=20, dt=0.001)
 
-        # Step 1: MuJoCo 推进（set_ctrl + step(2)）。
         sim_mock.set_ctrl.assert_called_once_with(ctrl)
-        sim_mock.step.assert_called_once_with(2)
-        # Step 2/3: 快照 → 注入 → 柔体推进。
-        sim_mock.query_dual_engine_state.assert_called_once()
-        soft_mock.sync_body_pose.assert_called_once_with(fake_snapshot)
-        soft_mock.step.assert_called_once_with(2, 0.001)
-        # Step 4: 力回流（COM→origin 力矩变换）。
-        sim_mock.apply_body_force.assert_called_once()
-        args, _ = sim_mock.apply_body_force.call_args
-        body_id, force, torque = args
-        self.assertEqual(body_id, 1)
-        np.testing.assert_allclose(force, [3.0, 0.0, 0.0], atol=1e-9)
-        np.testing.assert_allclose(torque, [0.0, 0.6, 0.0], atol=1e-9)
+        euler_mock.step.assert_called_once_with(20)
+        sim_mock.notify_gpu_advanced.assert_called_once_with()
+        sim_mock.step.assert_not_called()
+        sim_mock.query_dual_engine_state.assert_not_called()
+        sim_mock.apply_body_force.assert_not_called()
+        sim_mock.clear_all_forces.assert_not_called()
 
-    def test_step_with_coupling_no_soft_pure_mujoco(self):
-        """_soft=None：退化为 set_ctrl + step（P1/P2 行为不变）。"""
+    def test_step_with_coupling_mn_forwarded_inside_euler(self):
+        """Gym 改 M:N 后转交给 CoupledGpuSim；步进仍只调一次 euler.step。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        euler_mock = mock.MagicMock()
+        euler_mock.get_coupling_ratio.return_value = (2, 2)
+        object.__setattr__(gym, "_sim", mock.MagicMock())
+        object.__setattr__(gym, "_euler", euler_mock)
+        gym.set_coupling_ratio(2, 2)
+        euler_mock.set_coupling_ratio.assert_called_once_with(2, 2)
+        self.assertEqual(gym.get_coupling_ratio(), (2, 2))
+        gym.step_with_coupling(np.zeros(1), n_frames=4, dt=0.001)
+        euler_mock.step.assert_called_once_with(4)
+
+    def test_step_with_coupling_n_frames_error_from_euler(self):
+        """n_frames 不能被 M 整除时，错误由 Euler.step 抛出，Gym 原样传递。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        euler_mock = mock.MagicMock()
+        euler_mock.step.side_effect = ValueError("n_frames=3 不能被耦合比 M=2 整除。")
+        object.__setattr__(gym, "_sim", mock.MagicMock())
+        object.__setattr__(gym, "_euler", euler_mock)
+        with self.assertRaises(ValueError):
+            gym.step_with_coupling(np.zeros(1), n_frames=3, dt=0.001)
+
+    def test_set_coupling_ratio_rejects_invalid(self):
+        """M、N 必须是 >= 1 的整数。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        with self.assertRaises(ValueError):
+            gym.set_coupling_ratio(0, 1)
+        with self.assertRaises(TypeError):
+            gym.set_coupling_ratio(1.0, 1)
+        with self.assertRaises(TypeError):
+            gym.set_coupling_ratio(True, 1)
+
+    def test_step_with_coupling_no_euler_pure_mujoco(self):
+        """_euler=None：退化为 set_ctrl + step（纯刚体）。"""
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
@@ -795,44 +844,34 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
         gym.step_with_coupling(ctrl, n_frames=1, dt=0.002)
         sim_mock.set_ctrl.assert_called_once_with(ctrl)
         sim_mock.step.assert_called_once_with(1)
+        sim_mock.notify_gpu_advanced.assert_not_called()
         sim_mock.query_dual_engine_state.assert_not_called()
         sim_mock.apply_body_force.assert_not_called()
 
-    def test_step_with_coupling_no_body_f(self):
-        """body_f=None（floor-only）：跳过力回流但不报错。"""
+    def test_has_soft_sim_true_when_euler_coupled(self):
+        """有 CoupledGpuSim 时 has_soft_sim / has_euler 都为 True。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        object.__setattr__(gym, "_euler", mock.MagicMock())
+        self.assertTrue(gym.has_euler())
+        self.assertTrue(gym.has_soft_sim())
+
+    def test_reset_coupling_state_resets_euler(self):
+        """reset_coupling_state：_euler 存在时 reset()，不读 CPU 快照。"""
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
         sim_mock = mock.MagicMock()
-        soft_mock = mock.MagicMock()
-        soft_mock.body_map = {}
-        soft_mock.body_f_numpy.return_value = None
+        euler_mock = mock.MagicMock()
         object.__setattr__(gym, "_sim", sim_mock)
-        object.__setattr__(gym, "_soft", soft_mock)
-        gym.step_with_coupling(np.zeros(1), n_frames=1, dt=0.001)
-        soft_mock.sync_body_pose.assert_called_once()
-        soft_mock.step.assert_called_once()
-        sim_mock.apply_body_force.assert_not_called()
-
-    def test_reset_coupling_state_resets_soft(self):
-        """reset_coupling_state：_soft 存在时 reset(快照)。"""
-        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
-
-        gym = OrcaGymEuler()
-        sim_mock = mock.MagicMock()
-        soft_mock = mock.MagicMock()
-        object.__setattr__(gym, "_sim", sim_mock)
-        object.__setattr__(gym, "_soft", soft_mock)
+        object.__setattr__(gym, "_euler", euler_mock)
         gym.reset_coupling_state()
-        soft_mock.reset.assert_called_once_with(
-            sim_mock.query_dual_engine_state.return_value
-        )
+        euler_mock.reset.assert_called_once_with()
+        sim_mock.query_dual_engine_state.assert_not_called()
 
-    # --- P5 改动点 2：render() 挂 render_frame ---
-
-    def test_render_calls_soft_render_frame(self):
-        """render()：_soft 存在时先 soft.render_frame()（推流先于
-        studio.render）。"""
+    def test_render_calls_euler_render_frame(self):
+        """render()：_euler 存在时先 euler.render_frame()。"""
         import asyncio
 
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
@@ -840,76 +879,77 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
         gym = OrcaGymEuler()
         sim_mock = mock.MagicMock()
         sim_mock.query_contact_simple.return_value = []
-        soft_mock = mock.MagicMock()
+        euler_mock = mock.MagicMock()
         object.__setattr__(gym, "_sim", sim_mock)
-        object.__setattr__(gym, "_soft", soft_mock)
+        object.__setattr__(gym, "_euler", euler_mock)
 
         asyncio.run(gym.render())
-        soft_mock.render_frame.assert_called_once()
+        euler_mock.render_frame.assert_called_once()
 
     def test_render_without_soft_noop_regression(self):
-        """render()：_soft=None（纯刚体）行为不变（render_frame 不被调，
-        也不抛）。"""
+        """render()：无柔体时行为不变（render_frame 不被调，也不抛）。"""
         import asyncio
 
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
-        asyncio.run(gym.render())  # 不抛即通过（既有离线 no-op 语义）
-
-    # --- P5 改动点 2：euler_render_target 透传 ---
+        asyncio.run(gym.render())
 
     def _init_euler_backend_with_mocks(self, esdf_path, render_target):
-        """直接调 _init_euler_backend（patch 掉两个 core 组件类）。"""
+        """直接调 _init_euler_backend（patch 掉刚体 core 和 CoupledGpuSim）。"""
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
         opt_mock = mock.MagicMock()
         opt_mock.nworld = 1
-        opt_mock.device = "cpu"
+        opt_mock.device = "cuda:0"
+        opt_mock.timestep = 0.001
         object.__setattr__(gym, "_opt", opt_mock)
         object.__setattr__(gym, "_registry", mock.MagicMock())
 
         with mock.patch(
             "orca_gym.core.euler.mujoco_sim_core_euler.MuJoCoSimCoreEuler"
         ) as sim_cls, mock.patch(
-            "orca_gym.core.euler.euler_soft_sim.EulerSoftSim"
-        ) as soft_cls:
+            "orca.euler.CoupledGpuSim"
+        ) as coupled_cls:
             gym._init_euler_backend(  # noqa: SLF001  白盒：透传接线验证
                 "x.xml", esdf_path, None, render_target
             )
-        return sim_cls, soft_cls
+        return sim_cls, coupled_cls
 
-    def test_render_target_passthrough_to_soft(self):
-        """esdf + target：EulerSoftSim 构造后 enable_render_stream(target)。"""
-        sim_cls, soft_cls = self._init_euler_backend_with_mocks(
+    def test_render_target_passthrough_to_coupled(self):
+        """esdf + target：CoupledGpuSim 构造后 enable_render_stream(target)。"""
+        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
             esdf_path="y.esdf", render_target="127.0.0.1:50451"
         )
-        soft_cls.assert_called_once_with(
+        coupled_cls.assert_called_once_with(
             model_xml_path="x.xml",
             esdf_path="y.esdf",
-            device="cpu",
-            mj_model=sim_cls.return_value.mj_model,
+            device="cuda:0",
+            rigid_solver=sim_cls.return_value.solver,
+            dt=0.001,
+            coupling_m=1,
+            coupling_n=1,
         )
-        soft_cls.return_value.enable_render_stream.assert_called_once_with(
+        coupled_cls.return_value.enable_render_stream.assert_called_once_with(
             "127.0.0.1:50451"
         )
 
     def test_render_target_ignored_without_esdf(self):
-        """esdf=None + target：忽略（不构造 _soft、不连接），仅告警。"""
-        sim_cls, soft_cls = self._init_euler_backend_with_mocks(
+        """esdf=None + target：忽略（不构造 CoupledGpuSim、不连接），仅告警。"""
+        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
             esdf_path=None, render_target="127.0.0.1:50451"
         )
-        soft_cls.assert_not_called()
-        soft_cls.return_value.enable_render_stream.assert_not_called()
+        coupled_cls.assert_not_called()
+        coupled_cls.return_value.enable_render_stream.assert_not_called()
 
     def test_no_render_target_no_enable(self):
-        """esdf + target=None：构造 _soft 但不连接渲染流（默认降级）。"""
-        sim_cls, soft_cls = self._init_euler_backend_with_mocks(
+        """esdf + target=None：构造 CoupledGpuSim 但不连接渲染流。"""
+        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
             esdf_path="y.esdf", render_target=None
         )
-        soft_cls.assert_called_once()
-        soft_cls.return_value.enable_render_stream.assert_not_called()
+        coupled_cls.assert_called_once()
+        coupled_cls.return_value.enable_render_stream.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

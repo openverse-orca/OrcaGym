@@ -1,48 +1,10 @@
-"""EulerSoftSim — 非耦合柔体仿真器（ESDF 双文件注入）。
+"""EulerSoftSim — 旧的 CPU 快照柔体仿真器。已禁止接到 OrcaGym。
 
-非耦合双引擎契约（区别于双向耦合的 ``_euler`` 编排器）：
+OrcaGymEuler 不再持有 ``_soft`` 槽。生产 ESDF 走 Euler
+``CoupledGpuSim``。本文件只给隔离单测对照旧路径，不要从 Gym 构造。
 
-  * 刚体动力学归 MuJoCo（OrcaGym Euler GPU 后端 ``MuJoCoSimCoreEuler`` 推进）
-  * 柔体动力学归 Euler（本类推进，``rigid_body_mode="external"``）
-  * 每个耦合周期单次数据交换：
-      MuJoCo 位姿 → Euler  ``sync_body_pose``（本类）
-      Euler 接触力 → MuJoCo ``body_f_numpy`` → ``xfrc_applied``
-      （由 ``OrcaGymEuler.step_with_coupling`` 完成 COM→origin 力矩变换）
-
-构建流程对齐 OrcaEuler 双文件权威示例
-（``examples/solver_xpbd/08_dual_file_mujoco_euler/dual_file_drop.py``）::
-
-    builder = ModelBuilder()
-    builder.add_mjcf(xml_path)          # 刚体（与 MuJoCo 共用同一 XML）
-    builder.add_esdf(esdf_path)         # 柔体
-    ...（solver type 分支预处理）
-    builder.finalize(device)            # 一次 finalize
-
-兼容两种 ESDF solver：
-
-  * ``"xpbd"``：``apply_soft_contact_from_parse_result``（soft_contact
-    section 必填）+ ``solver.params`` 透传 SolverXPBD 构造参数
-  * ``"spring_mass_semi_implicit"``：逐 ``spring_mass_builder`` 执行
-    ``compute_dt_info`` + ``apply_damping_mode``（damping_mode 生效的
-    唯一路径，见 ``esdf_damping_mode_design.md``）
-
-外部刚体模式（external）语义：Euler 跳过刚体积分，柔体接触对刚体的
-力累积进 ``body_f``（[F(3), T_com(3)]，世界系、body COM 参考）供
-外部引擎读取；刚体位姿由 ``sync_body_pose`` 注入。
-
-渲染流（P5 改动点 2，对齐 05 课 ``esdf_skinning_snapshot`` 编排）::
-
-    构造期：build_skin_bindings_from_parse_result（P3 契约：finalize 后
-    、任何 step 前读 bind pose）+ 每 body 一个 SidecarRenderGraph
-    （establish，不连接 gRPC）
-    enable_render_stream(target)：显式 opt-in 连接 RenderClient 并逐
-    body 注册 CHANNEL_TYPE_DEFORMABLE_VERTEX（fail-fast）
-    render_frame()：skin_cb（每渲染帧一次，不进 step 子步）→ 逐通道
-    graph.sync → flow.synchronize → 逐 body read_q → send（per-body
-    sequence 单调递增）。send 失败自动断流降级，不炸物理循环。
-
-K3/K5：本类为 core 层内部组件，由 ``OrcaGymEuler`` Facade 组合，
-不进入用户 API；对外查询经 ``OrcaGymEuler.has_soft_sim()`` 等公共方法。
+隔离单测仍覆盖：``add_mjcf`` + ``add_esdf``、``rigid_body_mode="external"``、
+``sync_body_pose``、渲染流世界→局部。那些路径不是 Gym 生产耦合。
 """
 
 from __future__ import annotations
@@ -73,6 +35,97 @@ _SI_PARAM_KEYS = frozenset({
     "joint_attach_kd",
     "enable_tri_contact",
 })
+
+
+def _rotation_matrix_from_esdf_wxyz(wxyz) -> np.ndarray:
+    """把 ESDF 的 ``initial.rotation``（wxyz）变成 3×3 旋转矩阵。
+
+    做什么：单位化四元数后写出列向量约定的旋转矩阵，使
+    ``p_world = R @ p_local + T``。零长度四元数退回单位矩阵。
+
+    为什么：推流要把 Euler 世界坐标变回网格局部，必须和
+    ``add_cloth_mesh`` / ``import_esdf`` 用的同一套 R，两边才能互逆。
+    """
+    values = [float(v) for v in wxyz]
+    if len(values) != 4:
+        return np.eye(3, dtype=np.float64)
+    w, x, y, z = values
+    norm = (w * w + x * x + y * y + z * z) ** 0.5
+    if norm < 1.0e-12:
+        return np.eye(3, dtype=np.float64)
+    w, x, y, z = w / norm, x / norm, y / norm, z / norm
+    return np.array(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ],
+        dtype=np.float64,
+    )
+
+
+def _load_esdf_body_initial_poses(
+    esdf_path: str,
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """从 ESDF 读每个 body 的初始平移和旋转。
+
+    做什么：解析 ``bodies[].initial.position`` 与 ``initial.rotation``
+    （缺 rotation 时回退 ``transform.rotation``，再缺则单位四元数），
+    得到 ``body_name → (T, R)``。
+
+    为什么：``EsdfParseResult`` 没有按 body 缓存初始位姿；推流变回局部
+    必须用和物理导入同一份 ESDF 初值，不能去问 Studio 实体。
+    """
+    import json5
+
+    with open(esdf_path, encoding="utf-8") as handle:
+        data = json5.loads(handle.read())
+    poses: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for body in data.get("bodies") or []:
+        if not isinstance(body, dict):
+            continue
+        name = body.get("body_name") or body.get("name")
+        if not name:
+            continue
+        initial = body.get("initial") or {}
+        position = np.asarray(
+            initial.get("position") or (0.0, 0.0, 0.0),
+            dtype=np.float64,
+        ).reshape(3)
+        rotation = initial.get("rotation")
+        if rotation is None:
+            transform = body.get("transform") or {}
+            rotation = transform.get("rotation")
+        if rotation is None:
+            rotation = (1.0, 0.0, 0.0, 0.0)
+        poses[str(name)] = (
+            position,
+            _rotation_matrix_from_esdf_wxyz(rotation),
+        )
+    return poses
+
+
+def _world_vertices_to_mesh_local(
+    positions: np.ndarray,
+    origin: np.ndarray,
+    rotation: np.ndarray,
+) -> np.ndarray:
+    """把 Euler 世界坐标顶点变回网格局部坐标。
+
+    做什么：``p_local = R.T @ (p_world - T)``，写成行向量是
+    ``(p_world - T) @ R``。输入可以是 ``(N, 3)`` 或扁平 ``(N*3,)``，
+    输出形状、dtype 与输入相同。
+
+    为什么：物理和 ``State.deformable_vertex_q`` 是世界坐标；Studio
+    高模 buffer / L2 MLS 吃网格局部，ATOM 再乘实体世界变换。发送前
+    变回局部，视口才不会把平移和旋转套两次。只在 Gym 做一次。
+    """
+    source = np.asarray(positions)
+    points = np.reshape(source, (-1, 3)).astype(np.float64, copy=False)
+    local = (
+        points - np.asarray(origin, dtype=np.float64).reshape(1, 3)
+    ) @ np.asarray(rotation, dtype=np.float64)
+    return np.reshape(local.astype(source.dtype, copy=False), source.shape)
 
 
 class EulerSoftSim:
@@ -166,6 +219,7 @@ class EulerSoftSim:
             )
 
         self._dt = float(euler.resolve_dt(parse_result, self._solver))
+        self._esdf_path = esdf_path
         # 接触缓冲：粒子数 × 4 为经验上界（每粒子同时至多 ~4 个活跃接触），
         # 下限 8192 对齐 06_dual_engine 示例的 SOFT_CONTACT_MAX。
         self._contacts = euler.Contacts(
@@ -189,6 +243,7 @@ class EulerSoftSim:
         self._parse_result = parse_result
         self._skin_cb: Any = None
         self._render_graphs: dict[str, tuple[Any, Any]] | None = None
+        self._render_body_poses: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         self._render_client: Any = None
         self._render_sequences: dict[str, int] = {}
         self._render_warned = False
@@ -225,6 +280,13 @@ class EulerSoftSim:
             graphs[body_name] = (graph, graph.deformable())
         self._render_graphs = graphs
         self._render_sequences = {name: 0 for name in graphs}
+        esdf_poses = _load_esdf_body_initial_poses(self._esdf_path)
+        identity_r = np.eye(3, dtype=np.float64)
+        zero_t = np.zeros(3, dtype=np.float64)
+        self._render_body_poses = {
+            name: esdf_poses.get(name, (zero_t, identity_r))
+            for name in graphs
+        }
 
     # ------------------------------------------------------------------
     # 构建辅助
@@ -370,8 +432,11 @@ class EulerSoftSim:
 
         子步数 ``n_sub = max(1, round(n_frames·dt_macro / dt))``（对齐
         mattress 示例 ``_compute_frame_skip``）。整个调用期间刚体位姿
-        冻结在最近一次 ``sync_body_pose`` 注入值（对齐 06_dual_engine
-        每耦合周期单次 inject 的时序）。
+        冻结在最近一次 ``sync_body_pose`` 注入值。
+
+        第一版耦合比 M=N=1 时，``step_with_coupling`` 每个耦合窗调用
+        本方法一次，``n_frames=1``、``dt_macro=物理步长``（0.001），
+        于是 ``n_sub=1``：一窗走 1 个 XPBD 子步。
 
         每子步::
 
@@ -382,8 +447,8 @@ class EulerSoftSim:
             state_in ↔ state_out
 
         Args:
-            n_frames: MuJoCo 宏步数（与 step_with_coupling 的 n_frames 一致）。
-            dt_macro: 每宏步时长（秒）。
+            n_frames: 本耦合窗的柔体步数 N（不是一次 env.step 的 frame_skip）。
+            dt_macro: 每一步的物理时长（秒），与 MuJoCo timestep 相同。
         """
         if n_frames <= 0:
             return
@@ -490,8 +555,8 @@ class EulerSoftSim:
             skin_cb(state_in)             # 每渲染帧一次（P3 契约）
             graph.sync(state_in)          # 写槽 + 翻指针（逐通道）
             flow.synchronize()            # D2H 前置同步
-            ch.read_q.numpy()             # 冻结读槽
-            send_deformable_vertices(q, seq, body_name)   # 逐 body
+            ch.read_q.numpy()             # 冻结读槽（世界坐标）
+            变回网格局部后再 send_deformable_vertices
 
         send 失败（Studio 中途退出/断连）时自动断流降级：打印一次警告、
         后续 no-op，不中断物理循环（渲染中断不应炸仿真/训练）。
@@ -508,8 +573,11 @@ class EulerSoftSim:
         try:
             for body_name, (_, ch) in self._render_graphs.items():
                 self._render_sequences[body_name] += 1
+                origin, rotation = self._render_body_poses[body_name]
                 self._render_client.send_deformable_vertices(
-                    ch.read_q.numpy(),
+                    _world_vertices_to_mesh_local(
+                        ch.read_q.numpy(), origin, rotation
+                    ),
                     sequence=self._render_sequences[body_name],
                     body_name=body_name,
                 )

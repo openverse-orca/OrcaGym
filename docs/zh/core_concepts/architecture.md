@@ -526,12 +526,13 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     - 后端选择通过 step_with_coupling 封装（不写 if self._gym._euler is not None）
     - 步进完成后 self.data 保证一致
     """
-    # K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装
-    self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+    # K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
+    # dt 必须是物理步长（time_step），不能传 env.dt（那是 time_step × frame_skip）。
+    self._gym.step_with_coupling(ctrl, n_frames, self._time_step)
     self._gym.sync_to_view()
 ```
 
-> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。`step_with_coupling` 在 `has_euler()=False`（当前）时走 MuJoCo 后端路径（等价于 `set_ctrl + step`），后续 Euler 后端接入时切换到 Euler 路径。
+> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。无柔体时 `step_with_coupling` 等价于 `set_ctrl + step(n_frames)`。有 ESDF 时 Gym 只 `set_ctrl` + `CoupledGpuSim.step`；位姿/力交换和 M:N 拆窗都在 Euler `CouplingOrchestrator` 里。`device=cpu` 且带 ESDF 会立刻报错。`dt` 是物理步长，不是 `env.dt`。
 
 ### 7.2 两种使用模式
 

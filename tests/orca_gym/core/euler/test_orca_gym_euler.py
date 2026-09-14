@@ -117,6 +117,7 @@ class TestOrcaGymEulerSkeleton(unittest.TestCase):
             "mj_step", "mj_forward", "set_ctrl", "sync_to_view",
             "studio_bridge", "render", "pause_simulation",
             "has_euler", "step_with_coupling",
+            "set_coupling_ratio", "get_coupling_ratio",
         ]
         for name in expected_public:
             with self.subTest(attr=name):
@@ -486,7 +487,7 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             "_coupling", "coupling",
             # 多世界 DataView 边界标记（决策 D5）
             "_multi_world", "multi_world",
-            # P5 ESDF 非耦合柔体槽（EulerSoftSim）
+            # 旧 _soft 名字仍拦截，防止误用（槽已删除）
             "_soft", "soft",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)

@@ -531,12 +531,13 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     - Backend selection is encapsulated via step_with_coupling (do not write if self._gym._euler is not None)
     - After stepping completes, self.data is guaranteed consistent
     """
-    # K8 compliance: do not write if self._gym._euler is not None, encapsulated via step_with_coupling
-    self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+    # K8 compliance: do not write if self._gym._euler is not None, encapsulated via step_with_coupling.
+    # dt must be the physics timestep, not env.dt (env.dt is timestep × frame_skip).
+    self._gym.step_with_coupling(ctrl, n_frames, self._time_step)
     self._gym.sync_to_view()
 ```
 
-> See the actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. `step_with_coupling` takes the MuJoCo backend path when `has_euler()=False` (current, equivalent to `set_ctrl + step`), and switches to the Euler path when the Euler backend is integrated in the future.
+> See the actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. With no soft body, `step_with_coupling` is equivalent to `set_ctrl + step(n_frames)`. With ESDF, Gym only calls `set_ctrl` + `CoupledGpuSim.step`; pose/force exchange and M:N windowing stay inside Euler's `CouplingOrchestrator`. `device=cpu` with ESDF raises immediately. `dt` is the physics timestep, not `env.dt`.
 
 ### 7.2 Two Usage Modes
 

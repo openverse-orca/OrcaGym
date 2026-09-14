@@ -53,6 +53,24 @@ _DEFAULT_STUDIO_DATA_ROOTS = (
 )
 
 
+def _require_gpu_for_esdf(device: str, esdf_path: str | None) -> None:
+    """有 ESDF 时必须用 GPU，CPU 立刻报错。
+
+    做什么：``esdf_path`` 不是 None 时，检查 ``device`` 是否以 ``cuda``
+    或 ``hip`` 开头；否则抛 ``ValueError``。没有 ESDF 时什么都不做。
+    为什么：全 GPU 耦合走 MuJoCoFlow + Euler 内部 ``CouplingOrchestrator``，
+    CPU ``mj_step`` 接不上这条路径。纯刚体（无 ESDF）仍可用 CPU。
+    """
+    if esdf_path is None:
+        return
+    text = str(device)
+    if not (text.startswith("cuda") or text.startswith("hip")):
+        raise ValueError(
+            "ESDF 刚柔耦合固定走 GPU 后端（cuda* 或 hip*），"
+            f"收到 device={device!r}。请传 --device cuda:0。"
+        )
+
+
 def _discover_esdf_from_xml(
     model_xml_path: str | None,
     studio_data_root: str | None = None,
@@ -159,6 +177,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         sync_render: bool = False,
         device: str = "cpu",
         sim_config_overrides: dict[str, Any] | None = None,
+        coupling_m: int = 1,
+        coupling_n: int = 1,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -173,8 +193,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
-            esdf_path: ESDF 场文件路径（仅 Euler 后端使用；非 None 时
-                构造非耦合柔体仿真器，P5）。支持哨兵值 "auto"：由
+            esdf_path: ESDF 场文件路径。非 None 时走 Euler 内部
+                CoupledGpuSim（全 GPU 耦合）。必须配合 ``device=cuda*``
+                / ``hip*``，CPU 会立刻报错。支持哨兵值 "auto"：由
                 Studio 自动导出的 XML（同目录同名 ``<uuid>.esdf``，
                 位于 ``~/.local/share/Orca/OrcaStudio/<project_id>/tmp/``）
                 推导 ESDF 路径（单机场景；推导失败降级为 None 并告警，
@@ -188,12 +209,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
-            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0"/"hip:0" 等 → Euler.SolverMujoco GPU）。
+            device: 后端选择（"cpu" → 仅纯刚体 CPU MuJoCo；有 ESDF 时
+                必须 "cuda:0"/"hip:0" 等，否则立刻报错）。
             sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
                 合法键为 integrator/gravity/iterations（timestep 请用 time_step
                 构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
                 在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
                 setter 写入立即生效。
+            coupling_m: 注入 Euler 的刚体步数 M（默认 1）。权威在
+                ``SyncCycleConfig``，Gym 不按此拆窗。
+            coupling_n: 注入 Euler 的柔体步数 N（默认 1）。第一版须 M=N。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -219,6 +244,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 此时 SimConfig 未绑定 mjModel，缓存到 _time_step，
         # 在 initialize_simulation 末尾重新设置。
         self._time_step = time_step
+        self._coupling_m = coupling_m
+        self._coupling_n = coupling_n
         # 渲染节流字段（render_mode="human" 在线渲染时使用）
         self._render_count = 0.0
         self._render_count_interval = 0.0
@@ -282,6 +309,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self._channel = None
             self._stub = None
             self._gym = OrcaGymEuler(stub=None)
+            self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             if self._local_xml_path:
                 self._studio_bridge.configure_offline(self._local_xml_path)
@@ -297,6 +325,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         )
         self._stub = GrpcServiceStub(self._channel)
         self._gym = OrcaGymEuler(stub=self._stub)
+        self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
@@ -340,9 +369,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 self._esdf_path = None
             else:
                 self._esdf_path = resolved
+        _require_gpu_for_esdf(self._device, self._esdf_path)
         # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
         #    在后端固化前写入；不传时 opt_overrides=None，零行为差异。
-        #    P5 改动点 2：euler_render_target 透传 → _soft 渲染流 opt-in）
+        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 渲染流）
         self.loop.run_until_complete(
             self._gym.init_simulation(
                 model_xml_path,
@@ -457,18 +487,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
     def do_simulation(self, ctrl: np.ndarray, n_frames: int) -> None:
-        """标准仿真步进（含 ESDF 柔体同拍推进与力回流）。
+        """标准仿真步进。有 ESDF 时把整段交给 Euler 内部全 GPU 耦合。
 
-        K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler/_soft 等私有。
+        K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler 等私有。
         K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
 
-        esdf_path 未注入时（has_soft_sim()=False）等价于纯 MuJoCo 步进；
-        注入时每个调用周期执行非耦合双引擎四步时序（详见
-        ``OrcaGymEuler.step_with_coupling`` docstring）。
+        ``n_frames`` 是刚体总步数（通常等于 ``frame_skip``）。``dt`` 仍传
+        物理步长 ``self._time_step``，不能传 ``self.dt``。有柔体时 Gym
+        不再拆耦合窗、不写 ``xfrc``；M:N 在 Euler ``CoupledGpuSim`` 里。
 
         Args:
             ctrl: 控制输入数组，形状 (nu,)。
-            n_frames: 帧数。
+            n_frames: 刚体总步数。
 
         Raises:
             ValueError: ctrl 形状不匹配。
@@ -478,7 +508,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 f"Action dimension mismatch. Expected {(self.model.nu,)}, "
                 f"found {np.array(ctrl).shape}"
             )
-        self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+        self._gym.step_with_coupling(ctrl, n_frames, self._time_step)
         self._gym.sync_to_view()
 
     def mj_step(self, nstep: int) -> None:
