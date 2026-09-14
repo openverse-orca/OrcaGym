@@ -1,22 +1,23 @@
-"""端到端冒烟：Studio level → ESDF 自动发现 → 柔体仿真 → 50451 推流 → 视口随动。
+"""端到端冒烟：Studio level → ESDF 自动发现 → 全 GPU 耦合 → 50451 推流 → 视口随动。
 
-链路（P4/P5 验证）：
+链路：
     Studio 自动导出 XML/ESDF（同目录同名）
-      → OrcaGymEulerEnv(esdf_path="auto") 同名推导 ESDF
-      → EulerSoftSim 双文件注入（semi_implicit shell_gas）
-      → step 推进柔体（非耦合四步时序）
+      → OrcaGymEulerEnv(esdf_path="auto", device="cuda:0")
+      → Euler CoupledGpuSim（MuJoCoFlow 刚体 + XPBD/SemiImplicit 柔体）
+      → CouplingOrchestrator GPU 直拷（Gym 不感知位姿/力交换）
       → render() 节拍内 skinning → 通道 sync → gRPC 推流
       → Studio DeformableChannelComponent 接收 → CPU MLS 蒙皮 → 视口随动
 
 前置条件：
-    1. OrcaStudio 打开含可变形体的 level（如 water_1Cup）
+    1. OrcaStudio 打开含可变形体的 level（如 Euler_xpbdCloth）
     2. Studio 已启动仿真（导出 XML/ESDF 到 ~/Orca/OrcaStudio/<proj>/tmp/）
     3. level 内 DeformableChannelComponent 实体监听 50451
+    4. 本机 GPU 可用（device=cpu 会立刻报错）
 
 用法：
     python -m orca_gym.scripts.smoke_esdf_render \
         [--addr localhost:50051] [--target 127.0.0.1:50451] \
-        [--device cpu|cuda:0] [--steps 600]
+        [--device cuda:0] [--steps 600]
 """
 from __future__ import annotations
 
@@ -62,7 +63,7 @@ def run_smoke(
         )
         env.close()
         return 0
-    print("[SMOKE] ESDF 柔体注入成功（EulerSoftSim 就绪）")
+    print("[SMOKE] ESDF 柔体注入成功（CoupledGpuSim 就绪）")
     if gym.has_render_stream():
         print(f"[SMOKE] 渲染流已连接（render() 将推流到 {render_target}）")
     else:
@@ -98,7 +99,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="ESDF 柔体渲染端到端冒烟")
     parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
     parser.add_argument("--target", default="127.0.0.1:50451", help="渲染流 gRPC 地址")
-    parser.add_argument("--device", default="cpu", help="后端设备（cpu | cuda:0）")
+    parser.add_argument("--device", default="cuda:0", help="后端设备（必须 cuda:0 / hip:0；cpu 会报错）")
     parser.add_argument("--steps", type=int, default=600, help="步数（默认 600 ≈ 12s）")
     args = parser.parse_args(argv)
 

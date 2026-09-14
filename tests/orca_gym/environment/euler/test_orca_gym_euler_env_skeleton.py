@@ -2127,33 +2127,18 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
 class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
     """Phase H: OrcaGymEulerEnv esdf_path 透传 + reset_simulation 调用 reset_coupling_state。"""
 
-    def test_esdf_path_stored_and_passed_to_init_simulation(self):
-        """构造时 esdf_path 存入 _esdf_path 并透传给 gym.init_simulation。"""
+    def test_cpu_plus_esdf_raises_before_init(self):
+        """CPU + ESDF 立刻报错，且不会进入 gym.init_simulation。"""
         from unittest import mock
 
-        original_init = OrcaGymEuler.init_simulation
-        captured: dict = {}
-
-        async def spy_init(
-            self_, model_xml_path, esdf_path=None, opt_overrides=None,
-            euler_render_target=None,
-        ):
-            captured["model_xml_path"] = model_xml_path
-            captured["esdf_path"] = esdf_path
-            return await original_init(
-                self_, model_xml_path, esdf_path, opt_overrides,
-                euler_render_target,
-            )
-
-        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
-            env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
-
-        self.assertEqual(env._esdf_path, "/tmp/dummy.esdf")
-        self.assertEqual(captured["esdf_path"], "/tmp/dummy.esdf")
-        self.assertTrue(captured["model_xml_path"].endswith("simple_pendulum.xml"))
+        with mock.patch.object(OrcaGymEuler, "init_simulation") as m:
+            with self.assertRaises(ValueError) as ctx:
+                _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
+        m.assert_not_called()
+        self.assertIn("GPU", str(ctx.exception))
 
     def test_esdf_path_none_by_default(self):
-        """默认 esdf_path=None，透传 None（CPU 分支不回归）。"""
+        """默认 esdf_path=None，透传 None（CPU 纯刚体不回归）。"""
         from unittest import mock
 
         original_init = OrcaGymEuler.init_simulation
@@ -2174,6 +2159,17 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
 
         self.assertIsNone(env._esdf_path)
         self.assertIsNone(captured["esdf_path"])
+
+    def test_require_gpu_for_esdf_helper(self):
+        """有 ESDF 必须 GPU；无 ESDF 的 CPU 放行。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _require_gpu_for_esdf,
+        )
+
+        _require_gpu_for_esdf("cpu", None)
+        _require_gpu_for_esdf("cuda:0", "/tmp/a.esdf")
+        with self.assertRaises(ValueError):
+            _require_gpu_for_esdf("cpu", "/tmp/a.esdf")
 
     def test_reset_simulation_calls_reset_coupling_state(self):
         """reset_simulation 在 reset_data 后调用 gym.reset_coupling_state。"""
@@ -2273,33 +2269,20 @@ class TestEsdfAutoDiscovery(unittest.TestCase):
 
     # --- Env 集成：auto 哨兵解析 ---
 
-    def test_auto_resolved_to_discovered_path(self):
-        """esdf_path="auto" + 推导成功：_esdf_path 替换为发现路径并透传。"""
+    def test_auto_resolved_cpu_raises(self):
+        """esdf_path="auto" 推导成功但 device=cpu：立刻报错。"""
         from unittest import mock
 
         discovered = "/tmp/fake_studio/proj/tmp/abc123.esdf"
-        original_init = OrcaGymEuler.init_simulation
-        captured: dict = {}
-
-        async def spy_init(
-            self_, model_xml_path, esdf_path=None, opt_overrides=None,
-            euler_render_target=None,
-        ):
-            captured["esdf_path"] = esdf_path
-            return await original_init(
-                self_, model_xml_path, esdf_path, opt_overrides,
-                euler_render_target,
-            )
-
         with mock.patch(
             "orca_gym.environment.euler.orca_gym_euler_env"
             "._discover_esdf_from_xml",
             return_value=discovered,
-        ), mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
-            env = _make_skeleton_env(esdf_path="auto")
-
-        self.assertEqual(env._esdf_path, discovered)
-        self.assertEqual(captured["esdf_path"], discovered)
+        ), mock.patch.object(OrcaGymEuler, "init_simulation") as m:
+            with self.assertRaises(ValueError) as ctx:
+                _make_skeleton_env(esdf_path="auto")
+        m.assert_not_called()
+        self.assertIn("GPU", str(ctx.exception))
 
     def test_auto_fallback_warns_and_degrades_to_none(self):
         """esdf_path="auto" + 推导失败：RuntimeWarning + 降级 None（纯刚体）。"""
@@ -2329,22 +2312,9 @@ class TestEsdfAutoDiscovery(unittest.TestCase):
         self.assertIsNone(env._esdf_path)
         self.assertIsNone(captured["esdf_path"])
 
-    def test_explicit_path_skips_discovery(self):
-        """esdf_path 为具体路径：不触发推导，原样透传。"""
+    def test_explicit_path_skips_discovery_then_cpu_raises(self):
+        """esdf_path 为具体路径：不触发推导，CPU 仍因 ESDF 报错。"""
         from unittest import mock
-
-        original_init = OrcaGymEuler.init_simulation
-        captured: dict = {}
-
-        async def spy_init(
-            self_, model_xml_path, esdf_path=None, opt_overrides=None,
-            euler_render_target=None,
-        ):
-            captured["esdf_path"] = esdf_path
-            return await original_init(
-                self_, model_xml_path, esdf_path, opt_overrides,
-                euler_render_target,
-            )
 
         discover = mock.patch(
             "orca_gym.environment.euler.orca_gym_euler_env"
@@ -2352,13 +2322,13 @@ class TestEsdfAutoDiscovery(unittest.TestCase):
             return_value="/should/not/be/used.esdf",
         )
         with discover as m, mock.patch.object(
-            OrcaGymEuler, "init_simulation", spy_init
-        ):
-            env = _make_skeleton_env(esdf_path="/tmp/explicit.esdf")
+            OrcaGymEuler, "init_simulation"
+        ) as init_m:
+            with self.assertRaises(ValueError):
+                _make_skeleton_env(esdf_path="/tmp/explicit.esdf")
 
         m.assert_not_called()
-        self.assertEqual(env._esdf_path, "/tmp/explicit.esdf")
-        self.assertEqual(captured["esdf_path"], "/tmp/explicit.esdf")
+        init_m.assert_not_called()
 
     def test_none_path_skips_discovery(self):
         """esdf_path=None（默认）：不触发推导，行为零变化。"""

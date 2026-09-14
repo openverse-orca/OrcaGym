@@ -262,6 +262,24 @@ class MuJoCoSimCoreEuler:
         return self._solver.mj_model.nu
 
     @property
+    def solver(self):
+        """Euler 的 SolverMujocoSingleWorld（MuJoCoFlow 刚体）。
+
+        供内部构造 CoupledGpuSim 时接到同一份 GPU 刚体求解器。
+        """
+        self._require_solver()
+        return self._solver
+
+    def notify_gpu_advanced(self) -> None:
+        """标记 host 已过期：GPU 已由 Euler 内部耦合步进推进。
+
+        做什么：清 dirty、标 stale。不做 flush。
+        为什么：耦合环里禁止 flush，否则会盖掉 GPU 上的 xfrc。
+        """
+        self._host_dirty = False
+        self._host_stale = True
+
+    @property
     def mj_model(self):
         """返回 host MjModel（只读，供 SimConfig/ModelRegistry 绑定）。"""
         self._require_solver()
@@ -324,12 +342,10 @@ class MuJoCoSimCoreEuler:
         self._host_stale = False
 
     def query_dual_engine_state(self) -> dict[str, np.ndarray]:
-        """返回双引擎耦合所需的 host kinematics 批量快照（拷贝）。
+        """把刚体 kinematics 一次 D2H 成 NumPy 快照（诊断用）。
 
-        供 ``OrcaGymEuler.step_with_coupling`` / ``reset_coupling_state``
-        读取 MuJoCo 刚体位姿后注入 EulerSoftSim。单次 D2H 同步
-        （``_ensure_host_fresh``）后拷贝全部所需数组，避免后续 GPU
-        覆盖 host 时数据撕裂。
+        生产耦合禁止走这条：位姿在 ``CouplingOrchestrator`` 里 GPU 直拷。
+        隔离单测若仍构造旧 ``EulerSoftSim``，可自行组同样的 dict。
 
         Returns:
             dict 含键（均为 numpy 拷贝）：
