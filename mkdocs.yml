@@ -70,6 +70,8 @@ copyright: Copyright &copy; 松应科技有限公司
 
 extra:
   generator: false
+  polyfills:
+    - assets/javascripts/search-filter.js
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/openverse-orca/OrcaGym
