@@ -298,6 +298,27 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._gym.reset_data()
         self._gym.reset_coupling_state()
         self._gym.sync_to_view()
+        try:
+            body_names = self._gym.model.get_body_names()
+            _legacy_anchor = "ActorManipulator_Anchor"
+            if self._anchor_mocap_name not in body_names and _legacy_anchor in body_names:
+                self._anchor_mocap_name = _legacy_anchor
+                warnings.warn(
+                    f"Using legacy anchor mocap body name '{_legacy_anchor}'. "
+                    f"Please upgrade the level to use the new UUID-based name "
+                    f"'ORCA_MANIPULATOR_<uuid>_Anchor' to avoid name conflicts with user-imported XML.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+        except Exception as e:
+            _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
+        # AR-001：关闭 ActorManipulator 拖拽代理碰撞掩码（init_simulation 已执行，
+        # 此处经公共方法再断言一次，覆盖新/旧 Anchor 命名，保证代理不参与物理碰撞）。
+        try:
+            n = self._gym.disable_actor_manipulator_collision()
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
+        except Exception as e:
+            _logger.warning(f"failed to disable ActorManipulator collision: {e}")
 
     def init_qpos_qvel(self) -> None:
         """保存初始 qpos/qvel。"""
