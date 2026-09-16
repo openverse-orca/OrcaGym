@@ -172,6 +172,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         model_xml_path: str | None = None,
         esdf_path: str | None = None,
         euler_render_target: str | None = None,
+        fluid_render_target: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
@@ -206,6 +207,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 render() 节拍内 skinning → 读槽 → 推流（30Hz 节流复用
                 本 Env 的 render 策略）。None（默认）不推流。连接失败
                 fail-fast（显式 opt-in 语义）。
+            fluid_render_target: ESDF 流体粒子渲染流 gRPC 地址（如
+                "127.0.0.1:50452"）。仅 esdf_path 含顶层
+                ``fluid.fluid_blocks`` 时生效：init 时构造 FluidGpuSim
+                （独立流体槽）并注册 particle7 通道；do_simulation 内部
+                按仿真时长推进流体，render() 节拍内冻结读槽 → 密度归一化
+                → 推流（30Hz）。None（默认）不推流。连接失败 fail-fast。
+                渲染参数由 Studio 侧 Euler Fluid Material 组件管理，本
+                参数只管数据链路。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
@@ -232,6 +241,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._local_xml_path = model_xml_path
         self._esdf_path = esdf_path
         self._euler_render_target = euler_render_target
+        self._fluid_render_target = fluid_render_target
         self._device = device
         # 用户边界校验：非法键（含 timestep）尽早失败
         validate_opt_overrides(sim_config_overrides)
@@ -362,7 +372,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                     "esdf_path='auto' 未能推导 ESDF（无与 XML 同名的 "
                     ".esdf 于 ~/.local/share/Orca/OrcaStudio/*/tmp/），"
                     "降级为纯刚体仿真。请确认 Studio 已开启『导出XML』"
-                    "且场景含可变形体，或显式传入 esdf_path。",
+                    "且场景含可变形体/流体块，或显式传入 esdf_path。",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -372,13 +382,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         _require_gpu_for_esdf(self._device, self._esdf_path)
         # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
         #    在后端固化前写入；不传时 opt_overrides=None，零行为差异。
-        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 渲染流）
+        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 渲染流；
+        #    ESDF 含流体块时透传 fluid_render_target → FluidGpuSim 渲染流）
         self.loop.run_until_complete(
             self._gym.init_simulation(
                 model_xml_path,
                 esdf_path=self._esdf_path,
                 opt_overrides=self._opt_overrides,
                 euler_render_target=self._euler_render_target,
+                fluid_render_target=self._fluid_render_target,
             )
         )
         # 3. 应用缓存的 time_step：

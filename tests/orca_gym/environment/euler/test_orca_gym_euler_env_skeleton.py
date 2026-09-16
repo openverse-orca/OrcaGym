@@ -2146,12 +2146,12 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
 
         async def spy_init(
             self_, model_xml_path, esdf_path=None, opt_overrides=None,
-            euler_render_target=None,
+            euler_render_target=None, fluid_render_target=None,
         ):
             captured["esdf_path"] = esdf_path
             return await original_init(
                 self_, model_xml_path, esdf_path, opt_overrides,
-                euler_render_target,
+                euler_render_target, fluid_render_target,
             )
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
@@ -2159,6 +2159,48 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
 
         self.assertIsNone(env._esdf_path)
         self.assertIsNone(captured["esdf_path"])
+
+    def test_fluid_render_target_passthrough(self):
+        """fluid_render_target 三层透传：Env 构造 → init_simulation 收到。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None, fluid_render_target=None,
+        ):
+            captured["fluid_render_target"] = fluid_render_target
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target, fluid_render_target,
+            )
+
+        _pendulum_xml = (
+            pathlib.Path(__file__).resolve().parents[0]
+            / "fixtures" / "simple_pendulum.xml"
+        )
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = OrcaGymEulerEnv(
+                frame_skip=4,
+                orcagym_addr="localhost:50051",
+                agent_names=["agent0"],
+                time_step=0.002,
+                model_xml_path=str(_pendulum_xml),
+                skip_grpc_load=True,
+                fluid_render_target="127.0.0.1:50452",
+            )
+
+        # 透传断言：init_simulation 收到 Env 构造传入的流体渲染目标。
+        self.assertEqual(captured["fluid_render_target"], "127.0.0.1:50452")
+        # 字段驻留：Env 持有 _fluid_render_target（K1 下划线命名）。
+        self.assertEqual(env._fluid_render_target, "127.0.0.1:50452")
+        # 默认 None：不传参数时零行为差异（向后兼容）。
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env_default = _make_skeleton_env()
+        self.assertIsNone(env_default._fluid_render_target)
+        self.assertIsNone(captured["fluid_render_target"])
 
     def test_require_gpu_for_esdf_helper(self):
         """有 ESDF 必须 GPU；无 ESDF 的 CPU 放行。"""
@@ -2293,12 +2335,12 @@ class TestEsdfAutoDiscovery(unittest.TestCase):
 
         async def spy_init(
             self_, model_xml_path, esdf_path=None, opt_overrides=None,
-            euler_render_target=None,
+            euler_render_target=None, fluid_render_target=None,
         ):
             captured["esdf_path"] = esdf_path
             return await original_init(
                 self_, model_xml_path, esdf_path, opt_overrides,
-                euler_render_target,
+                euler_render_target, fluid_render_target,
             )
 
         with mock.patch(
