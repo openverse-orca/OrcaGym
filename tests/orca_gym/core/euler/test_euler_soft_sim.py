@@ -896,7 +896,15 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
         asyncio.run(gym.render())
 
     def _init_euler_backend_with_mocks(self, esdf_path, render_target):
-        """直接调 _init_euler_backend（patch 掉刚体 core 和 CoupledGpuSim）。"""
+        """直接调 _init_euler_backend（patch 掉刚体 core 和 CoupledGpuSim）。
+
+        esdf_path 真实文件（含 bodies、无 fluid 节）：_esdf_has_bodies /
+        load_fluid_blocks 会真读 ESDF，假路径会被分槽逻辑跳过。
+        """
+        import json
+        import tempfile
+        from pathlib import Path
+
         from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 
         gym = OrcaGymEuler()
@@ -907,24 +915,41 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
         object.__setattr__(gym, "_opt", opt_mock)
         object.__setattr__(gym, "_registry", mock.MagicMock())
 
+        if esdf_path is not None:
+            with tempfile.TemporaryDirectory() as tmp:
+                esdf_file = Path(tmp) / esdf_path
+                esdf_file.write_text(
+                    json.dumps({"bodies": [{"name": "b0", "type": "deformable"}]}),
+                    encoding="utf-8",
+                )
+                with mock.patch(
+                    "orca_gym.core.euler.mujoco_sim_core_euler.MuJoCoSimCoreEuler"
+                ) as sim_cls, mock.patch(
+                    "orca.euler.CoupledGpuSim"
+                ) as coupled_cls:
+                    gym._init_euler_backend(  # noqa: SLF001  白盒：透传接线验证
+                        "x.xml", str(esdf_file), None, render_target
+                    )
+                return sim_cls, coupled_cls, str(esdf_file)
+
         with mock.patch(
             "orca_gym.core.euler.mujoco_sim_core_euler.MuJoCoSimCoreEuler"
         ) as sim_cls, mock.patch(
             "orca.euler.CoupledGpuSim"
         ) as coupled_cls:
             gym._init_euler_backend(  # noqa: SLF001  白盒：透传接线验证
-                "x.xml", esdf_path, None, render_target
+                "x.xml", None, None, render_target
             )
-        return sim_cls, coupled_cls
+        return sim_cls, coupled_cls, None
 
     def test_render_target_passthrough_to_coupled(self):
         """esdf + target：CoupledGpuSim 构造后 enable_render_stream(target)。"""
-        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
+        sim_cls, coupled_cls, esdf_real = self._init_euler_backend_with_mocks(
             esdf_path="y.esdf", render_target="127.0.0.1:50451"
         )
         coupled_cls.assert_called_once_with(
             model_xml_path="x.xml",
-            esdf_path="y.esdf",
+            esdf_path=esdf_real,
             device="cuda:0",
             rigid_solver=sim_cls.return_value.solver,
             dt=0.001,
@@ -937,7 +962,7 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
 
     def test_render_target_ignored_without_esdf(self):
         """esdf=None + target：忽略（不构造 CoupledGpuSim、不连接），仅告警。"""
-        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
+        sim_cls, coupled_cls, _ = self._init_euler_backend_with_mocks(
             esdf_path=None, render_target="127.0.0.1:50451"
         )
         coupled_cls.assert_not_called()
@@ -945,11 +970,219 @@ class TestOrcaGymEulerSoftSlot(unittest.TestCase):
 
     def test_no_render_target_no_enable(self):
         """esdf + target=None：构造 CoupledGpuSim 但不连接渲染流。"""
-        sim_cls, coupled_cls = self._init_euler_backend_with_mocks(
+        sim_cls, coupled_cls, _ = self._init_euler_backend_with_mocks(
             esdf_path="y.esdf", render_target=None
         )
         coupled_cls.assert_called_once()
         coupled_cls.return_value.enable_render_stream.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 6.5 流体槽（FluidGpuSim）：分槽注入 / 透传 / 驱动 / 推流
+# ---------------------------------------------------------------------------
+
+
+class TestOrcaGymEulerFluidSlot(unittest.TestCase):
+    """ESDF 分槽：bodies → CoupledGpuSim；fluid.fluid_blocks → FluidGpuSim。
+
+    Gym 只驱动（advance/render_frame）和查询（has_fluid_*），耦合编排
+    归引擎层（Commit 2 教训）。
+    """
+
+    def _init_backend_with_fluid_mocks(
+        self,
+        esdf_content: dict,
+        fluid_blocks,
+        *,
+        fluid_target=None,
+        euler_target=None,
+    ):
+        """写临时 ESDF + patch 三件套（刚体 core / CoupledGpuSim /
+        FluidGpuSim / load_fluid_blocks），返回 (coupled_cls, fluid_cls)。"""
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        opt_mock = mock.MagicMock()
+        opt_mock.nworld = 1
+        opt_mock.device = "cuda:0"
+        opt_mock.timestep = 0.001
+        object.__setattr__(gym, "_opt", opt_mock)
+        object.__setattr__(gym, "_registry", mock.MagicMock())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            esdf_file = Path(tmp) / "scene.esdf"
+            esdf_file.write_text(json.dumps(esdf_content), encoding="utf-8")
+            with mock.patch(
+                "orca_gym.core.euler.mujoco_sim_core_euler.MuJoCoSimCoreEuler"
+            ), mock.patch(
+                "orca.euler.CoupledGpuSim"
+            ) as coupled_cls, mock.patch(
+                "orca.euler.FluidGpuSim"
+            ) as fluid_cls, mock.patch(
+                "orca.euler.load_fluid_blocks", return_value=fluid_blocks
+            ):
+                gym._init_euler_backend(  # noqa: SLF001  白盒：透传接线验证
+                    "x.xml", str(esdf_file), None, euler_target, fluid_target
+                )
+        return coupled_cls, fluid_cls
+
+    _BODY = {"name": "b0", "type": "deformable"}
+    _BLOCKS = [{"name": "water", "start": [0, 0, 0], "end": [0.1, 0.1, 0.1],
+                "dx": 0.05, "drop": 0.05}]
+
+    def test_fluid_attrs_blocked_and_default_none(self):
+        """默认流体槽为 None（对齐 _euler 模式）；_fluid/fluid 被 K5 拦截。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        self.assertIsNone(gym.__dict__.get("_fluid"))
+        self.assertFalse(gym.has_fluid_sim())
+        self.assertFalse(gym.has_fluid_render_stream())
+        for name in ("_fluid", "fluid"):
+            with self.assertRaises(AttributeError) as ctx:
+                getattr(gym, name)
+            self.assertIn("has_fluid_sim", str(ctx.exception))
+
+    def test_has_fluid_queries(self):
+        """has_fluid_sim / has_fluid_render_stream 委托流体槽。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        fluid_mock = mock.MagicMock()
+        fluid_mock.has_render_stream.return_value = True
+        object.__setattr__(gym, "_fluid", fluid_mock)
+        self.assertTrue(gym.has_fluid_sim())
+        self.assertTrue(gym.has_fluid_render_stream())
+        fluid_mock.has_render_stream.return_value = False
+        self.assertFalse(gym.has_fluid_render_stream())
+
+    def test_fluid_only_esdf_builds_fluid_sim_only(self):
+        """纯流体 ESDF（无 bodies）：只构造 FluidGpuSim，不碰 CoupledGpuSim。"""
+        coupled_cls, fluid_cls = self._init_backend_with_fluid_mocks(
+            {"fluid": {"fluid_blocks": self._BLOCKS}},
+            self._BLOCKS,
+            fluid_target="127.0.0.1:50452",
+        )
+        coupled_cls.assert_not_called()
+        fluid_cls.assert_called_once_with(device="cuda:0", blocks=self._BLOCKS)
+        fluid_cls.return_value.enable_render_stream.assert_called_once_with(
+            "127.0.0.1:50452"
+        )
+
+    def test_mixed_esdf_builds_both_sims(self):
+        """混合 ESDF（bodies + fluid_blocks）：两槽共存，各自连接渲染流。"""
+        coupled_cls, fluid_cls = self._init_backend_with_fluid_mocks(
+            {"bodies": [self._BODY], "fluid": {"fluid_blocks": self._BLOCKS}},
+            self._BLOCKS,
+            fluid_target="127.0.0.1:50452",
+            euler_target="127.0.0.1:50451",
+        )
+        coupled_cls.assert_called_once()
+        coupled_cls.return_value.enable_render_stream.assert_called_once_with(
+            "127.0.0.1:50451"
+        )
+        fluid_cls.assert_called_once()
+        fluid_cls.return_value.enable_render_stream.assert_called_once_with(
+            "127.0.0.1:50452"
+        )
+
+    def test_bodies_only_esdf_no_fluid_sim(self):
+        """纯柔体 ESDF：FluidGpuSim 不构造（旧行为零变化）。"""
+        coupled_cls, fluid_cls = self._init_backend_with_fluid_mocks(
+            {"bodies": [self._BODY]}, None,
+        )
+        coupled_cls.assert_called_once()
+        fluid_cls.assert_not_called()
+
+    def test_fluid_target_without_fluid_blocks_no_connect(self):
+        """无 fluid 块但传了 fluid_render_target：不连接、不抛。"""
+        coupled_cls, fluid_cls = self._init_backend_with_fluid_mocks(
+            {"bodies": [self._BODY]}, None,
+            fluid_target="127.0.0.1:50452",
+        )
+        coupled_cls.assert_called_once()
+        fluid_cls.assert_not_called()
+
+    def test_step_with_coupling_advances_fluid(self):
+        """step_with_coupling：流体按仿真时长 advance，柔体照常 step。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        sim_mock = mock.MagicMock()
+        euler_mock = mock.MagicMock()
+        fluid_mock = mock.MagicMock()
+        object.__setattr__(gym, "_sim", sim_mock)
+        object.__setattr__(gym, "_euler", euler_mock)
+        object.__setattr__(gym, "_fluid", fluid_mock)
+
+        gym.step_with_coupling(np.zeros(4), n_frames=20, dt=0.001)
+
+        fluid_mock.advance.assert_called_once_with(20 * 0.001)
+        euler_mock.step.assert_called_once_with(20)
+        sim_mock.notify_gpu_advanced.assert_called_once()
+
+    def test_render_calls_fluid_render_frame(self):
+        """render()：_fluid 存在时 fluid.render_frame() 被调（30Hz 节拍）。"""
+        import asyncio
+
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        sim_mock = mock.MagicMock()
+        sim_mock.query_contact_simple.return_value = []
+        fluid_mock = mock.MagicMock()
+        object.__setattr__(gym, "_sim", sim_mock)
+        object.__setattr__(gym, "_fluid", fluid_mock)
+
+        asyncio.run(gym.render())
+        fluid_mock.render_frame.assert_called_once()
+
+    def test_reset_coupling_state_resets_fluid(self):
+        """reset_coupling_state：_fluid 存在时 fluid.reset()。"""
+        from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+
+        gym = OrcaGymEuler()
+        fluid_mock = mock.MagicMock()
+        object.__setattr__(gym, "_sim", mock.MagicMock())
+        object.__setattr__(gym, "_fluid", fluid_mock)
+        gym.reset_coupling_state()
+        fluid_mock.reset.assert_called_once_with()
+
+
+class TestEsdfHasBodiesHelper(unittest.TestCase):
+    """_esdf_has_bodies：轻量 JSON 探测（分槽前置条件）。"""
+
+    def test_bodies_present(self):
+        import tempfile
+        from pathlib import Path
+
+        from orca_gym.core.euler.orca_gym_euler import _esdf_has_bodies
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.esdf"
+            path.write_text('{"bodies": [{"name": "b0"}]}', encoding="utf-8")
+            self.assertTrue(_esdf_has_bodies(str(path)))
+
+    def test_bodies_empty_or_missing(self):
+        import tempfile
+        from pathlib import Path
+
+        from orca_gym.core.euler.orca_gym_euler import _esdf_has_bodies
+
+        for content in ('{"bodies": []}', '{"fluid": {"fluid_blocks": [{}]}}', "{}"):
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "s.esdf"
+                path.write_text(content, encoding="utf-8")
+                self.assertFalse(_esdf_has_bodies(str(path)))
+
+    def test_missing_file_false(self):
+        from orca_gym.core.euler.orca_gym_euler import _esdf_has_bodies
+
+        self.assertFalse(_esdf_has_bodies("/nonexistent/scene.esdf"))
 
 
 # ---------------------------------------------------------------------------
