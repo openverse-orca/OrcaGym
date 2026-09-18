@@ -1,11 +1,11 @@
-"""端到端冒烟（流体）：Studio level → ESDF 自动发现 → FluidGpuSim → 50452 推流 → 水面随动。
+"""端到端冒烟（流体）：Studio level → ESDF 自动发现 → CoupledGpuSim(FluidPhase) → 50452 推流 → 水面随动。
 
 链路：
     Studio 自动导出 XML/ESDF（同目录同名，ESDF 含顶层 fluid.fluid_blocks）
       → OrcaGymEulerEnv(esdf_path="auto", fluid_render_target=..., device="cuda:0")
-      → OrcaGymEuler._fluid = FluidGpuSim（SPH/DFSPH 独立流体槽）
-      → do_simulation 内部 fluid.advance（按仿真时长，内部拆子步）
-      → render() 节拍内 冻结读槽 → 密度归一化 → particle7 → gRPC
+      → OrcaGymEuler._euler = CoupledGpuSim（只挂 FluidPhase，内部持有 FluidGpuSim）
+      → do_simulation 只调 euler.step（内部 FluidPhase → FluidGpuSim.advance）
+      → render() 节拍内 CoupledGpuSim.render_frame → 冻结读槽 → particle7 → gRPC
       → Studio FluidParticlesChannelComponent（50452）→ EulerFluidFP 水面
 
 前置条件：
@@ -62,13 +62,13 @@ def run_smoke(
     gym = env.unwrapped._gym  # noqa: SLF001  冒烟诊断：仅调公共查询
     if not gym.has_fluid_sim():
         _logger.error(
-            "流体槽未注入（esdf_path='auto' 推导失败或 ESDF 无 fluid.fluid_blocks？）。"
+            "流体相未注入（esdf_path='auto' 推导失败或 ESDF 无 fluid.fluid_blocks？）。"
             "请确认 Studio 已启动仿真且场景含 Euler Fluid Block 组件。"
         )
         env.close()
         return 0
     n_particles = gym.fluid_particle_count()
-    print(f"[SMOKE] 流体槽注入成功（FluidGpuSim 就绪，粒子数 {n_particles}）")
+    print(f"[SMOKE] 流体相注入成功（CoupledGpuSim FluidPhase 就绪，粒子数 {n_particles}）")
     if gym.has_fluid_render_stream():
         print(f"[SMOKE] 流体渲染流已连接（render() 将推流 {n_particles} 粒子到 {fluid_render_target}）")
     else:
