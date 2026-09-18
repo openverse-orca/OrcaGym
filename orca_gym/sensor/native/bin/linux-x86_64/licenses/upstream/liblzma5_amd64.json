@@ -1,0 +1,14 @@
+{
+  "name": "liblzma5:amd64",
+  "notices": [
+    {
+      "file": "xz/COPYING.txt",
+      "sha256": "bcb02973ef6e87ea73d331b3a80df7748407f17efdb784b61b47e0e610d3bb5c",
+      "source_url": "https://raw.githubusercontent.com/tukaani-project/xz/v5.2.5/COPYING"
+    }
+  ],
+  "upstream_license": "Public domain (liblzma); see XZ component-specific notice",
+  "upstream_name": "xz",
+  "upstream_version": "5.2.5",
+  "version": "5.2.5-2ubuntu1"
+}

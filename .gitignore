@@ -126,3 +126,8 @@ MUJOCO_LOG.TXT
 dist-test/
 
 logs/
+
+# Keep the pinned sensor Runtime, including its required shared libraries.
+!orca_gym/sensor/native/lib/
+!orca_gym/sensor/native/lib/**
+!orca_gym/sensor/native/bin/**

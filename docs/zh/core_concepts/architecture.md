@@ -58,6 +58,8 @@
 
 如果你的业务需要"绑定/释放/抓取"等多步编排流程，请自行组合这些原语实现，业务状态由你自己管理。这比框架代管更易审查、更不易误用。
 
+经确认的传感器扩展（§4.10）区分基础设施状态与任务业务状态：厂商 handle、滤波/随机数状态、采样序号及最后一次成功结果由仿真生命周期管理。它们属于传感器运行状态，不改变任务自行组织动作、观测、奖励或抓取流程的边界。公开结果查询仍是无副作用读取。
+
 ### 2.2 设计模式
 
 | 模式 | 应用位置 | 解决的问题 |
@@ -369,6 +371,33 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
 ---
 
+### 4.10 第三方传感器：复用现有仿真的子步采样
+
+本节为用户确认的架构扩展。保留 Env → Gym → SimCore 分层及原生对象隔离，不引入对外的 MuJoCo 句柄适配器。
+
+**启用与绑定**：`OrcaGymEulerEnv` 新增可选构造参数 `sensor_host_path` 和 `sensor_provider_manifests`，分别指定可选 Orca Host 路径覆盖和明确允许执行的厂商包清单；提供清单后默认使用随包 Host，也可显式覆盖 Host 路径。不配置清单和 Host 时保持原来的纯物理路径，XML 的 custom 元数据不会自动执行 DLL。应用可在部署时统一配置这些路径，场景只声明型号、实例、精确 site 和算法参数。当前 EulerEnv 接入口支持 `orca.sensor.v1/` 标准 custom 布局及 site 网格、site 射线、对象接触行、对象坐标系射线、采样时间/dt/index；本次范围按用户确认收敛为已经组装好的 XML：只绑定已有 site 或明确指定的 body/geom/site 对象，不装配或改写几何、不生成命名空间，不提供独立仿真后端、旧 JSON 场景或展示转换。按用户确认补齐已装配模型的运行绑定和采样：对象契约只读取厂商模型的局部对象类型元数据，由场景 `object/<alias>` typed tuple 显式映射到已有对象；site 契约仍忽略模型资料，展示元数据不参与运行。接触 body 只覆盖直属 geom，帧必须与触面同属一个刚性焊接组；默认自身范围由明确 body/geom 映射直接决定，可用 `geoms` tuple 补齐完整归属，不按名称前缀或整个机器人推断。接触行保持契约对象次序、符号和坐标系，超过容量时整批失败，不能截断。声明 `seed` 用十进制 uint64 text，参与环境 reset 的稳定实例种子派生。按用户确认保留完整接入功能：受支持的平台随包提供 Host、契约工具及其必要运行依赖，使用普通 Git 保存；`sensor_host_path` 和 `ORCA_SENSOR_TOOL` 仅作显式覆盖，无需另外安装 Runtime 或 SDK。打包仅补齐运行文件和平台标记。
+
+**内部职责**：
+
+- `MuJoCoSimCore` 使用已经加载的唯一一份模型和仿真数据，解析绑定、编译物理查询、逐子步采集。采集可组织为 SimCore 的内部 mixin 方法，仍只在同一对象内访问原生数据。
+- `SampledSensorRuntime` 是内部纯数据桥，复用 `SensorRuntime` 和 Host，负责契约投影、独立算法实例与结果发布。它只接收标准采样值及时间戳，不接收/保存 `mjModel`、`mjData` 或能访问它们的回调。
+- 不调用独立 `load_sensor_scene()` 再创建模型，不把原生对象传给 `MuJoCoQueryBackend.from_existing()`，也不向 Env/Gym/厂商暴露内部运行时对象。
+
+**步进**：`do_simulation(ctrl, n)` 与 `mj_step(n)` 汇合到 SimCore 的步进入口。启用传感器时，每个物理子步执行一次物理推进，立即从一致源状态组装输入、计算所有实例；本次步进全部成功后发布最后一轮结果。Euler/implicit/implicitfast 下，接触力和 site 位姿对应子步源状态，时间戳使用推进前的 time，不混用积分后 qpos/qvel/time。RK4 明确拒绝；运行中修改积分器也须在继续步进前检查。
+
+**结果接口**：
+
+```python
+values = env.query_provider_sensor_data(["touch_f2", "range_f2"])
+grid = values["touch_f2"]  # 独立的 NumPy 副本，保留契约 shape
+```
+
+省略实例列表表示读取全部已声明实例，使用 XML 中精确的 instance_id；不自动套用 agent 名称前缀。原 `query_sensor_data()` 仍读取原生 MuJoCo sensordata，不混入 DLL 输出。任务自行决定是否将结果放进 observation；基类不改变已有 observation_space、reward 或 step 返回签名。
+
+**生命周期和失败**：首次有效物理子步前，以及 `reset` 后，结果未就绪，读取应明确报错；`mj_forward()`、渲染和重复查询均不额外计算传感器。`reset(seed)` 同步重置物理与算法状态，保留相同 seed 的可重放性；重载模型释放旧实例并重新绑定，离线 `close()` 同样释放 Host 和算法实例。输入采样或 DLL 计算失败时使整批结果失效、要求重置恢复，不声称回滚已推进的物理状态。不得在失败后将旧结果伪装为本次动作的新观测。
+
+SimCore/Gym 内部编排接口包括 `configure_provider_sensors(...)`、`reset_data(sensor_seed=...)`、`close_provider_sensors()` 和结果查询的逐层委托；只有纯值/配置通过层间接口。该扩展当前针对 EulerEnv 的 MuJoCo 后端，不代表 Euler 物理后端或 OrcaLab UI 已实现。
+
 ## 5. API 使用契约
 
 ### 5.1 契约层级
@@ -469,6 +498,7 @@ body_name = env.body("object")
 | **名称空间** | `joint()`, `body()`, `site()`, `actuator()`, `sensor()` |
 | **Studio 交互** | `render()`, `save_streaming()`, `start_streaming()`, `show_camera()`, `get_recorder_manager()`, `set_render_fps()`, `set_video_recorder_manager()`, `get_camera_names()`, `make_camera_viewport_active()`, `load_content_file()`, `studio_bridge()`, `debug_draw()` |
 | **生命周期** | `initialize_simulation()`, `initialize_grpc()`, `pause_simulation()`, `close()` |
+| **第三方传感器（§4.10）** | 构造配置 `sensor_host_path` / `sensor_provider_manifests`；`query_provider_sensor_data(instance_ids=None)` |
 
 > **Studio UI 抓取为内部 API**：原 `anchor_actor()` / `release_body_anchored()` / `do_body_manipulation()` 按 P6 原则改为 `_` 前缀内部方法，由 `render()` 内部驱动，不进入公共 API。程序化体操作应使用等式约束无状态原语自行实现。
 
