@@ -209,10 +209,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 fail-fast（显式 opt-in 语义）。
             fluid_render_target: ESDF 流体粒子渲染流 gRPC 地址（如
                 "127.0.0.1:50452"）。仅 esdf_path 含顶层
-                ``fluid.fluid_blocks`` 时生效：init 时构造 FluidGpuSim
-                （独立流体槽）并注册 particle7 通道；do_simulation 内部
-                按仿真时长推进流体，render() 节拍内冻结读槽 → 密度归一化
-                → 推流（30Hz）。None（默认）不推流。连接失败 fail-fast。
+                ``fluid.fluid_blocks`` 时生效：init 时由 CoupledGpuSim
+                内部挂 FluidPhase 并注册 particle7 通道；do_simulation
+                只调 euler.step，render() 节拍内由 CoupledGpuSim 推流
+                （30Hz）。None（默认）不推流。连接失败 fail-fast。
                 渲染参数由 Studio 侧 Euler Fluid Material 组件管理，本
                 参数只管数据链路。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
@@ -382,8 +382,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         _require_gpu_for_esdf(self._device, self._esdf_path)
         # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
         #    在后端固化前写入；不传时 opt_overrides=None，零行为差异。
-        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 渲染流；
-        #    ESDF 含流体块时透传 fluid_render_target → FluidGpuSim 渲染流）
+        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 柔体渲染流；
+        #    ESDF 含流体块时透传 fluid_render_target → CoupledGpuSim 流体渲染流）
         self.loop.run_until_complete(
             self._gym.init_simulation(
                 model_xml_path,
@@ -499,14 +499,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
     def do_simulation(self, ctrl: np.ndarray, n_frames: int) -> None:
-        """标准仿真步进。有 ESDF 时把整段交给 Euler 内部全 GPU 耦合。
+        """标准仿真步进。委托 ``step_with_coupling``。
 
         K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler 等私有。
         K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
 
         ``n_frames`` 是刚体总步数（通常等于 ``frame_skip``）。``dt`` 仍传
-        物理步长 ``self._time_step``，不能传 ``self.dt``。有柔体时 Gym
-        不再拆耦合窗、不写 ``xfrc``；M:N 在 Euler ``CoupledGpuSim`` 里。
+        物理步长 ``self._time_step``，不能传 ``self.dt``。
+
+        Euler 后端纯刚体：``_sim.step`` 已是 MuJoCoFlow，不必构造
+        CoupledGpuSim。有 CoupledGpuSim 时只走它的 step，不再
+        ``sim.step``（刚体 GPU 步已在编排器内）。CPU 后端无 ESDF 时
+        才是 ``mj_step``。
 
         Args:
             ctrl: 控制输入数组，形状 (nu,)。

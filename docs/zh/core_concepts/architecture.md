@@ -532,7 +532,7 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._gym.sync_to_view()
 ```
 
-> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。无柔体时 `step_with_coupling` 等价于 `set_ctrl + step(n_frames)`。有 ESDF 时 Gym 只 `set_ctrl` + `CoupledGpuSim.step`；位姿/力交换和 M:N 拆窗都在 Euler `CouplingOrchestrator` 里。`device=cpu` 且带 ESDF 会立刻报错。`dt` 是物理步长，不是 `env.dt`。
+> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。无 `CoupledGpuSim` 时 `step_with_coupling` 等价于 `set_ctrl + step(n_frames)`。有 ESDF（柔体和/或流体）时 Gym 只 `set_ctrl` + `CoupledGpuSim.step`；位姿/力交换、M:N 拆窗、流体子步都在 Euler `CouplingOrchestrator` 里。`euler.step` 与 `sim.step` 互斥。`device=cpu` 且带 ESDF 会立刻报错。`dt` 是物理步长，不是 `env.dt`。
 
 ### 7.2 两种使用模式
 

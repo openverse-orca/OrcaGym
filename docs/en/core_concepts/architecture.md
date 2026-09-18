@@ -537,7 +537,7 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._gym.sync_to_view()
 ```
 
-> See the actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. With no soft body, `step_with_coupling` is equivalent to `set_ctrl + step(n_frames)`. With ESDF, Gym only calls `set_ctrl` + `CoupledGpuSim.step`; pose/force exchange and M:N windowing stay inside Euler's `CouplingOrchestrator`. `device=cpu` with ESDF raises immediately. `dt` is the physics timestep, not `env.dt`.
+> See the actual implementation in `orca_gym/environment/euler/orca_gym_euler_env.py` `do_simulation`. With no CoupledGpuSim, `step_with_coupling` is equivalent to `set_ctrl + step(n_frames)`. With ESDF (deformable and/or fluid), Gym only calls `set_ctrl` + `CoupledGpuSim.step`; pose/force exchange, M:N windowing, and fluid substeps stay inside Euler's `CouplingOrchestrator`. `euler.step` and `sim.step` are mutually exclusive. `device=cpu` with ESDF raises immediately. `dt` is the physics timestep, not `env.dt`.
 
 ### 7.2 Two Usage Modes
 
