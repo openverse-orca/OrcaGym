@@ -1,0 +1,14 @@
+{
+  "name": "libexpat1:amd64",
+  "notices": [
+    {
+      "file": "expat/COPYING.txt",
+      "sha256": "8c6b5b6de8fae20b317f4992729abc0e520bfba4c7606cd1e9eeb87418eebdec",
+      "source_url": "https://raw.githubusercontent.com/libexpat/libexpat/R_2_4_7/expat/COPYING"
+    }
+  ],
+  "upstream_license": "MIT",
+  "upstream_name": "expat",
+  "upstream_version": "2.4.7",
+  "version": "2.4.7-1ubuntu0.7"
+}

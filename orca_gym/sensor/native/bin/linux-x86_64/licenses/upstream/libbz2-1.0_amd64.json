@@ -1,0 +1,16 @@
+{
+  "name": "libbz2-1.0:amd64",
+  "notices": [
+    {
+      "file": "bzip2/LICENSE.txt",
+      "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3",
+      "source_archive_sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269",
+      "source_member": "bzip2-1.0.8/LICENSE",
+      "source_url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+    }
+  ],
+  "upstream_license": "BSD-style bzip2 license",
+  "upstream_name": "bzip2",
+  "upstream_version": "1.0.8",
+  "version": "1.0.8-5build1"
+}

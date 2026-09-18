@@ -1,0 +1,22 @@
+<mujoco model="ten_provider_handles_fixture">
+  <option timestep=".001" integrator="implicit"/>
+  <worldbody>
+    <body name="pad1" pos="-.2 0 0"><joint type="hinge"/><geom size=".02" mass=".1"/><site name="tip1"/></body>
+    <body name="pad2" pos="-.1 0 0"><joint type="hinge"/><geom size=".02" mass=".1"/><site name="tip2"/></body>
+    <body name="pad3"><joint type="hinge"/><geom size=".02" mass=".1"/><site name="tip3"/></body>
+    <body name="pad4" pos=".1 0 0"><joint type="hinge"/><geom size=".02" mass=".1"/><site name="tip4"/></body>
+    <body name="pad5" pos=".2 0 0"><joint type="hinge"/><geom size=".02" mass=".1"/><site name="tip5"/></body>
+  </worldbody>
+  <custom>
+    <text name="orca.sensor.v1/touch_f1/plugin" data="com.orca.examples.contact_grid"/><tuple name="orca.sensor.v1/touch_f1/site"><element objtype="site" objname="tip1"/></tuple>
+    <text name="orca.sensor.v1/range_f1/plugin" data="com.orca.examples.rangefinder"/><tuple name="orca.sensor.v1/range_f1/site"><element objtype="site" objname="tip1"/></tuple>
+    <text name="orca.sensor.v1/touch_f2/plugin" data="com.orca.examples.contact_grid"/><tuple name="orca.sensor.v1/touch_f2/site"><element objtype="site" objname="tip2"/></tuple>
+    <text name="orca.sensor.v1/range_f2/plugin" data="com.orca.examples.rangefinder"/><tuple name="orca.sensor.v1/range_f2/site"><element objtype="site" objname="tip2"/></tuple>
+    <text name="orca.sensor.v1/touch_f3/plugin" data="com.orca.examples.contact_grid"/><tuple name="orca.sensor.v1/touch_f3/site"><element objtype="site" objname="tip3"/></tuple>
+    <text name="orca.sensor.v1/range_f3/plugin" data="com.orca.examples.rangefinder"/><tuple name="orca.sensor.v1/range_f3/site"><element objtype="site" objname="tip3"/></tuple>
+    <text name="orca.sensor.v1/touch_f4/plugin" data="com.orca.examples.contact_grid"/><tuple name="orca.sensor.v1/touch_f4/site"><element objtype="site" objname="tip4"/></tuple>
+    <text name="orca.sensor.v1/range_f4/plugin" data="com.orca.examples.rangefinder"/><tuple name="orca.sensor.v1/range_f4/site"><element objtype="site" objname="tip4"/></tuple>
+    <text name="orca.sensor.v1/touch_f5/plugin" data="com.orca.examples.contact_grid"/><tuple name="orca.sensor.v1/touch_f5/site"><element objtype="site" objname="tip5"/></tuple>
+    <text name="orca.sensor.v1/range_f5/plugin" data="com.orca.examples.rangefinder"/><tuple name="orca.sensor.v1/range_f5/site"><element objtype="site" objname="tip5"/></tuple>
+  </custom>
+</mujoco>

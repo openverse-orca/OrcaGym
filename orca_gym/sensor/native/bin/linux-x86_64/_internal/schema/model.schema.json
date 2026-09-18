@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:orca:sensor:model:2",
+  "title": "Orca internal model descriptor and legacy compatibility",
+  "description": "New vendor packages reference XML directly through provider.model. Orca generates this internal descriptor from XML and the contract; vendors do not maintain it. This schema also validates legacy model_schema files. Instance configuration supplies the target attachment and pose; names are isolated per instance with no fuzzy lookup.",
+  "oneOf": [
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "backend", "objects"],
+      "properties": {
+        "schema_version": {"const": 1, "type": "integer"},
+        "backend": {"const": "mujoco"},
+        "asset": {"$ref": "#/$defs/assetPath"},
+        "objects": {
+          "type": "object", "propertyNames": {"$ref": "#/$defs/localName"},
+          "additionalProperties": {"$ref": "#/$defs/physicsReference"}
+        }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "backend", "asset", "units", "mount", "objects"],
+      "properties": {
+        "schema_version": {"const": 2, "type": "integer"},
+        "backend": {"const": "mujoco"},
+        "asset": {"$ref": "#/$defs/assetPath"},
+        "units": {"const": "m", "description": "Lengths are metres. Orientations are quaternions in w, x, y, z order."},
+        "instance_geoms": {
+          "type": "array", "uniqueItems": true,
+          "items": {"$ref": "#/$defs/backendName"},
+          "description": "Internal full geometry ownership generated from XML, used for instance-local ray exclusions. Not a vendor-maintained list."
+        },
+        "mount": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {"kind": {"const": "site"}, "name": {"$ref": "#/$defs/backendName"}},
+          "description": "The local site whose frame aligns with the requested installation pose. Only fixed installation is supported."
+        },
+        "objects": {
+          "type": "object", "propertyNames": {"$ref": "#/$defs/localName"},
+          "additionalProperties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["kind", "physics"],
+            "properties": {
+              "kind": {"enum": ["surface", "frame", "range"]},
+              "physics": {"$ref": "#/$defs/physicsReference"},
+              "visuals": {
+                "type": "array", "minItems": 1, "uniqueItems": true,
+                "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["kind", "name"],
+                  "properties": {"kind": {"const": "geom"}, "name": {"$ref": "#/$defs/backendName"}}
+                }
+              }
+            },
+            "allOf": [
+              {"if": {"properties": {"kind": {"const": "surface"}}}, "then": {"properties": {"physics": {"properties": {"kind": {"enum": ["body", "geom"]}}}}}},
+              {"if": {"properties": {"kind": {"const": "frame"}}}, "then": {"properties": {"physics": {"properties": {"kind": {"enum": ["body", "geom", "site"]}}}}}},
+              {"if": {"properties": {"kind": {"const": "range"}}}, "then": {"properties": {"physics": {"properties": {"kind": {"const": "sensor"}}}}}}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "assetPath": {"type": "string", "minLength": 1, "description": "Path relative to the provider package (or the descriptor directory for legacy files); must remain inside that directory after resolving symlinks."},
+    "localName": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"},
+    "backendName": {"type": "string", "minLength": 1, "maxLength": 512},
+    "physicsReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": {"enum": ["body", "geom", "site", "sensor"]},
+        "name": {"$ref": "#/$defs/backendName"}
+      }
+    }
+  }
+}
