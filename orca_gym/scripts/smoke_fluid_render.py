@@ -46,6 +46,9 @@ def run_smoke(
     fluid_render_target: str,
     device: str,
     max_steps: Optional[int],
+    render_mode: Optional[str] = None,
+    render_param_pairs: Optional[list[tuple[str, str]]] = None,
+    show_aabb: bool = False,
 ) -> int:
     """跑流体冒烟循环，返回实际执行的步数。"""
     env = EulerSimEnv(
@@ -68,12 +71,31 @@ def run_smoke(
         env.close()
         return 0
     n_particles = gym.fluid_particle_count()
-    print(f"[SMOKE] 流体槽注入成功（FluidGpuSim 就绪，粒子数 {n_particles}）")
+    solver_kind = gym.fluid_solver_kind()
+    print(
+        f"[SMOKE] 流体槽注入成功（FluidGpuSim 就绪，粒子数 {n_particles}，"
+        f"求解器={solver_kind}）"
+    )
     if gym.has_fluid_render_stream():
         print(f"[SMOKE] 流体渲染流已连接（render() 将推流 {n_particles} 粒子到 {fluid_render_target}）")
     else:
         _logger.warning(f"流体渲染流未连接（target={fluid_render_target}）")
         print(f"[SMOKE][WARN] 流体渲染流未连接（target={fluid_render_target}）")
+
+    if render_mode is not None:
+        gym.set_fluid_debug_mode(render_mode, show_aabb=show_aabb)
+        mode_desc = {
+            "debug": "粒子球视图（水面停更；查空中悬浮/嵌入地面）",
+            "overlay": "球+数据叠加（水面继续更新）",
+            "normal": "恢复水面",
+        }.get(render_mode, render_mode)
+        print(f"[SMOKE] 已切换渲染分支: {render_mode} = {mode_desc}")
+        if show_aabb:
+            print("[SMOKE] 已请求绘制通道 AABB 线框（对照薄层是否贴盒子顶面）")
+    if render_param_pairs:
+        params = dict(render_param_pairs)
+        gym.set_fluid_render_params(params)
+        print(f"[SMOKE] 已下发渲染参数: {params}")
 
     obs, info = env.reset()
     print("[SMOKE] 环境已 reset，开始步进。在 Studio 视口观察水面（涌动→沉降→静水）。")
@@ -97,6 +119,9 @@ def run_smoke(
     except KeyboardInterrupt:
         print(f"[SMOKE] 冒烟中断（step={step}）")
     finally:
+        # 正常退出清理：UnregisterChannel 同步销毁 debug 球 + 清空水面。
+        # （异常断连时引擎侧 T3 心跳超时 3s 兜底清理。）
+        gym.disable_fluid_render_stream()
         env.close()
     return step
 
@@ -109,13 +134,45 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--target", default="127.0.0.1:50452", help="流体渲染流 gRPC 地址")
     parser.add_argument("--device", default="cuda:0", help="后端设备（必须 cuda:0 / hip:0；cpu 会报错）")
     parser.add_argument("--steps", type=int, default=600, help="步数（默认 600 ≈ 12s）")
+    parser.add_argument(
+        "--render-mode",
+        choices=["normal", "debug", "overlay"],
+        default=None,
+        help="渲染分支：debug=粒子球（水面停更，查悬浮/嵌入）；normal=恢复水面。默认不切换",
+    )
+    parser.add_argument(
+        "--set-param",
+        action="append",
+        default=[],
+        metavar="K=V",
+        help="运行时调渲染参数（可多次）。如 --set-param anisotropy_mode=0 "
+             "--set-param render_droplets=false",
+    )
+    parser.add_argument(
+        "--show-aabb",
+        action="store_true",
+        help="绘制通道 AABB 线框（需配合 --render-mode debug/overlay；对照薄层是否贴盒子顶面）",
+    )
     args = parser.parse_args(argv)
+
+    pairs: list[tuple[str, str]] = []
+    for item in args.set_param:
+        if "=" not in item:
+            parser.error(f"--set-param 需要 K=V 形式，收到 {item!r}")
+        k, v = item.split("=", 1)
+        pairs.append((k.strip(), v.strip()))
 
     print(
         f"[SMOKE] 冒烟参数: addr={args.addr}, target={args.target}, "
-        f"device={args.device}, steps={args.steps}"
+        f"device={args.device}, steps={args.steps}, "
+        f"render_mode={args.render_mode}, set_param={pairs}"
     )
-    n = run_smoke(args.addr, args.target, args.device, args.steps)
+    n = run_smoke(
+        args.addr, args.target, args.device, args.steps,
+        render_mode=args.render_mode,
+        render_param_pairs=pairs or None,
+        show_aabb=args.show_aabb,
+    )
     print(f"[SMOKE] 冒烟结束，共 {n} 步")
 
 

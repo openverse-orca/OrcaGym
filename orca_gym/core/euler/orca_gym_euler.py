@@ -361,9 +361,20 @@ class OrcaGymEuler:
             # 流体：顶层 fluid.fluid_blocks[] 非空时构造独立槽。
             fluid_blocks = euler.load_fluid_blocks(esdf_path)
             if fluid_blocks:
+                # P3：fluid.solver 配置（Studio EulerFluidSolverParamsComponent
+                # 导出）。无 solver 节（旧 ESDF）→ None → 全默认（零回归）。
+                # dt_mode=auto → dt=None（FluidGpuSim 按求解器默认画像）；
+                # fixed → 透传 dt（参数优先级：ESDF 组件值 > Python 默认）。
+                solver_cfg = euler.load_fluid_solver_config(esdf_path)
                 fluid_sim = euler.FluidGpuSim(
                     device=opt.device,
                     blocks=fluid_blocks,
+                    solver=solver_cfg["type"] if solver_cfg else "dfsph",
+                    dt=(
+                        solver_cfg["dt"]
+                        if solver_cfg and solver_cfg["dt_mode"] == "fixed"
+                        else None
+                    ),
                 )
                 object.__setattr__(self, "_fluid", fluid_sim)
 
@@ -770,10 +781,59 @@ class OrcaGymEuler:
         fluid = object.__getattribute__(self, "_fluid")
         return fluid.particle_count if fluid is not None else 0
 
+    def fluid_solver_kind(self) -> str | None:
+        """查询流体实际生效的求解器类型（P3/P4：ESDF fluid.solver 驱动）。
+
+        Returns:
+            FluidGpuSim 的 ``solver_kind``（"sph" / "dfsph" / "mpm"）；
+            无流体槽时 None。
+        """
+        fluid = object.__getattribute__(self, "_fluid")
+        return fluid.solver_kind if fluid is not None else None
+
     def fluid_render_sequence(self) -> int:
         """查询流体渲染流已成功推送的帧号（单调递增；0 = 未推过）。"""
         fluid = object.__getattribute__(self, "_fluid")
         return fluid.sequence if fluid is not None else 0
+
+    def disable_fluid_render_stream(self) -> None:
+        """断开流体渲染流（正常退出清理路径）。
+
+        向引擎侧发 UnregisterChannel（同步销毁 debug 球 + 清空水面），
+        再关闭 gRPC 连接。未连接时 no-op；异常断连场景由引擎侧 T3
+        心跳超时（默认 3s）兜底清理。
+        """
+        fluid = object.__getattribute__(self, "_fluid")
+        if fluid is not None:
+            fluid.disable_render_stream()
+
+    def set_fluid_debug_mode(
+        self,
+        mode: str = "debug",
+        **kwargs,
+    ) -> bool:
+        """切换 Studio 侧流体渲染调试分支（'normal'/'debug'/'overlay'）。
+
+        'debug' = 粒子球视图（水面停更），诊断空中悬浮/嵌入地面用。
+        其余参数透传 FluidGpuSim.set_debug_mode。
+        """
+        fluid = object.__getattribute__(self, "_fluid")
+        if fluid is None:
+            print("[OrcaGymEuler] set_fluid_debug_mode: 无流体槽，忽略。")
+            return False
+        return fluid.set_debug_mode(mode, **kwargs)
+
+    def set_fluid_render_params(self, params: dict[str, str]) -> bool:
+        """运行时调 Studio 侧水面渲染参数（RPC 临时值，优先级最高）。
+
+        常用键：kernel_radius_multiplier / anisotropy_mode /
+        iso_surface_threshold / render_droplets 等。
+        """
+        fluid = object.__getattribute__(self, "_fluid")
+        if fluid is None:
+            print("[OrcaGymEuler] set_fluid_render_params: 无流体槽，忽略。")
+            return False
+        return fluid.set_render_params(params)
 
     def set_coupling_ratio(self, m: int, n: int) -> None:
         """把 M:N 作为构造期/运行期配置注入 Euler，不在 Gym 里拆窗。
