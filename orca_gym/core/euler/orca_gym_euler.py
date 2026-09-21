@@ -811,8 +811,9 @@ class OrcaGymEuler:
         """查询流体实际生效的求解器类型（P3/P4：ESDF fluid.solver 驱动）。
 
         Returns:
-            流体相 ``FluidGpuSim`` 的 ``solver_kind``（"sph" / "dfsph" /
-            "mpm"）；无流体相时 None。
+            流体相 ``FluidGpuSim`` 的 ``solver_kind``（"dfsph" / "mpm"；
+            sph 已下线，旧 ESDF type=sph 自动降级 dfsph）；无流体相时
+            None。
         """
         euler = object.__getattribute__(self, "_euler")
         if euler is None:
