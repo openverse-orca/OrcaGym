@@ -396,6 +396,10 @@ class MuJoCoSimCoreEuler:
         host = self._solver.host
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            # mj_name2id 返回 -1 时 body_mocapid[-1] 取末位 body 的 mocapid，
+            # 可能静默错写其 mocap 槽位，故防御（同 _joint_id 模式）
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(model.body_mocapid[body_id])
             if mocap_id >= 0:
                 host.mocap_pos[mocap_id] = np.asarray(
@@ -775,11 +779,18 @@ class MuJoCoSimCoreEuler:
     # ---- F 类：模型参数写入方法（P2 真实实现：写 host + notify）----
 
     def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
-        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。"""
+        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             model.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)

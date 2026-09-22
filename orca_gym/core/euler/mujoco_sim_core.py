@@ -215,11 +215,18 @@ class MuJoCoSimCore:
         Args:
             mocap_dict: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
                         body_name 必须是 mocap body（mocapid >= 0）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mocapid[-1] 会取到末位 body 的 mocapid，可能静默错写
+                其 mocap 槽位。
         """
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(self._mjModel.body_mocapid[body_id])
             if mocap_id >= 0:
                 self._mjData.mocap_pos[mocap_id] = np.asarray(
@@ -234,11 +241,17 @@ class MuJoCoSimCore:
 
         Args:
             geom_friction_dict: dict[geom_name -> friction (3,) [sliding, torsion, rolling]]。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
         """
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name
             )
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             self._mjModel.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)
