@@ -215,11 +215,18 @@ class MuJoCoSimCore:
         Args:
             mocap_dict: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
                         body_name 必须是 mocap body（mocapid >= 0）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mocapid[-1] 会取到末位 body 的 mocapid，可能静默错写
+                其 mocap 槽位。
         """
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(self._mjModel.body_mocapid[body_id])
             if mocap_id >= 0:
                 self._mjData.mocap_pos[mocap_id] = np.asarray(
@@ -234,28 +241,44 @@ class MuJoCoSimCore:
 
         Args:
             geom_friction_dict: dict[geom_name -> friction (3,) [sliding, torsion, rolling]]。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
         """
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name
             )
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             self._mjModel.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（修改 body_mass/body_inertia）。
+        """为 body 添加额外重量（修改 body_mass，mj_setConst 重算派生量）。
 
         Args:
             weight_load_dict: dict[body_name -> weight (float, kg)]。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
         """
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             self._mjModel.body_mass[body_id] += float(weight)
-            # 简化惯性：按球体 I = 2/5 m r^2，r 取当前等价半径
-            # 实际项目按需重算，此处仅同步 mass（保持质心/惯量张量不变）
+        # body_subtreemass/body_invweight0 等是 mj_setConst 计算的派生量，
+        # 直接改 body_mass 不会更新，需重算（质心/惯量张量保持不变）。
+        # 动力学（qM/qacc）在下一步 mj_step 时由 mj_crb 按新 body_mass 自然重算。
+        if weight_load_dict:
+            mujoco.mj_setConst(self._mjModel, self._mjData)
 
     # --- 关节查询（阶段三 3.1.1）---
 
