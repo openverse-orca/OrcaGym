@@ -98,6 +98,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         sync_render: bool = False,
         device: str = "cpu",
         sim_config_overrides: dict[str, Any] | None = None,
+        sensor_host_path: str | None = None,
+        sensor_provider_manifests: list[str] | None = None,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -122,6 +124,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
                 在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
                 setter 写入立即生效。
+            sensor_host_path: 可选 Host 路径覆盖；配置厂商包时默认使用随包 Host。
+            sensor_provider_manifests: 显式信任的 provider.json 路径清单。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -138,6 +142,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 用户边界校验：非法键（含 timestep）尽早失败
         validate_opt_overrides(sim_config_overrides)
         self._opt_overrides = dict(sim_config_overrides) if sim_config_overrides else None
+        self._sensor_host_path = sensor_host_path
+        # 独立保存启动配置，避免调用方随后修改列表改变重载时的可信包范围。
+        self._sensor_provider_manifests = (tuple(sensor_provider_manifests)
+                                           if isinstance(sensor_provider_manifests, (list, tuple))
+                                           else sensor_provider_manifests)
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
@@ -175,13 +184,30 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.loop = asyncio.get_event_loop()
 
         # 4. 生命周期编排（原父类 __init__ 中的编排，现在自主调用）
-        self.initialize_grpc()
-        self._configure_backend()
-        self.pause_simulation()
-        self.set_time_step(time_step)
-        self.initialize_simulation()   # 内部设置 _gym，model/data 通过 property 读取
-        self.reset_simulation()
-        self.init_qpos_qvel()
+        self._gym = None
+        self._channel = None
+        self._stub = None
+        try:
+            self.initialize_grpc()
+            self._configure_backend()
+            self.pause_simulation()
+            self.set_time_step(time_step)
+            self.initialize_simulation()   # 内部设置 _gym，model/data 通过 property 读取
+            self.reset_simulation()
+            self.init_qpos_qvel()
+        except BaseException:
+            # 构造失败时调用者拿不到 env，也必须释放已创建的 DLL/通信资源。
+            if self._gym is not None:
+                try:
+                    self._gym.close_provider_sensors()
+                except Exception:
+                    _logger.exception("Failed to clean up provider sensors after initialization error")
+            if self._channel is not None:
+                try:
+                    self.loop.run_until_complete(self._channel.close())
+                except Exception:
+                    _logger.exception("Failed to close channel after initialization error")
+            raise
 
     def __dir__(self) -> list[str]:
         """只列出公共 API，不含内部组件或引擎内部。
@@ -204,11 +230,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         离线模式: skip_grpc_load=True 时创建 stub=None 的 Gym，不连接 gRPC。
         在线模式: 创建 grpc.aio.insecure_channel + GrpcServiceStub。
         """
+        # Replacing the facade must release its owned provider instances first.
+        if getattr(self, "_gym", None) is not None:
+            self._gym.close_provider_sensors()
+        sensor_options = {}
+        if self._sensor_host_path is not None or self._sensor_provider_manifests is not None:
+            sensor_options = {"sensor_host_path": self._sensor_host_path,
+                              "sensor_provider_manifests": self._sensor_provider_manifests}
         if self._skip_grpc_load:
             # 离线模式：不创建 gRPC channel
             self._channel = None
             self._stub = None
-            self._gym = OrcaGymEuler(stub=None)
+            self._gym = OrcaGymEuler(stub=None, **sensor_options)
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             if self._local_xml_path:
                 self._studio_bridge.configure_offline(self._local_xml_path)
@@ -223,7 +256,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             ],
         )
         self._stub = GrpcServiceStub(self._channel)
-        self._gym = OrcaGymEuler(stub=self._stub)
+        self._gym = OrcaGymEuler(stub=self._stub, **sensor_options)
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
@@ -245,6 +278,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
         K6 合规：返回 OrcaGymDataView 而非 OrcaGymData。
         """
+        try:
+            return self._initialize_simulation()
+        except BaseException:
+            # 公开重载也可能在时间步/远端同步阶段失败，不仅是首次构造。
+            try:
+                self._gym.close_provider_sensors()
+            except Exception:
+                _logger.exception("Failed to close provider sensors after model initialization error")
+            raise
+
+    def _initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
+        """按既有编排加载；错误清理由公开生命周期入口统一负责。"""
         # 1. 获取模型 XML 路径（离线：本地路径；在线：从 Studio 拉取）
         if self._skip_grpc_load:
             model_xml_path = self._local_xml_path
@@ -294,8 +339,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
-        """重置 MjData 到初始状态并同步 DataView。"""
-        self._gym.reset_data()
+        """重置物理及传感器状态，同步视图，但不生成一次虚假的传感器采样。"""
+        if getattr(self, "_sensor_provider_manifests", None) is not None:
+            self._gym.reset_data(sensor_seed=getattr(self, "seed_value", None))
+        else:
+            self._gym.reset_data()
         self._gym.reset_coupling_state()
         self._gym.sync_to_view()
         try:
@@ -362,26 +410,42 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """关闭环境，清理资源。
 
         若有未完成的录制任务，自动保存为 MP4 后再关闭。
-        离线模式（skip_grpc_load=True）仅清理录制器，跳过 gRPC 清理。
+        离线模式同样释放厂商 DLL 实例与 Host，只跳过 gRPC 清理。
         """
-        # 先保存未完成的录制任务
-        if self._recorder_manager is not None:
-            saved = self._recorder_manager.stop_all_and_save()
-            for cam_name, result in saved.items():
-                _logger.info(
-                    f"Auto-saved recording for camera '{cam_name}' "
-                    f"to {result.file_path}"
-                )
-            self._recorder_manager = None
-
-        if self._skip_grpc_load:
-            return
-        # 在线模式：清空 immediate 队列避免残留绘制（retained 对象随 FP 销毁自动释放）
-        if self._debug_draw is not None:
-            self.loop.run_until_complete(self._debug_draw.clear())
-        # 关闭 gRPC channel
+        errors = []
+        try:
+            if self._recorder_manager is not None:
+                saved = self._recorder_manager.stop_all_and_save()
+                for cam_name, result in saved.items():
+                    _logger.info(
+                        f"Auto-saved recording for camera '{cam_name}' "
+                        f"to {result.file_path}"
+                    )
+                self._recorder_manager = None
+        except BaseException as error:
+            errors.append(error)
+        # 一项清理失败也不能跳过其他已拥有资源；最终保留首个错误。
+        try:
+            if self._gym is not None:
+                self._gym.close_provider_sensors()
+        except BaseException as error:
+            errors.append(error)
+        # 根据实际持有的连接清理，避免重建时模式配置变化遗留上一代 channel。
         if self._channel is not None:
-            self.loop.run_until_complete(self._channel.close())
+            try:
+                if self._debug_draw is not None:
+                    self.loop.run_until_complete(self._debug_draw.clear())
+            except BaseException as error:
+                errors.append(error)
+            try:
+                self.loop.run_until_complete(self._channel.close())
+                self._channel = None
+                self._stub = None
+                self._debug_draw = None
+            except BaseException as error:
+                errors.append(error)
+        if errors:
+            raise errors[0]
 
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
@@ -403,8 +467,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 f"Action dimension mismatch. Expected {(self.model.nu,)}, "
                 f"found {np.array(ctrl).shape}"
             )
-        self._gym.step_with_coupling(ctrl, n_frames, self.dt)
-        self._gym.sync_to_view()
+        try:
+            self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+        finally:
+            # DLL 错误可能发生在物理已推进之后；视图不应伪装成回滚前状态。
+            self._gym.sync_to_view()
 
     def mj_step(self, nstep: int) -> None:
         """纯 MuJoCo 步进（无 Euler 耦合），委托 self._gym.mj_step()。"""
@@ -1072,6 +1139,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             dict[sensor_name -> sensordata 切片 np.ndarray]。
         """
         return self._gym.query_sensor_data(sensor_names)
+
+    def query_provider_sensor_data(self, instance_ids: list[str] | None = None) -> dict[str, np.ndarray]:
+        """读取第三方传感器输出副本；不推进物理或触发算法计算。
+
+        instance_ids 使用 XML 的精确实例名，不自动添加 agent 前缀。
+        省略时读取全部实例；首次物理采样前和 reset 后结果尚未就绪。
+        原生 MuJoCo sensor 仍使用 query_sensor_data()。任务自行决定哪些
+        输出放入 observation，本方法不改变 observation_space。
+        """
+        return self._gym.query_provider_sensor_data(instance_ids)
 
     def query_actuator_torques(self, actuator_names: list[str]) -> dict[str, np.ndarray]:
         """查询执行器力矩（委托 self._gym）。

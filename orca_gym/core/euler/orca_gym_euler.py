@@ -72,13 +72,15 @@ class OrcaGymEuler:
         "_multi_world", "multi_world",
     })
 
-    def __init__(self, stub=None) -> None:
+    def __init__(self, stub=None, *, sensor_host_path=None, sensor_provider_manifests=None) -> None:
         """初始化仿真核心 Facade。
 
         组合所有子组件，全部带下划线（不在 __dir__ 暴露，被 __getattribute__ 拦截）。
 
         Args:
             stub: OrcaStudio gRPC stub，传递给 OrcaStudioBridge。
+            sensor_host_path: 可选 Host 路径覆盖；配置厂商包时默认使用随包 Host。
+            sensor_provider_manifests: 显式允许加载的 provider.json 路径清单。
         """
         # 内部组件（全部带下划线，不在 __dir__ 暴露，访问被 __getattribute__ 拦截）
         self._sim = MuJoCoSimCore()
@@ -89,6 +91,10 @@ class OrcaGymEuler:
         self._euler = None    # EulerOrchestrator | None（骨架阶段恒为 None）
         self._orca_model = None  # OrcaGymModel | None（init_simulation 后填充，model property 返回缓存）
         self._multi_world = False    # DataView 边界标记（多世界跳过 build/sync，决策 D5）
+        self._sensor_providers_configured = sensor_host_path is not None or sensor_provider_manifests is not None
+        if sensor_host_path is not None or sensor_provider_manifests is not None:
+            object.__getattribute__(self, "_sim").configure_provider_sensors(
+                sensor_host_path, sensor_provider_manifests)
 
     # --- K3/K5: 隔离机制 ---
 
@@ -176,27 +182,29 @@ class OrcaGymEuler:
         registry = object.__getattribute__(self, "_registry")
         view = object.__getattribute__(self, "_view")
 
-        if opt.backend == SimBackend.EULER:
-            self._init_euler_backend(model_xml_path, esdf_path, opt_overrides)
-        else:
-            sim.init_simulation(model_xml_path)
-            # 绑定 SimConfig/ModelRegistry 到真实 mjModel
-            opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
-            registry._bind(sim._mjModel, model_xml_path)  # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
-            # CPU 分支：绑定后经公共 setter 应用（写 mj_model.opt 立即生效）
-            if opt_overrides:
-                for key, value in opt_overrides.items():
-                    setattr(opt, key, value)
-        # 分支可能替换 _sim，重新取后再同步 DataView
-        sim = object.__getattribute__(self, "_sim")
-
-        if not object.__getattribute__(self, "_multi_world"):
-            # 缓存 OrcaGymModel（构建一次，后续 model property 返回缓存）
-            object.__setattr__(
-                self, "_orca_model", registry.build_orca_gym_model()
-            )
-            # 首次同步 DataView
-            sim.sync_to_view(view)
+        try:
+            if opt.backend == SimBackend.EULER:
+                if self._sensor_providers_configured:
+                    raise ValueError("Provider sensors currently require the CPU MuJoCo backend; GPU sampling is not supported")
+                self._init_euler_backend(model_xml_path, esdf_path, opt_overrides)
+            else:
+                sim.init_simulation(model_xml_path)
+                # 绑定 SimConfig/ModelRegistry 到真实 mjModel
+                opt._bind(sim._mjModel)           # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
+                registry._bind(sim._mjModel, model_xml_path)  # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
+                if opt_overrides:
+                    for key, value in opt_overrides.items():
+                        setattr(opt, key, value)
+            sim = object.__getattribute__(self, "_sim")
+            if not object.__getattribute__(self, "_multi_world"):
+                object.__setattr__(self, "_orca_model", registry.build_orca_gym_model())
+                sim.sync_to_view(view)
+        except BaseException:
+            try:
+                self.close_provider_sensors()
+            except Exception:
+                pass
+            raise
         # 多世界：跳过 OrcaGymModel 构建与 DataView 首同步（决策 D5）——
         # obs 经 mjf_data.<field>.numpy() 直读，41 个委托方法不构成多世界
         # 数据通路（适配设计 §7.1），数据面归应用框架。
@@ -322,9 +330,18 @@ class OrcaGymEuler:
         """
         object.__getattribute__(self, "_sim").set_qpos_qvel(qpos, qvel)
 
-    def reset_data(self) -> None:
-        """重置 MjData 到初始状态。"""
-        object.__getattribute__(self, "_sim").reset_data()
+    def reset_data(self, *, sensor_seed: int | None = None) -> None:
+        """重置物理与算法状态；未指定传感器 seed 时保留当前值。"""
+        sim = object.__getattribute__(self, "_sim")
+        if sensor_seed is None or not self._sensor_providers_configured:
+            sim.reset_data()
+        else:
+            sim.reset_data(sensor_seed=sensor_seed)
+
+    def close_provider_sensors(self) -> None:
+        """释放传感器实例和 Host，不依赖渲染器是否在线。"""
+        if self._sensor_providers_configured:
+            object.__getattribute__(self, "_sim").close_provider_sensors()
 
     def register_pid_controller(
         self,
@@ -688,6 +705,14 @@ class OrcaGymEuler:
         model = object.__getattribute__(self, "_orca_model")
         sensor_info = {name: model.get_sensor(name) for name in sensor_names}
         return sim.query_sensor_data(sensor_names, sensor_info)
+
+    def query_provider_sensor_data(self, instance_ids: list[str] | None = None) -> dict[str, np.ndarray]:
+        """读取 DLL 的最近成功输出副本，不采样、不步进、不修改原生 sensor。"""
+        if not self._sensor_providers_configured:
+            if instance_ids:
+                raise KeyError("No provider sensors are configured")
+            return {}
+        return object.__getattribute__(self, "_sim").query_provider_sensor_data(instance_ids)
 
     def query_actuator_torques(
         self, actuator_names: list[str]

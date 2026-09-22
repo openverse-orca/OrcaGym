@@ -13,6 +13,7 @@ import mujoco
 import numpy as np
 
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
+from orca_gym.core.euler.provider_sensor_sampling import ProviderSensorSamplingMixin
 
 
 _ACTOR_MANIPULATOR_BODY_NAMES = (
@@ -50,7 +51,7 @@ def disable_actor_manipulator_collision(model: mujoco.MjModel) -> int:
     return n_disabled
 
 
-class MuJoCoSimCore:
+class MuJoCoSimCore(ProviderSensorSamplingMixin):
     """MuJoCo 仿真核心，持有 _mjModel/_mjData。
 
     _mjModel/_mjData 只存在于此类内部，不对外暴露。
@@ -79,6 +80,7 @@ class MuJoCoSimCore:
         """
         self._mjModel = None    # mujoco.MjModel | None
         self._mjData = None     # mujoco.MjData | None
+        self._initialize_provider_sensor_state()
 
     # --- 生命周期方法 ---
 
@@ -88,11 +90,13 @@ class MuJoCoSimCore:
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
         """
+        self.close_provider_sensors()
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
         # AR-001：模型加载后关闭 ActorManipulator 拖拽代理的碰撞掩码，
         # 消除其埋地/远端碰撞体与无限平面贯产生的垃圾约束行（不影响 mocap weld 拖拽）。
         self.disable_actor_manipulator_collision()
+        self._bind_provider_sensors(model_xml_path)
 
     def disable_actor_manipulator_collision(self) -> int:
         """关闭 ActorManipulator 拖拽代理几何体的碰撞掩码（可随时重试/重断言）。
@@ -104,14 +108,19 @@ class MuJoCoSimCore:
             return 0
         return disable_actor_manipulator_collision(self._mjModel)
 
-    def reset_data(self) -> None:
+    def reset_data(self, *, sensor_seed: int | None = None) -> None:
         """重置 MjData 到初始状态（mj_resetData）。
 
         供 OrcaGymEulerEnv.reset_simulation 调用。
         """
         if self._mjModel is None or self._mjData is None:
             raise RuntimeError("Simulation not initialized")
+        seed = self._provider_seed if sensor_seed is None else self._validate_provider_seed(sensor_seed)
+        if (self._provider_configuration is not None and self._provider_status != "inactive"
+                and (self._provider_runtime is None or self._provider_status == "closed")):
+            raise RuntimeError("Provider sensors require model reload before reset")
         mujoco.mj_resetData(self._mjModel, self._mjData)
+        self.reset_provider_sensors(seed)
 
     def step(self, nstep: int) -> None:
         """执行 nstep 步 MuJoCo 仿真。
@@ -119,7 +128,10 @@ class MuJoCoSimCore:
         Args:
             nstep: 步进次数。
         """
-        mujoco.mj_step(self._mjModel, self._mjData, nstep)
+        if self._provider_configuration is not None and self._provider_status != "inactive":
+            self._step_provider_sensors(nstep)
+        else:
+            mujoco.mj_step(self._mjModel, self._mjData, nstep)
 
     def forward(self) -> None:
         """执行 MuJoCo 前向计算（不步进，仅更新派生量）。"""
