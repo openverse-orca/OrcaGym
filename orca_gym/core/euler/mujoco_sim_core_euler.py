@@ -787,14 +787,23 @@ class MuJoCoSimCoreEuler:
         self._solver.notify_model_changed(_model_changed_flags().GEOM_FRICTION)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。"""
+        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             model.body_mass[body_id] += float(weight)
         # body_mass 影响 subtreemass/invweight0，走全量 set_const（BODY_INERTIAL）
-        self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
+        if weight_load_dict:
+            self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
 
     def update_equality_constraints(self, eq_list: list[dict]) -> None:
         """更新等式约束（写 host mj_model.eq_*，set_const_0 重算 eq_data）。"""

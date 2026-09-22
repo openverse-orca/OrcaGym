@@ -665,6 +665,17 @@ class TestModelWriteMethods(unittest.TestCase):
         self.assertAlmostEqual(core._solver.mj_model.body_mass[0], base + 2.5)
         self.assertEqual(core._solver.calls, [ModelChangedFlags.BODY_INERTIAL])
 
+    def test_add_extra_weight_invalid_name_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body。"""
+        core = self._core()
+        model = core._solver.mj_model
+        last_id = model.nbody - 1
+        last_mass = float(model.body_mass[last_id])
+        with self.assertRaises(ValueError):
+            core.add_extra_weight({"no_such_body": 2.5})
+        self.assertAlmostEqual(float(model.body_mass[last_id]), last_mass, places=6)
+        self.assertEqual(core._solver.calls, [])
+
     def test_update_equality_constraints_writes_slot(self):
         core = self._core()
         core.update_equality_constraints(

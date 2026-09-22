@@ -244,18 +244,28 @@ class MuJoCoSimCore:
             ).reshape(3)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（修改 body_mass/body_inertia）。
+        """为 body 添加额外重量（修改 body_mass，mj_setConst 重算派生量）。
 
         Args:
             weight_load_dict: dict[body_name -> weight (float, kg)]。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
         """
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             self._mjModel.body_mass[body_id] += float(weight)
-            # 简化惯性：按球体 I = 2/5 m r^2，r 取当前等价半径
-            # 实际项目按需重算，此处仅同步 mass（保持质心/惯量张量不变）
+        # body_subtreemass/body_invweight0 等是 mj_setConst 计算的派生量，
+        # 直接改 body_mass 不会更新，需重算（质心/惯量张量保持不变）。
+        # 动力学（qM/qacc）在下一步 mj_step 时由 mj_crb 按新 body_mass 自然重算。
+        if weight_load_dict:
+            mujoco.mj_setConst(self._mjModel, self._mjData)
 
     # --- 关节查询（阶段三 3.1.1）---
 

@@ -301,6 +301,23 @@ class TestSimCoreSetMethodsFunctional(unittest.TestCase):
         new_mass = float(self.sim._mjModel.body_mass[self.pelvis_id])
         self.assertAlmostEqual(new_mass - old_mass, 2.0, places=6)
 
+    def test_add_extra_weight_recomputes_subtreemass(self):
+        """添加重量后 body_subtreemass 派生量被 mj_setConst 重算。"""
+        old_sub = float(self.sim._mjModel.body_subtreemass[self.pelvis_id])
+        self.sim.add_extra_weight({"pelvis": 2.0})
+        new_sub = float(self.sim._mjModel.body_subtreemass[self.pelvis_id])
+        self.assertAlmostEqual(new_sub - old_sub, 2.0, places=6)
+
+    def test_add_extra_weight_invalid_name_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body。"""
+        last_id = self.sim._mjModel.nbody - 1
+        last_mass = float(self.sim._mjModel.body_mass[last_id])
+        with self.assertRaises(ValueError):
+            self.sim.add_extra_weight({"manipulation_box_geom": 2.0})
+        self.assertAlmostEqual(
+            float(self.sim._mjModel.body_mass[last_id]), last_mass, places=6
+        )
+
 
 class TestMuJoCoSimCoreFunctional(unittest.TestCase):
     """MuJoCoSimCore 真实 MuJoCo 功能测试（对应阶段二 Step 1 验收标准）。"""
