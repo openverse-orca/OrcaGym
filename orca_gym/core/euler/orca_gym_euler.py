@@ -372,6 +372,9 @@ class OrcaGymEuler:
                 # 按求解器默认画像；fixed → 透传 dt（参数优先级：
                 # ESDF 组件值 > Python 默认）。
                 solver_cfg = euler.load_fluid_solver_config(esdf_path)
+                # RD：fluid.render_domain（Studio EulerFluidRenderDomainComponent
+                # 导出）。无该子节（旧 ESDF）→ None → 自动域推导（零回归）。
+                render_domain_cfg = euler.load_fluid_render_domain(esdf_path)
                 coupled = euler.CoupledGpuSim(
                     model_xml_path=model_xml_path,
                     esdf_path=esdf_path,
@@ -381,6 +384,7 @@ class OrcaGymEuler:
                     coupling_m=object.__getattribute__(self, "_coupling_m"),
                     coupling_n=object.__getattribute__(self, "_coupling_n"),
                     fluid_solver_config=solver_cfg,
+                    fluid_render_domain=render_domain_cfg,
                 )
                 object.__setattr__(self, "_euler", coupled)
 
@@ -843,8 +847,9 @@ class OrcaGymEuler:
         """查询流体实际生效的求解器类型（P3/P4：ESDF fluid.solver 驱动）。
 
         Returns:
-            流体相 ``FluidGpuSim`` 的 ``solver_kind``（"sph" / "dfsph" /
-            "mpm"）；无流体相时 None。
+            流体相 ``FluidGpuSim`` 的 ``solver_kind``（"dfsph" / "mpm"；
+            sph 已下线，旧 ESDF type=sph 自动降级 dfsph）；无流体相时
+            None。
         """
         euler = object.__getattribute__(self, "_euler")
         if euler is None:
