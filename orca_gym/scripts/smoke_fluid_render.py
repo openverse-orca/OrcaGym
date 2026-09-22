@@ -21,11 +21,16 @@
 用法：
     python -m orca_gym.scripts.smoke_fluid_render \
         [--addr localhost:50051] [--target 127.0.0.1:50452] \
-        [--device cuda:0] [--steps 600]
+        [--device cuda:0] [--sim-time 12] [--steps 600] \
+        [--render-mode debug] [--eulerviewer]
+
+不传 --sim-time 且不传 --steps 时一直跑，按 Ctrl+C 结束。
+--sim-time 的单位是仿真秒（MuJoCo data.time），不是墙钟。
 """
 from __future__ import annotations
 
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
 
@@ -39,6 +44,197 @@ _logger = get_orca_logger()
 TIME_STEP = 0.001
 FRAME_SKIP = 20
 REALTIME_STEP = TIME_STEP * FRAME_SKIP
+WATER_COLOR = (0.20, 0.45, 0.85)
+BOX_COLOR = (0.55, 0.55, 0.60)
+DOMAIN_COLOR = (1.0, 0.60, 0.10)
+
+
+def euler_xyz_matrix(degrees: list[float]) -> np.ndarray:
+    """把 MuJoCo 的 xyz 欧拉角（度，内旋）变成 3x3 旋转矩阵。
+
+    做什么：R = Rx @ Ry @ Rz，与场景 XML 里 body euler 的约定一致。
+    为什么：Polyscope 里的碰撞盒必须和 Studio 里的板子朝向相同。
+    """
+    ax, ay, az = np.radians(degrees)
+    cx, sx = np.cos(ax), np.sin(ax)
+    cy, sy = np.cos(ay), np.sin(ay)
+    cz, sz = np.cos(az), np.sin(az)
+    rx = np.array([[1.0, 0.0, 0.0], [0.0, cx, -sx], [0.0, sx, cx]])
+    ry = np.array([[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]])
+    rz = np.array([[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]])
+    return rx @ ry @ rz
+
+
+def read_collision_boxes(xml_path: str) -> list[dict]:
+    """读 XML 里 type=box 的碰撞盒（世界系中心、旋转、半长）。
+
+    做什么：用 body 的 pos/euler 和 geom 的 size 拼世界系盒子。
+    为什么：Polyscope 没有 Studio 的容器网格，线框用来对照粒子有没有穿板。
+    """
+    root = ET.parse(xml_path).getroot()
+    boxes: list[dict] = []
+    for body in root.iter("body"):
+        body_pos = np.array([float(v) for v in body.get("pos", "0 0 0").split()])
+        rotation = euler_xyz_matrix(
+            [float(v) for v in body.get("euler", "0 0 0").split()]
+        )
+        for geom in body.findall("geom"):
+            if geom.get("type") != "box" or "size" not in geom.attrib:
+                continue
+            geom_pos = np.array([float(v) for v in geom.get("pos", "0 0 0").split()])
+            half = np.array([float(v) for v in geom.get("size").split()][:3])
+            boxes.append(
+                {
+                    "name": geom.get("name") or body.get("name", "box"),
+                    "center": body_pos + geom_pos,
+                    "rotation": rotation,
+                    "half": half,
+                }
+            )
+    return boxes
+
+
+def box_wireframe(center: np.ndarray, rotation: np.ndarray, half: np.ndarray):
+    """盒子 8 个角点和 12 条边，坐标已经变到世界系。"""
+    hx, hy, hz = half
+    corners = np.array(
+        [
+            [-hx, -hy, -hz], [hx, -hy, -hz], [hx, hy, -hz], [-hx, hy, -hz],
+            [-hx, -hy, hz], [hx, -hy, hz], [hx, hy, hz], [-hx, hy, hz],
+        ],
+        dtype=np.float64,
+    )
+    nodes = corners @ rotation.T + center
+    edges = np.array(
+        [
+            [0, 1], [1, 2], [2, 3], [3, 0],
+            [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7],
+        ],
+        dtype=np.int32,
+    )
+    return nodes.astype(np.float32), edges
+
+
+def run_studio_loop(env, gym, n_particles: int, max_steps: Optional[int], sim_time_limit: Optional[float]) -> int:
+    """按原来的节拍步进，并把粒子推给 Studio。
+
+    做什么：每步 env.step 再 env.render，墙钟不够 REALTIME_STEP 时补睡。
+    为什么：不开 Polyscope 时保持原冒烟节奏，不把显示窗口嵌进循环。
+    """
+    step = 0
+    while True:
+        if max_steps is not None and step >= max_steps:
+            print(f"[SMOKE] 已到步数上限 {max_steps}")
+            break
+        start = datetime.now()
+        action = np.zeros(env.unwrapped.nu, dtype=np.float32)
+        env.step(action)
+        env.render()
+        step += 1
+        sim_time = float(env.unwrapped.data.time)
+        if step % 100 == 0:
+            print(
+                f"[SMOKE] step={step}, time={sim_time:.3f}s, "
+                f"粒子数={n_particles}, 已推流帧号={gym.fluid_render_sequence()}"
+            )
+        if sim_time_limit is not None and sim_time >= sim_time_limit:
+            print(f"[SMOKE] 已到仿真时间上限 {sim_time_limit:g}s（当前 {sim_time:.3f}s）")
+            break
+        elapsed = (datetime.now() - start).total_seconds()
+        if elapsed < REALTIME_STEP:
+            time.sleep(REALTIME_STEP - elapsed)
+    return step
+
+
+def run_euler_viewer(env, gym, n_particles: int, max_steps: Optional[int], sim_time_limit: Optional[float]) -> int:
+    """打开 Polyscope，每帧推进一步，同时继续把同一帧推给 Studio。
+
+    做什么：窗口回调里 env.step、env.render，再用流体粒子坐标刷新点云。
+    为什么：Polyscope 的 show() 占住主线程，步进必须放进它的帧回调，
+    否则 Studio 循环和窗口循环不能一起跑。
+    """
+    try:
+        import polyscope as ps
+        import polyscope.imgui as psim
+    except ImportError:
+        print("[SMOKE] polyscope 未安装，改为只推 Studio。")
+        return run_studio_loop(env, gym, n_particles, max_steps, sim_time_limit)
+
+    positions = gym.fluid_particle_positions()
+    ps.init()
+    ps.set_program_name("Euler viewer")
+    ps.set_up_dir("z_up")
+    ps.set_ground_plane_mode("tile")
+    ps.set_ground_plane_height_factor(0.0)
+    if len(positions) > 0:
+        center = positions.mean(axis=0)
+        span = max(float(np.ptp(positions, axis=0).max()), 1.0)
+        ps.look_at(
+            camera_location=(
+                float(center[0] + 1.8 * span),
+                float(center[1] - 2.2 * span),
+                float(center[2] + 1.2 * span),
+            ),
+            target=(float(center[0]), float(center[1]), float(center[2])),
+        )
+
+    xml_path = gym.fluid_scene_xml()
+    if xml_path:
+        for box in read_collision_boxes(xml_path):
+            nodes, edges = box_wireframe(box["center"], box["rotation"], box["half"])
+            curve = ps.register_curve_network(f"box/{box['name']}", nodes, edges)
+            curve.set_radius(0.008, relative=False)
+            curve.set_color(BOX_COLOR)
+
+    bounds = gym.fluid_bounds()
+    if bounds is not None:
+        low, high = bounds
+        center = np.array([(low[i] + high[i]) / 2.0 for i in range(3)])
+        half = np.array([(high[i] - low[i]) / 2.0 for i in range(3)])
+        nodes, edges = box_wireframe(center, np.eye(3), half)
+        domain = ps.register_curve_network("physics_bounds", nodes, edges)
+        domain.set_radius(0.006, relative=False)
+        domain.set_color(DOMAIN_COLOR)
+
+    cloud = ps.register_point_cloud("water", positions, color=WATER_COLOR)
+    cloud.set_radius(float(gym.fluid_particle_radius()), relative=False)
+
+    ui = {"paused": False, "step": 0}
+
+    def on_frame() -> None:
+        sim_time = float(env.unwrapped.data.time)
+        psim.TextUnformatted(
+            f"step = {ui['step']}   t = {sim_time:.3f} s   particles = {n_particles}"
+        )
+        changed, paused = psim.Checkbox("paused", ui["paused"])
+        if changed:
+            ui["paused"] = paused
+        if ui["paused"]:
+            return
+        if max_steps is not None and ui["step"] >= max_steps:
+            print(f"[SMOKE] 已到步数上限 {max_steps}")
+            ps.unshow()
+            return
+        if sim_time_limit is not None and sim_time >= sim_time_limit:
+            print(f"[SMOKE] 已到仿真时间上限 {sim_time_limit:g}s（当前 {sim_time:.3f}s）")
+            ps.unshow()
+            return
+        action = np.zeros(env.unwrapped.nu, dtype=np.float32)
+        env.step(action)
+        env.render()
+        ui["step"] += 1
+        cloud.update_point_positions(gym.fluid_particle_positions())
+        if ui["step"] % 100 == 0:
+            print(
+                f"[SMOKE] step={ui['step']}, time={float(env.unwrapped.data.time):.3f}s, "
+                f"粒子数={n_particles}, 已推流帧号={gym.fluid_render_sequence()}"
+            )
+
+    ps.set_user_callback(on_frame)
+    print("[SMOKE] Polyscope 已打开。Studio 仍接收同一帧粒子。")
+    ps.show()
+    return int(ui["step"])
 
 
 def run_smoke(
@@ -46,11 +242,17 @@ def run_smoke(
     fluid_render_target: str,
     device: str,
     max_steps: Optional[int],
+    sim_time_limit: Optional[float] = None,
     render_mode: Optional[str] = None,
     render_param_pairs: Optional[list[tuple[str, str]]] = None,
     show_aabb: bool = False,
+    euler_viewer: bool = False,
 ) -> int:
-    """跑流体冒烟循环，返回实际执行的步数。"""
+    """跑流体冒烟循环，返回实际执行的步数。
+
+    max_steps 是环境步数上限；sim_time_limit 是仿真时钟上限（秒，看 data.time）。
+    两者都为空时不自动停止。两者都有值时，先到达的条件先停。
+    """
     env = EulerSimEnv(
         frame_skip=FRAME_SKIP,
         orcagym_addr=orcagym_addr,
@@ -100,22 +302,19 @@ def run_smoke(
     obs, info = env.reset()
     print("[SMOKE] 环境已 reset，开始步进。在 Studio 视口观察水面（涌动→沉降→静水）。")
 
+    if euler_viewer:
+        print("[SMOKE] 将同时打开 Polyscope。关窗或 Ctrl+C 结束。勾选 paused 时 Studio 也不再推进。")
+    elif sim_time_limit is None and max_steps is None:
+        print("[SMOKE] 未指定仿真时间或步数，将一直运行，按 Ctrl+C 结束。")
+    elif sim_time_limit is not None:
+        print(f"[SMOKE] 仿真时间上限 {sim_time_limit:g}s（按 data.time）。")
+
     step = 0
     try:
-        while max_steps is None or step < max_steps:
-            start = datetime.now()
-            action = np.zeros(env.unwrapped.nu, dtype=np.float32)
-            obs, reward, terminated, truncated, info = env.step(action)
-            env.render()
-            step += 1
-            if step % 100 == 0:
-                print(
-                    f"[SMOKE] step={step}, time={float(env.unwrapped.data.time):.3f}s, "
-                    f"粒子数={n_particles}, 已推流帧号={gym.fluid_render_sequence()}"
-                )
-            elapsed = (datetime.now() - start).total_seconds()
-            if elapsed < REALTIME_STEP:
-                time.sleep(REALTIME_STEP - elapsed)
+        if euler_viewer:
+            step = run_euler_viewer(env, gym, n_particles, max_steps, sim_time_limit)
+        else:
+            step = run_studio_loop(env, gym, n_particles, max_steps, sim_time_limit)
     except KeyboardInterrupt:
         print(f"[SMOKE] 冒烟中断（step={step}）")
     finally:
@@ -153,6 +352,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         action="store_true",
         help="绘制通道 AABB 线框（需配合 --render-mode debug/overlay；对照薄层是否贴盒子顶面）",
     )
+    parser.add_argument(
+        "--eulerviewer",
+        action="store_true",
+        help="同时打开 Polyscope，和 Studio 看同一份流体粒子",
+    )
     args = parser.parse_args(argv)
 
     pairs: list[tuple[str, str]] = []
@@ -165,13 +369,15 @@ def main(argv: Optional[list[str]] = None) -> None:
     print(
         f"[SMOKE] 冒烟参数: addr={args.addr}, target={args.target}, "
         f"device={args.device}, steps={args.steps}, "
-        f"render_mode={args.render_mode}, set_param={pairs}"
+        f"render_mode={args.render_mode}, eulerviewer={args.eulerviewer}, "
+        f"set_param={pairs}"
     )
     n = run_smoke(
         args.addr, args.target, args.device, args.steps,
         render_mode=args.render_mode,
         render_param_pairs=pairs or None,
         show_aabb=args.show_aabb,
+        euler_viewer=args.eulerviewer,
     )
     print(f"[SMOKE] 冒烟结束，共 {n} 步")
 

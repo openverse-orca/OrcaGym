@@ -807,6 +807,38 @@ class OrcaGymEuler:
             return 0
         return int(euler.fluid_particle_count())
 
+    def fluid_particle_positions(self) -> np.ndarray:
+        """拷贝当前流体粒子世界坐标，形状 (n, 3)。
+
+        做什么：转发 CoupledGpuSim。无 Euler 或无流体相时返回空数组。
+        为什么：冒烟脚本用它刷新 Polyscope，和 Studio 推流看同一帧位置。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return np.zeros((0, 3), dtype=np.float32)
+        return euler.fluid_particle_positions()
+
+    def fluid_particle_radius(self) -> float:
+        """流体物理粒子半径 [m]。无流体相时为 0。"""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return 0.0
+        return float(euler.fluid_particle_radius())
+
+    def fluid_bounds(self):
+        """流体求解域 AABB ``(lo, hi)``。无流体相时为 None。"""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return None
+        return euler.fluid_bounds()
+
+    def fluid_scene_xml(self) -> str | None:
+        """流体场景 XML 路径。无 Euler 时为 None。"""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return None
+        return euler.fluid_scene_xml()
+
     def fluid_solver_kind(self) -> str | None:
         """查询流体实际生效的求解器类型（P3/P4：ESDF fluid.solver 驱动）。
 
