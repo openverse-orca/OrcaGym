@@ -34,6 +34,19 @@ def reset_controllers():
         pybullet_server.connect()
 
 
+def _sim_timestep(sim) -> float:
+    """读取仿真物理步长。
+
+    做什么：有 ``sim_config.timestep`` 时用它（Euler 环境/Gym），
+    否则用 ``sim.opt.timestep``（CPU ``OrcaGymLocal``）。
+    为什么：Euler 没有 ``opt``，OSC 插值器仍需要物理 dt。
+    """
+    sim_config = getattr(sim, "sim_config", None)
+    if sim_config is not None and hasattr(sim_config, "timestep"):
+        return float(sim_config.timestep)
+    return float(sim.opt.timestep)
+
+
 def get_pybullet_server():
     """
     Getter to return reference to pybullet server module variable
@@ -119,7 +132,7 @@ def controller_factory(name, params):
     if params["interpolation"] == "linear":
         interpolator = LinearInterpolator(
             ndim=params["ndim"],
-            controller_freq=(1 / params["sim"].opt.timestep),
+            controller_freq=(1 / _sim_timestep(params["sim"])),
             policy_freq=params["policy_freq"],
             ramp_ratio=params["ramp_ratio"],
         )
