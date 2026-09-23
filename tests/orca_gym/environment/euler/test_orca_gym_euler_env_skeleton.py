@@ -654,8 +654,10 @@ class TestEnvQueryDelegationArchCompliance(unittest.TestCase):
             "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
             "jnt_qposadr", "jnt_dofadr",
             "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
-            "query_site_pos_and_mat", "query_site_size",
+            "query_body_xpos_xmat_xquat",
+            "query_site_pos_and_mat", "query_site_pos_and_quat", "query_site_size",
             "query_sensor_data", "query_actuator_torques",
+            "mj_fullM", "disable_actuator", "set_sync_render", "has_euler",
             "query_contact_simple", "query_contact_force",
             "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
         ]
@@ -693,8 +695,10 @@ class TestEnvQueryDelegationArchCompliance(unittest.TestCase):
             "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
             "jnt_qposadr", "jnt_dofadr",
             "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
-            "query_site_pos_and_mat", "query_site_size",
+            "query_body_xpos_xmat_xquat",
+            "query_site_pos_and_mat", "query_site_pos_and_quat", "query_site_size",
             "query_sensor_data", "query_actuator_torques",
+            "mj_fullM", "disable_actuator", "has_euler",
             "query_contact_simple", "query_contact_force",
             "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
         ]
@@ -726,14 +730,44 @@ class TestEnvQueryDelegationFunctional(unittest.TestCase):
         expected = env.data.qpos[0]
         np.testing.assert_array_equal(result["hinge"], np.array([expected]))
 
-    def test_env_get_body_xpos_xmat_xquat_returns_dict(self):
-        """get_body_xpos_xmat_xquat 返回 dict[body -> {xpos/xmat/xquat}]，形状正确。"""
+    def test_env_query_site_pos_and_quat_world(self):
+        """query_site_pos_and_quat 返回 xpos/xquat，形状正确。"""
         env = _make_skeleton_env()
         env.mj_forward()
-        result = env.get_body_xpos_xmat_xquat(["pendulum"])
+        result = env.query_site_pos_and_quat(["tip"])
+        self.assertIn("tip", result)
+        self.assertEqual(result["tip"]["xpos"].shape, (3,))
+        self.assertEqual(result["tip"]["xquat"].shape, (4,))
+
+    def test_env_mj_fullM_shape(self):
+        """mj_fullM 返回 (nv, nv) 质量矩阵。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        mass_matrix = env.mj_fullM()
+        self.assertEqual(mass_matrix.shape, (env.model.nv, env.model.nv))
+
+    def test_env_disable_actuator_and_has_euler(self):
+        """disable_actuator 可调用；纯刚体 pendulum 的 has_euler 为 False。"""
+        env = _make_skeleton_env()
+        env.disable_actuator([0])
+        self.assertFalse(env.has_euler())
+
+    def test_env_get_body_xpos_xmat_xquat_returns_tuple(self):
+        """get_body_xpos_xmat_xquat 返回 (xpos, xmat, xquat) 扁平数组，与 CPU 解包一致。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        xpos, xmat, xquat = env.get_body_xpos_xmat_xquat(["pendulum"])
+        self.assertEqual(xpos.shape, (3,))
+        self.assertEqual(xmat.shape, (9,))
+        self.assertEqual(xquat.shape, (4,))
+
+    def test_env_query_body_xpos_xmat_xquat_returns_dict(self):
+        """query_body_xpos_xmat_xquat 返回 dict[body -> {xpos/xmat/xquat}]，形状正确。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        result = env.query_body_xpos_xmat_xquat(["pendulum"])
         self.assertIsInstance(result, dict)
         self.assertIn("pendulum", result)
-        # xpos 形状 (3,)，xmat 形状 (3,3) 或 (9,)，xquat 形状 (4,)
         self.assertEqual(result["pendulum"]["xpos"].shape, (3,))
         self.assertEqual(result["pendulum"]["xquat"].shape, (4,))
 
@@ -777,11 +811,15 @@ class TestEnvQueryDelegationFunctional(unittest.TestCase):
         env_qpos = env.query_joint_qpos(["hinge"])
         gym_qpos = env._gym.query_joint_qpos(["hinge"])
         np.testing.assert_array_equal(env_qpos["hinge"], gym_qpos["hinge"])
-        # body xpos
-        env_body = env.get_body_xpos_xmat_xquat(["pendulum"])
+        # body xpos：get_ 扁平三元组与 gym 字典查询一致
+        env_xpos, _, _ = env.get_body_xpos_xmat_xquat(["pendulum"])
         gym_body = env._gym.query_body_xpos_xmat_xquat(["pendulum"])
         np.testing.assert_array_equal(
-            env_body["pendulum"]["xpos"], gym_body["pendulum"]["xpos"]
+            env_xpos, np.asarray(gym_body["pendulum"]["xpos"]).reshape(-1)
+        )
+        env_body_dict = env.query_body_xpos_xmat_xquat(["pendulum"])
+        np.testing.assert_array_equal(
+            env_body_dict["pendulum"]["xpos"], gym_body["pendulum"]["xpos"]
         )
         # body subtree mass
         env_mass = env.body_subtree_mass("pendulum")
@@ -1825,7 +1863,7 @@ class TestEnvAnchorActorFunctional(unittest.TestCase):
 
     def test_anchor_actor_sets_mocap_to_actor_pose(self):
         """锚定后 mocap 位姿 = actor 初始位姿。"""
-        actor_pose_before = self.env.get_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
+        actor_pose_before = self.env.query_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
         self.env._anchor_actor("pelvis", "weld")
         # 查询 mocap body 当前的 pos/quat（通过 DataView 零拷贝视图）
         mocap_names = self.env._gym.mocap_body_names()

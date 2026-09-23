@@ -54,7 +54,10 @@ class Controller(object, metaclass=abc.ABCMeta):
 
         # mujoco simulator state
         self.gym = gym
-        self.model_timestep = gym.opt.timestep   #macros.SIMULATION_TIMESTEP
+        if hasattr(gym, "sim_config"):
+            self.model_timestep = gym.sim_config.timestep
+        else:
+            self.model_timestep = gym.opt.timestep
         self.eef_name = eef_name
         self.joint_index = joint_indexes["joints"]
         self.qpos_index = joint_indexes["qpos"]

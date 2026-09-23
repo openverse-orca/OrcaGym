@@ -1173,6 +1173,14 @@ class OrcaGymEuler:
         """
         return object.__getattribute__(self, "_sim").mj_jac_site(site_names)
 
+    def mj_fullM(self) -> np.ndarray:
+        """完整质量矩阵 (nv, nv)，委托 SimCore。"""
+        return object.__getattribute__(self, "_sim").mj_fullM()
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组禁用，委托 SimCore。"""
+        object.__getattribute__(self, "_sim").disable_actuator(actuator_groups)
+
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（委托 ModelRegistry）。"""
         return object.__getattribute__(self, "_registry").equality_data_width()

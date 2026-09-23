@@ -126,8 +126,15 @@ class TestDelegationChainQueryMethods(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_get_body_xpos_xmat_xquat_chain(self):
-        """get_body_xpos_xmat_xquat 返回 dict 含 xpos/xmat/xquat。"""
-        result = self.env.get_body_xpos_xmat_xquat(["pelvis"])
+        """get_body_xpos_xmat_xquat 返回 (xpos, xmat, xquat) 扁平数组。"""
+        xpos, xmat, xquat = self.env.get_body_xpos_xmat_xquat(["pelvis"])
+        self.assertEqual(xpos.shape, (3,))
+        self.assertEqual(xmat.shape, (9,))
+        self.assertEqual(xquat.shape, (4,))
+
+    def test_query_body_xpos_xmat_xquat_chain(self):
+        """query_body_xpos_xmat_xquat 返回 dict 含 xpos/xmat/xquat。"""
+        result = self.env.query_body_xpos_xmat_xquat(["pelvis"])
         self.assertIn("pelvis", result)
         self.assertIn("xpos", result["pelvis"])
         self.assertIn("xmat", result["pelvis"])
@@ -303,18 +310,16 @@ class TestDataConsistency(unittest.TestCase):
         """env.data.body_xpos(name) 与 env.get_body_xpos_xmat_xquat([name]) 一致。"""
         body_name = "pelvis"
         dv_xpos = self.env.data.body_xpos(body_name)
-        query_result = self.env.get_body_xpos_xmat_xquat([body_name])
-        np.testing.assert_array_almost_equal(
-            dv_xpos, query_result[body_name]["xpos"]
-        )
+        xpos, _, _ = self.env.get_body_xpos_xmat_xquat([body_name])
+        np.testing.assert_array_almost_equal(dv_xpos, xpos)
 
     def test_dataview_query_consistency_body_xmat(self):
         """env.data.body_xmat(name) 与 query 结果 xmat 一致（DataView 返回扁平化需 reshape）。"""
         body_name = "pelvis"
         dv_xmat = self.env.data.body_xmat(body_name)
-        query_result = self.env.get_body_xpos_xmat_xquat([body_name])
+        _, xmat, _ = self.env.get_body_xpos_xmat_xquat([body_name])
         np.testing.assert_array_almost_equal(
-            dv_xmat.reshape(3, 3), query_result[body_name]["xmat"]
+            dv_xmat.reshape(3, 3), xmat.reshape(3, 3)
         )
 
     def test_dataview_xfrc_consistency(self):
@@ -370,8 +375,9 @@ class TestKConstraintRegression(unittest.TestCase):
         env.mj_forward()
         # query 方法返回 dict
         self.assertIsInstance(env.query_joint_qpos(["left_hip_pitch_joint"]), dict)
-        # body 查询返回 dict
-        self.assertIsInstance(env.get_body_xpos_xmat_xquat(["pelvis"]), dict)
+        # body 按名查询返回 dict；get_ 返回扁平三元组
+        self.assertIsInstance(env.query_body_xpos_xmat_xquat(["pelvis"]), dict)
+        self.assertIsInstance(env.get_body_xpos_xmat_xquat(["pelvis"]), tuple)
         # 雅可比原地写（返回 None）
         nv = env.model.nv
         jacp = np.zeros((3, nv))

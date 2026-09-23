@@ -1041,6 +1041,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_interval = 1.0 / fps
         self._render_count_interval = self.realtime_step * fps
 
+    def set_sync_render(self, enabled: bool) -> None:
+        """开关同步渲染，对齐 OrcaGymLocalEnv.set_sync_render。
+
+        做什么：改内部 ``_sync_render``。True 时 render 按物理步计数节流。
+        为什么：DataCollectionManager 构造后会立刻调用，没有此方法环境起不来。
+        """
+        self._sync_render = bool(enabled)
+
+    def has_euler(self) -> bool:
+        """是否已挂 CoupledGpuSim（柔体或流体相）。委托 Gym 公共方法。"""
+        return self._gym.has_euler()
+
     def make_camera_viewport_active(
         self, actor_name: str, entity_name: str
     ) -> None:
@@ -1156,18 +1168,57 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         return self._gym.jnt_dofadr(joint_name)
 
-    def get_body_xpos_xmat_xquat(
+    def query_body_xpos_xmat_xquat(
         self, body_name_list: list[str]
     ) -> dict[str, dict[str, np.ndarray]]:
-        """查询 body 的 xpos/xmat/xquat（委托 self._gym）。
+        """按 body 名查询世界系位姿，返回字典。
+
+        做什么：把 gym 层已有的 ``query_body_xpos_xmat_xquat`` 原样交给调用方。
+        为什么：Euler 锚定、教程需要按名字取 ``xpos``/``xmat``/``xquat``；
+        CPU 侧同名接口也在 gym 层。Env 只做委托，不读内部 mjData。
 
         Args:
             body_name_list: body 名称列表。
 
         Returns:
-            dict[body_name -> {"xpos": ..., "xmat": ..., "xquat": ...}]。
+            dict[body_name -> {"xpos": (3,), "xmat": (3, 3), "xquat": (4,)}]。
         """
         return self._gym.query_body_xpos_xmat_xquat(body_name_list)
+
+    def get_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """获取 body 的位姿（位置、旋转矩阵、四元数）。
+
+        做什么：先委托 ``query_body_xpos_xmat_xquat``（内部再委托 gym）拿字典，
+        再按 CPU ``OrcaGymLocalEnv`` 同样的方式拼成扁平数组三元组。
+        为什么：``ControllerArm`` 等 Manipulation 代码解包
+        ``xpos, xmat, xquat``；需要按名字取字段时用
+        ``query_body_xpos_xmat_xquat``。
+
+        Args:
+            body_name_list: body 名称列表，如 ``["base_link"]``。
+
+        Returns:
+            xpos: 形状 ``(n*3,)``，每 3 个元素为一个 body 的 ``[x, y, z]``。
+            xmat: 形状 ``(n*9,)``，每 9 个元素为一个 body 的 3x3 矩阵（按行展开）。
+            xquat: 形状 ``(n*4,)``，每 4 个元素为一个 body 的 ``[w, x, y, z]``。
+        """
+        body_dict = self.query_body_xpos_xmat_xquat(body_name_list)
+        if len(body_dict) != len(body_name_list):
+            _logger.error(f"Body Name List: {body_name_list}")
+            _logger.error(f"Body Dict: {body_dict}")
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos = np.array(
+            [body_dict[body_name]["xpos"] for body_name in body_name_list]
+        ).flat.copy()
+        xmat = np.array(
+            [body_dict[body_name]["xmat"] for body_name in body_name_list]
+        ).flat.copy()
+        xquat = np.array(
+            [body_dict[body_name]["xquat"] for body_name in body_name_list]
+        ).flat.copy()
+        return xpos, xmat, xquat
 
     def get_body_xpos_xmat_xquat_xvel(
         self, body_name_list: list[str]
@@ -1192,6 +1243,25 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             dict[site_name -> {"pos": ..., "mat": ...}]。
         """
         return self._gym.query_site_pos_and_mat(site_names)
+
+    def query_site_pos_and_quat(
+        self, site_names: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 site 世界系位置和四元数（wxyz），委托已有查询再转四元数。
+
+        做什么：调用 ``query_site_pos_and_mat`` 取旋转矩阵，再 ``mat2quat``。
+        为什么：ControllerArm / OSC 在 CPU 环境上调用同名方法；禁止读内部 mjData。
+        """
+        query_dict = self.query_site_pos_and_mat(site_names)
+        site_dict: dict[str, dict[str, np.ndarray]] = {}
+        for site in query_dict:
+            site_dict[site] = {
+                "xpos": np.array(query_dict[site]["xpos"]),
+                "xquat": mat2quat(
+                    np.array(query_dict[site]["xmat"]).reshape(3, 3)
+                ),
+            }
+        return site_dict
 
     def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
         """查询 site 尺寸（委托 self._gym）。
@@ -1641,6 +1711,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         return self._gym.mj_jac_site(site_names)
 
+    def mj_fullM(self) -> np.ndarray:
+        """完整质量矩阵 (nv, nv)，委托 self._gym。供 OSC 动力学使用。"""
+        return self._gym.mj_fullM()
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组禁用，委托 self._gym。对齐 CPU ``OrcaGymLocalEnv.disable_actuator``。"""
+        self._gym.disable_actuator(actuator_groups)
+
     # --- 等式约束原语（L1 公共，单次原子读写）---
     # 这组方法不依赖任何 UI 抓取状态字段（_anchored_actor 等），单次原子读写，
     # 调用方自管快照与恢复。UI 抓取内部方法基于本组方法实现。
@@ -1797,7 +1875,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._anchor_original_eq = self.equality_constraint(slot)
         # 3. 对齐 mocap 位姿到 actor 当前位姿（避免下一帧拉扯）
         mocap_id = self.model.body_name2id(self._anchor_mocap_name)
-        actor_pose = self.get_body_xpos_xmat_xquat([actor_name])[actor_name]
+        actor_pose = self.query_body_xpos_xmat_xquat([actor_name])[actor_name]
         self.set_mocap_pos_and_quat({
             self._anchor_mocap_name: {
                 "pos": actor_pose["xpos"],

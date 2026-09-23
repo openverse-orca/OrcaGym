@@ -818,6 +818,32 @@ class MuJoCoSimCoreEuler:
             result[site_name] = {"jacp": jacp, "jacr": jacr}
         return result
 
+    def mj_fullM(self) -> np.ndarray:
+        """在 host mjData 上计算完整质量矩阵 (nv, nv)，供 OSC 使用。"""
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        data = self._solver.host
+        mass_matrix = np.ndarray(
+            shape=(model.nv, model.nv), dtype=np.float64, order="C"
+        )
+        if hasattr(data, "qM"):
+            mujoco.mj_fullM(model, mass_matrix, data.qM)
+        else:
+            mujoco.mj_fullM(model, data, mass_matrix)
+        return np.reshape(mass_matrix, (model.nv, model.nv))
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组关闭伺服：写 host mj_model.opt.disableactuator。
+
+        与 CPU 路径相同的位标志。GPU 求解器读同一份 host 模型 opt；
+        无独立 ModelChangedFlags 项，不调用 notify_model_changed。
+        """
+        self._require_solver()
+        model = self._solver.mj_model
+        for actuator_group in actuator_groups:
+            model.opt.disableactuator |= 1 << int(actuator_group)
+
     # ---- F 类：模型参数写入方法（P2 真实实现：写 host + notify）----
 
     def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:

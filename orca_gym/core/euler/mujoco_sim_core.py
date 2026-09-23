@@ -707,6 +707,28 @@ class MuJoCoSimCore:
         """
         mujoco.mj_jacSite(self._mjModel, self._mjData, jacp, jacr, site_id)
 
+    def mj_fullM(self) -> np.ndarray:
+        """计算完整质量矩阵 (nv, nv)，供 OSC 动力学使用。"""
+        if self._mjModel is None or self._mjData is None:
+            raise RuntimeError("Simulation not initialized")
+        mass_matrix = np.ndarray(
+            shape=(self._mjModel.nv, self._mjModel.nv),
+            dtype=np.float64,
+            order="C",
+        )
+        if hasattr(self._mjData, "qM"):
+            mujoco.mj_fullM(self._mjModel, mass_matrix, self._mjData.qM)
+        else:
+            mujoco.mj_fullM(self._mjModel, self._mjData, mass_matrix)
+        return np.reshape(mass_matrix, (self._mjModel.nv, self._mjModel.nv))
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组关闭力矩/位置伺服（写 opt.disableactuator 位标志）。"""
+        if self._mjModel is None:
+            raise RuntimeError("Simulation not initialized")
+        for actuator_group in actuator_groups:
+            self._mjModel.opt.disableactuator |= 1 << int(actuator_group)
+
     def mj_jac_site(self, site_names: list[str]) -> dict[str, dict]:
         """批量计算 site 雅可比（循环 mj_jacSite）。
 
