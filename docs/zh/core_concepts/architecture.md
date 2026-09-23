@@ -64,7 +64,7 @@
 |------|---------|-----------|
 | **Facade** | `OrcaGymEulerEnv` / `OrcaGymEuler` | 组合多个子组件，提供统一 API，避免上帝类 |
 | **组合优于继承** | Env 持有 Gym，Gym 持有子组件 | 避免继承链腐化，职责可独立演进 |
-| **策略模式** | `OrcaGymEuler._euler` 字段（占位） | 当前恒为 None，未来通过后端选择在 MuJoCo/Euler 两条互斥路径间切换（`has_euler()` / `step_with_coupling()` 为预留接口） |
+| **策略模式** | `SimConfig.backend`（`device` 选择） | 刚体走哪条求解器：`cpu` → CPU MuJoCo（`MuJoCoSimCore`，`mj_step`）；`cuda*` / `hip*` → GPU MuJoCoFlow（`MuJoCoSimCoreEuler`）。`_euler` 不参与这个选择 |
 | **依赖反转** | `OrcaStudioBridge` 不持有 mjData，通过接收数据参数实现解耦 | Studio 集成与仿真核心解耦 |
 | **只读视图** | `OrcaGymDataView` | 提供完整状态读取，禁止写入 |
 
@@ -81,11 +81,14 @@ gym.Env
         │
         │   组合（非继承）
         ├── _gym: OrcaGymEuler           (仿真核心 Facade)
-        │     ├── _sim: MuJoCoSimCore    # 持有 _mjModel/_mjData（不对外暴露）
+        │     ├── _sim: MuJoCoSimCore 或 MuJoCoSimCoreEuler
+        │     │     # cpu：MuJoCoSimCore，原生 mj_step（CPU MuJoCo）
+        │     │     # cuda*/hip*：MuJoCoSimCoreEuler，内部是 MuJoCoFlow（GPU 刚体）
         │     ├── _studio: OrcaStudioBridge  # gRPC 集成
         │     ├── _registry: ModelRegistry  # 模型信息
-        │     ├── _opt: SimConfig        # 求解器配置（typed）
-        │     └── _euler: None  # Euler 后端占位（当前未实现，未来接入）
+        │     ├── _opt: SimConfig        # 求解器配置（typed），backend 由 device 决定
+        │     └── _euler: CoupledGpuSim | None
+        │           # 不是后端开关。仅 ESDF 含 type=deformable 或 fluid.fluid_blocks 时非空
         │
         │   公共 API（你面向的接口）
         ├── .data → OrcaGymDataView      # 完整状态视图
@@ -153,7 +156,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
 ### 4.2 OrcaGymEuler — 仿真核心 Facade
 
-组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有 `MuJoCoSimCore`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及 `_euler` 占位字段（当前为 `None`，Euler 后端后续接入）。**不暴露** `_mjModel`/`_mjData`，通过 `__getattribute__` 主动拦截对 `_sim`/`_studio`/`_mjData` 等内部组件的访问（直接抛 `AttributeError`），辅以 `_` 前缀约定 + ruff SLF001 静态检查 + `__dir__` 控制 IDE 自动补全只显示公共 API。
+组合仿真子组件，向 `OrcaGymEulerEnv` 提供仿真操作接口。持有刚体核心 `_sim`、`OrcaStudioBridge`、`ModelRegistry`、`SimConfig`，以及非刚体耦合句柄 `_euler`。**不暴露** `_mjModel`/`_mjData`，通过 `__getattribute__` 主动拦截对 `_sim`/`_studio`/`_mjData`/`_euler` 等内部组件的访问（直接抛 `AttributeError`），辅以 `_` 前缀约定 + ruff SLF001 静态检查 + `__dir__` 控制 IDE 自动补全只显示公共 API。
+
+刚体后端由 `SimConfig.backend` 决定，不由 `_euler` 决定：
+
+| `device` | `_sim` | 刚体怎么推 |
+|----------|--------|------------|
+| `cpu`（`SimBackend.MUJOCO`） | `MuJoCoSimCore` | CPU 上的原生 MuJoCo，`mj_step`。不加载 MuJoCoFlow，也接不上柔体/流体耦合 |
+| `cuda*` / `hip*`（`SimBackend.EULER`） | `MuJoCoSimCoreEuler` | GPU 上的 MuJoCoFlow（OrcaEuler 里的 `SolverMujocoSingleWorld`）。纯刚体时 `_euler` 仍是 `None`，步进是 `sim.step` |
 
 ```python
 class OrcaGymEuler:
@@ -296,24 +306,37 @@ class OrcaGymDataView:
 | `gym._mjData.xpos[body_id, 2]` | `env.data.body_xpos(name)[2]` |
 | `gym._mjData.time` | `env.data.time` |
 
-### 4.8 Euler 后端集成 — 占位（当前未实现）
+### 4.8 `_euler` — CoupledGpuSim 句柄
 
-Euler 后端是 OrcaGym 的可选物理后端之一，与 MuJoCo 后端互斥。Euler 作为完整物理引擎自治运行，对外提供 MuJoCo 风格 API，并通过 D2H 接口将 `qpos`/`xpos` 等数据提取到 CPU 供 OrcaGym 驱动渲染。
+`device` 决定刚体走 CPU 还是 GPU，结果写在 `_sim` 上。`cpu` 是 CPU MuJoCo（`MuJoCoSimCore`，`mj_step`），不进 OrcaEuler。`cuda*` 和 `hip*` 都是 Euler 后端里的 GPU MuJoCoFlow（`MuJoCoSimCoreEuler`）；二者只选哪张 GPU，不是两种求解器。纯刚体到这里就结束，`_euler` 仍是 `None`，MuJoCoFlow 自己 `sim.step`。
 
-**当前实现状态**：`OrcaGymEuler._euler` 字段为占位（恒为 `None`），`has_euler()` 恒返回 `False`，当前仅 MuJoCo 后端可用。Euler 后端的接入将在后续版本实现。代码中保留的 `has_euler()` / `step_with_coupling()` 接口为未来接入预留：
+`_euler` 非空表示已经建了 `CoupledGpuSim`，并把上面那份 MuJoCoFlow 求解器交进去当刚体。触发条件是 ESDF 里有 `type=deformable` 的柔体，或有流体块，或两者都有。这时刚体步包在 `CoupledGpuSim.step` 里，不再另调 `sim.step`。只有柔体、没有流体时，它才只是 MuJoCoFlow 耦合大变形求解器。
+
+早期文档把 `_euler` 写成「要不要用 Euler 后端」的占位，并假定 Euler 只含大变形求解器、不含刚体。那个前提已经不成立：GPU 刚体是 MuJoCoFlow，嵌在 OrcaEuler 里，由 `_sim`（`MuJoCoSimCoreEuler`）持有。`device=cuda*` / `hip*` 时无论有没有柔体，都会构造这份刚体求解器。
+
+`_euler` 现在只表示一件事：有没有建好 `CoupledGpuSim`。
+
+- ESDF 含 `type=deformable` 的 body，或含 `fluid.fluid_blocks`，或两者都有：构造 `CoupledGpuSim`，把已经建好的刚体求解器作为 `rigid_solver` 交进去，赋给 `_euler`。
+- 没有 ESDF，或 ESDF 里既没有柔体也没有流体块：`_euler` 保持 `None`。GPU 纯刚体走 `sim.step`（MuJoCoFlow），CPU 纯刚体走 `mj_step`。
+
+`has_euler()` 为真表示非刚体耦合入口已就绪，不表示「正在用 GPU 刚体」。纯 MuJoCoFlow 时它为假。柔体、流体要再查 `has_soft_sim()`、`has_fluid_sim()`。
+
+`step_with_coupling` 用这个句柄二选一，避免刚体被推两遍：
 
 ```python
-# 当前代码中的预留接口（OrcaGymEuler 公共 API）
 def has_euler(self) -> bool:
-    """查询是否已加载 Euler 后端。当前恒返回 False。"""
+    """是否已构造 CoupledGpuSim（柔体和/或流体）。不是 GPU 刚体开关。"""
     return self._euler is not None
 
-def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
-    """Euler 后端步进。当前（has_euler()=False）等价于 set_ctrl + step。"""
-    # 当前：set_ctrl + step（MuJoCo 后端路径）
+def step_with_coupling(self, ctrl, n_frames, dt) -> None:
     self._sim.set_ctrl(ctrl)
-    self._sim.step(n_frames)
+    if self._euler is not None:
+        self._euler.step(n_frames)   # 耦合窗内已包含 MuJoCoFlow 刚体步
+        return
+    self._sim.step(n_frames)         # 无耦合：CPU 为 mj_step，GPU 为 MuJoCoFlow
 ```
+
+环境层禁止读 `_euler`。要问有没有非刚体相，用 `has_euler()`。
 
 ### 4.9 OrcaGymEnvMixin — 环境公共方法混入
 
@@ -421,14 +444,14 @@ env._gym._sim._mjData.xfrc_applied[body_id, :3] = force  # ruff SLF001 报警
 env.do_simulation(ctrl, self.frame_skip)
 # do_simulation 返回后 env.data 已自动同步（内部调用 sync_to_view）
 
-# 模式 B（精细控制，MuJoCo 后端专用）
+# 模式 B（精细控制，仅 CPU MuJoCo；GPU MuJoCoFlow 用模式 A）
 for _ in range(self.frame_skip):
     env.set_ctrl(torques)
     env.mj_step(1)
 # 循环结束后需调用 env.mj_forward() 刷新派生量，再通过 env.data 读取
 ```
 
-> 模式 A 后端无关，MuJoCo/Euler 后端均适用；模式 B 仅 MuJoCo 后端可用（直接调用 `mj_step`）。
+> 模式 A 两边都能用：CPU MuJoCo 与 GPU MuJoCoFlow 都走 `do_simulation`。模式 B 只适用于 CPU MuJoCo（直接 `mj_step`）。
 
 ### 5.5 求解器配置
 
@@ -532,7 +555,7 @@ def do_simulation(self, ctrl: np.ndarray, n_frames: int):
     self._gym.sync_to_view()
 ```
 
-> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`。无 `CoupledGpuSim` 时 `step_with_coupling` 等价于 `set_ctrl + step(n_frames)`。有 ESDF（柔体和/或流体）时 Gym 只 `set_ctrl` + `CoupledGpuSim.step`；位姿/力交换、M:N 拆窗、流体子步都在 Euler `CouplingOrchestrator` 里。`euler.step` 与 `sim.step` 互斥。`device=cpu` 且带 ESDF 会立刻报错。`dt` 是物理步长，不是 `env.dt`。
+> 实际实现见 `orca_gym/environment/euler/orca_gym_euler_env.py` 的 `do_simulation`，分支在 `OrcaGymEuler.step_with_coupling`。无 `CoupledGpuSim`（`_euler is None`）时等于 `set_ctrl + sim.step`：`device=cpu` 时这一步是 CPU MuJoCo 的 `mj_step`，`device=cuda*` / `hip*` 时是 GPU MuJoCoFlow。有 ESDF（柔体和/或流体）时 Gym 只 `set_ctrl` + `CoupledGpuSim.step`；位姿/力交换、M:N 拆窗、流体子步都在 Euler `CouplingOrchestrator` 里，刚体步也在这个窗内，用的是同一份 MuJoCoFlow。`euler.step` 与 `sim.step` 互斥。`device=cpu` 且带 ESDF 会立刻报错。`dt` 是物理步长，不是 `env.dt`。
 
 ### 7.2 两种使用模式
 
@@ -560,7 +583,7 @@ def step(self, action):
     return obs, reward, terminated, truncated, info
 ```
 
-**契约**：模式 B 当前与 OrcaGymLocalEnv 行为一致（纯 MuJoCo）。模式 B 仅 MuJoCo 后端可用（直接调用 `mj_step`）；若使用 Euler 后端，须改用模式 A。
+**契约**：模式 B 直接调用 `mj_step`，只适用于 CPU MuJoCo（`device=cpu`，`SimBackend.MUJOCO`）。GPU MuJoCoFlow 以及带 `CoupledGpuSim` 的场景都用模式 A（`do_simulation` → `step_with_coupling`）。
 
 ---
 
@@ -572,7 +595,7 @@ def step(self, action):
 |---------|---------|------|
 | 生命周期与属性 | 低 | `model`/`data`/`ctrl`/`frame_skip` 等原样提供 |
 | 仿真步进（模式 A） | 低 | `do_simulation` 内部委托，签名一致 |
-| 仿真步进（模式 B） | 中 | `mj_step(1)` 仅 MuJoCo 后端可用，Euler 后端须改用模式 A |
+| 仿真步进（模式 B） | 中 | `mj_step(1)` 仅 CPU MuJoCo 可用；GPU MuJoCoFlow 须改用模式 A |
 | 状态查询 | 低 | `query_*` 方法原样复制 |
 | 状态设置 | 低 | `set_*` 方法原样复制 + 新增 `apply_body_force` |
 | 名称空间解析 | 低 | `joint()`/`body()`/`site()` 等原样提供 |
@@ -697,7 +720,7 @@ self.do_simulation(torques, self.frame_skip)
 
 本文档的核心要点：
 
-1. **Facade + 职责内聚分解**替代上帝类，组件按职责划分为 `MuJoCoSimCore`/`OrcaStudioBridge`/`ModelRegistry`/`SimConfig`（`_euler` 字段为占位，当前未实现）
+1. **Facade + 职责内聚分解**替代上帝类。刚体在 `_sim`：CPU MuJoCo 用 `MuJoCoSimCore`，GPU MuJoCoFlow 用 `MuJoCoSimCoreEuler`。`_euler` 只持有 `CoupledGpuSim`（柔体和/或流体），不是后端开关
 2. **直接继承 `gym.Env` + `OrcaGymEnvMixin`**：不继承 `OrcaGymBaseEnv`，公共方法通过 Mixin 共享
 3. **完备的公共 API 契约**覆盖所有合法 MuJoCo 操作需求，消除绕道理由
 4. **多层封装隔离**（ruff SLF001 + AGENTS.md + Python 原生属性不存在 + `__dir__` + DataView 兜底 + 类型标注 + docstring）引导你和 AI 走正确路径
