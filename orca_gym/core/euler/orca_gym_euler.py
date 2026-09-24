@@ -142,6 +142,8 @@ class OrcaGymEuler:
         # 拆窗和交换不在本类。
         self._coupling_m = 1
         self._coupling_n = 1
+        # 外层耦合窗图：True 时刚体内层图关掉，reset 后录一整窗再重放。
+        self._capture_cycle_graph = False
 
     # --- K3/K5: 隔离机制 ---
 
@@ -325,6 +327,12 @@ class OrcaGymEuler:
         opt = object.__getattribute__(self, "_opt")
         registry = object.__getattribute__(self, "_registry")
 
+        use_outer_graph = bool(
+            object.__getattribute__(self, "_capture_cycle_graph")
+        )
+        # 外层图打开时刚体内层图必须关，与隔离课 build_sim(graph=True) 相同。
+        rigid_graph_capture = not use_outer_graph
+
         if opt.nworld == 1:
             sim = MuJoCoSimCoreEuler()
             sim.init_simulation(
@@ -333,6 +341,7 @@ class OrcaGymEuler:
                 nworld=opt.nworld,
                 timestep=opt.timestep,
                 opt_overrides=opt_overrides,
+                graph_capture=rigid_graph_capture,
             )
             multi_world = False
         else:
@@ -428,10 +437,14 @@ class OrcaGymEuler:
         P1 下无 ESDF 时 _euler 为 None。
         有 ESDF 时 _euler 是 CoupledGpuSim：重置柔体和/或流体相，
         刚体已由 reset_data 在 GPU 上复位。流体不再走独立槽。
+        ``reset`` 会丢掉外层图；若开了 ``_capture_cycle_graph``，这里立刻
+        再录一张，和隔离课建完仿真后录图对齐。
         """
         coupling = object.__getattribute__(self, "_euler")
         if coupling is not None:
             coupling.reset()
+            if object.__getattribute__(self, "_capture_cycle_graph"):
+                coupling.capture_cycle_graph()
 
     async def load_model_xml(self) -> str:
         """加载模型 XML（在线模式从 Studio 拉取，离线模式返回本地路径）。
@@ -901,6 +914,29 @@ class OrcaGymEuler:
             print("[OrcaGymEuler] set_fluid_render_params: 无流体相，忽略。")
             return False
         return euler.set_fluid_render_params(params)
+
+    def set_capture_cycle_graph(self, enabled: bool) -> None:
+        """打开或关闭外层耦合窗 CUDA Graph。
+
+        做什么：记下开关。必须在 ``init_simulation`` 之前调用，这样刚体
+        求解器会按开关决定内层图开还是关。
+        为什么：外层图和刚体内层图不能套在一起。打开时刚体用
+        ``graph_capture=False`` 构造，``reset`` 后再录一整窗。
+        """
+        object.__setattr__(self, "_capture_cycle_graph", bool(enabled))
+
+    def capture_cycle_graph(self) -> None:
+        """把当前耦合窗录成外层 CUDA Graph。
+
+        做什么：有 ``CoupledGpuSim`` 时转发 ``capture_cycle_graph``。
+        没有非刚体相时什么也不做。
+        为什么：Gym 不暴露 ``_euler``。隔离课在建完仿真后录图；联调在
+        ``reset`` 之后录，缓冲和隔离课一样是新的。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return
+        euler.capture_cycle_graph()
 
     def set_coupling_ratio(self, m: int, n: int) -> None:
         """把 M:N 作为构造期/运行期配置注入 Euler，不在 Gym 里拆窗。

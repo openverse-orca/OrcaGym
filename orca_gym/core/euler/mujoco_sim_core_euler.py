@@ -294,6 +294,7 @@ class MuJoCoSimCoreEuler:
         nworld: int = 1,
         timestep: float | None = None,
         opt_overrides: dict[str, Any] | None = None,
+        graph_capture: bool = True,
     ) -> None:
         if nworld != 1:
             raise NotImplementedError(
@@ -314,8 +315,13 @@ class MuJoCoSimCoreEuler:
         # 数值发散（qpos 出现 NaN）。
         njmax = max(model.njmax, 2000)
         nconmax = max(model.nconmax, 500)
+        # 外层耦合窗图打开时必须关刚体内层图，CUDA 不允许图套图。
         self._solver = euler.SolverMujocoSingleWorld(
-            source=model, device=device, nconmax=nconmax, njmax=njmax
+            source=model,
+            device=device,
+            nconmax=nconmax,
+            njmax=njmax,
+            graph_capture=graph_capture,
         )
         self._nworld = nworld
         self._host_dirty = False

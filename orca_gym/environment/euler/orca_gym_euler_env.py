@@ -180,6 +180,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         sim_config_overrides: dict[str, Any] | None = None,
         coupling_m: int = 1,
         coupling_n: int = 1,
+        cycle_graph: bool = False,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -228,6 +229,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             coupling_m: 注入 Euler 的刚体步数 M（默认 1）。权威在
                 ``SyncCycleConfig``，Gym 不按此拆窗。
             coupling_n: 注入 Euler 的柔体步数 N（默认 1）。第一版须 M=N。
+            cycle_graph: True 时与隔离课 ``--graph`` 对齐：刚体内层图关
+                掉，每次 ``reset`` 后把一个耦合窗录成外层 CUDA Graph。
+                默认 False，保持原来的联调节拍。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -256,6 +260,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._time_step = time_step
         self._coupling_m = coupling_m
         self._coupling_n = coupling_n
+        self._cycle_graph = bool(cycle_graph)
         # 渲染节流字段（render_mode="human" 在线渲染时使用）
         self._render_count = 0.0
         self._render_count_interval = 0.0
@@ -320,6 +325,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self._stub = None
             self._gym = OrcaGymEuler(stub=None)
             self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
+            self._gym.set_capture_cycle_graph(self._cycle_graph)
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             if self._local_xml_path:
                 self._studio_bridge.configure_offline(self._local_xml_path)
@@ -336,6 +342,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._stub = GrpcServiceStub(self._channel)
         self._gym = OrcaGymEuler(stub=self._stub)
         self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
+        self._gym.set_capture_cycle_graph(self._cycle_graph)
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
@@ -1052,6 +1059,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def has_euler(self) -> bool:
         """是否已挂 CoupledGpuSim（柔体或流体相）。委托 Gym 公共方法。"""
         return self._gym.has_euler()
+
+    def capture_cycle_graph(self) -> None:
+        """把一个耦合窗录成外层 CUDA Graph。
+
+        做什么：转给 Gym。刚体内层图必须已经关掉（构造时 ``cycle_graph=True``）。
+        为什么：``CoupledGpuSim.reset`` 会丢掉旧图，隔离课在建完后录一次；
+        联调在每次 ``reset_simulation`` 里自动再录。需要手动补录时调本方法。
+        """
+        self._gym.capture_cycle_graph()
 
     def make_camera_viewport_active(
         self, actor_name: str, entity_name: str

@@ -17,7 +17,7 @@
 用法：
     python -m orca_gym.scripts.smoke_esdf_render \
         [--addr localhost:50051] [--target 127.0.0.1:50451] \
-        [--device cuda:0] [--steps 600]
+        [--device cuda:0] [--steps 600] [--graph]
 """
 from __future__ import annotations
 
@@ -42,8 +42,13 @@ def run_smoke(
     render_target: str,
     device: str,
     max_steps: Optional[int],
+    graph: bool,
 ) -> int:
-    """跑冒烟循环，返回实际执行的步数。"""
+    """跑冒烟循环，返回实际执行的步数。
+
+    ``graph=True`` 时与隔离课 ``robot_cloth_latest.py --graph`` 对齐：
+    刚体内层图关掉，reset 后把一个耦合窗录成外层 CUDA Graph。
+    """
     env = EulerSimEnv(
         frame_skip=FRAME_SKIP,
         orcagym_addr=orcagym_addr,
@@ -53,6 +58,7 @@ def run_smoke(
         euler_render_target=render_target,   # P5 改动点 2：渲染流推流
         device=device,
         render_mode="human",
+        cycle_graph=graph,
     )
 
     gym = env.unwrapped._gym  # noqa: SLF001  冒烟诊断：仅调公共查询
@@ -64,6 +70,8 @@ def run_smoke(
         env.close()
         return 0
     print("[SMOKE] ESDF 柔体注入成功（CoupledGpuSim 就绪）")
+    if graph:
+        print("[SMOKE] 外层耦合窗图已开启（刚体内层图关闭，与隔离课 --graph 对齐）")
     if gym.has_render_stream():
         print(f"[SMOKE] 渲染流已连接（render() 将推流到 {render_target}）")
     else:
@@ -101,13 +109,19 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--target", default="127.0.0.1:50451", help="渲染流 gRPC 地址")
     parser.add_argument("--device", default="cuda:0", help="后端设备（必须 cuda:0 / hip:0；cpu 会报错）")
     parser.add_argument("--steps", type=int, default=600, help="步数（默认 600 ≈ 12s）")
+    parser.add_argument(
+        "--graph",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="打开外层耦合窗 CUDA Graph（关刚体内层图，reset 后录一整窗；与隔离课 --graph 相同）",
+    )
     args = parser.parse_args(argv)
 
     print(
         f"[SMOKE] 冒烟参数: addr={args.addr}, target={args.target}, "
-        f"device={args.device}, steps={args.steps}"
+        f"device={args.device}, steps={args.steps}, graph={args.graph}"
     )
-    n = run_smoke(args.addr, args.target, args.device, args.steps)
+    n = run_smoke(args.addr, args.target, args.device, args.steps, args.graph)
     print(f"[SMOKE] 冒烟结束，共 {n} 步")
 
 
