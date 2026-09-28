@@ -496,11 +496,17 @@ class EulerSoftSim:
     def enable_render_stream(
         self, target: str = "127.0.0.1:50451", timeout: float = 5.0
     ) -> None:
-        """连接 Studio 渲染服务并逐 body 注册可变形顶点通道。
+        """连接 Studio 渲染服务并注册可变形顶点通道（单次注册）。
 
         显式 opt-in（fail-fast）：连接失败/注册失败直接抛错（用户显式
         传入 target 即期望推流，静默降级会掩盖 Studio 未开 50451 的
         配置错误）。渲染通道在构造期已建立，本方法仅建立 gRPC 连接。
+
+        单次注册（per-channel 语义）：整条通道只调一次
+        ``RegisterChannel``，主 body 取首个；其余 body 由引擎
+        ``RegisterExistingProxyMeshes`` 遍历子 Entity 自动回填 FP
+        （S3.5 单 channel 多 body 契约）。逐 body 注册会被 per-channel
+        单槽 registry 拒绝（Channel already registered）并触发断流。
 
         Args:
             target: Studio DeformableChannelComponent 的 gRPC 地址
@@ -521,15 +527,27 @@ class EulerSoftSim:
         # 懒加载：RenderClient 依赖 grpcio（[render] extra），未启用渲染
         # 流的环境无需安装。
         from orca.euler.render import RenderClient
+        from orca.euler.render._generated import euler_render_pb2 as pb
 
         client = RenderClient(target, timeout=timeout)
         try:
-            for body_name, (_, ch) in self._render_graphs.items():
-                client.register_deformable_channel(
-                    name=f"{body_name}_verts",
-                    body_name=body_name,
-                    vertex_count=ch.vertex_count,
+            # 残留清理（对齐 FluidGpuSim.enable_render_stream 模式）：
+            # 上次仿真退出若未走 Unregister（close 只断 channel），
+            # 引擎 per-channel 单槽 registry 仍占着 → 重新注册被拒。
+            # 先 best-effort 注销（触发引擎高模复位 + FP 注销 + 清槽），
+            # 失败静默（可能本就未注册，如 Studio 刚启动）。
+            try:
+                client._stub.UnregisterChannel(  # noqa: SLF001  包内使用：client.py 未封装无参注销
+                    pb.UnregisterChannelRequest()
                 )
+            except Exception:  # noqa: BLE001  残留清理 best-effort
+                pass
+            primary, (_, ch) = next(iter(self._render_graphs.items()))
+            client.register_deformable_channel(
+                name=f"{primary}_verts",
+                body_name=primary,
+                vertex_count=ch.vertex_count,
+            )
         except Exception:
             client.close()
             raise
