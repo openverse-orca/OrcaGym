@@ -27,7 +27,7 @@ class RewardType:
 
 
 class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
-    """Superclass for all OrcaSim environments."""
+    """Superclass for all OrcaStudio environments."""
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         time_step: float,
         **kwargs
     ):
-        """Base abstract class for OrcaSim based environments.
+        """Base abstract class for OrcaStudio based environments.
 
         Args:
             frame_skip: Number of MuJoCo simulation steps per gym `step()`.
@@ -57,7 +57,7 @@ class OrcaGymBaseEnv(gym.Env[NDArray[np.float64], NDArray[np.float32]]):
         self.seed = 0
         self.loop = asyncio.get_event_loop()
         self.initialize_grpc()
-        self.pause_simulation()  # 暂停仿真，Gym 采用被动模式，OrcaSim侧不执行周期循环
+        self.pause_simulation()  # 暂停仿真，Gym 采用被动模式，OrcaStudio侧不执行周期循环
         self.frame_skip = frame_skip        
         self.set_time_step(time_step)  # 设置仿真时间步长
 

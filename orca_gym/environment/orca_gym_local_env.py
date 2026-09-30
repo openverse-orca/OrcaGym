@@ -149,7 +149,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         return model_xml_path
 
     async def _initialize_orca_sim(self, model_xml_path):
-        """异步初始化 OrcaSim 仿真"""
+        """异步初始化 OrcaStudio 仿真"""
         await self.gym.init_simulation(model_xml_path)
         return
 
@@ -548,7 +548,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
     def render(self, simulate_index: int = -1, request_idr: bool = False):
         """
-        渲染当前仿真状态到 OrcaSim 服务器。
+        渲染当前仿真状态到 OrcaStudio 服务器。
 
         将当前关节位置和仿真时间发送到服务器用于可视化。
         同时处理场景视口交互（锚点操作）。
@@ -954,7 +954,7 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
         """
         从服务器同步最新的仿真数据
         
-        从 OrcaSim 服务器获取最新的 qpos、qvel、qacc 等状态数据，
+        从 OrcaStudio 服务器获取最新的 qpos、qvel、qacc 等状态数据，
         更新到本地的 self.data 中。在每次仿真步进后自动调用。
         
         使用示例:

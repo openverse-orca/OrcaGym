@@ -202,7 +202,7 @@ class OrcaGymLocal(OrcaGymBase):
     OrcaGym 本地仿真接口
     
     负责与本地 MuJoCo 仿真器的交互，包括模型加载、仿真控制、状态查询等。
-    这是 OrcaGymLocalEnv 的核心通信对象，通过 gRPC 与 OrcaSim 服务器通信。
+    这是 OrcaGymLocalEnv 的核心通信对象，通过 gRPC 与 OrcaStudio 服务器通信。
     
     核心功能:
         1. 模型管理: 加载 XML 模型、初始化 MuJoCo 模型和数据
@@ -243,7 +243,7 @@ class OrcaGymLocal(OrcaGymBase):
         初始化 OrcaGymLocal 对象
         
         Args:
-            stub: gRPC 服务存根，用于与 OrcaSim 服务器通信；离线短链模式下可为 None
+            stub: gRPC 服务存根，用于与 OrcaStudio 服务器通信；离线短链模式下可为 None
             skip_grpc_load: 为 True 时不经 gRPC 拉取 MJCF/资源（见 local_xml_path）
             local_xml_path: 本地 MJCF XML 绝对或相对路径（与 skip_grpc_load 联用）
             xml_assets_dir: mesh/hfield 等资源目录；默认取 local_xml_path 所在目录
@@ -281,7 +281,7 @@ class OrcaGymLocal(OrcaGymBase):
         """
         从服务器加载模型 XML 文件
         
-        从 OrcaSim 服务器获取模型 XML 文件，下载依赖的资源文件（mesh、hfield等），
+        从 OrcaStudio 服务器获取模型 XML 文件，下载依赖的资源文件（mesh、hfield等），
         并返回本地文件路径。
         
         Returns:
@@ -398,7 +398,7 @@ class OrcaGymLocal(OrcaGymBase):
 
     async def render(self, simulate_index: int = -1, request_idr: bool = False):
         """
-        渲染当前仿真状态到 OrcaSim 服务器
+        渲染当前仿真状态到 OrcaStudio 服务器
 
         将当前的关节位置和仿真时间发送到服务器，用于可视化。
         同时接收服务器返回的控制覆盖值（如果用户在界面中手动控制）。
@@ -1080,7 +1080,7 @@ class OrcaGymLocal(OrcaGymBase):
         """
         异步设置远程服务器的时间步长
         
-        将时间步长同步到 OrcaSim 服务器，确保本地和远程一致。
+        将时间步长同步到 OrcaStudio 服务器，确保本地和远程一致。
         
         Args:
             timestep: 时间步长（秒）
