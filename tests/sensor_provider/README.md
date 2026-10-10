@@ -10,6 +10,13 @@ Run with the `orca` interpreter:
 <conda-base>/envs/orca/bin/python -m pytest tests/sensor_provider
 ```
 
+Install `build` and `wheel` in that environment for the packaging tests. These
+build an sdist and its wheel in a temporary directory, check the universal tag
+and complete Runtime payload, and install the wheel into a temporary target.
+On supported Linux hosts the installed-wheel test loads the bundled Host and
+calls the contract tool. Platform tests also cover Windows/macOS, Linux ARM,
+old glibc and musl, including when Linux binaries are already present.
+
 Without `ORCA_SENSOR_TEST_SDK`, native integration tests explicitly skip. To run
 those tests, set it to an independently released OrcaSensorSDK matching the host
 platform. The fixture builds its contact-grid, rangefinder, touch-grid and seven-pad example plugins

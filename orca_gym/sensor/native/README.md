@@ -1,8 +1,9 @@
 # Orca Sensor Runtime
 
-This directory contains the versioned Runtime built by OrcaSensorHost. On
-Linux x86_64 with glibc 2.35 or later, the normal `orca-gym` installation
-provides these files. Users do not need a separate Runtime or vendor SDK.
+This directory contains the versioned Runtime built by OrcaSensorHost. The
+single `orca-gym` universal wheel (`py3-none-any`) includes these Linux files on
+every installation platform. Sensor providers can use them only on Linux x86_64
+with glibc 2.35 or later. Users do not need a separate Runtime or vendor SDK.
 
 | Path | Contents |
 |---|---|
@@ -18,6 +19,10 @@ The Python integration lives in `orca_gym.sensor.providers`. Use
 Host. The contract tool runs during registration and preparation, not during
 physics steps. Simulations without provider sensors do not load these native
 components.
+Host and tool resolution check the runtime platform before reading or executing
+binaries, including when the files are present on an incompatible Linux system.
+On unsupported platforms, requesting the bundled Sensor functionality raises an
+explicit error; installing or importing OrcaGym does not perform this check.
 
 Vendor headers, C++ samples and manuals are delivered separately in
 OrcaSensorSDK. This integration consumes preassembled XML and vendor packages;
@@ -43,5 +48,11 @@ its dependencies and all applicable notices intact.
 
 Keep the two release manifests, artifact bytes and licenses together when
 updating this directory. `setup.py` verifies them during packaging.
-`ORCA_SENSOR_BUNDLE_NATIVE=0` builds a developer-only portable wheel without the
-Host or tool; normal supported-platform builds include the complete Runtime.
+Default builds (`ORCA_SENSOR_BUNDLE_NATIVE=auto`) and `=1` include the complete
+Runtime regardless of the build machine's platform. The build only copies and
+verifies the payload; it does not execute Linux binaries. Runtime files are
+optional package data, so they do not change the wheel's universal tag.
+`ORCA_SENSOR_BUNDLE_NATIVE=0` builds a developer-only lightweight wheel without
+the Host or tool; it must not be published as the official release. Source
+archives always retain the complete Runtime. `scripts/release/build.sh` forces
+`=1` for both production and TestPyPI artifacts, overriding a developer setting.
