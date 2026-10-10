@@ -46,14 +46,8 @@ def tool_path() -> Path:
     machine = platform.machine().lower()
     machine = {"amd64": "x86_64", "x64": "x86_64", "arm64": "aarch64"}.get(machine, machine)
     system = {"linux": "linux", "win32": "windows", "darwin": "macos"}.get(sys.platform, sys.platform)
-    path = (Path(override).expanduser() if override else
-            RUNTIME_ROOT / "bin" / f"{system}-{machine}" /
-            ("orca-sensor-tool.exe" if sys.platform == "win32" else "orca-sensor-tool"))
-    if not path.is_absolute():
-        raise SensorToolError("ORCA_SENSOR_TOOL must be an absolute path to a trusted Orca Sensor tool executable")
-    if not path.is_file() or (os.name != "nt" and not os.access(path, os.X_OK)):
-        if override:
-            raise SensorToolError(f"The developer override ORCA_SENSOR_TOOL is not an executable file: {path}")
+    if not override:
+        # File presence cannot imply compatibility in a universal wheel.
         libc, version = platform.libc_ver()
         try:
             glibc = tuple(int(part) for part in version.split(".")[:2])
@@ -62,10 +56,18 @@ def tool_path() -> Path:
         if ((system, machine) != ("linux", "x86_64")
                 or libc != "glibc" or glibc < (2, 35)):
             raise SensorToolError(
-                f"This OrcaGym release does not bundle sensor provider tooling for {system}-{machine}; "
+                f"Bundled sensor provider tooling is not supported on {system}-{machine}/{libc} {version}; "
                 "sensor providers require Linux x86_64 with glibc >= 2.35; "
                 "ordinary OrcaGym use is unaffected."
             )
+    path = (Path(override).expanduser() if override else
+            RUNTIME_ROOT / "bin" / f"{system}-{machine}" /
+            ("orca-sensor-tool.exe" if sys.platform == "win32" else "orca-sensor-tool"))
+    if not path.is_absolute():
+        raise SensorToolError("ORCA_SENSOR_TOOL must be an absolute path to a trusted Orca Sensor tool executable")
+    if not path.is_file() or (os.name != "nt" and not os.access(path, os.X_OK)):
+        if override:
+            raise SensorToolError(f"The developer override ORCA_SENSOR_TOOL is not an executable file: {path}")
         raise SensorToolError(
             f"The installed OrcaGym package is missing its bundled sensor tool for {system}-{machine}. "
             "Upgrade or reinstall the official orca-gym release with sensor support on a supported "

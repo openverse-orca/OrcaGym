@@ -7,11 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 
-def test_plain_simulation_does_not_launch_tool_or_load_provider_host(tmp_path, monkeypatch):
+@pytest.mark.parametrize("system", ["Linux", "Windows", "Darwin"])
+def test_plain_simulation_does_not_launch_tool_or_load_provider_host(tmp_path, monkeypatch, system):
     # MuJoCo itself has native dependencies. The guard is installed after its
     # ordinary import and only prohibits additional provider native loading.
     from orca_gym.core.euler.mujoco_sim_core import MuJoCoSimCore
     from orca_gym.sensor.providers import abi
+    from orca_gym.sensor.providers import native
     from orca_gym.sensor.providers.contracts import _rpc
 
     def forbidden(*args, **kwargs):
@@ -20,6 +22,7 @@ def test_plain_simulation_does_not_launch_tool_or_load_provider_host(tmp_path, m
     monkeypatch.setattr(_rpc.subprocess, "run", forbidden)
     monkeypatch.setattr(abi.C, "CDLL", forbidden)
     monkeypatch.setattr(_rpc, "tool_path", forbidden)
+    monkeypatch.setattr(native.platform, "system", lambda: system)
     scene = tmp_path / "plain.xml"
     scene.write_text('<mujoco><worldbody><body><freejoint/><geom size=".01"/></body></worldbody></mujoco>')
     sim = MuJoCoSimCore()
@@ -78,23 +81,43 @@ def test_missing_supported_runtime_reports_an_installation_error(tmp_path, monke
         _rpc.tool_path()
 
 
-def test_unsupported_runtime_errors_are_scoped_to_providers(tmp_path, monkeypatch):
+@pytest.mark.parametrize("system,sys_platform,machine,libc,version", [
+    ("Windows", "win32", "AMD64", "", ""),
+    ("Darwin", "darwin", "arm64", "", ""),
+    ("Linux", "linux", "aarch64", "glibc", "2.35"),
+    ("Linux", "linux", "x86_64", "glibc", "2.34"),
+    ("Linux", "linux", "x86_64", "musl", "1.2"),
+    ("Linux", "linux", "x86_64", "glibc", "unknown"),
+])
+def test_unsupported_runtime_errors_are_scoped_to_providers(
+        monkeypatch, system, sys_platform, machine, libc, version):
     from orca_gym.sensor.providers import native
     from orca_gym.sensor.providers.contracts import _rpc
 
     monkeypatch.delenv("ORCA_SENSOR_TOOL", raising=False)
-    monkeypatch.setattr(native, "runtime_directory", lambda: tmp_path)
-    monkeypatch.setattr(_rpc, "RUNTIME_ROOT", tmp_path)
-    monkeypatch.setattr(_rpc, "sys", SimpleNamespace(platform="win32"))
-    monkeypatch.setattr(native.platform, "system", lambda: "Windows")
-    monkeypatch.setattr(native.platform, "machine", lambda: "AMD64")
-    with pytest.raises(RuntimeError, match="core OrcaGym is unaffected"):
+    # Use the real bundle: old glibc/musl must fail even when Linux files exist.
+    root = native.runtime_directory()
+    assert (root / "lib/linux-x86_64/liborca_sensor_host.so").is_file()
+    assert (root / "bin/linux-x86_64/orca-sensor-tool").is_file()
+    monkeypatch.setattr(_rpc, "sys", SimpleNamespace(platform=sys_platform))
+    monkeypatch.setattr(native.platform, "system", lambda: system)
+    monkeypatch.setattr(native.platform, "machine", lambda: machine)
+    monkeypatch.setattr(native.platform, "libc_ver", lambda: (libc, version))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Unsupported platform tried to read or execute Sensor binaries")
+
+    monkeypatch.setattr(Path, "read_bytes", forbidden)
+    monkeypatch.setattr(Path, "read_text", forbidden)
+    monkeypatch.setattr(_rpc.subprocess, "run", forbidden)
+    with pytest.raises(RuntimeError, match="Linux x86_64 with glibc >= 2.35; core OrcaGym is unaffected"):
         native.default_host_path()
-    with pytest.raises(_rpc.SensorToolError, match="ordinary OrcaGym use is unaffected"):
+    with pytest.raises(_rpc.SensorToolError, match="Linux x86_64 with glibc >= 2.35; ordinary OrcaGym use is unaffected"):
         _rpc.tool_path()
 
 
-def test_explicit_tool_override_does_not_require_a_bundled_install(tmp_path, monkeypatch):
+@pytest.mark.parametrize("sys_platform", ["linux", "win32", "darwin"])
+def test_explicit_tool_override_does_not_require_a_bundled_install(tmp_path, monkeypatch, sys_platform):
     from orca_gym.sensor.providers.contracts import _rpc
 
     executable = tmp_path / "trusted-tool"
@@ -102,4 +125,5 @@ def test_explicit_tool_override_does_not_require_a_bundled_install(tmp_path, mon
     executable.chmod(0o755)
     monkeypatch.setenv("ORCA_SENSOR_TOOL", str(executable))
     monkeypatch.setattr(_rpc, "RUNTIME_ROOT", tmp_path / "missing-bundle")
+    monkeypatch.setattr(_rpc, "sys", SimpleNamespace(platform=sys_platform))
     assert _rpc.tool_path() == executable
