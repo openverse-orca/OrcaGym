@@ -336,7 +336,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--addr", default="localhost:50051", help="OrcaStudio gRPC 地址")
     parser.add_argument("--target", default="127.0.0.1:50452", help="流体渲染流 gRPC 地址")
     parser.add_argument("--device", default="cuda:0", help="后端设备（必须 cuda:0 / hip:0；cpu 会报错）")
-    parser.add_argument("--steps", type=int, default=600, help="步数（默认 600 ≈ 12s）")
+    parser.add_argument("--steps", type=int, default=None, help="步数上限（默认不限，一直运行到 Ctrl+C）")
     parser.add_argument(
         "--render-mode",
         choices=["normal", "debug", "overlay"],
