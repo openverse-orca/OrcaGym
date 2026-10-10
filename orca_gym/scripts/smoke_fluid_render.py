@@ -247,11 +247,14 @@ def run_smoke(
     render_param_pairs: Optional[list[tuple[str, str]]] = None,
     show_aabb: bool = False,
     euler_viewer: bool = False,
+    cycle_graph: bool = True,
 ) -> int:
     """跑流体冒烟循环，返回实际执行的步数。
 
     max_steps 是环境步数上限；sim_time_limit 是仿真时钟上限（秒，看 data.time）。
     两者都为空时不自动停止。两者都有值时，先到达的条件先停。
+    cycle_graph=True 时把一个耦合窗录成外层 CUDA Graph 重放（刚体内层
+    图自动关闭），消除 Python 逐 kernel launch 开销。
     """
     env = EulerSimEnv(
         frame_skip=FRAME_SKIP,
@@ -262,6 +265,7 @@ def run_smoke(
         fluid_render_target=fluid_render_target,  # 流体粒子渲染流（50452）
         device=device,
         render_mode="human",
+        cycle_graph=cycle_graph,                 # 外层耦合窗 CUDA Graph
     )
 
     gym = env.unwrapped._gym  # noqa: SLF001  冒烟诊断：仅调公共查询
@@ -357,6 +361,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         action="store_true",
         help="同时打开 Polyscope，和 Studio 看同一份流体粒子",
     )
+    parser.add_argument(
+        "--no-cycle-graph",
+        action="store_true",
+        help="关闭外层耦合窗 CUDA Graph（默认开启；关闭后退回 Python 逐 launch，用于 A/B 对照）",
+    )
     args = parser.parse_args(argv)
 
     pairs: list[tuple[str, str]] = []
@@ -366,11 +375,12 @@ def main(argv: Optional[list[str]] = None) -> None:
         k, v = item.split("=", 1)
         pairs.append((k.strip(), v.strip()))
 
+    cycle_graph = not args.no_cycle_graph
     print(
         f"[SMOKE] 冒烟参数: addr={args.addr}, target={args.target}, "
         f"device={args.device}, steps={args.steps}, "
         f"render_mode={args.render_mode}, eulerviewer={args.eulerviewer}, "
-        f"set_param={pairs}"
+        f"cycle_graph={cycle_graph}, set_param={pairs}"
     )
     n = run_smoke(
         args.addr, args.target, args.device, args.steps,
@@ -378,6 +388,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         render_param_pairs=pairs or None,
         show_aabb=args.show_aabb,
         euler_viewer=args.eulerviewer,
+        cycle_graph=cycle_graph,
     )
     print(f"[SMOKE] 冒烟结束，共 {n} 步")
 
