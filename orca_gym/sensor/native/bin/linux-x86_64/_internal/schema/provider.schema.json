@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:orca:sensor:provider:v2",
+  "title": "Orca sensor provider package manifest v2",
+  "description": "SensorHost additionally validates package containment/existence, unique IDs/parameters, numeric bounds, output element count, and agreement with the loaded C descriptor. Only load explicitly trusted libraries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["abi_version", "provider_id", "version", "library", "types"],
+  "properties": {
+    "abi_version": {"const": 2, "type": "integer"},
+    "provider_id": {"$ref": "#/$defs/identifier"},
+    "version": {"$ref": "#/$defs/text"},
+    "sdk_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "Orca Sensor SDK release used to build this package, distinct from the vendor version and C ABI. Missing selects the first-release ABI-2 / SDK 1.0.0 baseline. Runtime selects an explicitly supported release profile before loading vendor code."
+    },
+    "library": {
+      "type": "object", "additionalProperties": false, "minProperties": 1,
+      "properties": {
+        "linux": {"$ref": "#/$defs/packagePath"},
+        "windows": {"$ref": "#/$defs/packagePath"},
+        "darwin": {"$ref": "#/$defs/packagePath"}
+      }
+    },
+    "types": {
+      "type": "array", "minItems": 1, "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["type_id", "display_name"],
+        "not": {"required": ["model", "model_schema"]},
+        "allOf": [{"oneOf": [
+          {"required": ["global_parameters"], "not": {"required": ["parameters"]}},
+          {"required": ["parameters"], "not": {"required": ["global_parameters"]}}
+        ]}],
+        "oneOf": [
+          {"required": ["contract_schema"], "not": {"anyOf": [{"required": ["input_schema"]}, {"required": ["output"]}]}},
+          {"required": ["input_schema", "output"], "not": {"required": ["contract_schema"]}}
+        ],
+        "properties": {
+          "type_id": {"$ref": "#/$defs/identifier"},
+          "display_name": {"$ref": "#/$defs/text"},
+          "input_schema": {"$ref": "#/$defs/packagePath"},
+          "contract_schema": {"$ref": "#/$defs/packagePath"},
+          "model": {
+            "type": "object", "additionalProperties": false,
+            "required": ["asset"],
+            "oneOf": [
+              {"required": ["mount_site"], "not": {"required": ["mount"]}},
+              {"required": ["mount"], "not": {"required": ["mount_site"]}}
+            ],
+            "description": "XML describes structure and reference frames, not native sensors. mount_site selects the installation site, distinct from measurement frames. Lengths are metres.",
+            "properties": {
+              "asset": {"$ref": "#/$defs/packagePath"},
+              "mount_site": {"$ref": "#/$defs/text"},
+              "mount": {"$ref": "#/$defs/text"}
+            }
+          },
+          "model_schema": {"$ref": "#/$defs/packagePath"},
+          "presentation_schema": {"$ref": "#/$defs/packagePath"},
+          "output": {
+            "type": "object", "additionalProperties": false, "required": ["dtype", "shape"],
+            "properties": {
+              "dtype": {"const": "float64"},
+              "shape": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "integer", "minimum": 1, "maximum": 1048576}},
+              "unit": {"$ref": "#/$defs/text"},
+              "channels": {
+                "type": "array", "minItems": 1, "maxItems": 256,
+                "description": "Named channel slices must cover the full output exactly once. Model object references align with channel elements; runtime checks both.",
+                "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["name", "offset", "unit", "description"],
+                  "properties": {
+                    "name": {"$ref": "#/$defs/text"},
+                    "offset": {"type": "integer", "minimum": 0, "maximum": 1048575},
+                    "unit": {"$ref": "#/$defs/text"},
+                    "description": {"$ref": "#/$defs/text"},
+                    "shape": {"type": "array", "maxItems": 4, "items": {"type": "integer", "minimum": 1, "maximum": 1048576}},
+                    "objects": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/text"}}
+                  }
+                }
+              }
+            }
+          },
+          "parameters": {"$ref": "#/properties/types/items/properties/global_parameters", "deprecated": true},
+          "global_parameters": {
+            "type": "array", "maxItems": 256,
+            "description": "Per-instance algorithm configuration passed once at create, not process-global shared state or step input. Order defines the create-info numeric array. Defaults must lie within inclusive finite bounds.",
+            "items": {
+              "type": "object", "additionalProperties": false, "required": ["name", "default", "min", "max"],
+              "properties": {
+                "name": {"$ref": "#/$defs/text"},
+                "default": {"type": "number"},
+                "min": {"type": "number"},
+                "max": {"type": "number"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\u0000]+$", "description": "Runtime also limits UTF-8 representation to 512 bytes."},
+    "identifier": {"type": "string", "maxLength": 512, "pattern": "^[a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)+$"},
+    "packagePath": {"$ref": "#/$defs/text", "description": "Path relative to provider.json. Must resolve to a file inside the provider package, including after resolving symlinks."}
+  }
+}

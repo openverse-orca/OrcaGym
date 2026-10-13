@@ -18,7 +18,7 @@ OrcaGym 提供多种传感器接口和 RGB-D 相机支持。
 
 ## 查询方式
 
-所有传感器数据通过统一的 `env.query_sensor_data(names)` API 查询：
+MuJoCo 原生传感器数据通过 `env.query_sensor_data(names)` API 查询：
 
 ```python
 sensor_data = env.query_sensor_data(["g1_imu_quat", "g1_imu_gyro"])
@@ -26,8 +26,10 @@ imu_quat = sensor_data["g1_imu_quat"]  # (4,) 姿态四元数
 imu_gyro = sensor_data["g1_imu_gyro"]  # (3,) 角速度
 ```
 
+厂商 DLL 传感器使用独立的 `env.query_provider_sensor_data(instance_ids)`，按 XML 实例名返回 NumPy 数组，不混入原生 `sensordata`。
+
 ## 章节导航
 
 - [🖲️ 传感器系统](sensors.md) — MuJoCo 原生传感器查询与数据布局
-
 - [🤝 接触感知](contact-sensing.md) — 接触力作为触觉感知
+- [第三方传感器运行接入](sensor_provider_sdk.md) — 厂商包加载、XML 绑定及结果读取

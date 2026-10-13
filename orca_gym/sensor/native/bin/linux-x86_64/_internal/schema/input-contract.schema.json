@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:orca:sensor:input-contract",
+  "title": "Orca sensor input contract: model references and capability requirements",
+  "description": "Schema 4 references fixed model-local names. Orca resolves their semantics from XML and requested capabilities; the compiler validates catalog types, result mappings, references, limits, and fingerprints, retaining C ABI 2. Schemas 2 and 3 remain supported.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_id",
+    "c_struct"
+  ],
+  "properties": {
+    "contract_id": {
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "c_struct": {
+      "$ref": "#/$defs/identifier"
+    },
+    "bindings": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/binding"
+      }
+    },
+    "queries": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/query"
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/value"
+          },
+          {
+            "$ref": "#/$defs/records"
+          }
+        ]
+      }
+    },
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        2,
+        3,
+        4
+      ]
+    },
+    "objects": {
+      "type": "object",
+      "maxProperties": 65536,
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/semanticObject"
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/capabilityInput"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "maxLength": 100,
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "body",
+            "geom",
+            "site",
+            "sensor"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536,
+          "default": 1
+        },
+        "sensor_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "if": {
+        "required": [
+          "sensor_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "sensor"
+          }
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "required": [
+        "op"
+      ],
+      "properties": {
+        "op": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "additionalProperties": true,
+      "description": "Operator options belong to the backend registry, not the native Host or generator. No expressions are evaluated."
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "dtype"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "dtype": {
+          "enum": [
+            "f64",
+            "f32",
+            "u32",
+            "u64",
+            "u8"
+          ]
+        },
+        "shape": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16777216
+          }
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*\\.[A-Za-z][A-Za-z0-9_]*$"
+        }
+      }
+    },
+    "records": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "capacity",
+        "fields"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      }
+    },
+    "semanticObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "surface",
+            "frame",
+            "range"
+          ]
+        }
+      }
+    },
+    "capabilityInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "capability"
+      ],
+      "description": "Versioned catalog capability request. The compiler validates exact options, object kinds, physical semantics and result mappings. orca.raycast.v1 references frame/direction/max_distance and optional exclude_self; no native sensor is required. SDK 1.0.0 includes schema-4-only contact_grid/site_raycast inputs whose frame is the scene-bound site, with no model-local object references.",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "object": {
+          "$ref": "#/$defs/identifier"
+        },
+        "objects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 65536,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "frame": {
+          "$ref": "#/$defs/identifier"
+        },
+        "exclude_internal": {
+          "type": "boolean",
+          "default": true
+        },
+        "dtype": {
+          "enum": [
+            "f64",
+            "f32",
+            "u32",
+            "u64",
+            "u8"
+          ]
+        },
+        "shape": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16777216
+          }
+        },
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "propertyNames": {
+            "$ref": "#/$defs/identifier"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "direction": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          },
+          "not": {
+            "const": [
+              0,
+              0,
+              0
+            ]
+          },
+          "description": "Finite nonzero local vector; backend normalizes it. Compiler additionally rejects NaN/Infinity."
+        },
+        "max_distance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Finite positive distance in metres."
+        },
+        "exclude_self": {
+          "type": "boolean",
+          "default": true
+        },
+        "resolution": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
+          },
+          "description": "[rows, cols] for the bound-site ideal force grid."
+        },
+        "fov_degrees": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 180
+          },
+          "description": "[horizontal, vertical] full angular fields of view in degrees."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "orca.raycast.v1"
+              }
+            },
+            "required": [
+              "capability"
+            ]
+          },
+          "then": {
+            "required": [
+              "frame",
+              "direction",
+              "max_distance"
+            ],
+            "propertyNames": {
+              "enum": [
+                "name",
+                "capability",
+                "frame",
+                "direction",
+                "max_distance",
+                "exclude_self",
+                "dtype",
+                "shape"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "orca.contact_grid.v1"
+              }
+            },
+            "required": [
+              "capability"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution",
+              "fov_degrees"
+            ],
+            "propertyNames": {
+              "enum": [
+                "name",
+                "capability",
+                "resolution",
+                "fov_degrees"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "orca.site_raycast.v1"
+              }
+            },
+            "required": [
+              "capability"
+            ]
+          },
+          "then": {
+            "required": [
+              "direction",
+              "max_distance"
+            ],
+            "propertyNames": {
+              "enum": [
+                "name",
+                "capability",
+                "direction",
+                "max_distance"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "not": {
+                  "enum": [
+                    "orca.raycast.v1",
+                    "orca.site_raycast.v1"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "capability"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "direction"
+                  ]
+                },
+                {
+                  "required": [
+                    "max_distance"
+                  ]
+                },
+                {
+                  "required": [
+                    "exclude_self"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "not": {
+                  "const": "orca.contact_grid.v1"
+                }
+              }
+            },
+            "required": [
+              "capability"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "resolution"
+                  ]
+                },
+                {
+                  "required": [
+                    "fov_degrees"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "schema_version",
+        "inputs"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 4
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "objects"
+            ]
+          },
+          {
+            "required": [
+              "fields"
+            ]
+          },
+          {
+            "required": [
+              "bindings"
+            ]
+          },
+          {
+            "required": [
+              "queries"
+            ]
+          }
+        ]
+      },
+      "description": "Object declarations belong to the model asset, not this contract."
+    },
+    {
+      "required": [
+        "schema_version",
+        "objects",
+        "inputs"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 3
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "fields"
+            ]
+          },
+          {
+            "required": [
+              "bindings"
+            ]
+          },
+          {
+            "required": [
+              "queries"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "fields"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 2
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "objects"
+            ]
+          },
+          {
+            "required": [
+              "inputs"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "inputs": {
+            "contains": {
+              "properties": {
+                "capability": {
+                  "enum": [
+                    "orca.contact_grid.v1",
+                    "orca.site_raycast.v1"
+                  ]
+                }
+              },
+              "required": [
+                "capability"
+              ]
+            }
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "then": {
+        "required": [
+          "schema_version"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": 4
+          }
+        }
+      }
+    }
+  ]
+}

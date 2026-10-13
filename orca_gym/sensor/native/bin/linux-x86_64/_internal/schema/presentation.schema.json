@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Orca optional sensor output presentation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "numeric": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "curves": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "surface_colors": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["channel", "range", "palette"],
+        "properties": {
+          "channel": {"type": "string", "minLength": 1},
+          "range": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+          "palette": {"const": "blue_red"}
+        }
+      }
+    }
+  }
+}

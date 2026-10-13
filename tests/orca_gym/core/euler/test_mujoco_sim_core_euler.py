@@ -658,12 +658,45 @@ class TestModelWriteMethods(unittest.TestCase):
         )
         self.assertEqual(core._solver.calls, [ModelChangedFlags.GEOM_FRICTION])
 
+    def test_set_geom_friction_invalid_name_raises(self):
+        """geom 名不存在时抛 ValueError，不静默错写末位 geom。"""
+        core = self._core()
+        model = core._solver.mj_model
+        last_id = model.ngeom - 1
+        last_friction = model.geom_friction[last_id].copy()
+        with self.assertRaises(ValueError):
+            core.set_geom_friction({"no_such_geom": np.array([1.0, 1.0, 1.0])})
+        np.testing.assert_allclose(model.geom_friction[last_id], last_friction)
+        self.assertEqual(core._solver.calls, [])
+
+    def test_set_mocap_pos_and_quat_invalid_body_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body 的 mocap 槽位。"""
+        # G1 fixture 末位 body 是 mocap 锚点体：-1 负索引会错写其 mocap 槽位
+        core = _make_real_core()
+        mocap_before = core._solver.host.mocap_pos.copy()
+        with self.assertRaises(ValueError):
+            core.set_mocap_pos_and_quat(
+                {"no_such_body": {"pos": np.ones(3), "quat": np.array([1.0, 0.0, 0.0, 0.0])}}
+            )
+        np.testing.assert_array_equal(core._solver.host.mocap_pos, mocap_before)
+
     def test_add_extra_weight_writes_host_and_accumulates(self):
         core = self._core()
         base = core._solver.mj_model.body_mass[0]
         core.add_extra_weight({"world": 2.5})
         self.assertAlmostEqual(core._solver.mj_model.body_mass[0], base + 2.5)
         self.assertEqual(core._solver.calls, [ModelChangedFlags.BODY_INERTIAL])
+
+    def test_add_extra_weight_invalid_name_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body。"""
+        core = self._core()
+        model = core._solver.mj_model
+        last_id = model.nbody - 1
+        last_mass = float(model.body_mass[last_id])
+        with self.assertRaises(ValueError):
+            core.add_extra_weight({"no_such_body": 2.5})
+        self.assertAlmostEqual(float(model.body_mass[last_id]), last_mass, places=6)
+        self.assertEqual(core._solver.calls, [])
 
     def test_update_equality_constraints_writes_slot(self):
         core = self._core()

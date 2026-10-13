@@ -136,6 +136,7 @@ plugins:
                 - 接触感知: tutorial/sensing/contact-sensing.md
                 - RGBD 相机: tutorial/sensing/rgbd-camera.md
                 - 传感器: tutorial/sensing/sensors.md
+                - 第三方传感器接入: tutorial/sensing/sensor_provider_sdk.md
               - 🔧 工具:
                 - 概览: tutorial/tools/index.md
                 - 资源处理: tutorial/tools/asset-processing.md
