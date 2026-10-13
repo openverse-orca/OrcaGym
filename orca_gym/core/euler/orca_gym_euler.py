@@ -771,6 +771,22 @@ class OrcaGymEuler:
             },
         }
 
+    async def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        """查询 LiDAR 点云数据（委托 bridge）。
+
+        点云为世界坐标，返回中含传感器世界位姿
+        （sensor_position / sensor_rotation），供坐标系转换。
+
+        Args:
+            entity_name: LiDAR 实体名称（对应 OrcaStudio 中的 Entity 名称）。
+
+        Returns:
+            成功时返回包含点云、距离图像与传感器位姿的 dict；
+            失败或离线模式返回 None。字段说明见 bridge 同名方法。
+        """
+        return await object.__getattribute__(
+            self, "_studio").query_lidar_point_cloud(entity_name)
+
     # --- K8: 步进耦合查询（供 do_simulation 使用，不暴露 _euler）---
 
     def has_euler(self) -> bool:

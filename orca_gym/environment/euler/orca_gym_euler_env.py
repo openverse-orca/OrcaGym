@@ -1096,6 +1096,37 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     # --- 公共查询 API（阶段三 3.1.7，全部委托 self._gym 公共方法，K4）---
     # 架构 K4：Env 层查询方法只触 self._gym.<公共方法>，不触 _gym._sim/_registry 等私有。
 
+    def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        """查询 LiDAR 点云数据（委托 self._gym，gRPC 查询）。
+
+        点云为世界坐标，返回中含传感器世界位姿
+        （sensor_position / sensor_rotation），供坐标系转换。
+
+        Args:
+            entity_name: LiDAR 实体名称（对应 OrcaStudio 中的 Entity 名称）。
+
+        Returns:
+            成功时返回字典，包含点云、距离图像与传感器位姿：
+                - bin_count: 水平方向 bin 数量
+                - vertical_layers: 垂直层数
+                - angular_resolution: 每个 bin 的角分辨率（弧度）
+                - max_h_angle: 水平总视场角（弧度）
+                - min_v_angle: 最小垂直角（弧度）
+                - v_step: 垂直层间步进（弧度）
+                - min_range: 最小探测距离
+                - max_range: 最大探测距离
+                - sensor_position: 传感器世界坐标位置，形状 (3,)
+                - sensor_rotation: 传感器世界姿态四元数 (x, y, z, w)，形状 (4,)
+                - ranges: 距离数组，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
+                - points: 3D 点数组（世界坐标），形状 (bin_count, vertical_layers, 3)
+                - intensities: 强度数组，形状 (bin_count, vertical_layers)
+            失败（实体不存在 / 环形缓冲为空 / 离线模式）返回 None。
+        """
+        if self._skip_grpc_load:
+            return None
+        return self.loop.run_until_complete(
+            self._gym.query_lidar_point_cloud(entity_name))
+
     def query_joint_qpos(self, joint_names: list[str]) -> dict[str, np.ndarray]:
         """查询关节 qpos（委托 self._gym）。
 
