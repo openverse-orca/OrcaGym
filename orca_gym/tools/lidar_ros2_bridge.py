@@ -121,6 +121,14 @@ def query_lidar(stub, entity_name):
         "v_step": response.v_step,
         "min_range": response.min_range,
         "max_range": response.max_range,
+        # 传感器世界位姿（点云为世界坐标，可用于世界系与传感器本体系之间转换）
+        "sensor_position": np.array(
+            [response.sensor_position_x, response.sensor_position_y, response.sensor_position_z],
+            dtype=np.float32),
+        "sensor_rotation": np.array(
+            [response.sensor_rotation_x, response.sensor_rotation_y,
+             response.sensor_rotation_z, response.sensor_rotation_w],
+            dtype=np.float32),
     }
 
     if response.range_data:
@@ -239,8 +247,12 @@ class LiDARRos2Bridge(Node):
 
         if self.frame_count % 30 == 0:
             n_valid = int(np.sum(data["ranges"] > 0))
+            pos = data["sensor_position"]
+            quat = data["sensor_rotation"]
             self.get_logger().info(
-                f"Published frame {self.frame_count}: {n_valid} valid points"
+                f"Published frame {self.frame_count}: {n_valid} valid points, "
+                f"sensor pos=({pos[0]:.3f}, {pos[1]:.3f}, {pos[2]:.3f}), "
+                f"quat (x,y,z,w)=({quat[0]:.3f}, {quat[1]:.3f}, {quat[2]:.3f}, {quat[3]:.3f})"
             )
 
 
