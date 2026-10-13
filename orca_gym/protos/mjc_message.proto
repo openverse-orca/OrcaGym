@@ -1290,6 +1290,14 @@ message LiDARPointCloudResponse {
     bytes range_data = 11;
     bytes point_data = 12;
     bytes intensity_data = 13;
+    // 传感器世界位姿（点云为世界坐标，此为传感器原点/朝向，用于坐标系转换）
+    float sensor_position_x = 14;
+    float sensor_position_y = 15;
+    float sensor_position_z = 16;
+    float sensor_rotation_x = 17;
+    float sensor_rotation_y = 18;
+    float sensor_rotation_z = 19;
+    float sensor_rotation_w = 20;
 }
 
 // ============= DebugMesh 公共类型 =============

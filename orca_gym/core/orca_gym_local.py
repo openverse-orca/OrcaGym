@@ -755,8 +755,10 @@ class OrcaGymLocal(OrcaGymBase):
             - v_step: 垂直层间步进（弧度）
             - min_range: 最小探测距离
             - max_range: 最大探测距离
+            - sensor_position: 传感器世界坐标位置，形状 (3,)
+            - sensor_rotation: 传感器世界姿态四元数 (x, y, z, w)，形状 (4,)
             - ranges: 距离数组，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
-            - points: 3D 点数组，形状 (bin_count, vertical_layers, 3)
+            - points: 3D 点数组（世界坐标），形状 (bin_count, vertical_layers, 3)
         - 失败时返回 None
 
         注意：
@@ -782,6 +784,13 @@ class OrcaGymLocal(OrcaGymBase):
             'v_step': response.v_step,
             'min_range': response.min_range,
             'max_range': response.max_range,
+            'sensor_position': np.array(
+                [response.sensor_position_x, response.sensor_position_y, response.sensor_position_z],
+                dtype=np.float32),
+            'sensor_rotation': np.array(
+                [response.sensor_rotation_x, response.sensor_rotation_y,
+                 response.sensor_rotation_z, response.sensor_rotation_w],
+                dtype=np.float32),
         }
 
         if response.range_data:
