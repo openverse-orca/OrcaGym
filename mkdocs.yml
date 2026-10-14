@@ -152,6 +152,8 @@ plugins:
               - 场景: api_reference/scene.md
               - 传感器: api_reference/sensor.md
               - 工具函数: api_reference/utils.md
+            - 版本说明:
+              - Release Notes: release-notes/index.md
             - 迁移指南:
               - 相机接口迁移: migration/camera-recorder.md
             - 常见问题:
@@ -224,6 +226,8 @@ plugins:
               - Scene: api_reference/scene.md
               - Sensor: api_reference/sensor.md
               - Utilities: api_reference/utils.md
+            - Release Notes:
+              - Release Notes: release-notes/index.md
             - Migration Guides:
               - Camera Interface Migration: migration/camera-recorder.md
             - FAQ:
