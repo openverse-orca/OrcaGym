@@ -17,7 +17,8 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 
 # Env 源码路径（用于 K4/K8/K9 源码审查测试）
 # __file__ = tests/orca_gym/environment/euler/test_*.py
@@ -55,7 +56,12 @@ def _exec_source_without_docstrings() -> str:
     return exec_source
 
 
-def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) -> OrcaGymEulerEnv:
+def _make_skeleton_env(
+    render_mode: str = "human",
+    sync_render: bool = False,
+    esdf_path: str | None = None,
+    sim_config_overrides: dict | None = None,
+) -> OrcaGymEulerEnv:
     """构造离线模式 Env（skip_grpc_load=True，加载本地 pendulum 模型）。"""
     # 测试 fixture 位于本仓 tests/orca_gym/environment/euler/fixtures/
     # __file__ = tests/orca_gym/environment/euler/test_*.py
@@ -70,9 +76,11 @@ def _make_skeleton_env(render_mode: str = "human", sync_render: bool = False) ->
         agent_names=["agent0"],
         time_step=0.002,
         model_xml_path=str(_pendulum_xml),
+        esdf_path=esdf_path,
         skip_grpc_load=True,
         render_mode=render_mode,
         sync_render=sync_render,
+        sim_config_overrides=sim_config_overrides,
     )
 
 
@@ -1377,16 +1385,27 @@ class TestEnvStudioArchCompliance(unittest.TestCase):
             "get_camera_time_stamp",
             "get_frame_png",
             "load_content_file",
+            # 客户端 PyAV remux 录制 API（start_streaming + save_streaming）
+            "start_streaming",
+            "save_streaming",
         ]:
             self.assertIn(name, d, f"dir(env) 缺少 {name}")
 
     def test_env_studio_returns_typed(self):
-        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。"""
+        """K11: get_current_frame 返回 int，get_camera_time_stamp 返回 dict。
+
+        .. note::
+            引擎侧 RPC 已删除，bridge 层降级为 no-op + DeprecationWarning，
+            但返回值仍保持 typed（int / dict）。
+        """
         env = _make_g1_env()
-        ret = env.get_current_frame()
-        self.assertIsInstance(ret, int)
-        ret = env.get_camera_time_stamp(0)
-        self.assertIsInstance(ret, dict)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ret = env.get_current_frame()
+            self.assertIsInstance(ret, int)
+            ret = env.get_camera_time_stamp(0)
+            self.assertIsInstance(ret, dict)
 
     def test_env_studio_docstrings_present(self):
         """K12: 新增 Studio 委托方法有 docstring。"""
@@ -1400,6 +1419,8 @@ class TestEnvStudioArchCompliance(unittest.TestCase):
             "get_camera_time_stamp",
             "get_frame_png",
             "load_content_file",
+            "start_streaming",
+            "save_streaming",
         ]:
             method = getattr(env, name)
             doc = inspect.getdoc(method)
@@ -1411,72 +1432,113 @@ class TestEnvStudioFunctional(unittest.TestCase):
     """子步骤 3.4.4 功能单元测试。
 
     对应文档 §8.5 功能单元测试表。
+
+    .. note::
+        引擎侧 MP4 录制 / 帧捕获 RPC 已删除，Env 层方法降级为
+        DeprecationWarning + 委托 bridge（bridge 也为 no-op）。
+        新增客户端 PyAV remux 录制 API（save_streaming），但离线模式无法测试
+        WebSocket 连接。
     """
 
     def setUp(self):
         self.env = _make_g1_env()
 
     def test_env_begin_stop_save_video_offline_noop(self):
-        """离线模式 no-op 不抛错。"""
-        self.env.begin_save_video("/tmp/test.mp4")
-        self.env.stop_save_video()
+        """离线模式 no-op 不抛错（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.env.begin_save_video("/tmp/test.mp4")
+            self.env.stop_save_video()
 
     def test_env_get_current_frame_offline_returns_neg1(self):
-        """离线模式返回 -1。"""
-        self.assertEqual(self.env.get_current_frame(), -1)
+        """离线模式返回 -1（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(self.env.get_current_frame(), -1)
 
     def test_env_get_camera_time_stamp_offline_returns_empty(self):
-        """离线模式返回空 dict。"""
-        self.assertEqual(self.env.get_camera_time_stamp(0), {})
+        """离线模式返回空 dict（发出 DeprecationWarning）。"""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertEqual(self.env.get_camera_time_stamp(0), {})
 
     def test_env_get_frame_png_offline_noop(self):
-        """离线模式 no-op。"""
+        """离线模式 no-op（get_frame_png 未废弃）。"""
         self.env.get_frame_png("/tmp/test.png")
 
     def test_env_load_content_file_offline_noop(self):
         """离线模式 no-op。"""
         self.env.load_content_file("mesh.obj")
 
+    def test_env_video_methods_emit_deprecation_warning(self):
+        """新增：视频/帧捕获方法应发出 DeprecationWarning。"""
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self.env.begin_save_video("/tmp/test.mp4")
+            self.env.stop_save_video()
+            self.env.get_current_frame()
+            self.env.get_camera_time_stamp(0)
+            self.env.get_next_frame()
+            # 5 个方法都应发出 DeprecationWarning
+            dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            self.assertGreaterEqual(len(dep_warnings), 5)
+
     def test_env_video_methods_delegate_to_bridge(self):
-        """在线模式委托链路：Env -> Gym -> bridge（mock stub）。"""
+        """在线模式委托链路：Env -> Gym -> bridge（mock stub）。
+
+        .. note::
+            引擎侧 RPC 已删除，Env 层方法降级为 DeprecationWarning + 委托。
+            本测试验证委托链路仍存在（Env -> Gym -> bridge），Env 层发出
+            DeprecationWarning。bridge 的返回值取决于 mock 实现。
+        """
+        import warnings
+
         # 构造 mock bridge 替换 Gym 的 _studio
-        captured = {}
+        called = {"count": 0}
 
         class MockBridge:
             async def begin_save_video(self, file_path, capture_mode):
-                captured["begin"] = (file_path, capture_mode)
+                called["begin"] = (file_path, capture_mode)
 
             async def stop_save_video(self):
-                captured["stop"] = True
+                called["stop"] = True
 
             async def get_current_frame(self):
-                captured["frame"] = True
+                called["frame"] = True
                 return 99
 
             async def get_camera_time_stamp(self, last_frame_index):
-                captured["ts"] = last_frame_index
+                called["ts"] = last_frame_index
                 return {"cam0": [1, 2, 3]}
 
             async def get_frame_png(self, image_path):
-                captured["png"] = image_path
+                called["png"] = image_path
 
             async def load_content_file(self, *args, **kwargs):
-                captured["load"] = (args, kwargs)
+                called["load"] = (args, kwargs)
 
         # 替换 Gym 的 _studio（用 object.__setattr__ 绕过 __setattr__ 拦截）
         object.__setattr__(self.env._gym, "_studio", MockBridge())
-        self.env.begin_save_video("/tmp/x.mp4", capture_mode=1)
-        self.assertEqual(captured["begin"], ("/tmp/x.mp4", 1))
-        self.env.stop_save_video()
-        self.assertTrue(captured["stop"])
-        self.assertEqual(self.env.get_current_frame(), 99)
-        self.assertTrue(captured["frame"])
-        self.assertEqual(self.env.get_camera_time_stamp(5), {"cam0": [1, 2, 3]})
-        self.assertEqual(captured["ts"], 5)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.env.begin_save_video("/tmp/x.mp4", capture_mode=1)
+            self.assertEqual(called["begin"], ("/tmp/x.mp4", 1))
+            self.env.stop_save_video()
+            self.assertTrue(called["stop"])
+            # 委托链路返回 mock bridge 的值（真实 bridge 会返回 -1）
+            self.assertEqual(self.env.get_current_frame(), 99)
+            self.assertTrue(called["frame"])
+            self.assertEqual(self.env.get_camera_time_stamp(5), {"cam0": [1, 2, 3]})
+            self.assertEqual(called["ts"], 5)
+        # get_frame_png / load_content_file 未废弃，正常委托
         self.env.get_frame_png("/tmp/x.png")
-        self.assertEqual(captured["png"], "/tmp/x.png")
+        self.assertEqual(called["png"], "/tmp/x.png")
         self.env.load_content_file("mesh.obj", remote_file_dir="/r")
-        self.assertIn("load", captured)
+        self.assertIn("load", called)
 
 
 # =============================================================================
@@ -2060,6 +2122,119 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
         self._patch_bridge(anchored=None, anchor_type=AnchorType.NONE)
         self.env._do_body_manipulation()
         self.assertIsNone(self.env._anchored_actor)
+
+
+class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
+    """Phase H: OrcaGymEulerEnv esdf_path 透传 + reset_simulation 调用 reset_coupling_state。"""
+
+    def test_esdf_path_stored_and_passed_to_init_simulation(self):
+        """构造时 esdf_path 存入 _esdf_path 并透传给 gym.init_simulation。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
+            captured["model_xml_path"] = model_xml_path
+            captured["esdf_path"] = esdf_path
+            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
+
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
+
+        self.assertEqual(env._esdf_path, "/tmp/dummy.esdf")
+        self.assertEqual(captured["esdf_path"], "/tmp/dummy.esdf")
+        self.assertTrue(captured["model_xml_path"].endswith("simple_pendulum.xml"))
+
+    def test_esdf_path_none_by_default(self):
+        """默认 esdf_path=None，透传 None（CPU 分支不回归）。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
+            captured["esdf_path"] = esdf_path
+            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
+
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = _make_skeleton_env()
+
+        self.assertIsNone(env._esdf_path)
+        self.assertIsNone(captured["esdf_path"])
+
+    def test_reset_simulation_calls_reset_coupling_state(self):
+        """reset_simulation 在 reset_data 后调用 gym.reset_coupling_state。"""
+        from unittest import mock
+
+        env = _make_skeleton_env()
+        with mock.patch.object(OrcaGymEuler, "reset_coupling_state") as m:
+            env.reset_simulation()
+        m.assert_called_once_with()
+
+
+class TestSimConfigOverrides(unittest.TestCase):
+    """Feature A: sim_config_overrides 构造期下发（CPU 后端离线验证）。"""
+
+    def test_sim_config_overrides_applied_cpu(self):
+        """CPU 后端：构造完成后 getter 即返回覆盖值。"""
+        env = _make_skeleton_env(
+            sim_config_overrides={
+                "integrator": 0,                          # Euler
+                "gravity": np.array([0.0, 0.0, -1.62]),   # 月球重力
+                "iterations": 42,
+            }
+        )
+        self.assertEqual(env.sim_config.integrator, 0)
+        np.testing.assert_array_almost_equal(
+            env.sim_config.gravity, np.array([0.0, 0.0, -1.62])
+        )
+        self.assertEqual(env.sim_config.iterations, 42)
+        # timestep 走既有 time_step 通道，不受 overrides 影响
+        self.assertAlmostEqual(env.sim_config.timestep, 0.002)
+
+    def test_sim_config_overrides_timestep_key_rejected(self):
+        """timestep 键被拒绝（双通道隔离）。"""
+        with self.assertRaises(ValueError):
+            _make_skeleton_env(sim_config_overrides={"timestep": 0.01})
+
+    def test_sim_config_overrides_unknown_key_rejected(self):
+        """未知键被拒绝。"""
+        with self.assertRaises(ValueError):
+            _make_skeleton_env(sim_config_overrides={"foo": 1})
+
+
+class _FakeGymForBackend:
+    """最小 fake gym，仅为 _configure_backend 提供 sim_config。"""
+
+    def __init__(self) -> None:
+        self.sim_config = SimConfig()
+
+
+def _make_bare_env(device: str) -> OrcaGymEulerEnv:
+    """构造未走 __init__ 的 bare env，仅设置 _device/_gym 供 _configure_backend 测试。"""
+    env = object.__new__(OrcaGymEulerEnv)
+    env._device = device
+    env._gym = _FakeGymForBackend()
+    return env
+
+
+class TestEnvDeviceBackendSelection(unittest.TestCase):
+    """Phase I: --device 参数到后端选择的映射（cpu → MuJoCo，cuda* → Euler）。"""
+
+    def test_device_cpu_selects_mujoco_backend(self):
+        """--device cpu → backend=MUJOCO，device=cpu。"""
+        env = _make_bare_env("cpu")
+        env._configure_backend()
+        self.assertEqual(env._gym.sim_config.backend, SimBackend.MUJOCO)
+        self.assertEqual(env._gym.sim_config.device, "cpu")
+
+    def test_device_cuda_selects_euler_backend(self):
+        """--device cuda:0 → backend=EULER，device=cuda:0（不实际初始化 GPU）。"""
+        env = _make_bare_env("cuda:0")
+        env._configure_backend()
+        self.assertEqual(env._gym.sim_config.backend, SimBackend.EULER)
+        self.assertEqual(env._gym.sim_config.device, "cuda:0")
 
 
 if __name__ == "__main__":

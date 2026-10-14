@@ -15,6 +15,41 @@ import numpy as np
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 
 
+_ACTOR_MANIPULATOR_BODY_NAMES = (
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_Anchor",
+    "ORCA_MANIPULATOR_a3f5e2d1-7b8c-4f2a-9e6d-1c2b3a4f5d6e_dummy",
+    "ActorManipulator_Anchor",
+    "ActorManipulator_dummy",
+)
+
+
+def disable_actor_manipulator_collision(model: mujoco.MjModel) -> int:
+    """
+    关闭 ActorManipulator 拖拽代理所有几何体的碰撞掩码（contype=conaffinity=0）。
+
+    拖拽/抓取依赖 mocap anchor 与 weld 等号约束，与接触完全无关，故关闭碰撞不影响功能；
+    但可消除 AR-001 中该代理埋地/远端碰撞体与无限平面贯产生的垃圾约束（junk efc）行。
+
+    Args:
+        model: 原始 mujoco.MjModel。
+
+    Returns:
+        被修改的 geom 数量（用于日志/断言）。
+    """
+    n_disabled = 0
+    for body_name in _ACTOR_MANIPULATOR_BODY_NAMES:
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if body_id < 0:
+            continue
+        for gid in range(model.ngeom):
+            if model.geom_bodyid[gid] == body_id:
+                if model.geom_contype[gid] != 0 or model.geom_conaffinity[gid] != 0:
+                    model.geom_contype[gid] = 0
+                    model.geom_conaffinity[gid] = 0
+                    n_disabled += 1
+    return n_disabled
+
+
 class MuJoCoSimCore:
     """MuJoCo 仿真核心，持有 _mjModel/_mjData。
 
@@ -55,6 +90,19 @@ class MuJoCoSimCore:
         """
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
+        # AR-001：模型加载后关闭 ActorManipulator 拖拽代理的碰撞掩码，
+        # 消除其埋地/远端碰撞体与无限平面贯产生的垃圾约束行（不影响 mocap weld 拖拽）。
+        self.disable_actor_manipulator_collision()
+
+    def disable_actor_manipulator_collision(self) -> int:
+        """关闭 ActorManipulator 拖拽代理几何体的碰撞掩码（可随时重试/重断言）。
+
+        Returns:
+            本次被修改的 geom 数量。
+        """
+        if self._mjModel is None:
+            return 0
+        return disable_actor_manipulator_collision(self._mjModel)
 
     def reset_data(self) -> None:
         """重置 MjData 到初始状态（mj_resetData）。
@@ -212,8 +260,17 @@ class MuJoCoSimCore:
     # --- 关节查询（阶段三 3.1.1）---
 
     def _joint_id(self, joint_name: str) -> int:
-        """解析关节名称到 joint_id（内部辅助）。"""
-        return mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        """解析关节名称到 joint_id（内部辅助）。
+
+        Raises:
+            ValueError: 关节名不存在于当前模型（mj_name2id 返回 -1 时若放行，
+                后续 jnt_qposadr[-1] 等负索引会静默取到末尾关节的地址，
+                导致 device PD 等按偏移访问的 kernel 读/写到错误关节）。
+        """
+        jid = mujoco.mj_name2id(self._mjModel, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        if jid < 0:
+            raise ValueError(f"joint not found in model: {joint_name!r}")
+        return jid
 
     def _joint_qpos_len(self, joint_id: int) -> int:
         """关节 qpos 长度（按类型：free=7, ball=4, hinge/slide=1）。"""
@@ -560,6 +617,10 @@ class MuJoCoSimCore:
             ``pos`` (np.ndarray(3,))、``frame`` (np.ndarray(9,) 扁平)。
             无接触时返回空列表。
         """
+        if self._mjData is None:
+            # 离线骨架模式（未 init_simulation）：优雅降级为空接触列表，
+            # 维持 render() 的离线 no-op 契约
+            return []
         contacts: list[dict] = []
         ncon = self._mjData.ncon
         for i in range(ncon):

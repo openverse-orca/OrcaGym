@@ -2,7 +2,7 @@
 
 Inverse Kinematics converts the target pose of an end-effector into joint angles.
 
-> For complete runnable code, see [OrcaPlayground examples/euler/06_jacobian/](https://github.com/OrcaGym/OrcaPlayground).
+> For complete runnable code, see [OrcaPlayground examples/euler/07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian).
 
 ---
 

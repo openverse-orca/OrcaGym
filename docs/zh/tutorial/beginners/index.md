@@ -31,9 +31,13 @@
  │
  └── 🎬 场景搭建 学会往场景里放机器人、物体、灯光
  │
+ └── 🔧 MuJoCo 后端 模型加载、步进控制、求解器配置
+ │
  └── 🏗️ 第一个环境 学会写自己的环境类
  │
- └── 📡 读取状态 学会查询关节角度、body 位姿
+ └── 📐 状态管理 理解 qpos/qvel/qacc 数据布局与同步规则
+ │
+ └── 📡 读取状态 学会按名称查询关节角度、body 位姿
  │
  └── 🦾 让机器人动起来 理解 qpos/qvel，控制关节
  │
@@ -50,10 +54,12 @@
 |------|--------|----------|
 | [🔌 Hello World](hello-world.md) | 离线模式、`do_simulation`、`data.qpos` | 5 分钟 |
 | [🎬 场景搭建](scene-setup.md) | `OrcaGymScene`、`Actor`、资产摆放 | 15 分钟 |
+| [🔧 MuJoCo 后端](mujoco-backend.md) | 模型加载、`sim_config`、步进控制 | 15 分钟 |
 | [🏗️ 第一个环境](your-first-env.md) | 继承 `OrcaGymEulerEnv`、实现 `step`/`reset_model`/`_get_obs` | 15 分钟 |
+| [📐 状态管理](state-management.md) | qpos/qvel/qacc 布局、`mj_forward` 同步、零拷贝视图 | 15 分钟 |
 | [📡 读取状态](state-queries.md) | `query_joint_qpos`、`get_body_xpos_xmat_xquat`、传感器 | 15 分钟 |
 | [🦾 让机器人动起来](move-a-joint.md) | `qpos`/`qvel`、`set_joint_qpos`、`do_simulation` | 20 分钟 |
-| [📷 相机与视觉](camera-and-vision.md) | `CameraWrapper`、RGB-D 图像获取 | 15 分钟 |
+| [📷 相机与视觉](camera-and-vision.md) | `start_streaming`、`save_streaming`、RGB-D 图像获取 | 15 分钟 |
 | [🎮 简单控制器](simple-controller.md) | PD 控制器原理、参数调优 | 20 分钟 |
 | [🏆 搭建一个任务](build-a-task.md) | 组合一切：感知→决策→控制，完成到达目标 | 30 分钟 |
 | [🧠 PPO 训练](ppo-training.md) | SB3 PPO、奖励函数设计、离线训练 | 30 分钟 |
@@ -106,7 +112,7 @@ gymnasium.Env
 ```
 
 > **推荐**：`OrcaGymEulerEnv` 是当前推荐的新入口。 `OrcaGymLocalEnv` 处于维护模式，逐步废弃。
-> 可运行的完整示例见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)。
+> 可运行的完整示例见 [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler)。
 
 ---
 

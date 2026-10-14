@@ -2,7 +2,7 @@
 
 This section explains how to use OrcaGym's **state query API**, covering joint states, body poses, sensors, actuator torques, contact information, and more.
 
-> For complete runnable code, see [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground).
+> For complete runnable code, see [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api).
 
 ---
 
@@ -40,7 +40,7 @@ class QueryDemoEnv(OrcaGymEulerEnv):
     def demo_all_queries(self):
         """Demonstrate the full set of query APIs"""
         self.reset()
-        agent = self.agent_name
+        agent = self._agent_names[0]
         print(f"Agent name: {agent}\n")
 
         # ─── 1. Joint Queries ───
@@ -298,7 +298,7 @@ forces = env.query_contact_force(contact_ids)
 max_normal = max(abs(f[0]) for f in forces.values())
 ```
 
-> **Note**: The dict keys returned by `query_contact_simple()` are **lowercase** `"geom1"` / `"geom2"`,
+> ⚠️ **Note**: The dict keys returned by `query_contact_simple()` are **lowercase** `"geom1"` / `"geom2"`,
 > not uppercase `"Geom1"` / `"Geom2"`.
 
 ### 5. Base Frame Transform

@@ -10,7 +10,39 @@
 显式重新应用需生效的缓存配置。
 """
 
+import enum
+from typing import Any
+
 import numpy as np
+
+#: SimConfig 构造期 opt 覆盖支持的键（timestep 走 time_step 构造参数，单独通道）。
+OPT_OVERRIDE_KEYS: frozenset[str] = frozenset({"integrator", "gravity", "iterations"})
+
+
+def validate_opt_overrides(overrides: dict[str, Any] | None) -> None:
+    """校验构造期 opt 覆盖键（用户边界入口调用，越早失败越好）。
+
+    Args:
+        overrides: Env 构造参数 sim_config_overrides。None 或空 dict 直接通过。
+
+    Raises:
+        ValueError: 含非法键（含 "timestep" —— 该键与 time_step 构造参数双通道冲突）。
+    """
+    if not overrides:
+        return
+    invalid = set(overrides) - OPT_OVERRIDE_KEYS
+    if invalid:
+        raise ValueError(
+            f"不支持的 sim_config_overrides 键: {sorted(invalid)}；"
+            f"合法键: {sorted(OPT_OVERRIDE_KEYS)}（timestep 请用 time_step 构造参数）"
+        )
+
+
+class SimBackend(enum.Enum):
+    """仿真后端选择（对齐 design §2.1 二选一）。"""
+
+    MUJOCO = "mujoco"   # CPU 后端（现状 MuJoCoSimCore）
+    EULER = "euler"     # Euler GPU 后端（P1 单世界）
 
 
 class SimConfig:
@@ -44,6 +76,10 @@ class SimConfig:
         self._integrator: int = 0
         self._iterations: int = 100
         self._gravity: np.ndarray = np.array([0.0, 0.0, -9.81])
+        # Euler 后端选择（不委托 mj_model，见 design §4.3）
+        self._backend: SimBackend = SimBackend.MUJOCO
+        self._device: str = "cuda"
+        self._nworld: int = 1
 
     # --- 绑定方法（供 OrcaGymEuler.init_simulation 后调用）---
 
@@ -73,6 +109,11 @@ class SimConfig:
         v = float(value)
         self._timestep = v  # 始终缓存
         if self._mj_model is not None:
+            if self._backend == SimBackend.EULER:
+                raise RuntimeError(
+                    "Euler 后端下 timestep 在 init_simulation 后不可修改。"
+                    "请在 init_simulation 前通过 SimConfig.timestep = v 设置。"
+                )
             self._mj_model.opt.timestep = v
 
     @property
@@ -87,6 +128,11 @@ class SimConfig:
         v = int(value)
         self._integrator = v
         if self._mj_model is not None:
+            if self._backend == SimBackend.EULER:
+                raise RuntimeError(
+                    "Euler 后端下 integrator 在 init_simulation 后不可修改。"
+                    "请在 init_simulation 前通过 SimConfig.integrator = v 设置。"
+                )
             self._mj_model.opt.integrator = v
 
     @property
@@ -101,6 +147,11 @@ class SimConfig:
         v = int(value)
         self._iterations = v
         if self._mj_model is not None:
+            if self._backend == SimBackend.EULER:
+                raise RuntimeError(
+                    "Euler 后端下 iterations 在 init_simulation 后不可修改。"
+                    "请在 init_simulation 前通过 SimConfig.iterations = v 设置。"
+                )
             self._mj_model.opt.iterations = v
 
     @property
@@ -115,7 +166,38 @@ class SimConfig:
         v = np.asarray(value, dtype=np.float64)
         self._gravity = v
         if self._mj_model is not None:
+            if self._backend == SimBackend.EULER:
+                raise RuntimeError(
+                    "Euler 后端下 gravity 在 init_simulation 后不可修改。"
+                    "请在 init_simulation 前通过 SimConfig.gravity = v 设置。"
+                )
             self._mj_model.opt.gravity[:] = v
+
+    # --- 后端选择（不委托 mj_model，见 design §4.3）---
+
+    @property
+    def backend(self) -> SimBackend:
+        return self._backend
+
+    @backend.setter
+    def backend(self, value: SimBackend | str) -> None:
+        self._backend = SimBackend(value)  # 支持 "euler" str 或 SimBackend 枚举
+
+    @property
+    def device(self) -> str:
+        return self._device
+
+    @device.setter
+    def device(self, value: str) -> None:
+        self._device = value
+
+    @property
+    def nworld(self) -> int:
+        return self._nworld
+
+    @nworld.setter
+    def nworld(self, value: int) -> None:
+        self._nworld = value
 
     # --- 批量读写 ---
 

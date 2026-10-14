@@ -2,7 +2,7 @@
 
 Managing state (qpos/qvel/qacc) in MuJoCo simulation is key to using OrcaGym correctly.
 
-> See [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground) and [06_jacobian/](https://github.com/OrcaGym/OrcaPlayground) for complete runnable code.
+> See [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) and [07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian) for complete runnable code.
 
 ## State Data Layout
 
@@ -66,7 +66,7 @@ dof_adr = env.jnt_dofadr("g1_left_knee_joint")      # starting index in qvel/qac
 knee_angle = env.data.qpos[qpos_adr]                 # hinge joint qpos length = 1
 ```
 
-> **Note**: `env.data.qpos` is a **global** array (containing all body free dofs and joint qpos).
+> ⚠️ **Note**: `env.data.qpos` is a **global** array (containing all body free dofs and joint qpos).
 > In multi-body scenes, you cannot directly use `data.qpos[7:]` to access G1 joints — you must use `jnt_qposadr`
 > to stitch together segments by each joint's address. For example, the qpos addresses of G1's 29 revolute joints may not be contiguous with `data.qpos[7:]`.
 
@@ -166,3 +166,9 @@ snapshot = env.data.qpos.copy()     # copy() creates an independent copy, unaffe
 | Wrong array dimensions | ValueError | Use `jnt_qposadr` to check address and length |
 | Reading body pose without calling `mj_forward()` | Reading stale pose | Must call `mj_forward()` after modifying qpos |
 | Using `data.qpos[7:]` directly in multi-body scenes | Reading data from other bodies | Use `jnt_qposadr` to stitch segments joint by joint |
+
+---
+
+## Next Step
+
+Now that you understand state layout and synchronization rules, learn how to use the **query-by-name API** to read joint, body, and sensor states more intuitively: [📡 Reading State](state-queries.md).

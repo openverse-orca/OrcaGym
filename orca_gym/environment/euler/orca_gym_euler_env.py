@@ -21,6 +21,7 @@ reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
 import asyncio
 import time
 import warnings
+from concurrent.futures import Future
 from typing import Any, Dict, Tuple, Union
 
 import grpc
@@ -31,9 +32,10 @@ from scipy.spatial.transform import Rotation as R
 
 from orca_gym.core.euler.orca_gym_euler import OrcaGymEuler
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
-from orca_gym.core.euler.sim_config import SimConfig
+from orca_gym.core.euler.sim_config import SimBackend, SimConfig, validate_opt_overrides
 from orca_gym.log.orca_log import get_orca_logger
 from orca_gym.protos.mjc_message_pb2_grpc import GrpcServiceStub
+from orca_gym.recorder import CreateVideoRecorderManager, RemuxResult, VideoRecorderManager
 from orca_gym.utils.orca_debug_draw import DebugDraw
 from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env_mixin import OrcaGymEnvMixin
@@ -90,9 +92,12 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         time_step: float,
         *,
         model_xml_path: str | None = None,
+        esdf_path: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
+        device: str = "cpu",
+        sim_config_overrides: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -107,9 +112,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
+            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
+            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0"/"hip:0" 等 → Euler.SolverMujoco GPU）。
+            sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
+                合法键为 integrator/gravity/iterations（timestep 请用 time_step
+                构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
+                在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
+                setter 写入立即生效。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -121,6 +133,11 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 2. Env 自有字段
         self._skip_grpc_load = skip_grpc_load
         self._local_xml_path = model_xml_path
+        self._esdf_path = esdf_path
+        self._device = device
+        # 用户边界校验：非法键（含 timestep）尽早失败
+        validate_opt_overrides(sim_config_overrides)
+        self._opt_overrides = dict(sim_config_overrides) if sim_config_overrides else None
         self._render_mode = render_mode
         self._sync_render = sync_render
         self._studio_bridge = None   # 将在 initialize_grpc 中赋值
@@ -133,8 +150,12 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_count = 0.0
         self._render_count_interval = 0.0
         self._render_time_step = 0.0
-        self._render_interval = 1.0 / self.metadata.get("render_fps", 30)
+        self._render_fps = self.metadata.get("render_fps", 30)
+        self._render_interval = 1.0 / self._render_fps
         self._last_frame_index = -1
+
+        # 相机录制管理器（惰性初始化，首次调用 save_streaming 时创建）
+        self._recorder_manager: VideoRecorderManager | None = None
 
         # 5. 锚点状态（UI 抓取内部方法 _anchor_actor/_release_body_anchored 使用）
         # 默认关卡 ActorManipulator 已改名为 UUID 化的 ORCA_MANIPULATOR_<uuid>，
@@ -155,6 +176,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
         # 4. 生命周期编排（原父类 __init__ 中的编排，现在自主调用）
         self.initialize_grpc()
+        self._configure_backend()
         self.pause_simulation()
         self.set_time_step(time_step)
         self.initialize_simulation()   # 内部设置 _gym，model/data 通过 property 读取
@@ -205,6 +227,19 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
+    def _configure_backend(self) -> None:
+        """依据 device 参数配置后端（cpu → MuJoCo；cuda* → Euler）。
+
+        必须在 initialize_simulation 之前调用：initialize_simulation 内部
+        依据 sim_config.backend 决定走 CPU 或 Euler 初始化路径。
+        """
+        if self._device.startswith(("cuda", "hip")):
+            self._gym.sim_config.backend = SimBackend.EULER
+            self._gym.sim_config.device = self._device
+        else:
+            self._gym.sim_config.backend = SimBackend.MUJOCO
+            self._gym.sim_config.device = self._device
+
     def initialize_simulation(self) -> Tuple[Any, OrcaGymDataView]:
         """初始化仿真：加载模型 XML + init_simulation + 返回 (model, view)。
 
@@ -215,10 +250,21 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             model_xml_path = self._local_xml_path
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
-        # 2. 初始化仿真
-        self.loop.run_until_complete(self._gym.init_simulation(model_xml_path))
-        # 3. 应用缓存的 time_step（init_simulation 前设置的值需重新生效）
-        self._gym.sim_config.timestep = self._time_step
+        # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
+        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异）
+        self.loop.run_until_complete(
+            self._gym.init_simulation(
+                model_xml_path,
+                esdf_path=self._esdf_path,
+                opt_overrides=self._opt_overrides,
+            )
+        )
+        # 3. 应用缓存的 time_step：
+        #    - CPU 后端：_bind 后写 mj_model.opt.timestep。
+        #    - Euler 后端：init_simulation 内部（_init_euler_backend）已在构造
+        #      求解器前将 SimConfig.timestep 下发到模型，无需（也无法）在此重复设置。
+        if self._gym.sim_config.backend == SimBackend.MUJOCO:
+            self._gym.sim_config.timestep = self._time_step
         # 4. 在线模式：同步时间步到远端 OrcaStudio
         if not self._skip_grpc_load:
             self._studio_bridge.set_timestep_remote(self._time_step)
@@ -238,12 +284,41 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 )
         except Exception as e:
             _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
+        # AR-001：关闭 ActorManipulator 拖拽代理碰撞掩码（init_simulation 已执行，
+        # 此处经公共方法再断言一次，覆盖新/旧 Anchor 命名，保证代理不参与物理碰撞）。
+        try:
+            n = self._gym.disable_actor_manipulator_collision()
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
+        except Exception as e:
+            _logger.warning(f"failed to disable ActorManipulator collision: {e}")
         return self._gym.model, self._gym.data
 
     def reset_simulation(self) -> None:
         """重置 MjData 到初始状态并同步 DataView。"""
         self._gym.reset_data()
+        self._gym.reset_coupling_state()
         self._gym.sync_to_view()
+        try:
+            body_names = self._gym.model.get_body_names()
+            _legacy_anchor = "ActorManipulator_Anchor"
+            if self._anchor_mocap_name not in body_names and _legacy_anchor in body_names:
+                self._anchor_mocap_name = _legacy_anchor
+                warnings.warn(
+                    f"Using legacy anchor mocap body name '{_legacy_anchor}'. "
+                    f"Please upgrade the level to use the new UUID-based name "
+                    f"'ORCA_MANIPULATOR_<uuid>_Anchor' to avoid name conflicts with user-imported XML.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+        except Exception as e:
+            _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
+        # AR-001：关闭 ActorManipulator 拖拽代理碰撞掩码（init_simulation 已执行，
+        # 此处经公共方法再断言一次，覆盖新/旧 Anchor 命名，保证代理不参与物理碰撞）。
+        try:
+            n = self._gym.disable_actor_manipulator_collision()
+            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
+        except Exception as e:
+            _logger.warning(f"failed to disable ActorManipulator collision: {e}")
 
     def init_qpos_qvel(self) -> None:
         """保存初始 qpos/qvel。"""
@@ -252,21 +327,26 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.init_qvel = self._gym.data.qvel.ravel().copy()
 
     def set_time_step(self, time_step: float) -> None:
-        """设置仿真时间步长（本地缓存 + 远端同步）。
+        """设置仿真时间步长 dt（本地缓存 + 远端同步）——用户配置物理步长的明确接口。
 
-        __init__ 在 initialize_simulation 前调用本方法，此时 SimConfig
-        未绑定 mjModel，缓存到 self._time_step，在 initialize_simulation
-        末尾重新设置。initialize_simulation 后调用时，本地立即生效，
-        在线模式同步到远端 OrcaStudio。
+        时序约定（重要）：
+        - **初始化前调用**（``__init__`` 在 ``initialize_simulation`` 前调用本方法）：
+          SimConfig 尚未绑定 mjModel，仅缓存到 ``self._time_step``，随后由
+          ``initialize_simulation`` 下发到求解器，Euler 后端据此在 solver 构造时
+          固化步长（Euler 步长初始化后只读）。
+        - **初始化后调用**：
+          - CPU(MUJOCO) 后端：直接写 ``mj_model.opt.timestep``，立即生效；
+          - Euler 后端：timestep 已固化只读，SimConfig setter 抛出 RuntimeError，
+            明确提示用户在初始化前（构造参数 ``time_step``）配置，不静默吞掉。
+
+        远端（在线模式）始终同步到 OrcaStudio。
         """
         self._time_step = time_step
         self.realtime_step = time_step * self.frame_skip
-        # 本地：若 Gym 已初始化（init_simulation 已执行），直接设置
+        # 本地：未绑定时 setter 仅缓存 _timestep（不抛错）；绑定后按后端
+        # 应用（MUJOCO 立即生效；EULER 只读，setter 抛 RuntimeError）。
         if hasattr(self, "_gym") and self._gym is not None:
-            try:
-                self._gym.sim_config.timestep = time_step
-            except RuntimeError:
-                pass   # SimConfig 未绑定，缓存待 init_simulation
+            self._gym.sim_config.timestep = time_step
         # 远端：在线模式同步到 OrcaStudio
         if not self._skip_grpc_load and hasattr(self, "_studio_bridge"):
             self._studio_bridge.set_timestep_remote(time_step)
@@ -279,7 +359,21 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self.loop.run_until_complete(self._gym.pause_simulation())
 
     def close(self) -> None:
-        """关闭环境（离线模式 no-op）。"""
+        """关闭环境，清理资源。
+
+        若有未完成的录制任务，自动保存为 MP4 后再关闭。
+        离线模式（skip_grpc_load=True）仅清理录制器，跳过 gRPC 清理。
+        """
+        # 先保存未完成的录制任务
+        if self._recorder_manager is not None:
+            saved = self._recorder_manager.stop_all_and_save()
+            for cam_name, result in saved.items():
+                _logger.info(
+                    f"Auto-saved recording for camera '{cam_name}' "
+                    f"to {result.file_path}"
+                )
+            self._recorder_manager = None
+
         if self._skip_grpc_load:
             return
         # 在线模式：清空 immediate 队列避免残留绘制（retained 对象随 FP 销毁自动释放）
@@ -323,6 +417,46 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     def set_ctrl(self, ctrl: np.ndarray) -> None:
         """设置控制输入，委托 self._gym.set_ctrl()。"""
         self._gym.set_ctrl(ctrl)
+
+    def register_pid_controller(
+        self,
+        controller_type: str,
+        *,
+        kp: np.ndarray,
+        kd: np.ndarray,
+        motor_limits: np.ndarray,
+        joint_names: list[str],
+    ) -> Any:
+        """注册 device-side PD 控制器（GPU(Euler) 后端专属）。
+
+        SingleWorld 封装原则（design §3.8 / guide §3.3）：仅暴露参数化配置接口，
+        用户不接触任何 ``flow.*`` 对象；CPU(MUJOCO) 后端无 GPU 图捕获能力，直接抛错。
+
+        Args:
+            controller_type: 控制算法标识（P1 仅 "pd"）。
+            kp: 位置增益 (nu,)。
+            kd: 速度增益 (nu,)。
+            motor_limits: 力矩限幅 (nu,)。
+            joint_names: 被驱动关节名（与 ctrl 执行器顺序一致）。
+
+        Returns:
+            PidController 句柄（``update_target`` / ``set_gains``）。
+
+        Raises:
+            NotImplementedError: CPU(MUJOCO) 后端。
+        """
+        if self._gym.sim_config.backend != SimBackend.EULER:
+            raise NotImplementedError(
+                "register_pid_controller 仅 GPU(Euler) 后端可用；"
+                "CPU(MUJOCO) 后端请使用 host 逐子步闭环（step 模式 2）。"
+            )
+        return self._gym.register_pid_controller(
+            controller_type,
+            kp=kp,
+            kd=kd,
+            motor_limits=motor_limits,
+            joint_names=joint_names,
+        )
 
     # --- 状态设置（reset_model 必需）---
 
@@ -397,7 +531,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
 
     # --- 渲染（K9: Studio 交互通过 self._studio_bridge / self._gym.render）---
 
-    def render(self) -> Union[NDArray[np.float64], None]:
+    def render(self, simulate_index: int = -1, request_idr: bool = False) -> Union[NDArray[np.float64], None]:
         """渲染当前仿真状态到 OrcaStudio。
 
         K9 合规: 通过 self._gym.render()（Gym 公共方法），不触 _gym.studio。
@@ -409,6 +543,15 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         离线模式（skip_grpc_load=True）: 无 OrcaStudio 可渲染，返回 None。
         render_mode 不在 ["human", "force"] 时立即返回 None。
 
+        Args:
+            simulate_index: 物理仿真步索引，透传到引擎相机管线用于帧对齐。
+                ``-1`` 表示由服务端自增（向后兼容，默认值）。当启用客户端
+                PyAV remux 录制时，应传入 ``>=0`` 的递增值，以便录制器按
+                ``simulate_index`` 区间提取帧。
+            request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
+                默认 ``False``。录制段起点设 ``True`` 使该帧为关键帧，
+                配合 ``save_streaming`` 内部默认的前向截断使用。
+
         Returns:
             None（Euler 渲染不返回像素数组，由 OrcaStudio 负责显示）。
         """
@@ -416,18 +559,18 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             return None
         if self._skip_grpc_load:
             return None
-        # 在线模式：节流后委托 gym.render()
+        # 在线模式：节流后委托 gym.render(simulate_index)
         if self._sync_render:
             self._render_count += self._render_count_interval
-            if self._render_count >= 1.0:
-                self.loop.run_until_complete(self._gym.render())
+            if self._render_count >= 1.0 or request_idr:
+                self.loop.run_until_complete(self._gym.render(simulate_index, request_idr))
                 self._do_body_manipulation()
                 self._render_count -= 1.0
         else:
             time_diff = time.perf_counter() - self._render_time_step
-            if time_diff > self._render_interval:
+            if time_diff > self._render_interval or request_idr:
                 self._render_time_step = time.perf_counter()
-                self.loop.run_until_complete(self._gym.render())
+                self.loop.run_until_complete(self._gym.render(simulate_index, request_idr))
                 self._do_body_manipulation()
         return None
 
@@ -491,49 +634,112 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         return self._debug_draw
 
     # --- Studio 委托（阶段三 3.4.4，Env 层同步包装 async Gym 方法）---
+    # 视频录制/帧捕获相关方法（begin_save_video / stop_save_video /
+    # get_current_frame / get_next_frame / get_camera_time_stamp）所对应的
+    # 引擎侧 RPC 已删除，底层 Gym/Bridge 已降级为 no-op + DeprecationWarning。
+    # 以下方法保留为向后兼容的同步包装，调用时会触发 deprecation warning。
+    # 新代码请使用 save_streaming 进行客户端 PyAV remux 录制
+    # （基于 WebSocket 流 + simulate_index 帧对齐）。
 
     def begin_save_video(self, file_path, capture_mode=0) -> None:
-        """开始录制视频（委托 self._gym）。
+        """[Deprecated] 开始录制视频（委托 self._gym）。
+
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除，底层为 no-op。请使用
+            ``save_streaming(camera_name, file_path, start_simulate_index,
+            end_simulate_index, color_port)`` 进行客户端 PyAV remux 录制。
 
         Args:
-            file_path: 视频文件保存路径。
-            capture_mode: 捕获模式（CaptureMode 枚举值，默认 0）。
+            file_path: 视频文件保存路径（已忽略）。
+            capture_mode: 捕获模式（已忽略）。
         """
+        warnings.warn(
+            "begin_save_video is deprecated. "
+            "Use save_streaming(camera_name, file_path, start_simulate_index, "
+            "end_simulate_index, color_port) for client-side PyAV remux recording.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.loop.run_until_complete(
             self._gym.begin_save_video(file_path, capture_mode)
         )
 
     def stop_save_video(self) -> None:
-        """停止录制视频（委托 self._gym）。"""
+        """[Deprecated] 停止录制视频（委托 self._gym）。
+
+        .. deprecated::
+            引擎侧 MP4 录制 RPC 已删除，底层为 no-op。请使用
+            ``save_streaming(camera_name, file_path, start_simulate_index,
+            end_simulate_index, color_port)``。
+        """
+        warnings.warn(
+            "stop_save_video is deprecated. "
+            "Use save_streaming(camera_name, file_path, start_simulate_index, "
+            "end_simulate_index, color_port) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.loop.run_until_complete(self._gym.stop_save_video())
 
     def get_current_frame(self) -> int:
-        """获取当前帧号（委托 self._gym）。离线模式返回 -1。
+        """[Deprecated] 获取当前帧号（委托 self._gym）。
+
+        .. deprecated::
+            引擎侧帧索引 RPC 已删除，底层返回 -1。客户端录制通过
+            ``simulate_index`` 在 WebSocket 帧头中对齐。
 
         Returns:
-            当前帧索引（int）。
+            -1（始终）。
         """
+        warnings.warn(
+            "get_current_frame is deprecated. "
+            "Engine-side frame index RPC has been removed. "
+            "Use simulate_index in render() for frame alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.loop.run_until_complete(self._gym.get_current_frame())
 
     def get_next_frame(self) -> int:
-        """带轮询的获取下一帧（复用 get_current_frame 轮询）。
+        """[Deprecated] 带轮询的获取下一帧（复用 get_current_frame 轮询）。
+
+        .. deprecated::
+            引擎侧帧索引 RPC 已删除。客户端录制通过 ``simulate_index``
+            在 WebSocket 帧头中对齐，无需轮询远端帧号。
 
         Returns:
-            下一帧索引（int）。
+            -1（始终，因 get_current_frame 返回 -1）。
         """
-        # 复用老体系轮询逻辑：循环调用 get_current_frame 直到帧号递增
+        warnings.warn(
+            "get_next_frame is deprecated. "
+            "Engine-side frame index RPC has been removed. "
+            "Use simulate_index in render() for frame alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         current = self.get_current_frame()
         return current + 1
 
     def get_camera_time_stamp(self, last_frame_index) -> dict:
-        """获取相机时间戳（委托 self._gym）。
+        """[Deprecated] 获取相机时间戳（委托 self._gym）。
+
+        .. deprecated::
+            引擎侧时间戳 RPC 已删除，底层返回 ``{}``。客户端录制通过
+            WebSocket 帧头携带 uint64 timestamp 对齐。
 
         Args:
-            last_frame_index: 截止帧索引。
+            last_frame_index: 截止帧索引（已忽略）。
 
         Returns:
-            dict[camera_name -> list[uint64]]。
+            ``{}``（始终）。
         """
+        warnings.warn(
+            "get_camera_time_stamp is deprecated. "
+            "Engine-side timestamp RPC has been removed. "
+            "WebSocket frame header carries uint64 timestamp for alignment.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.loop.run_until_complete(
             self._gym.get_camera_time_stamp(last_frame_index)
         )
@@ -546,52 +752,152 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         self.loop.run_until_complete(self._gym.get_frame_png(image_path))
 
-    # --- 摄像头传感器激活（阶段四补遗：激活 Studio 端摄像头流）---
+    # --- 相机录制 API（基于客户端 PyAV remux，复用 orca_gym.recorder 模块）---
 
-    def set_camera_sensor_info(
+    def save_streaming(
         self,
-        actor_name: str,
-        capture_rgb: bool,
-        capture_depth: bool,
-        save_mp4_file: bool = False,
-        use_dds: bool = False,
-        **kwargs,
-    ) -> None:
-        """激活/配置摄像头传感器流（委托 self._gym）。
+        camera_name: str,
+        camera_type: str,
+        file_path: str,
+        start_simulate_index: int,
+        end_simulate_index: int,
+    ) -> Future[RemuxResult]:
+        """保存指定相机 ``[start, end]`` 区间的视频流为 MP4。**非阻塞**。
 
-        Studio 端 MuJoCo <camera> 默认不推送 WebSocket RGB/Depth 流，
-        必须通过本方法显式激活后，对应端口（如 7070/7071）才会监听并推流。
-        `begin_save_video` 只控制 MP4 文件录制，与本方法正交。
+        需先调用 ``start_streaming`` 启动推流与录制器。本方法仅注册区间保存
+        任务，不重复启动录制器。内部默认前向截断到区间内第一个关键帧，
+        保证输出视频可正常播放。
 
         Args:
-            actor_name: 摄像头所属 actor 名（Euler 体系下即 agent_name 前缀，如 "g1"）。
-            capture_rgb: 是否激活 RGB 视频流。
-            capture_depth: 是否激活深度视频流。
-            save_mp4_file: 是否同时保存 MP4 文件。
-            use_dds: 是否使用 DDS 传输。
-            **kwargs: 扩展 optional 参数（None 表示不修改现有值）：
-                capture_normal (bool): 是否捕获法线图。
-                capture_object_color (bool): 是否捕获实例分割色标图。
-                is_recording (bool): 是否正在录制。
-                use_nvenc (bool): 是否使用 NvEnc 硬件编码。
-                nvenc_gpu_index (int): NvEnc GPU 适配器索引。
-                random_object_color (bool): 是否随机分配物体颜色。
-                width (int): 图像宽度（像素）。
-                height (int): 图像高度（像素）。
-                vertical_fov (float): 垂直视场角（度）。
-                near_clip (float): 近裁剪面距离。
-                far_clip (float): 远裁剪面距离。
-                gamma (float): 深度相机 gamma 校正。
-                color_port (int): RGB 流 WebSocket 端口。
-                depth_port (int): 深度流 WebSocket 端口。
-                dds_topic (str): DDS 主题。
-                dds_stream_id (str): DDS 流 ID。
+            camera_name: 相机名称。
+            camera_type: 流类型，``"color"`` 保存彩色流，``"depth"`` 保存深度流。
+            file_path: MP4 输出文件路径。
+            start_simulate_index: 区间起始（含），对应
+                ``render(simulate_index=...)`` 传入的值。
+            end_simulate_index: 区间结束（含）。
+
+        Returns:
+            ``Future[RemuxResult]``：保存完成后 ``future.result()`` 返回
+            ``RemuxResult``（file_path / frame_count / frame_indices /
+            timestamps_ns）。
+
+        Raises:
+            ValueError: 相机不存在或未启动对应类型的录制器。
         """
-        self.loop.run_until_complete(
-            self._gym.set_camera_sensor_info(
-                actor_name, capture_rgb, capture_depth, save_mp4_file, use_dds, **kwargs
-            )
+        manager = self.get_recorder_manager()
+        return manager.save_streaming(
+            camera_name=camera_name,
+            file_path=file_path,
+            start_simulate_index=start_simulate_index,
+            end_simulate_index=end_simulate_index,
+            stream_kind=camera_type,
+            truncate_to_keyframe=True,
         )
+
+    def show_camera(
+        self,
+        camera_name: str,
+        camera_type: str = "color",
+        window_name: str | None = None,
+    ) -> None:
+        """实时展示指定相机的画面。**非阻塞**。
+
+        在独立子进程中建立 WebSocket 连接接收 H.264 码流、解码、用 matplotlib
+        显示，不影响仿真主线程、接收线程与保存线程。深度流直接显示原始
+        灰度帧，不做伪彩色转换。
+
+        需先调用 ``start_streaming`` 启动推流与录制器。
+
+        Args:
+            camera_name: 相机名称。
+            camera_type: 流类型，``"color"``（默认）或 ``"depth"``。
+            window_name: matplotlib 窗口标题；默认自动生成。
+
+        Raises:
+            ValueError: 相机未启动对应类型的录制器。
+        """
+        self.get_recorder_manager().start_viewer(
+            camera_name=camera_name,
+            window_name=window_name,
+            stream_kind=camera_type,
+        )
+
+    def set_video_recorder_manager(self, manager: VideoRecorderManager | None) -> None:
+        """注入 ``VideoRecorderManager`` 实例。
+
+        环境层相机属性查询/设置与录制统一转发到该管理器。为 ``None`` 时
+        后续首次调用相机/录制接口会由 ``CreateVideoRecorderManager`` 惰性创建。
+
+        Args:
+            manager: ``VideoRecorderManager`` 实例（可经
+                ``CreateVideoRecorderManager(self._stub)`` 创建）。
+        """
+        self._recorder_manager = manager
+
+    def get_recorder_manager(self) -> VideoRecorderManager:
+        """获取或惰性创建录制管理器（以 ``self._stub`` 为 gRPC 后端）。
+
+        调用方保证在单一线程中创建管理器，故无需加锁。以 ``self.loop`` 作为
+        事件循环桥接 stub 异步接口。相机属性/推流接口由 ``VideoRecorderManager``
+        基于 stub 直接实现（实际执行者）。
+
+        外部模块可通过此方法获取 manager，直接调用 ``submit_task`` /
+        ``get_latest_frame_simulate_index`` 等接口，避免在 env 层增加过多转发方法。
+        """
+        if self._recorder_manager is None:
+            self._recorder_manager = CreateVideoRecorderManager(self._stub, self.loop)
+        return self._recorder_manager
+
+    # --- 相机串流与录制 API（基于客户端 PyAV remux）---
+
+    def get_camera_names(self) -> list[str]:
+        """获取所有已注册相机名称列表（转发到 VideoRecorderManager）。
+
+        Returns:
+            已注册相机名称列表（含 uuid 后缀的 registered name）。
+            离线模式返回空列表。
+        """
+        return self.get_recorder_manager().get_camera_names()
+
+    def start_streaming(self, camera_name: str, **kwargs) -> None:
+        """开启指定相机的串流（含 color/depth 按传感器开关自动启动）。
+
+        内部委托 ``VideoRecorderManager.start_recorder``：查询相机属性确认
+        存在、按 ``kwargs`` 校验/同步属性（必要时停流重配）、开启推流，并根据
+        ``capture_rgb`` / ``capture_depth`` 启动对应的录制器。上层无需关心
+        Idle/Streaming 状态机。
+
+        Args:
+            camera_name: 相机名称（可通过 ``get_camera_names`` 枚举获取）。
+            **kwargs: 相机属性设置（如 ``capture_rgb`` / ``capture_depth`` /
+                ``color_port`` / ``depth_port`` / ``width`` / ``height`` /
+                ``near_clip`` / ``far_clip`` / ``gamma`` 等）以及 recorder
+                专属参数 ``max_buffer_frames``。未提供的键保留相机当前属性。
+
+        Raises:
+            ValueError: 相机不存在、未注册，或缺少有效端口。
+            ConnectionError: WebSocket 连接超时或失败。
+        """
+        self.get_recorder_manager().start_recorder(camera_name, **kwargs)
+
+    def set_render_fps(self, fps: int) -> None:
+        """设置渲染帧率（render FPS）。
+
+        控制 ``render()`` 调用引擎渲染的频率：
+        - **同步渲染**（``sync_render=True``）：每隔 ``realtime_step * fps`` 个物理步渲染一帧
+        - **异步渲染**（``sync_render=False``）：每隔 ``1/fps`` 秒渲染一帧
+
+        同时更新 ``metadata['render_fps']``。
+
+        Args:
+            fps: 渲染帧率，必须 > 0。
+        """
+        if fps <= 0:
+            raise ValueError(f"fps must be > 0, got {fps}")
+        self._render_fps = fps
+        self.metadata["render_fps"] = fps
+        self._render_interval = 1.0 / fps
+        self._render_count_interval = self.realtime_step * fps
 
     def make_camera_viewport_active(
         self, actor_name: str, entity_name: str

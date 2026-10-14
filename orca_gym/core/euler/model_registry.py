@@ -13,7 +13,8 @@ site/sensor/geom/mesh/equality/mocap 字典。`build_orca_gym_data` 保留
     而非 `OrcaGymDataView`。`OrcaGymDataView` 由 `MuJoCoSimCore`
     的 `sync_to_view` 填充，不由此处构建。
 """
-
+import os
+import xml.etree.ElementTree as ET
 from typing import Tuple
 
 import mujoco
@@ -47,15 +48,16 @@ class ModelRegistry:
 
     # --- 绑定方法（供 OrcaGymEuler.init_simulation 后调用）---
 
-    def _bind(self, mj_model) -> None:
-        """绑定真实 mjModel。
-
-        供 OrcaGymEuler.init_simulation 在加载 mjModel 后调用。
+    def _bind(self, mj_model, xml_path: str | None = None) -> None:
+        """绑定真实 mjModel，并记住 XML 路径，供查询 mesh 文件路径。
 
         Args:
-            mj_model: MuJoCo MjModel 对象。
+            mj_model: MuJoCo MjModel。
+            xml_path: 加载该模型的 MJCF 路径；用来解析 <mesh file="...">。
+                      不传时 File 为空，行为与改之前一致。
         """
         self._mj_model = mj_model
+        self._xml_path = xml_path
 
     # --- 构建方法 ---
 
@@ -307,20 +309,58 @@ class ModelRegistry:
         return geom_dict
 
     def _query_all_meshes(self) -> dict:
-        """查询所有 mesh 信息。
+        """查询 mesh：名称、ID，以及 XML 里的 file/scale（给 SPH geometryFile）。
 
-        注意：MuJoCo Python 绑定的 mesh 对象不包含原始文件路径，
-        仅填充 mesh 名称与基本结构信息。
+        MuJoCo 内存里没有原始 obj 路径，必须从 MJCF 读 <mesh file="...">。
         """
         model = self._mj_model
+        mesh_files_from_xml: dict[str, str] = {}
+        mesh_scales_from_xml: dict[str, list] = {}
+        xml_path = getattr(self, "_xml_path", None)
+        if xml_path and os.path.isfile(xml_path):
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                xml_dir = os.path.dirname(os.path.abspath(xml_path))
+                meshdir = ""
+                compiler = root.find("compiler")
+                if compiler is not None:
+                    meshdir = compiler.get("meshdir", "") or ""
+                for mesh_elem in root.findall(".//asset/mesh"):
+                    mesh_name = mesh_elem.get("name")
+                    mesh_file = mesh_elem.get("file", "") or ""
+                    mesh_scale_str = mesh_elem.get("scale", "") or ""
+                    if mesh_name and mesh_file:
+                        if meshdir:
+                            full_path = os.path.join(xml_dir, meshdir, mesh_file)
+                        else:
+                            full_path = os.path.join(xml_dir, mesh_file)
+                        mesh_files_from_xml[mesh_name] = os.path.abspath(full_path)
+                    if mesh_name and mesh_scale_str:
+                        try:
+                            scale_values = [float(x) for x in mesh_scale_str.split()]
+                            if len(scale_values) == 3:
+                                mesh_scales_from_xml[mesh_name] = scale_values
+                            elif len(scale_values) == 1:
+                                mesh_scales_from_xml[mesh_name] = [scale_values[0]] * 3
+                        except ValueError:
+                            pass
+            except Exception:
+                pass
+
         mesh_dict = {}
         for i in range(model.nmesh):
             mesh_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, i)
             mesh_dict[mesh_name] = {
                 "ID": i,
                 "Name": mesh_name,
+                "File": mesh_files_from_xml.get(mesh_name, ""),
+                "Scale": mesh_scales_from_xml.get(mesh_name, [1.0, 1.0, 1.0]),
             }
         return mesh_dict
+
+
+
 
     def _query_all_equality_constraints(self) -> list:
         """查询所有等式约束（复用老体系 query_all_equality_constraints 逻辑）。"""

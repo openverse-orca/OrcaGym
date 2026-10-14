@@ -80,13 +80,13 @@ do_simulation(ctrl, n_frames)   ← Simulation step
   └─▶ Can directly read env.data.qpos, etc.
 ```
 
-> ⚠️ **Important**: After `do_simulation()` returns, `env.data` is already automatically synchronized and can be read directly. If you manually call `mj_forward()` and need to read derived quantities in `env.data` (such as `body_xpos`, `site_xpos`, etc.), it is recommended to use the standard stepping path via `do_simulation()` (which internally encapsulates `sync_to_view`), or use synchronization mechanisms inside subclasses. Directly calling `mj_forward()` does not automatically refresh the derived quantity view of `env.data`.
+> ⚠️ **Important**: After `do_simulation()` returns, `env.data` is already automatically synchronized (internally calling `sync_to_view`) and can be read directly. The base fields of `env.data` (`qpos`/`qvel`, etc.) are zero-copy views, while derived quantities (`body_xpos`/`site_xpos`, etc.) are read on demand from the live `_mjData`, so after `mj_forward()` executes, derived quantities reflect the latest values (`mj_forward` updates `_mjData` in place). However, `env.data.time` is a float copy (not a view) that is only refreshed on `sync_to_view` — `mj_forward` does not change `time`, so it has no effect; if you need to read `time` after `mj_step`, use `do_simulation()` or manually call `sync_to_view`.
 
 ---
 
 ## SimConfig — Solver Configuration
 
-`SimConfig` provides a read/write interface for simulation parameters, accessible via `env.sim_config`. Changes take effect on the next simulation step.
+`SimConfig` provides a read/write interface for simulation parameters, accessible via `env.sim_config`. Changes are written immediately to `mj_model.opt`, and take effect on the next `mj_step`.
 
 ```python
 sim_config = env.sim_config
@@ -94,7 +94,7 @@ sim_config = env.sim_config
 # Read/write parameters
 sim_config.timestep = 0.002     # Physics time step
 sim_config.iterations = 100     # Solver iteration count
-sim_config.integrator = 1       # Integrator (0=Euler, 1=RK4)
+sim_config.integrator = 1       # Integrator (0=Euler, 1=RK4, 2=IMPLICIT, 3=IMPLICITFAST)
 sim_config.gravity = np.array([0., 0., -9.81])  # Gravity
 
 # Batch configuration

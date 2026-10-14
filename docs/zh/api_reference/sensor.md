@@ -1,185 +1,69 @@
 # 📷 Sensor API
 
-传感器接口，提供相机图像接收、缓存、解析、回放等功能。
+传感器数据查询接口。相机串流、录制与可视化已迁移至 `orca_gym.recorder` 模块
+（见下方"相机接口"章节）。
 
-## 类概览
+## 目录
 
-| 类 | 说明 |
-|----|------|
-| `CameraWrapper` | 实时接收仿真渲染的相机图像 |
-| `CameraCacher` | 将相机流保存到本地文件 |
-| `CameraDataParser` | 解析本地缓存的相机数据 |
-| `VideoPlayer` | 逐帧回放本地缓存的视频 |
-| `Monitor` | 实时相机监控窗口 |
+- [相机接口（新）](#相机接口orca_gymrecorder)：`start_streaming` / `save_streaming` / `show_camera` / `VideoRecorderManager`
+- [rgbd_camera（已废弃）](#rgbd_camera已废弃)：`CameraWrapper` / `Monitor` / `CameraCacher` 等旧类
+- [传感器数据查询（Environment 层）](#传感器数据查询environment-layer)
+- [LiDAR 点云查询](#lidar-点云查询)
 
 ---
 
-## CameraWrapper
+## 相机接口（orca_gym.recorder）
 
-通过 WebSocket 连接仿真服务接收实时相机图像。
-
-### 构造
-
-```python
-class CameraWrapper:
-    def __init__(self, name: str, port: int)
-```
-- `name`: 相机名称
-- `port`: WebSocket 端口号
-
-### 属性
+录制已从引擎侧移到 Python 客户端侧，由 `orca_gym.recorder` 模块
+（`VideoRecorderManager`，基于 PyAV）统一管理串流、录制、保存与实时可视化。
+环境层提供以下入口（`OrcaGymEulerEnv` / `OrcaGymLocalEnv`）：
 
 ```python
-name: str                       # 相机名称
-port: int                       # WebSocket 端口
-image: np.ndarray               # 当前图像 (H, W, 3)，BGR 格式
-image_index: int                # 当前帧索引
-enabled: bool                   # 是否启用（默认 True）
-received_first_frame: bool      # 是否已收到第一帧
+def get_camera_names() -> list[str]          # 枚举所有已注册相机
+def start_streaming(camera_name, **kwargs)   # 一键配置 + 推流 + 启动录制器
+def show_camera(camera_name, camera_type="color", window_name=None)  # 非阻塞实时预览
+def save_streaming(camera_name, camera_type, file_path,
+                   start_simulate_index, end_simulate_index) -> Future[RemuxResult]
+                                             # 保存区间视频为 MP4（非阻塞）
+def get_recorder_manager() -> VideoRecorderManager  # 底层管理器（高级用法）
 ```
 
-### 生命周期
+典型用法：
 
 ```python
-def start()                     # 启动后台接收线程
-def stop()                      # 停止接收
-```
+camera = env.get_camera_names()[0]
+env.start_streaming(camera, capture_rgb=True, color_port=7070)
 
-### 帧获取
-
-```python
-def get_frame(format: str = 'bgr24', size: tuple | None = None) -> tuple[np.ndarray, int]
-```
-- `format`: `'bgr24'`（默认）或 `'rgb24'`
-- `size`: 可选的目标尺寸 `(width, height)`
-- 返回: `(frame, image_index)`
-
-```python
-def is_first_frame_received() -> bool  # 是否已收到第一帧
-```
-
-### 使用示例
-
-```python
-from orca_gym.sensor.rgbd_camera import CameraWrapper
-import time
-
-camera = CameraWrapper("front_camera", port=8765)
-camera.start()
-
-# 等待第一帧
-while not camera.is_first_frame_received():
-    time.sleep(0.1)
-
-# 循环获取帧
 for i in range(100):
-    frame, idx = camera.get_frame(format='rgb24', size=(224, 224))
-    print(f"帧 #{idx}, 形状: {frame.shape}")
+    env.step(action)
+    env.render(simulate_index=i)          # 索引必须递增，用于帧对齐
 
-camera.stop()
+env.show_camera(camera)                    # 实时预览（非阻塞）
+future = env.save_streaming(camera, "color", "/tmp/out.mp4", 0, 99)
+result = future.result()                   # RemuxResult: file_path / frame_count /
+                                           #             frame_indices / timestamps_ns
+env.close()                                # 自动保存未完成任务
 ```
+
+完整 API 说明（含 `SingleFrameTask` 逐帧回调、深度流、多相机）见
+[Environment API](environment.md) 与教程 [📷 相机与视觉](../tutorial/beginners/camera-and-vision.md)。
+从旧版本迁移见 [迁移指南](../migration/camera-recorder.md)。
 
 ---
 
-## CameraCacher
+## rgbd_camera（已废弃）
 
-将 WebSocket 相机流保存为本地文件，包含 H.264 视频和二进制时间戳。
+> ⚠️ `orca_gym.sensor.rgbd_camera` 模块（`CameraWrapper` / `Monitor` /
+> `CameraCacher` / `CameraDataParser` / `VideoPlayer`）**已废弃**：
+> 录制移到 Python 侧后由 `orca_gym.recorder` 取代。旧类保留仅为兼容，
+> 请按 [迁移指南](../migration/camera-recorder.md) 迁移到新接口。
 
-### 构造
-
-```python
-class CameraCacher:
-    def __init__(self, name: str, port: int)
-```
-- `name`: 相机名称（生成 `{name}_video.h264` 和 `{name}_ts.bin`）
-- `port`: WebSocket 端口
-
-### 生命周期
-
-```python
-def start()
-def stop()
-def is_first_frame_received() -> bool
-```
-
----
-
-## CameraDataParser
-
-解析 CameraCacher 保存的离线数据。
-
-### 构造
-
-```python
-class CameraDataParser:
-    def __init__(self, name: str)
-```
-
-### 帧查找
-
-```python
-def get_closed_frame(ts: int) -> tuple[int, np.ndarray]  # 按时间戳查找最近帧
-def get_frame(index: int) -> np.ndarray                   # 按索引获取指定帧
-```
-
----
-
-## VideoPlayer
-
-用 OpenCV 逐帧播放本地缓存的 H.264 视频。
-
-```python
-class VideoPlayer:
-    def __init__(self, name: str)
-    def play()                     # 播放，按 q 退出
-```
-
----
-
-## Monitor
-
-基于 Matplotlib 的实时相机监控窗口。
-
-```python
-class Monitor:
-    def __init__(self, name: str, fps: int = 30, port: int = 7070)
-    def start()                    # 启动监控窗口（会阻塞当前线程）
-    def stop()                     # 停止（释放摄像头资源，当前实现为空方法体）
-```
-
----
-
-## 完整使用示例
-
-### 实时监控
-
-```python
-from orca_gym.sensor.rgbd_camera import Monitor
-
-monitor = Monitor("my_camera", fps=30, port=8765)
-monitor.start()  # 阻塞直到关闭窗口
-```
-
-### 离线缓存 + 按需读取
-
-```python
-from orca_gym.sensor.rgbd_camera import CameraCacher, CameraDataParser, VideoPlayer
-
-# === 采集阶段 ===
-cacher = CameraCacher("my_dataset", port=8765)
-cacher.start()
-# ... 运行仿真 ...
-cacher.stop()
-
-# === 解析阶段 ===
-parser = CameraDataParser("my_dataset")
-ts = 1234567890
-index, frame = parser.get_closed_frame(ts)
-
-# === 回放阶段 ===
-player = VideoPlayer("my_dataset")
-player.play()
-```
+| 旧类 | 替代接口 |
+|------|----------|
+| `CameraWrapper` | `env.start_streaming()` + `manager.get_last_decoded_frame()` |
+| `Monitor` | `env.show_camera()` |
+| `CameraCacher` | `env.save_streaming()`（直接输出 MP4） |
+| `CameraDataParser` / `VideoPlayer` | 标准 MP4，任意播放器 / PyAV 读取 |
 
 ---
 

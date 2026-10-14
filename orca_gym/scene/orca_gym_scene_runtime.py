@@ -1,6 +1,6 @@
 import numpy as np
 from orca_gym.scene.orca_gym_scene import OrcaGymScene
-from orca_gym.scene.orca_gym_scene import Actor, LightInfo, CameraSensorInfo, MaterialInfo
+from orca_gym.scene.orca_gym_scene import Actor, LightInfo, CameraProperty, MaterialInfo
 
 from orca_gym.log.orca_log import get_orca_logger
 _logger = get_orca_logger()

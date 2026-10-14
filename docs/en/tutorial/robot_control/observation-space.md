@@ -40,13 +40,18 @@ def _get_obs(self):
 def _get_obs(self):
     return {
         "proprio": np.concatenate([
-            self.data.qpos.copy(), 
+            self.data.qpos.copy(),
             self.data.qvel.copy()
         ]).astype(np.float32),
-        "vision": self.get_camera_image("front_camera"),  # Requires custom camera capture
+        # Camera image: first start streaming via start_streaming, then get frames through VideoRecorderManager
+        # "vision": env.get_recorder_manager().get_frame(...),  # see the camera streaming section
         "force": self.query_sensor_data(["ft_sensor"])["ft_sensor"],
     }
 ```
+
+> Note: camera image capture requires first starting the stream via `env.start_streaming(camera_name, ...)`,
+> then obtaining the `VideoRecorderManager` through `env.get_recorder_manager()` to read frames.
+> There is no `get_camera_image` method. See [API Reference · Sensors](../../api_reference/sensor.md).
 
 ## Automatic Observation Space Inference
 

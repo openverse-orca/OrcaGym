@@ -2,12 +2,10 @@
 
 OrcaGym 的物理仿真基于 MuJoCo 引擎，提供了高精度的刚体动力学和约束求解。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler)。
 
 ## 章节导航
 
-- [🔧 MuJoCo 后端](mujoco-backend.md) — 模型加载、求解器配置、步进控制
-- [📐 状态管理](state-management.md) — qpos/qvel/qacc、状态设置与读取
 - [💥 接触与力](contacts-forces.md) — 接触检测、力查询、外力注入
 - [🔄 外力应用与 IK](force-apply.md) — 外力施加、状态写入、雅可比、逆运动学
 - [🔗 等式约束](equality-constraints.md) — WELD/CONNECT 约束、mocap 锚定、抓取操作

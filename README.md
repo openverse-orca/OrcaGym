@@ -16,10 +16,10 @@
 机器人仿真作为具身智能训练的关键平台，需要物理准确性和可扩展的基础设施。传统解决方案往往在保真度和计算效率之间面临权衡，特别是在扩展到分布式系统时。OrcaGym 通过将实时物理仿真与云原生架构相结合来弥合这一差距，使研究人员能够在高保真环境中原型化算法并在大规模部署。
 
 ## 主要特性
-- 🎮 **Gym/Gymnasium API 兼容性** - 提供与 OpenAI Gym/Gymnasium API 兼容的 GPU 加速仿真环境，与现有 RL 算法无缝集成
-- ⚡ **多物理后端** - 支持 Mujoco (CPU)、MujocoWarp (CUDA)、Euler (多厂商 GPU)，其中 Euler 为松应科技自研的多物理场仿真引擎
+- 🎮 **Gym/Gymnasium API 兼容性** - 提供与 OpenAI Gym/Gymnasium API 兼容的仿真环境，与现有 RL 算法无缝集成
+- ⚡ **双物理后端** - MuJoCo（CPU，开源标准）与 Euler（GPU，Orca 团队自研），两条路径互不隶属
 - 🌐 **分布式部署** - 支持跨异构计算节点的分布式训练场景
-- 🔍 **光线追踪与3DGS渲染** - 为基于视觉的 RL 任务提供逼真的视觉观察
+- 🔍 **可扩展渲染** - 可接入外部可视化工具（如 OrcaStudio/OrcaLab）进行光线追踪等高质量渲染
 - 🤖 **多智能体支持** - 原生异构智能体管理
 
 ## 安装
@@ -70,24 +70,14 @@ pip install -e ".[devices]"
 pip install -e ".[sensors]"
 ```
 
-## OrcaStudio、OrcaLab 配置
+## 外部可视化工具配置（可选）
 
-从[官方门户](http://orca3d.cn/)下载并安装 OrcaStudio、OrcaLab
+OrcaGym 的物理仿真不依赖外部工具，可直接在本地运行。如需可视化场景或远程渲染，可从[官方门户](http://orca3d.cn/)下载并安装 OrcaStudio 或 OrcaLab，并参照其各自文档完成配置。
 
 ### 使用 orcagym-loop 命令启动仿真循环
 
 `orcagym-loop` 是一个用于测试的常用脚本，用于启动基本的仿真循环。安装 `orca-gym` 后，可以直接使用该命令。
 
-**使用 OrcaStudio 的情况**：
-1. 在 OrcaStudio 中，点击"运行"按钮（或按快捷键 `Ctrl+G`）启动仿真服务器
-2. 在控制台执行 `orcagym-loop` 命令，启动仿真循环
-
-**使用 OrcaLab 的情况**：
-1. 在 OrcaLab 中点击"运行"按钮启动仿真服务器
-2. 选择"无仿真程序"选项
-3. 在控制台执行 `orcagym-loop` 命令，启动仿真循环
-
-**命令示例**：
 ```bash
 # 安装 orca-gym 后，直接运行
 orcagym-loop

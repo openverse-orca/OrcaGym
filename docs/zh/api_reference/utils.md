@@ -41,7 +41,17 @@ class InverseKinematicsController:
 def set_goal(pos: np.ndarray, quat: np.ndarray)         # 设置目标位姿
 def set_lambda(lambda_value: float)                     # 设置阻尼系数
 def set_alpha(alpha_value: float)                       # 设置步长
-def compute_inverse_kinematics() -> np.ndarray          # 计算增量关节角度 dq
+def compute_inverse_kinematics() -> np.ndarray          # 计算增量关节角度 dq（长度为 model.nv，非仅受控关节子向量）
+```
+
+### 公共属性
+
+```python
+env: RobomimicEnv             # 关联的环境适配器
+site_id: int                  # 末端执行器 site ID
+dof_indices: list[int]        # 受控关节的 DOF 索引
+goal_pos: np.ndarray | None   # 目标位置
+goal_quat: np.ndarray | None  # 目标姿态
 ```
 
 ### 使用示例
@@ -102,6 +112,17 @@ def compute_torque(
 ) -> float                    # 输出力矩 (Nm)
 ```
 
+### 公共属性
+
+```python
+Kp / Ki / Kd / Kv: float       # PID 增益与速度反馈增益
+max_speed: float               # 最大允许目标速度
+ctrl_low / ctrl_high: float   # 驱动器力矩范围（从 ctrlrange 拆分）
+integral: float                # 积分项（状态变量）
+prev_error_pos: float          # 前一步位置误差（状态变量）
+prev_error_vel: float         # 前一步速度误差（状态变量）
+```
+
 ### 使用示例
 
 ```python
@@ -129,6 +150,8 @@ for target in target_trajectory:
 
 简单 PD 控制器函数。
 
+模块路径：`from orca_gym.utils.joint_controller import pd_control`
+
 ```python
 def pd_control(
     target_q: np.ndarray,      # 目标位置
@@ -151,12 +174,19 @@ def pd_control(
 ```python
 class LowPassFilter:
     def __init__(self, alpha: float, initial_output: np.ndarray)
-    def apply(self, x: np.ndarray) -> np.ndarray
+    def apply(self, input: np.ndarray) -> np.ndarray
 ```
 
-公式: `output[t] = alpha × x[t] + (1 - alpha) × output[t-1]`
+公式: `output[t] = alpha × input[t] + (1 - alpha) × output[t-1]`
 
 - `alpha`: 平滑系数 (0, 1]，1 = 不过滤，接近 0 = 强滤波
+
+### 公共属性
+
+```python
+alpha: float              # 平滑系数
+output: np.ndarray        # 当前滤波输出（可读取）
+```
 
 ---
 
@@ -171,16 +201,25 @@ class RewardPrinter:
     def print_reward(self, message: str, reward: float = 0, coeff: float = 1.0)
 ```
 
+### 公共属性
+
+```python
+reward_history: dict          # 历次奖励均值记录
+file_name: str                # 奖励历史落盘文件路径
+```
+
 ---
 
 ## 旋转工具 (`rotations`)
 
-所有函数支持 **batch 操作**，角度单位为 **弧度**。
+角度单位为 **弧度**。
 
 ### 约定
 
 - **四元数格式**: `[w, x, y, z]`（MuJoCo 标准）
 - **矩阵格式**: 3×3 旋转矩阵
+- **batch 操作**：多数转换函数（`mat2quat`/`quat2mat`/`euler2mat`/`mat2euler`/`euler2quat`/`quat2euler`）支持 batch。
+  注意：`quat2axisangle`、`quat_rot_vec`、`quat_slerp` 仅支持单个四元数/向量，不支持 batch。
 
 ### 转换函数
 
@@ -197,10 +236,10 @@ class RewardPrinter:
 ### 四元数运算
 
 ```python
-rotations.quat_mul(q1, q2)              # 四元数乘法 q1 * q2
+rotations.quat_mul(q0, q1)              # 四元数乘法 q0 * q1
 rotations.quat_conjugate(q)             # 四元数共轭
 rotations.quat_identity()               # 单位四元数 [1, 0, 0, 0]
-rotations.quat_rot_vec(q, v0)           # 四元数旋转向量
+rotations.quat_rot_vec(q, v0)           # 四元数旋转向量（仅单个四元数/向量，不支持 batch）
 ```
 
 ### 欧拉角运算
@@ -208,7 +247,7 @@ rotations.quat_rot_vec(q, v0)           # 四元数旋转向量
 ```python
 rotations.subtract_euler(e1, e2)        # 欧拉角差值
 rotations.euler2point_euler(euler)      # 欧拉角 → point 表示
-rotations.point_euler2euler(pe)         # point 表示 → 欧拉角
+rotations.point_euler2euler(euler)     # point 表示 → 欧拉角
 rotations.normalize_angles(angles)      # 归一化角度到 [-pi, pi]
 rotations.round_to_straight_angles(angles)  # 舍入到直角
 ```
@@ -217,10 +256,10 @@ rotations.round_to_straight_angles(angles)  # 舍入到直角
 
 ```python
 rotations.quat2point_quat(quat)         # 四元数 → point 表示
-rotations.point_quat2quat(pq)           # point 表示 → 四元数
+rotations.point_quat2quat(quat)         # point 表示 → 四元数
 rotations.get_parallel_rotations()      # 获取平行旋转集合
-rotations.unit_vector(data, axis, out)  # 单位向量
-rotations.quat_slerp(q0, q1, fraction, shortestpath=True)  # 球面线性插值
+rotations.unit_vector(data, axis=None, out=None)  # 单位向量（axis/out 可选）
+rotations.quat_slerp(quat0, quat1, fraction, shortestpath=True)  # 球面线性插值（仅单个四元数，不支持 batch）
 ```
 
 ### 使用示例

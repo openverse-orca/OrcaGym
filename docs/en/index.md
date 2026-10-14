@@ -2,7 +2,7 @@
 
 Welcome to the **OrcaGym** documentation!
 
-OrcaGym is an open-source robot simulation platform that provides an interface fully compatible with OpenAI Gym/Gymnasium, supporting multiple physics backends and distributed simulation.
+OrcaGym is an open-source robot simulation platform that provides an interface fully compatible with OpenAI Gym/Gymnasium, supporting dual physics backends and distributed simulation.
 
 ---
 
@@ -20,10 +20,10 @@ OrcaGym is an open-source robot simulation platform that provides an interface f
 
 OrcaGym is a **cloud-native robot simulation platform** with the following core features:
 
-- :material-gym: **Gymnasium Compatible** — Seamless integration with existing RL algorithms
-- :material-engine: **Multi-Physics Backend** — Supports MuJoCo, PhysX, and ODE
+- :material-gymnastics: **Gymnasium Compatible** — Seamless integration with existing RL algorithms
+- :material-engine: **Dual Physics Backends** — MuJoCo (CPU, open-source standard) and Euler (GPU, in-house), mutually independent
 - :material-cloud: **Distributed Deployment** — Supports local development and remote large-scale training
-- :material-camera: **Ray Tracing Rendering** — Realistic visual observations
+- :material-camera: **Extensible Rendering** — External visualization tools can be attached
 - :material-robot: **Multi-Agent Support** — Native heterogeneous agent management
 
 ---
@@ -32,7 +32,7 @@ OrcaGym is a **cloud-native robot simulation platform** with the following core 
 
 - **Reinforcement Learning Researchers** — Need high-performance, standardized Gymnasium environments to train policies
 - **Robotics Developers** — Need workflows integrated with the OrcaStudio and OrcaLab platforms
-- **Simulation Engineers** — Need the flexibility of multiple physics backends and distributed deployment capabilities
+- **Simulation Engineers** — Need the flexibility of dual physics backends and distributed deployment capabilities
 - **Educators** — Need an easy-to-use robot simulation teaching platform
 
 ---

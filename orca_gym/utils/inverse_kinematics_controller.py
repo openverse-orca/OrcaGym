@@ -38,7 +38,7 @@ class InverseKinematicsController:
         Args:
             lambda_: The lambda value to set.
         """
-        self._lamba_value = lambda_value
+        self._lambda_value = lambda_value
 
     def set_alpha(self, alpha_value):
         """

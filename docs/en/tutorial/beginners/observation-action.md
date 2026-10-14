@@ -76,7 +76,7 @@ def _get_obs(self) -> dict:
 
     # End-effector pose in world coordinates
     ee_site_name = self.site("end_effector")
-    ee_site = self.query_site_pos_and_quat([ee_site_name])
+    ee_site = self.query_site_pos_and_mat([ee_site_name])
 
     # End-effector pose relative to base (useful for fixed-base robot arms)
     base_name = self.body("base_link")
@@ -109,11 +109,11 @@ def _get_obs(self) -> dict:
 | Dictionary observation (recommended) | `spaces.Dict` | `{"joint_pos": Box, "joint_vel": Box}` |
 | Single array | `spaces.Box` | `Box(low=-inf, high=inf, shape=(13,))` |
 
-!!! tip "Dictionary observations are recommended"
-    Dictionary observations are easier to use than single arrays for:
-    - Debugging (you can inspect each component by name)
-    - Extension (adding new observations does not change existing dimensions)
-    - Normalization (different normalization strategies can be applied to different keys)
+> 💡 **Recommended: Dictionary Observations**
+> Dictionary observations are easier to use than single arrays for:
+> - Debugging (you can inspect each component by name)
+> - Extension (adding new observations does not change existing dimensions)
+> - Normalization (different normalization strategies can be applied to different keys)
 
 ---
 
@@ -214,12 +214,14 @@ from orca_gym.environment.euler.orca_gym_euler_env import OrcaGymEulerEnv
 class ReachEnv(OrcaGymEulerEnv):
     """Task: move the robot arm end-effector to a specified target point"""
 
-    def __init__(self, frame_skip, orcagym_addr, agent_names, time_step, **kwargs):
+    def __init__(self, frame_skip, orcagym_addr, agent_names, time_step,
+        model_xml_path=None, **kwargs):
         super().__init__(
             frame_skip=frame_skip,
             orcagym_addr=orcagym_addr,
             agent_names=agent_names,
             time_step=time_step,
+            model_xml_path=model_xml_path,  # pass local XML path via kwargs
             **kwargs,
         )
 

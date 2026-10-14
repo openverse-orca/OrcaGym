@@ -9,7 +9,9 @@ The low-level joint control interface directly operates MuJoCo actuators.
 ctrl = np.array([0.1, -0.2, 0.0, ...], dtype=np.float64) # (nu,)
 env.set_ctrl(ctrl)
 env.mj_step(n_frames)
-env._sync_view() 
+# Note: set_ctrl + mj_step does not automatically sync the DataView.
+# Recommended to use do_simulation (below), which internally wraps set_ctrl + mj_step + sync_to_view.
+# For manual sync, subclasses can call self._sync_view() internally (private method, subclass use only).
 ```
 
 ## Atomic Operations via do_simulation (Recommended)

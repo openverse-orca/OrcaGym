@@ -63,7 +63,8 @@ def get_geom_body_name(geom_id: int) -> str
 def get_geom_body_id(geom_id: int) -> int
 
 # mocap：通过 init_mocap_dict(mocap_dict) 初始化，
-# 通过 nmocap 属性获取数量（无 get_mocap_dict 方法）
+# 通过 nmocap 属性获取数量，通过 get_mocap_dict() 获取字典
+def get_mocap_dict() -> dict
 ```
 
 ### 按 ID / 按名称获取实体
@@ -198,7 +199,7 @@ env.sim_config.load_from_dict({"integrator": 0, "iterations": 100})
 ### AnchorType
 
 模块路径：Euler 体系下位于 `orca_gym.core.euler.orca_studio_bridge`；
-Local/Warp 体系下位于 `orca_gym.core.orca_gym_local`。
+Local 体系下位于 `orca_gym.core.orca_gym_local`，Warp 体系下位于 `orca_gym.core.orca_gym_warp`。
 
 ```python
 class AnchorType:
@@ -220,7 +221,7 @@ class CaptureMode:
 
 ### 工具函数
 
-模块路径：`orca_gym.core.orca_gym_local`（Local/Warp 体系）。
+模块路径：Local 体系 `orca_gym.core.orca_gym_local`、Warp 体系 `orca_gym.core.orca_gym_warp`。
 Euler 体系不导出这两个函数。
 
 ```python

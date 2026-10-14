@@ -1,0 +1,969 @@
+"""MuJoCoSimCoreEuler — lazy 同步原语 + 维度 property 单元测试（Phase B）。
+
+用 FakeSolver（无 GPU、无 orca.euler）验收 lazy 同步状态机（L1/L5）：
+_mark_dirty/_commit_if_dirty（H2D 合并）、_mark_stale/_ensure_host_fresh（D2H 幂等）、
+维度 property（无同步）。
+
+运行方式:
+    <conda-base>/envs/orca/bin/python tests/run_tests.py --component core/euler
+"""
+
+import os
+import tempfile
+import types
+import unittest
+import warnings
+
+import mujoco
+import numpy as np
+
+from orca.euler import ModelChangedFlags
+from orca_gym.core.euler.mujoco_sim_core_euler import (
+    MuJoCoSimCoreEuler,
+    _actor_manipulator_body_ids,
+)
+
+
+# G1 模型 XML（Phase D 查询功能测试用，含 free joint + 29 hinge joint +
+# sensors/actuators/sites/geoms）
+_G1_XML = os.path.abspath(os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "environment", "euler", "fixtures", "g1_29dof_camera_simplified.xml",
+))
+
+
+# 最小单摆模型，含 noslip_iterations=3（用于验收 _prepare_model 降级）
+_NOSLIP_XML = """<mujoco>
+  <option timestep="0.002" noslip_iterations="3"/>
+  <worldbody>
+    <body>
+      <joint type="hinge"/>
+      <geom size="0.1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+# 拖拽代理（mocap anchor + 极轻 dummy 自由体）埋于地面以下 + weld 约束，
+# 复刻旧关卡导出模型触发的 GPU float32 发散场景。{anchor}/{dummy} 用于切换新旧命名。
+_ACTOR_MANIPULATOR_XML_TMPL = """<mujoco>
+  <option gravity="0 0 -9.81" timestep="0.005"/>
+  <worldbody>
+    <geom type="plane" size="5 5 0.1"/>
+    <body pos="0 0 -1000" mocap="true" name="{anchor}">
+      <geom type="sphere" size="0.01" density="1000"/>
+    </body>
+    <body pos="0 0 -1000" name="{dummy}">
+      <geom type="sphere" size="0.01" density="1000"/>
+      <freejoint/>
+    </body>
+  </worldbody>
+  <equality>
+    <weld body1="{anchor}" body2="{dummy}" solref="0.02 1"/>
+  </equality>
+</mujoco>
+"""
+
+
+def _make_fake_mj_model() -> types.SimpleNamespace:
+    """提供 nq/nv/nu/site_bodyid 的最小 mj_model stub。"""
+    return types.SimpleNamespace(nq=3, nv=3, nu=1, site_bodyid=np.array([0], dtype=np.int32))
+
+
+def _make_fake_host() -> types.SimpleNamespace:
+    """提供常用 host 字段的 numpy 数组 stub。"""
+    return types.SimpleNamespace(
+        qpos=np.zeros(3),
+        qvel=np.zeros(3),
+        ctrl=np.zeros(1),
+        xfrc_applied=np.zeros((2, 6)),   # 2 bodies
+        mocap_pos=np.zeros((0, 3)),
+        mocap_quat=np.zeros((0, 4)),
+    )
+
+
+class FakeSolver:
+    """记录 flush/sync_to_host 调用次数 + 提供 host/mj_model。"""
+
+    def __init__(self) -> None:
+        self.flush_count = 0
+        self.sync_count = 0
+        self.mj_model = _make_fake_mj_model()   # 提供 nq=3, nv=3, nu=1
+        self.host = _make_fake_host()           # 提供 qpos/qvel/ctrl/xfrc_applied 等
+
+    def flush(self) -> None:
+        self.flush_count += 1
+
+    def sync_to_host(self) -> None:
+        self.sync_count += 1
+
+    def step(self, nstep: int) -> None:
+        pass
+
+    def forward(self) -> None:
+        pass
+
+    def reset(self) -> None:
+        pass
+
+    def apply_body_force(self, body_id, force, torque) -> None:
+        pass
+
+
+class TestLazySyncPrimitives(unittest.TestCase):
+    """lazy 同步状态机验收（L5 状态转换表）。"""
+
+    def test_init_flags(self):
+        """构造后 _host_dirty=False、_host_stale=True、_solver=None。"""
+        core = MuJoCoSimCoreEuler()
+        self.assertIs(core._solver, None)
+        self.assertIs(core._host_dirty, False)
+        self.assertIs(core._host_stale, True)
+
+    def test_mark_dirty_then_commit(self):
+        """_mark_dirty 后 _commit_if_dirty 只 flush 1 次且 dirty 归 False。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._mark_dirty()
+        core._commit_if_dirty()
+        self.assertEqual(core._solver.flush_count, 1)
+        self.assertIs(core._host_dirty, False)
+
+    def test_commit_merges_multiple_dirty(self):
+        """连续多次 _mark_dirty 后 _commit_if_dirty 仍只 flush 1 次（合并）。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._mark_dirty()
+        core._mark_dirty()
+        core._commit_if_dirty()
+        self.assertEqual(core._solver.flush_count, 1)
+        self.assertIs(core._host_dirty, False)
+
+    def test_commit_noop_when_clean(self):
+        """无 dirty 时 _commit_if_dirty 不调 flush。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._commit_if_dirty()
+        self.assertEqual(core._solver.flush_count, 0)
+
+    def test_mark_stale_then_ensure(self):
+        """_mark_stale 后 _ensure_host_fresh 只 sync 1 次且 stale 归 False。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._host_stale = False
+        core._mark_stale()
+        core._ensure_host_fresh()
+        self.assertEqual(core._solver.sync_count, 1)
+        self.assertIs(core._host_stale, False)
+
+    def test_ensure_idempotent_when_fresh(self):
+        """无 stale 时 _ensure_host_fresh 不调 sync_to_host（幂等）。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._host_stale = False
+        core._ensure_host_fresh()
+        self.assertEqual(core._solver.sync_count, 0)
+
+
+class TestDimensionProperties(unittest.TestCase):
+    """维度 property（G 类）验收。"""
+
+    def test_dimension_properties(self):
+        """nq/nv/nu 返回正确值，且不触发 flush/sync（sync 计数为 0）。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()  # nq=3, nv=3, nu=1
+        self.assertEqual(core.nq, 3)
+        self.assertEqual(core.nv, 3)
+        self.assertEqual(core.nu, 1)
+        self.assertEqual(core._solver.flush_count, 0)
+        self.assertEqual(core._solver.sync_count, 0)
+
+    def test_dimension_uninit_raises(self):
+        """_solver 为 None 时 nq 抛 RuntimeError('Simulation not initialized')。"""
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(RuntimeError) as ctx:
+            _ = core.nq
+        self.assertEqual(str(ctx.exception), "Simulation not initialized")
+
+
+class FakeDataView:
+    """记录 _sync_from_mjdata 调用（供 sync_to_view 验收）。"""
+
+    def __init__(self) -> None:
+        self.sync_calls = 0
+        self.last_host = None
+        self.last_model = None
+
+    def _sync_from_mjdata(self, host, model) -> None:
+        self.sync_calls += 1
+        self.last_host = host
+        self.last_model = model
+
+
+class TestLifecycleMethods(unittest.TestCase):
+    """A 类生命周期方法验收（step/forward/reset/sync_to_view 状态转换）。"""
+
+    def test_step_flushes_dirty_then_marks_stale(self):
+        """step 前置 flush（H2D）后置 stale：dirty→False、stale→True、flush=1。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._mark_dirty()
+        core.step(1)
+        self.assertEqual(core._solver.flush_count, 1)
+        self.assertIs(core._host_dirty, False)
+        self.assertIs(core._host_stale, True)
+
+    def test_forward_flushes_dirty_then_marks_stale(self):
+        """forward 前置 flush 后置 stale。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._mark_dirty()
+        core.forward()
+        self.assertEqual(core._solver.flush_count, 1)
+        self.assertIs(core._host_dirty, False)
+        self.assertIs(core._host_stale, True)
+
+    def test_sync_to_view_ensures_fresh(self):
+        """sync_to_view 前置 D2H（sync=1）且清 stale，并回调 DataView。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._host_stale = True
+        view = FakeDataView()
+        core.sync_to_view(view)
+        self.assertEqual(core._solver.sync_count, 1)
+        self.assertIs(core._host_stale, False)
+        self.assertEqual(view.sync_calls, 1)
+        self.assertIs(view.last_host, core._solver.host)
+        self.assertIs(view.last_model, core._solver.mj_model)
+
+    def test_sync_to_view_idempotent_when_fresh(self):
+        """无 stale 时 sync_to_view 不重复 sync（sync=0）。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._host_stale = False
+        view = FakeDataView()
+        core.sync_to_view(view)
+        self.assertEqual(core._solver.sync_count, 0)
+        self.assertEqual(view.sync_calls, 1)
+
+    def test_reset_data_clears_flags(self):
+        """reset_data 清 dirty/stale 两标志。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._host_dirty = True
+        core._host_stale = True
+        core.reset_data()
+        self.assertIs(core._host_dirty, False)
+        self.assertIs(core._host_stale, False)
+
+    def test_step_uninitialized_raises(self):
+        """_solver 为 None 时 step 抛 RuntimeError。"""
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(RuntimeError):
+            core.step(1)
+
+    def test_init_simulation_nworld_not_one_raises(self):
+        """nworld != 1 抛 NotImplementedError（且不 import orca.euler）。"""
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(NotImplementedError):
+            core.init_simulation("model.xml", device="cuda", nworld=2)
+
+
+class TestWriteMethods(unittest.TestCase):
+    """B 类写入方法验收：写后 _mark_dirty、step 时合并 flush。"""
+
+    def test_set_ctrl_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.set_ctrl(np.zeros(1))
+        self.assertIs(core._host_dirty, True)
+        self.assertEqual(core._solver.flush_count, 0)
+
+    def test_set_qpos_qvel_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.set_qpos_qvel(np.zeros(3), np.zeros(3))
+        self.assertIs(core._host_dirty, True)
+
+    def test_set_mocap_pos_and_quat_empty_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.set_mocap_pos_and_quat({})
+        self.assertIs(core._host_dirty, True)
+
+    def test_write_then_step_flushes_once(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.set_ctrl(np.zeros(1))
+        core.step(1)
+        self.assertEqual(core._solver.flush_count, 1)
+
+    def test_multiple_writes_merged_single_flush(self):
+        """连续 set_ctrl + apply_body_force 后 step 只 flush 1 次（合并）。"""
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.set_ctrl(np.zeros(1))
+        core.apply_body_force(0, np.zeros(3), np.zeros(3))
+        core.step(1)
+        self.assertEqual(core._solver.flush_count, 1)
+
+
+class TestForceMethods(unittest.TestCase):
+    """C 类力应用方法验收：写 host.xfrc_applied + _mark_dirty。"""
+
+    def test_apply_body_force_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.apply_body_force(0, np.zeros(3), np.zeros(3))
+        self.assertIs(core._host_dirty, True)
+
+    def test_clear_body_force_marks_dirty_and_zeroes(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._solver.host.xfrc_applied[0, :] = 1.0
+        core.clear_body_force(0)
+        self.assertIs(core._host_dirty, True)
+        self.assertEqual(float(core._solver.host.xfrc_applied[0].sum()), 0.0)
+
+    def test_clear_all_forces_marks_dirty_and_zeroes(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._solver.host.xfrc_applied[:] = 1.0
+        core.clear_all_forces()
+        self.assertIs(core._host_dirty, True)
+        self.assertEqual(float(core._solver.host.xfrc_applied.sum()), 0.0)
+
+    def test_mj_apply_force_at_site_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core.mj_apply_force_at_site(0, np.zeros(3), np.zeros(3))
+        self.assertIs(core._host_dirty, True)
+
+    def test_mj_clear_xfrc_applied_for_site_marks_dirty(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        core._solver.host.xfrc_applied[0, :] = 1.0
+        core.mj_clear_xfrc_applied_for_site(0)
+        self.assertIs(core._host_dirty, True)
+        self.assertEqual(float(core._solver.host.xfrc_applied[0].sum()), 0.0)
+
+
+class RealDataSolver:
+    """用真实 mujoco.MjModel/MjData 包装，统计 flush/sync 次数（Phase D）。"""
+
+    def __init__(self, model, data) -> None:
+        self.flush_count = 0
+        self.sync_count = 0
+        self.mj_model = model
+        self.host = data
+
+    def flush(self) -> None:
+        self.flush_count += 1
+
+    def sync_to_host(self) -> None:
+        self.sync_count += 1
+
+    def step(self, nstep: int) -> None:
+        pass
+
+    def forward(self) -> None:
+        pass
+
+    def reset(self) -> None:
+        pass
+
+    def apply_body_force(self, body_id, force, torque) -> None:
+        pass
+
+
+def _make_real_core():
+    """构造带真实 G1 模型 + 统计 solver 的 MuJoCoSimCoreEuler（未 forward）。"""
+    model = mujoco.MjModel.from_xml_path(_G1_XML)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    core = MuJoCoSimCoreEuler()
+    core._solver = RealDataSolver(model, data)
+    return core
+
+
+class TestQueryD2HBehavior(unittest.TestCase):
+    """D 类查询方法 lazy-D2H 触发验收（每个查询 sync 1 次、读不 flush）。"""
+
+    def test_query_triggers_sync_once_then_fresh(self):
+        core = _make_real_core()
+        core._host_stale = True
+        core.query_joint_qpos(["left_hip_pitch_joint"])
+        self.assertEqual(core._solver.sync_count, 1)
+        self.assertIs(core._host_stale, False)
+        self.assertEqual(core._solver.flush_count, 0)
+
+    def test_consecutive_queries_sync_once(self):
+        core = _make_real_core()
+        core._host_stale = True
+        core.query_joint_qpos(["left_hip_pitch_joint"])
+        core.query_body_xpos_xmat_xquat(["pelvis"])
+        core.query_site_pos_and_mat(["imu"])
+        self.assertEqual(core._solver.sync_count, 1)
+
+    def test_read_queries_never_flush(self):
+        core = _make_real_core()
+        core._host_stale = True
+        core.query_joint_qvel(["floating_base_joint"])
+        core.get_cfrc_ext()
+        core.query_sensor_data(["left_hip_pitch_pos"], {})
+        core.query_actuator_torques(["left_hip_pitch"])
+        self.assertEqual(core._solver.flush_count, 0)
+        self.assertEqual(core._solver.sync_count, 1)
+
+    def test_query_uninitialized_raises(self):
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(RuntimeError):
+            core.query_joint_qpos(["left_hip_pitch_joint"])
+
+
+class TestQueryReturnTypes(unittest.TestCase):
+    """D 类返回类型验收：offsets/lengths 元组、adr 返回 Python int。"""
+
+    def setUp(self):
+        self.core = _make_real_core()
+
+    def test_offsets_lengths_return_tuples_of_arrays(self):
+        names = ["floating_base_joint", "left_hip_pitch_joint"]
+        off = self.core.query_joint_offsets(names)
+        lens = self.core.query_joint_lengths(names)
+        self.assertIsInstance(off, tuple)
+        self.assertIsInstance(lens, tuple)
+        self.assertEqual(len(off), 3)
+        self.assertEqual(len(lens), 3)
+        for arr in off + lens:
+            self.assertIsInstance(arr, np.ndarray)
+
+    def test_free_joint_lengths(self):
+        names = ["floating_base_joint", "left_hip_pitch_joint"]
+        qpos_len, qvel_len, qacc_len = self.core.query_joint_lengths(names)
+        self.assertEqual(int(qpos_len[0]), 7)
+        self.assertEqual(int(qvel_len[0]), 6)
+        self.assertEqual(int(qpos_len[1]), 1)
+        self.assertEqual(int(qvel_len[1]), 1)
+
+    def test_jnt_qposadr_dofadr_return_python_int(self):
+        self.assertIsInstance(self.core.jnt_qposadr("floating_base_joint"), int)
+        self.assertIsInstance(self.core.jnt_dofadr("floating_base_joint"), int)
+        self.assertNotIsInstance(
+            self.core.jnt_qposadr("left_hip_pitch_joint"), np.integer
+        )
+
+    def test_query_joint_dofadrs_returns_dict_of_int(self):
+        result = self.core.query_joint_dofadrs(
+            ["floating_base_joint", "left_hip_pitch_joint"]
+        )
+        self.assertIsInstance(result, dict)
+        for v in result.values():
+            self.assertIsInstance(v, int)
+
+
+class TestQueryNumericalConsistency(unittest.TestCase):
+    """D 类数值一致性验收：Euler 查询结果与宿主 MjModel/MjData 直接读取一致。"""
+
+    def setUp(self):
+        self.core = _make_real_core()
+        self.model = self.core._solver.mj_model
+        self.data = self.core._solver.host
+
+    def test_query_joint_qpos_matches_host(self):
+        name = "left_hip_pitch_joint"
+        jid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        adr = int(self.model.jnt_qposadr[jid])
+        np.testing.assert_array_equal(
+            self.core.query_joint_qpos([name])[name], self.data.qpos[adr:adr + 1]
+        )
+
+    def test_query_joint_qvel_qacc(self):
+        name = "floating_base_joint"
+        jid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        adr = int(self.model.jnt_dofadr[jid])
+        np.testing.assert_array_equal(
+            self.core.query_joint_qvel([name])[name], self.data.qvel[adr:adr + 6]
+        )
+        np.testing.assert_array_equal(
+            self.core.query_joint_qacc([name])[name], self.data.qacc[adr:adr + 6]
+        )
+
+    def test_query_body_matches_host(self):
+        name = "pelvis"
+        bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+        result = self.core.query_body_xpos_xmat_xquat([name])[name]
+        np.testing.assert_array_equal(result["xpos"], self.data.xpos[bid])
+        np.testing.assert_array_equal(result["xmat"], self.data.xmat[bid].reshape(3, 3))
+        np.testing.assert_array_equal(result["xquat"], self.data.xquat[bid])
+
+    def test_query_site_matches_host(self):
+        pos_mat = self.core.query_site_pos_and_mat(["imu"])["imu"]
+        sid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "imu")
+        np.testing.assert_array_equal(pos_mat["xpos"], self.data.site_xpos[sid])
+        np.testing.assert_array_equal(
+            pos_mat["xmat"], self.data.site_xmat[sid].reshape(3, 3)
+        )
+        np.testing.assert_array_equal(
+            self.core.query_site_size(["imu"])["imu"], self.model.site_size[sid]
+        )
+
+    def test_query_sensor_matches_host(self):
+        name = "left_hip_pitch_pos"
+        sid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SENSOR, name)
+        adr = int(self.model.sensor_adr[sid])
+        dim = int(self.model.sensor_dim[sid])
+        expected = self.data.sensordata[adr:adr + dim]
+        np.testing.assert_array_equal(
+            self.core.query_sensor_data([name], {})[name], expected
+        )
+        np.testing.assert_array_equal(
+            self.core.query_sensor_data([name], {name: {"adr": adr, "dim": dim}})[name],
+            expected,
+        )
+
+    def test_query_actuator_torques_matches_host(self):
+        name = "left_hip_pitch"
+        aid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
+        np.testing.assert_array_equal(
+            self.core.query_actuator_torques([name])[name],
+            self.data.actuator_force[aid:aid + 1],
+        )
+
+    def test_query_contact_simple_returns_list(self):
+        contacts = self.core.query_contact_simple()
+        self.assertIsInstance(contacts, list)
+        self.assertEqual(len(contacts), self.data.ncon)
+
+    def test_query_contact_force(self):
+        if self.data.ncon == 0:
+            self.skipTest("G1 初始姿态无接触")
+        cid = 0
+        expected = np.zeros(6)
+        mujoco.mj_contactForce(self.model, self.data, cid, expected)
+        np.testing.assert_array_equal(
+            self.core.query_contact_force([cid])[cid], expected
+        )
+
+    def test_get_cfrc_ext_shape(self):
+        cfrc = self.core.get_cfrc_ext()
+        self.assertEqual(cfrc.shape, (self.model.nbody, 6))
+
+    def test_get_goal_bounding_box_matches_host(self):
+        name = "manipulation_box_geom"
+        gid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+        np.testing.assert_array_equal(
+            self.core.get_goal_bounding_box(name), self.model.geom_size[gid]
+        )
+
+
+class TestJacMethods(unittest.TestCase):
+    """E 类雅可比方法验收：原地写、返回 None、数值与 mujoco 一致、D2H 触发。"""
+
+    def setUp(self):
+        self.core = _make_real_core()
+        self.model = self.core._solver.mj_model
+        self.data = self.core._solver.host
+
+    def test_mj_jacBody_writes_inplace_and_matches(self):
+        self.core._host_stale = True
+        jacp = np.zeros((3, self.model.nv))
+        jacr = np.zeros((3, self.model.nv))
+        bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
+        ret = self.core.mj_jacBody(jacp, jacr, bid)
+        self.assertIsNone(ret)
+        ref_p = np.zeros((3, self.model.nv))
+        ref_r = np.zeros((3, self.model.nv))
+        mujoco.mj_jacBody(self.model, self.data, ref_p, ref_r, bid)
+        np.testing.assert_allclose(jacp, ref_p)
+        np.testing.assert_allclose(jacr, ref_r)
+        self.assertEqual(self.core._solver.sync_count, 1)
+        self.assertIs(self.core._host_stale, False)
+        self.assertEqual(self.core._solver.flush_count, 0)
+
+    def test_mj_jacSite_writes_inplace_and_matches(self):
+        self.core._host_stale = True
+        jacp = np.zeros((3, self.model.nv))
+        jacr = np.zeros((3, self.model.nv))
+        sid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "imu")
+        ret = self.core.mj_jacSite(jacp, jacr, sid)
+        self.assertIsNone(ret)
+        ref_p = np.zeros((3, self.model.nv))
+        ref_r = np.zeros((3, self.model.nv))
+        mujoco.mj_jacSite(self.model, self.data, ref_p, ref_r, sid)
+        np.testing.assert_allclose(jacp, ref_p)
+        np.testing.assert_allclose(jacr, ref_r)
+
+    def test_mj_jac_site_returns_dict(self):
+        result = self.core.mj_jac_site(["imu", "camera_head_site"])
+        self.assertIsInstance(result, dict)
+        for name in ("imu", "camera_head_site"):
+            self.assertIn(name, result)
+            self.assertEqual(result[name]["jacp"].shape, (3, self.model.nv))
+            self.assertEqual(result[name]["jacr"].shape, (3, self.model.nv))
+
+    def test_query_body_xvel_matches_jac(self):
+        """D 类 xvel 方法现在可用（依赖 E 类 mj_jacBody）。"""
+        name = "torso_link"
+        bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+        result = self.core.query_body_xpos_xmat_xquat_xvel([name])[name]
+        jacp = np.zeros((3, self.model.nv))
+        jacr = np.zeros((3, self.model.nv))
+        mujoco.mj_jacBody(self.model, self.data, jacp, jacr, bid)
+        np.testing.assert_allclose(result["xvel"], jacp @ self.data.qvel)
+        self.assertEqual(result["xvel"].shape, (3,))
+
+
+def _make_equality_model():
+    """带 1 body + 1 geom + 1 equality 的最小模型（weld world↔b1）。"""
+    xml = """
+    <mujoco>
+      <worldbody>
+        <geom name="g0" type="sphere" size="0.1"/>
+        <body name="b1" pos="0 0 0.1"/>
+      </worldbody>
+      <equality>
+        <weld name="e0" body1="world" body2="b1"/>
+      </equality>
+    </mujoco>
+    """
+    return mujoco.MjModel.from_xml_string(xml)
+
+
+class RecordingSolver:
+    """记录 notify_model_changed 的 flags；提供真 mj_model。"""
+
+    def __init__(self, mj_model):
+        self.mj_model = mj_model
+        self.calls = []
+
+    def notify_model_changed(self, flags) -> None:
+        self.calls.append(flags)
+
+
+class TestModelWriteMethods(unittest.TestCase):
+    """F 类方法真实实现验收：写 host mj_model + notify_model_changed(正确 flag)。"""
+
+    def _core(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = RecordingSolver(_make_equality_model())
+        return core
+
+    def test_set_geom_friction_writes_host(self):
+        core = self._core()
+        core.set_geom_friction({"g0": np.array([1.1, 1.2, 1.3])})
+        np.testing.assert_allclose(
+            core._solver.mj_model.geom_friction[0], [1.1, 1.2, 1.3]
+        )
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.GEOM_FRICTION])
+
+    def test_add_extra_weight_writes_host_and_accumulates(self):
+        core = self._core()
+        base = core._solver.mj_model.body_mass[0]
+        core.add_extra_weight({"world": 2.5})
+        self.assertAlmostEqual(core._solver.mj_model.body_mass[0], base + 2.5)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.BODY_INERTIAL])
+
+    def test_update_equality_constraints_writes_slot(self):
+        core = self._core()
+        core.update_equality_constraints(
+            [{"obj1_id": 0, "obj2_id": 1, "type": mujoco.mjtEq.mjEQ_WELD,
+              "data": np.zeros(mujoco.mjNEQDATA)}]
+        )
+        self.assertEqual(core._solver.mj_model.eq_type[0], mujoco.mjtEq.mjEQ_WELD)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_update_equality_constraints_unmatched_raises(self):
+        core = self._core()
+        with self.assertRaises(ValueError):
+            core.update_equality_constraints(
+                [{"obj1_id": 99, "obj2_id": 99, "type": 0, "data": np.zeros(11)}]
+            )
+
+    def test_modify_equality_objects_writes_objs(self):
+        core = self._core()
+        core.modify_equality_objects([0], obj1_ids=[1], obj2_ids=[1])
+        self.assertEqual(core._solver.mj_model.eq_obj1id[0], 1)
+        self.assertEqual(core._solver.mj_model.eq_obj2id[0], 1)
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_active(self):
+        core = self._core()
+        core.set_equality_active(0, False)
+        self.assertFalse(bool(core._solver.mj_model.eq_active0[0]))
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_solref(self):
+        core = self._core()
+        core.set_equality_solref(0, np.array([0.01, 0.9]))
+        np.testing.assert_allclose(core._solver.mj_model.eq_solref[0], [0.01, 0.9])
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+    def test_set_equality_solimp(self):
+        core = self._core()
+        core.set_equality_solimp(0, np.arange(5, dtype=np.float64))
+        np.testing.assert_allclose(core._solver.mj_model.eq_solimp[0], np.arange(5))
+        self.assertEqual(core._solver.calls, [ModelChangedFlags.EQUALITY])
+
+
+class TestPrepareModel(unittest.TestCase):
+    """_prepare_model 降级 no-slip 求解器（GPU 后端上游未实现）。"""
+
+    def test_downgrades_noslip_iterations_with_warning(self):
+        """noslip_iterations>0 时清零并发出 warning。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertEqual(model.opt.noslip_iterations, 0)
+            self.assertTrue(
+                any("no-slip" in str(w.message) for w in caught)
+            )
+        finally:
+            os.remove(path)
+
+    def test_keeps_zero_noslip_without_warning(self):
+        """noslip_iterations=0 时保持 0 且不告警。"""
+        xml_no_noslip = _NOSLIP_XML.replace(' noslip_iterations="3"', "")
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(xml_no_noslip)
+            path = f.name
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertEqual(model.opt.noslip_iterations, 0)
+            self.assertEqual(len(caught), 0)
+        finally:
+            os.remove(path)
+
+    def test_timestep_override_applied_before_solver(self):
+        """timestep 非 None 时覆盖 model.opt.timestep（Euler 只读约束）。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path, timestep=0.001)
+            self.assertAlmostEqual(float(model.opt.timestep), 0.001)
+        finally:
+            os.remove(path)
+
+    def test_timestep_none_preserves_xml_default(self):
+        """timestep=None 时保留 XML 默认值（0.002）。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path)
+            self.assertAlmostEqual(float(model.opt.timestep), 0.002)
+        finally:
+            os.remove(path)
+
+
+class TestParkActorManipulator(unittest.TestCase):
+    """_prepare_model 停放 ActorManipulator 拖拽代理（消除 GPU float32 发散）。"""
+
+    def _prepare(self, anchor: str, dummy: str) -> mujoco.MjModel:
+        """用给定 (anchor, dummy) 命名渲染 XML 并走 _prepare_model。"""
+        xml = _ACTOR_MANIPULATOR_XML_TMPL.format(anchor=anchor, dummy=dummy)
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(xml)
+            path = f.name
+        try:
+            return MuJoCoSimCoreEuler._prepare_model(path)
+        finally:
+            os.remove(path)
+
+    def _assert_parked(self, model: mujoco.MjModel) -> None:
+        anchor_id, dummy_id = _actor_manipulator_body_ids(model)
+        self.assertGreaterEqual(anchor_id, 0)
+        self.assertGreaterEqual(dummy_id, 0)
+        # anchor（mocap）与 dummy（free body）均抬升到地面以上
+        self.assertAlmostEqual(float(model.body_pos[anchor_id][2]), 0.5)
+        dummy_jnt = int(model.body_jntadr[dummy_id])
+        qadr = int(model.jnt_qposadr[dummy_jnt])
+        self.assertAlmostEqual(float(model.qpos0[qadr + 2]), 0.5)
+        # 代理 geom 碰撞掩码被关闭
+        proxy = {anchor_id, dummy_id}
+        for gid in range(model.ngeom):
+            if int(model.geom_bodyid[gid]) in proxy:
+                self.assertEqual(model.geom_contype[gid], 0)
+                self.assertEqual(model.geom_conaffinity[gid], 0)
+
+    def test_parks_old_naming(self):
+        """旧版 ``ActorManipulator_{Anchor,dummy}`` 命名被识别并停放。"""
+        model = self._prepare("ActorManipulator_Anchor", "ActorManipulator_dummy")
+        self._assert_parked(model)
+
+    def test_parks_uuid_naming(self):
+        """新版 ``ORCA_MANIPULATOR_<uuid>_{Anchor,dummy}`` 命名被识别并停放。"""
+        model = self._prepare(
+            "ORCA_MANIPULATOR_ABC123_Anchor",
+            "ORCA_MANIPULATOR_ABC123_dummy",
+        )
+        self._assert_parked(model)
+
+    def test_no_proxy_returns_minus_one(self):
+        """无拖拽代理时返回 (-1, -1) 且不触发停放。"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".xml", delete=False
+        ) as f:
+            f.write(_NOSLIP_XML)
+            path = f.name
+        try:
+            model = MuJoCoSimCoreEuler._prepare_model(path)
+        finally:
+            os.remove(path)
+        self.assertEqual(_actor_manipulator_body_ids(model), (-1, -1))
+
+
+class TestRegisterPidControllerValidation(unittest.TestCase):
+    """register_pid_controller 参数校验（Phase D §8.2，CPU-only）。
+
+    校验路径在 GPU/flow 导入之前抛出，用 FakeSolver（无 orca.euler）即可验收；
+    覆盖 RuntimeError（未初始化）、NotImplementedError（非 pd）、
+    ValueError（空关节 / kp/kd/motor_limits 维度不一致）。
+    """
+
+    @staticmethod
+    def _pd_kwargs(nu: int = 3) -> dict:
+        return dict(
+            controller_type="pd",
+            kp=np.zeros(nu, dtype=np.float64),
+            kd=np.zeros(nu, dtype=np.float64),
+            motor_limits=np.ones(nu, dtype=np.float64),
+            joint_names=[f"j{i}" for i in range(nu)],
+        )
+
+    def test_uninitialized_solver_raises(self):
+        core = MuJoCoSimCoreEuler()
+        with self.assertRaises(RuntimeError):
+            core.register_pid_controller(**self._pd_kwargs())
+
+    def test_unsupported_controller_type(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs()
+        kwargs["controller_type"] = "pid"
+        with self.assertRaises(NotImplementedError):
+            core.register_pid_controller(**kwargs)
+
+    def test_empty_joint_names_raises(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(
+                "pd",
+                kp=np.zeros(0),
+                kd=np.zeros(0),
+                motor_limits=np.zeros(0),
+                joint_names=[],
+            )
+
+    def test_kp_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["kp"] = np.zeros(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+    def test_kd_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["kd"] = np.zeros(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+    def test_motor_limits_shape_mismatch(self):
+        core = MuJoCoSimCoreEuler()
+        core._solver = FakeSolver()
+        kwargs = self._pd_kwargs(nu=3)
+        kwargs["motor_limits"] = np.ones(2)
+        with self.assertRaises(ValueError):
+            core.register_pid_controller(**kwargs)
+
+
+class _RecordingDeviceArray:
+    """记录 assign 调用的最小 flow.array 替身（PidController 仅依赖 duck-typed assign）。"""
+
+    def __init__(self) -> None:
+        self.assigned: list[np.ndarray] = []
+
+    def assign(self, value) -> None:
+        self.assigned.append(np.asarray(value))
+
+
+class TestPidControllerInterface(unittest.TestCase):
+    """PidController 公共接口（update_target/set_gains）验收（Phase D §8.2，CPU-only）。
+
+    用 duck-typed device array 替身（只实现 assign）验收纯 numpy 参数的
+    dtype/reshape 处理与赋值目标，不触及 GPU 或 flow.array 分配。PidController 从
+    ``orca_gym.core.euler.controller`` 惰性导入（该模块顶层 import orca.flow，
+    装饰 ``@flow.kernel`` 在 launch 前不编译，sandbox 内导入安全）。
+    """
+
+    @staticmethod
+    def _make(nu: int = 3):
+        from orca_gym.core.euler.controller import PidController
+
+        q_target = _RecordingDeviceArray()
+        kp = _RecordingDeviceArray()
+        kd = _RecordingDeviceArray()
+        motor_limit = _RecordingDeviceArray()
+        ctrl = PidController(
+            q_target_dev=q_target,
+            kp_dev=kp,
+            kd_dev=kd,
+            motor_limit_dev=motor_limit,
+        )
+        return ctrl, (q_target, kp, kd, motor_limit)
+
+    def test_update_target_reshapes_to_1_by_nu(self):
+        ctrl, (q_target, _, _, _) = self._make(nu=3)
+        ctrl.update_target(np.array([0.1, 0.2, 0.3]))
+        self.assertEqual(len(q_target.assigned), 1)
+        self.assertEqual(q_target.assigned[0].shape, (1, 3))
+
+    def test_update_target_converts_dtype(self):
+        ctrl, (q_target, _, _, _) = self._make(nu=2)
+        ctrl.update_target(np.array([0.5, -0.5]))
+        self.assertEqual(q_target.assigned[0].dtype, np.float32)
+
+    def test_set_gains_assigns_kp_kd_only(self):
+        ctrl, (q_target, kp, kd, motor_limit) = self._make(nu=2)
+        ctrl.set_gains(np.array([10.0, 20.0]), np.array([0.5, 0.6]))
+        self.assertEqual(len(kp.assigned), 1)
+        self.assertEqual(len(kd.assigned), 1)
+        # set_gains 内部以 float32 上载：0.6 经 float32 round-trip 有 1e-8 级误差，
+        # 故用 assert_allclose 而非 assert_array_equal。
+        np.testing.assert_allclose(kp.assigned[0], [10.0, 20.0])
+        np.testing.assert_allclose(kd.assigned[0], [0.5, 0.6])
+        # q_target 与 motor_limit 不被触碰
+        self.assertEqual(len(q_target.assigned), 0)
+        self.assertEqual(len(motor_limit.assigned), 0)
+
+    def test_set_gains_dtype_is_float32(self):
+        ctrl, (_, kp, kd, _) = self._make(nu=2)
+        ctrl.set_gains(np.array([1.0, 2.0]), np.array([0.1, 0.2]))
+        self.assertEqual(kp.assigned[0].dtype, np.float32)
+        self.assertEqual(kd.assigned[0].dtype, np.float32)
+
+
+if __name__ == "__main__":
+    unittest.main()

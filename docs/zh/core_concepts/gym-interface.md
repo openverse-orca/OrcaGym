@@ -43,7 +43,7 @@ def step(self, action) -> tuple:
     ...
 
 def reset_model(self) -> tuple:
-    """重置机器人状态到初始位姿"""
+    """重置机器人状态到初始位姿，返回 (obs, info)"""
     ...
 
 def _get_obs(self):

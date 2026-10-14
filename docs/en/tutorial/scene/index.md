@@ -2,7 +2,7 @@
 
 OrcaGym's scene system provides runtime control over the simulation scene.
 
-> Scene loading is handled automatically in the Euler environment via the `model_xml_path` parameter. See [🔧 MuJoCo Backend](../physics/mujoco-backend.md) for details.
+> Scene loading is handled automatically in the Euler environment via the `model_xml_path` parameter. See [🔧 MuJoCo Backend](../beginners/mujoco-backend.md) for details.
 
 ## Scene Objects
 
@@ -23,4 +23,4 @@ from orca_gym.scene.orca_gym_scene_runtime import OrcaGymSceneRuntime
 - [🏞️ Scene Loading](scene-loading.md) — XML loading process, resource caching
 - [🎭 Actor Manipulation](actor-manipulation.md) — Mocap anchoring, equality constraints
 - [🏔️ Terrain Generation](terrain-generation.md) — Height map terrain tools
-- [🎨 Assets and Rendering](assets-rendering.md) — 3D asset formats, rendering configuration
+

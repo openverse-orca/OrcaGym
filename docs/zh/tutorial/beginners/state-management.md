@@ -2,7 +2,7 @@
 
 管理 MuJoCo 仿真中的状态（qpos/qvel/qacc）是正确使用 OrcaGym 的关键。
 
-> 完整可运行代码见 [OrcaPlayground examples/euler/04_query_api/](https://github.com/OrcaGym/OrcaPlayground) 和 [06_jacobian/](https://github.com/OrcaGym/OrcaPlayground)。
+> 完整可运行代码见 [OrcaPlayground examples/euler/05_query_api/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/05_query_api) 和 [07_jacobian/](https://github.com/openverse-orca/OrcaPlayground/tree/main/examples/euler/07_jacobian)。
 
 ## 状态数据布局
 
@@ -66,7 +66,7 @@ dof_adr = env.jnt_dofadr("g1_left_knee_joint")      # qvel/qacc 中的起始索�
 knee_angle = env.data.qpos[qpos_adr]                 # 铰链关节 qpos 长度 = 1
 ```
 
-> **注意**：`env.data.qpos` 是**全局**数组（包含所有 body 的自由度和关节 qpos）。
+> ⚠️ **注意**：`env.data.qpos` 是**全局**数组（包含所有 body 的自由度和关节 qpos）。
 > 在多 body 场景中，不能直接 `data.qpos[7:]` 访问 G1 关节 —— 必须通过 `jnt_qposadr`
 > 按各关节地址逐段拼接。例如 G1 的 29 个旋转关节的 qpos 地址可能与 `data.qpos[7:]` 不连续。
 
@@ -166,3 +166,9 @@ snapshot = env.data.qpos.copy()     # copy() 创建独立副本，不受后续�
 | 数组维度不对 | ValueError | 用 `jnt_qposadr` 检查地址和长度 |
 | 不调用 `mj_forward()` 就读 body 位姿 | 读到旧位姿 | 修改 qpos 后必须 `mj_forward()` |
 | 多 body 场景直接用 `data.qpos[7:]` | 读到其他 body 的数据 | 用 `jnt_qposadr` 逐关节切片拼接 |
+
+---
+
+## 下一步
+
+理解了状态布局和同步规则后，接下来学习如何用**按名称查询 API** 更直观地读取关节、body、传感器状态：[📡 读取状态](state-queries.md)。
