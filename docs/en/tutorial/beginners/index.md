@@ -59,7 +59,7 @@ We have designed a **progressive** learning path. Each step introduces only one 
 | [📐 State Management](state-management.md) | qpos/qvel/qacc layout, `mj_forward` sync, zero-copy view | 15 min |
 | [📡 Reading State](state-queries.md) | `query_joint_qpos`, `get_body_xpos_xmat_xquat`, sensors | 15 min |
 | [🦾 Making the Robot Move](move-a-joint.md) | `qpos`/`qvel`, `set_joint_qpos`, `do_simulation` | 20 min |
-| [📷 Camera & Vision](camera-and-vision.md) | `CameraWrapper`, RGB-D image acquisition | 15 min |
+| [📷 Camera & Vision](camera-and-vision.md) | `start_streaming`, `save_streaming`, RGB-D image acquisition | 15 min |
 | [🎮 Simple Controller](simple-controller.md) | PD controller principles, parameter tuning | 20 min |
 | [🏆 Build a Task](build-a-task.md) | Combine everything: perception -> decision -> control, complete a reach goal | 30 min |
 | [🧠 PPO Training](ppo-training.md) | SB3 PPO, reward function design, offline training | 30 min |
