@@ -30,7 +30,7 @@ OrcaGym API documentation to help you quickly find the interfaces you need.
 | Query body/site state | `env.query_*()` / `env.get_body_*()` |
 | Apply external force | `env.apply_body_force(name, force, torque)` |
 | Grasp/drag objects | Mocap + equality constraints |
-| Camera image capture | `start_streaming` / `show_camera` / `CameraWrapper` |
+| Camera image capture | `start_streaming` / `show_camera` ([Migration Guide](../migration/camera-recorder.md)) |
 | Place objects in scene | `OrcaGymScene` |
 | Inverse kinematics control | `InverseKinematicsController` |
 | Joint torque control | `JointController` |

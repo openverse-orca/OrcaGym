@@ -155,7 +155,9 @@ env.render(simulate_index=step_idx, request_idr=False)
 - **`simulate_index`**：物理仿真步索引，透传到引擎相机管线用于帧对齐。
   保存区间视频时按此索引提取帧，**必须递增**。
 - **`request_idr`**：是否请求引擎输出 IDR 关键帧。
-  保存段起点可设 `True`，保证输出视频起点可正常播放。
+  **需要保存视频时，录制区间的第一帧与最后一帧渲染时都必须设 `True`**：
+  首帧 IDR 保证输出视频从区间起点可正常播放；末帧 IDR 保证区间末尾的帧
+  能被完整解码写入 MP4。中间帧无需额外请求。
 
 渲染频率由 `set_render_fps(fps)` 控制：
 - `sync_render=True`：按物理步节流（每 N 个物理步渲染一帧）

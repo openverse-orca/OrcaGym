@@ -59,7 +59,7 @@
 | [📐 状态管理](state-management.md) | qpos/qvel/qacc 布局、`mj_forward` 同步、零拷贝视图 | 15 分钟 |
 | [📡 读取状态](state-queries.md) | `query_joint_qpos`、`get_body_xpos_xmat_xquat`、传感器 | 15 分钟 |
 | [🦾 让机器人动起来](move-a-joint.md) | `qpos`/`qvel`、`set_joint_qpos`、`do_simulation` | 20 分钟 |
-| [📷 相机与视觉](camera-and-vision.md) | `CameraWrapper`、RGB-D 图像获取 | 15 分钟 |
+| [📷 相机与视觉](camera-and-vision.md) | `start_streaming`、`save_streaming`、RGB-D 图像获取 | 15 分钟 |
 | [🎮 简单控制器](simple-controller.md) | PD 控制器原理、参数调优 | 20 分钟 |
 | [🏆 搭建一个任务](build-a-task.md) | 组合一切：感知→决策→控制，完成到达目标 | 30 分钟 |
 | [🧠 PPO 训练](ppo-training.md) | SB3 PPO、奖励函数设计、离线训练 | 30 分钟 |
