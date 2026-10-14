@@ -155,7 +155,10 @@ env.render(simulate_index=step_idx, request_idr=False)
 - **`simulate_index`**: physics simulation step index, passed through to the engine camera pipeline for frame alignment.
   When saving interval video, frames are extracted by this index, which **must be monotonically increasing**.
 - **`request_idr`**: whether to request the engine to output an IDR keyframe.
-  Set `True` at the start of a saved segment to ensure the output video starts playing correctly.
+  **When saving video, you must set `True` when rendering both the first frame and the
+  last frame of the recording range**: the first-frame IDR ensures the output video
+  plays correctly from the range start; the last-frame IDR ensures the final frames of
+  the range are fully decoded into the MP4. Intermediate frames need no extra requests.
 
 Rendering frequency is controlled by `set_render_fps(fps)`:
 - `sync_render=True`: throttled by physics step (render one frame every N physics steps)

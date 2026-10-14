@@ -152,6 +152,8 @@ plugins:
               - 场景: api_reference/scene.md
               - 传感器: api_reference/sensor.md
               - 工具函数: api_reference/utils.md
+            - 迁移指南:
+              - 相机接口迁移: migration/camera-recorder.md
             - 常见问题:
               - FAQ: faq/faq.md
         - locale: en
@@ -222,6 +224,8 @@ plugins:
               - Scene: api_reference/scene.md
               - Sensor: api_reference/sensor.md
               - Utilities: api_reference/utils.md
+            - Migration Guides:
+              - Camera Interface Migration: migration/camera-recorder.md
             - FAQ:
               - FAQ: faq/faq.md
   - git-revision-date-localized:

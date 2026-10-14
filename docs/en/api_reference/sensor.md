@@ -1,196 +1,72 @@
 # 📷 Sensor API
 
-Sensor interface, providing camera image receiving, caching, parsing, and playback capabilities.
+Sensor data query interface. Camera streaming, recording, and visualization have
+migrated to the `orca_gym.recorder` module (see the "Camera Interface" section below).
 
-## Class Overview
+## Contents
 
-| Class | Description |
-|----|------|
-| `CameraWrapper` | Receive rendered camera images from the simulation in real time |
-| `CameraCacher` | Save camera streams to local files |
-| `CameraDataParser` | Parse locally cached camera data |
-| `VideoPlayer` | Play back locally cached video frame by frame |
-| `Monitor` | Real-time camera monitoring window |
+- [Camera Interface (new)](#camera-interface-orca_gymrecorder): `start_streaming` / `save_streaming` / `show_camera` / `VideoRecorderManager`
+- [rgbd_camera (deprecated)](#rgbd_camera-deprecated): `CameraWrapper` / `Monitor` / `CameraCacher`, etc.
+- [Sensor Data Queries (Environment Layer)](#sensor-data-queries-environment-layer)
+- [LiDAR Point Cloud Query](#lidar-point-cloud-query)
 
 ---
 
-## CameraWrapper
+## Camera Interface (orca_gym.recorder)
 
-Receives real-time camera images from the simulation service via WebSocket.
-
-### Constructor
-
-```python
-class CameraWrapper:
-    def __init__(self, name: str, port: int)
-```
-- `name`: Camera name
-- `port`: WebSocket port number
-
-### Properties
+Recording has moved from the engine side to the Python client side. The
+`orca_gym.recorder` module (`VideoRecorderManager`, based on PyAV) uniformly
+manages streaming, recording, saving, and live visualization. The environment
+layer (`OrcaGymEulerEnv` / `OrcaGymLocalEnv`) provides these entry points:
 
 ```python
-name: str                       # Camera name (@property, stored internally as _name)
-port: int                       # WebSocket port
-image: np.ndarray               # Current image (H, W, 3), BGR format; random noise (480, 640, 3) before the first frame arrives
-image_index: int                # Current frame index
-enabled: bool                   # Whether enabled (default True)
-received_first_frame: bool      # Whether the first frame has been received
+def get_camera_names() -> list[str]          # Enumerate all registered cameras
+def start_streaming(camera_name, **kwargs)   # One-call config + streaming + recorder startup
+def show_camera(camera_name, camera_type="color", window_name=None)  # Non-blocking live preview
+def save_streaming(camera_name, camera_type, file_path,
+                   start_simulate_index, end_simulate_index) -> Future[RemuxResult]
+                                             # Save a range to MP4 (non-blocking)
+def get_recorder_manager() -> VideoRecorderManager  # Low-level manager (advanced usage)
 ```
 
-### Lifecycle
+Typical usage:
 
 ```python
-def start()                     # Start the background receiving thread
-def stop()                      # Stop receiving
-```
+camera = env.get_camera_names()[0]
+env.start_streaming(camera, capture_rgb=True, color_port=7070)
 
-### Frame Retrieval
-
-```python
-def get_frame(self, format='bgr24', size: tuple = None) -> tuple[np.ndarray, int]
-```
-- `format`: `'bgr24'` (default) or `'rgb24'`
-- `size`: Optional target size `(width, height)`
-- Returns: `(frame, image_index)`
-
-```python
-def is_first_frame_received() -> bool  # Whether the first frame has been received
-```
-
-### Usage Example
-
-```python
-from orca_gym.sensor.rgbd_camera import CameraWrapper
-import time
-
-camera = CameraWrapper("front_camera", port=8765)
-camera.start()
-
-# Wait for the first frame
-while not camera.is_first_frame_received():
-    time.sleep(0.1)
-
-# Retrieve frames in a loop
 for i in range(100):
-    frame, idx = camera.get_frame(format='rgb24', size=(224, 224))
-    print(f"Frame #{idx}, shape: {frame.shape}")
+    env.step(action)
+    env.render(simulate_index=i)          # Index must increase; used for frame alignment
 
-camera.stop()
+env.show_camera(camera)                    # Live preview (non-blocking)
+future = env.save_streaming(camera, "color", "/tmp/out.mp4", 0, 99)
+result = future.result()                   # RemuxResult: file_path / frame_count /
+                                           #             frame_indices / timestamps_ns
+env.close()                                # Automatically saves pending tasks
 ```
+
+For the full API (including `SingleFrameTask` per-frame callbacks, depth streams,
+multi-camera setups), see the [Environment API](environment.md) and the tutorial
+[📷 Camera & Vision](../tutorial/beginners/camera-and-vision.md).
+For upgrading from the old version, see the [Migration Guide](../migration/camera-recorder.md).
 
 ---
 
-## CameraCacher
+## rgbd_camera (Deprecated)
 
-Saves WebSocket camera streams as local files, including H.264 video and binary timestamps.
+> ⚠️ The `orca_gym.sensor.rgbd_camera` module (`CameraWrapper` / `Monitor` /
+> `CameraCacher` / `CameraDataParser` / `VideoPlayer`) is **deprecated**:
+> after recording moved to the Python side, it has been replaced by
+> `orca_gym.recorder`. The old classes are kept only for compatibility —
+> please migrate via the [Migration Guide](../migration/camera-recorder.md).
 
-### Constructor
-
-```python
-class CameraCacher:
-    def __init__(self, name: str, port: int)
-```
-- `name`: Camera name (generates `{name}_video.h264` and `{name}_ts.bin`)
-- `port`: WebSocket port number
-
-### Lifecycle
-
-```python
-def start()
-def stop()
-def is_first_frame_received() -> bool
-```
-
----
-
-## CameraDataParser
-
-Parses offline data saved by CameraCacher.
-
-### Constructor
-
-```python
-class CameraDataParser:
-    def __init__(self, name: str)
-```
-
-### Frame Lookup
-
-```python
-def get_closed_frame(self, ts) -> tuple[int, np.ndarray]  # Find the nearest frame by timestamp
-def get_frame(self, index) -> np.ndarray                  # Get a specific frame by index (linear forward iteration, not random access)
-```
-
-> Note: `get_frame` only supports linear forward access. When `index == current_index` it returns the cached frame,
-> otherwise it decodes forward to the target frame and caches it. Random backward access is not possible.
-
-### Module-Level Helper Functions
-
-```python
-def find_closest_index(a: np.ndarray, target: int) -> int
-    # Binary search: returns the index in the ascending timestamp array `a` closest to `target`
-```
-
----
-
-## VideoPlayer
-
-Plays locally cached H.264 video frame by frame using OpenCV.
-
-```python
-class VideoPlayer:
-    def __init__(self, name: str)
-    def play()                     # Play; press q to quit
-```
-
----
-
-## Monitor
-
-Matplotlib-based real-time camera monitoring window.
-
-```python
-class Monitor:
-    def __init__(self, name: str, fps: int = 30, port: int = 7070)
-    def start()                    # Start the monitoring window (blocks the current thread)
-    def stop()                     # Stop: release camera resources (camera.stop()) and close the figure window (plt.close)
-    def update(frame)              # matplotlib animation callback, used internally
-```
-
----
-
-## Complete Usage Examples
-
-### Real-Time Monitoring
-
-```python
-from orca_gym.sensor.rgbd_camera import Monitor
-
-monitor = Monitor("my_camera", fps=30, port=8765)
-monitor.start()  # Blocks until the window is closed
-```
-
-### Offline Caching + On-Demand Reading
-
-```python
-from orca_gym.sensor.rgbd_camera import CameraCacher, CameraDataParser, VideoPlayer
-
-# === Collection phase ===
-cacher = CameraCacher("my_dataset", port=8765)
-cacher.start()
-# ... run the simulation ...
-cacher.stop()
-
-# === Parsing phase ===
-parser = CameraDataParser("my_dataset")
-ts = 1234567890
-index, frame = parser.get_closed_frame(ts)
-
-# === Playback phase ===
-player = VideoPlayer("my_dataset")
-player.play()
-```
+| Old class | Replacement |
+|-----------|-------------|
+| `CameraWrapper` | `env.start_streaming()` + `manager.get_last_decoded_frame()` |
+| `Monitor` | `env.show_camera()` |
+| `CameraCacher` | `env.save_streaming()` (outputs standard MP4 directly) |
+| `CameraDataParser` / `VideoPlayer` | Standard MP4, readable by any player / PyAV |
 
 ---
 
