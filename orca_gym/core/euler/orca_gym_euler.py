@@ -792,6 +792,55 @@ class OrcaGymEuler:
         euler = object.__getattribute__(self, "_euler")
         return euler is not None and bool(euler.has_deformable_phase())
 
+    def has_esdf_coupling(self) -> bool:
+        """查询 ESDF 刚柔耦合是否已启用（柔体相存在）。
+
+        做什么：等价于 ``has_euler() and has_soft_sim()``——CoupledGpuSim
+        已建好且 ESDF 含 ``type=deformable`` 柔体。
+        为什么：夹布等任务脚本用它做门闩断言，再调
+        ``get_cloth_particle_positions()`` 读布料粒子。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and bool(euler.has_deformable_phase())
+
+    def get_cloth_particle_positions(self) -> np.ndarray:
+        """拷贝当前柔体（布料）粒子世界坐标，形状 (n, 3)。
+
+        做什么：转发 ``CoupledGpuSim.copy_deformable_view`` 的粒子数组。
+        无 Euler 或无柔体相时返回空数组。
+        为什么：任务脚本（抓取检测、推流）需要读布粒子；直接暴露
+        ``_euler`` 会破坏封装，与 ``fluid_particle_positions`` 对齐。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return np.zeros((0, 3), dtype=np.float32)
+        particles, _, _ = euler.copy_deformable_view()
+        return np.asarray(particles)
+
+    def set_soft_contact_params(
+        self,
+        mu: float | None = None,
+        ke: float | None = None,
+        kd: float | None = None,
+        kf: float | None = None,
+        relaxation: float | None = None,
+    ) -> bool:
+        """运行时覆盖 ESDF soft_contact 参数（委托 CoupledGpuSim）。
+
+        做什么：转发 ``CoupledGpuSim.set_soft_contact_params``——把
+        非 None 的参数写入柔体粒子-刚体 shape 软接触材料（摩擦 mu、
+        法向刚度 ke、法向阻尼 kd、摩擦刚度 kf、XPBD 松弛 relaxation）。
+        为什么：ESDF 是这些参数的唯一事实源，但每次由外部编辑器重新
+        导出会重置；任务脚本（如夹布摩擦标定）需要在构造后调参，
+        直接暴露 ``_euler`` 会破坏封装。返回是否有柔体相。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return False
+        return euler.set_soft_contact_params(
+            mu=mu, ke=ke, kd=kd, kf=kf, relaxation=relaxation
+        )
+
     def has_render_stream(self) -> bool:
         """查询 ESDF 柔体渲染流是否已连接。"""
         euler = object.__getattribute__(self, "_euler")
