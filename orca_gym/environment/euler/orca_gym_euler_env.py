@@ -1060,6 +1060,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """是否已挂 CoupledGpuSim（柔体或流体相）。委托 Gym 公共方法。"""
         return self._gym.has_euler()
 
+    def has_esdf_coupling(self) -> bool:
+        """ESDF 刚柔耦合是否已启用（柔体相存在）。委托 Gym 公共方法。"""
+        return self._gym.has_esdf_coupling()
+
+    def get_cloth_particle_positions(self) -> np.ndarray:
+        """当前柔体（布料）粒子世界坐标 (n, 3)。委托 Gym 公共方法。"""
+        return self._gym.get_cloth_particle_positions()
+
     def capture_cycle_graph(self) -> None:
         """把一个耦合窗录成外层 CUDA Graph。
 
