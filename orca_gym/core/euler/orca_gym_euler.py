@@ -857,6 +857,66 @@ class OrcaGymEuler:
         euler = object.__getattribute__(self, "_euler")
         return euler is not None and bool(euler.has_fluid_phase())
 
+    def pin_cloth_particles(self, particle_ids) -> bool:
+        """把选定布料粒子钉成运动学锚点（inv_mass=0 且去 ACTIVE）。
+
+        做什么：委托 ``CoupledGpuSim.pin_cloth_particles``——备份选中
+        行的 ``particle_inv_mass`` / ``particle_flags`` 后置 0 / 清
+        ``ACTIVE`` 位（构建期 ``pin_vertex_indices`` 的运行时等价物）。
+        为什么：夹布等任务在夹持确认后需要把布粒"焊"在夹爪上，配合
+        ``write_cloth_particle_kinematics`` 由宿主驱动其位姿，提举
+        不再依赖摩擦锥。返回是否有柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.pin_cloth_particles(particle_ids)
+
+    def unpin_cloth_particles(self) -> bool:
+        """恢复 ``pin_cloth_particles`` 备份的粒子质量与标志。
+
+        做什么：委托 ``CoupledGpuSim.unpin_cloth_particles``，被钉
+        粒子回到动力学控制。为什么：放开夹爪前必须先解除锚定，
+        否则布粒会冻结在爪张开后的空中位置。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.unpin_cloth_particles()
+
+    def write_cloth_particle_kinematics(
+        self, particle_ids, positions, velocities
+    ) -> bool:
+        """整行写入选定布料粒子的位置与速度（宿主侧运动学驱动）。
+
+        做什么：委托 ``CoupledGpuSim.write_cloth_particle_kinematics``。
+        通常每耦合窗一次，配 pin 使用：窗口内求解器把被写粒子视为
+        冻结锚点，窗口边界由宿主按夹爪位姿更新。
+        为什么：任务脚本掌握夹爪刚体位姿，可把 pin 粒子钉到任意
+        运动学轨迹上；不暴露内部 State buffer（K4 封装契约）。
+        返回是否有柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.write_cloth_particle_kinematics(
+            particle_ids, positions, velocities
+        )
+
+    def get_soft_body_forces(self, body_names=None):
+        """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
+
+        做什么：委托 ``CoupledGpuSim.get_soft_body_forces``——传
+        ``body_names`` 返回对应刚体的 [force(3), torque(3)] 数组
+        （COM 参考）；不传返回 (labels, 全量)。无柔体相返回 None。
+        为什么：夹布 grasp_confirm 的承重判据（方案A）需要读指垫
+        实际载荷；不暴露内部 State buffer（K4 封装契约）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return None
+        return euler.get_soft_body_forces(body_names)
+
     def has_fluid_render_stream(self) -> bool:
         """查询流体粒子渲染流（50452）是否已连接。"""
         euler = object.__getattribute__(self, "_euler")

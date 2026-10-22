@@ -1068,6 +1068,49 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """当前柔体（布料）粒子世界坐标 (n, 3)。委托 Gym 公共方法。"""
         return self._gym.get_cloth_particle_positions()
 
+    def pin_cloth_particles(self, particle_ids) -> bool:
+        """把选定布料粒子钉成运动学锚点（inv_mass=0 且去 ACTIVE）。
+
+        做什么：委托 Gym 公共方法（内部转 CoupledGpuSim）——构建期
+        ``pin_vertex_indices`` 的运行时等价物，备份后置 0/清 ACTIVE。
+        为什么：夹布任务在夹持确认后把布粒"焊"在夹爪上，配合
+        ``write_cloth_particle_kinematics`` 宿主驱动，提举不依赖摩擦。
+        返回是否有柔体相（False 表示无操作）。
+        """
+        return self._gym.pin_cloth_particles(particle_ids)
+
+    def unpin_cloth_particles(self) -> bool:
+        """恢复 ``pin_cloth_particles`` 备份的粒子质量与标志。
+
+        做什么：委托 Gym 公共方法，被钉粒子回到动力学控制。
+        为什么：放开夹爪前必须先解除锚定，否则布粒冻结在空中。
+        """
+        return self._gym.unpin_cloth_particles()
+
+    def write_cloth_particle_kinematics(
+        self, particle_ids, positions, velocities
+    ) -> bool:
+        """整行写入选定布料粒子的位置与速度（宿主侧运动学驱动）。
+
+        做什么：委托 Gym 公共方法。通常每耦合窗一次，配 pin 使用：
+        窗口内求解器把被写粒子视为冻结锚点，窗口边界由宿主按夹爪
+        位姿更新。返回是否有柔体相（False 表示无操作）。
+        """
+        return self._gym.write_cloth_particle_kinematics(
+            particle_ids, positions, velocities
+        )
+
+    def get_soft_body_forces(self, body_names=None):
+        """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
+
+        做什么：委托 Gym 公共方法（内部转 CoupledGpuSim）——传
+        ``body_names`` 返回对应刚体的 [force(3), torque(3)] 数组
+        （COM 参考）；不传返回 (labels, 全量)。无柔体相返回 None。
+        为什么：夹布 grasp_confirm 的承重判据（方案A）需要读指垫
+        实际载荷；不暴露内部 State buffer（K4 封装契约）。
+        """
+        return self._gym.get_soft_body_forces(body_names)
+
     def capture_cycle_graph(self) -> None:
         """把一个耦合窗录成外层 CUDA Graph。
 
