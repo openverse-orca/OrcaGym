@@ -82,3 +82,22 @@ sensor_data = env.query_sensor_data(["imu_accelerometer", "imu_gyro", "touch_lef
 - `touch`: 触觉传感器（接触力）
 - `velocimeter`: 速度计（线性速度）
 - `framequat`: 框架姿态（四元数）
+
+### LiDAR 点云查询
+
+`OrcaGymEulerEnv` / `OrcaGymLocalEnv` 提供激光雷达点云查询接口：
+
+```python
+lidar_data = env.query_lidar_point_cloud("LiDAREntity")
+# 返回字典包含：
+# - bin_count, vertical_layers, angular_resolution, max_h_angle,
+#   min_v_angle, v_step, min_range, max_range
+# - sensor_position: 传感器世界坐标原点，形状 (3,)
+# - sensor_rotation: 传感器世界姿态四元数 (x, y, z, w)，形状 (4,)
+# - ranges: 距离图像，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
+# - points: 世界坐标 3D 点数组，形状 (bin_count, vertical_layers, 3)
+# - intensities: 强度图像，形状 (bin_count, vertical_layers)
+# 实体不存在 / 环形缓冲为空 / 离线模式时返回 None
+```
+
+> 注意：点云（`points`）为**世界坐标系**。可通过 `sensor_position` / `sensor_rotation` 在世界系与传感器本体系之间转换。

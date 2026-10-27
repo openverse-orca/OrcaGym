@@ -13,6 +13,7 @@ import mujoco
 import numpy as np
 
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
+from orca_gym.core.euler.provider_sensor_sampling import ProviderSensorSamplingMixin
 
 
 _ACTOR_MANIPULATOR_BODY_NAMES = (
@@ -50,7 +51,7 @@ def disable_actor_manipulator_collision(model: mujoco.MjModel) -> int:
     return n_disabled
 
 
-class MuJoCoSimCore:
+class MuJoCoSimCore(ProviderSensorSamplingMixin):
     """MuJoCo 仿真核心，持有 _mjModel/_mjData。
 
     _mjModel/_mjData 只存在于此类内部，不对外暴露。
@@ -79,6 +80,7 @@ class MuJoCoSimCore:
         """
         self._mjModel = None    # mujoco.MjModel | None
         self._mjData = None     # mujoco.MjData | None
+        self._initialize_provider_sensor_state()
 
     # --- 生命周期方法 ---
 
@@ -88,11 +90,13 @@ class MuJoCoSimCore:
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
         """
+        self.close_provider_sensors()
         self._mjModel = mujoco.MjModel.from_xml_path(model_xml_path)
         self._mjData = mujoco.MjData(self._mjModel)
         # AR-001：模型加载后关闭 ActorManipulator 拖拽代理的碰撞掩码，
         # 消除其埋地/远端碰撞体与无限平面贯产生的垃圾约束行（不影响 mocap weld 拖拽）。
         self.disable_actor_manipulator_collision()
+        self._bind_provider_sensors(model_xml_path)
 
     def disable_actor_manipulator_collision(self) -> int:
         """关闭 ActorManipulator 拖拽代理几何体的碰撞掩码（可随时重试/重断言）。
@@ -104,14 +108,19 @@ class MuJoCoSimCore:
             return 0
         return disable_actor_manipulator_collision(self._mjModel)
 
-    def reset_data(self) -> None:
+    def reset_data(self, *, sensor_seed: int | None = None) -> None:
         """重置 MjData 到初始状态（mj_resetData）。
 
         供 OrcaGymEulerEnv.reset_simulation 调用。
         """
         if self._mjModel is None or self._mjData is None:
             raise RuntimeError("Simulation not initialized")
+        seed = self._provider_seed if sensor_seed is None else self._validate_provider_seed(sensor_seed)
+        if (self._provider_configuration is not None and self._provider_status != "inactive"
+                and (self._provider_runtime is None or self._provider_status == "closed")):
+            raise RuntimeError("Provider sensors require model reload before reset")
         mujoco.mj_resetData(self._mjModel, self._mjData)
+        self.reset_provider_sensors(seed)
 
     def step(self, nstep: int) -> None:
         """执行 nstep 步 MuJoCo 仿真。
@@ -119,7 +128,10 @@ class MuJoCoSimCore:
         Args:
             nstep: 步进次数。
         """
-        mujoco.mj_step(self._mjModel, self._mjData, nstep)
+        if self._provider_configuration is not None and self._provider_status != "inactive":
+            self._step_provider_sensors(nstep)
+        else:
+            mujoco.mj_step(self._mjModel, self._mjData, nstep)
 
     def forward(self) -> None:
         """执行 MuJoCo 前向计算（不步进，仅更新派生量）。"""
@@ -215,11 +227,18 @@ class MuJoCoSimCore:
         Args:
             mocap_dict: dict[body_name -> {"pos": (3,), "quat": (4,) [w,x,y,z]}]。
                         body_name 必须是 mocap body（mocapid >= 0）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mocapid[-1] 会取到末位 body 的 mocapid，可能静默错写
+                其 mocap 槽位。
         """
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(self._mjModel.body_mocapid[body_id])
             if mocap_id >= 0:
                 self._mjData.mocap_pos[mocap_id] = np.asarray(
@@ -234,28 +253,44 @@ class MuJoCoSimCore:
 
         Args:
             geom_friction_dict: dict[geom_name -> friction (3,) [sliding, torsion, rolling]]。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
         """
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name
             )
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             self._mjModel.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（修改 body_mass/body_inertia）。
+        """为 body 添加额外重量（修改 body_mass，mj_setConst 重算派生量）。
 
         Args:
             weight_load_dict: dict[body_name -> weight (float, kg)]。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
         """
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(
                 self._mjModel, mujoco.mjtObj.mjOBJ_BODY, body_name
             )
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             self._mjModel.body_mass[body_id] += float(weight)
-            # 简化惯性：按球体 I = 2/5 m r^2，r 取当前等价半径
-            # 实际项目按需重算，此处仅同步 mass（保持质心/惯量张量不变）
+        # body_subtreemass/body_invweight0 等是 mj_setConst 计算的派生量，
+        # 直接改 body_mass 不会更新，需重算（质心/惯量张量保持不变）。
+        # 动力学（qM/qacc）在下一步 mj_step 时由 mj_crb 按新 body_mass 自然重算。
+        if weight_load_dict:
+            mujoco.mj_setConst(self._mjModel, self._mjData)
 
     # --- 关节查询（阶段三 3.1.1）---
 

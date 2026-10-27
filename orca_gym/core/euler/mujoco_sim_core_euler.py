@@ -396,6 +396,10 @@ class MuJoCoSimCoreEuler:
         host = self._solver.host
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            # mj_name2id 返回 -1 时 body_mocapid[-1] 取末位 body 的 mocapid，
+            # 可能静默错写其 mocap 槽位，故防御（同 _joint_id 模式）
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(model.body_mocapid[body_id])
             if mocap_id >= 0:
                 host.mocap_pos[mocap_id] = np.asarray(
@@ -775,11 +779,18 @@ class MuJoCoSimCoreEuler:
     # ---- F 类：模型参数写入方法（P2 真实实现：写 host + notify）----
 
     def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
-        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。"""
+        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             model.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)
@@ -787,14 +798,23 @@ class MuJoCoSimCoreEuler:
         self._solver.notify_model_changed(_model_changed_flags().GEOM_FRICTION)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。"""
+        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             model.body_mass[body_id] += float(weight)
         # body_mass 影响 subtreemass/invweight0，走全量 set_const（BODY_INERTIAL）
-        self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
+        if weight_load_dict:
+            self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
 
     def update_equality_constraints(self, eq_list: list[dict]) -> None:
         """更新等式约束（写 host mj_model.eq_*，set_const_0 重算 eq_data）。"""

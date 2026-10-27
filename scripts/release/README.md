@@ -76,6 +76,12 @@
 
 构建后的文件在 `dist/` 目录。
 
+正式包始终是一个 `py3-none-any` wheel，包含完整的 Linux Sensor Runtime，
+所有平台安装相同的文件。普通 OrcaGym 功能不加载这些二进制；只有使用原生
+Sensor provider 时才检查 Linux x86_64 和 glibc >= 2.35，不支持时给出明确错误。
+`build.sh` 对正式包和 TestPyPI 包都固定设置 `ORCA_SENSOR_BUNDLE_NATIVE=1`，
+防止开发环境的 `=0` 设置产生缺少 Sensor 的发布包。
+
 ### 检查包质量
 
 ```bash
@@ -424,4 +430,3 @@ pip install orca-gym
 - 确保所有测试通过后再发布到正式 PyPI
 - 版本号递增，不要回退
 - 保持包的向后兼容性
-

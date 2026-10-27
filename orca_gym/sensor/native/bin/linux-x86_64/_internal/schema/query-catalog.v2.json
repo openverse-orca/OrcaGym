@@ -1,0 +1,50 @@
+{
+  "catalog_version": 2,
+  "description": "Reference operators shipped by Orca's MuJoCo query backend. This is not a native Host or code-generator whitelist: backends can register additional operators. Bindings resolve names at prepare time; result fields map into any vendor-named compatible input field.",
+  "operators": {
+    "sample.read": {
+      "description": "Read metadata of the consistent physics sample.",
+      "options": {},
+      "results": {
+        "time": {"dtype": "f64", "shape": [], "unit": "s"},
+        "dt": {"dtype": "f64", "shape": [], "unit": "s"},
+        "index": {"dtype": "u64", "shape": []}
+      }
+    },
+    "contacts.query": {
+      "description": "Query contacts involving an ordered group of bound bodies or geoms. Each instance receives its own row order and recipient-side force sign. Bodies select directly owned geoms, not descendants.",
+      "options": {
+        "bodies": "Binding reference, exclusive with geoms, e.g. $pads",
+        "geoms": "Binding reference, exclusive with bodies, e.g. $surfaces",
+        "frame": "world or a site binding reference, e.g. $frame",
+        "force_on": "bound",
+        "exclude_internal": "true"
+      },
+      "variable_rows": true,
+      "results": {
+        "bound_body_index": {"dtype": "u32", "shape": [], "description": "Zero-based index in the ordered bound body list."},
+        "bound_geom_index": {"dtype": "u32", "shape": [], "description": "Zero-based index in the ordered bound geom list."},
+        "counterpart_body_id": {"dtype": "u64", "shape": [], "description": "Opaque opposing body identifier, not geom identifier."},
+        "position": {"dtype": "f64", "shape": [3], "unit": "m", "frame": "query frame"},
+        "normal_force": {"dtype": "f64", "shape": [3], "unit": "N", "frame": "query frame"},
+        "tangential_force": {"dtype": "f64", "shape": [3], "unit": "N", "frame": "query frame"}
+      }
+    },
+    "sensor.read": {
+      "description": "Copy a bound native sensor's already evaluated data (user/plugin sensors are rejected). The bound sensor determines dimension and physical semantics; reading does not run forward dynamics.",
+      "options": {"sensor": "Binding reference, e.g. $range"},
+      "results": {"value": {"dtype": "f64", "shape": "scalar for dimension 1, otherwise [dimension]", "unit": "depends on bound sensor"}}
+    },
+    "model.read": {
+      "description": "Read and cache an immutable model attribute when preparing the binding plan.",
+      "options": {"object": "Body binding reference, e.g. $pads[0]", "field": "local_rotation", "frequency": "on_bind"},
+      "results": {"value": {"dtype": "f64", "shape": [3, 3], "description": "Body-local orientation relative to its parent, row-major rotation matrix."}}
+    }
+  },
+  "rules": [
+    "Fields belonging to one variable record array map to the same query and preserve row alignment.",
+    "Record counts are generated per array, not declared as separate vendor fields.",
+    "Capacity overflow fails the step; rows are never silently truncated.",
+    "Unsupported operators, result fields, bindings, and incompatible dtype/shape fail prepare before vendor instances are created."
+  ]
+}

@@ -58,6 +58,8 @@ All framework public APIs are **stateless primitives** — a single call complet
 
 If your business requires multi-step orchestration flows such as "bind/release/grasp", compose these primitives yourself and manage your own business state. This is easier to review and less error-prone than framework-managed state.
 
+The approved sensor extension (§4.10) distinguishes infrastructure state from task business state: vendor handles, filter/RNG state, sample indices and the latest successful result follow the simulation lifecycle. They do not move action, observation, reward or grasp orchestration into the framework. Public result queries remain side-effect-free reads.
+
 ### 2.2 Design Patterns
 
 | Pattern | Applied At | Problem Solved |
@@ -374,6 +376,22 @@ class OrcaGymLocalEnv(OrcaGymBaseEnv):
 
 ---
 
+### 4.10 Third-Party Sensors: Sampling the Existing Simulation
+
+This user-approved extension preserves Env → Gym → SimCore layering and native-object isolation. It does not introduce an exposed MuJoCo handle adapter.
+
+**Configuration and binding.** The `sensor_provider_manifests` constructor argument explicitly identifies trusted vendor packages and enables the bundled Host. Optional `sensor_host_path` overrides that Host. Without either argument, the existing physics-only path is unchanged and XML metadata cannot execute DLLs. Deployments may configure these paths centrally; scenes only declare type, instance, exact site and algorithm parameters. The EulerEnv entrypoint initially supports the standard `orca.sensor.v1/` custom layout and site contact-grid, site-raycast, object contact rows, object-frame rays and sample time/dt/index inputs. The user-confirmed scope is a preassembled XML model: bind existing sites or explicitly named bodies/geoms/sites without assembling geometry, rewriting names or providing a standalone simulation backend, legacy JSON scenes or presentation conversion. The user-approved restoration includes runtime object binding and sampling: object contracts read only provider-local semantic types from model metadata and map them to existing scene objects through exact `object/<alias>` typed tuples. Site contracts still ignore model assets; presentation stays outside the runtime. A contact body owns only its direct geoms, and its frame must share the same rigid weld group. Default self-ownership comes from explicit body/geom mappings, with optional `geoms` tuples for complete ownership; never infer a robot subtree or namespace. Contact rows retain declared object order, force signs and frame transforms; capacity overflow faults the entire batch rather than truncating it. Optional uint64 decimal `seed` text participates in deterministic reset seeds. The user-confirmed complete integration bundles the Host, contract tool and required runtime dependencies on supported platforms, stored in ordinary Git. `sensor_host_path` and `ORCA_SENSOR_TOOL` are explicit overrides; no separate Runtime or SDK installation is needed. Packaging changes only ensure complete runtime contents and platform tags.
+
+**Responsibilities.** `MuJoCoSimCore` resolves bindings and samples its existing, single model/data pair. Sampling may be implemented as internal SimCore mixin methods, accessing native state only through the same object. An internal `SampledSensorRuntime` reuses `SensorRuntime` and Host for contract projection, per-instance algorithms and publication. The bridge receives only standard sample values and timestamps, never native objects or callbacks exposing them. Do not call standalone `load_sensor_scene()` to construct another simulation, pass native handles to a `from_existing()` adapter, or expose runtime components through Env/Gym.
+
+**Stepping.** Both `do_simulation(ctrl, n)` and `mj_step(n)` reach SimCore. When enabled, each physics substep advances once, captures a coherent source sample and computes all instances. The last result is published only after all requested substeps succeed. Under Euler/implicit/implicitfast, contact forces and site poses use the substep source time, not integrated qpos/qvel/time. Reject RK4, including integrator changes made after initialization.
+
+**Reading.** `env.query_provider_sensor_data(instance_ids=None)` returns owned NumPy copies, preserving contract shapes. Omission selects all declared instances; names are exact XML instance IDs without automatic agent prefixes. Existing `query_sensor_data()` retains its native MuJoCo sensordata semantics. Tasks, not the base environment, decide which outputs belong in observations; observation spaces, rewards and step return signatures remain unchanged.
+
+**Lifecycle and failure.** Results are not ready before the first successful physics sample or after reset. Forward, rendering and repeated reads do not compute algorithms. `reset(seed)` resets physics and algorithm state deterministically; model reload releases and rebinds instances, and offline close also releases Host resources. Sampling/algorithm errors invalidate the entire batch and require reset; already advanced physics is not rolled back and stale outputs must not masquerade as new observations.
+
+Internal SimCore/Gym orchestration adds configuration, seed-aware `reset_data`, provider cleanup and query delegates carrying only ordinary values. This integration targets EulerEnv's MuJoCo backend; it does not implement the Euler physics backend or OrcaLab UI.
+
 ## 5. API Usage Contract
 
 ### 5.1 Contract Levels
@@ -474,6 +492,7 @@ body_name = env.body("object")
 | **Namespace** | `joint()`, `body()`, `site()`, `actuator()`, `sensor()` |
 | **Studio Interaction** | `render()`, `save_streaming()`, `start_streaming()`, `show_camera()`, `get_recorder_manager()`, `set_render_fps()`, `set_video_recorder_manager()`, `get_camera_names()`, `make_camera_viewport_active()`, `load_content_file()`, `studio_bridge()`, `debug_draw()` |
 | **Lifecycle** | `initialize_simulation()`, `initialize_grpc()`, `pause_simulation()`, `close()` |
+| **Provider sensors (§4.10)** | Constructor configuration `sensor_host_path` / `sensor_provider_manifests`; `query_provider_sensor_data(instance_ids=None)` |
 
 > **Studio UI grasping is an internal API**: The original `anchor_actor()` / `release_body_anchored()` / `do_body_manipulation()` have been changed to `_`-prefixed internal methods per the P6 principle, driven internally by `render()`, and do not enter the public API. Programmatic body manipulation should use equality constraint stateless primitives implemented by yourself.
 
