@@ -1100,6 +1100,10 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             particle_ids, positions, velocities
         )
 
+    def get_soft_contact_snapshot(self):
+        """Read material contact diagnostics from the Newton-style VBD adapter."""
+        return self._gym.get_soft_contact_snapshot()
+
     def get_soft_body_forces(self, body_names=None):
         """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
 
@@ -1110,6 +1114,23 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         实际载荷；不暴露内部 State buffer（K4 封装契约）。
         """
         return self._gym.get_soft_body_forces(body_names)
+
+    def set_pad_adhesion(self, adhesion_by_body=None, adhesion_axis_by_body=None,
+                         adhesion_strength_by_body=None) -> bool:
+        """运行时覆盖柔-刚指垫黏附距离与方向门控轴（委托 Gym）。
+
+        做什么：把 ``{body名: 黏附距离m}`` 转成每 shape 距离并原地
+        重写 VBD Newton 求解器的 soft_adhesion 缓冲；``None``/空
+        字典清零全部黏附。``adhesion_axis_by_body`` 可选安装形状
+        局部门控轴：只有相向承载面（朝夹槽内侧）吸引布料，指垫
+        外表面/底面不粘，闭合阶段即可安全开启黏附咬住褶皱。
+        返回是否有支持黏附的柔体相。
+        """
+        return self._gym.set_pad_adhesion(
+            adhesion_by_body=adhesion_by_body,
+            adhesion_axis_by_body=adhesion_axis_by_body,
+            adhesion_strength_by_body=adhesion_strength_by_body,
+        )
 
     def capture_cycle_graph(self) -> None:
         """把一个耦合窗录成外层 CUDA Graph。
