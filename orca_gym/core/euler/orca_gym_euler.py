@@ -841,6 +841,29 @@ class OrcaGymEuler:
             mu=mu, ke=ke, kd=kd, kf=kf, relaxation=relaxation
         )
 
+    def set_pad_adhesion(self, adhesion_by_body=None, adhesion_axis_by_body=None,
+                         adhesion_strength_by_body=None) -> bool:
+        """运行时覆盖柔-刚指垫黏附距离与方向门控轴（委托 CoupledGpuSim）。
+
+        做什么：转发 ``CoupledGpuSim.set_pad_adhesion``——把
+        ``{body名: 黏附距离m}`` 解析成每 shape 距离并原地重写 VBD
+        Newton 求解器的 soft_adhesion 缓冲；``None``/空字典清零。
+        ``adhesion_axis_by_body`` 可选安装形状局部门控轴：只有相向
+        承载面（朝夹槽内侧）吸引，外表面不粘布。
+        为什么：黏附按宿主阶段事件开启/关闭，构造期参数无法按阶段
+        切换；方向门控让闭合阶段就能安全开启黏附咬住褶皱。直接暴露
+        ``_euler`` 会破坏封装。旧引擎无该方法时返回 False。
+        返回是否有支持黏附的柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return False
+        return euler.set_pad_adhesion(
+            adhesion_by_body=adhesion_by_body,
+            adhesion_axis_by_body=adhesion_axis_by_body,
+            adhesion_strength_by_body=adhesion_strength_by_body,
+        )
+
     def has_render_stream(self) -> bool:
         """查询 ESDF 柔体渲染流是否已连接。"""
         euler = object.__getattribute__(self, "_euler")
@@ -902,6 +925,13 @@ class OrcaGymEuler:
         return euler.write_cloth_particle_kinematics(
             particle_ids, positions, velocities
         )
+
+    def get_soft_contact_snapshot(self):
+        """Read barycentric cloth contacts without modifying particle dynamics."""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return None
+        return euler.get_soft_contact_snapshot()
 
     def get_soft_body_forces(self, body_names=None):
         """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
