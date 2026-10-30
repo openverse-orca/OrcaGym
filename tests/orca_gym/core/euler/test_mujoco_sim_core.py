@@ -294,12 +294,49 @@ class TestSimCoreSetMethodsFunctional(unittest.TestCase):
             self.sim._mjModel.geom_friction[self.box_geom_id], new_friction, atol=1e-6
         )
 
+    def test_set_geom_friction_invalid_name_raises(self):
+        """geom 名不存在时抛 ValueError，不静默错写末位 geom。"""
+        last_id = self.sim._mjModel.ngeom - 1
+        last_friction = self.sim._mjModel.geom_friction[last_id].copy()
+        with self.assertRaises(ValueError):
+            self.sim.set_geom_friction({"pelvis": np.array([1.0, 1.0, 1.0])})
+        np.testing.assert_allclose(
+            self.sim._mjModel.geom_friction[last_id], last_friction, atol=1e-12
+        )
+
+    def test_set_mocap_pos_and_quat_invalid_body_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body 的 mocap 槽位。"""
+        # G1 fixture 末位 body 是 mocap 锚点体：-1 负索引会错写其 mocap 槽位
+        mocap_before = self.sim._mjData.mocap_pos.copy()
+        with self.assertRaises(ValueError):
+            self.sim.set_mocap_pos_and_quat(
+                {"no_such_body": {"pos": np.ones(3), "quat": np.array([1.0, 0.0, 0.0, 0.0])}}
+            )
+        np.testing.assert_array_equal(self.sim._mjData.mocap_pos, mocap_before)
+
     def test_add_extra_weight_increases_mass(self):
         """添加重量后 body_mass 增加。"""
         old_mass = float(self.sim._mjModel.body_mass[self.pelvis_id])
         self.sim.add_extra_weight({"pelvis": 2.0})
         new_mass = float(self.sim._mjModel.body_mass[self.pelvis_id])
         self.assertAlmostEqual(new_mass - old_mass, 2.0, places=6)
+
+    def test_add_extra_weight_recomputes_subtreemass(self):
+        """添加重量后 body_subtreemass 派生量被 mj_setConst 重算。"""
+        old_sub = float(self.sim._mjModel.body_subtreemass[self.pelvis_id])
+        self.sim.add_extra_weight({"pelvis": 2.0})
+        new_sub = float(self.sim._mjModel.body_subtreemass[self.pelvis_id])
+        self.assertAlmostEqual(new_sub - old_sub, 2.0, places=6)
+
+    def test_add_extra_weight_invalid_name_raises(self):
+        """body 名不存在时抛 ValueError，不静默错写末位 body。"""
+        last_id = self.sim._mjModel.nbody - 1
+        last_mass = float(self.sim._mjModel.body_mass[last_id])
+        with self.assertRaises(ValueError):
+            self.sim.add_extra_weight({"manipulation_box_geom": 2.0})
+        self.assertAlmostEqual(
+            float(self.sim._mjModel.body_mass[last_id]), last_mass, places=6
+        )
 
 
 class TestMuJoCoSimCoreFunctional(unittest.TestCase):

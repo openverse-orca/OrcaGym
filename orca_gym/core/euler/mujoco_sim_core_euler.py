@@ -262,6 +262,24 @@ class MuJoCoSimCoreEuler:
         return self._solver.mj_model.nu
 
     @property
+    def solver(self):
+        """Euler 的 SolverMujocoSingleWorld（MuJoCoFlow 刚体）。
+
+        供内部构造 CoupledGpuSim 时接到同一份 GPU 刚体求解器。
+        """
+        self._require_solver()
+        return self._solver
+
+    def notify_gpu_advanced(self) -> None:
+        """标记 host 已过期：GPU 已由 Euler 内部耦合步进推进。
+
+        做什么：清 dirty、标 stale。不做 flush。
+        为什么：耦合环里禁止 flush，否则会盖掉 GPU 上的 xfrc。
+        """
+        self._host_dirty = False
+        self._host_stale = True
+
+    @property
     def mj_model(self):
         """返回 host MjModel（只读，供 SimConfig/ModelRegistry 绑定）。"""
         self._require_solver()
@@ -276,6 +294,7 @@ class MuJoCoSimCoreEuler:
         nworld: int = 1,
         timestep: float | None = None,
         opt_overrides: dict[str, Any] | None = None,
+        graph_capture: bool = True,
     ) -> None:
         if nworld != 1:
             raise NotImplementedError(
@@ -296,8 +315,13 @@ class MuJoCoSimCoreEuler:
         # 数值发散（qpos 出现 NaN）。
         njmax = max(model.njmax, 2000)
         nconmax = max(model.nconmax, 500)
+        # 外层耦合窗图打开时必须关刚体内层图，CUDA 不允许图套图。
         self._solver = euler.SolverMujocoSingleWorld(
-            source=model, device=device, nconmax=nconmax, njmax=njmax
+            source=model,
+            device=device,
+            nconmax=nconmax,
+            njmax=njmax,
+            graph_capture=graph_capture,
         )
         self._nworld = nworld
         self._host_dirty = False
@@ -322,6 +346,34 @@ class MuJoCoSimCoreEuler:
         self._solver.reset()       # GPU reset + host 重置
         self._host_dirty = False
         self._host_stale = False
+
+    def query_dual_engine_state(self) -> dict[str, np.ndarray]:
+        """把刚体 kinematics 一次 D2H 成 NumPy 快照（诊断用）。
+
+        生产耦合禁止走这条：位姿在 ``CouplingOrchestrator`` 里 GPU 直拷。
+        隔离单测若仍构造旧 ``EulerSoftSim``，可自行组同样的 dict。
+
+        Returns:
+            dict 含键（均为 numpy 拷贝）：
+                - ``xpos``: (nbody, 3) body 原点世界坐标。
+                - ``xquat``: (nbody, 4) body 四元数 [w, x, y, z]。
+                - ``xmat``: (nbody, 9) body 旋转矩阵（行优先扁平）。
+                - ``cvel``: (nbody, 6) 空间速度 [ang(3), lin(3)]，
+                  subtree COM 参考、世界系。
+                - ``xipos``: (nbody, 3) body COM 世界坐标。
+                - ``subtree_com``: (nbody, 3) subtree COM 世界坐标。
+        """
+        self._require_solver()
+        self._ensure_host_fresh()
+        host = self._solver.host
+        return {
+            "xpos": np.array(host.xpos),
+            "xquat": np.array(host.xquat),
+            "xmat": np.array(host.xmat),
+            "cvel": np.array(host.cvel),
+            "xipos": np.array(host.xipos),
+            "subtree_com": np.array(host.subtree_com),
+        }
 
     def step(self, nstep: int) -> None:
         self._require_solver()
@@ -396,6 +448,10 @@ class MuJoCoSimCoreEuler:
         host = self._solver.host
         for body_name, pose in mocap_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            # mj_name2id 返回 -1 时 body_mocapid[-1] 取末位 body 的 mocapid，
+            # 可能静默错写其 mocap 槽位，故防御（同 _joint_id 模式）
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             mocap_id = int(model.body_mocapid[body_id])
             if mocap_id >= 0:
                 host.mocap_pos[mocap_id] = np.asarray(
@@ -772,14 +828,47 @@ class MuJoCoSimCoreEuler:
             result[site_name] = {"jacp": jacp, "jacr": jacr}
         return result
 
+    def mj_fullM(self) -> np.ndarray:
+        """在 host mjData 上计算完整质量矩阵 (nv, nv)，供 OSC 使用。"""
+        self._require_solver()
+        self._ensure_host_fresh()
+        model = self._solver.mj_model
+        data = self._solver.host
+        mass_matrix = np.ndarray(
+            shape=(model.nv, model.nv), dtype=np.float64, order="C"
+        )
+        if hasattr(data, "qM"):
+            mujoco.mj_fullM(model, mass_matrix, data.qM)
+        else:
+            mujoco.mj_fullM(model, data, mass_matrix)
+        return np.reshape(mass_matrix, (model.nv, model.nv))
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组关闭伺服：写 host mj_model.opt.disableactuator。
+
+        与 CPU 路径相同的位标志。GPU 求解器读同一份 host 模型 opt；
+        无独立 ModelChangedFlags 项，不调用 notify_model_changed。
+        """
+        self._require_solver()
+        model = self._solver.mj_model
+        for actuator_group in actuator_groups:
+            model.opt.disableactuator |= 1 << int(actuator_group)
+
     # ---- F 类：模型参数写入方法（P2 真实实现：写 host + notify）----
 
     def set_geom_friction(self, geom_friction_dict: dict[str, np.ndarray]) -> None:
-        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。"""
+        """设置 geom 摩擦系数（写 host mj_model.geom_friction，H2D 同步）。
+
+        Raises:
+            ValueError: geom 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                geom_friction[-1] 会静默改写末位 geom 的摩擦系数。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for geom_name, friction in geom_friction_dict.items():
             geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            if geom_id < 0:
+                raise ValueError(f"geom not found in model: {geom_name!r}")
             model.geom_friction[geom_id] = np.asarray(
                 friction, dtype=np.float64
             ).reshape(3)
@@ -787,14 +876,23 @@ class MuJoCoSimCoreEuler:
         self._solver.notify_model_changed(_model_changed_flags().GEOM_FRICTION)
 
     def add_extra_weight(self, weight_load_dict: dict) -> None:
-        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。"""
+        """为 body 添加额外重量（改 host mj_model.body_mass，全量 set_const 重算）。
+
+        Raises:
+            ValueError: body 名不存在于当前模型。mj_name2id 返回 -1 时若放行，
+                body_mass[-1] 会静默累加到末位 body（如 ActorManipulator 锚点
+                等 mocap 体），目标 body 质量与动力学均不变。
+        """
         self._require_solver()
         model = self._solver.mj_model
         for body_name, weight in weight_load_dict.items():
             body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            if body_id < 0:
+                raise ValueError(f"body not found in model: {body_name!r}")
             model.body_mass[body_id] += float(weight)
         # body_mass 影响 subtreemass/invweight0，走全量 set_const（BODY_INERTIAL）
-        self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
+        if weight_load_dict:
+            self._solver.notify_model_changed(_model_changed_flags().BODY_INERTIAL)
 
     def update_equality_constraints(self, eq_list: list[dict]) -> None:
         """更新等式约束（写 host mj_model.eq_*，set_const_0 重算 eq_data）。"""

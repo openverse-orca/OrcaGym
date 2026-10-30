@@ -117,6 +117,7 @@ class TestOrcaGymEulerSkeleton(unittest.TestCase):
             "mj_step", "mj_forward", "set_ctrl", "sync_to_view",
             "studio_bridge", "render", "pause_simulation",
             "has_euler", "step_with_coupling",
+            "set_coupling_ratio", "get_coupling_ratio",
         ]
         for name in expected_public:
             with self.subTest(attr=name):
@@ -470,15 +471,15 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
         self.assertIn("env.data", msg)
 
     def test_blocked_attrs_frozenset_complete(self):
-        """_BLOCKED_ATTRS 是 frozenset 且包含全部 32 个拦截名（K3/K5 + Euler 后端 + 多世界边界标记）。"""
+        """_BLOCKED_ATTRS 是 frozenset 且包含全部 36 个拦截名（K3/K5 + Euler 后端 + 多世界边界标记 + P5 柔体槽 + 流体槽）。"""
         self.assertIsInstance(OrcaGymEuler._BLOCKED_ATTRS, frozenset)
         expected_blocked = {
             # L3 引擎内部 (8)
             "_mjData", "_mjModel", "mj_data", "mj_model",
             "_mj_data", "_mj_model", "mjData", "mjModel",
-            # K5 子组件 (12 = 6 带下划线 + 6 不带)
-            "_sim", "_studio", "_registry", "_opt", "_view", "_euler",
-            "sim", "studio", "registry", "opt", "view", "euler",
+            # K5 子组件 (14 = 7 带下划线 + 7 不带)
+            "_sim", "_studio", "_registry", "_opt", "_view", "_euler", "_fluid",
+            "sim", "studio", "registry", "opt", "view", "euler", "fluid",
             # Euler 后端 GPU 对象 (10)
             "_mjf_model", "_mjf_data", "mjf_model", "mjf_data",
             "_host_cache", "host_cache",
@@ -486,6 +487,8 @@ class TestOrcaGymEulerViolationPatterns(unittest.TestCase):
             "_coupling", "coupling",
             # 多世界 DataView 边界标记（决策 D5）
             "_multi_world", "multi_world",
+            # 旧 _soft 名字仍拦截，防止误用（槽已删除）
+            "_soft", "soft",
         }
         self.assertEqual(OrcaGymEuler._BLOCKED_ATTRS, expected_blocked)
 

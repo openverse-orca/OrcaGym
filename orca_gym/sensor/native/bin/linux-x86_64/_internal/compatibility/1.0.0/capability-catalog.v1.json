@@ -1,0 +1,264 @@
+{
+  "catalog_version": 1,
+  "description": "Versioned, backend-independent sensor input capabilities. These string IDs and result semantics are SDK data, not native Host enums. A new capability requires a reviewed catalog definition plus a backend implementation; declaring a name alone does not produce data. Used definitions participate in schema-3 contract fingerprints.",
+  "object_kinds": {
+    "surface": {
+      "description": "One logical sensing surface. A backend model binding may realize it as one or more collision shapes belonging to a rigid body. The contract does not name backend body/geom APIs."
+    },
+    "frame": {
+      "description": "One named coordinate frame in the sensor model; its realization belongs to the model/backend binding."
+    },
+    "range": {
+      "description": "One scalar range channel. A nonnegative evaluated value is an SI distance; a negative value is an opaque no-hit marker, not a distance. The backend preserves its evaluated marker without normalization."
+    }
+  },
+  "capabilities": {
+    "orca.contact.v1": {
+      "kind": "records",
+      "object_kinds": [
+        "surface"
+      ],
+      "objects": "ordered_list",
+      "frame": "world_or_declared_frame",
+      "sampling": "physics_source_state",
+      "options": {
+        "frame": {
+          "default": "world"
+        },
+        "exclude_internal": {
+          "default": true
+        }
+      },
+      "description": "One aligned record per contact touching exactly one selected surface, or both recipients when internal contacts are explicitly included. Forces act ON the recipient bound surface. Surface index is zero-based in the input's ordered objects list. Each instance receives its own force sign; opposing identity is rigid-body identity, not shape identity.",
+      "no_hit": "Zero records. Capacity overflow is an error, never silent truncation.",
+      "results": [
+        {
+          "name": "surface_index",
+          "dtype": "u32",
+          "shape": [],
+          "unit": "1",
+          "description": "Zero-based index of the receiving surface in the ordered objects list."
+        },
+        {
+          "name": "counterpart_rigid_body_id",
+          "dtype": "u64",
+          "shape": [],
+          "unit": "1",
+          "description": "Opaque opposing rigid-body ID, stable for the loaded model; never a geometry ID."
+        },
+        {
+          "name": "position",
+          "dtype": "f64",
+          "shape": [
+            3
+          ],
+          "unit": "m",
+          "frame": "requested_frame",
+          "description": "Contact position relative to the requested frame origin."
+        },
+        {
+          "name": "normal_force",
+          "dtype": "f64",
+          "shape": [
+            3
+          ],
+          "unit": "N",
+          "frame": "requested_frame",
+          "description": "Normal force vector acting on the receiving surface, not its norm."
+        },
+        {
+          "name": "tangential_force",
+          "dtype": "f64",
+          "shape": [
+            3
+          ],
+          "unit": "N",
+          "frame": "requested_frame",
+          "description": "Tangential force vector acting on the receiving surface, not its norm."
+        }
+      ],
+      "layout_order": "Projected result fields follow this results-list order; vendor aliases of the same result are sorted by name. JSON mapping key order does not affect memory layout."
+    },
+    "orca.raycast.v1": {
+      "kind": "value",
+      "object_kinds": [
+        "frame"
+      ],
+      "objects": "frame",
+      "sampling": "physics_source_state",
+      "frame": "declared_local_frame",
+      "options": {
+        "direction": {
+          "description": "Required finite nonzero 3-vector in the declared frame; the backend normalizes it."
+        },
+        "max_distance": {
+          "description": "Required finite positive maximum distance in metres."
+        },
+        "exclude_self": {
+          "default": true,
+          "description": "Exclude all geoms belonging to this sensor model instance, including unqueried housing and sibling bodies; not a single body or welded group."
+        }
+      },
+      "description": "Orca-computed ray from the named frame origin along its local direction. Returns distance to the nearest eligible collision-geometry surface, including static geometry, in [0, max_distance]. Visual-only geometry is not a target. No native sensor definition or sensor data slot is required.",
+      "no_hit": "Exactly -1 when no eligible surface is hit within max_distance. Nonfinite input or backend results are errors.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [],
+          "unit": "m"
+        }
+      ]
+    },
+    "orca.range.v1": {
+      "kind": "value",
+      "object_kinds": [
+        "range"
+      ],
+      "objects": "single",
+      "sampling": "physics_source_state",
+      "frame": "bound_range_ray",
+      "description": "Evaluated ray distance along the bound range channel. No backend-native sensor struct crosses the provider ABI.",
+      "no_hit": "Any finite negative value denotes no hit and is not interpreted as a distance. Its exact numeric value is unspecified and preserved from the backend; no normalization is performed. Nonfinite values are invalid.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [],
+          "unit": "m"
+        }
+      ]
+    },
+    "orca.frame.parent_rotation.v1": {
+      "kind": "value",
+      "object_kinds": [
+        "surface",
+        "frame"
+      ],
+      "objects": "single",
+      "sampling": "on_bind",
+      "frame": "parent",
+      "description": "Immutable rest/model-local rotation of the bound object relative to its immediate parent frame. Row-major 3x3 matrix maps local vectors to parent coordinates. It is not the current world orientation or a dynamically evaluated joint rotation; a backend without this model attribute rejects the capability.",
+      "no_hit": "Not applicable. Missing object or unavailable rest orientation fails preparation.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [
+            3,
+            3
+          ],
+          "unit": "1"
+        }
+      ]
+    },
+    "orca.sample.time.v1": {
+      "kind": "value",
+      "object_kinds": [],
+      "objects": "none",
+      "sampling": "physics_source_state",
+      "frame": "none",
+      "description": "Time of the physics source state represented by this input, not an already integrated simulator time.",
+      "no_hit": "Not applicable; no dynamic sample is available before the first physics substep after prepare/reset.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [],
+          "unit": "s"
+        }
+      ]
+    },
+    "orca.sample.dt.v1": {
+      "kind": "value",
+      "object_kinds": [],
+      "objects": "none",
+      "sampling": "physics_source_state",
+      "frame": "none",
+      "description": "Positive duration of one physics substep, not the logical environment step duration.",
+      "no_hit": "Not applicable; no dynamic sample is available before the first physics substep after prepare/reset.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [],
+          "unit": "s"
+        }
+      ]
+    },
+    "orca.sample.index.v1": {
+      "kind": "value",
+      "object_kinds": [],
+      "objects": "none",
+      "sampling": "physics_source_state",
+      "frame": "none",
+      "description": "Zero-based physics substep number since reset; one input sample per physics substep.",
+      "no_hit": "Not applicable; no dynamic sample is available before the first physics substep after prepare/reset.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "u64",
+          "shape": [],
+          "unit": "1"
+        }
+      ]
+    },
+    "orca.contact_grid.v1": {
+      "kind": "value",
+      "object_kinds": [],
+      "objects": "bound_site",
+      "sampling": "physics_source_state",
+      "frame": "scene_bound_site",
+      "options": {
+        "resolution": {
+          "description": "Required [rows, cols], each an integer in 1..256. Result shape is [rows, cols, 3]; ordinary total input ABI byte limits also apply."
+        },
+        "fov_degrees": {
+          "description": "Required [horizontal, vertical] full angular fields of view in degrees, each finite and in (0, 180]."
+        }
+      },
+      "description": "Orca-computed ideal force grid at the scene-bound site, not a calibrated sensor reading. Eligible contacts touch exactly one side of the site's rigid weld group; contacts internal to that entire group are excluded. The group is a contact candidate set, not a sensor asset boundary. Transform contact positions and total forces acting ON that group (normal plus tangential) into site coordinates. Accept only positions with z > 0 within the angular field of view. Sum the signed Fx, Fy, Fz components in each angular cell without normalization, pressure conversion, response, calibration or filtering.",
+      "projection": "For site-local contact position (x,y,z), horizontal angle = atan2(x,z); vertical angle = atan2(y,hypot(x,z)). Uniform angular bins span [-horizontal_fov/2,+horizontal_fov/2] and [-vertical_fov/2,+vertical_fov/2]. Both bounds are inclusive; exact boundary hits clamp to the first or last cell. Rows increase with vertical angle (+Y), columns increase with horizontal angle (+X); +Z is forward. Row-major value[rows][cols][3] stores Fx,Fy,Fz.",
+      "no_hit": "A fixed all-zero grid when there are no eligible contacts. Nonfinite input or backend results are errors.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [
+            "rows",
+            "cols",
+            3
+          ],
+          "unit": "N",
+          "frame": "scene_bound_site",
+          "description": "Fixed shape derived from resolution. Three signed total-force components per cell, before vendor sensor response."
+        }
+      ]
+    },
+    "orca.site_raycast.v1": {
+      "kind": "value",
+      "object_kinds": [],
+      "objects": "bound_site",
+      "sampling": "physics_source_state",
+      "frame": "scene_bound_site",
+      "options": {
+        "direction": {
+          "description": "Required finite nonzero 3-vector in the scene-bound site's local frame; the backend normalizes it. [0,0,1] is the site's +Z direction."
+        },
+        "max_distance": {
+          "description": "Required finite positive maximum distance in metres."
+        }
+      },
+      "description": "Orca-computed ray from the scene-bound site origin along its normalized local direction. Returns the nearest eligible collision-geometry surface distance in [0,max_distance], including static geometry. Visual-only geometry is not a target. All geoms of the site's rigid weld group are always excluded. This fixed exclusion is not the model-instance exclude_self policy of orca.raycast.v1; no exclusion option or model-local frame reference is accepted.",
+      "no_hit": "Exactly -1 when no eligible surface is hit within max_distance. Nonfinite input or backend results are errors.",
+      "results": [
+        {
+          "name": "value",
+          "dtype": "f64",
+          "shape": [],
+          "unit": "m"
+        }
+      ]
+    }
+  }
+}

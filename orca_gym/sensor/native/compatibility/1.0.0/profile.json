@@ -1,0 +1,8 @@
+{
+  "sdk_version": "1.0.0",
+  "abi_version": 2,
+  "contract_compiler": "abi2-v1",
+  "model_resolver": "xml-v1",
+  "catalog": "capability-catalog.v1.json",
+  "catalog_sha256": "196162610e2364c5fdbf463aa3315a11b863873297c2e81ddb87fa7f413fde51"
+}

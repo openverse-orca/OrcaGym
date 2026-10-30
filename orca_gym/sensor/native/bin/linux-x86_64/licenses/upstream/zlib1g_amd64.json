@@ -1,0 +1,14 @@
+{
+  "name": "zlib1g:amd64",
+  "notices": [
+    {
+      "file": "zlib/README.txt",
+      "sha256": "7960b6b1cc63e619abb77acaea5427159605afee8c8b362664f4effc7d7f7d15",
+      "source_url": "https://raw.githubusercontent.com/madler/zlib/v1.2.11/README"
+    }
+  ],
+  "upstream_license": "Zlib",
+  "upstream_name": "zlib",
+  "upstream_version": "1.2.11",
+  "version": "1:1.2.11.dfsg-2ubuntu9.2"
+}

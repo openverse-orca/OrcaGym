@@ -4,6 +4,10 @@
 
 set -e
 
+# Published universal wheels must include the complete optional Linux Runtime,
+# even if the shell inherited a developer-only lightweight build override.
+export ORCA_SENSOR_BUNDLE_NATIVE=1
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
@@ -55,4 +59,3 @@ ls -lh dist/ || true
 echo ""
 echo "Generated files for TestPyPI (dist-test/):"
 ls -lh "$TEST_OUTDIR" || true
-

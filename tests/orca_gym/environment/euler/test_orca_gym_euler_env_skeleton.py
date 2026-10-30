@@ -654,8 +654,10 @@ class TestEnvQueryDelegationArchCompliance(unittest.TestCase):
             "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
             "jnt_qposadr", "jnt_dofadr",
             "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
-            "query_site_pos_and_mat", "query_site_size",
+            "query_body_xpos_xmat_xquat",
+            "query_site_pos_and_mat", "query_site_pos_and_quat", "query_site_size",
             "query_sensor_data", "query_actuator_torques",
+            "mj_fullM", "disable_actuator", "set_sync_render", "has_euler",
             "query_contact_simple", "query_contact_force",
             "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
         ]
@@ -693,8 +695,10 @@ class TestEnvQueryDelegationArchCompliance(unittest.TestCase):
             "query_joint_offsets", "query_joint_lengths", "query_joint_dofadrs",
             "jnt_qposadr", "jnt_dofadr",
             "get_body_xpos_xmat_xquat", "get_body_xpos_xmat_xquat_xvel",
-            "query_site_pos_and_mat", "query_site_size",
+            "query_body_xpos_xmat_xquat",
+            "query_site_pos_and_mat", "query_site_pos_and_quat", "query_site_size",
             "query_sensor_data", "query_actuator_torques",
+            "mj_fullM", "disable_actuator", "has_euler",
             "query_contact_simple", "query_contact_force",
             "get_cfrc_ext", "get_goal_bounding_box", "body_subtree_mass",
         ]
@@ -726,14 +730,44 @@ class TestEnvQueryDelegationFunctional(unittest.TestCase):
         expected = env.data.qpos[0]
         np.testing.assert_array_equal(result["hinge"], np.array([expected]))
 
-    def test_env_get_body_xpos_xmat_xquat_returns_dict(self):
-        """get_body_xpos_xmat_xquat 返回 dict[body -> {xpos/xmat/xquat}]，形状正确。"""
+    def test_env_query_site_pos_and_quat_world(self):
+        """query_site_pos_and_quat 返回 xpos/xquat，形状正确。"""
         env = _make_skeleton_env()
         env.mj_forward()
-        result = env.get_body_xpos_xmat_xquat(["pendulum"])
+        result = env.query_site_pos_and_quat(["tip"])
+        self.assertIn("tip", result)
+        self.assertEqual(result["tip"]["xpos"].shape, (3,))
+        self.assertEqual(result["tip"]["xquat"].shape, (4,))
+
+    def test_env_mj_fullM_shape(self):
+        """mj_fullM 返回 (nv, nv) 质量矩阵。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        mass_matrix = env.mj_fullM()
+        self.assertEqual(mass_matrix.shape, (env.model.nv, env.model.nv))
+
+    def test_env_disable_actuator_and_has_euler(self):
+        """disable_actuator 可调用；纯刚体 pendulum 的 has_euler 为 False。"""
+        env = _make_skeleton_env()
+        env.disable_actuator([0])
+        self.assertFalse(env.has_euler())
+
+    def test_env_get_body_xpos_xmat_xquat_returns_tuple(self):
+        """get_body_xpos_xmat_xquat 返回 (xpos, xmat, xquat) 扁平数组，与 CPU 解包一致。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        xpos, xmat, xquat = env.get_body_xpos_xmat_xquat(["pendulum"])
+        self.assertEqual(xpos.shape, (3,))
+        self.assertEqual(xmat.shape, (9,))
+        self.assertEqual(xquat.shape, (4,))
+
+    def test_env_query_body_xpos_xmat_xquat_returns_dict(self):
+        """query_body_xpos_xmat_xquat 返回 dict[body -> {xpos/xmat/xquat}]，形状正确。"""
+        env = _make_skeleton_env()
+        env.mj_forward()
+        result = env.query_body_xpos_xmat_xquat(["pendulum"])
         self.assertIsInstance(result, dict)
         self.assertIn("pendulum", result)
-        # xpos 形状 (3,)，xmat 形状 (3,3) 或 (9,)，xquat 形状 (4,)
         self.assertEqual(result["pendulum"]["xpos"].shape, (3,))
         self.assertEqual(result["pendulum"]["xquat"].shape, (4,))
 
@@ -777,11 +811,15 @@ class TestEnvQueryDelegationFunctional(unittest.TestCase):
         env_qpos = env.query_joint_qpos(["hinge"])
         gym_qpos = env._gym.query_joint_qpos(["hinge"])
         np.testing.assert_array_equal(env_qpos["hinge"], gym_qpos["hinge"])
-        # body xpos
-        env_body = env.get_body_xpos_xmat_xquat(["pendulum"])
+        # body xpos：get_ 扁平三元组与 gym 字典查询一致
+        env_xpos, _, _ = env.get_body_xpos_xmat_xquat(["pendulum"])
         gym_body = env._gym.query_body_xpos_xmat_xquat(["pendulum"])
         np.testing.assert_array_equal(
-            env_body["pendulum"]["xpos"], gym_body["pendulum"]["xpos"]
+            env_xpos, np.asarray(gym_body["pendulum"]["xpos"]).reshape(-1)
+        )
+        env_body_dict = env.query_body_xpos_xmat_xquat(["pendulum"])
+        np.testing.assert_array_equal(
+            env_body_dict["pendulum"]["xpos"], gym_body["pendulum"]["xpos"]
         )
         # body subtree mass
         env_mass = env.body_subtree_mass("pendulum")
@@ -1825,7 +1863,7 @@ class TestEnvAnchorActorFunctional(unittest.TestCase):
 
     def test_anchor_actor_sets_mocap_to_actor_pose(self):
         """锚定后 mocap 位姿 = actor 初始位姿。"""
-        actor_pose_before = self.env.get_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
+        actor_pose_before = self.env.query_body_xpos_xmat_xquat(["pelvis"])["pelvis"]
         self.env._anchor_actor("pelvis", "weld")
         # 查询 mocap body 当前的 pos/quat（通过 DataView 零拷贝视图）
         mocap_names = self.env._gym.mocap_body_names()
@@ -2127,41 +2165,91 @@ class TestEnvDoBodyManipulationFunctional(unittest.TestCase):
 class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
     """Phase H: OrcaGymEulerEnv esdf_path 透传 + reset_simulation 调用 reset_coupling_state。"""
 
-    def test_esdf_path_stored_and_passed_to_init_simulation(self):
-        """构造时 esdf_path 存入 _esdf_path 并透传给 gym.init_simulation。"""
+    def test_cpu_plus_esdf_raises_before_init(self):
+        """CPU + ESDF 立刻报错，且不会进入 gym.init_simulation。"""
         from unittest import mock
 
-        original_init = OrcaGymEuler.init_simulation
-        captured: dict = {}
-
-        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
-            captured["model_xml_path"] = model_xml_path
-            captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
-
-        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
-            env = _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
-
-        self.assertEqual(env._esdf_path, "/tmp/dummy.esdf")
-        self.assertEqual(captured["esdf_path"], "/tmp/dummy.esdf")
-        self.assertTrue(captured["model_xml_path"].endswith("simple_pendulum.xml"))
+        with mock.patch.object(OrcaGymEuler, "init_simulation") as m:
+            with self.assertRaises(ValueError) as ctx:
+                _make_skeleton_env(esdf_path="/tmp/dummy.esdf")
+        m.assert_not_called()
+        self.assertIn("GPU", str(ctx.exception))
 
     def test_esdf_path_none_by_default(self):
-        """默认 esdf_path=None，透传 None（CPU 分支不回归）。"""
+        """默认 esdf_path=None，透传 None（CPU 纯刚体不回归）。"""
         from unittest import mock
 
         original_init = OrcaGymEuler.init_simulation
         captured: dict = {}
 
-        async def spy_init(self_, model_xml_path, esdf_path=None, opt_overrides=None):
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None, fluid_render_target=None,
+        ):
             captured["esdf_path"] = esdf_path
-            return await original_init(self_, model_xml_path, esdf_path, opt_overrides)
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target, fluid_render_target,
+            )
 
         with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
             env = _make_skeleton_env()
 
         self.assertIsNone(env._esdf_path)
         self.assertIsNone(captured["esdf_path"])
+
+    def test_fluid_render_target_passthrough(self):
+        """fluid_render_target 三层透传：Env 构造 → init_simulation 收到。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None, fluid_render_target=None,
+        ):
+            captured["fluid_render_target"] = fluid_render_target
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target, fluid_render_target,
+            )
+
+        _pendulum_xml = (
+            pathlib.Path(__file__).resolve().parents[0]
+            / "fixtures" / "simple_pendulum.xml"
+        )
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env = OrcaGymEulerEnv(
+                frame_skip=4,
+                orcagym_addr="localhost:50051",
+                agent_names=["agent0"],
+                time_step=0.002,
+                model_xml_path=str(_pendulum_xml),
+                skip_grpc_load=True,
+                fluid_render_target="127.0.0.1:50452",
+            )
+
+        # 透传断言：init_simulation 收到 Env 构造传入的流体渲染目标。
+        self.assertEqual(captured["fluid_render_target"], "127.0.0.1:50452")
+        # 字段驻留：Env 持有 _fluid_render_target（K1 下划线命名）。
+        self.assertEqual(env._fluid_render_target, "127.0.0.1:50452")
+        # 默认 None：不传参数时零行为差异（向后兼容）。
+        with mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            env_default = _make_skeleton_env()
+        self.assertIsNone(env_default._fluid_render_target)
+        self.assertIsNone(captured["fluid_render_target"])
+
+    def test_require_gpu_for_esdf_helper(self):
+        """有 ESDF 必须 GPU；无 ESDF 的 CPU 放行。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _require_gpu_for_esdf,
+        )
+
+        _require_gpu_for_esdf("cpu", None)
+        _require_gpu_for_esdf("cuda:0", "/tmp/a.esdf")
+        with self.assertRaises(ValueError):
+            _require_gpu_for_esdf("cpu", "/tmp/a.esdf")
 
     def test_reset_simulation_calls_reset_coupling_state(self):
         """reset_simulation 在 reset_data 后调用 gym.reset_coupling_state。"""
@@ -2171,6 +2259,171 @@ class TestEnvEsdfPathAndResetCoupling(unittest.TestCase):
         with mock.patch.object(OrcaGymEuler, "reset_coupling_state") as m:
             env.reset_simulation()
         m.assert_called_once_with()
+
+
+class TestEsdfAutoDiscovery(unittest.TestCase):
+    """方案 A 同名推导：esdf_path="auto" 从 Studio 导出 XML 推导 ESDF。
+
+    纯函数（_discover_esdf_from_xml）+ Env 集成（auto 哨兵解析与降级）。
+    """
+
+    # --- 纯函数：目录扫描 ---
+
+    def test_discover_unique_match(self):
+        """唯一命中：<root>/<proj>/tmp/<uuid>.esdf 直接返回。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            esdf = pathlib.Path(root) / "proj_a" / "tmp" / "abc123.esdf"
+            esdf.parent.mkdir(parents=True)
+            esdf.touch()
+            result = _discover_esdf_from_xml(
+                "/anywhere/abc123.xml", studio_data_root=root
+            )
+            self.assertEqual(result, str(esdf))
+
+    def test_discover_multiple_match_latest_mtime(self):
+        """多项目命中：取 mtime 最新（模拟残留旧导出）。"""
+        import os
+        import tempfile
+
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            old = pathlib.Path(root) / "proj_old" / "tmp" / "abc123.esdf"
+            new = pathlib.Path(root) / "proj_new" / "tmp" / "abc123.esdf"
+            for p in (old, new):
+                p.parent.mkdir(parents=True)
+                p.touch()
+            # new 的 mtime 晚 2 秒（mtime 分辨率兜底）。
+            st = new.stat()
+            os.utime(new, (st.st_atime, st.st_mtime + 2))
+            result = _discover_esdf_from_xml(
+                "/anywhere/abc123.xml", studio_data_root=root
+            )
+            self.assertEqual(result, str(new))
+
+    def test_discover_no_match_returns_none(self):
+        """无同名 .esdf：返回 None（调用方降级）。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            (pathlib.Path(root) / "proj_a" / "tmp").mkdir(parents=True)
+            result = _discover_esdf_from_xml(
+                "/anywhere/nonexistent.xml", studio_data_root=root
+            )
+            self.assertIsNone(result)
+
+    def test_discover_missing_root_returns_none(self):
+        """studio_data_root 不存在：返回 None。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        result = _discover_esdf_from_xml(
+            "/anywhere/abc123.xml",
+            studio_data_root="/nonexistent/root/for/test",
+        )
+        self.assertIsNone(result)
+
+    def test_discover_none_xml_returns_none(self):
+        """XML 路径为 None：返回 None。"""
+        from orca_gym.environment.euler.orca_gym_euler_env import (
+            _discover_esdf_from_xml,
+        )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as root:
+            self.assertIsNone(
+                _discover_esdf_from_xml(None, studio_data_root=root)
+            )
+
+    # --- Env 集成：auto 哨兵解析 ---
+
+    def test_auto_resolved_cpu_raises(self):
+        """esdf_path="auto" 推导成功但 device=cpu：立刻报错。"""
+        from unittest import mock
+
+        discovered = "/tmp/fake_studio/proj/tmp/abc123.esdf"
+        with mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value=discovered,
+        ), mock.patch.object(OrcaGymEuler, "init_simulation") as m:
+            with self.assertRaises(ValueError) as ctx:
+                _make_skeleton_env(esdf_path="auto")
+        m.assert_not_called()
+        self.assertIn("GPU", str(ctx.exception))
+
+    def test_auto_fallback_warns_and_degrades_to_none(self):
+        """esdf_path="auto" + 推导失败：RuntimeWarning + 降级 None（纯刚体）。"""
+        from unittest import mock
+
+        original_init = OrcaGymEuler.init_simulation
+        captured: dict = {}
+
+        async def spy_init(
+            self_, model_xml_path, esdf_path=None, opt_overrides=None,
+            euler_render_target=None, fluid_render_target=None,
+        ):
+            captured["esdf_path"] = esdf_path
+            return await original_init(
+                self_, model_xml_path, esdf_path, opt_overrides,
+                euler_render_target, fluid_render_target,
+            )
+
+        with mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value=None,
+        ), mock.patch.object(OrcaGymEuler, "init_simulation", spy_init):
+            with self.assertWarns(RuntimeWarning):
+                env = _make_skeleton_env(esdf_path="auto")
+
+        self.assertIsNone(env._esdf_path)
+        self.assertIsNone(captured["esdf_path"])
+
+    def test_explicit_path_skips_discovery_then_cpu_raises(self):
+        """esdf_path 为具体路径：不触发推导，CPU 仍因 ESDF 报错。"""
+        from unittest import mock
+
+        discover = mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value="/should/not/be/used.esdf",
+        )
+        with discover as m, mock.patch.object(
+            OrcaGymEuler, "init_simulation"
+        ) as init_m:
+            with self.assertRaises(ValueError):
+                _make_skeleton_env(esdf_path="/tmp/explicit.esdf")
+
+        m.assert_not_called()
+        init_m.assert_not_called()
+
+    def test_none_path_skips_discovery(self):
+        """esdf_path=None（默认）：不触发推导，行为零变化。"""
+        from unittest import mock
+
+        discover = mock.patch(
+            "orca_gym.environment.euler.orca_gym_euler_env"
+            "._discover_esdf_from_xml",
+            return_value="/should/not/be/used.esdf",
+        )
+        with discover as m:
+            env = _make_skeleton_env()
+
+        m.assert_not_called()
+        self.assertIsNone(env._esdf_path)
 
 
 class TestSimConfigOverrides(unittest.TestCase):

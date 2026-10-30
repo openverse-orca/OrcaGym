@@ -19,6 +19,8 @@ reset_simulation/init_qpos_qvel/set_time_step/pause_simulation/close）、
 """
 
 import asyncio
+import glob
+import os
 import time
 import warnings
 from concurrent.futures import Future
@@ -41,6 +43,82 @@ from orca_gym.utils.rotations import mat2quat
 from ..orca_gym_env_mixin import OrcaGymEnvMixin
 
 _logger = get_orca_logger()
+
+# Studio 用户数据根候选（对齐引擎 OrcaUtil::GetOrcaDataDirectory）。
+# 2607 实测：~/Orca/OrcaStudio/<project_id>/tmp/<uuid>.{xml,esdf}；
+# 2409 源码行为（QStandardPaths::AppDataLocation）留作第二候选。
+_DEFAULT_STUDIO_DATA_ROOTS = (
+    os.path.join("~", "Orca", "OrcaStudio"),
+    os.path.join("~", ".local", "share", "Orca", "OrcaStudio"),
+)
+
+
+def _require_gpu_for_esdf(device: str, esdf_path: str | None) -> None:
+    """有 ESDF 时必须用 GPU，CPU 立刻报错。
+
+    做什么：``esdf_path`` 不是 None 时，检查 ``device`` 是否以 ``cuda``
+    或 ``hip`` 开头；否则抛 ``ValueError``。没有 ESDF 时什么都不做。
+    为什么：全 GPU 耦合走 MuJoCoFlow + Euler 内部 ``CouplingOrchestrator``，
+    CPU ``mj_step`` 接不上这条路径。纯刚体（无 ESDF）仍可用 CPU。
+    """
+    if esdf_path is None:
+        return
+    text = str(device)
+    if not (text.startswith("cuda") or text.startswith("hip")):
+        raise ValueError(
+            "ESDF 刚柔耦合固定走 GPU 后端（cuda* 或 hip*），"
+            f"收到 device={device!r}。请传 --device cuda:0。"
+        )
+
+
+def _discover_esdf_from_xml(
+    model_xml_path: str | None,
+    studio_data_root: str | None = None,
+) -> str | None:
+    """从 Studio 自动导出的 XML 推导同名 ESDF 路径（方案 A 同名推导）。
+
+    引擎 MjGlobalSettingsComponent::CreateScene 自动导出 XML 与 ESDF 到
+    同目录同名（``<uuid>.xml`` / ``<uuid>.esdf``），目录为
+    ``<OrcaDataDirectory>/tmp/``（2607 实测 ``~/Orca/OrcaStudio/
+    <project_id>/tmp/``）。OrcaGym 在线拉取 XML 时保留了原文件名
+    （MjGrpcServerComponent::LoadLocalEnv 返回 m_localEnvTempXMLPath
+    的 uuid 文件名），故可由 XML 文件名推导同批导出的 ESDF
+    （单机场景，Studio 与 Gym 同机时有效）。
+
+    Args:
+        model_xml_path: 已解析的模型 XML 本地路径（文件名须为 Studio
+            导出的原名 ``<uuid>.xml``）。
+        studio_data_root: Studio 用户数据根目录；None 用默认候选列表
+            （测试可注入单根）。
+
+    Returns:
+        推导成功的 ESDF 绝对路径；无匹配返回 None（调用方降级）。
+    """
+    if not model_xml_path:
+        return None
+    stem = os.path.splitext(os.path.basename(model_xml_path))[0]
+    esdf_name = stem + ".esdf"
+    if studio_data_root is not None:
+        roots = [os.path.expanduser(studio_data_root)]
+    else:
+        roots = [os.path.expanduser(r) for r in _DEFAULT_STUDIO_DATA_ROOTS]
+    candidates: list[str] = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        candidates.extend(
+            glob.glob(
+                os.path.join(
+                    glob.escape(root), "*", "tmp", glob.escape(esdf_name)
+                )
+            )
+        )
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    # 多项目目录命中（uuid 碰撞或残留旧导出）：取最新修改时间。
+    return max(candidates, key=os.path.getmtime)
 
 
 class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
@@ -93,11 +171,16 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         *,
         model_xml_path: str | None = None,
         esdf_path: str | None = None,
+        euler_render_target: str | None = None,
+        fluid_render_target: str | None = None,
         skip_grpc_load: bool = False,
         render_mode: str = "human",
         sync_render: bool = False,
         device: str = "cpu",
         sim_config_overrides: dict[str, Any] | None = None,
+        coupling_m: int = 1,
+        coupling_n: int = 1,
+        cycle_graph: bool = False,
         **kwargs,
     ) -> None:
         """初始化 Euler 环境 Facade。
@@ -112,16 +195,43 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             agent_names: 环境中智能体名称列表。
             time_step: 仿真时间步长。
             model_xml_path: MuJoCo 模型 XML 文件路径（离线模式使用）。
-            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
+            esdf_path: ESDF 场文件路径。非 None 时走 Euler 内部
+                CoupledGpuSim（全 GPU 耦合）。必须配合 ``device=cuda*``
+                / ``hip*``，CPU 会立刻报错。支持哨兵值 "auto"：由
+                Studio 自动导出的 XML（同目录同名 ``<uuid>.esdf``，
+                位于 ``~/.local/share/Orca/OrcaStudio/<project_id>/tmp/``）
+                推导 ESDF 路径（单机场景；推导失败降级为 None 并告警，
+                不影响纯刚体仿真）。
+            euler_render_target: ESDF 柔体渲染流 gRPC 地址（P5 改动点 2，
+                如 "127.0.0.1:50451"）。仅 esdf_path 非 None 时生效：
+                init 时连接 RenderClient 并逐 body 注册可变形顶点通道，
+                render() 节拍内 skinning → 读槽 → 推流（30Hz 节流复用
+                本 Env 的 render 策略）。None（默认）不推流。连接失败
+                fail-fast（显式 opt-in 语义）。
+            fluid_render_target: ESDF 流体粒子渲染流 gRPC 地址（如
+                "127.0.0.1:50452"）。仅 esdf_path 含顶层
+                ``fluid.fluid_blocks`` 时生效：init 时由 CoupledGpuSim
+                内部挂 FluidPhase 并注册 particle7 通道；do_simulation
+                只调 euler.step，render() 节拍内由 CoupledGpuSim 推流
+                （30Hz）。None（默认）不推流。连接失败 fail-fast。
+                渲染参数由 Studio 侧 Euler Fluid Material 组件管理，本
+                参数只管数据链路。
             skip_grpc_load: 跳过 gRPC 加载（骨架测试/离线模式）。
             render_mode: 渲染模式（"human"/"none"）。
             sync_render: 是否同步渲染。
-            device: 后端选择（"cpu" → CPU MuJoCo；"cuda:0"/"hip:0" 等 → Euler.SolverMujoco GPU）。
+            device: 后端选择（"cpu" → 仅纯刚体 CPU MuJoCo；有 ESDF 时
+                必须 "cuda:0"/"hip:0" 等，否则立刻报错）。
             sim_config_overrides: 构造期 SimConfig opt 覆盖（Feature A），
                 合法键为 integrator/gravity/iterations（timestep 请用 time_step
                 构造参数，双通道冲突会被拒绝）。在后端固化前下发：Euler 分支
                 在求解器构造前写入 host model.opt；CPU 分支绑定后经公共
                 setter 写入立即生效。
+            coupling_m: 注入 Euler 的刚体步数 M（默认 1）。权威在
+                ``SyncCycleConfig``，Gym 不按此拆窗。
+            coupling_n: 注入 Euler 的柔体步数 N（默认 1）。第一版须 M=N。
+            cycle_graph: True 时与隔离课 ``--graph`` 对齐：刚体内层图关
+                掉，每次 ``reset`` 后把一个耦合窗录成外层 CUDA Graph。
+                默认 False，保持原来的联调节拍。
             **kwargs: 额外参数（保留兼容，当前未使用）。
         """
         # 1. 基础字段（Mixin 依赖 + Env 公共字段）
@@ -134,6 +244,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._skip_grpc_load = skip_grpc_load
         self._local_xml_path = model_xml_path
         self._esdf_path = esdf_path
+        self._euler_render_target = euler_render_target
+        self._fluid_render_target = fluid_render_target
         self._device = device
         # 用户边界校验：非法键（含 timestep）尽早失败
         validate_opt_overrides(sim_config_overrides)
@@ -146,6 +258,9 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         # 此时 SimConfig 未绑定 mjModel，缓存到 _time_step，
         # 在 initialize_simulation 末尾重新设置。
         self._time_step = time_step
+        self._coupling_m = coupling_m
+        self._coupling_n = coupling_n
+        self._cycle_graph = bool(cycle_graph)
         # 渲染节流字段（render_mode="human" 在线渲染时使用）
         self._render_count = 0.0
         self._render_count_interval = 0.0
@@ -209,6 +324,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             self._channel = None
             self._stub = None
             self._gym = OrcaGymEuler(stub=None)
+            self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
+            self._gym.set_capture_cycle_graph(self._cycle_graph)
             self._studio_bridge = self._gym.studio_bridge()   # 取一次引用
             if self._local_xml_path:
                 self._studio_bridge.configure_offline(self._local_xml_path)
@@ -224,6 +341,8 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         )
         self._stub = GrpcServiceStub(self._channel)
         self._gym = OrcaGymEuler(stub=self._stub)
+        self._gym.set_coupling_ratio(self._coupling_m, self._coupling_n)
+        self._gym.set_capture_cycle_graph(self._cycle_graph)
         self._studio_bridge = self._gym.studio_bridge()
         self._debug_draw = DebugDraw(stub=self._stub)
 
@@ -250,13 +369,35 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             model_xml_path = self._local_xml_path
         else:
             model_xml_path = self.loop.run_until_complete(self._gym.load_model_xml())
+        # 1.5 ESDF 自动发现（esdf_path="auto"）：由 Studio 自动导出的
+        #     XML 同名推导 ESDF（单机）；失败降级为 None（纯刚体行为，
+        #     不破坏既有流程）。仅 "auto" 哨兵触发，None/具体路径零变化。
+        if self._esdf_path == "auto":
+            resolved = _discover_esdf_from_xml(model_xml_path)
+            if resolved is None:
+                warnings.warn(
+                    "esdf_path='auto' 未能推导 ESDF（无与 XML 同名的 "
+                    ".esdf 于 ~/.local/share/Orca/OrcaStudio/*/tmp/），"
+                    "降级为纯刚体仿真。请确认 Studio 已开启『导出XML』"
+                    "且场景含可变形体/流体块，或显式传入 esdf_path。",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._esdf_path = None
+            else:
+                self._esdf_path = resolved
+        _require_gpu_for_esdf(self._device, self._esdf_path)
         # 2. 初始化仿真（Feature A：构造期 opt 覆盖随 init 下发，
-        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异）
+        #    在后端固化前写入；不传时 opt_overrides=None，零行为差异。
+        #    有 ESDF 时透传 euler_render_target → CoupledGpuSim 柔体渲染流；
+        #    ESDF 含流体块时透传 fluid_render_target → CoupledGpuSim 流体渲染流）
         self.loop.run_until_complete(
             self._gym.init_simulation(
                 model_xml_path,
                 esdf_path=self._esdf_path,
                 opt_overrides=self._opt_overrides,
+                euler_render_target=self._euler_render_target,
+                fluid_render_target=self._fluid_render_target,
             )
         )
         # 3. 应用缓存的 time_step：
@@ -298,27 +439,6 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._gym.reset_data()
         self._gym.reset_coupling_state()
         self._gym.sync_to_view()
-        try:
-            body_names = self._gym.model.get_body_names()
-            _legacy_anchor = "ActorManipulator_Anchor"
-            if self._anchor_mocap_name not in body_names and _legacy_anchor in body_names:
-                self._anchor_mocap_name = _legacy_anchor
-                warnings.warn(
-                    f"Using legacy anchor mocap body name '{_legacy_anchor}'. "
-                    f"Please upgrade the level to use the new UUID-based name "
-                    f"'ORCA_MANIPULATOR_<uuid>_Anchor' to avoid name conflicts with user-imported XML.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-        except Exception as e:
-            _logger.warning(f"Failed to resolve anchor mocap body name: {e}")
-        # AR-001：关闭 ActorManipulator 拖拽代理碰撞掩码（init_simulation 已执行，
-        # 此处经公共方法再断言一次，覆盖新/旧 Anchor 命名，保证代理不参与物理碰撞）。
-        try:
-            n = self._gym.disable_actor_manipulator_collision()
-            _logger.info(f"ActorManipulator collision disabled on {n} geom(s).")
-        except Exception as e:
-            _logger.warning(f"failed to disable ActorManipulator collision: {e}")
 
     def init_qpos_qvel(self) -> None:
         """保存初始 qpos/qvel。"""
@@ -386,14 +506,22 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
     # --- 仿真控制（K4/K8: 全部委托 self._gym 公共方法，不触私有）---
 
     def do_simulation(self, ctrl: np.ndarray, n_frames: int) -> None:
-        """标准仿真步进（含 Euler 耦合，骨架阶段等价于纯 MuJoCo）。
+        """标准仿真步进。委托 ``step_with_coupling``。
 
         K4 合规: 只走 Gym 公共方法，不触 _gym._sim/_euler 等私有。
         K8 合规: 不写 if self._gym._euler is not None，通过 step_with_coupling 封装。
 
+        ``n_frames`` 是刚体总步数（通常等于 ``frame_skip``）。``dt`` 仍传
+        物理步长 ``self._time_step``，不能传 ``self.dt``。
+
+        Euler 后端纯刚体：``_sim.step`` 已是 MuJoCoFlow，不必构造
+        CoupledGpuSim。有 CoupledGpuSim 时只走它的 step，不再
+        ``sim.step``（刚体 GPU 步已在编排器内）。CPU 后端无 ESDF 时
+        才是 ``mj_step``。
+
         Args:
             ctrl: 控制输入数组，形状 (nu,)。
-            n_frames: 帧数。
+            n_frames: 刚体总步数。
 
         Raises:
             ValueError: ctrl 形状不匹配。
@@ -403,7 +531,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
                 f"Action dimension mismatch. Expected {(self.model.nu,)}, "
                 f"found {np.array(ctrl).shape}"
             )
-        self._gym.step_with_coupling(ctrl, n_frames, self.dt)
+        self._gym.step_with_coupling(ctrl, n_frames, self._time_step)
         self._gym.sync_to_view()
 
     def mj_step(self, nstep: int) -> None:
@@ -899,6 +1027,99 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._render_interval = 1.0 / fps
         self._render_count_interval = self.realtime_step * fps
 
+    def set_sync_render(self, enabled: bool) -> None:
+        """开关同步渲染，对齐 OrcaGymLocalEnv.set_sync_render。
+
+        做什么：改内部 ``_sync_render``。True 时 render 按物理步计数节流。
+        为什么：DataCollectionManager 构造后会立刻调用，没有此方法环境起不来。
+        """
+        self._sync_render = bool(enabled)
+
+    def has_euler(self) -> bool:
+        """是否已挂 CoupledGpuSim（柔体或流体相）。委托 Gym 公共方法。"""
+        return self._gym.has_euler()
+
+    def has_esdf_coupling(self) -> bool:
+        """ESDF 刚柔耦合是否已启用（柔体相存在）。委托 Gym 公共方法。"""
+        return self._gym.has_esdf_coupling()
+
+    def get_cloth_particle_positions(self) -> np.ndarray:
+        """当前柔体（布料）粒子世界坐标 (n, 3)。委托 Gym 公共方法。"""
+        return self._gym.get_cloth_particle_positions()
+
+    def pin_cloth_particles(self, particle_ids) -> bool:
+        """把选定布料粒子钉成运动学锚点（inv_mass=0 且去 ACTIVE）。
+
+        做什么：委托 Gym 公共方法（内部转 CoupledGpuSim）——构建期
+        ``pin_vertex_indices`` 的运行时等价物，备份后置 0/清 ACTIVE。
+        为什么：夹布任务在夹持确认后把布粒"焊"在夹爪上，配合
+        ``write_cloth_particle_kinematics`` 宿主驱动，提举不依赖摩擦。
+        返回是否有柔体相（False 表示无操作）。
+        """
+        return self._gym.pin_cloth_particles(particle_ids)
+
+    def unpin_cloth_particles(self) -> bool:
+        """恢复 ``pin_cloth_particles`` 备份的粒子质量与标志。
+
+        做什么：委托 Gym 公共方法，被钉粒子回到动力学控制。
+        为什么：放开夹爪前必须先解除锚定，否则布粒冻结在空中。
+        """
+        return self._gym.unpin_cloth_particles()
+
+    def write_cloth_particle_kinematics(
+        self, particle_ids, positions, velocities
+    ) -> bool:
+        """整行写入选定布料粒子的位置与速度（宿主侧运动学驱动）。
+
+        做什么：委托 Gym 公共方法。通常每耦合窗一次，配 pin 使用：
+        窗口内求解器把被写粒子视为冻结锚点，窗口边界由宿主按夹爪
+        位姿更新。返回是否有柔体相（False 表示无操作）。
+        """
+        return self._gym.write_cloth_particle_kinematics(
+            particle_ids, positions, velocities
+        )
+
+    def get_soft_contact_snapshot(self):
+        """Read material contact diagnostics from the Newton-style VBD adapter."""
+        return self._gym.get_soft_contact_snapshot()
+
+    def get_soft_body_forces(self, body_names=None):
+        """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
+
+        做什么：委托 Gym 公共方法（内部转 CoupledGpuSim）——传
+        ``body_names`` 返回对应刚体的 [force(3), torque(3)] 数组
+        （COM 参考）；不传返回 (labels, 全量)。无柔体相返回 None。
+        为什么：夹布 grasp_confirm 的承重判据（方案A）需要读指垫
+        实际载荷；不暴露内部 State buffer（K4 封装契约）。
+        """
+        return self._gym.get_soft_body_forces(body_names)
+
+    def set_pad_adhesion(self, adhesion_by_body=None, adhesion_axis_by_body=None,
+                         adhesion_strength_by_body=None) -> bool:
+        """运行时覆盖柔-刚指垫黏附距离与方向门控轴（委托 Gym）。
+
+        做什么：把 ``{body名: 黏附距离m}`` 转成每 shape 距离并原地
+        重写 VBD Newton 求解器的 soft_adhesion 缓冲；``None``/空
+        字典清零全部黏附。``adhesion_axis_by_body`` 可选安装形状
+        局部门控轴：只有相向承载面（朝夹槽内侧）吸引布料，指垫
+        外表面/底面不粘，闭合阶段即可安全开启黏附咬住褶皱。
+        返回是否有支持黏附的柔体相。
+        """
+        return self._gym.set_pad_adhesion(
+            adhesion_by_body=adhesion_by_body,
+            adhesion_axis_by_body=adhesion_axis_by_body,
+            adhesion_strength_by_body=adhesion_strength_by_body,
+        )
+
+    def capture_cycle_graph(self) -> None:
+        """把一个耦合窗录成外层 CUDA Graph。
+
+        做什么：转给 Gym。刚体内层图必须已经关掉（构造时 ``cycle_graph=True``）。
+        为什么：``CoupledGpuSim.reset`` 会丢掉旧图，隔离课在建完后录一次；
+        联调在每次 ``reset_simulation`` 里自动再录。需要手动补录时调本方法。
+        """
+        self._gym.capture_cycle_graph()
+
     def make_camera_viewport_active(
         self, actor_name: str, entity_name: str
     ) -> None:
@@ -1014,18 +1235,57 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         return self._gym.jnt_dofadr(joint_name)
 
-    def get_body_xpos_xmat_xquat(
+    def query_body_xpos_xmat_xquat(
         self, body_name_list: list[str]
     ) -> dict[str, dict[str, np.ndarray]]:
-        """查询 body 的 xpos/xmat/xquat（委托 self._gym）。
+        """按 body 名查询世界系位姿，返回字典。
+
+        做什么：把 gym 层已有的 ``query_body_xpos_xmat_xquat`` 原样交给调用方。
+        为什么：Euler 锚定、教程需要按名字取 ``xpos``/``xmat``/``xquat``；
+        CPU 侧同名接口也在 gym 层。Env 只做委托，不读内部 mjData。
 
         Args:
             body_name_list: body 名称列表。
 
         Returns:
-            dict[body_name -> {"xpos": ..., "xmat": ..., "xquat": ...}]。
+            dict[body_name -> {"xpos": (3,), "xmat": (3, 3), "xquat": (4,)}]。
         """
         return self._gym.query_body_xpos_xmat_xquat(body_name_list)
+
+    def get_body_xpos_xmat_xquat(
+        self, body_name_list: list[str]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """获取 body 的位姿（位置、旋转矩阵、四元数）。
+
+        做什么：先委托 ``query_body_xpos_xmat_xquat``（内部再委托 gym）拿字典，
+        再按 CPU ``OrcaGymLocalEnv`` 同样的方式拼成扁平数组三元组。
+        为什么：``ControllerArm`` 等 Manipulation 代码解包
+        ``xpos, xmat, xquat``；需要按名字取字段时用
+        ``query_body_xpos_xmat_xquat``。
+
+        Args:
+            body_name_list: body 名称列表，如 ``["base_link"]``。
+
+        Returns:
+            xpos: 形状 ``(n*3,)``，每 3 个元素为一个 body 的 ``[x, y, z]``。
+            xmat: 形状 ``(n*9,)``，每 9 个元素为一个 body 的 3x3 矩阵（按行展开）。
+            xquat: 形状 ``(n*4,)``，每 4 个元素为一个 body 的 ``[w, x, y, z]``。
+        """
+        body_dict = self.query_body_xpos_xmat_xquat(body_name_list)
+        if len(body_dict) != len(body_name_list):
+            _logger.error(f"Body Name List: {body_name_list}")
+            _logger.error(f"Body Dict: {body_dict}")
+            raise ValueError("Some body names are not found in the simulation.")
+        xpos = np.array(
+            [body_dict[body_name]["xpos"] for body_name in body_name_list]
+        ).flat.copy()
+        xmat = np.array(
+            [body_dict[body_name]["xmat"] for body_name in body_name_list]
+        ).flat.copy()
+        xquat = np.array(
+            [body_dict[body_name]["xquat"] for body_name in body_name_list]
+        ).flat.copy()
+        return xpos, xmat, xquat
 
     def get_body_xpos_xmat_xquat_xvel(
         self, body_name_list: list[str]
@@ -1050,6 +1310,25 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
             dict[site_name -> {"pos": ..., "mat": ...}]。
         """
         return self._gym.query_site_pos_and_mat(site_names)
+
+    def query_site_pos_and_quat(
+        self, site_names: list[str]
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """查询 site 世界系位置和四元数（wxyz），委托已有查询再转四元数。
+
+        做什么：调用 ``query_site_pos_and_mat`` 取旋转矩阵，再 ``mat2quat``。
+        为什么：ControllerArm / OSC 在 CPU 环境上调用同名方法；禁止读内部 mjData。
+        """
+        query_dict = self.query_site_pos_and_mat(site_names)
+        site_dict: dict[str, dict[str, np.ndarray]] = {}
+        for site in query_dict:
+            site_dict[site] = {
+                "xpos": np.array(query_dict[site]["xpos"]),
+                "xquat": mat2quat(
+                    np.array(query_dict[site]["xmat"]).reshape(3, 3)
+                ),
+            }
+        return site_dict
 
     def query_site_size(self, site_names: list[str]) -> dict[str, np.ndarray]:
         """查询 site 尺寸（委托 self._gym）。
@@ -1499,6 +1778,14 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         """
         return self._gym.mj_jac_site(site_names)
 
+    def mj_fullM(self) -> np.ndarray:
+        """完整质量矩阵 (nv, nv)，委托 self._gym。供 OSC 动力学使用。"""
+        return self._gym.mj_fullM()
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组禁用，委托 self._gym。对齐 CPU ``OrcaGymLocalEnv.disable_actuator``。"""
+        self._gym.disable_actuator(actuator_groups)
+
     # --- 等式约束原语（L1 公共，单次原子读写）---
     # 这组方法不依赖任何 UI 抓取状态字段（_anchored_actor 等），单次原子读写，
     # 调用方自管快照与恢复。UI 抓取内部方法基于本组方法实现。
@@ -1655,7 +1942,7 @@ class OrcaGymEulerEnv(OrcaGymEnvMixin, gym.Env):
         self._anchor_original_eq = self.equality_constraint(slot)
         # 3. 对齐 mocap 位姿到 actor 当前位姿（避免下一帧拉扯）
         mocap_id = self.model.body_name2id(self._anchor_mocap_name)
-        actor_pose = self.get_body_xpos_xmat_xquat([actor_name])[actor_name]
+        actor_pose = self.query_body_xpos_xmat_xquat([actor_name])[actor_name]
         self.set_mocap_pos_and_quat({
             self._anchor_mocap_name: {
                 "pos": actor_pose["xpos"],

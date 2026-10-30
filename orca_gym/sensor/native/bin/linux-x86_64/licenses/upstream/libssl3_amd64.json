@@ -1,0 +1,14 @@
+{
+  "name": "libssl3:amd64",
+  "notices": [
+    {
+      "file": "openssl/LICENSE.txt",
+      "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "source_url": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0.2/LICENSE.txt"
+    }
+  ],
+  "upstream_license": "Apache-2.0",
+  "upstream_name": "openssl",
+  "upstream_version": "3.0.2",
+  "version": "3.0.2-0ubuntu1.23"
+}

@@ -452,6 +452,81 @@ class OrcaStudioBridge:
             "delta_quat": np.array(response.delta_quat),
         }
 
+    # --- LiDAR 点云查询 ---
+
+    async def query_lidar_point_cloud(self, entity_name: str) -> dict | None:
+        """查询指定 LiDAR 实体的点云数据（含传感器世界位姿）。
+
+        离线模式（_stub is None）返回 None。
+
+        Args:
+            entity_name: LiDAR 实体名称（对应 OrcaStudio 中的 Entity 名称）。
+
+        Returns:
+            成功时返回字典，包含以下字段：
+                - bin_count: 水平方向 bin 数量
+                - vertical_layers: 垂直层数
+                - angular_resolution: 每个 bin 的角分辨率（弧度）
+                - max_h_angle: 水平总视场角（弧度）
+                - min_v_angle: 最小垂直角（弧度）
+                - v_step: 垂直层间步进（弧度）
+                - min_range: 最小探测距离
+                - max_range: 最大探测距离
+                - sensor_position: 传感器世界坐标位置，形状 (3,)
+                - sensor_rotation: 传感器世界姿态四元数 (x, y, z, w)，形状 (4,)
+                - ranges: 距离数组，形状 (bin_count, vertical_layers)，-1.0 表示未扫描
+                - points: 3D 点数组（世界坐标），形状 (bin_count, vertical_layers, 3)
+                - intensities: 强度数组，形状 (bin_count, vertical_layers)
+            失败（实体不存在 / 环形缓冲为空）时返回 None。
+        """
+        if self._stub is None:
+            return None
+        request = mjc_message_pb2.LiDARPointCloudRequest(entity_name=entity_name)
+        response = await self._stub.QueryLiDARPointCloud(request)
+        if response.status != mjc_message_pb2.LiDARPointCloudResponse.SUCCESS:
+            return None
+
+        result = {
+            'bin_count': response.bin_count,
+            'vertical_layers': response.vertical_layers,
+            'angular_resolution': response.angular_resolution,
+            'max_h_angle': response.max_h_angle,
+            'min_v_angle': response.min_v_angle,
+            'v_step': response.v_step,
+            'min_range': response.min_range,
+            'max_range': response.max_range,
+            'sensor_position': np.array(
+                [response.sensor_position_x, response.sensor_position_y, response.sensor_position_z],
+                dtype=np.float32),
+            'sensor_rotation': np.array(
+                [response.sensor_rotation_x, response.sensor_rotation_y,
+                 response.sensor_rotation_z, response.sensor_rotation_w],
+                dtype=np.float32),
+        }
+
+        if response.range_data:
+            ranges = np.frombuffer(response.range_data, dtype=np.float32).copy()
+            result['ranges'] = ranges.reshape(response.bin_count, response.vertical_layers)
+        else:
+            result['ranges'] = np.full(
+                (response.bin_count, response.vertical_layers), -1.0, dtype=np.float32)
+
+        if response.point_data:
+            points = np.frombuffer(response.point_data, dtype=np.float32).copy()
+            result['points'] = points.reshape(response.bin_count, response.vertical_layers, 3)
+        else:
+            result['points'] = np.zeros(
+                (response.bin_count, response.vertical_layers, 3), dtype=np.float32)
+
+        if response.intensity_data:
+            intensities = np.frombuffer(response.intensity_data, dtype=np.float32).copy()
+            result['intensities'] = intensities.reshape(response.bin_count, response.vertical_layers)
+        else:
+            result['intensities'] = np.zeros(
+                (response.bin_count, response.vertical_layers), dtype=np.float32)
+
+        return result
+
     # --- mocap 远端同步（阶段三 3.2.3）---
 
     async def set_mocap_pos_and_quat(

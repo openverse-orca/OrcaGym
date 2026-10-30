@@ -3,6 +3,9 @@ include README.md
 include LICENSE
 include pyproject.toml
 
+# Runtime payload and licenses are verified by SensorSdist.
+include orca_gym/sensor/native/README.md
+
 # Include proto files
 recursive-include orca_gym/protos *.proto
 

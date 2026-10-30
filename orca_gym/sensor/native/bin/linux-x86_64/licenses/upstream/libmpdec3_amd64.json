@@ -1,0 +1,16 @@
+{
+  "name": "libmpdec3:amd64",
+  "notices": [
+    {
+      "file": "mpdecimal/LICENSE.txt",
+      "sha256": "b07528d8b1dbf1e2d2741052996f0876e23342ce2d30d0effa39c5457716c25a",
+      "source_archive_sha256": "9f9cd4c041f99b5c49ffb7b59d9f12d95b683d88585608aa56a6307667b2b21f",
+      "source_member": "mpdecimal-2.5.1/LICENSE.txt",
+      "source_url": "https://www.bytereef.org/software/mpdecimal/releases/mpdecimal-2.5.1.tar.gz"
+    }
+  ],
+  "upstream_license": "BSD-2-Clause",
+  "upstream_name": "mpdecimal",
+  "upstream_version": "2.5.1",
+  "version": "2.5.1-2build2"
+}

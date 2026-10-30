@@ -85,3 +85,22 @@ Sensor types include:
 - `touch`: Touch sensor (contact force)
 - `velocimeter`: Velocimeter (linear velocity)
 - `framequat`: Frame orientation (quaternion)
+
+### LiDAR Point Cloud Query
+
+`OrcaGymEulerEnv` / `OrcaGymLocalEnv` provide a LiDAR point cloud query interface:
+
+```python
+lidar_data = env.query_lidar_point_cloud("LiDAREntity")
+# Returns a dict containing:
+# - bin_count, vertical_layers, angular_resolution, max_h_angle,
+#   min_v_angle, v_step, min_range, max_range
+# - sensor_position: world-space sensor origin, shape (3,)
+# - sensor_rotation: world-space sensor quaternion (x, y, z, w), shape (4,)
+# - ranges: range image, shape (bin_count, vertical_layers), -1.0 = unscanned
+# - points: world-space 3D points, shape (bin_count, vertical_layers, 3)
+# - intensities: intensity image, shape (bin_count, vertical_layers)
+# Returns None if the entity is not found, the ring buffer is empty, or in offline mode
+```
+
+> Note: The point cloud (`points`) is in **world coordinates**. Use `sensor_position` / `sensor_rotation` to transform between world and sensor frames.

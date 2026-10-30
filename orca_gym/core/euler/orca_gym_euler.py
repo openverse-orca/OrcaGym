@@ -33,6 +33,53 @@ from orca_gym.core.euler.sim_config import SimBackend, SimConfig
 from orca_gym.core.euler.orca_gym_data_view import OrcaGymDataView
 
 
+def _peek_esdf(esdf_path: str) -> dict:
+    """轻量读 ESDF JSON。解析失败返回空 dict，不在此处报错。"""
+    try:
+        import json5  # noqa: PLC0415
+
+        with open(esdf_path, encoding="utf-8") as handle:
+            return json5.loads(handle.read()) or {}
+    except Exception:  # noqa: BLE001  探测失败不在此处报错
+        return {}
+
+
+def _esdf_body_is_deformable(body: object) -> bool:
+    """判断 ESDF 一项 body 是不是可变形体。
+
+    做什么：只认 ``type == "deformable"``（与 ``import_esdf`` 的
+    ``deformable×xpbd / deformable×spring_mass`` 对齐）。
+    为什么：``bodies[]`` 里还可以是 ``fluid_particles``、
+    ``discrete_particles``（MPM/SPH）。那些不是柔体相，不能当成
+    开 XPBD/SemiImplicit 的门闩。
+    """
+    return isinstance(body, dict) and body.get("type") == "deformable"
+
+
+def _esdf_has_deformable_bodies(esdf_path: str) -> bool:
+    """判断 ESDF 是否含可变形体（柔体相的前置条件）。
+
+    做什么：轻量 JSON 探测，看 ``bodies[]`` 里有没有
+    ``type=deformable``。不跑完整 ``parse_esdf``。
+    为什么：有数组不等于有柔体。纯流体或只有 MPM 粒子时不应走
+    ``add_esdf`` 的 XPBD/SemiImplicit 构造。
+    """
+    bodies = _peek_esdf(esdf_path).get("bodies") or []
+    return any(_esdf_body_is_deformable(item) for item in bodies)
+
+
+def _esdf_has_fluid_blocks(esdf_path: str) -> bool:
+    """判断 ESDF 顶层 ``fluid.fluid_blocks[]`` 是否非空（流体相的前置条件）。
+
+    做什么：轻量 JSON 探测，不构造 ``FluidGpuSim``。
+    为什么：Gym 只决定要不要建 ``CoupledGpuSim``、要不要开哪条渲染流；
+    流体求解器由 ``CoupledGpuSim`` 内部持有。
+    """
+    data = _peek_esdf(esdf_path)
+    blocks = (data.get("fluid") or {}).get("fluid_blocks") or []
+    return bool(blocks)
+
+
 class OrcaGymEuler:
     """仿真核心 Facade，组合子组件，不暴露 _mjModel/_mjData，不暴露子组件对象。
 
@@ -62,8 +109,8 @@ class OrcaGymEuler:
         "_mjData", "_mjModel", "mj_data", "mj_model",
         "_mj_data", "_mj_model", "mjData", "mjModel",
         # K5: 子组件对象也不对外暴露
-        "_sim", "_studio", "_registry", "_opt", "_view", "_euler",
-        "sim", "studio", "registry", "opt", "view", "euler",
+        "_sim", "_studio", "_registry", "_opt", "_view", "_euler", "_soft", "_fluid",
+        "sim", "studio", "registry", "opt", "view", "euler", "soft", "fluid",
         # Euler 后端 GPU 对象
         "_mjf_model", "_mjf_data", "mjf_model", "mjf_data",
         "_host_cache", "host_cache",
@@ -86,9 +133,17 @@ class OrcaGymEuler:
         self._registry = ModelRegistry()
         self._opt = SimConfig()
         self._view = OrcaGymDataView()
-        self._euler = None    # EulerOrchestrator | None（骨架阶段恒为 None）
+        self._euler = None    # CoupledGpuSim | None（有 ESDF 柔体和/或流体时）
+        self._fluid = None    # 已废弃：流体走 CoupledGpuSim，保留拦截防旧代码误用
         self._orca_model = None  # OrcaGymModel | None（init_simulation 后填充，model property 返回缓存）
         self._multi_world = False    # DataView 边界标记（多世界跳过 build/sync，决策 D5）
+        # 耦合比：只作为注入 Euler ``SyncCycleConfig`` 的数字。
+        # 第一版默认 M=N=1。不要用属性名 coupling（已被拦截）。
+        # 拆窗和交换不在本类。
+        self._coupling_m = 1
+        self._coupling_n = 1
+        # 外层耦合窗图：True 时刚体内层图关掉，reset 后录一整窗再重放。
+        self._capture_cycle_graph = False
 
     # --- K3/K5: 隔离机制 ---
 
@@ -126,6 +181,17 @@ class OrcaGymEuler:
                 euler_hint = (
                     "  Euler 耦合查询 → 使用 env.has_euler() / env.step_with_coupling()\n"
                 )
+            elif name in ("_soft", "soft"):
+                euler_hint = (
+                    "  旧 CPU 柔体槽已删除，不要再接 EulerSoftSim。\n"
+                    "  有 ESDF 时用 env.has_euler() / env.step_with_coupling()\n"
+                )
+            elif name in ("_fluid", "fluid"):
+                euler_hint = (
+                    "  流体已并入 CoupledGpuSim，不要再持有独立流体槽。\n"
+                    "  查询 → gym.has_fluid_sim() / gym.has_fluid_render_stream()\n"
+                    "  步进 → env.step_with_coupling()（有 CoupledGpuSim 时只调它的 step）\n"
+                )
             elif name in ("_multi_world", "multi_world"):
                 euler_hint = (
                     "  多世界数据读写 → 由应用框架直接持有编排类实例，"
@@ -159,17 +225,29 @@ class OrcaGymEuler:
         model_xml_path: str,
         esdf_path: str | None = None,
         opt_overrides: dict[str, Any] | None = None,
+        euler_render_target: str | None = None,
+        fluid_render_target: str | None = None,
     ) -> None:
         """初始化仿真：加载模型、绑定 SimConfig/ModelRegistry、同步 DataView。
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
-            esdf_path: ESDF 场文件路径（仅 Euler 后端使用，P1 忽略）。
+            esdf_path: ESDF 场文件路径（仅 Euler GPU 后端使用；含
+                ``type=deformable`` 的 body 和/或 ``fluid.fluid_blocks``
+                时构造 CoupledGpuSim，耦合留在 Euler 内部）。
             opt_overrides: 构造期 opt 覆盖（Feature A，键为
                 integrator/gravity/iterations）。Euler 分支在求解器构造前
                 写入 host model.opt（GPU 固化值）；CPU 分支绑定后经公共
                 setter 写入 mj_model.opt 立即生效。键已在上游（Env
                 ``__init__``）经 ``validate_opt_overrides`` 校验。
+            euler_render_target: ESDF 柔体渲染流 gRPC 地址（如
+                ``"127.0.0.1:50451"``，P5 改动点 2）。仅 Euler 后端 +
+                esdf_path 非 None 时生效；None（默认）不推流，完全向后
+                兼容。连接失败 fail-fast（显式 opt-in 语义）。
+            fluid_render_target: ESDF 流体渲染流 gRPC 地址（如
+                ``"127.0.0.1:50452"``）。仅 esdf_path 含顶层
+                ``fluid.fluid_blocks`` 时生效（由 CoupledGpuSim 内部
+                连接粒子通道）；None（默认）不推流。连接失败 fail-fast。
         """
         sim = object.__getattribute__(self, "_sim")
         opt = object.__getattribute__(self, "_opt")
@@ -177,7 +255,13 @@ class OrcaGymEuler:
         view = object.__getattribute__(self, "_view")
 
         if opt.backend == SimBackend.EULER:
-            self._init_euler_backend(model_xml_path, esdf_path, opt_overrides)
+            self._init_euler_backend(
+                model_xml_path,
+                esdf_path,
+                opt_overrides,
+                euler_render_target,
+                fluid_render_target,
+            )
         else:
             sim.init_simulation(model_xml_path)
             # 绑定 SimConfig/ModelRegistry 到真实 mjModel
@@ -206,6 +290,8 @@ class OrcaGymEuler:
         model_xml_path: str,
         esdf_path: str | None,
         opt_overrides: dict[str, Any] | None = None,
+        euler_render_target: str | None = None,
+        fluid_render_target: str | None = None,
     ) -> None:
         """按 Euler 后端初始化：构造 MuJoCoSimCoreEuler 并绑定 host MjModel。
 
@@ -216,10 +302,16 @@ class OrcaGymEuler:
 
         Args:
             model_xml_path: MuJoCo 模型 XML 文件路径。
-            esdf_path: ESDF 场文件路径（P1 忽略）。
+            esdf_path: ESDF 场文件路径。含 ``type=deformable`` 的 body
+                和/或 ``fluid.fluid_blocks`` 时构造 CoupledGpuSim，接到
+                本后端 GPU 刚体求解器。Gym 不另开流体槽。
             opt_overrides: 构造期 opt 覆盖（Feature A）。在求解器构造前
                 随 init_simulation 下发，由 ``_prepare_model`` 写入 host
                 model.opt（GPU 固化值）。
+            euler_render_target: ESDF 柔体渲染流 gRPC 地址（P5 改动点 2）。
+                esdf_path 含 bodies 且本参数非 None 时连接渲染流（fail-fast）。
+            fluid_render_target: ESDF 流体渲染流 gRPC 地址（50452）。
+                esdf_path 含流体块且本参数非 None 时由 CoupledGpuSim 连接。
         """
         try:
             from orca_gym.core.euler.mujoco_sim_core_euler import MuJoCoSimCoreEuler
@@ -235,6 +327,12 @@ class OrcaGymEuler:
         opt = object.__getattribute__(self, "_opt")
         registry = object.__getattribute__(self, "_registry")
 
+        use_outer_graph = bool(
+            object.__getattribute__(self, "_capture_cycle_graph")
+        )
+        # 外层图打开时刚体内层图必须关，与隔离课 build_sim(graph=True) 相同。
+        rigid_graph_capture = not use_outer_graph
+
         if opt.nworld == 1:
             sim = MuJoCoSimCoreEuler()
             sim.init_simulation(
@@ -243,6 +341,7 @@ class OrcaGymEuler:
                 nworld=opt.nworld,
                 timestep=opt.timestep,
                 opt_overrides=opt_overrides,
+                graph_capture=rigid_graph_capture,
             )
             multi_world = False
         else:
@@ -259,18 +358,93 @@ class OrcaGymEuler:
         opt._bind(sim.mj_model)              # noqa: SLF001  core 层组件编排：Euler 绑定 SimConfig
         registry._bind(sim.mj_model)         # noqa: SLF001  core 层组件编排：Euler 绑定 ModelRegistry
         object.__setattr__(self, "_sim", sim)
-        object.__setattr__(self, "_euler", None)   # P1 纯刚体，无 CouplingOrchestrator
+        object.__setattr__(self, "_euler", None)   # 无非刚体相；刚体已在 _sim（Euler 后端=MuJoCoFlow）
+        object.__setattr__(self, "_fluid", None)   # 废弃槽，始终为 None
         object.__setattr__(self, "_multi_world", multi_world)   # DataView 边界标记（决策 D5）
 
-    def reset_coupling_state(self) -> None:
-        """重置 Euler 耦合编排器内部状态（供 reset_simulation 调用）。
+        # ESDF：柔体和/或流体都归 CoupledGpuSim（CouplingOrchestrator
+        # GPU 直拷，Gym 不注入位姿、不写 xfrc、不另持 FluidGpuSim）。
+        # esdf_path 为 None，或既无 deformable body 也无 fluid_blocks → 纯刚体。
+        if esdf_path is not None:
+            if multi_world:
+                raise NotImplementedError(
+                    "ESDF 注入暂不支持多世界（nworld>1），请使用 nworld=1。"
+                )
+            import orca.euler as euler
 
-        P1 下 _euler 恒为 None，本方法为 no-op，但签名存在以保证
-        OrcaGymEulerEnv.reset_simulation 无需分支。
+            has_deformable = _esdf_has_deformable_bodies(esdf_path)
+            has_fluid = _esdf_has_fluid_blocks(esdf_path)
+            if has_deformable or has_fluid:
+                # P3：fluid.solver 配置（Studio EulerFluidSolverParamsComponent
+                # 导出）。无 solver 节（旧 ESDF）→ None → 全默认（零回归）。
+                # 由 CoupledGpuSim 内部 FluidPhase 消费：dt_mode=auto →
+                # 按求解器默认画像；fixed → 透传 dt（参数优先级：
+                # ESDF 组件值 > Python 默认）。
+                solver_cfg = euler.load_fluid_solver_config(esdf_path)
+                # RD：fluid.render_domain（Studio EulerFluidRenderDomainComponent
+                # 导出）。无该子节（旧 ESDF）→ None → 自动域推导（零回归）。
+                render_domain_cfg = euler.load_fluid_render_domain(esdf_path)
+                coupled = euler.CoupledGpuSim(
+                    model_xml_path=model_xml_path,
+                    esdf_path=esdf_path,
+                    device=opt.device,
+                    rigid_solver=sim.solver,
+                    dt=float(opt.timestep),
+                    coupling_m=object.__getattribute__(self, "_coupling_m"),
+                    coupling_n=object.__getattribute__(self, "_coupling_n"),
+                    fluid_solver_config=solver_cfg,
+                    fluid_render_domain=render_domain_cfg,
+                )
+                object.__setattr__(self, "_euler", coupled)
+
+                if euler_render_target is not None:
+                    if has_deformable:
+                        coupled.enable_render_stream(euler_render_target)
+                    else:
+                        print(
+                            "[OrcaGymEuler] euler_render_target 被忽略："
+                            "ESDF 无 type=deformable 的 body（柔体渲染流不可用）。"
+                        )
+                if fluid_render_target is not None:
+                    if has_fluid:
+                        coupled.enable_fluid_render_stream(fluid_render_target)
+                    else:
+                        print(
+                            "[OrcaGymEuler] fluid_render_target 被忽略："
+                            "ESDF 无 fluid.fluid_blocks。"
+                        )
+            elif (
+                euler_render_target is not None
+                or fluid_render_target is not None
+            ):
+                print(
+                    "[OrcaGymEuler] euler_render_target / fluid_render_target "
+                    "被忽略：ESDF 既无 type=deformable 的 body 也无 fluid.fluid_blocks。"
+                )
+        elif (
+            euler_render_target is not None or fluid_render_target is not None
+        ):
+            # esdf_path=None 但传了渲染目标：多为配置失误（忘传 esdf），
+            # 告警而非报错（允许一组 Env 共享同一配置、部分带 esdf）。
+            print(
+                "[OrcaGymEuler] euler_render_target / fluid_render_target "
+                "被忽略：esdf_path=None（渲染流仅在 ESDF 双文件注入时可用）。"
+            )
+
+    def reset_coupling_state(self) -> None:
+        """重置耦合相关内部状态（供 reset_simulation 调用）。
+
+        P1 下无 ESDF 时 _euler 为 None。
+        有 ESDF 时 _euler 是 CoupledGpuSim：重置柔体和/或流体相，
+        刚体已由 reset_data 在 GPU 上复位。流体不再走独立槽。
+        ``reset`` 会丢掉外层图；若开了 ``_capture_cycle_graph``，这里立刻
+        再录一张，和隔离课建完仿真后录图对齐。
         """
         coupling = object.__getattribute__(self, "_euler")
         if coupling is not None:
             coupling.reset()
+            if object.__getattribute__(self, "_capture_cycle_graph"):
+                coupling.capture_cycle_graph()
 
     async def load_model_xml(self) -> str:
         """加载模型 XML（在线模式从 Studio 拉取，离线模式返回本地路径）。
@@ -418,11 +592,19 @@ class OrcaGymEuler:
         ``simulate_index`` 透传到 bridge 与相机管线，用于帧对齐；
         ``-1`` 表示由服务端自增（向后兼容，默认值）。
 
+        P5 改动点 2：ESDF 柔体/流体渲染流（``_euler`` CoupledGpuSim
+        已启用时）在本方法内推流。节拍复用 Env 层 30Hz 节流（D4：不进
+        step 循环）。流体 particle7 与柔体顶点由 CoupledGpuSim 按相分发，
+        Gym 不再另调流体槽。
+
         Args:
             simulate_index: 物理仿真步索引。
             request_idr: 是否请求引擎在本次渲染输出一个 IDR 关键帧。
-                默认 ``False``。
+            默认 ``False``。
         """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is not None:
+            euler.render_frame()
         view = object.__getattribute__(self, "_view")
         studio = object.__getattribute__(self, "_studio")
         await studio.render(
@@ -592,28 +774,333 @@ class OrcaGymEuler:
     # --- K8: 步进耦合查询（供 do_simulation 使用，不暴露 _euler）---
 
     def has_euler(self) -> bool:
-        """查询是否存在 Euler 耦合编排器。
-
-        骨架阶段恒返回 False（_euler 为 None）。
+        """查询是否已构造 CoupledGpuSim（非刚体耦合入口）。
 
         Returns:
-            False（骨架阶段无 Euler）。
+            True 表示 ESDF 含柔体和/或流体，且 CoupledGpuSim 已建好。
+            False 不等于没用 Euler 后端：纯刚体时刚体仍由 ``_sim``
+            推进；Euler 后端下 ``_sim`` 已是 MuJoCoFlow。
         """
         return object.__getattribute__(self, "_euler") is not None
 
+    def has_soft_sim(self) -> bool:
+        """查询是否存在 ESDF 柔体相。
+
+        纯流体 CoupledGpuSim 时为 False；请用 ``has_euler()`` 判断入口，
+        用 ``has_fluid_sim()`` 判断流体。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and bool(euler.has_deformable_phase())
+
+    def has_esdf_coupling(self) -> bool:
+        """查询 ESDF 刚柔耦合是否已启用（柔体相存在）。
+
+        做什么：等价于 ``has_euler() and has_soft_sim()``——CoupledGpuSim
+        已建好且 ESDF 含 ``type=deformable`` 柔体。
+        为什么：夹布等任务脚本用它做门闩断言，再调
+        ``get_cloth_particle_positions()`` 读布料粒子。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and bool(euler.has_deformable_phase())
+
+    def get_cloth_particle_positions(self) -> np.ndarray:
+        """拷贝当前柔体（布料）粒子世界坐标，形状 (n, 3)。
+
+        做什么：转发 ``CoupledGpuSim.copy_deformable_view`` 的粒子数组。
+        无 Euler 或无柔体相时返回空数组。
+        为什么：任务脚本（抓取检测、推流）需要读布粒子；直接暴露
+        ``_euler`` 会破坏封装，与 ``fluid_particle_positions`` 对齐。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return np.zeros((0, 3), dtype=np.float32)
+        particles, _, _ = euler.copy_deformable_view()
+        return np.asarray(particles)
+
+    def set_soft_contact_params(
+        self,
+        mu: float | None = None,
+        ke: float | None = None,
+        kd: float | None = None,
+        kf: float | None = None,
+        relaxation: float | None = None,
+    ) -> bool:
+        """运行时覆盖 ESDF soft_contact 参数（委托 CoupledGpuSim）。
+
+        做什么：转发 ``CoupledGpuSim.set_soft_contact_params``——把
+        非 None 的参数写入柔体粒子-刚体 shape 软接触材料（摩擦 mu、
+        法向刚度 ke、法向阻尼 kd、摩擦刚度 kf、XPBD 松弛 relaxation）。
+        为什么：ESDF 是这些参数的唯一事实源，但每次由外部编辑器重新
+        导出会重置；任务脚本（如夹布摩擦标定）需要在构造后调参，
+        直接暴露 ``_euler`` 会破坏封装。返回是否有柔体相。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return False
+        return euler.set_soft_contact_params(
+            mu=mu, ke=ke, kd=kd, kf=kf, relaxation=relaxation
+        )
+
+    def set_pad_adhesion(self, adhesion_by_body=None, adhesion_axis_by_body=None,
+                         adhesion_strength_by_body=None) -> bool:
+        """运行时覆盖柔-刚指垫黏附距离与方向门控轴（委托 CoupledGpuSim）。
+
+        做什么：转发 ``CoupledGpuSim.set_pad_adhesion``——把
+        ``{body名: 黏附距离m}`` 解析成每 shape 距离并原地重写 VBD
+        Newton 求解器的 soft_adhesion 缓冲；``None``/空字典清零。
+        ``adhesion_axis_by_body`` 可选安装形状局部门控轴：只有相向
+        承载面（朝夹槽内侧）吸引，外表面不粘布。
+        为什么：黏附按宿主阶段事件开启/关闭，构造期参数无法按阶段
+        切换；方向门控让闭合阶段就能安全开启黏附咬住褶皱。直接暴露
+        ``_euler`` 会破坏封装。旧引擎无该方法时返回 False。
+        返回是否有支持黏附的柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return False
+        return euler.set_pad_adhesion(
+            adhesion_by_body=adhesion_by_body,
+            adhesion_axis_by_body=adhesion_axis_by_body,
+            adhesion_strength_by_body=adhesion_strength_by_body,
+        )
+
+    def has_render_stream(self) -> bool:
+        """查询 ESDF 柔体渲染流是否已连接。"""
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and euler.has_render_stream()
+
+    def has_fluid_sim(self) -> bool:
+        """查询 ESDF 流体相是否已由 CoupledGpuSim 挂上。
+
+        Returns:
+            True 表示 ESDF 含顶层 ``fluid.fluid_blocks`` 且流体相已建好。
+            步进由 ``CoupledGpuSim.step`` 内部的 ``FluidPhase`` 驱动，
+            推流挂 ``render()`` 节拍。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and bool(euler.has_fluid_phase())
+
+    def pin_cloth_particles(self, particle_ids) -> bool:
+        """把选定布料粒子钉成运动学锚点（inv_mass=0 且去 ACTIVE）。
+
+        做什么：委托 ``CoupledGpuSim.pin_cloth_particles``——备份选中
+        行的 ``particle_inv_mass`` / ``particle_flags`` 后置 0 / 清
+        ``ACTIVE`` 位（构建期 ``pin_vertex_indices`` 的运行时等价物）。
+        为什么：夹布等任务在夹持确认后需要把布粒"焊"在夹爪上，配合
+        ``write_cloth_particle_kinematics`` 由宿主驱动其位姿，提举
+        不再依赖摩擦锥。返回是否有柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.pin_cloth_particles(particle_ids)
+
+    def unpin_cloth_particles(self) -> bool:
+        """恢复 ``pin_cloth_particles`` 备份的粒子质量与标志。
+
+        做什么：委托 ``CoupledGpuSim.unpin_cloth_particles``，被钉
+        粒子回到动力学控制。为什么：放开夹爪前必须先解除锚定，
+        否则布粒会冻结在爪张开后的空中位置。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.unpin_cloth_particles()
+
+    def write_cloth_particle_kinematics(
+        self, particle_ids, positions, velocities
+    ) -> bool:
+        """整行写入选定布料粒子的位置与速度（宿主侧运动学驱动）。
+
+        做什么：委托 ``CoupledGpuSim.write_cloth_particle_kinematics``。
+        通常每耦合窗一次，配 pin 使用：窗口内求解器把被写粒子视为
+        冻结锚点，窗口边界由宿主按夹爪位姿更新。
+        为什么：任务脚本掌握夹爪刚体位姿，可把 pin 粒子钉到任意
+        运动学轨迹上；不暴露内部 State buffer（K4 封装契约）。
+        返回是否有柔体相（False 表示无操作）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return False
+        return euler.write_cloth_particle_kinematics(
+            particle_ids, positions, velocities
+        )
+
+    def get_soft_contact_snapshot(self):
+        """Read barycentric cloth contacts without modifying particle dynamics."""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return None
+        return euler.get_soft_contact_snapshot()
+
+    def get_soft_body_forces(self, body_names=None):
+        """读取柔体→刚体反作用 wrench（external 模式 ``body_f``）。
+
+        做什么：委托 ``CoupledGpuSim.get_soft_body_forces``——传
+        ``body_names`` 返回对应刚体的 [force(3), torque(3)] 数组
+        （COM 参考）；不传返回 (labels, 全量)。无柔体相返回 None。
+        为什么：夹布 grasp_confirm 的承重判据（方案A）需要读指垫
+        实际载荷；不暴露内部 State buffer（K4 封装契约）。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None or not euler.has_deformable_phase():
+            return None
+        return euler.get_soft_body_forces(body_names)
+
+    def has_fluid_render_stream(self) -> bool:
+        """查询流体粒子渲染流（50452）是否已连接。"""
+        euler = object.__getattribute__(self, "_euler")
+        return euler is not None and bool(euler.has_fluid_render_stream())
+
+    def fluid_particle_count(self) -> int:
+        """查询流体粒子总数（采样后的真实粒子数，不含边界粒子）。
+
+        Returns:
+            CoupledGpuSim 流体相的粒子数；无流体相时 0。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return 0
+        return int(euler.fluid_particle_count())
+
+    def fluid_solver_kind(self) -> str | None:
+        """查询流体实际生效的求解器类型（P3/P4：ESDF fluid.solver 驱动）。
+
+        Returns:
+            流体相 ``FluidGpuSim`` 的 ``solver_kind``（"dfsph" / "mpm"；
+            sph 已下线，旧 ESDF type=sph 自动降级 dfsph）；无流体相时
+            None。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return None
+        return euler.fluid_solver_kind()
+
+    def fluid_render_sequence(self) -> int:
+        """查询流体渲染流已成功推送的帧号（单调递增；0 = 未推过）。"""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return 0
+        return int(euler.fluid_render_sequence())
+
+    def disable_fluid_render_stream(self) -> None:
+        """断开流体渲染流（正常退出清理路径）。
+
+        向引擎侧发 UnregisterChannel（同步销毁 debug 球 + 清空水面），
+        再关闭 gRPC 连接。未连接时 no-op；异常断连场景由引擎侧 T3
+        心跳超时（默认 3s）兜底清理。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is not None:
+            euler.disable_fluid_render_stream()
+
+    def set_fluid_debug_mode(
+        self,
+        mode: str = "debug",
+        **kwargs,
+    ) -> bool:
+        """切换 Studio 侧流体渲染调试分支（'normal'/'debug'/'overlay'）。
+
+        'debug' = 粒子球视图（水面停更），诊断空中悬浮/嵌入地面用。
+        其余参数透传 FluidGpuSim.set_debug_mode。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            print("[OrcaGymEuler] set_fluid_debug_mode: 无流体相，忽略。")
+            return False
+        return euler.set_fluid_debug_mode(mode, **kwargs)
+
+    def set_fluid_render_params(self, params: dict[str, str]) -> bool:
+        """运行时调 Studio 侧水面渲染参数（RPC 临时值，优先级最高）。
+
+        常用键：kernel_radius_multiplier / anisotropy_mode /
+        iso_surface_threshold / render_droplets 等。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            print("[OrcaGymEuler] set_fluid_render_params: 无流体相，忽略。")
+            return False
+        return euler.set_fluid_render_params(params)
+
+    def set_capture_cycle_graph(self, enabled: bool) -> None:
+        """打开或关闭外层耦合窗 CUDA Graph。
+
+        做什么：记下开关。必须在 ``init_simulation`` 之前调用，这样刚体
+        求解器会按开关决定内层图开还是关。
+        为什么：外层图和刚体内层图不能套在一起。打开时刚体用
+        ``graph_capture=False`` 构造，``reset`` 后再录一整窗。
+        """
+        object.__setattr__(self, "_capture_cycle_graph", bool(enabled))
+
+    def capture_cycle_graph(self) -> None:
+        """把当前耦合窗录成外层 CUDA Graph。
+
+        做什么：有 ``CoupledGpuSim`` 时转发 ``capture_cycle_graph``。
+        没有非刚体相时什么也不做。
+        为什么：Gym 不暴露 ``_euler``。隔离课在建完仿真后录图；联调在
+        ``reset`` 之后录，缓冲和隔离课一样是新的。
+        """
+        euler = object.__getattribute__(self, "_euler")
+        if euler is None:
+            return
+        euler.capture_cycle_graph()
+
+    def set_coupling_ratio(self, m: int, n: int) -> None:
+        """把 M:N 作为构造期/运行期配置注入 Euler，不在 Gym 里拆窗。
+
+        做什么：校验正整数后记下，若已有 CoupledGpuSim 则写入
+        ``SyncCycleConfig``。
+        为什么：M、N 的权威在 Euler 内部；Gym 只允许像 ``time_step``
+        那样注入数字，不能循环交换位姿和力。
+        """
+        if isinstance(m, bool) or isinstance(n, bool):
+            raise TypeError("耦合比 M、N 必须是正整数，不能是 bool。")
+        if not isinstance(m, int) or not isinstance(n, int):
+            raise TypeError("耦合比 M、N 必须是正整数。")
+        if m < 1 or n < 1:
+            raise ValueError(f"耦合比 M、N 必须 >= 1，收到 M={m}, N={n}。")
+        object.__setattr__(self, "_coupling_m", m)
+        object.__setattr__(self, "_coupling_n", n)
+        euler = object.__getattribute__(self, "_euler")
+        if euler is not None:
+            euler.set_coupling_ratio(m, n)
+
+    def get_coupling_ratio(self) -> tuple[int, int]:
+        """返回当前耦合比 (M, N)。"""
+        euler = object.__getattribute__(self, "_euler")
+        if euler is not None:
+            return euler.get_coupling_ratio()
+        m = object.__getattribute__(self, "_coupling_m")
+        n = object.__getattribute__(self, "_coupling_n")
+        return int(m), int(n)
+
     def step_with_coupling(self, ctrl: np.ndarray, n_frames: int, dt: float) -> None:
-        """带 Euler 耦合的步进（骨架阶段无 Euler，等价于纯 MuJoCo 步进）。
+        """按当前后端推进一步：有非刚体相走 CoupledGpuSim，否则只推刚体。
 
-        供 do_simulation 使用，替代 do_simulation 内部直接读 self._gym._euler。
-        has_euler()=False 时等价于 set_ctrl + step。后续 Euler 耦合实现时扩展。
+        Euler 后端在 ``init_simulation`` 时已经把 ``_sim`` 换成
+        ``MuJoCoSimCoreEuler``（内部 ``SolverMujocoSingleWorld``，即
+        MuJoCoFlow）。纯刚体场景不需要 ``CoupledGpuSim``，
+        ``sim.step`` 就是 GPU 刚体步，不是 CPU ``mj_step``。
 
-        Args:
-            ctrl: 控制输入数组。
-            n_frames: 帧数。
-            dt: 时间步长。
+        有 ``CoupledGpuSim``（ESDF 含 ``type=deformable`` 和/或
+        ``fluid.fluid_blocks``）：``set_ctrl`` 后只调
+        ``euler.step(n_frames)``。位姿/力交换、M:N 拆窗、流体子步、
+        刚体 GPU 步都在编排器里。不得再 ``sim.step``，否则刚体被推
+        两遍。
+
+        无 ``CoupledGpuSim``：``set_ctrl`` + ``sim.step``。
+        Euler 后端 → MuJoCoFlow；CPU 后端 → ``mj_step``。
+
+        ``dt`` 留在签名里以兼容 ``do_simulation``；有 CoupledGpuSim
+        时步长在构造时已经交给它。
         """
         sim = object.__getattribute__(self, "_sim")
         sim.set_ctrl(ctrl)
+        euler = object.__getattribute__(self, "_euler")
+        if euler is not None:
+            euler.step(n_frames)
+            sim.notify_gpu_advanced()
+            return
         sim.step(n_frames)
 
     # --- 查询委托（阶段三 3.1.6，全部经 object.__getattribute__ 访问子组件）---
@@ -828,6 +1315,14 @@ class OrcaGymEuler:
                                "jacr": np.ndarray(3, nv)}]。
         """
         return object.__getattribute__(self, "_sim").mj_jac_site(site_names)
+
+    def mj_fullM(self) -> np.ndarray:
+        """完整质量矩阵 (nv, nv)，委托 SimCore。"""
+        return object.__getattribute__(self, "_sim").mj_fullM()
+
+    def disable_actuator(self, actuator_groups: list[int]) -> None:
+        """按执行器组禁用，委托 SimCore。"""
+        object.__getattribute__(self, "_sim").disable_actuator(actuator_groups)
 
     def equality_data_width(self) -> int:
         """查询等式约束数据宽度（委托 ModelRegistry）。"""
